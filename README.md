@@ -1,35 +1,85 @@
 # Hazuki
 
-一个基于 Flutter 开发的高颜值、高性能漫画阅读器，专为 JMComic 资源提供极致的阅读体验。
+<p align="center">
+  <img src="screenshots/discover.jpg" width="220" alt="发现页">
+  <img src="screenshots/detail.jpg" width="220" alt="详情页">
+  <img src="screenshots/favorite.jpg" width="220" alt="收藏页">
+</p>
 
-## ✨ 特性
-
-- **极致设计**：界面设计参考 [Animeko](https://github.com/open-ani/animeko)，兼顾现代感与实用性。
-- **动态取色 (Material You)**：漫画详情页支持根据封面图自动转换系统主题色，带来沉浸式的视觉体验。
-- **智能进度记录**：自动记录每一部漫画的阅读进度，支持从详情页“继续阅读”，多话漫画无缝衔接。
-- **完善的历史管理**：本地持久化保存阅读历史，支持多选删除、一键清理。
-- **高性能阅读器**：支持全方位双指缩放、平移，针对大图加载进行了优化，告别闪烁感。
-- **引擎驱动**：通过 JavaScript 脚本实现数据加载与解析，逻辑上参考了 [Venera](https://github.com/venera-app/venera) 的相关实现。
-- **隐私与安全**：内置隐私模式（防截屏、后台模糊），保护你的阅读私密空间。
-
-## 🛠️ 技术栈
-
-- **Core**: Flutter (Dart)
-- **Engine**: JavaScript 解释器 (由 `flutter_qjs` 驱动)
-- **Storage**: `shared_preferences` & 文件系统缓存
-- **UI Components**: Material 3 Design
-
-## 🤝 致谢
-
-本项目的开发离不开以下优秀开源项目的启发与帮助：
-
-- **[Venera](https://github.com/venera-app/venera)**：参考了其登录逻辑的实现。
-- **[Animeko](https://github.com/open-ani/animeko)**：参考了其出色的界面布局设计。
-
-## 📜 开源协议
-
-本项目采用 [GPL-3.0 License](LICENSE) 协议开源。
+<p align="center">
+  一个基于 Flutter 的 JMComic 第三方阅读器，强调启动速度、阅读性能、现代化界面与脚本化源能力。
+</p>
 
 ---
 
-> 如果你喜欢这个项目，欢迎点一个 Star 🌟。
+## 项目简介
+
+Hazuki 是一个使用 Flutter 构建的漫画阅读应用，围绕“高性能阅读体验 + 可动态更新的漫画源 + 贴近移动端习惯的界面设计”展开。
+
+项目通过内置 JS 运行时加载远程 `jm.js` 脚本，实现漫画源逻辑与客户端的解耦；当源站规则变动时，可以通过更新脚本而不是直接发布新版本来完成适配。
+
+## 功能特性
+
+### 1. 脚本化漫画源
+
+- 使用 `flutter_qjs` 执行 JS 源脚本
+- 支持从远程拉取并更新 `jm.js`
+- 内置源版本检查与网络恢复后的自动刷新逻辑
+- 将源能力拆分为多种 Capability，便于维护与扩展
+
+### 2. 阅读体验优化
+
+- 面向漫画阅读场景设计的页面结构
+- 图片缓存与内存缓存结合，减少重复加载
+- 支持长图阅读场景下的流畅浏览
+- 针对源站图片处理逻辑做了适配
+
+### 3. 现代化 UI
+
+- 基于 Material 3 构建
+- 支持动态取色与主题切换
+- 提供毛玻璃风格顶部栏与更偏移动端的沉浸式视觉体验
+- 首页、发现、搜索、详情、收藏、历史等核心页面已完成
+
+### 4. 设置与个性化能力
+
+- 主题模式切换
+- 显示模式设置
+- 阅读设置
+- 缓存管理
+- 隐私设置
+- 高级设置
+- 云同步相关页面
+
+### 5. 账号与社区相关能力
+
+- 登录态保持
+- 收藏相关能力
+- 评论浏览
+- 排行与分类浏览
+- 历史记录管理
+
+## 截图预览
+
+- 发现页：[`screenshots/discover.jpg`](screenshots/discover.jpg)
+- 详情页：[`screenshots/detail.jpg`](screenshots/detail.jpg)
+- 收藏页：[`screenshots/favorite.jpg`](screenshots/favorite.jpg)
+
+## 致谢
+
+本项目在设计与实现过程中参考或使用了以下项目的相关思路与资源：
+
+- [Venera](https://github.com/venera-app/venera)
+- [venera-configs](https://github.com/venera-app/venera-configs)
+- [Animeko](https://github.com/open-ani/animeko)
+- [flutter_qjs](https://github.com/cfug/flutter_qjs)
+
+感谢这些优秀的开源项目提供的灵感与基础能力。
+
+## 免责声明
+
+本项目仅供技术研究与学习交流使用，请勿将其用于任何违法违规用途。使用者应自行承担因使用本项目而产生的一切后果。
+
+## 许可证
+
+本项目基于 [GPL-3.0](LICENSE) 开源，详见 [`LICENSE`](LICENSE)。
