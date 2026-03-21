@@ -306,13 +306,9 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
       setState(() {
         _favoriteOverride = isAdding;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            isAdding ? 'Added to favorites' : 'Removed from favorites',
-          ),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(isAdding ? '已加入收藏' : '已取消收藏')));
     } catch (e) {
       if (!mounted) {
         return;
@@ -564,23 +560,23 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
                 }
               }
 
-              Widget buildBody() {
-                if (isLoading) {
-                  return const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 24),
-                    child: Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          HazukiStickerLoadingIndicator(size: 112),
-                          SizedBox(height: 10),
-                          Text('加载中...'),
-                        ],
-                      ),
+              Widget buildLoadingBody() {
+                return const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 24),
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        HazukiStickerLoadingIndicator(size: 112),
+                        SizedBox(height: 10),
+                        Text('加载中...'),
+                      ],
                     ),
-                  );
-                }
+                  ),
+                );
+              }
 
+              Widget buildLoadedBody() {
                 if (loadError != null) {
                   return Padding(
                     padding: const EdgeInsets.symmetric(vertical: 24),
@@ -602,7 +598,10 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
                   );
                 }
 
-                return Flexible(
+                return ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(sheetContext).size.height * 0.48,
+                  ),
                   child: ListView.separated(
                     shrinkWrap: true,
                     itemCount: folders.length,
@@ -639,7 +638,7 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
                                 service.supportFavoriteFolderDelete)
                               IconButton(
                                 icon: const Icon(Icons.delete_outline),
-                                tooltip: 'Delete',
+                                tooltip: '删除收藏夹',
                                 onPressed: () => deleteFolder(folder.id),
                               ),
                           ],
@@ -658,6 +657,42 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
                       );
                     },
                   ),
+                );
+              }
+
+              Widget buildAnimatedBody() {
+                final showLoadingBody = isLoading && !loadedAnimationPlayed;
+                return TweenAnimationBuilder<double>(
+                  key: ValueKey(
+                    showLoadingBody
+                        ? 'favorite_loading_body'
+                        : 'favorite_loaded_body',
+                  ),
+                  tween: Tween<double>(begin: 0.94, end: 1),
+                  duration: Duration(milliseconds: showLoadingBody ? 160 : 320),
+                  curve: showLoadingBody
+                      ? Curves.easeOutCubic
+                      : Curves.easeOutBack,
+                  builder: (context, value, child) {
+                    final opacity = showLoadingBody
+                        ? 1.0
+                        : ((value - 0.94) / 0.06).clamp(0.0, 1.0);
+                    final translateY = (1 - value) * 28;
+                    return Opacity(
+                      opacity: opacity,
+                      child: Transform.translate(
+                        offset: Offset(0, translateY),
+                        child: Transform.scale(
+                          scale: value,
+                          alignment: Alignment.topCenter,
+                          child: child,
+                        ),
+                      ),
+                    );
+                  },
+                  child: showLoadingBody
+                      ? buildLoadingBody()
+                      : buildLoadedBody(),
                 );
               }
 
@@ -705,7 +740,7 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
                               children: [
                                 const Expanded(
                                   child: Text(
-                                    'Manage favorites',
+                                    '管理收藏',
                                     style: TextStyle(
                                       fontSize: 18,
                                       fontWeight: FontWeight.w600,
@@ -716,7 +751,7 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
                                     !isLoading &&
                                     loadError == null)
                                   IconButton(
-                                    tooltip: 'New folder',
+                                    tooltip: '新建收藏夹',
                                     onPressed: addFolder,
                                     icon: const Icon(
                                       Icons.create_new_folder_outlined,
@@ -726,12 +761,12 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
                             ),
                             Text(
                               singleFolderOnly
-                                  ? 'Current source only allows one folder for this comic'
-                                  : 'You can select multiple folders',
+                                  ? '当前漫画源仅支持将该漫画加入一个收藏夹'
+                                  : '可为该漫画选择多个收藏夹',
                               style: Theme.of(sheetContext).textTheme.bodySmall,
                             ),
                             const SizedBox(height: 10),
-                            buildBody(),
+                            buildAnimatedBody(),
                             const SizedBox(height: 12),
                             FilledButton(
                               onPressed: (isLoading || loadError != null)
@@ -743,9 +778,7 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
                                           sheetContext,
                                         ).showSnackBar(
                                           const SnackBar(
-                                            content: Text(
-                                              'Please select at least one folder',
-                                            ),
+                                            content: Text('请至少选择一个收藏夹'),
                                           ),
                                         );
                                         return;
@@ -759,7 +792,7 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
                                         ),
                                       });
                                     },
-                              child: const Text('Save'),
+                              child: const Text('保存'),
                             ),
                           ],
                         ),

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 import 'dart:io';
 import 'dart:ui';
 
@@ -151,6 +152,7 @@ PreferredSizeWidget hazukiFrostedAppBar({
   double elevation = 0,
   bool centerTitle = false,
   double backgroundAlpha = 0.72,
+  double? titleSpacing,
 }) {
   final surface = Theme.of(context).colorScheme.surface;
   return AppBar(
@@ -159,6 +161,7 @@ PreferredSizeWidget hazukiFrostedAppBar({
     leading: leading,
     automaticallyImplyLeading: automaticallyImplyLeading,
     toolbarHeight: toolbarHeight,
+    titleSpacing: titleSpacing,
     bottom: bottom,
     elevation: elevation,
     centerTitle: centerTitle,

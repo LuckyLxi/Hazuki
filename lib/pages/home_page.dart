@@ -27,6 +27,7 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
   int _authVersion = 0;
   DateTime? _lastBackPressedAt;
   double _discoverSearchMorphProgress = 0;
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final GlobalKey<_FavoritePageState> _favoritePageKey =
       GlobalKey<_FavoritePageState>();
   FavoriteAppBarActionsState _favoriteAppBarActions =
@@ -531,6 +532,12 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
   }
 
   Future<bool> _onWillPop() async {
+    final scaffoldState = _scaffoldKey.currentState;
+    if (scaffoldState?.isDrawerOpen ?? false) {
+      Navigator.of(context).pop();
+      return false;
+    }
+
     final now = DateTime.now();
     final last = _lastBackPressedAt;
     if (last == null || now.difference(last) > const Duration(seconds: 2)) {
@@ -680,6 +687,7 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
         );
       },
       child: Scaffold(
+        key: _scaffoldKey,
         appBar: hazukiFrostedAppBar(
           context: context,
           title: const Text('Hazuki'),

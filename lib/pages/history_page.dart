@@ -62,12 +62,14 @@ class _HistoryPageState extends State<HistoryPage> {
       try {
         final List<dynamic> jsonList = jsonDecode(jsonStr);
         final history = jsonList
-            .map((e) => ExploreComic(
-                  id: e['id'] as String? ?? '',
-                  title: e['title'] as String? ?? '',
-                  cover: e['cover'] as String? ?? '',
-                  subTitle: e['subTitle'] as String? ?? '',
-                ))
+            .map(
+              (e) => ExploreComic(
+                id: e['id'] as String? ?? '',
+                title: e['title'] as String? ?? '',
+                cover: e['cover'] as String? ?? '',
+                subTitle: e['subTitle'] as String? ?? '',
+              ),
+            )
             .toList();
         if (mounted) {
           setState(() {
@@ -88,12 +90,16 @@ class _HistoryPageState extends State<HistoryPage> {
 
   Future<void> _saveHistory(List<ExploreComic> history) async {
     final prefs = await SharedPreferences.getInstance();
-    final jsonList = history.map((e) => {
-      'id': e.id,
-      'title': e.title,
-      'cover': e.cover,
-      'subTitle': e.subTitle,
-    }).toList();
+    final jsonList = history
+        .map(
+          (e) => {
+            'id': e.id,
+            'title': e.title,
+            'cover': e.cover,
+            'subTitle': e.subTitle,
+          },
+        )
+        .toList();
     await prefs.setString('hazuki_read_history', jsonEncode(jsonList));
   }
 
@@ -135,7 +141,9 @@ class _HistoryPageState extends State<HistoryPage> {
 
     if (confirm != true) return;
 
-    final newHistory = _history.where((e) => !_selectedIds.contains(e.id)).toList();
+    final newHistory = _history
+        .where((e) => !_selectedIds.contains(e.id))
+        .toList();
     await _saveHistory(newHistory);
     setState(() {
       _history = newHistory;
@@ -193,8 +201,9 @@ class _HistoryPageState extends State<HistoryPage> {
     if (!mounted) {
       return;
     }
-    ScaffoldMessenger.of(context)
-        .showSnackBar(const SnackBar(content: Text('已复制漫画ID')));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('已复制漫画ID')));
   }
 
   Future<void> _handleToggleFavoriteFromHistory(ExploreComic comic) async {
@@ -207,7 +216,9 @@ class _HistoryPageState extends State<HistoryPage> {
     }
     messenger.showSnackBar(const SnackBar(content: Text('正在处理收藏...')));
     try {
-      final details = await HazukiSourceService.instance.loadComicDetails(comic.id);
+      final details = await HazukiSourceService.instance.loadComicDetails(
+        comic.id,
+      );
       if (HazukiSourceService.instance.supportFavoriteFolderLoad &&
           HazukiSourceService.instance.supportFavoriteToggle) {
         messenger.showSnackBar(
@@ -248,6 +259,7 @@ class _HistoryPageState extends State<HistoryPage> {
   Future<void> _showComicMenu(
     ExploreComic comic,
     BuildContext itemContext,
+    Offset globalPosition,
   ) async {
     final navigator = Navigator.of(context);
     final overlay = navigator.overlay?.context.findRenderObject() as RenderBox?;
@@ -256,29 +268,60 @@ class _HistoryPageState extends State<HistoryPage> {
       return;
     }
 
-    final itemTopLeft = itemRender.localToGlobal(Offset.zero, ancestor: overlay);
+    final itemTopLeft = itemRender.localToGlobal(
+      Offset.zero,
+      ancestor: overlay,
+    );
     final itemRect = itemTopLeft & itemRender.size;
-    final anchorOffset = itemRect.centerRight;
+    final fingerOffset = overlay.globalToLocal(globalPosition);
 
     const menuWidth = 212.0;
     const menuHeight = 174.0;
     const gap = 8.0;
     const screenPadding = 8.0;
 
-    var dx = itemRect.right + gap;
+    final preferRight = fingerOffset.dx <= itemRect.center.dx;
+    var dx = preferRight
+        ? itemRect.right + gap
+        : itemRect.left - menuWidth - gap;
     if (dx + menuWidth > overlay.size.width - screenPadding) {
       dx = itemRect.left - menuWidth - gap;
     }
     if (dx < screenPadding) {
+      dx = itemRect.right + gap;
+    }
+    if (dx + menuWidth > overlay.size.width - screenPadding) {
       dx = (overlay.size.width - menuWidth) / 2;
     }
 
-    var dy = anchorOffset.dy - menuHeight / 2;
-    final minY = screenPadding + MediaQuery.of(context).padding.top;
-    final maxY = overlay.size.height - menuHeight - screenPadding;
-    dy = dy.clamp(minY, maxY);
+    final mediaPadding = MediaQuery.of(context).padding;
+    final scrollableRender =
+        Scrollable.maybeOf(itemContext)?.context.findRenderObject()
+            as RenderBox?;
+    final viewportRect = scrollableRender != null && scrollableRender.hasSize
+        ? scrollableRender.localToGlobal(Offset.zero, ancestor: overlay) &
+              scrollableRender.size
+        : Offset.zero & overlay.size;
+    final minY = math.max(
+      screenPadding + mediaPadding.top,
+      viewportRect.top + screenPadding,
+    );
+    final maxY = math.min(
+      overlay.size.height - mediaPadding.bottom - menuHeight - screenPadding,
+      viewportRect.bottom - menuHeight - screenPadding,
+    );
+    final availableAbove = itemRect.top - minY;
+    final availableBelow = maxY + menuHeight - itemRect.bottom;
+    final canShowBelow = availableBelow >= menuHeight + gap;
+    final canShowAbove = availableAbove >= menuHeight;
+    final showBelow =
+        canShowBelow || (!canShowAbove && availableBelow >= availableAbove);
+    final preferredTop = itemRect.bottom + gap;
+    final dy = preferredTop.clamp(minY, math.max(minY, maxY)).toDouble();
+    final upwardBottom = (overlay.size.height - itemRect.top).toDouble();
 
-    final originX = anchorOffset.dx < dx + menuWidth / 2 ? 0.0 : 1.0;
+    final originX = fingerOffset.dx < dx + menuWidth / 2 ? 0.0 : 1.0;
+    final originY = showBelow ? -1.0 : 1.0;
 
     final action = await showGeneralDialog<String>(
       context: context,
@@ -292,7 +335,8 @@ class _HistoryPageState extends State<HistoryPage> {
           children: [
             Positioned(
               left: dx,
-              top: dy,
+              top: showBelow ? dy : null,
+              bottom: showBelow ? null : upwardBottom,
               width: menuWidth,
               child: Material(
                 color: Colors.transparent,
@@ -320,7 +364,8 @@ class _HistoryPageState extends State<HistoryPage> {
                       _HistoryMenuItem(
                         icon: Icons.favorite_border,
                         label: '收藏/取消收藏',
-                        onTap: () => Navigator.of(dialogContext).pop('favorite'),
+                        onTap: () =>
+                            Navigator.of(dialogContext).pop('favorite'),
                       ),
                       Divider(height: 1, color: scheme.outlineVariant),
                       _HistoryMenuItem(
@@ -344,7 +389,7 @@ class _HistoryPageState extends State<HistoryPage> {
           reverseCurve: Curves.easeInCubic,
         );
         final scale = Tween<double>(begin: 0.92, end: 1.0).animate(curved);
-        final align = Alignment(originX, -0.3);
+        final align = Alignment(originX, originY);
         return FadeTransition(
           opacity: curved,
           child: ScaleTransition(alignment: align, scale: scale, child: child),
@@ -370,126 +415,139 @@ class _HistoryPageState extends State<HistoryPage> {
         break;
     }
   }
+
   Widget _buildItem(ExploreComic comic, int index) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(10),
-        onLongPress: () {
-          if (!_selectionMode) {
-            HapticFeedback.mediumImpact();
-            unawaited(_showComicMenu(comic, context));
-          }
-        },
-        onTap: () {
-          if (_selectionMode) {
-            setState(() {
-              if (_selectedIds.contains(comic.id)) {
-                _selectedIds.remove(comic.id);
-              } else {
-                _selectedIds.add(comic.id);
-              }
-            });
-            return;
-          }
-          final heroTag = _comicCoverHeroTag(comic, salt: 'history');
-          Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => ComicDetailPage(comic: comic, heroTag: heroTag),
-            ),
-          ).then((_) {
-            _loadHistory(); // 重新加载以防记录位置变动
-          });
-        },
-        child: Ink(
-          padding: EdgeInsets.fromLTRB(_selectionMode ? 6 : 10, 10, 10, 10),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surfaceContainer,
+      child: Builder(
+        builder: (itemContext) => GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onLongPressStart: (details) {
+            if (!_selectionMode) {
+              HapticFeedback.mediumImpact();
+              unawaited(
+                _showComicMenu(comic, itemContext, details.globalPosition),
+              );
+            }
+          },
+          child: InkWell(
             borderRadius: BorderRadius.circular(10),
-          ),
-          child: Row(
-            children: [
-              AnimatedSwitcher(
-                duration: const Duration(milliseconds: 160),
-                switchInCurve: Curves.easeOutCubic,
-                switchOutCurve: Curves.easeInCubic,
-                transitionBuilder: (child, animation) {
-                  return FadeTransition(
-                    opacity: animation,
-                    child: SizeTransition(
-                      sizeFactor: animation,
-                      axis: Axis.horizontal,
-                      axisAlignment: -1.0,
-                      child: child,
+            onTap: () {
+              if (_selectionMode) {
+                setState(() {
+                  if (_selectedIds.contains(comic.id)) {
+                    _selectedIds.remove(comic.id);
+                  } else {
+                    _selectedIds.add(comic.id);
+                  }
+                });
+                return;
+              }
+              final heroTag = _comicCoverHeroTag(comic, salt: 'history');
+              Navigator.of(context)
+                  .push(
+                    MaterialPageRoute<void>(
+                      builder: (_) =>
+                          ComicDetailPage(comic: comic, heroTag: heroTag),
                     ),
-                  );
-                },
-                child: _selectionMode
-                    ? Padding(
-                        key: const ValueKey('selection_checkbox'),
-                        padding: const EdgeInsets.only(right: 6),
-                        child: Checkbox(
-                          visualDensity: VisualDensity.compact,
-                          materialTapTargetSize:
-                              MaterialTapTargetSize.shrinkWrap,
-                          value: _selectedIds.contains(comic.id),
-                          onChanged: (v) {
-                            setState(() {
-                              if (v == true) {
-                                _selectedIds.add(comic.id);
-                              } else {
-                                _selectedIds.remove(comic.id);
-                              }
-                            });
-                          },
-                        ),
-                      )
-                    : const SizedBox.shrink(key: ValueKey('no_selection')),
+                  )
+                  .then((_) {
+                    _loadHistory(); // 重新加载以防记录位置变动
+                  });
+            },
+            child: Ink(
+              padding: EdgeInsets.fromLTRB(_selectionMode ? 6 : 10, 10, 10, 10),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainer,
+                borderRadius: BorderRadius.circular(10),
               ),
-              Hero(
-                tag: _comicCoverHeroTag(comic, salt: 'history'),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: comic.cover.isEmpty
-                      ? Container(
-                          width: 72,
-                          height: 102,
-                          color: Theme.of(context)
-                              .colorScheme
-                              .surfaceContainerHighest,
-                          child: const Icon(Icons.image_not_supported_outlined),
-                        )
-                      : HazukiCachedImage(
-                          url: comic.cover,
-                          width: 72,
-                          height: 102,
-                          fit: BoxFit.cover,
+              child: Row(
+                children: [
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 160),
+                    switchInCurve: Curves.easeOutCubic,
+                    switchOutCurve: Curves.easeInCubic,
+                    transitionBuilder: (child, animation) {
+                      return FadeTransition(
+                        opacity: animation,
+                        child: SizeTransition(
+                          sizeFactor: animation,
+                          axis: Axis.horizontal,
+                          axisAlignment: -1.0,
+                          child: child,
                         ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      comic.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleMedium,
+                      );
+                    },
+                    child: _selectionMode
+                        ? Padding(
+                            key: const ValueKey('selection_checkbox'),
+                            padding: const EdgeInsets.only(right: 6),
+                            child: Checkbox(
+                              visualDensity: VisualDensity.compact,
+                              materialTapTargetSize:
+                                  MaterialTapTargetSize.shrinkWrap,
+                              value: _selectedIds.contains(comic.id),
+                              onChanged: (v) {
+                                setState(() {
+                                  if (v == true) {
+                                    _selectedIds.add(comic.id);
+                                  } else {
+                                    _selectedIds.remove(comic.id);
+                                  }
+                                });
+                              },
+                            ),
+                          )
+                        : const SizedBox.shrink(key: ValueKey('no_selection')),
+                  ),
+                  Hero(
+                    tag: _comicCoverHeroTag(comic, salt: 'history'),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: comic.cover.isEmpty
+                          ? Container(
+                              width: 72,
+                              height: 102,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.surfaceContainerHighest,
+                              child: const Icon(
+                                Icons.image_not_supported_outlined,
+                              ),
+                            )
+                          : HazukiCachedImage(
+                              url: comic.cover,
+                              width: 72,
+                              height: 102,
+                              fit: BoxFit.cover,
+                            ),
                     ),
-                    if (comic.subTitle.isNotEmpty) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        comic.subTitle,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          comic.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        if (comic.subTitle.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            comic.subTitle,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -510,18 +568,18 @@ class _HistoryPageState extends State<HistoryPage> {
             ),
           )
         : _history.isEmpty
-            ? const Center(child: Text('暂无历史记录'))
-            : ListView.builder(
-                controller: _scrollController,
-                physics: const AlwaysScrollableScrollPhysics(
-                  parent: ClampingScrollPhysics(),
-                ),
-                padding: const EdgeInsets.all(16),
-                itemCount: _history.length,
-                itemBuilder: (context, index) {
-                  return _buildItem(_history[index], index);
-                },
-              );
+        ? const Center(child: Text('暂无历史记录'))
+        : ListView.builder(
+            controller: _scrollController,
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: ClampingScrollPhysics(),
+            ),
+            padding: const EdgeInsets.all(16),
+            itemCount: _history.length,
+            itemBuilder: (context, index) {
+              return _buildItem(_history[index], index);
+            },
+          );
 
     return Scaffold(
       appBar: AppBar(
