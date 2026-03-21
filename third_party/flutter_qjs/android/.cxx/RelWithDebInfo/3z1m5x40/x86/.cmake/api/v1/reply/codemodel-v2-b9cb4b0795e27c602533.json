@@ -1,0 +1,69 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"jsonFile" : "directory-.-RelWithDebInfo-d0094a50bb2071803777.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.7"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						0,
+						1
+					]
+				}
+			],
+			"name" : "RelWithDebInfo",
+			"projects" : 
+			[
+				{
+					"directoryIndexes" : 
+					[
+						0
+					],
+					"name" : "quickjs",
+					"targetIndexes" : 
+					[
+						0,
+						1
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 0,
+					"id" : "qjs::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-qjs-RelWithDebInfo-98482b620ed6aefa68f6.json",
+					"name" : "qjs",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "quickjs::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-quickjs-RelWithDebInfo-edb10b5e176600d6854b.json",
+					"name" : "quickjs",
+					"projectIndex" : 0
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "D:/Project/hazuki/third_party/flutter_qjs/android/.cxx/RelWithDebInfo/3z1m5x40/x86",
+		"source" : "D:/Project/hazuki/third_party/flutter_qjs/android/src/main/cxx"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 3
+	}
+}

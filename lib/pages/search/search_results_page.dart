@@ -1,0 +1,786 @@
+part of '../../main.dart';
+
+class SearchResultsPage extends StatefulWidget {
+  const SearchResultsPage({
+    super.key,
+    required this.initialKeyword,
+    this.initialOrder = 'mr',
+  });
+
+  final String initialKeyword;
+  final String initialOrder;
+
+  @override
+  State<SearchResultsPage> createState() => _SearchResultsPageState();
+}
+
+class _SearchResultsPageState extends State<SearchResultsPage> {
+  final ScrollController _scrollController = ScrollController();
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
+
+  String _searchKeyword = '';
+  String? _searchErrorMessage;
+  List<ExploreComic> _searchComics = const [];
+  bool _searchLoading = false;
+  bool _searchLoadingMore = false;
+  bool _searchHasMore = true;
+  bool _showBackToTop = false;
+  int _searchPage = 1;
+  int? _searchMaxPage;
+  int _searchRequestToken = 0;
+  String _searchOrder = 'mr';
+  double _searchRevealProgress = 0;
+
+  bool get _showCollapsedSearch => _searchRevealProgress >= 0.94;
+
+  @override
+  void initState() {
+    super.initState();
+    _searchOrder = _searchOrderLabels.containsKey(widget.initialOrder)
+        ? widget.initialOrder
+        : 'mr';
+    _searchController.text = widget.initialKeyword;
+    _scrollController.addListener(_onScroll);
+    _searchFocusNode.addListener(_onFocusChanged);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      unawaited(_submitSearch());
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _searchFocusNode.removeListener(_onFocusChanged);
+    _scrollController.dispose();
+    _searchController.dispose();
+    _searchFocusNode.dispose();
+    super.dispose();
+  }
+
+  void _onFocusChanged() {
+    if (!mounted) {
+      return;
+    }
+    setState(() {});
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients) {
+      return;
+    }
+
+    final position = _scrollController.position;
+    final nextReveal = (position.pixels / _searchAppBarRevealOffset).clamp(
+      0.0,
+      1.0,
+    );
+    final nextShowBackToTop = position.pixels > 520;
+    final shouldLoadMore =
+        position.maxScrollExtent > 0 &&
+        position.pixels >= position.maxScrollExtent - 260;
+
+    if ((nextReveal - _searchRevealProgress).abs() >= 0.01 ||
+        nextShowBackToTop != _showBackToTop) {
+      setState(() {
+        _searchRevealProgress = nextReveal;
+        _showBackToTop = nextShowBackToTop;
+      });
+    }
+
+    if (shouldLoadMore) {
+      unawaited(_loadMoreSearch());
+    }
+  }
+
+  Future<void> _scrollToTop({bool focusSearch = false}) async {
+    if (_scrollController.hasClients) {
+      await _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeOutCubic,
+      );
+    }
+    if (focusSearch && mounted) {
+      _searchFocusNode.requestFocus();
+    }
+  }
+
+  void _clearSearch() {
+    _searchController.clear();
+    setState(() {
+      _searchRequestToken++;
+      _searchKeyword = '';
+      _searchErrorMessage = null;
+      _searchComics = const [];
+      _searchLoading = false;
+      _searchLoadingMore = false;
+      _searchHasMore = true;
+      _searchPage = 1;
+      _searchMaxPage = null;
+    });
+    _searchFocusNode.requestFocus();
+  }
+
+  void _onSearchOrderSelected(String order) {
+    if (!_searchOrderLabels.containsKey(order) || order == _searchOrder) {
+      return;
+    }
+    setState(() {
+      _searchOrder = order;
+    });
+    if (_searchKeyword.isNotEmpty) {
+      unawaited(_search(keyword: _searchKeyword, page: 1));
+    }
+  }
+
+  String get _currentSearchOrderLabel =>
+      _searchOrderLabels[_searchOrder] ?? '最新';
+
+  Future<SearchComicsResult> _loadSearchPage({
+    required String keyword,
+    required int page,
+    required String order,
+  }) {
+    return HazukiSourceService.instance
+        .searchComics(keyword: keyword, page: page, order: order)
+        .timeout(
+          _searchLoadTimeout,
+          onTimeout: () {
+            throw Exception('搜索超时，请稍后重试');
+          },
+        );
+  }
+
+  Future<void> _search({
+    required String keyword,
+    required int page,
+    bool append = false,
+    bool silentRefresh = false,
+  }) async {
+    final normalized = keyword.trim();
+    if (normalized.isEmpty) {
+      return;
+    }
+
+    final requestToken = ++_searchRequestToken;
+    final isLoadMore = append;
+
+    setState(() {
+      _searchKeyword = normalized;
+      _searchErrorMessage = null;
+      if (!isLoadMore && !silentRefresh) {
+        _searchPage = 1;
+        _searchMaxPage = null;
+        _searchHasMore = true;
+        _searchComics = const [];
+      }
+      if (isLoadMore) {
+        _searchLoadingMore = true;
+      } else if (!silentRefresh) {
+        _searchLoading = true;
+      }
+    });
+
+    try {
+      final result = await _loadSearchPage(
+        keyword: normalized,
+        page: page,
+        order: _searchOrder,
+      );
+      if (!mounted || requestToken != _searchRequestToken) {
+        return;
+      }
+
+      setState(() {
+        final previousCount = _searchComics.length;
+        if (append) {
+          final merged = <String, ExploreComic>{
+            for (final comic in _searchComics)
+              if (comic.id.isNotEmpty) comic.id: comic,
+          };
+          for (final comic in result.comics) {
+            if (comic.id.isNotEmpty) {
+              merged[comic.id] = comic;
+            }
+          }
+          _searchComics = merged.values.toList();
+        } else {
+          _searchComics = result.comics;
+        }
+        _searchPage = page;
+        _searchMaxPage = result.maxPage;
+        final reachedMaxPage =
+            result.maxPage != null && page >= result.maxPage!;
+        final noNewItems = append && _searchComics.length == previousCount;
+        _searchHasMore =
+            !reachedMaxPage && result.comics.isNotEmpty && !noNewItems;
+        _searchErrorMessage = null;
+      });
+    } catch (e) {
+      if (!mounted || requestToken != _searchRequestToken) {
+        return;
+      }
+      setState(() {
+        _searchErrorMessage = '搜索失败：$e';
+      });
+    } finally {
+      if (mounted && requestToken == _searchRequestToken) {
+        setState(() {
+          if (isLoadMore) {
+            _searchLoadingMore = false;
+          } else if (!silentRefresh) {
+            _searchLoading = false;
+          }
+        });
+      }
+    }
+  }
+
+  Future<void> _loadMoreSearch() async {
+    if (_searchKeyword.isEmpty ||
+        _searchLoading ||
+        _searchLoadingMore ||
+        !_searchHasMore ||
+        (_searchMaxPage != null && _searchPage >= _searchMaxPage!)) {
+      return;
+    }
+
+    if (_searchComics.isEmpty) {
+      return;
+    }
+
+    await _search(keyword: _searchKeyword, page: _searchPage + 1, append: true);
+  }
+
+  String? _normalizeComicIdKeyword(String keyword) {
+    final normalized = keyword.trim().toLowerCase();
+    if (RegExp(r'^\d{2,}$').hasMatch(normalized)) {
+      return normalized;
+    }
+    if (RegExp(r'^jm\d{2,}$').hasMatch(normalized)) {
+      return normalized;
+    }
+    return null;
+  }
+
+  Future<bool> _tryOpenComicDetailByKeywordId(String keyword) async {
+    final comicId = _normalizeComicIdKeyword(keyword);
+    if (comicId == null) {
+      return false;
+    }
+
+    try {
+      final navigator = Navigator.of(context);
+      final details = await HazukiSourceService.instance
+          .loadComicDetails(comicId)
+          .timeout(const Duration(seconds: 25));
+      if (!mounted) {
+        return true;
+      }
+
+      final comic = ExploreComic(
+        id: details.id,
+        title: details.title.trim().isEmpty ? keyword.trim() : details.title,
+        subTitle: details.subTitle,
+        cover: details.cover,
+      );
+      await _addSearchHistory(keyword);
+      await navigator.pushReplacement(
+        MaterialPageRoute<void>(
+          builder: (_) => ComicDetailPage(
+            comic: comic,
+            heroTag: _comicCoverHeroTag(comic, salt: 'search-id-direct'),
+          ),
+        ),
+      );
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _submitSearch() async {
+    final keyword = await _normalizeSubmittedKeyword(
+      _searchController.text,
+      controller: _searchController,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    if (keyword.isEmpty) {
+      _clearSearch();
+      return;
+    }
+
+    final idKeyword = _normalizeComicIdKeyword(keyword);
+    final requestToken = ++_searchRequestToken;
+
+    if (idKeyword != null) {
+      setState(() {
+        _searchKeyword = keyword;
+        _searchErrorMessage = null;
+        _searchComics = const [];
+        _searchLoading = true;
+        _searchLoadingMore = false;
+        _searchHasMore = true;
+        _searchPage = 1;
+        _searchMaxPage = null;
+      });
+    }
+
+    final openedById = await _tryOpenComicDetailByKeywordId(keyword);
+    if (!openedById) {
+      await _addSearchHistory(keyword);
+    }
+
+    if (!mounted || requestToken != _searchRequestToken) {
+      return;
+    }
+
+    if (openedById) {
+      setState(() {
+        _searchLoading = false;
+      });
+      return;
+    }
+
+    await _search(keyword: keyword, page: 1);
+  }
+
+  Widget _buildTopSearchBox() {
+    final hideProgress = Curves.easeOutCubic.transform(_searchRevealProgress);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 14, 0, 10),
+      child: Opacity(
+        opacity: 1 - hideProgress,
+        child: Transform.translate(
+          offset: Offset(0, -10 * hideProgress),
+          child: Transform.scale(
+            scale: 1 - 0.04 * hideProgress,
+            alignment: Alignment.topCenter,
+            child: HeroMode(
+              enabled: !_showCollapsedSearch,
+              child: Hero(
+                tag: _discoverSearchHeroTag,
+                child: SizedBox(
+                  height: 56,
+                  child: SearchBar(
+                    focusNode: _searchFocusNode,
+                    controller: _searchController,
+                    hintText: '搜索漫画',
+                    elevation: const WidgetStatePropertyAll(0),
+                    backgroundColor: WidgetStatePropertyAll(
+                      Theme.of(context).colorScheme.surfaceContainerHigh,
+                    ),
+                    shape: WidgetStatePropertyAll(
+                      RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    padding: const WidgetStatePropertyAll(
+                      EdgeInsets.symmetric(horizontal: 16),
+                    ),
+                    leading: const Icon(Icons.search),
+                    trailing: [
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 180),
+                        transitionBuilder: (child, animation) {
+                          return ScaleTransition(
+                            scale: CurvedAnimation(
+                              parent: animation,
+                              curve: Curves.easeOutBack,
+                              reverseCurve: Curves.easeInCubic,
+                            ),
+                            child: FadeTransition(
+                              opacity: animation,
+                              child: child,
+                            ),
+                          );
+                        },
+                        child: _searchController.text.isNotEmpty
+                            ? IconButton(
+                                key: const ValueKey('results-clear'),
+                                tooltip: '清空',
+                                onPressed: _clearSearch,
+                                icon: const Icon(Icons.close),
+                              )
+                            : IconButton(
+                                key: const ValueKey('results-submit'),
+                                tooltip: '搜索',
+                                onPressed: () => unawaited(_submitSearch()),
+                                icon: const Icon(Icons.arrow_forward),
+                              ),
+                      ),
+                    ],
+                    onSubmitted: (_) => unawaited(_submitSearch()),
+                    onChanged: (_) => setState(() {}),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCollapsedSearchBox() {
+    return HeroMode(
+      enabled: _showCollapsedSearch,
+      child: Hero(
+        tag: _discoverSearchHeroTag,
+        child: ClipRect(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            width: _showCollapsedSearch ? 180 : 0,
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: AnimatedSlide(
+                offset: _showCollapsedSearch
+                    ? Offset.zero
+                    : const Offset(-0.08, 0),
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+                child: AnimatedScale(
+                  scale: _showCollapsedSearch ? 1 : 0.94,
+                  duration: const Duration(milliseconds: 240),
+                  curve: Curves.easeOutBack,
+                  child: AnimatedOpacity(
+                    opacity: _showCollapsedSearch ? 1 : 0,
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOutCubic,
+                    child: IgnorePointer(
+                      ignoring: !_showCollapsedSearch,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(14),
+                        onTap: () => unawaited(_scrollToTop(focusSearch: true)),
+                        child: Container(
+                          height: 40,
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          decoration: BoxDecoration(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.surfaceContainerHigh,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.search,
+                                size: 18,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  _searchController.text.isEmpty
+                                      ? '搜索漫画'
+                                      : _searchController.text,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(
+                                        color: Theme.of(
+                                          context,
+                                        ).colorScheme.onSurfaceVariant,
+                                      ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchResultState() {
+    if (_searchKeyword.isEmpty) {
+      return const SizedBox(
+        height: 240,
+        child: Center(child: Text('输入关键词开始搜索')),
+      );
+    }
+
+    if (_searchLoading && _searchComics.isEmpty) {
+      return const SizedBox(
+        height: 360,
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              HazukiStickerLoadingIndicator(size: 120),
+              SizedBox(height: 12),
+              Text('正在搜索...'),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_searchErrorMessage != null && _searchComics.isEmpty) {
+      return SizedBox(
+        height: 360,
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Text(_searchErrorMessage!, textAlign: TextAlign.center),
+              ),
+              const SizedBox(height: 12),
+              FilledButton(
+                onPressed: () => unawaited(_submitSearch()),
+                child: const Text('重试'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_searchComics.isEmpty) {
+      return const SizedBox(height: 220, child: Center(child: Text('什么也没搜到')));
+    }
+
+    return const SizedBox.shrink();
+  }
+
+  Widget _buildSearchComicItem(ExploreComic comic, int index) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: () {
+          final heroTag = _comicCoverHeroTag(
+            comic,
+            salt: 'search-${_searchKeyword.trim()}-$index',
+          );
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => ComicDetailPage(comic: comic, heroTag: heroTag),
+            ),
+          );
+        },
+        child: Ink(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceContainer,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Row(
+            children: [
+              Hero(
+                tag: _comicCoverHeroTag(
+                  comic,
+                  salt: 'search-${_searchKeyword.trim()}-$index',
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: comic.cover.isEmpty
+                      ? Container(
+                          width: 72,
+                          height: 102,
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.surfaceContainerHighest,
+                          child: const Icon(Icons.image_not_supported_outlined),
+                        )
+                      : HazukiCachedImage(
+                          url: comic.cover,
+                          width: 72,
+                          height: 102,
+                          fit: BoxFit.cover,
+                          loading: Container(
+                            width: 72,
+                            height: 102,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.surfaceContainerHighest,
+                          ),
+                          error: Container(
+                            width: 72,
+                            height: 102,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.surfaceContainerHighest,
+                            child: const Icon(Icons.broken_image_outlined),
+                          ),
+                        ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      comic.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    if (comic.subTitle.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        comic.subTitle,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      appBar: hazukiFrostedAppBar(
+        context: context,
+        title: Row(
+          children: [
+            const Text('搜索'),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+              width: _showCollapsedSearch ? 12 : 0,
+            ),
+            _buildCollapsedSearchBox(),
+          ],
+        ),
+        actions: [
+          PopupMenuButton<String>(
+            tooltip: '排序',
+            initialValue: _searchOrder,
+            onSelected: _onSearchOrderSelected,
+            itemBuilder: (context) => _searchOrderLabels.entries
+                .map(
+                  (entry) => CheckedPopupMenuItem<String>(
+                    value: entry.key,
+                    checked: _searchOrder == entry.key,
+                    child: Text(entry.value),
+                  ),
+                )
+                .toList(),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Row(
+                children: [
+                  const Icon(Icons.sort_rounded),
+                  const SizedBox(width: 4),
+                  Text(_currentSearchOrderLabel),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+      body: Stack(
+        children: [
+          ListView.builder(
+            controller: _scrollController,
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: ClampingScrollPhysics(),
+            ),
+            padding: const EdgeInsets.only(left: 16, right: 16, bottom: 16),
+            itemCount: _searchComics.length + 3,
+            itemBuilder: (context, index) {
+              if (index == 0) {
+                return _buildTopSearchBox();
+              }
+              if (index == 1) {
+                final emptyState =
+                    _searchComics.isEmpty ||
+                    (_searchLoading && _searchComics.isEmpty) ||
+                    (_searchErrorMessage != null && _searchComics.isEmpty);
+                if (emptyState || _searchKeyword.isEmpty) {
+                  return _buildSearchResultState();
+                }
+                return const SizedBox(height: 4);
+              }
+
+              final resultIndex = index - 2;
+              if (resultIndex < _searchComics.length) {
+                final comic = _searchComics[resultIndex];
+                return _buildSearchComicItem(comic, resultIndex);
+              }
+
+              if (resultIndex == _searchComics.length) {
+                if (_searchLoadingMore) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 10),
+                    child: Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          HazukiStickerLoadingIndicator(size: 72),
+                          SizedBox(height: 8),
+                          Text('加载中...'),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+                return const SizedBox(height: 8);
+              }
+
+              return const SizedBox.shrink();
+            },
+          ),
+          Positioned(
+            right: 16,
+            bottom: 16,
+            child: AnimatedSlide(
+              offset: _showBackToTop ? Offset.zero : const Offset(0, 0.24),
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+              child: AnimatedScale(
+                scale: _showBackToTop ? 1 : 0.86,
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+                child: AnimatedOpacity(
+                  opacity: _showBackToTop ? 1 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  curve: Curves.easeOutCubic,
+                  child: IgnorePointer(
+                    ignoring: !_showBackToTop,
+                    child: FloatingActionButton.small(
+                      heroTag: 'search_back_to_top',
+                      onPressed: () => unawaited(_scrollToTop()),
+                      child: const Icon(Icons.vertical_align_top_rounded),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

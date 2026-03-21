@@ -1,0 +1,27 @@
+[
+{
+  "directory": "D:/Project/hazuki/third_party/flutter_qjs/android/.cxx/Debug/12p6y6y1/x86",
+  "command": "D:\\Android\\SDK\\ndk\\27.0.12077973\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang.exe --target=i686-none-linux-android21 --sysroot=D:/Android/SDK/ndk/27.0.12077973/toolchains/llvm/prebuilt/windows-x86_64/sysroot -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -mstackrealign -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -fno-limit-debug-info  -fPIC -DCONFIG_VERSION=\\\"2021-03-27\\\" -DDUMP_LEAKS -o CMakeFiles\\quickjs.dir\\D_\\Project\\hazuki\\third_party\\flutter_qjs\\cxx\\quickjs\\cutils.c.o -c D:\\Project\\hazuki\\third_party\\flutter_qjs\\cxx\\quickjs\\cutils.c",
+  "file": "D:\\Project\\hazuki\\third_party\\flutter_qjs\\cxx\\quickjs\\cutils.c"
+},
+{
+  "directory": "D:/Project/hazuki/third_party/flutter_qjs/android/.cxx/Debug/12p6y6y1/x86",
+  "command": "D:\\Android\\SDK\\ndk\\27.0.12077973\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang.exe --target=i686-none-linux-android21 --sysroot=D:/Android/SDK/ndk/27.0.12077973/toolchains/llvm/prebuilt/windows-x86_64/sysroot -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -mstackrealign -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -fno-limit-debug-info  -fPIC -DCONFIG_VERSION=\\\"2021-03-27\\\" -DDUMP_LEAKS -o CMakeFiles\\quickjs.dir\\D_\\Project\\hazuki\\third_party\\flutter_qjs\\cxx\\quickjs\\libregexp.c.o -c D:\\Project\\hazuki\\third_party\\flutter_qjs\\cxx\\quickjs\\libregexp.c",
+  "file": "D:\\Project\\hazuki\\third_party\\flutter_qjs\\cxx\\quickjs\\libregexp.c"
+},
+{
+  "directory": "D:/Project/hazuki/third_party/flutter_qjs/android/.cxx/Debug/12p6y6y1/x86",
+  "command": "D:\\Android\\SDK\\ndk\\27.0.12077973\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang.exe --target=i686-none-linux-android21 --sysroot=D:/Android/SDK/ndk/27.0.12077973/toolchains/llvm/prebuilt/windows-x86_64/sysroot -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -mstackrealign -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -fno-limit-debug-info  -fPIC -DCONFIG_VERSION=\\\"2021-03-27\\\" -DDUMP_LEAKS -o CMakeFiles\\quickjs.dir\\D_\\Project\\hazuki\\third_party\\flutter_qjs\\cxx\\quickjs\\libunicode.c.o -c D:\\Project\\hazuki\\third_party\\flutter_qjs\\cxx\\quickjs\\libunicode.c",
+  "file": "D:\\Project\\hazuki\\third_party\\flutter_qjs\\cxx\\quickjs\\libunicode.c"
+},
+{
+  "directory": "D:/Project/hazuki/third_party/flutter_qjs/android/.cxx/Debug/12p6y6y1/x86",
+  "command": "D:\\Android\\SDK\\ndk\\27.0.12077973\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang.exe --target=i686-none-linux-android21 --sysroot=D:/Android/SDK/ndk/27.0.12077973/toolchains/llvm/prebuilt/windows-x86_64/sysroot -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -mstackrealign -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security  -fno-limit-debug-info  -fPIC -DCONFIG_VERSION=\\\"2021-03-27\\\" -DDUMP_LEAKS -o CMakeFiles\\quickjs.dir\\D_\\Project\\hazuki\\third_party\\flutter_qjs\\cxx\\quickjs\\quickjs.c.o -c D:\\Project\\hazuki\\third_party\\flutter_qjs\\cxx\\quickjs\\quickjs.c",
+  "file": "D:\\Project\\hazuki\\third_party\\flutter_qjs\\cxx\\quickjs\\quickjs.c"
+},
+{
+  "directory": "D:/Project/hazuki/third_party/flutter_qjs/android/.cxx/Debug/12p6y6y1/x86",
+  "command": "D:\\Android\\SDK\\ndk\\27.0.12077973\\toolchains\\llvm\\prebuilt\\windows-x86_64\\bin\\clang++.exe --target=i686-none-linux-android21 --sysroot=D:/Android/SDK/ndk/27.0.12077973/toolchains/llvm/prebuilt/windows-x86_64/sysroot -Dqjs_EXPORTS -g -DANDROID -fdata-sections -ffunction-sections -funwind-tables -fstack-protector-strong -no-canonical-prefixes -mstackrealign -D_FORTIFY_SOURCE=2 -Wformat -Werror=format-security   -fno-limit-debug-info  -fPIC -o CMakeFiles\\qjs.dir\\D_\\Project\\hazuki\\third_party\\flutter_qjs\\cxx\\ffi.cpp.o -c D:\\Project\\hazuki\\third_party\\flutter_qjs\\cxx\\ffi.cpp",
+  "file": "D:\\Project\\hazuki\\third_party\\flutter_qjs\\cxx\\ffi.cpp"
+}
+]

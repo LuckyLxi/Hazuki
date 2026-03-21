@@ -1,0 +1,8 @@
+# ninja log v5
+89	262	7952663944799964	CMakeFiles/quickjs.dir/D_/Project/Hazuki/third_party/flutter_qjs/cxx/quickjs/cutils.c.o	6b240372733a5352
+43	344	7952663945618063	CMakeFiles/quickjs.dir/D_/Project/Hazuki/third_party/flutter_qjs/cxx/quickjs/libunicode.c.o	62d42e192f5e533
+1	429	7952663946460638	CMakeFiles/quickjs.dir/D_/Project/Hazuki/third_party/flutter_qjs/cxx/quickjs/libregexp.c.o	35bf146d7b9f4c56
+65	872	7952663950872787	CMakeFiles/qjs.dir/D_/Project/Hazuki/third_party/flutter_qjs/cxx/ffi.cpp.o	5f6b20b260ed5ea1
+22	25101	7952664191844371	CMakeFiles/quickjs.dir/D_/Project/Hazuki/third_party/flutter_qjs/cxx/quickjs/quickjs.c.o	abc7459720302c6d
+25102	25321	7952664194884007	libquickjs.a	2aca56c6b600fdc6
+25321	25477	7952664196890050	D:/Project/Hazuki/build/flutter_qjs/intermediates/cxx/RelWithDebInfo/2e4e42d4/obj/armeabi-v7a/libqjs.so	bde14df1b73d10fa

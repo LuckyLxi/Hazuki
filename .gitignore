@@ -25,3 +25,12 @@ doc/api/
 
 .flutter-plugins
 .flutter-plugins-dependencies
+
+# IDE
+.idea/
+.vscode/
+.metadata
+*.iml
+
+# OS files
+.DS_Store
