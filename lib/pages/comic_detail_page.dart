@@ -892,7 +892,6 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
       return;
     }
 
-    // 使用自定义路由实现弹性弹出与平滑收起动画。
     Navigator.of(context).push(
       _SpringBottomSheetRoute(
         builder: (routeContext) {
@@ -1235,83 +1234,4 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
   }
 }
 
-/// 弹性底部面板路由。
-/// 打开时使用 spring 回弹效果，关闭时使用 easeInCubic 下滑收起。
-// ignore: unused_element
-class _LegacySpringBottomSheetRoute<T> extends PageRoute<T> {
-  _LegacySpringBottomSheetRoute({required this.builder});
 
-  final WidgetBuilder builder;
-
-  @override
-  bool get opaque => false;
-
-  @override
-  bool get barrierDismissible => true;
-
-  @override
-  Color get barrierColor => Colors.black54;
-
-  @override
-  String? get barrierLabel => 'Dismiss';
-
-  @override
-  bool get maintainState => true;
-  @override
-  Duration get transitionDuration => const Duration(milliseconds: 480);
-
-  @override
-  Duration get reverseTransitionDuration => const Duration(milliseconds: 280);
-
-  @override
-  Widget buildPage(
-    BuildContext context,
-    Animation<double> animation,
-    Animation<double> secondaryAnimation,
-  ) {
-    return builder(context);
-  }
-
-  @override
-  Widget buildTransitions(
-    BuildContext context,
-    Animation<double> animation,
-    Animation<double> secondaryAnimation,
-    Widget child,
-  ) {
-    // 打开时使用弹性曲线，关闭时使用 easeInCubic。
-    final isReversing = animation.status == AnimationStatus.reverse;
-    final slideIn = Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
-        .animate(
-          CurvedAnimation(
-            parent: animation,
-            curve: isReversing ? Curves.easeInCubic : const _SpringCurve(),
-            reverseCurve: Curves.easeInCubic,
-          ),
-        );
-
-    // 背景蒙层淡入淡出。
-    final fade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: animation,
-        curve: const Interval(0.0, 0.4, curve: Curves.easeOut),
-        reverseCurve: const Interval(0.5, 1.0, curve: Curves.easeIn),
-      ),
-    );
-
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () => Navigator.of(context).pop(),
-      child: FadeTransition(
-        opacity: fade,
-        child: Align(
-          alignment: Alignment.bottomCenter,
-          child: GestureDetector(
-            onTap: () {}, // 阻止点击内容区时事件透传到背景层。
-            child: SlideTransition(position: slideIn, child: child),
-          ),
-        ),
-      ),
-    );
-  }
-}

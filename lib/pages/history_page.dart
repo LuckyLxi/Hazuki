@@ -328,7 +328,7 @@ class _HistoryPageState extends State<HistoryPage> {
       barrierDismissible: true,
       barrierLabel: '关闭',
       barrierColor: Colors.black26,
-      transitionDuration: const Duration(milliseconds: 240),
+      transitionDuration: const Duration(milliseconds: 280),
       pageBuilder: (dialogContext, animation, secondaryAnimation) {
         final scheme = Theme.of(context).colorScheme;
         return Stack(
@@ -383,15 +383,20 @@ class _HistoryPageState extends State<HistoryPage> {
         );
       },
       transitionBuilder: (dialogContext, animation, secondaryAnimation, child) {
-        final curved = CurvedAnimation(
+        final scaleCurve = CurvedAnimation(
           parent: animation,
-          curve: Curves.easeOutCubic,
-          reverseCurve: Curves.easeInCubic,
+          curve: Curves.easeOutBack, // 弹出时带轻微回弹，显得灵动
+          reverseCurve: Curves.easeOutCubic, // 消失时平滑收起
         );
-        final scale = Tween<double>(begin: 0.92, end: 1.0).animate(curved);
+        final opacityCurve = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic, // 透明度平滑过渡
+          reverseCurve: Curves.linear,
+        );
+        final scale = Tween<double>(begin: 0.6, end: 1.0).animate(scaleCurve);
         final align = Alignment(originX, originY);
         return FadeTransition(
-          opacity: curved,
+          opacity: opacityCurve,
           child: ScaleTransition(alignment: align, scale: scale, child: child),
         );
       },

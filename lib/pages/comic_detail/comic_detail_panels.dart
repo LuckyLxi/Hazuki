@@ -1,9 +1,10 @@
 part of '../../main.dart';
 
 class _HazukiTabBarDelegate extends SliverPersistentHeaderDelegate {
-  const _HazukiTabBarDelegate(this.tabBar);
+  const _HazukiTabBarDelegate(this.tabBar, this.surfaceColor);
 
   final TabBar tabBar;
+  final Color surfaceColor;
 
   @override
   double get minExtent => tabBar.preferredSize.height;
@@ -17,14 +18,14 @@ class _HazukiTabBarDelegate extends SliverPersistentHeaderDelegate {
     bool overlapsContent,
   ) {
     return ColoredBox(
-      color: Theme.of(context).colorScheme.surface,
+      color: surfaceColor,
       child: tabBar,
     );
   }
 
   @override
   bool shouldRebuild(covariant _HazukiTabBarDelegate oldDelegate) {
-    return tabBar != oldDelegate.tabBar;
+    return tabBar != oldDelegate.tabBar || surfaceColor != oldDelegate.surfaceColor;
   }
 }
 
@@ -47,8 +48,9 @@ class _SpringBottomSheetRoute<T> extends PageRoute<T> {
 
   @override
   bool get maintainState => true;
+
   @override
-  Duration get transitionDuration => const Duration(milliseconds: 480);
+  Duration get transitionDuration => const Duration(milliseconds: 380);
 
   @override
   Duration get reverseTransitionDuration => const Duration(milliseconds: 280);
@@ -70,20 +72,21 @@ class _SpringBottomSheetRoute<T> extends PageRoute<T> {
     Widget child,
   ) {
     final isReversing = animation.status == AnimationStatus.reverse;
+
+    // 使用 easeOutBack 带来轻度弹性，摒弃之前用力过猛的自制曲线
     final slideIn = Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
         .animate(
           CurvedAnimation(
             parent: animation,
-            curve: isReversing ? Curves.easeInCubic : const _SpringCurve(),
-            reverseCurve: Curves.easeInCubic,
+            curve: isReversing ? Curves.easeInCubic : Curves.easeOutBack,
           ),
         );
 
     final fade = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: animation,
-        curve: const Interval(0.0, 0.4, curve: Curves.easeOut),
-        reverseCurve: const Interval(0.5, 1.0, curve: Curves.easeIn),
+        curve: const Interval(0.0, 0.5, curve: Curves.easeOutCubic),
+        reverseCurve: Curves.easeInCubic,
       ),
     );
 
@@ -95,8 +98,11 @@ class _SpringBottomSheetRoute<T> extends PageRoute<T> {
         child: Align(
           alignment: Alignment.bottomCenter,
           child: GestureDetector(
-            onTap: () {},
-            child: SlideTransition(position: slideIn, child: child),
+            onTap: () {}, // 防透传
+            child: SlideTransition(
+              position: slideIn,
+              child: child,
+            ),
           ),
         ),
       ),
@@ -104,22 +110,9 @@ class _SpringBottomSheetRoute<T> extends PageRoute<T> {
   }
 }
 
-class _SpringCurve extends Curve {
-  const _SpringCurve();
 
-  @override
-  double transformInternal(double t) {
-    if (t < 0.55) {
-      return Curves.easeOut.transform(t / 0.55) * 1.06;
-    } else if (t < 0.78) {
-      final p = (t - 0.55) / (0.78 - 0.55);
-      return 1.06 - p * 0.09;
-    } else {
-      final p = (t - 0.78) / (1.0 - 0.78);
-      return 0.97 + p * 0.03;
-    }
-  }
-}
+
+
 
 class _ChaptersPanelSheet extends StatelessWidget {
   const _ChaptersPanelSheet({
@@ -137,69 +130,82 @@ class _ChaptersPanelSheet extends StatelessWidget {
     final chapters = details.chapters;
     final screenH = MediaQuery.of(context).size.height;
 
-    return Container(
-      constraints: BoxConstraints(maxHeight: screenH * 0.65),
-      decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 10, bottom: 4),
-            child: Container(
-              width: 36,
-              height: 4,
-              decoration: BoxDecoration(
-                color: cs.onSurfaceVariant.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        // 这一层用于在弹性回环（弹窗跳得比屏幕底部更高）时，遮挡住屏幕底部的空缺
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: -200,
+          height: 200,
+          child: ColoredBox(color: cs.surface),
+        ),
+        Container(
+          constraints: BoxConstraints(maxHeight: screenH * 0.65),
+          decoration: BoxDecoration(
+            color: cs.surface,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-            child: Row(
-              children: [
-                Text(
-                  '章节',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(top: 10, bottom: 4),
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: cs.onSurfaceVariant.withValues(alpha: 0.3),
+                    borderRadius: BorderRadius.circular(2),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  '共 ${chapters.length} 话',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: cs.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 1),
-          Flexible(
-            child: GridView.builder(
-              padding: const EdgeInsets.all(14),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-                mainAxisSpacing: 8,
-                crossAxisSpacing: 8,
-                childAspectRatio: 2.8,
               ),
-              itemCount: chapters.length,
-              itemBuilder: (context, index) {
-                final entry = chapters.entries.elementAt(index);
-                return _ChapterChip(
-                  label: entry.value,
-                  onTap: () => onChapterTap(entry.key, entry.value, index),
-                );
-              },
-            ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+                child: Row(
+                  children: [
+                    Text(
+                      '章节',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '共 ${chapters.length} 话',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              Flexible(
+                child: GridView.builder(
+                  padding: const EdgeInsets.all(14),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    mainAxisSpacing: 8,
+                    crossAxisSpacing: 8,
+                    childAspectRatio: 2.8,
+                  ),
+                  itemCount: chapters.length,
+                  itemBuilder: (context, index) {
+                    final entry = chapters.entries.elementAt(index);
+                    return _ChapterChip(
+                      label: entry.value,
+                      onTap: () => onChapterTap(entry.key, entry.value, index),
+                    );
+                  },
+                ),
+              ),
+              SizedBox(height: MediaQuery.of(context).padding.bottom + 8),
+            ],
           ),
-          SizedBox(height: MediaQuery.of(context).padding.bottom + 8),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

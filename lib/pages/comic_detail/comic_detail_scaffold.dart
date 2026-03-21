@@ -19,6 +19,15 @@ class _ComicDetailAppBarTitle extends StatelessWidget {
       duration: const Duration(milliseconds: 220),
       switchInCurve: Curves.easeOutCubic,
       switchOutCurve: Curves.easeInCubic,
+      layoutBuilder: (currentChild, previousChildren) {
+        return Stack(
+          alignment: Alignment.centerLeft,
+          children: <Widget>[
+            ...previousChildren,
+            if (currentChild != null) currentChild,
+          ],
+        );
+      },
       transitionBuilder: (child, animation) {
         final offset = Tween<Offset>(
           begin: const Offset(0, 0.18),
@@ -41,7 +50,9 @@ class _ComicDetailAppBarTitle extends StatelessWidget {
               key: const ValueKey('default-appbar-update-time'),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodyMedium,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w500,
+              ),
             ),
     );
   }
@@ -208,6 +219,7 @@ class _ComicDetailBody extends StatelessWidget {
                       Tab(text: '相关'),
                     ],
                   ),
+                  surface,
                 ),
               ),
             ];
