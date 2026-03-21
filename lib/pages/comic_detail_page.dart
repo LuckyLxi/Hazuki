@@ -1125,7 +1125,6 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
   @override
   Widget build(BuildContext context) {
     final theme = _buildDetailTheme(Theme.of(context));
-
     final topInset = MediaQuery.of(context).padding.top + kToolbarHeight;
     final surface = theme.colorScheme.surface;
 
@@ -1140,36 +1139,11 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
           extendBodyBehindAppBar: true,
           appBar: AppBar(
             titleSpacing: 0,
-            title: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 220),
-              switchInCurve: Curves.easeOutCubic,
-              switchOutCurve: Curves.easeInCubic,
-              transitionBuilder: (child, animation) {
-                final offset = Tween<Offset>(
-                  begin: const Offset(0, 0.18),
-                  end: Offset.zero,
-                ).animate(animation);
-                return FadeTransition(
-                  opacity: animation,
-                  child: SlideTransition(position: offset, child: child),
-                );
-              },
-              child: _showCollapsedComicTitle
-                  ? Text(
-                      _appBarComicTitle,
-                      key: const ValueKey('collapsed-appbar-title'),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    )
-                  : Text(
-                      _appBarUpdateTime.isNotEmpty
-                          ? '漫画更新时间：$_appBarUpdateTime'
-                          : '漫画详情',
-                      key: const ValueKey('default-appbar-update-time'),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodyMedium,
-                    ),
+            title: _ComicDetailAppBarTitle(
+              showCollapsedComicTitle: _showCollapsedComicTitle,
+              appBarComicTitle: _appBarComicTitle,
+              appBarUpdateTime: _appBarUpdateTime,
+              theme: theme,
             ),
             backgroundColor: Color.lerp(
               Colors.transparent,
@@ -1182,31 +1156,10 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
           ),
           body: Stack(
             children: [
-              Positioned(
-                left: 0,
-                right: 0,
-                top: 0,
-                // 提供足够的背景高度，避免滚动时出现未覆盖区域。
-                height: MediaQuery.of(context).size.height,
-                child: AnimatedBuilder(
-                  animation: _scrollController,
-                  builder: (context, child) {
-                    final offset = _scrollController.hasClients
-                        ? _scrollController.offset.clamp(0.0, double.infinity)
-                        : 0.0;
-                    return Transform.translate(
-                      offset: Offset(0, -offset * 0.51),
-                      child: child,
-                    );
-                  },
-                  child: RepaintBoundary(
-                    child: _ComicBlurredCoverBackground(
-                      coverUrl: widget.comic.cover.trim(),
-                    ),
-                  ),
-                ),
+              _ComicDetailParallaxBackground(
+                scrollController: _scrollController,
+                coverUrl: widget.comic.cover.trim(),
               ),
-              // 中间辅助过渡层，随 AppBar 实色进度增强遮罩。
               Positioned.fill(
                 child: IgnorePointer(
                   child: ColoredBox(
@@ -1216,120 +1169,28 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
               ),
               Padding(
                 padding: EdgeInsets.only(top: topInset),
-                child: FutureBuilder<ComicDetailsData>(
+                child: _ComicDetailBody(
                   future: _future,
-                  builder: (context, snapshot) {
-                    final details = snapshot.data;
-                    final isDark =
-                        Theme.of(context).brightness == Brightness.dark;
-                    final skeletonColor = isDark
-                        ? Colors.white.withValues(alpha: 0.1)
-                        : Colors.black.withValues(alpha: 0.06);
-
-                    // 稳定的 Header 数据。
-                    final displayTitle = details?.title ?? widget.comic.title;
-                    final displaySubTitle =
-                        details?.subTitle ?? widget.comic.subTitle;
-                    final listCoverUrl = widget.comic.cover.trim();
-                    final displayCoverUrl = listCoverUrl.isNotEmpty
-                        ? listCoverUrl
-                        : (details?.cover.trim() ?? '');
-                    _appBarComicTitle = displayTitle;
-                    _appBarUpdateTime = details?.updateTime ?? '';
-
-                    return NestedScrollView(
-                      controller: _scrollController,
-                      physics: const ClampingScrollPhysics(),
-                      headerSliverBuilder: (context, _) {
-                        return [
-                          SliverToBoxAdapter(
-                            child: DecoratedBox(
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  begin: Alignment.topCenter,
-                                  end: Alignment.bottomCenter,
-                                  colors: [
-                                    surface.withValues(alpha: 0.0),
-                                    surface.withValues(alpha: 0.9),
-                                    surface,
-                                  ],
-                                  stops: const [0.75, 0.95, 1.0],
-                                ),
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.fromLTRB(
-                                  16,
-                                  16,
-                                  16,
-                                  0,
-                                ),
-                                child: _ComicDetailHeaderSection(
-                                  heroTag: widget.heroTag,
-                                  details: details,
-                                  skeletonColor: skeletonColor,
-                                  displayTitle: displayTitle,
-                                  displaySubTitle: displaySubTitle,
-                                  displayCoverUrl: displayCoverUrl,
-                                  viewsText: details != null
-                                      ? _extractComicViewsText(details)
-                                      : '',
-                                  headerTitleKey: _headerTitleKey,
-                                  favoriteRowKey: _favoriteRowKey,
-                                  actionButtonsKey: _actionButtonsKey,
-                                  favoriteBusy: _favoriteBusy,
-                                  favoriteOverride: _favoriteOverride,
-                                  lastReadProgress: _lastReadProgress,
-                                  onCoverTap: displayCoverUrl.isEmpty
-                                      ? null
-                                      : () =>
-                                            _showCoverPreview(displayCoverUrl),
-                                  onFavoriteTap: _toggleFavorite,
-                                  onShowChapters: _showChaptersPanel,
-                                  onOpenReader: _openReader,
-                                ),
-                              ),
-                            ),
-                          ),
-                          SliverPersistentHeader(
-                            pinned: true,
-                            delegate: _HazukiTabBarDelegate(
-                              const TabBar(
-                                tabs: [
-                                  Tab(text: '详情'),
-                                  Tab(text: '评论'),
-                                  Tab(text: '相关'),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ];
-                      },
-                      body: ColoredBox(
-                        color: surface,
-                        child: TabBarView(
-                          children: [
-                            _ComicDetailInfoTab(
-                              details: details,
-                              skeletonColor: skeletonColor,
-                              metaSectionBuilder: _buildDetailMetaSection,
-                            ),
-                            details != null
-                                ? CommentsPage(
-                                    comicId: details.id,
-                                    subId: details.subId.isEmpty
-                                        ? null
-                                        : details.subId,
-                                    isTabView: true,
-                                  )
-                                : const _ComicDetailLoadingView(),
-                            _ComicDetailRelatedTab(
-                              details: details,
-                              heroTagPrefix: widget.heroTag,
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
+                  scrollController: _scrollController,
+                  surface: surface,
+                  heroTag: widget.heroTag,
+                  comic: widget.comic,
+                  headerTitleKey: _headerTitleKey,
+                  favoriteRowKey: _favoriteRowKey,
+                  actionButtonsKey: _actionButtonsKey,
+                  favoriteBusy: _favoriteBusy,
+                  favoriteOverride: _favoriteOverride,
+                  lastReadProgress: _lastReadProgress,
+                  buildViewsText: _extractComicViewsText,
+                  buildMetaSection: _buildDetailMetaSection,
+                  onShowCoverPreview: (imageUrl) =>
+                      unawaited(_showCoverPreview(imageUrl)),
+                  onFavoriteTap: _toggleFavorite,
+                  onShowChapters: _showChaptersPanel,
+                  onOpenReader: _openReader,
+                  onDetailsResolved: ({required title, required updateTime}) {
+                    _appBarComicTitle = title;
+                    _appBarUpdateTime = updateTime;
                   },
                 ),
               ),

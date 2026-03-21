@@ -35,6 +35,7 @@ part 'pages/comic_detail/comic_detail_cover.dart';
 part 'pages/comic_detail/comic_detail_meta.dart';
 part 'pages/comic_detail/comic_detail_sections.dart';
 part 'pages/comic_detail/comic_detail_header.dart';
+part 'pages/comic_detail/comic_detail_scaffold.dart';
 part 'pages/reader_page.dart';
 part 'pages/comments_page.dart';
 part 'pages/search/search_page.dart';
