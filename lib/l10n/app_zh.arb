@@ -12,6 +12,8 @@
   "settingsPrivacySubtitle": "隐私相关功能",
   "settingsCloudSyncTitle": "云同步",
   "settingsCloudSyncSubtitle": "上传与恢复备份",
+  "settingsOtherTitle": "其它",
+  "settingsOtherSubtitle": "签到与附加功能",
   "settingsAdvancedTitle": "高级",
   "settingsAdvancedSubtitle": "实验性功能",
   "settingsAboutTitle": "关于",
@@ -91,9 +93,32 @@
   "homeMenuHistory": "历史记录",
   "homeMenuCategories": "标签分类",
   "homeMenuRanking": "排行榜",
+  "homeMenuDownloads": "下载",
   "homeMenuLines": "线路",
+  "homeCheckInAction": "签到",
+  "homeCheckInDone": "今日已签到",
+  "homeCheckInInProgress": "签到中...",
+  "homeCheckInSuccess": "签到成功",
+  "homeCheckInAlreadyDone": "今天已经签到过了",
+  "homeCheckInFailed": "签到失败：{error}",
+  "@homeCheckInFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
   "homeTabDiscover": "发现",
   "homeTabFavorite": "收藏",
+  "otherTitle": "其它",
+  "otherAutoCheckInTitle": "自动签到",
+  "otherAutoCheckInSubtitle": "开启后，每天打开软件时会自动触发一次签到",
+  "sourceBootstrapDownloading": "正在下载漫画源",
+  "sourceBootstrapPreparing": "正在准备源文件...",
+  "sourceBootstrapProgress": "已下载 {progress}%",
+  "@sourceBootstrapProgress": {
+    "placeholders": {
+      "progress": {}
+    }
+  },
   "dialogBarrierLabel": "对话框",
   "aboutTitle": "关于",
   "aboutVersion": "版本 1.0.0",
@@ -320,6 +345,12 @@
   "sourceUpdateDownloadFailed": "下载失败，请稍后重试",
   "sourceUpdateDownload": "下载",
   "readingSettingsTitle": "阅读设置",
+  "readingModeTitle": "阅读模式",
+  "readingModeSubtitle": "选择阅读器中的页面排列方式",
+  "readingModeTopToBottom": "从上往下",
+  "readingModeRightToLeft": "从右到左",
+  "readingTapToTurnPageTitle": "点击翻页",
+  "readingTapToTurnPageSubtitle": "仅在从右到左模式下生效，点击左侧回到上一页，点击右侧前往下一页",
   "readingImmersiveModeTitle": "沉浸模式",
   "readingImmersiveModeSubtitle": "开启后进入阅读器自动隐藏状态栏和底部导航栏",
   "readingKeepScreenOnTitle": "屏幕常亮",
@@ -336,6 +367,58 @@
   "readingPinchToZoomSubtitle": "启用后可双指捏合对漫画图片进行放大查看",
   "readingLongPressSaveTitle": "长按保存图片",
   "readingLongPressSaveSubtitle": "启用后长按漫画图片可保存该图片",
+  "downloadsTitle": "下载",
+  "downloadsTabOngoing": "正在下载",
+  "downloadsTabDownloaded": "已下载",
+  "downloadsEmptyOngoing": "暂无下载任务",
+  "downloadsEmptyDownloaded": "还没有已下载漫画",
+  "downloadsSelectionTitle": "已选择 {count} 项",
+  "@downloadsSelectionTitle": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "downloadsDeleteSelectedTitle": "删除已下载漫画",
+  "downloadsDeleteSelectedContent": "确定删除选中的 {count} 部已下载漫画吗？",
+  "@downloadsDeleteSelectedContent": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "downloadsStatusQueued": "等待中",
+  "downloadsStatusDownloading": "下载中",
+  "downloadsStatusPaused": "已暂停",
+  "downloadsStatusFailed": "失败：{error}",
+  "@downloadsStatusFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "downloadsChapterCount": "共 {count} 话",
+  "@downloadsChapterCount": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "downloadsCurrentProgress": "{current}/{total} 张图片",
+  "@downloadsCurrentProgress": {
+    "placeholders": {
+      "current": {},
+      "total": {}
+    }
+  },
+  "downloadsActionSelect": "选择",
+  "downloadsActionPause": "暂停",
+  "downloadsActionResume": "继续",
+  "downloadsQueued": "已加入 {count} 话到下载队列",
+  "@downloadsQueued": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "downloadsDownloadChaptersTitle": "下载章节",
+  "downloadsDownloadChaptersSubtitle": "选择要下载的章节",
+  "downloadsDownloadAction": "下载",
   "privacySettingsTitle": "隐私设置",
   "privacyBlurTaskTitle": "模糊任务栏应用页面",
   "privacyBlurTaskSubtitle": "切到近期任务时任务卡片显示为纯黑",

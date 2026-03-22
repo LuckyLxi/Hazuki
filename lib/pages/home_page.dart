@@ -31,6 +31,10 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
   int _authVersion = 0;
   DateTime? _lastBackPressedAt;
   double _discoverSearchMorphProgress = 0;
+  bool _autoCheckInEnabled = false;
+  bool _didAttemptStartupCheckIn = false;
+  bool _checkInBusy = false;
+  bool _checkedInToday = false;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final GlobalKey<_FavoritePageState> _favoritePageKey =
       GlobalKey<_FavoritePageState>();
@@ -47,15 +51,34 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
     _currentIndex = widget.initialTabIndex.clamp(0, 1);
     unawaited(_syncUserProfile());
     unawaited(_loadFirstUseText());
+    unawaited(_loadOtherSettings());
     if (HazukiSourceService.instance.isLogged) {
       unawaited(HazukiSourceService.instance.warmUpFavoritesDebugInfo());
     }
   }
 
+  @override
+  void didUpdateWidget(covariant HazukiHomePage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final oldLocaleCode = oldWidget.locale?.languageCode;
+    final newLocaleCode = widget.locale?.languageCode;
+    if (oldLocaleCode != newLocaleCode) {
+      unawaited(_loadFirstUseText());
+      unawaited(_syncUserProfile());
+    }
+  }
+
   Future<void> _syncUserProfile() async {
-    try {
-      await HazukiSourceService.instance.ensureInitialized();
-    } catch (_) {}
+    if (!HazukiSourceService.instance.isInitialized) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _username = l10n(context).homeGuestUser;
+        _avatarUrl = null;
+      });
+      return;
+    }
 
     if (!mounted) {
       return;
@@ -78,6 +101,7 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
       _username = username;
       _avatarUrl = avatar;
     });
+    unawaited(_refreshCheckInState());
   }
 
   Future<void> _loadFirstUseText() async {
@@ -102,6 +126,107 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
     setState(() {
       _firstUseText = text;
     });
+  }
+
+  Future<void> _loadOtherSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    final enabled = prefs.getBool(_autoCheckInEnabledKey) ?? false;
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _autoCheckInEnabled = enabled;
+    });
+    if (enabled) {
+      unawaited(_maybeAutoCheckInOnStartup());
+    }
+  }
+
+  Future<void> _refreshCheckInState() async {
+    if (!HazukiSourceService.instance.isLogged) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _checkedInToday = false;
+      });
+      return;
+    }
+
+    try {
+      final checked = await HazukiSourceService.instance
+          .isDailyCheckInCompletedToday();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _checkedInToday = checked;
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _maybeAutoCheckInOnStartup() async {
+    if (_didAttemptStartupCheckIn) {
+      return;
+    }
+    _didAttemptStartupCheckIn = true;
+
+    try {
+      await HazukiSourceService.instance.ensureInitialized();
+    } catch (_) {
+      return;
+    }
+
+    if (!mounted ||
+        !_autoCheckInEnabled ||
+        !HazukiSourceService.instance.isLogged ||
+        _checkInBusy) {
+      return;
+    }
+
+    await _performCheckIn(triggeredAutomatically: true);
+  }
+
+  Future<void> _performCheckIn({required bool triggeredAutomatically}) async {
+    if (_checkInBusy) {
+      return;
+    }
+
+    setState(() => _checkInBusy = true);
+    try {
+      final result = await HazukiSourceService.instance.performDailyCheckIn();
+      if (!mounted) {
+        return;
+      }
+      if (result.isSuccess || result.isAlreadyCheckedIn) {
+        setState(() {
+          _checkedInToday = true;
+        });
+      }
+      final promptMessage = result.isSuccess
+          ? l10n(context).homeCheckInSuccess
+          : result.isAlreadyCheckedIn
+          ? l10n(context).homeCheckInAlreadyDone
+          : (result.message?.trim().isNotEmpty ?? false)
+          ? result.message!.trim()
+          : l10n(context).homeCheckInAlreadyDone;
+      unawaited(showHazukiPrompt(context, promptMessage));
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      unawaited(
+        showHazukiPrompt(
+          context,
+          l10n(context).homeCheckInFailed('$e'),
+          isError: true,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _checkInBusy = false);
+      }
+    }
   }
 
   Future<T?> _showAnimatedDialog<T>({
@@ -335,6 +460,7 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
 
                                             setState(() => _authVersion++);
                                             await _syncUserProfile();
+                                            await _refreshCheckInState();
 
                                             // 加载头像 URL 用于卡片展示
                                             var avatar = '';
@@ -364,13 +490,10 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
                                             if (!mounted) {
                                               return;
                                             }
-                                            ScaffoldMessenger.of(
-                                              context,
-                                            ).showSnackBar(
-                                              SnackBar(
-                                                content: Text(
-                                                  strings.homeLoginSuccess,
-                                                ),
+                                            unawaited(
+                                              showHazukiPrompt(
+                                                context,
+                                                strings.homeLoginSuccess,
                                               ),
                                             );
                                           } catch (e) {
@@ -419,11 +542,10 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
     if (!mounted) return;
     setState(() {
       _authVersion++;
+      _checkedInToday = false;
     });
     unawaited(_syncUserProfile());
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(l10n(context).homeLoggedOut)));
+    unawaited(showHazukiPrompt(context, l10n(context).homeLoggedOut));
   }
 
   Future<bool> _showSaveAvatarConfirmDialog() async {
@@ -470,15 +592,17 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(strings.homeAvatarSaved(file.path))),
-      );
+      unawaited(showHazukiPrompt(context, strings.homeAvatarSaved(file.path)));
     } catch (e) {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(strings.homeAvatarSaveFailed('$e'))),
+      unawaited(
+        showHazukiPrompt(
+          context,
+          strings.homeAvatarSaveFailed('$e'),
+          isError: true,
+        ),
       );
     }
   }
@@ -565,8 +689,8 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
     if (last == null || now.difference(last) > const Duration(seconds: 2)) {
       _lastBackPressedAt = now;
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n(context).homePressBackAgainToExit)),
+        unawaited(
+          showHazukiPrompt(context, l10n(context).homePressBackAgainToExit),
         );
       }
       return false;
@@ -786,6 +910,50 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
                 ),
                 const SizedBox(height: 12),
                 Text(_username, style: Theme.of(context).textTheme.titleMedium),
+                if (isLogged && !_autoCheckInEnabled) ...[
+                  const SizedBox(height: 8),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 260),
+                    switchInCurve: Curves.easeOutBack,
+                    switchOutCurve: Curves.easeInCubic,
+                    transitionBuilder: (child, animation) {
+                      return ScaleTransition(
+                        scale: Tween<double>(begin: 0.92, end: 1).animate(
+                          animation,
+                        ),
+                        child: FadeTransition(opacity: animation, child: child),
+                      );
+                    },
+                    child: FilledButton.icon(
+                      key: ValueKey(
+                        'checkin-${_checkInBusy ? 'busy' : _checkedInToday ? 'done' : 'idle'}',
+                      ),
+                      onPressed: (_checkInBusy || _checkedInToday)
+                          ? null
+                          : () => _performCheckIn(
+                              triggeredAutomatically: false,
+                            ),
+                      icon: _checkInBusy
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Icon(
+                              _checkedInToday
+                                  ? Icons.check_circle_outline
+                                  : Icons.event_available_outlined,
+                            ),
+                      label: Text(
+                        _checkInBusy
+                            ? l10n(context).homeCheckInInProgress
+                            : _checkedInToday
+                            ? l10n(context).homeCheckInDone
+                            : l10n(context).homeCheckInAction,
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 16),
                 const Divider(height: 1),
                 ListTile(
@@ -825,11 +993,23 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
                   },
                 ),
                 ListTile(
-                  leading: const Icon(Icons.settings_outlined),
-                  title: Text(l10n(context).settingsTitle),
+                  leading: const Icon(Icons.download_outlined),
+                  title: Text(l10n(context).homeMenuDownloads),
                   onTap: () {
                     Navigator.pop(context);
                     Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const DownloadsPage(),
+                      ),
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.settings_outlined),
+                  title: Text(l10n(context).settingsTitle),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    await Navigator.of(context).push(
                       MaterialPageRoute<void>(
                         builder: (_) => SettingsPage(
                           appearanceSettings: widget.appearanceSettings,
@@ -839,6 +1019,10 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
                         ),
                       ),
                     );
+                    if (!mounted) {
+                      return;
+                    }
+                    await _loadOtherSettings();
                   },
                 ),
                 ListTile(

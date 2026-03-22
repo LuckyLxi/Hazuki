@@ -230,6 +230,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeMenuRanking => 'Ranking';
 
   @override
+  String get homeMenuDownloads => 'Downloads';
+
+  @override
   String get homeMenuLines => 'Lines';
 
   @override
@@ -657,6 +660,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get readingSettingsTitle => 'Reading settings';
 
   @override
+  String get readingModeTitle => 'Reading mode';
+
+  @override
+  String get readingModeSubtitle =>
+      'Choose how pages are arranged in the reader';
+
+  @override
+  String get readingModeTopToBottom => 'Top to bottom';
+
+  @override
+  String get readingModeRightToLeft => 'Right to left';
+
+  @override
+  String get readingTapToTurnPageTitle => 'Tap to turn page';
+
+  @override
+  String get readingTapToTurnPageSubtitle =>
+      'Only works in right-to-left mode. Tap the left side for the previous page and the right side for the next page';
+
+  @override
   String get readingImmersiveModeTitle => 'Immersive mode';
 
   @override
@@ -690,6 +713,82 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get readingLongPressSaveSubtitle => 'Allow saving the current comic image by long pressing it';
+
+  @override
+  String get downloadsTitle => 'Downloads';
+
+  @override
+  String get downloadsTabOngoing => 'Downloading';
+
+  @override
+  String get downloadsTabDownloaded => 'Downloaded';
+
+  @override
+  String get downloadsEmptyOngoing => 'No active downloads';
+
+  @override
+  String get downloadsEmptyDownloaded => 'No downloaded comics yet';
+
+  @override
+  String downloadsSelectionTitle(Object count) {
+    return '$count selected';
+  }
+
+  @override
+  String get downloadsDeleteSelectedTitle => 'Delete downloaded comics';
+
+  @override
+  String downloadsDeleteSelectedContent(Object count) {
+    return 'Delete $count selected downloaded comics?';
+  }
+
+  @override
+  String get downloadsStatusQueued => 'Queued';
+
+  @override
+  String get downloadsStatusDownloading => 'Downloading';
+
+  @override
+  String get downloadsStatusPaused => 'Paused';
+
+  @override
+  String downloadsStatusFailed(Object error) {
+    return 'Failed: $error';
+  }
+
+  @override
+  String downloadsChapterCount(Object count) {
+    return '$count chapters';
+  }
+
+  @override
+  String downloadsCurrentProgress(Object current, Object total) {
+    return '$current/$total images';
+  }
+
+  @override
+  String get downloadsActionSelect => 'Select';
+
+  @override
+  String get downloadsActionPause => 'Pause';
+
+  @override
+  String get downloadsActionResume => 'Resume';
+
+  @override
+  String downloadsQueued(Object count) {
+    return '$count chapters added to downloads';
+  }
+
+  @override
+  String get downloadsDownloadChaptersTitle => 'Download chapters';
+
+  @override
+  String get downloadsDownloadChaptersSubtitle =>
+      'Select the chapters you want to download';
+
+  @override
+  String get downloadsDownloadAction => 'Download';
 
   @override
   String get privacySettingsTitle => 'Privacy settings';
@@ -1232,4 +1331,50 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get advancedNoImageModeSubtitle => 'Hide images globally (except the login avatar in the sidebar)';
+
+  @override
+  String get settingsOtherTitle => 'Other';
+
+  @override
+  String get settingsOtherSubtitle => 'Check-in and extra actions';
+
+  @override
+  String get homeCheckInAction => 'Check in';
+
+  @override
+  String get homeCheckInDone => 'Checked in today';
+
+  @override
+  String get homeCheckInInProgress => 'Checking in...';
+
+  @override
+  String get homeCheckInSuccess => 'Check-in successful';
+
+  @override
+  String get homeCheckInAlreadyDone => 'Already checked in today';
+
+  @override
+  String homeCheckInFailed(Object error) {
+    return 'Check-in failed: $error';
+  }
+
+  @override
+  String get otherTitle => 'Other';
+
+  @override
+  String get otherAutoCheckInTitle => 'Auto daily check-in';
+
+  @override
+  String get otherAutoCheckInSubtitle => 'Automatically check in once when the app is opened each day';
+
+  @override
+  String get sourceBootstrapDownloading => 'Downloading comic source';
+
+  @override
+  String get sourceBootstrapPreparing => 'Preparing source files...';
+
+  @override
+  String sourceBootstrapProgress(Object progress) {
+    return 'Downloaded $progress%';
+  }
 }

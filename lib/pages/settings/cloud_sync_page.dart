@@ -16,6 +16,7 @@ class _CloudSyncPageState extends State<CloudSyncPage> {
   bool _loading = true;
   bool _saving = false;
   bool _syncing = false;
+  bool _checkingConnectivity = false;
   CloudSyncConnectionStatus? _status;
 
   @override
@@ -44,6 +45,19 @@ class _CloudSyncPageState extends State<CloudSyncPage> {
       _passwordController.text = config.password;
       _loading = false;
     });
+    if (config.enabled && config.isComplete) {
+      unawaited(_checkConnectivityOnce(config));
+    } else if (mounted) {
+      setState(() {
+        _status = CloudSyncConnectionStatus(
+          ok: false,
+          message: config.enabled
+              ? l10n(context).cloudSyncStatusIncomplete
+              : l10n(context).cloudSyncStatusDisabled,
+          checkedAt: DateTime.now(),
+        );
+      });
+    }
   }
 
   CloudSyncConfig _buildConfig() {
@@ -53,6 +67,32 @@ class _CloudSyncPageState extends State<CloudSyncPage> {
       username: _usernameController.text.trim(),
       password: _passwordController.text,
     );
+  }
+
+  Future<void> _checkConnectivityOnce(CloudSyncConfig config) async {
+    if (_checkingConnectivity) {
+      return;
+    }
+    setState(() {
+      _checkingConnectivity = true;
+    });
+    try {
+      final status = await CloudSyncService.instance.testConnection(
+        configOverride: config,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _status = status;
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _checkingConnectivity = false;
+        });
+      }
+    }
   }
 
   Future<void> _save() async {
@@ -65,15 +105,23 @@ class _CloudSyncPageState extends State<CloudSyncPage> {
         uri != null && uri.hasScheme && config.url.trim().isNotEmpty;
     final strings = l10n(context);
     if (config.enabled && !config.isComplete) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(strings.cloudSyncIncompleteConfig)),
+      unawaited(
+        showHazukiPrompt(
+          context,
+          strings.cloudSyncIncompleteConfig,
+          isError: true,
+        ),
       );
       return;
     }
     if (config.enabled && !urlValid) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(strings.cloudSyncInvalidUrl)));
+      unawaited(
+        showHazukiPrompt(
+          context,
+          strings.cloudSyncInvalidUrl,
+          isError: true,
+        ),
+      );
       return;
     }
 
@@ -103,15 +151,17 @@ class _CloudSyncPageState extends State<CloudSyncPage> {
       setState(() {
         _status = status;
       });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(strings.cloudSyncConfigSaved)));
+      unawaited(showHazukiPrompt(context, strings.cloudSyncConfigSaved));
     } catch (e) {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(strings.cloudSyncSaveFailed('$e'))),
+      unawaited(
+        showHazukiPrompt(
+          context,
+          strings.cloudSyncSaveFailed('$e'),
+          isError: true,
+        ),
       );
     } finally {
       if (mounted) {
@@ -129,8 +179,12 @@ class _CloudSyncPageState extends State<CloudSyncPage> {
     final config = _buildConfig();
     final strings = l10n(context);
     if (!config.enabled || !config.isComplete) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(strings.cloudSyncNeedCompleteConfig)),
+      unawaited(
+        showHazukiPrompt(
+          context,
+          strings.cloudSyncNeedCompleteConfig,
+          isError: true,
+        ),
       );
       return;
     }
@@ -149,15 +203,17 @@ class _CloudSyncPageState extends State<CloudSyncPage> {
       setState(() {
         _status = status;
       });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(strings.cloudSyncUploadCompleted)));
+      unawaited(showHazukiPrompt(context, strings.cloudSyncUploadCompleted));
     } catch (e) {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(strings.cloudSyncUploadFailed('$e'))),
+      unawaited(
+        showHazukiPrompt(
+          context,
+          strings.cloudSyncUploadFailed('$e'),
+          isError: true,
+        ),
       );
     } finally {
       if (mounted) {
@@ -175,8 +231,12 @@ class _CloudSyncPageState extends State<CloudSyncPage> {
     final config = _buildConfig();
     final strings = l10n(context);
     if (!config.enabled || !config.isComplete) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(strings.cloudSyncNeedCompleteConfig)),
+      unawaited(
+        showHazukiPrompt(
+          context,
+          strings.cloudSyncNeedCompleteConfig,
+          isError: true,
+        ),
       );
       return;
     }
@@ -220,15 +280,17 @@ class _CloudSyncPageState extends State<CloudSyncPage> {
       setState(() {
         _status = status;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(strings.cloudSyncRestoreCompleted)),
-      );
+      unawaited(showHazukiPrompt(context, strings.cloudSyncRestoreCompleted));
     } catch (e) {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(strings.cloudSyncRestoreFailed('$e'))),
+      unawaited(
+        showHazukiPrompt(
+          context,
+          strings.cloudSyncRestoreFailed('$e'),
+          isError: true,
+        ),
       );
     } finally {
       if (mounted) {
@@ -253,14 +315,23 @@ class _CloudSyncPageState extends State<CloudSyncPage> {
     }
 
     final status = _status;
-    final statusText = status == null
+    final statusText = !_enabled
+        ? strings.cloudSyncStatusDisabled
+        : _checkingConnectivity
+        ? strings.commonLoading
+        : status == null
         ? strings.cloudSyncStatusUnchecked
         : '${status.ok ? strings.cloudSyncStatusConnected : strings.cloudSyncStatusDisconnected}\n${status.message}';
-    final statusColor = status == null
+    final statusColor = !_enabled
+        ? Theme.of(context).colorScheme.outline
+        : _checkingConnectivity
+        ? Theme.of(context).colorScheme.primary
+        : status == null
         ? Theme.of(context).colorScheme.outline
         : status.ok
         ? Colors.green
         : Theme.of(context).colorScheme.error;
+    final controlsEnabled = _enabled && !_saving && !_syncing;
 
     return Scaffold(
       appBar: hazukiFrostedAppBar(
@@ -277,105 +348,125 @@ class _CloudSyncPageState extends State<CloudSyncPage> {
             onChanged: (value) {
               setState(() {
                 _enabled = value;
+                if (!value) {
+                  _status = CloudSyncConnectionStatus(
+                    ok: false,
+                    message: strings.cloudSyncStatusDisabled,
+                    checkedAt: DateTime.now(),
+                  );
+                }
               });
             },
           ),
           const SizedBox(height: 12),
-          TextField(
-            controller: _urlController,
-            enabled: !_saving && !_syncing,
-            decoration: InputDecoration(
-              labelText: 'URL',
-              border: const OutlineInputBorder(),
-              helperText: strings.cloudSyncUrlHelper,
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _usernameController,
-            enabled: !_saving && !_syncing,
-            decoration: InputDecoration(
-              labelText: strings.cloudSyncUsernameLabel,
-              border: const OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _passwordController,
-            enabled: !_saving && !_syncing,
-            obscureText: true,
-            decoration: InputDecoration(
-              labelText: strings.cloudSyncPasswordLabel,
-              border: const OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                flex: 1,
-                child: Container(
-                  height: 52,
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                      color: statusColor.withValues(alpha: 0.7),
+          IgnorePointer(
+            ignoring: !_enabled,
+            child: AnimatedOpacity(
+              duration: const Duration(milliseconds: 180),
+              opacity: _enabled ? 1 : 0.45,
+              child: Column(
+                children: [
+                  TextField(
+                    controller: _urlController,
+                    enabled: controlsEnabled,
+                    decoration: InputDecoration(
+                      labelText: 'URL',
+                      border: const OutlineInputBorder(),
+                      helperText: strings.cloudSyncUrlHelper,
                     ),
-                    borderRadius: BorderRadius.circular(10),
                   ),
-                  alignment: Alignment.center,
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child: Text(
-                    statusText,
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 12, color: statusColor),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _usernameController,
+                    enabled: controlsEnabled,
+                    decoration: InputDecoration(
+                      labelText: strings.cloudSyncUsernameLabel,
+                      border: const OutlineInputBorder(),
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _passwordController,
+                    enabled: controlsEnabled,
+                    obscureText: true,
+                    decoration: InputDecoration(
+                      labelText: strings.cloudSyncPasswordLabel,
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        flex: 1,
+                        child: Container(
+                          height: 52,
+                          decoration: BoxDecoration(
+                            border: Border.all(
+                              color: statusColor.withValues(alpha: 0.7),
+                            ),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          alignment: Alignment.center,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: Text(
+                            statusText,
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 12, color: statusColor),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: 2,
+                        child: SizedBox(
+                          height: 52,
+                          child: FilledButton(
+                            onPressed: controlsEnabled ? _save : null,
+                            child: _saving
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : Text(strings.cloudSyncSave),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: controlsEnabled ? _uploadBackup : null,
+                          icon: const Icon(Icons.cloud_upload_outlined),
+                          label: Text(strings.cloudSyncUpload),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: FilledButton.tonalIcon(
+                          onPressed: controlsEnabled ? _restoreBackup : null,
+                          icon: const Icon(Icons.restore_outlined),
+                          label: Text(strings.cloudSyncRestore),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (_syncing) ...[
+                    const SizedBox(height: 12),
+                    const LinearProgressIndicator(),
+                  ],
+                ],
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                flex: 2,
-                child: SizedBox(
-                  height: 52,
-                  child: FilledButton(
-                    onPressed: (_saving || _syncing) ? null : _save,
-                    child: _saving
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Text(strings.cloudSyncSave),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: (_saving || _syncing) ? null : _uploadBackup,
-                  icon: const Icon(Icons.cloud_upload_outlined),
-                  label: Text(strings.cloudSyncUpload),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: FilledButton.tonalIcon(
-                  onPressed: (_saving || _syncing) ? null : _restoreBackup,
-                  icon: const Icon(Icons.restore_outlined),
-                  label: Text(strings.cloudSyncRestore),
-                ),
-              ),
-            ],
-          ),
-          if (_syncing) ...[
-            const SizedBox(height: 12),
-            const LinearProgressIndicator(),
-          ],
         ],
       ),
     );

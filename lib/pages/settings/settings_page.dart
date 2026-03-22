@@ -88,6 +88,18 @@ class SettingsPage extends StatelessWidget {
             },
           ),
           ListTile(
+            leading: const Icon(Icons.widgets_outlined),
+            title: Text(strings.settingsOtherTitle),
+            subtitle: Text(strings.settingsOtherSubtitle),
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const OtherSettingsPage(),
+                ),
+              );
+            },
+          ),
+          ListTile(
             leading: const Icon(Icons.settings_applications_outlined),
             title: Text(strings.settingsAdvancedTitle),
             subtitle: Text(strings.settingsAdvancedSubtitle),

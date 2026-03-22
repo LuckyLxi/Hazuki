@@ -271,7 +271,7 @@ extension HazukiSourceServiceImageCacheCapability on HazukiSourceService {
           now.difference(DateTime.fromMillisecondsSinceEpoch(lastAtMs)) >=
               const Duration(days: 7);
       if (shouldCleanByAge) {
-        await _cleanImageCacheByAge(const Duration(days: 7));
+        await _cleanImageCacheByAge(const Duration(days: 1));
         await prefs.setInt(
           HazukiSourceService._cacheLastAutoCleanAtKey,
           now.millisecondsSinceEpoch,
@@ -279,8 +279,8 @@ extension HazukiSourceServiceImageCacheCapability on HazukiSourceService {
       }
     }
 
-    await _trimImageCacheToMaxBytes();
-    if (mode != 'seven_days') {
+    final trimmedByOverflow = await _trimImageCacheToOverflowTarget();
+    if (mode != 'seven_days' && trimmedByOverflow) {
       await prefs.setInt(
         HazukiSourceService._cacheLastAutoCleanAtKey,
         now.millisecondsSinceEpoch,
@@ -288,7 +288,7 @@ extension HazukiSourceServiceImageCacheCapability on HazukiSourceService {
     }
   }
 
-  Future<void> _trimImageCacheToMaxBytes() async {
+  Future<bool> _trimImageCacheToOverflowTarget() async {
     final dir = await _ensureImageCacheDir();
     final entities = await dir.list(followLinks: false).toList();
     final files = <File>[];
@@ -315,21 +315,31 @@ extension HazukiSourceServiceImageCacheCapability on HazukiSourceService {
 
     final maxBytes = imageCacheMaxBytes;
     if (total <= maxBytes) {
-      return;
+      return false;
+    }
+
+    var targetBytes =
+        (maxBytes * HazukiSourceService._cacheOverflowTrimTargetRatio).round();
+    if (targetBytes < 0) {
+      targetBytes = 0;
     }
 
     stats.sort((a, b) => a.value.modified.compareTo(b.value.modified));
+    var removedAny = false;
     for (final item in stats) {
-      if (total <= maxBytes) {
+      if (total <= targetBytes) {
         break;
       }
       try {
         await item.key.delete();
         total -= item.value.size;
+        removedAny = true;
       } catch (_) {
         continue;
       }
     }
+
+    return removedAny;
   }
 
   Future<void> _cleanImageCacheByAge(Duration keepDuration) async {

@@ -54,8 +54,12 @@ class AboutPage extends StatelessWidget {
                 await launchUrl(url, mode: LaunchMode.externalApplication);
               } else {
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(strings.aboutOpenLinkFailed)),
+                  unawaited(
+                    showHazukiPrompt(
+                      context,
+                      strings.aboutOpenLinkFailed,
+                      isError: true,
+                    ),
                   );
                 }
               }
@@ -73,8 +77,12 @@ class AboutPage extends StatelessWidget {
                 await launchUrl(url, mode: LaunchMode.externalApplication);
               } else {
                 if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(strings.aboutOpenFeedbackFailed)),
+                  unawaited(
+                    showHazukiPrompt(
+                      context,
+                      strings.aboutOpenFeedbackFailed,
+                      isError: true,
+                    ),
                   );
                 }
               }
@@ -85,9 +93,7 @@ class AboutPage extends StatelessWidget {
             title: Text(strings.aboutLicenseTitle),
             subtitle: Text(strings.aboutLicenseSubtitle),
             onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text(strings.aboutLicenseSnackbar)),
-              );
+              unawaited(showHazukiPrompt(context, strings.aboutLicenseSnackbar));
             },
           ),
           ListTile(

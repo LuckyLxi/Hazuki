@@ -12,6 +12,8 @@
   "settingsPrivacySubtitle": "Privacy-related features",
   "settingsCloudSyncTitle": "Cloud Sync",
   "settingsCloudSyncSubtitle": "Upload and restore backups",
+  "settingsOtherTitle": "Other",
+  "settingsOtherSubtitle": "Check-in and extra actions",
   "settingsAdvancedTitle": "Advanced",
   "settingsAdvancedSubtitle": "Experimental features",
   "settingsAboutTitle": "About",
@@ -91,9 +93,32 @@
   "homeMenuHistory": "History",
   "homeMenuCategories": "Categories",
   "homeMenuRanking": "Ranking",
+  "homeMenuDownloads": "Downloads",
   "homeMenuLines": "Lines",
+  "homeCheckInAction": "Check in",
+  "homeCheckInDone": "Checked in today",
+  "homeCheckInInProgress": "Checking in...",
+  "homeCheckInSuccess": "Check-in successful",
+  "homeCheckInAlreadyDone": "Already checked in today",
+  "homeCheckInFailed": "Check-in failed: {error}",
+  "@homeCheckInFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
   "homeTabDiscover": "Discover",
   "homeTabFavorite": "Favorites",
+  "otherTitle": "Other",
+  "otherAutoCheckInTitle": "Auto daily check-in",
+  "otherAutoCheckInSubtitle": "Automatically check in once when the app is opened each day",
+  "sourceBootstrapDownloading": "Downloading comic source",
+  "sourceBootstrapPreparing": "Preparing source files...",
+  "sourceBootstrapProgress": "Downloaded {progress}%",
+  "@sourceBootstrapProgress": {
+    "placeholders": {
+      "progress": {}
+    }
+  },
   "dialogBarrierLabel": "Dialog",
   "aboutTitle": "About",
   "aboutVersion": "Version 1.0.0",
@@ -320,6 +345,12 @@
   "sourceUpdateDownloadFailed": "Download failed. Please try again later.",
   "sourceUpdateDownload": "Download",
   "readingSettingsTitle": "Reading settings",
+  "readingModeTitle": "Reading mode",
+  "readingModeSubtitle": "Choose how pages are arranged in the reader",
+  "readingModeTopToBottom": "Top to bottom",
+  "readingModeRightToLeft": "Right to left",
+  "readingTapToTurnPageTitle": "Tap to turn page",
+  "readingTapToTurnPageSubtitle": "Only works in right-to-left mode. Tap the left side for the previous page and the right side for the next page",
   "readingImmersiveModeTitle": "Immersive mode",
   "readingImmersiveModeSubtitle": "Hide the status bar and bottom navigation bar automatically when entering the reader",
   "readingKeepScreenOnTitle": "Keep screen on",
@@ -336,6 +367,58 @@
   "readingPinchToZoomSubtitle": "Allow two-finger pinch gestures to zoom comic images",
   "readingLongPressSaveTitle": "Long press to save images",
   "readingLongPressSaveSubtitle": "Allow saving the current comic image by long pressing it",
+  "downloadsTitle": "Downloads",
+  "downloadsTabOngoing": "Downloading",
+  "downloadsTabDownloaded": "Downloaded",
+  "downloadsEmptyOngoing": "No active downloads",
+  "downloadsEmptyDownloaded": "No downloaded comics yet",
+  "downloadsSelectionTitle": "{count} selected",
+  "@downloadsSelectionTitle": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "downloadsDeleteSelectedTitle": "Delete downloaded comics",
+  "downloadsDeleteSelectedContent": "Delete {count} selected downloaded comics?",
+  "@downloadsDeleteSelectedContent": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "downloadsStatusQueued": "Queued",
+  "downloadsStatusDownloading": "Downloading",
+  "downloadsStatusPaused": "Paused",
+  "downloadsStatusFailed": "Failed: {error}",
+  "@downloadsStatusFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "downloadsChapterCount": "{count} chapters",
+  "@downloadsChapterCount": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "downloadsCurrentProgress": "{current}/{total} images",
+  "@downloadsCurrentProgress": {
+    "placeholders": {
+      "current": {},
+      "total": {}
+    }
+  },
+  "downloadsActionSelect": "Select",
+  "downloadsActionPause": "Pause",
+  "downloadsActionResume": "Resume",
+  "downloadsQueued": "{count} chapters added to downloads",
+  "@downloadsQueued": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "downloadsDownloadChaptersTitle": "Download chapters",
+  "downloadsDownloadChaptersSubtitle": "Select the chapters you want to download",
+  "downloadsDownloadAction": "Download",
   "privacySettingsTitle": "Privacy settings",
   "privacyBlurTaskTitle": "Blur app in recent tasks",
   "privacyBlurTaskSubtitle": "Show a pure black task card when switching to recent apps",

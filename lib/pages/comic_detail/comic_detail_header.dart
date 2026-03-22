@@ -162,16 +162,13 @@ class _ComicDetailHeaderSection extends StatelessWidget {
           Row(
             key: actionButtonsKey,
             children: [
-              Expanded(
-                flex: 1,
-                child: TextButton(
-                  onPressed: () => onShowChapters(details!),
-                  child: Text(l10n(context).comicDetailChapters),
-                ),
+              IconButton(
+                tooltip: l10n(context).comicDetailChapters,
+                onPressed: () => onShowChapters(details!),
+                icon: const Icon(Icons.format_list_bulleted_rounded),
               ),
               const SizedBox(width: 8),
               Expanded(
-                flex: 4,
                 child: FilledButton.icon(
                   onPressed: () => onOpenReader(details!),
                   icon: const Icon(Icons.menu_book_outlined),
@@ -184,12 +181,18 @@ class _ComicDetailHeaderSection extends StatelessWidget {
           Row(
             key: actionButtonsKey,
             children: [
-              Expanded(child: Container(height: 48, color: skeletonColor)),
-              const SizedBox(width: 8),
-              Expanded(
-                flex: 2,
-                child: Container(height: 48, color: skeletonColor),
+              SizedBox(
+                width: 48,
+                height: 48,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: skeletonColor,
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                ),
               ),
+              const SizedBox(width: 8),
+              Expanded(child: Container(height: 48, color: skeletonColor)),
             ],
           ),
         const SizedBox(height: 8),

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui';
 
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
@@ -17,6 +18,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/hazuki_models.dart';
 
 part 'source/account_session_capability.dart';
+part 'source/check_in_capability.dart';
 part 'source/comments_capability.dart';
 part 'source/debug_capability.dart';
 part 'source/explore_capability.dart';
@@ -24,6 +26,7 @@ part 'source/category_capability.dart';
 part 'source/comic_details_capability.dart';
 part 'source/favorites_capability.dart';
 part 'source/image_cache_capability.dart';
+part 'source/image_prepare_capability.dart';
 part 'source/line_settings.dart';
 part 'source/source_loader_capability.dart';
 
@@ -42,6 +45,32 @@ const _sourceIndexUrls = [
 ];
 
 const _bundledInitAssetPath = 'assets/init.js';
+
+enum DailyCheckInStatus {
+  success,
+  alreadyCheckedIn,
+  skipped,
+}
+
+class DailyCheckInResult {
+  const DailyCheckInResult._(this.status, [this.message]);
+
+  const DailyCheckInResult.success([String? message])
+    : this._(DailyCheckInStatus.success, message);
+
+  const DailyCheckInResult.alreadyCheckedIn([String? message])
+    : this._(DailyCheckInStatus.alreadyCheckedIn, message);
+
+  const DailyCheckInResult.skipped([String? message])
+    : this._(DailyCheckInStatus.skipped, message);
+
+  final DailyCheckInStatus status;
+  final String? message;
+
+  bool get isSuccess => status == DailyCheckInStatus.success;
+  bool get isAlreadyCheckedIn => status == DailyCheckInStatus.alreadyCheckedIn;
+  bool get isSkipped => status == DailyCheckInStatus.skipped;
+}
 
 class HazukiSourceService {
   HazukiSourceService._();
@@ -71,6 +100,7 @@ class HazukiSourceService {
   final List<Map<String, dynamic>> _recentNetworkLogs = [];
   int _networkLogDedupedCount = 0;
   Map<String, dynamic>? _lastLoginDebugInfo;
+  Map<String, dynamic>? _lastSourceVersionDebugInfo;
   final LinkedHashMap<String, Uint8List> _imageBytesCache =
       LinkedHashMap<String, Uint8List>();
   final Map<String, Future<Uint8List>> _imageDownloadInFlight =
@@ -92,19 +122,24 @@ class HazukiSourceService {
   static const int _defaultCacheMaxBytes = 400 * 1024 * 1024;
   static const String _defaultAutoCleanMode = 'size_overflow';
   static const Duration _discoverCacheTtl = Duration(days: 1);
+  static const double _cacheOverflowTrimTargetRatio = 0.1;
 
   String get statusText => _statusText;
   SourceMeta? get sourceMeta => _sourceMeta;
   bool get isInitialized => _engine != null && _sourceMeta != null;
 
-  Future<void> init() async {
+  Future<void> init({
+    void Function(int received, int total)? onSourceDownloadProgress,
+  }) async {
     final inFlight = _initFuture;
     if (inFlight != null) {
       await inFlight;
       return;
     }
 
-    final future = _initInternal();
+    final future = _initInternal(
+      onSourceDownloadProgress: onSourceDownloadProgress,
+    );
     _initFuture = future;
     await future;
   }
@@ -135,13 +170,17 @@ class HazukiSourceService {
     }
   }
 
-  Future<void> _initInternal() async {
+  Future<void> _initInternal({
+    void Function(int received, int total)? onSourceDownloadProgress,
+  }) async {
     try {
       _prefs = await SharedPreferences.getInstance();
       _configureDioCookieBridge();
       await _initImageCache();
       await _initDiscoverCache();
-      final result = await _downloadOrLoadSourceFiles();
+      final result = await _downloadOrLoadSourceFiles(
+        onProgress: onSourceDownloadProgress,
+      );
       final meta = await _loadSourceMetadata(result.initFile, result.jmFile);
       _sourceMeta = meta;
       _statusText =
@@ -152,16 +191,48 @@ class HazukiSourceService {
   }
 
   Future<SourceVersionCheckResult?> checkJmSourceVersionFromCloud() async {
-    final supportDir = await getApplicationSupportDirectory();
-    final sourceDir = Directory('${supportDir.path}/comic_source');
+    final sourceDir = await _getSourceStorageDirectory();
     final jmFile = File('${sourceDir.path}/jm.js');
     if (!await jmFile.exists()) {
+      _lastSourceVersionDebugInfo = {
+        'checkedAt': DateTime.now().toIso8601String(),
+        'sourceDir': sourceDir.path,
+        'localJmExists': false,
+        'outcome': 'local_jm_missing',
+      };
       return null;
     }
 
     final localVersion = await _readJmVersionFromFile(jmFile);
+    final remoteVersionDirect = await _resolveRemoteJmVersion();
+    if (remoteVersionDirect != null && remoteVersionDirect.isNotEmpty) {
+      final hasUpdate = _isVersionGreater(remoteVersionDirect, localVersion);
+      _lastSourceVersionDebugInfo = {
+        'checkedAt': DateTime.now().toIso8601String(),
+        'sourceDir': sourceDir.path,
+        'localJmExists': true,
+        'localVersion': localVersion,
+        'remoteVersion': remoteVersionDirect,
+        'hasUpdate': hasUpdate,
+        'remoteVersionSource':
+            _lastSourceVersionDebugInfo?['resolvedFrom'] ?? 'unknown',
+        'outcome': hasUpdate ? 'update_available' : 'no_update',
+      };
+      return SourceVersionCheckResult(
+        localVersion: localVersion,
+        remoteVersion: remoteVersionDirect,
+        hasUpdate: hasUpdate,
+      );
+    }
     final indexRaw = await _downloadFromUrls(_sourceIndexUrls);
     if (indexRaw == null || indexRaw.trim().isEmpty) {
+      _lastSourceVersionDebugInfo = {
+        'checkedAt': DateTime.now().toIso8601String(),
+        'sourceDir': sourceDir.path,
+        'localJmExists': true,
+        'localVersion': localVersion,
+        'outcome': 'index_download_empty',
+      };
       return null;
     }
 
@@ -169,9 +240,23 @@ class HazukiSourceService {
     try {
       decoded = jsonDecode(indexRaw);
     } catch (_) {
+      _lastSourceVersionDebugInfo = {
+        'checkedAt': DateTime.now().toIso8601String(),
+        'sourceDir': sourceDir.path,
+        'localJmExists': true,
+        'localVersion': localVersion,
+        'outcome': 'index_json_decode_failed',
+      };
       return null;
     }
     if (decoded is! List) {
+      _lastSourceVersionDebugInfo = {
+        'checkedAt': DateTime.now().toIso8601String(),
+        'sourceDir': sourceDir.path,
+        'localJmExists': true,
+        'localVersion': localVersion,
+        'outcome': 'index_json_not_list',
+      };
       return null;
     }
 
@@ -193,21 +278,39 @@ class HazukiSourceService {
     }
 
     if (remoteVersion == null || remoteVersion.isEmpty) {
+      _lastSourceVersionDebugInfo = {
+        'checkedAt': DateTime.now().toIso8601String(),
+        'sourceDir': sourceDir.path,
+        'localJmExists': true,
+        'localVersion': localVersion,
+        'outcome': 'remote_version_not_found_in_index',
+      };
       return null;
     }
+
+    final hasUpdate = _isVersionGreater(remoteVersion, localVersion);
+    _lastSourceVersionDebugInfo = {
+      'checkedAt': DateTime.now().toIso8601String(),
+      'sourceDir': sourceDir.path,
+      'localJmExists': true,
+      'localVersion': localVersion,
+      'remoteVersion': remoteVersion,
+      'hasUpdate': hasUpdate,
+      'remoteVersionSource': 'index_fallback_parse',
+      'outcome': hasUpdate ? 'update_available' : 'no_update',
+    };
 
     return SourceVersionCheckResult(
       localVersion: localVersion,
       remoteVersion: remoteVersion,
-      hasUpdate: _isVersionGreater(remoteVersion, localVersion),
+      hasUpdate: hasUpdate,
     );
   }
 
   Future<bool> downloadJmSourceAndReload({
     void Function(int received, int total)? onProgress,
   }) async {
-    final supportDir = await getApplicationSupportDirectory();
-    final sourceDir = Directory('${supportDir.path}/comic_source');
+    final sourceDir = await _getSourceStorageDirectory();
     if (!await sourceDir.exists()) {
       await sourceDir.create(recursive: true);
     }
@@ -240,6 +343,31 @@ class HazukiSourceService {
     _statusText =
         'source_reloaded|${result.name}|${result.key}|${result.version}';
     return true;
+  }
+
+  Future<bool> hasLocalJmSourceFile() async {
+    final sourceDir = await _getSourceStorageDirectory();
+    final jmFile = File('${sourceDir.path}/jm.js');
+    return jmFile.exists();
+  }
+
+  Future<Directory> _getSourceStorageDirectory() async {
+    if (Platform.isAndroid) {
+      final externalDir = await getExternalStorageDirectory();
+      if (externalDir != null) {
+        return Directory('${externalDir.path}/comic_source');
+      }
+    }
+
+    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+      final downloadsDir = await getDownloadsDirectory();
+      if (downloadsDir != null) {
+        return Directory('${downloadsDir.path}/hazuki_source_test');
+      }
+    }
+
+    final documentsDir = await getApplicationDocumentsDirectory();
+    return Directory('${documentsDir.path}/comic_source');
   }
 
   Future<bool> refreshSourceOnNetworkRecovery() async {
@@ -670,12 +798,16 @@ class HazukiSourceService {
     return Uint8List(0);
   }
 
-  Future<String?> _downloadFromUrls(List<String> urls) async {
+  Future<String?> _downloadFromUrls(
+    List<String> urls, {
+    String source = 'source_fetch',
+  }) async {
     if (urls.isEmpty) {
       return null;
     }
 
     Future<String?> requestOnce(String url) async {
+      final startedAt = DateTime.now();
       try {
         final response = await _dio.get<String>(
           url,
@@ -684,11 +816,30 @@ class HazukiSourceService {
             headers: {'cache-control': 'no-cache'},
           ),
         );
+        _appendNetworkLog(
+          source: source,
+          method: 'GET',
+          url: url,
+          statusCode: response.statusCode,
+          error: null,
+          startedAt: startedAt,
+          responseHeaders: response.headers.map,
+          responseBody: response.data,
+        );
         if (response.statusCode == 200 &&
             (response.data?.isNotEmpty ?? false)) {
           return response.data;
         }
-      } catch (_) {}
+      } catch (e) {
+        _appendNetworkLog(
+          source: source,
+          method: 'GET',
+          url: url,
+          statusCode: null,
+          error: e.toString(),
+          startedAt: startedAt,
+        );
+      }
       return null;
     }
 
@@ -723,8 +874,10 @@ class HazukiSourceService {
   Future<String?> _downloadFromUrlsWithProgress(
     List<String> urls, {
     void Function(int received, int total)? onProgress,
+    String source = 'source_download',
   }) async {
     for (final url in urls) {
+      final startedAt = DateTime.now();
       try {
         final response = await _dio.get<String>(
           url,
@@ -734,11 +887,30 @@ class HazukiSourceService {
           ),
           onReceiveProgress: onProgress,
         );
+        _appendNetworkLog(
+          source: source,
+          method: 'GET',
+          url: url,
+          statusCode: response.statusCode,
+          error: null,
+          startedAt: startedAt,
+          responseHeaders: response.headers.map,
+          responseBody: response.data,
+        );
         if (response.statusCode == 200 &&
             (response.data?.isNotEmpty ?? false)) {
           return response.data;
         }
-      } catch (_) {}
+      } catch (e) {
+        _appendNetworkLog(
+          source: source,
+          method: 'GET',
+          url: url,
+          statusCode: null,
+          error: e.toString(),
+          startedAt: startedAt,
+        );
+      }
     }
     return null;
   }
@@ -746,6 +918,62 @@ class HazukiSourceService {
   Future<String> _readJmVersionFromFile(File jmFile) async {
     final content = await jmFile.readAsString();
     return _extractSourceVersion(content);
+  }
+
+  Future<String?> _resolveRemoteJmVersion() async {
+    final indexRaw = await _downloadFromUrls(
+      _sourceIndexUrls,
+      source: 'source_version_index',
+    );
+    if (indexRaw != null && indexRaw.trim().isNotEmpty) {
+      try {
+        final decoded = jsonDecode(indexRaw);
+        if (decoded is List) {
+          for (final item in decoded) {
+            if (item is! Map) {
+              continue;
+            }
+            final map = Map<String, dynamic>.from(item);
+            final key = map['key']?.toString().trim().toLowerCase();
+            final fileName = map['fileName']?.toString().trim().toLowerCase();
+            if (key != 'jm' && fileName != 'jm.js') {
+              continue;
+            }
+            final version = map['version']?.toString().trim();
+            if (version != null && version.isNotEmpty) {
+              _lastSourceVersionDebugInfo = {
+                'checkedAt': DateTime.now().toIso8601String(),
+                'resolvedFrom': 'index_json',
+                'matchedKey': key,
+                'matchedFileName': fileName,
+                'remoteVersion': version,
+              };
+              return version;
+            }
+          }
+        }
+      } catch (_) {}
+    }
+
+    final remoteScript = await _downloadFromUrls(
+      _jmSourceUrls,
+      source: 'source_version_jm_script',
+    );
+    if (remoteScript == null || remoteScript.trim().isEmpty) {
+      _lastSourceVersionDebugInfo = {
+        'checkedAt': DateTime.now().toIso8601String(),
+        'resolvedFrom': 'failed',
+        'outcome': 'remote_script_empty',
+      };
+      return null;
+    }
+    final version = _extractSourceVersion(remoteScript);
+    _lastSourceVersionDebugInfo = {
+      'checkedAt': DateTime.now().toIso8601String(),
+      'resolvedFrom': 'jm_script',
+      'remoteVersion': version,
+    };
+    return version;
   }
 
   String _extractSourceVersion(String script) {

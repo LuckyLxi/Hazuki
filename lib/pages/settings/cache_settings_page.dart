@@ -163,9 +163,7 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
     if (!mounted) {
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(strings.cacheLimitUpdated('$normalizedMb'))),
-    );
+    unawaited(showHazukiPrompt(context, strings.cacheLimitUpdated('$normalizedMb')));
   }
 
   Future<void> _chooseAutoCleanMode() async {
@@ -243,13 +241,12 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
     if (!mounted) {
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          result == 'seven_days'
-              ? strings.cacheAutoCleanSevenDaysApplied
-              : strings.cacheAutoCleanOverflowApplied,
-        ),
+    unawaited(
+      showHazukiPrompt(
+        context,
+        result == 'seven_days'
+            ? strings.cacheAutoCleanSevenDaysApplied
+            : strings.cacheAutoCleanOverflowApplied,
       ),
     );
   }
@@ -308,16 +305,18 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(strings.cacheCleared)));
+      unawaited(showHazukiPrompt(context, strings.cacheCleared));
     } catch (e) {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(strings.cacheClearFailed('$e'))));
+      unawaited(
+        showHazukiPrompt(
+          context,
+          strings.cacheClearFailed('$e'),
+          isError: true,
+        ),
+      );
     } finally {
       if (mounted) {
         await _loadCacheStatus();

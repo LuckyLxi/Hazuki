@@ -205,15 +205,23 @@ class _CommentsPageState extends State<CommentsPage>
     }
 
     if (!HazukiSourceService.instance.isLogged) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n(context).commentsLoginRequiredToSend)),
+      unawaited(
+        showHazukiPrompt(
+          context,
+          l10n(context).commentsLoginRequiredToSend,
+          isError: true,
+        ),
       );
       return;
     }
 
     if (!HazukiSourceService.instance.supportCommentSend) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n(context).commentsSourceNotSupported)),
+      unawaited(
+        showHazukiPrompt(
+          context,
+          l10n(context).commentsSourceNotSupported,
+          isError: true,
+        ),
       );
       return;
     }
@@ -238,16 +246,18 @@ class _CommentsPageState extends State<CommentsPage>
       setState(() {
         _replyToComment = null;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n(context).commentsSendSuccess)),
-      );
+      unawaited(showHazukiPrompt(context, l10n(context).commentsSendSuccess));
       await _loadInitial();
     } catch (e) {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n(context).commentsSendFailed('$e'))),
+      unawaited(
+        showHazukiPrompt(
+          context,
+          l10n(context).commentsSendFailed('$e'),
+          isError: true,
+        ),
       );
     } finally {
       if (mounted) {

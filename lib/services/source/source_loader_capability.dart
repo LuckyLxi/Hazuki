@@ -1,9 +1,10 @@
 part of '../hazuki_source_service.dart';
 
 extension HazukiSourceServiceSourceLoaderCapability on HazukiSourceService {
-  Future<_SourceLoadResult> _downloadOrLoadSourceFiles() async {
-    final supportDir = await getApplicationSupportDirectory();
-    final sourceDir = Directory('${supportDir.path}/comic_source');
+  Future<_SourceLoadResult> _downloadOrLoadSourceFiles({
+    void Function(int received, int total)? onProgress,
+  }) async {
+    final sourceDir = await _getSourceStorageDirectory();
     if (!await sourceDir.exists()) {
       await sourceDir.create(recursive: true);
     }
@@ -24,7 +25,10 @@ extension HazukiSourceServiceSourceLoaderCapability on HazukiSourceService {
       );
     }
 
-    final jmScript = await _downloadFromUrls(_jmSourceUrls);
+    final jmScript = await _downloadFromUrlsWithProgress(
+      _jmSourceUrls,
+      onProgress: onProgress,
+    );
     if (jmScript != null && jmScript.trim().isNotEmpty) {
       await jmFile.writeAsString(jmScript);
       return _SourceLoadResult(

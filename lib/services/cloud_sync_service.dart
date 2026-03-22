@@ -420,7 +420,35 @@ class CloudSyncService {
     final data = Map<String, dynamic>.from(dataRaw);
     final prefs = await SharedPreferences.getInstance();
     for (final entry in data.entries) {
-      await _setPrefValue(prefs, entry.key, entry.value);
+      final sanitized = _sanitizeRestoredSetting(entry.key, entry.value);
+      if (sanitized == null) {
+        continue;
+      }
+      await _setPrefValue(prefs, entry.key, sanitized);
+    }
+  }
+
+  dynamic _sanitizeRestoredSetting(String key, dynamic value) {
+    final normalizedKey = key.trim();
+    if (normalizedKey == 'cookie_store_v1') {
+      return null;
+    }
+    if (!normalizedKey.startsWith('source_data_')) {
+      return value;
+    }
+    if (value is! String || value.trim().isEmpty) {
+      return value;
+    }
+    try {
+      final decoded = jsonDecode(value);
+      if (decoded is! Map) {
+        return value;
+      }
+      final sanitized = Map<String, dynamic>.from(decoded);
+      sanitized.remove('account');
+      return jsonEncode(sanitized);
+    } catch (_) {
+      return value;
     }
   }
 

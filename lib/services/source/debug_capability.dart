@@ -127,11 +127,20 @@ void _appendNetworkLog({
 }) {
   final endedAt = DateTime.now();
   final durationMs = endedAt.difference(startedAt).inMilliseconds;
-  final requestHeadersSafe = _jsonSafe(requestHeaders);
-  final requestDataSafe = _jsonSafe(requestData);
-  final responseHeadersSafe = _jsonSafe(responseHeaders);
-  final responseBodyFull = _toBodyFull(responseBody);
-  final responseBodyPreview = _toBodyPreview(responseBodyFull);
+  final isImportant = _isImportantNetworkLogForStorage(
+    source: source,
+    url: url,
+    statusCode: statusCode,
+    error: error,
+    durationMs: durationMs,
+  );
+  final requestHeadersSafe = isImportant ? _jsonSafe(requestHeaders) : null;
+  final requestDataSafe = isImportant ? _jsonSafe(requestData) : null;
+  final responseHeadersSafe = isImportant ? _jsonSafe(responseHeaders) : null;
+  final responseBodyFull = isImportant ? _toBodyFull(responseBody) : null;
+  final responseBodyPreview = isImportant
+      ? _toBodyPreview(responseBodyFull)
+      : _toBodyPreview(_toBodyFull(responseBody));
 
   final dedupKey = [
     source,
@@ -185,6 +194,43 @@ void _appendNetworkLog({
   }
 }
 
+bool _isImportantNetworkLogForStorage({
+  required String source,
+  required String url,
+  required int? statusCode,
+  required String? error,
+  required int durationMs,
+}) {
+  final normalizedSource = source.toLowerCase();
+  final normalizedUrl = url.toLowerCase();
+  final normalizedError = (error ?? '').toLowerCase();
+
+  if (normalizedError.isNotEmpty && normalizedError != 'null') {
+    return true;
+  }
+  if (statusCode != null && statusCode >= 400) {
+    return true;
+  }
+  if (durationMs >= 2500) {
+    return true;
+  }
+  if (normalizedSource.contains('login') ||
+      normalizedSource.contains('avatar') ||
+      normalizedSource.contains('source_version')) {
+    return true;
+  }
+  if (normalizedUrl.contains('/login') ||
+      normalizedUrl.contains('/favorite') ||
+      normalizedUrl.contains('/user') ||
+      normalizedUrl.contains('/daily') ||
+      normalizedUrl.contains('/daily_chk') ||
+      normalizedUrl.contains('index.json') ||
+      normalizedUrl.contains('/jm.js')) {
+    return true;
+  }
+  return false;
+}
+
 String? _toBodyFull(Object? value) {
   if (value == null) {
     return null;
@@ -222,6 +268,7 @@ Future<Map<String, dynamic>> collectNetworkDebugInfo() async {
       'dedupedCount': _networkLogDedupedCount,
     },
     'lastLoginDebugInfo': _lastLoginDebugInfo,
+    'lastSourceVersionDebugInfo': _lastSourceVersionDebugInfo,
     'recentNetworkLogs': _recentNetworkLogs.map((e) {
       final copy = Map<String, dynamic>.from(e);
       copy.remove('dedupKey');

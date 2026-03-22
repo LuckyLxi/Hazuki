@@ -86,9 +86,13 @@ class _LineSettingsPageState extends State<LineSettingsPage> {
         return;
       }
       final strings = l10n(context);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(strings.lineLoadFailed('$e'))));
+      unawaited(
+        showHazukiPrompt(
+          context,
+          strings.lineLoadFailed('$e'),
+          isError: true,
+        ),
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -152,17 +156,19 @@ class _LineSettingsPageState extends State<LineSettingsPage> {
         return;
       }
       final strings = l10n(context);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(strings.lineApiSwitched(value))));
+      unawaited(showHazukiPrompt(context, strings.lineApiSwitched(value)));
     } catch (e) {
       if (!mounted) {
         return;
       }
       final strings = l10n(context);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(strings.lineSwitchFailed('$e'))));
+      unawaited(
+        showHazukiPrompt(
+          context,
+          strings.lineSwitchFailed('$e'),
+          isError: true,
+        ),
+      );
     }
   }
 
@@ -188,17 +194,19 @@ class _LineSettingsPageState extends State<LineSettingsPage> {
         return;
       }
       final strings = l10n(context);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(strings.lineImageSwitched(value))));
+      unawaited(showHazukiPrompt(context, strings.lineImageSwitched(value)));
     } catch (e) {
       if (!mounted) {
         return;
       }
       final strings = l10n(context);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(strings.lineSwitchFailed('$e'))));
+      unawaited(
+        showHazukiPrompt(
+          context,
+          strings.lineSwitchFailed('$e'),
+          isError: true,
+        ),
+      );
     }
   }
 
@@ -216,17 +224,19 @@ class _LineSettingsPageState extends State<LineSettingsPage> {
         return;
       }
       final strings = l10n(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(strings.lineRefreshOnStartUpdated)),
-      );
+      unawaited(showHazukiPrompt(context, strings.lineRefreshOnStartUpdated));
     } catch (e) {
       if (!mounted) {
         return;
       }
       final strings = l10n(context);
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(strings.lineSaveFailed('$e'))));
+      unawaited(
+        showHazukiPrompt(
+          context,
+          strings.lineSaveFailed('$e'),
+          isError: true,
+        ),
+      );
     }
   }
 

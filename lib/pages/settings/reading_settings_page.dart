@@ -8,6 +8,8 @@ class ReadingSettingsPage extends StatefulWidget {
 }
 
 class _ReadingSettingsPageState extends State<ReadingSettingsPage> {
+  _ReaderMode _readerMode = _ReaderMode.topToBottom;
+  bool _tapToTurnPage = false;
   bool _immersiveMode = true;
   bool _keepScreenOn = true;
   bool _customBrightness = false;
@@ -25,6 +27,8 @@ class _ReadingSettingsPageState extends State<ReadingSettingsPage> {
     final prefs = await SharedPreferences.getInstance();
     if (!mounted) return;
     setState(() {
+      _readerMode = _readerModeFromRaw(prefs.getString('reader_reading_mode'));
+      _tapToTurnPage = prefs.getBool('reader_tap_to_turn_page') ?? false;
       _immersiveMode = prefs.getBool('reader_immersive_mode') ?? true;
       _keepScreenOn = prefs.getBool('reader_keep_screen_on') ?? true;
       _customBrightness = prefs.getBool('reader_custom_brightness') ?? false;
@@ -32,6 +36,23 @@ class _ReadingSettingsPageState extends State<ReadingSettingsPage> {
       _pinchToZoom = prefs.getBool('reader_pinch_to_zoom') ?? false;
       _longPressToSave = prefs.getBool('reader_long_press_save') ?? false;
     });
+  }
+
+  Future<void> _updateReaderMode(_ReaderMode? value) async {
+    if (value == null) {
+      return;
+    }
+    setState(() {
+      _readerMode = value;
+    });
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('reader_reading_mode', value.prefsValue);
+  }
+
+  Future<void> _toggleTapToTurnPage(bool value) async {
+    setState(() => _tapToTurnPage = value);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('reader_tap_to_turn_page', value);
   }
 
   Future<void> _toggleImmersiveMode(bool value) async {
@@ -86,6 +107,37 @@ class _ReadingSettingsPageState extends State<ReadingSettingsPage> {
       ),
       body: ListView(
         children: [
+          ListTile(
+            leading: const Icon(Icons.chrome_reader_mode_outlined),
+            title: Text(strings.readingModeTitle),
+            subtitle: Text(strings.readingModeSubtitle),
+            trailing: DropdownButtonHideUnderline(
+              child: DropdownButton<_ReaderMode>(
+                value: _readerMode,
+                borderRadius: BorderRadius.circular(18),
+                onChanged: _updateReaderMode,
+                items: [
+                  DropdownMenuItem(
+                    value: _ReaderMode.topToBottom,
+                    child: Text(strings.readingModeTopToBottom),
+                  ),
+                  DropdownMenuItem(
+                    value: _ReaderMode.rightToLeft,
+                    child: Text(strings.readingModeRightToLeft),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          SwitchListTile(
+            secondary: const Icon(Icons.touch_app_outlined),
+            title: Text(strings.readingTapToTurnPageTitle),
+            subtitle: Text(strings.readingTapToTurnPageSubtitle),
+            value: _tapToTurnPage,
+            onChanged: _readerMode == _ReaderMode.rightToLeft
+                ? _toggleTapToTurnPage
+                : null,
+          ),
           SwitchListTile(
             secondary: const Icon(Icons.fullscreen_outlined),
             title: Text(strings.readingImmersiveModeTitle),

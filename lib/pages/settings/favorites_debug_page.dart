@@ -12,7 +12,7 @@ class _FavoritesDebugPageState extends State<FavoritesDebugPage> {
   String? _errorText;
   bool _loading = true;
   bool _fullLoading = false;
-  bool _importantOnly = false;
+  bool _importantOnly = true;
   Map<String, dynamic>? _rawDebugInfo;
 
   @override
@@ -32,9 +32,7 @@ class _FavoritesDebugPageState extends State<FavoritesDebugPage> {
     if (!mounted) {
       return;
     }
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(l10n(context).favoritesDebugCopied)));
+    unawaited(showHazukiPrompt(context, l10n(context).favoritesDebugCopied));
   }
 
   Future<void> _loadNetworkDebugInfo() async {
@@ -139,7 +137,7 @@ class _FavoritesDebugPageState extends State<FavoritesDebugPage> {
 
     final targetLogs = importantOnly
         ? logs.where(_isImportantLog).toList()
-        : logs;
+        : _limitUnimportantLogs(logs);
 
     final normalizedLogs = targetLogs.map((log) {
       final item = Map<String, dynamic>.from(log);
@@ -168,8 +166,35 @@ class _FavoritesDebugPageState extends State<FavoritesDebugPage> {
       ...(copy['networkLogStats'] as Map? ?? const {}),
       'visibleCount': normalizedLogs.length,
       'totalCountBeforeFilter': logs.length,
+      'importantCount': logs.where(_isImportantLog).length,
+      'noiseDroppedCount': importantOnly
+          ? logs.length - normalizedLogs.length
+          : logs.length - normalizedLogs.length,
     };
     return copy;
+  }
+
+  List<Map<String, dynamic>> _limitUnimportantLogs(List<Map<String, dynamic>> logs) {
+    const maxUnimportantLogs = 12;
+    final importantLogs = <Map<String, dynamic>>[];
+    final unimportantLogs = <Map<String, dynamic>>[];
+
+    for (final log in logs) {
+      if (_isImportantLog(log)) {
+        importantLogs.add(log);
+      } else {
+        unimportantLogs.add(log);
+      }
+    }
+
+    if (unimportantLogs.length <= maxUnimportantLogs) {
+      return [...importantLogs, ...unimportantLogs];
+    }
+
+    final recentUnimportant = unimportantLogs
+        .skip(unimportantLogs.length - maxUnimportantLogs)
+        .toList();
+    return [...importantLogs, ...recentUnimportant];
   }
 
   String _toCompactBody(dynamic body) {
@@ -205,6 +230,12 @@ class _FavoritesDebugPageState extends State<FavoritesDebugPage> {
       return true;
     }
 
+    final isSlowRequest =
+        log['durationMs'] is num && (log['durationMs'] as num).toInt() >= 2500;
+    if (isSlowRequest) {
+      return true;
+    }
+
     if (statusCode != null && statusCode >= 400) {
       return true;
     }
@@ -212,10 +243,15 @@ class _FavoritesDebugPageState extends State<FavoritesDebugPage> {
     final authChainRelated =
         source.contains('login') ||
         source.contains('avatar') ||
+        source.contains('source_version') ||
         method == 'LOGIN' ||
         url.contains('/login') ||
         url.contains('/user') ||
         url.contains('/favorite') ||
+        url.contains('index.json') ||
+        url.contains('/jm.js') ||
+        url.contains('/daily') ||
+        url.contains('/daily_chk') ||
         url.contains('source://avatar') ||
         url.contains('source://account.login') ||
         url.contains('signin') ||

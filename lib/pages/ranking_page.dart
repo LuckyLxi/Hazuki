@@ -84,11 +84,10 @@ class _RankingPageState extends State<RankingPage> {
   }
 
   Future<List<CategoryRankingOption>> _loadRankingOptions() {
+    final timeoutMessage = l10n(context).rankingLoadOptionsTimeout;
     return HazukiSourceService.instance.loadCategoryRankingOptions().timeout(
       _loadTimeout,
-      onTimeout: () {
-        throw Exception(l10n(context).rankingLoadOptionsTimeout);
-      },
+      onTimeout: () => throw Exception(timeoutMessage),
     );
   }
 
@@ -96,13 +95,12 @@ class _RankingPageState extends State<RankingPage> {
     required String rankingOption,
     required int page,
   }) {
+    final timeoutMessage = l10n(context).rankingLoadTimeout;
     return HazukiSourceService.instance
         .loadCategoryRankingComics(rankingOption: rankingOption, page: page)
         .timeout(
           _loadTimeout,
-          onTimeout: () {
-            throw Exception(l10n(context).rankingLoadTimeout);
-          },
+          onTimeout: () => throw Exception(timeoutMessage),
         );
   }
 

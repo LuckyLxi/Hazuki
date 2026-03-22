@@ -1,5 +1,22 @@
 part of '../main.dart';
 
+enum _ReaderMode {
+  topToBottom,
+  rightToLeft;
+
+  String get prefsValue => switch (this) {
+    _ReaderMode.topToBottom => 'top_to_bottom',
+    _ReaderMode.rightToLeft => 'right_to_left',
+  };
+}
+
+_ReaderMode _readerModeFromRaw(String? raw) {
+  return switch (raw) {
+    'right_to_left' => _ReaderMode.rightToLeft,
+    _ => _ReaderMode.topToBottom,
+  };
+}
+
 class ReaderPage extends StatefulWidget {
   const ReaderPage({
     super.key,
@@ -27,6 +44,7 @@ class ReaderPage extends StatefulWidget {
 class _ReaderPageState extends State<ReaderPage>
     with SingleTickerProviderStateMixin {
   final ScrollController _scrollController = ScrollController();
+  final PageController _pageController = PageController();
 
   bool get _noImageModeEnabled => hazukiNoImageModeNotifier.value;
   final Map<String, ImageProvider> _providerCache = <String, ImageProvider>{};
@@ -59,6 +77,8 @@ class _ReaderPageState extends State<ReaderPage>
   bool _keepScreenOn = _defaultKeepScreenOn;
   bool _customBrightness = _defaultCustomBrightness;
   double _brightnessValue = _defaultBrightnessValue;
+  _ReaderMode _readerMode = _ReaderMode.topToBottom;
+  bool _tapToTurnPage = false;
   bool _pinchToZoom = false;
   bool _longPressToSave = false;
   // 整屏缩放控制器 & 是否处于放大状态
@@ -105,6 +125,7 @@ class _ReaderPageState extends State<ReaderPage>
     hazukiNoImageModeNotifier.removeListener(_handleNoImageModeChanged);
     _scrollController.removeListener(_onScrollPrefetch);
     _scrollController.dispose();
+    _pageController.dispose();
     _zoomController.removeListener(_onZoomChanged);
     _zoomController.dispose();
     _resetAnimController.dispose();
@@ -175,12 +196,17 @@ class _ReaderPageState extends State<ReaderPage>
         prefs.getBool('reader_custom_brightness') ?? _defaultCustomBrightness;
     final brightnessValue =
         prefs.getDouble('reader_brightness_value') ?? _defaultBrightnessValue;
+    final readerMode = _readerModeFromRaw(
+      prefs.getString('reader_reading_mode'),
+    );
     if (!mounted) return;
     setState(() {
       _immersiveMode = immersiveMode;
       _keepScreenOn = keepScreenOn;
       _customBrightness = customBrightness;
       _brightnessValue = brightnessValue.clamp(0.0, 1.0);
+      _readerMode = readerMode;
+      _tapToTurnPage = prefs.getBool('reader_tap_to_turn_page') ?? false;
       _pinchToZoom = prefs.getBool('reader_pinch_to_zoom') ?? false;
       _longPressToSave = prefs.getBool('reader_long_press_save') ?? false;
     });
@@ -326,13 +352,17 @@ class _ReaderPageState extends State<ReaderPage>
       final file = File('${directory.path}/$saveName');
       await file.writeAsBytes(bytes, flush: true);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(strings.comicDetailSavedToPath(file.path))),
+      unawaited(
+        showHazukiPrompt(context, strings.comicDetailSavedToPath(file.path)),
       );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(strings.comicDetailSaveFailed('$e'))),
+      unawaited(
+        showHazukiPrompt(
+          context,
+          strings.comicDetailSaveFailed('$e'),
+          isError: true,
+        ),
       );
     }
   }
@@ -508,6 +538,13 @@ class _ReaderPageState extends State<ReaderPage>
             continue;
           }
 
+          if (HazukiSourceService.instance.isLocalImagePath(url)) {
+            if (shouldKeepInMemory) {
+              unawaited(_getOrCreateImageProviderFuture(url));
+            }
+            continue;
+          }
+
           futures.add(
             HazukiSourceService.instance
                 .downloadImageBytes(
@@ -655,24 +692,28 @@ class _ReaderPageState extends State<ReaderPage>
   }
 
   Future<ImageProvider> _buildImageProvider(String url) async {
+    final sourceService = HazukiSourceService.instance;
     if (_noImageModeEnabled) {
       throw StateError('no-image mode enabled');
     }
 
-    final segments = _calcJmSegments(widget.epId, url);
+    if (sourceService.isLocalImagePath(url)) {
+      return FileImage(File(sourceService.normalizeLocalImagePath(url)));
+    }
+
+    final segments = sourceService.calculateJmImageSegments(widget.epId, url);
     if (segments <= 1 || url.toLowerCase().endsWith('.gif')) {
       return NetworkImage(url);
     }
 
     await _acquireUnscramblePermit();
     try {
-      final bytes = await HazukiSourceService.instance.downloadImageBytes(
+      final prepared = await sourceService.prepareChapterImageData(
         url,
         comicId: widget.comicId,
         epId: widget.epId,
       );
-      final fixed = await _unscrambleJmImage(bytes, segments);
-      return MemoryImage(fixed);
+      return MemoryImage(prepared.bytes);
     } catch (_) {
       return NetworkImage(url);
     } finally {
@@ -750,6 +791,145 @@ class _ReaderPageState extends State<ReaderPage>
         return Container(
           key: index < _itemKeys.length ? _itemKeys[index] : null,
           child: content,
+        );
+      },
+    );
+  }
+
+  Widget _buildReaderPageView() {
+    return PageView.builder(
+      key: ValueKey('${widget.comicId}-${widget.epId}-rtl'),
+      controller: _pageController,
+      reverse: true,
+      itemCount: _images.length,
+      physics: (_pinchToZoom && _isZoomed)
+          ? const NeverScrollableScrollPhysics()
+          : const PageScrollPhysics(),
+      onPageChanged: (index) {
+        if (_currentPageIndex != index) {
+          _currentPageIndex = index;
+          _pageIndexNotifier.value = index;
+        }
+        if (!_noImageModeEnabled) {
+          _prefetchAround(index);
+          unawaited(_prefetchAheadFrom(index));
+        }
+      },
+      itemBuilder: (context, index) {
+        final url = _images[index];
+        final cachedProvider = _providerCache[url];
+
+        if (_noImageModeEnabled) {
+          return const SizedBox.expand();
+        }
+
+        Widget buildImage(ImageProvider provider) {
+          return _wrapImageWidget(
+            ColoredBox(
+              color: Colors.black,
+              child: Center(
+                child: Image(
+                  key: ValueKey('reader-page-$url'),
+                  image: provider,
+                  fit: BoxFit.contain,
+                  width: double.infinity,
+                  height: double.infinity,
+                  filterQuality: FilterQuality.medium,
+                  frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+                    if (wasSynchronouslyLoaded || frame != null) {
+                      return child;
+                    }
+                    return const ColoredBox(color: Colors.black);
+                  },
+                  errorBuilder: (_, _, _) {
+                    return Container(
+                      color:
+                          Theme.of(context).colorScheme.surfaceContainerHighest,
+                      alignment: Alignment.center,
+                      child: const Icon(Icons.broken_image_outlined),
+                    );
+                  },
+                ),
+              ),
+            ),
+            url,
+          );
+        }
+
+        if (cachedProvider != null) {
+          return buildImage(cachedProvider);
+        }
+
+        return FutureBuilder<ImageProvider>(
+          key: ValueKey('reader-page-future-$url'),
+          future: _getOrCreateImageProviderFuture(url),
+          builder: (context, snapshot) {
+            if (snapshot.hasData) {
+              return buildImage(snapshot.data!);
+            }
+            return const ColoredBox(
+              color: Colors.black,
+              child: Center(
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _goToReaderPage(int index) async {
+    if (!_pageController.hasClients || _images.isEmpty) {
+      return;
+    }
+    final target = math.max(0, math.min(index, _images.length - 1));
+    if (target == _currentPageIndex) {
+      return;
+    }
+    await _pageController.animateToPage(
+      target,
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  Future<void> _goToPreviousPage() async {
+    if (_currentPageIndex <= 0) {
+      return;
+    }
+    await _goToReaderPage(_currentPageIndex - 1);
+  }
+
+  Future<void> _goToNextPage() async {
+    if (_currentPageIndex >= _images.length - 1) {
+      return;
+    }
+    await _goToReaderPage(_currentPageIndex + 1);
+  }
+
+  Widget _wrapReaderTapPaging(Widget child) {
+    final tapPagingEnabled =
+        _readerMode == _ReaderMode.rightToLeft &&
+        _tapToTurnPage &&
+        !(_pinchToZoom && _isZoomed);
+    if (!tapPagingEnabled) {
+      return child;
+    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onTapUp: (details) {
+            final isLeftSide =
+                details.localPosition.dx <= constraints.maxWidth / 2;
+            if (isLeftSide) {
+              unawaited(_goToPreviousPage());
+            } else {
+              unawaited(_goToNextPage());
+            }
+          },
+          child: child,
         );
       },
     );
@@ -840,7 +1020,8 @@ class _ReaderPageState extends State<ReaderPage>
           bottom: false,
           child: Stack(
             children: [
-              (_pinchToZoom
+              _wrapReaderTapPaging(
+                _pinchToZoom
                   ? InteractiveViewer(
                       transformationController: _zoomController,
                       panEnabled: true,
@@ -851,9 +1032,14 @@ class _ReaderPageState extends State<ReaderPage>
                       constrained: true,
                       minScale: 1.0,
                       maxScale: 5.0,
-                      child: _buildReaderListView(),
+                      child: _readerMode == _ReaderMode.rightToLeft
+                          ? _buildReaderPageView()
+                          : _buildReaderListView(),
                     )
-                  : _buildReaderListView()),
+                  : (_readerMode == _ReaderMode.rightToLeft
+                        ? _buildReaderPageView()
+                        : _buildReaderListView()),
+              ),
               Positioned(
                 left: 12,
                 bottom: 12,

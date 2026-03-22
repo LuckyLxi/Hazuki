@@ -170,15 +170,12 @@ class _FavoritePageState extends State<FavoritePage>
     String? folderId,
   }) {
     final targetFolderId = (folderId ?? _selectedFolderId).trim();
+    final timeoutMessage = l10n(context).favoriteLoadTimeout;
     return HazukiSourceService.instance
         .loadFavoriteComics(page: page, folderId: targetFolderId)
         .timeout(
           _favoriteLoadTimeout,
-          onTimeout: () {
-            return FavoriteComicsResult.error(
-              l10n(context).favoriteLoadTimeout,
-            );
-          },
+          onTimeout: () => FavoriteComicsResult.error(timeoutMessage),
         );
   }
 
@@ -281,11 +278,11 @@ class _FavoritePageState extends State<FavoritePage>
       setState(() {
         _loadingFolders = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            l10n(context).favoriteFoldersLoadFailed(result.errorMessage!),
-          ),
+      unawaited(
+        showHazukiPrompt(
+          context,
+          l10n(context).favoriteFoldersLoadFailed(result.errorMessage!),
+          isError: true,
         ),
       );
       return;
@@ -333,9 +330,13 @@ class _FavoritePageState extends State<FavoritePage>
       }
 
       if (result.errorMessage != null) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(result.errorMessage!)));
+        unawaited(
+          showHazukiPrompt(
+            context,
+            result.errorMessage!,
+            isError: true,
+          ),
+        );
         setState(() {
           _loadingMore = false;
         });
@@ -507,9 +508,7 @@ class _FavoritePageState extends State<FavoritePage>
         return;
       }
       // 新建成功后显示 SnackBar 提示
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n(context).favoriteCreated(name))),
-      );
+      unawaited(showHazukiPrompt(context, l10n(context).favoriteCreated(name)));
       final created = _folders.where((e) => e.name == name).toList();
       if (created.isNotEmpty) {
         await _selectFolder(created.first.id);
@@ -518,8 +517,12 @@ class _FavoritePageState extends State<FavoritePage>
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n(context).favoriteCreateFailed('$e'))),
+      unawaited(
+        showHazukiPrompt(
+          context,
+          l10n(context).favoriteCreateFailed('$e'),
+          isError: true,
+        ),
       );
     }
   }
@@ -550,8 +553,12 @@ class _FavoritePageState extends State<FavoritePage>
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n(context).favoriteSortChangeFailed('$e'))),
+      unawaited(
+        showHazukiPrompt(
+          context,
+          l10n(context).favoriteSortChangeFailed('$e'),
+          isError: true,
+        ),
       );
     }
   }
@@ -613,8 +620,12 @@ class _FavoritePageState extends State<FavoritePage>
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n(context).favoriteDeleteFailed('$e'))),
+      unawaited(
+        showHazukiPrompt(
+          context,
+          l10n(context).favoriteDeleteFailed('$e'),
+          isError: true,
+        ),
       );
     }
   }
@@ -777,7 +788,23 @@ class _FavoritePageState extends State<FavoritePage>
     final strings = l10n(context);
     final isLogged = HazukiSourceService.instance.isLogged;
     if (!isLogged) {
-      return Center(child: Text(strings.favoriteLoginRequired));
+      return Center(
+        child: FilledButton.icon(
+          style: FilledButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 18),
+            textStyle: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          onPressed: () {
+            final homeState =
+                context.findAncestorStateOfType<_HazukiHomePageState>();
+            homeState?._showLoginDialog();
+          },
+          icon: const Icon(Icons.login_rounded, size: 22),
+          label: Text(strings.favoriteLoginRequired),
+        ),
+      );
     }
 
     Widget content;

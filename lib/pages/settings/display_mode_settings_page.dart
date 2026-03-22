@@ -106,15 +106,17 @@ class _DisplayModeSettingsPageState extends State<DisplayModeSettingsPage> {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(strings.displayModeApplied)));
+      unawaited(showHazukiPrompt(context, strings.displayModeApplied));
     } catch (e) {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(strings.displayModeSetFailed('$e'))),
+      unawaited(
+        showHazukiPrompt(
+          context,
+          strings.displayModeSetFailed('$e'),
+          isError: true,
+        ),
       );
     }
   }

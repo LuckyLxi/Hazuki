@@ -17,6 +17,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'models/hazuki_models.dart';
 import 'services/cloud_sync_service.dart';
 import 'services/hazuki_source_service.dart';
+import 'services/manga_download_service.dart';
 
 part 'pages/home_page.dart';
 part 'pages/discover/discover_page.dart';
@@ -29,6 +30,7 @@ part 'pages/settings/cache_settings_page.dart';
 part 'pages/settings/privacy_settings_page.dart';
 part 'pages/settings/reading_settings_page.dart';
 part 'pages/settings/favorites_debug_page.dart';
+part 'pages/settings/other_settings_page.dart';
 part 'pages/settings/advanced_settings_page.dart';
 part 'pages/settings/line_settings_page.dart';
 part 'pages/settings/cloud_sync_page.dart';
@@ -46,8 +48,10 @@ part 'pages/search/search_results_page.dart';
 part 'pages/history_page.dart';
 part 'pages/tag_category_page.dart';
 part 'pages/ranking_page.dart';
+part 'pages/downloads_page.dart';
 part 'pages/about_page.dart';
 part 'widgets/cached_image_widgets.dart';
+part 'widgets/hazuki_prompt.dart';
 part 'widgets/sticker_loading_indicator.dart';
 
 const MethodChannel _displayModeChannel = MethodChannel(
@@ -58,6 +62,9 @@ const MethodChannel _readerDisplayChannel = MethodChannel(
 );
 const _discoverSearchHeroTag = 'discover_search_to_search_page';
 const _noImageModeKey = 'advanced_no_image_mode';
+const _autoCheckInEnabledKey = 'other_auto_check_in_enabled';
+const _defaultAppearancePresetIndex = 0;
+const _defaultDynamicColorEnabled = false;
 final ValueNotifier<bool> hazukiNoImageModeNotifier = ValueNotifier<bool>(
   false,
 );
@@ -78,7 +85,6 @@ AppLocalizations l10n(BuildContext context) => AppLocalizations.of(context)!;
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await _loadGlobalUiFlags();
-  unawaited(HazukiSourceService.instance.init());
   runApp(const HazukiApp());
 }
 
@@ -246,13 +252,17 @@ class _HazukiAppState extends State<HazukiApp> {
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   bool _hasConnectivity = true;
   bool _isShowingSourceUpdateDialog = false;
+  bool _showInitialSourceBootstrapOverlay = false;
+  bool _sourceBootstrapIndeterminate = true;
+  double _sourceBootstrapProgress = 0;
+  String? _sourceBootstrapErrorText;
   int _homeRefreshTick = 0;
 
   AppearanceSettingsData _appearance = const AppearanceSettingsData(
     themeMode: ThemeMode.system,
     oledPureBlack: false,
-    dynamicColor: true,
-    presetIndex: 0,
+    dynamicColor: _defaultDynamicColorEnabled,
+    presetIndex: _defaultAppearancePresetIndex,
     displayModeRaw: 'native:auto',
     comicDetailDynamicColor: false,
   );
@@ -264,7 +274,12 @@ class _HazukiAppState extends State<HazukiApp> {
     unawaited(_loadAppearance());
     unawaited(_loadLocalePreference());
     unawaited(_initConnectivityWatcher());
-    unawaited(_checkSourceUpdateInBackground());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      unawaited(_bootstrapSourceRuntime());
+    });
     unawaited(CloudSyncService.instance.autoSyncOnce());
   }
 
@@ -282,9 +297,10 @@ class _HazukiAppState extends State<HazukiApp> {
       'dark' => ThemeMode.dark,
       _ => ThemeMode.system,
     };
-    var presetIndex = prefs.getInt(_presetIndexKey) ?? 0;
+    var presetIndex =
+        prefs.getInt(_presetIndexKey) ?? _defaultAppearancePresetIndex;
     if (presetIndex < 0 || presetIndex >= kHazukiColorPresets.length) {
-      presetIndex = 0;
+      presetIndex = _defaultAppearancePresetIndex;
     }
     final displayModeRaw = prefs.getString(_displayModeKey) ?? 'native:auto';
     if (Platform.isAndroid) {
@@ -308,7 +324,8 @@ class _HazukiAppState extends State<HazukiApp> {
       _appearance = AppearanceSettingsData(
         themeMode: mode,
         oledPureBlack: prefs.getBool(_oledPureBlackKey) ?? false,
-        dynamicColor: prefs.getBool(_dynamicColorKey) ?? true,
+        dynamicColor:
+            prefs.getBool(_dynamicColorKey) ?? _defaultDynamicColorEnabled,
         presetIndex: presetIndex,
         displayModeRaw: displayModeRaw,
         comicDetailDynamicColor:
@@ -373,6 +390,73 @@ class _HazukiAppState extends State<HazukiApp> {
     });
   }
 
+  Future<void> _bootstrapSourceRuntime() async {
+    final hasLocalSource =
+        await HazukiSourceService.instance.hasLocalJmSourceFile();
+    if (!mounted) {
+      return;
+    }
+
+    if (!hasLocalSource) {
+      setState(() {
+        _showInitialSourceBootstrapOverlay = true;
+        _sourceBootstrapIndeterminate = true;
+        _sourceBootstrapProgress = 0;
+        _sourceBootstrapErrorText = null;
+      });
+      try {
+        await HazukiSourceService.instance.init(
+          onSourceDownloadProgress: (received, total) {
+            if (!mounted) {
+              return;
+            }
+            setState(() {
+              if (total > 0) {
+                _sourceBootstrapIndeterminate = false;
+                _sourceBootstrapProgress = (received / total).clamp(0.0, 1.0);
+              } else {
+                _sourceBootstrapIndeterminate = true;
+              }
+            });
+          },
+        );
+      } catch (e) {
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          _sourceBootstrapIndeterminate = false;
+          _sourceBootstrapProgress = 1;
+          _sourceBootstrapErrorText = '$e';
+        });
+        await Future<void>.delayed(const Duration(seconds: 2));
+      }
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _showInitialSourceBootstrapOverlay = false;
+      });
+      await Future<void>.delayed(const Duration(milliseconds: 280));
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _homeRefreshTick++;
+      });
+      return;
+    }
+
+    await HazukiSourceService.instance.init();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _homeRefreshTick++;
+    });
+    _scheduleSourceUpdateDialogCheck();
+  }
+
   Future<void> _initConnectivityWatcher() async {
     try {
       final initial = await _connectivity.checkConnectivity();
@@ -403,16 +487,30 @@ class _HazukiAppState extends State<HazukiApp> {
     unawaited(_runSourceRecovery());
   }
 
-  Future<void> _runSourceRecovery() async {
-    await HazukiSourceService.instance.refreshSourceOnNetworkRecovery();
+  void _scheduleSourceUpdateDialogCheck() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      unawaited(_runSourceUpdateDialogCheck());
+    });
   }
 
-  Future<void> _checkSourceUpdateInBackground() async {
-    await HazukiSourceService.instance.ensureInitialized();
+  Future<void> _runSourceUpdateDialogCheck() async {
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    final result = await _showSourceUpdateDialogIfNeeded();
     if (!mounted) {
       return;
     }
-    await _showSourceUpdateDialogIfNeeded();
+    if (result == _SourceUpdateDialogAction.downloaded) {
+      setState(() {
+        _homeRefreshTick++;
+      });
+    }
+  }
+
+  Future<void> _runSourceRecovery() async {
+    await HazukiSourceService.instance.refreshSourceOnNetworkRecovery();
   }
 
   String _formatTodayKey() {
@@ -461,21 +559,21 @@ class _HazukiAppState extends State<HazukiApp> {
     );
   }
 
-  Future<void> _showSourceUpdateDialogIfNeeded() async {
+  Future<_SourceUpdateDialogAction?> _showSourceUpdateDialogIfNeeded() async {
     if (_isShowingSourceUpdateDialog) {
-      return;
+      return null;
     }
 
     final check = await HazukiSourceService.instance
         .checkJmSourceVersionFromCloud();
     if (!mounted || check == null || !check.hasUpdate) {
-      return;
+      return null;
     }
 
     final prefs = await SharedPreferences.getInstance();
     final skipDate = prefs.getString(_sourceUpdateSkipDateKey);
     if (skipDate == _formatTodayKey()) {
-      return;
+      return null;
     }
 
     _isShowingSourceUpdateDialog = true;
@@ -609,16 +707,11 @@ class _HazukiAppState extends State<HazukiApp> {
 
     if (!mounted) {
       _isShowingSourceUpdateDialog = false;
-      return;
-    }
-
-    if (result == _SourceUpdateDialogAction.downloaded) {
-      setState(() {
-        _homeRefreshTick++;
-      });
+      return result;
     }
 
     _isShowingSourceUpdateDialog = false;
+    return result;
   }
 
   ThemeData _buildLightTheme([ColorScheme? dynamicColorScheme]) {
@@ -686,6 +779,126 @@ class _HazukiAppState extends State<HazukiApp> {
           themeMode: _appearance.themeMode,
           theme: _buildLightTheme(lightDynamic),
           darkTheme: _buildDarkTheme(darkDynamic),
+          builder: (context, child) {
+            final scheme = Theme.of(context).colorScheme;
+            return Stack(
+              children: [
+                if (!_showInitialSourceBootstrapOverlay && child != null) child,
+                if (_showInitialSourceBootstrapOverlay)
+                  Positioned.fill(
+                    child: ColoredBox(
+                      color: Theme.of(context).scaffoldBackgroundColor,
+                    ),
+                  ),
+                Positioned.fill(
+                  child: IgnorePointer(
+                    ignoring: !_showInitialSourceBootstrapOverlay,
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 280),
+                      switchInCurve: Curves.easeOutCubic,
+                      switchOutCurve: Curves.easeInCubic,
+                      transitionBuilder: (widget, animation) {
+                        final curved = CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOutCubic,
+                          reverseCurve: Curves.easeInCubic,
+                        );
+                        return FadeTransition(
+                          opacity: curved,
+                          child: ScaleTransition(
+                            scale: Tween<double>(
+                              begin: 0.94,
+                              end: 1,
+                            ).animate(curved),
+                            child: widget,
+                          ),
+                        );
+                      },
+                      child: _showInitialSourceBootstrapOverlay
+                          ? ColoredBox(
+                              key: const ValueKey(
+                                'initial-source-bootstrap-overlay',
+                              ),
+                              color: Colors.black.withValues(alpha: 0.18),
+                              child: Center(
+                                child: Container(
+                                  width: 332,
+                                  padding: const EdgeInsets.fromLTRB(
+                                    20,
+                                    18,
+                                    20,
+                                    18,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: scheme.surface,
+                                    borderRadius: BorderRadius.circular(28),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(
+                                          alpha: 0.14,
+                                        ),
+                                        blurRadius: 24,
+                                        offset: const Offset(0, 10),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        l10n(context)
+                                            .sourceBootstrapDownloading,
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.titleMedium,
+                                      ),
+                                      const SizedBox(height: 14),
+                                      LinearProgressIndicator(
+                                        value: _sourceBootstrapIndeterminate
+                                            ? null
+                                            : _sourceBootstrapProgress,
+                                        borderRadius: BorderRadius.circular(
+                                          999,
+                                        ),
+                                        minHeight: 8,
+                                      ),
+                                      const SizedBox(height: 10),
+                                      Text(
+                                        _sourceBootstrapErrorText ??
+                                            (_sourceBootstrapIndeterminate
+                                                ? l10n(context)
+                                                      .sourceBootstrapPreparing
+                                                : l10n(context)
+                                                      .sourceBootstrapProgress(
+                                                        (_sourceBootstrapProgress *
+                                                                100)
+                                                            .toStringAsFixed(0),
+                                                      )),
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.copyWith(
+                                              color: scheme.onSurfaceVariant,
+                                            ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            )
+                          : const SizedBox.shrink(
+                              key: ValueKey(
+                                'initial-source-bootstrap-overlay-empty',
+                              ),
+                            ),
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
           home: HazukiHomePage(
             key: ValueKey(_homeRefreshTick),
             appearanceSettings: _appearance,

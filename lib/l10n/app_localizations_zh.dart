@@ -230,6 +230,9 @@ class AppLocalizationsZh extends AppLocalizations {
   String get homeMenuRanking => '排行榜';
 
   @override
+  String get homeMenuDownloads => '下载';
+
+  @override
   String get homeMenuLines => '线路';
 
   @override
@@ -657,6 +660,25 @@ class AppLocalizationsZh extends AppLocalizations {
   String get readingSettingsTitle => '阅读设置';
 
   @override
+  String get readingModeTitle => '阅读模式';
+
+  @override
+  String get readingModeSubtitle => '选择阅读器中的页面排列方式';
+
+  @override
+  String get readingModeTopToBottom => '从上往下';
+
+  @override
+  String get readingModeRightToLeft => '从右到左';
+
+  @override
+  String get readingTapToTurnPageTitle => '点击翻页';
+
+  @override
+  String get readingTapToTurnPageSubtitle =>
+      '仅在从右到左模式下生效，点击左侧回到上一页，点击右侧前往下一页';
+
+  @override
   String get readingImmersiveModeTitle => '沉浸模式';
 
   @override
@@ -690,6 +712,81 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get readingLongPressSaveSubtitle => '启用后长按漫画图片可保存该图片';
+
+  @override
+  String get downloadsTitle => '下载';
+
+  @override
+  String get downloadsTabOngoing => '正在下载';
+
+  @override
+  String get downloadsTabDownloaded => '已下载';
+
+  @override
+  String get downloadsEmptyOngoing => '暂无下载任务';
+
+  @override
+  String get downloadsEmptyDownloaded => '还没有已下载漫画';
+
+  @override
+  String downloadsSelectionTitle(Object count) {
+    return '已选择 $count 项';
+  }
+
+  @override
+  String get downloadsDeleteSelectedTitle => '删除已下载漫画';
+
+  @override
+  String downloadsDeleteSelectedContent(Object count) {
+    return '确定删除选中的 $count 部已下载漫画吗？';
+  }
+
+  @override
+  String get downloadsStatusQueued => '等待中';
+
+  @override
+  String get downloadsStatusDownloading => '下载中';
+
+  @override
+  String get downloadsStatusPaused => '已暂停';
+
+  @override
+  String downloadsStatusFailed(Object error) {
+    return '失败：$error';
+  }
+
+  @override
+  String downloadsChapterCount(Object count) {
+    return '共 $count 话';
+  }
+
+  @override
+  String downloadsCurrentProgress(Object current, Object total) {
+    return '$current/$total 张图片';
+  }
+
+  @override
+  String get downloadsActionSelect => '选择';
+
+  @override
+  String get downloadsActionPause => '暂停';
+
+  @override
+  String get downloadsActionResume => '继续';
+
+  @override
+  String downloadsQueued(Object count) {
+    return '已加入 $count 话到下载队列';
+  }
+
+  @override
+  String get downloadsDownloadChaptersTitle => '下载章节';
+
+  @override
+  String get downloadsDownloadChaptersSubtitle => '选择要下载的章节';
+
+  @override
+  String get downloadsDownloadAction => '下载';
 
   @override
   String get privacySettingsTitle => '隐私设置';
@@ -1232,4 +1329,50 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get advancedNoImageModeSubtitle => '全局不显示图片（侧边栏登录头像除外）';
+
+  @override
+  String get settingsOtherTitle => '其它';
+
+  @override
+  String get settingsOtherSubtitle => '签到与附加功能';
+
+  @override
+  String get homeCheckInAction => '签到';
+
+  @override
+  String get homeCheckInDone => '今日已签到';
+
+  @override
+  String get homeCheckInInProgress => '签到中...';
+
+  @override
+  String get homeCheckInSuccess => '签到成功';
+
+  @override
+  String get homeCheckInAlreadyDone => '今天已经签到过了';
+
+  @override
+  String homeCheckInFailed(Object error) {
+    return '签到失败：$error';
+  }
+
+  @override
+  String get otherTitle => '其它';
+
+  @override
+  String get otherAutoCheckInTitle => '自动签到';
+
+  @override
+  String get otherAutoCheckInSubtitle => '开启后，每天打开软件时会自动触发一次签到';
+
+  @override
+  String get sourceBootstrapDownloading => '正在下载漫画源';
+
+  @override
+  String get sourceBootstrapPreparing => '正在准备源文件...';
+
+  @override
+  String sourceBootstrapProgress(Object progress) {
+    return '已下载 $progress%';
+  }
 }

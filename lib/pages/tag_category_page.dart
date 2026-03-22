@@ -24,11 +24,10 @@ class _TagCategoryPageState extends State<TagCategoryPage> {
   }
 
   Future<List<CategoryTagGroup>> _loadTagGroups() {
+    final timeoutMessage = l10n(context).tagCategoryLoadTimeout;
     return HazukiSourceService.instance.loadCategoryTagGroups().timeout(
       _loadTimeout,
-      onTimeout: () {
-        throw Exception(l10n(context).tagCategoryLoadTimeout);
-      },
+      onTimeout: () => throw Exception(timeoutMessage),
     );
   }
 

@@ -71,6 +71,195 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
     return raw;
   }
 
+  Future<_LocaleDialogChoice?> _showLocaleDialog(BuildContext context) {
+    return showGeneralDialog<_LocaleDialogChoice>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: l10n(context).dialogBarrierLabel,
+      barrierColor: Colors.black45,
+      transitionDuration: const Duration(milliseconds: 260),
+      pageBuilder: (dialogContext, animation, secondaryAnimation) {
+        final strings = l10n(dialogContext);
+        final colorScheme = Theme.of(dialogContext).colorScheme;
+        final currentLanguageCode = _locale?.languageCode;
+
+        Widget optionTile({
+          required String title,
+          required String subtitle,
+          required bool selected,
+          required VoidCallback onTap,
+        }) {
+          return InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(22),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOutCubic,
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+              decoration: BoxDecoration(
+                color: selected
+                    ? colorScheme.primaryContainer
+                    : colorScheme.surfaceContainerHigh,
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(
+                  color: selected
+                      ? colorScheme.primary
+                      : colorScheme.outlineVariant.withValues(alpha: 0.45),
+                  width: selected ? 1.6 : 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          title,
+                          style: Theme.of(dialogContext).textTheme.titleMedium
+                              ?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                color: selected
+                                    ? colorScheme.onPrimaryContainer
+                                    : colorScheme.onSurface,
+                              ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          subtitle,
+                          style: Theme.of(dialogContext).textTheme.bodySmall
+                              ?.copyWith(
+                                color: selected
+                                    ? colorScheme.onPrimaryContainer
+                                          .withValues(alpha: 0.82)
+                                    : colorScheme.onSurfaceVariant,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOutCubic,
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: selected
+                          ? colorScheme.primary
+                          : colorScheme.surface,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: selected
+                            ? colorScheme.primary
+                            : colorScheme.outlineVariant,
+                      ),
+                    ),
+                    child: Icon(
+                      selected
+                          ? Icons.check_rounded
+                          : Icons.radio_button_unchecked_rounded,
+                      size: 18,
+                      color: selected
+                          ? colorScheme.onPrimary
+                          : colorScheme.outline,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        return SafeArea(
+          child: Center(
+            child: Material(
+              type: MaterialType.transparency,
+              child: Container(
+                width: 360,
+                margin: const EdgeInsets.symmetric(horizontal: 20),
+                padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
+                decoration: BoxDecoration(
+                  color: colorScheme.surface,
+                  borderRadius: BorderRadius.circular(30),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.18),
+                      blurRadius: 28,
+                      offset: const Offset(0, 14),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      strings.displayLanguageTitle,
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      strings.displayLanguageSubtitle,
+                      style: Theme.of(dialogContext).textTheme.bodyMedium
+                          ?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                    ),
+                    const SizedBox(height: 16),
+                    optionTile(
+                      title: strings.displayLanguageSystem,
+                      subtitle: 'Use device setting',
+                      selected: _locale == null,
+                      onTap: () => Navigator.of(dialogContext).pop(
+                        const _LocaleDialogChoice.system(),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    optionTile(
+                      title: strings.displayLanguageZhHans,
+                      subtitle: 'Simplified Chinese',
+                      selected: currentLanguageCode == 'zh',
+                      onTap: () => Navigator.of(dialogContext).pop(
+                        const _LocaleDialogChoice.locale(Locale('zh')),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    optionTile(
+                      title: strings.displayLanguageEnglish,
+                      subtitle: 'English',
+                      selected: currentLanguageCode == 'en',
+                      onTap: () => Navigator.of(dialogContext).pop(
+                        const _LocaleDialogChoice.locale(Locale('en')),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+      transitionBuilder:
+          (dialogContext, animation, secondaryAnimation, child) {
+            final curved = CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutBack,
+              reverseCurve: Curves.easeInCubic,
+            );
+            return FadeTransition(
+              opacity: curved,
+              child: ScaleTransition(
+                scale: Tween<double>(begin: 0.92, end: 1).animate(curved),
+                child: child,
+              ),
+            );
+          },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final strings = l10n(context);
@@ -120,40 +309,16 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
             subtitle: Text(_localeLabel(strings)),
             trailing: const Icon(Icons.chevron_right),
             onTap: () async {
-              final next = await showModalBottomSheet<Locale?>(
-                context: context,
-                builder: (sheetContext) {
-                  final sheetStrings = l10n(sheetContext);
-                  return SafeArea(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        ListTile(
-                          title: Text(sheetStrings.displayLanguageSystem),
-                          onTap: () => Navigator.of(sheetContext).pop(),
-                        ),
-                        ListTile(
-                          title: Text(sheetStrings.displayLanguageZhHans),
-                          onTap: () => Navigator.of(
-                            sheetContext,
-                          ).pop(const Locale('zh')),
-                        ),
-                        ListTile(
-                          title: Text(sheetStrings.displayLanguageEnglish),
-                          onTap: () => Navigator.of(
-                            sheetContext,
-                          ).pop(const Locale('en')),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              );
-              if (_locale?.languageCode == next?.languageCode &&
-                  ((_locale != null) == (next != null))) {
+              final next = await _showLocaleDialog(context);
+              if (next == null) {
                 return;
               }
-              await _applyLocale(next);
+              final nextLocale = next.followSystem ? null : next.locale;
+              if (_locale?.languageCode == nextLocale?.languageCode &&
+                  ((_locale != null) == (nextLocale != null))) {
+                return;
+              }
+              await _applyLocale(nextLocale);
             },
           ),
           const Divider(height: 1),
@@ -266,4 +431,15 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
       ),
     );
   }
+}
+
+class _LocaleDialogChoice {
+  const _LocaleDialogChoice.system()
+    : followSystem = true,
+      locale = null;
+
+  const _LocaleDialogChoice.locale(this.locale) : followSystem = false;
+
+  final bool followSystem;
+  final Locale? locale;
 }

@@ -266,8 +266,12 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
     }
 
     if (!HazukiSourceService.instance.isLogged) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n(context).historyLoginRequired)),
+      unawaited(
+        showHazukiPrompt(
+          context,
+          l10n(context).historyLoginRequired,
+          isError: true,
+        ),
       );
       return;
     }
@@ -306,22 +310,23 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
       setState(() {
         _favoriteOverride = isAdding;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            isAdding
-                ? l10n(context).comicDetailFavoriteAdded
-                : l10n(context).comicDetailFavoriteRemoved,
-          ),
+      unawaited(
+        showHazukiPrompt(
+          context,
+          isAdding
+              ? l10n(context).comicDetailFavoriteAdded
+              : l10n(context).comicDetailFavoriteRemoved,
         ),
       );
     } catch (e) {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(l10n(context).comicDetailFavoriteActionFailed('$e')),
+      unawaited(
+        showHazukiPrompt(
+          context,
+          l10n(context).comicDetailFavoriteActionFailed('$e'),
+          isError: true,
         ),
       );
     } finally {
@@ -516,11 +521,11 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
                     return;
                   }
                   setSheetState(() => isLoading = false);
-                  ScaffoldMessenger.of(sheetContext).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        strings.comicDetailCreateFavoriteFolderFailed('$e'),
-                      ),
+                  unawaited(
+                    showHazukiPrompt(
+                      sheetContext,
+                      strings.comicDetailCreateFavoriteFolderFailed('$e'),
+                      isError: true,
                     ),
                   );
                 }
@@ -574,11 +579,11 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
                     return;
                   }
                   setSheetState(() => isLoading = false);
-                  ScaffoldMessenger.of(sheetContext).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        strings.comicDetailDeleteFavoriteFolderFailed('$e'),
-                      ),
+                  unawaited(
+                    showHazukiPrompt(
+                      sheetContext,
+                      strings.comicDetailDeleteFavoriteFolderFailed('$e'),
+                      isError: true,
                     ),
                   );
                 }
@@ -806,15 +811,12 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
                                   : () {
                                       if (selected.isEmpty &&
                                           initialFavorited.isEmpty) {
-                                        ScaffoldMessenger.of(
-                                          sheetContext,
-                                        ).showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                              l10n(
-                                                context,
-                                              ).comicDetailSelectAtLeastOneFolder,
-                                            ),
+                                        unawaited(
+                                          showHazukiPrompt(
+                                            sheetContext,
+                                            l10n(context)
+                                                .comicDetailSelectAtLeastOneFolder,
+                                            isError: true,
                                           ),
                                         );
                                         return;
@@ -901,20 +903,21 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(l10n(context).comicDetailFavoriteSettingsUpdated),
+      unawaited(
+        showHazukiPrompt(
+          context,
+          l10n(context).comicDetailFavoriteSettingsUpdated,
         ),
       );
     } catch (e) {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            l10n(context).comicDetailFavoriteSettingsUpdateFailed('$e'),
-          ),
+      unawaited(
+        showHazukiPrompt(
+          context,
+          l10n(context).comicDetailFavoriteSettingsUpdateFailed('$e'),
+          isError: true,
         ),
       );
     } finally {
@@ -928,8 +931,12 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
 
   void _showChaptersPanel(ComicDetailsData details) {
     if (details.chapters.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n(context).comicDetailNoChapterInfo)),
+      unawaited(
+        showHazukiPrompt(
+          context,
+          l10n(context).comicDetailNoChapterInfo,
+          isError: true,
+        ),
       );
       return;
     }
@@ -942,6 +949,14 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
             data: themedData,
             child: _ChaptersPanelSheet(
               details: details,
+              onDownloadTap: () {
+                unawaited(
+                  _showChapterDownloadSheet(
+                    details,
+                    navigatorContext: routeContext,
+                  ),
+                );
+              },
               onChapterTap: (epId, chapterTitle, index) {
                 Navigator.of(routeContext).pop();
                 unawaited(
@@ -960,6 +975,62 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
     );
   }
 
+  Future<void> _showChapterDownloadSheet(
+    ComicDetailsData details, {
+    required BuildContext navigatorContext,
+  }) async {
+    final selectedEpIds = await Navigator.of(navigatorContext).push<Set<String>>(
+      _SpringBottomSheetRoute(
+        builder: (sheetContext) {
+          final themedData = _buildDetailTheme(Theme.of(sheetContext));
+          return Theme(
+            data: themedData,
+            child: _ChapterDownloadSelectionSheet(
+              details: details,
+              initialSelectedEpIds: const <String>{},
+            ),
+          );
+        },
+      ),
+    );
+    if (selectedEpIds == null || selectedEpIds.isEmpty) {
+      return;
+    }
+    final targets = <MangaChapterDownloadTarget>[];
+    for (var i = 0; i < details.chapters.length; i++) {
+      final entry = details.chapters.entries.elementAt(i);
+      if (selectedEpIds.contains(entry.key)) {
+        targets.add(
+          MangaChapterDownloadTarget(
+            epId: entry.key,
+            title: entry.value,
+            index: i,
+          ),
+        );
+      }
+    }
+    if (targets.isEmpty) {
+      return;
+    }
+    await MangaDownloadService.instance.enqueueDownload(
+      details: details,
+      coverUrl: details.cover.trim().isNotEmpty
+          ? details.cover
+          : widget.comic.cover,
+      description: details.description,
+      chapters: targets,
+    );
+    if (!mounted) {
+      return;
+    }
+    unawaited(
+      showHazukiPrompt(
+        context,
+        l10n(context).downloadsQueued('${targets.length}'),
+      ),
+    );
+  }
+
   Future<void> _openReader(
     ComicDetailsData details, {
     String? epId,
@@ -972,8 +1043,12 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n(context).comicDetailNoChapters)),
+      unawaited(
+        showHazukiPrompt(
+          context,
+          l10n(context).comicDetailNoChapters,
+          isError: true,
+        ),
       );
       return;
     }
@@ -1045,9 +1120,7 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
             if (!mounted) {
               return;
             }
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(strings.comicDetailCopiedId)),
-            );
+            unawaited(showHazukiPrompt(context, strings.comicDetailCopiedId));
           },
         ),
         _ComicDetailMetaRow(
@@ -1072,8 +1145,8 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
             if (!mounted) {
               return;
             }
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(strings.comicDetailCopiedPrefix(value))),
+            unawaited(
+              showHazukiPrompt(context, strings.comicDetailCopiedPrefix(value)),
             );
           },
         ),
@@ -1103,8 +1176,8 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
             if (!mounted) {
               return;
             }
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(strings.comicDetailCopiedPrefix(value))),
+            unawaited(
+              showHazukiPrompt(context, strings.comicDetailCopiedPrefix(value)),
             );
           },
         ),
@@ -1135,17 +1208,22 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(l10n(context).comicDetailSavedToPath(file.path)),
+      unawaited(
+        showHazukiPrompt(
+          context,
+          l10n(context).comicDetailSavedToPath(file.path),
         ),
       );
     } catch (e) {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n(context).comicDetailSaveFailed('$e'))),
+      unawaited(
+        showHazukiPrompt(
+          context,
+          l10n(context).comicDetailSaveFailed('$e'),
+          isError: true,
+        ),
       );
     }
   }

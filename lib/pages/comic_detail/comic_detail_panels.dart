@@ -109,10 +109,12 @@ class _ChaptersPanelSheet extends StatelessWidget {
   const _ChaptersPanelSheet({
     required this.details,
     required this.onChapterTap,
+    required this.onDownloadTap,
   });
 
   final ComicDetailsData details;
   final void Function(String epId, String chapterTitle, int index) onChapterTap;
+  final VoidCallback onDownloadTap;
 
   @override
   Widget build(BuildContext context) {
@@ -171,6 +173,12 @@ class _ChaptersPanelSheet extends StatelessWidget {
                         color: cs.onSurfaceVariant,
                       ),
                     ),
+                    const Spacer(),
+                    IconButton(
+                      tooltip: l10n(context).downloadsDownloadAction,
+                      onPressed: onDownloadTap,
+                      icon: const Icon(Icons.download_outlined),
+                    ),
                   ],
                 ),
               ),
@@ -199,6 +207,172 @@ class _ChaptersPanelSheet extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _ChapterDownloadSelectionSheet extends StatefulWidget {
+  const _ChapterDownloadSelectionSheet({
+    required this.details,
+    required this.initialSelectedEpIds,
+  });
+
+  final ComicDetailsData details;
+  final Set<String> initialSelectedEpIds;
+
+  @override
+  State<_ChapterDownloadSelectionSheet> createState() =>
+      _ChapterDownloadSelectionSheetState();
+}
+
+class _ChapterDownloadSelectionSheetState
+    extends State<_ChapterDownloadSelectionSheet> {
+  late final Set<String> _selectedEpIds = <String>{
+    ...widget.initialSelectedEpIds,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final chapters = widget.details.chapters.entries.toList();
+    final bottomInset = MediaQuery.of(context).padding.bottom;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 12, bottom: 4),
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: cs.onSurfaceVariant.withValues(alpha: 0.28),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    l10n(context).downloadsDownloadChaptersTitle,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    l10n(context).downloadsDownloadChaptersSubtitle,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Flexible(
+              child: GridView.builder(
+                padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+                shrinkWrap: true,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  mainAxisSpacing: 8,
+                  crossAxisSpacing: 8,
+                  childAspectRatio: 2.8,
+                ),
+                itemCount: chapters.length,
+                itemBuilder: (context, index) {
+                  final entry = chapters[index];
+                  final selected = _selectedEpIds.contains(entry.key);
+                  return _SelectableChapterChip(
+                    label: entry.value,
+                    selected: selected,
+                    onTap: () {
+                      setState(() {
+                        if (selected) {
+                          _selectedEpIds.remove(entry.key);
+                        } else {
+                          _selectedEpIds.add(entry.key);
+                        }
+                      });
+                    },
+                  );
+                },
+              ),
+            ),
+            Padding(
+              padding: EdgeInsets.fromLTRB(16, 0, 16, bottomInset + 12),
+              child: FilledButton.icon(
+                onPressed: _selectedEpIds.isEmpty
+                    ? null
+                    : () => Navigator.of(context).pop<Set<String>>(
+                        Set<String>.from(_selectedEpIds),
+                      ),
+                icon: const Icon(Icons.download_outlined),
+                label: Text(l10n(context).downloadsDownloadAction),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(48),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SelectableChapterChip extends StatelessWidget {
+  const _SelectableChapterChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Material(
+      color: selected
+          ? cs.primaryContainer
+          : cs.secondaryContainer.withValues(alpha: 0.55),
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: selected
+                    ? cs.onPrimaryContainer
+                    : cs.onSecondaryContainer,
+                fontWeight: FontWeight.w600,
+                fontSize: 12,
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

@@ -521,6 +521,12 @@ abstract class AppLocalizations {
   /// **'Ranking'**
   String get homeMenuRanking;
 
+  /// No description provided for @homeMenuDownloads.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloads'**
+  String get homeMenuDownloads;
+
   /// No description provided for @homeMenuLines.
   ///
   /// In en, this message translates to:
@@ -1295,6 +1301,42 @@ abstract class AppLocalizations {
   /// **'Reading settings'**
   String get readingSettingsTitle;
 
+  /// No description provided for @readingModeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading mode'**
+  String get readingModeTitle;
+
+  /// No description provided for @readingModeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose how pages are arranged in the reader'**
+  String get readingModeSubtitle;
+
+  /// No description provided for @readingModeTopToBottom.
+  ///
+  /// In en, this message translates to:
+  /// **'Top to bottom'**
+  String get readingModeTopToBottom;
+
+  /// No description provided for @readingModeRightToLeft.
+  ///
+  /// In en, this message translates to:
+  /// **'Right to left'**
+  String get readingModeRightToLeft;
+
+  /// No description provided for @readingTapToTurnPageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to turn page'**
+  String get readingTapToTurnPageTitle;
+
+  /// No description provided for @readingTapToTurnPageSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Only works in right-to-left mode. Tap the left side for the previous page and the right side for the next page'**
+  String get readingTapToTurnPageSubtitle;
+
   /// No description provided for @readingImmersiveModeTitle.
   ///
   /// In en, this message translates to:
@@ -1360,6 +1402,132 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Allow saving the current comic image by long pressing it'**
   String get readingLongPressSaveSubtitle;
+
+  /// No description provided for @downloadsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloads'**
+  String get downloadsTitle;
+
+  /// No description provided for @downloadsTabOngoing.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading'**
+  String get downloadsTabOngoing;
+
+  /// No description provided for @downloadsTabDownloaded.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloaded'**
+  String get downloadsTabDownloaded;
+
+  /// No description provided for @downloadsEmptyOngoing.
+  ///
+  /// In en, this message translates to:
+  /// **'No active downloads'**
+  String get downloadsEmptyOngoing;
+
+  /// No description provided for @downloadsEmptyDownloaded.
+  ///
+  /// In en, this message translates to:
+  /// **'No downloaded comics yet'**
+  String get downloadsEmptyDownloaded;
+
+  /// No description provided for @downloadsSelectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} selected'**
+  String downloadsSelectionTitle(Object count);
+
+  /// No description provided for @downloadsDeleteSelectedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete downloaded comics'**
+  String get downloadsDeleteSelectedTitle;
+
+  /// No description provided for @downloadsDeleteSelectedContent.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete {count} selected downloaded comics?'**
+  String downloadsDeleteSelectedContent(Object count);
+
+  /// No description provided for @downloadsStatusQueued.
+  ///
+  /// In en, this message translates to:
+  /// **'Queued'**
+  String get downloadsStatusQueued;
+
+  /// No description provided for @downloadsStatusDownloading.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading'**
+  String get downloadsStatusDownloading;
+
+  /// No description provided for @downloadsStatusPaused.
+  ///
+  /// In en, this message translates to:
+  /// **'Paused'**
+  String get downloadsStatusPaused;
+
+  /// No description provided for @downloadsStatusFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed: {error}'**
+  String downloadsStatusFailed(Object error);
+
+  /// No description provided for @downloadsChapterCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} chapters'**
+  String downloadsChapterCount(Object count);
+
+  /// No description provided for @downloadsCurrentProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'{current}/{total} images'**
+  String downloadsCurrentProgress(Object current, Object total);
+
+  /// No description provided for @downloadsActionSelect.
+  ///
+  /// In en, this message translates to:
+  /// **'Select'**
+  String get downloadsActionSelect;
+
+  /// No description provided for @downloadsActionPause.
+  ///
+  /// In en, this message translates to:
+  /// **'Pause'**
+  String get downloadsActionPause;
+
+  /// No description provided for @downloadsActionResume.
+  ///
+  /// In en, this message translates to:
+  /// **'Resume'**
+  String get downloadsActionResume;
+
+  /// No description provided for @downloadsQueued.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} chapters added to downloads'**
+  String downloadsQueued(Object count);
+
+  /// No description provided for @downloadsDownloadChaptersTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Download chapters'**
+  String get downloadsDownloadChaptersTitle;
+
+  /// No description provided for @downloadsDownloadChaptersSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Select the chapters you want to download'**
+  String get downloadsDownloadChaptersSubtitle;
+
+  /// No description provided for @downloadsDownloadAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Download'**
+  String get downloadsDownloadAction;
 
   /// No description provided for @privacySettingsTitle.
   ///
@@ -2308,6 +2476,90 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Hide images globally (except the login avatar in the sidebar)'**
   String get advancedNoImageModeSubtitle;
+
+  /// No description provided for @settingsOtherTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get settingsOtherTitle;
+
+  /// No description provided for @settingsOtherSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Check-in and extra actions'**
+  String get settingsOtherSubtitle;
+
+  /// No description provided for @homeCheckInAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Check in'**
+  String get homeCheckInAction;
+
+  /// No description provided for @homeCheckInDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Checked in today'**
+  String get homeCheckInDone;
+
+  /// No description provided for @homeCheckInInProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking in...'**
+  String get homeCheckInInProgress;
+
+  /// No description provided for @homeCheckInSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Check-in successful'**
+  String get homeCheckInSuccess;
+
+  /// No description provided for @homeCheckInAlreadyDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Already checked in today'**
+  String get homeCheckInAlreadyDone;
+
+  /// No description provided for @homeCheckInFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Check-in failed: {error}'**
+  String homeCheckInFailed(Object error);
+
+  /// No description provided for @otherTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get otherTitle;
+
+  /// No description provided for @otherAutoCheckInTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto daily check-in'**
+  String get otherAutoCheckInTitle;
+
+  /// No description provided for @otherAutoCheckInSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatically check in once when the app is opened each day'**
+  String get otherAutoCheckInSubtitle;
+
+  /// No description provided for @sourceBootstrapDownloading.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading comic source'**
+  String get sourceBootstrapDownloading;
+
+  /// No description provided for @sourceBootstrapPreparing.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing source files...'**
+  String get sourceBootstrapPreparing;
+
+  /// No description provided for @sourceBootstrapProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloaded {progress}%'**
+  String sourceBootstrapProgress(Object progress);
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

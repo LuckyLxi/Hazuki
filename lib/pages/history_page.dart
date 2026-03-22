@@ -206,34 +206,35 @@ class _HistoryPageState extends State<HistoryPage> {
     if (!mounted) {
       return;
     }
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(strings.historyCopiedComicId)));
+    unawaited(showHazukiPrompt(context, strings.historyCopiedComicId));
   }
 
   Future<void> _handleToggleFavoriteFromHistory(ExploreComic comic) async {
     final isLogged = HazukiSourceService.instance.isLogged;
-    final messenger = ScaffoldMessenger.of(context);
-
     final strings = l10n(context);
 
     if (!isLogged) {
-      messenger.showSnackBar(
-        SnackBar(content: Text(strings.historyLoginRequired)),
+      unawaited(
+        showHazukiPrompt(
+          context,
+          strings.historyLoginRequired,
+          isError: true,
+        ),
       );
       return;
     }
-    messenger.showSnackBar(
-      SnackBar(content: Text(strings.historyFavoriteProcessing)),
-    );
+    unawaited(showHazukiPrompt(context, strings.historyFavoriteProcessing));
     try {
       final details = await HazukiSourceService.instance.loadComicDetails(
         comic.id,
       );
+      if (!mounted) {
+        return;
+      }
       if (HazukiSourceService.instance.supportFavoriteFolderLoad &&
           HazukiSourceService.instance.supportFavoriteToggle) {
-        messenger.showSnackBar(
-          SnackBar(content: Text(strings.historyFavoriteFolderNotice)),
+        unawaited(
+          showHazukiPrompt(context, strings.historyFavoriteFolderNotice),
         );
       }
       if (details.isFavorite) {
@@ -242,22 +243,31 @@ class _HistoryPageState extends State<HistoryPage> {
           isAdding: false,
           folderId: '0',
         );
-        messenger.showSnackBar(
-          SnackBar(content: Text(strings.historyFavoriteRemoved)),
-        );
+        if (!mounted) {
+          return;
+        }
+        unawaited(showHazukiPrompt(context, strings.historyFavoriteRemoved));
       } else {
         await HazukiSourceService.instance.toggleFavorite(
           comicId: details.id,
           isAdding: true,
           folderId: '0',
         );
-        messenger.showSnackBar(
-          SnackBar(content: Text(strings.historyFavoriteAdded)),
-        );
+        if (!mounted) {
+          return;
+        }
+        unawaited(showHazukiPrompt(context, strings.historyFavoriteAdded));
       }
     } catch (e) {
-      messenger.showSnackBar(
-        SnackBar(content: Text(strings.historyFavoriteFailed('$e'))),
+      if (!mounted) {
+        return;
+      }
+      unawaited(
+        showHazukiPrompt(
+          context,
+          strings.historyFavoriteFailed('$e'),
+          isError: true,
+        ),
       );
     }
   }
