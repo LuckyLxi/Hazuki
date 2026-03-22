@@ -82,6 +82,10 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
   }
 
   void _onScroll() {
+    _syncSearchRevealProgress();
+  }
+
+  void _syncSearchRevealProgress() {
     if (!_scrollController.hasClients) {
       return;
     }
@@ -95,6 +99,15 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
     }
     setState(() {
       _searchRevealProgress = nextReveal;
+    });
+  }
+
+  void _scheduleSearchRevealSync() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      _syncSearchRevealProgress();
     });
   }
 
@@ -122,6 +135,7 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
         _historyEditMode = false;
       }
     });
+    _scheduleSearchRevealSync();
   }
 
   Future<void> _removeHistory(String keyword) async {
@@ -137,6 +151,7 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
         _historyEditMode = false;
       }
     });
+    _scheduleSearchRevealSync();
   }
 
   Future<void> _clearHistory() async {
@@ -150,6 +165,7 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
       _historyEditMode = false;
       _historyExpanded = false;
     });
+    _scheduleSearchRevealSync();
   }
 
   Future<void> _openResults(String rawKeyword) async {
@@ -413,6 +429,7 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
                 setState(() {
                   _historyExpanded = !_historyExpanded;
                 });
+                _scheduleSearchRevealSync();
               },
             ),
           ),
