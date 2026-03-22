@@ -148,9 +148,8 @@ class CloudSyncService {
     final rootUrl = _rootUrl(config.url);
     await _ensureDir(dio, rootUrl);
 
-    final state = await _readRemoteState(dio, rootUrl);
-    final nextSlot = ((state['latestSlot'] as int? ?? 0) % 3) + 1;
-    final backupDirUrl = '$rootUrl/backup_$nextSlot';
+    const backupSlot = 1;
+    final backupDirUrl = '$rootUrl/backup_$backupSlot';
     await _ensureDir(dio, backupDirUrl);
 
     final snapshot = await _buildLocalSnapshotFiles();
@@ -172,32 +171,12 @@ class CloudSyncService {
     };
     await _putString(dio, '$backupDirUrl/manifest.json', jsonEncode(manifest));
 
-    final backups = <Map<String, dynamic>>[];
-    final oldBackups = (state['backups'] as List?) ?? const [];
-    for (final item in oldBackups) {
-      if (item is! Map) {
-        continue;
-      }
-      final map = Map<String, dynamic>.from(item);
-      final slot = map['slot'];
-      if (slot is int && slot != nextSlot) {
-        backups.add(map);
-      }
-    }
-    backups.add({'slot': nextSlot, 'updatedAtMs': nowMs});
-    backups.sort((a, b) {
-      final av = (a['updatedAtMs'] as int?) ?? 0;
-      final bv = (b['updatedAtMs'] as int?) ?? 0;
-      return bv.compareTo(av);
-    });
-    if (backups.length > 3) {
-      backups.removeRange(3, backups.length);
-    }
-
     final nextState = {
-      'latestSlot': nextSlot,
+      'latestSlot': backupSlot,
       'updatedAtMs': nowMs,
-      'backups': backups,
+      'backups': [
+        {'slot': backupSlot, 'updatedAtMs': nowMs},
+      ],
     };
     await _putString(dio, '$rootUrl/$_stateFileName', jsonEncode(nextState));
   }
