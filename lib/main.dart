@@ -274,6 +274,7 @@ class _HazukiAppState extends State<HazukiApp> {
     unawaited(_loadAppearance());
     unawaited(_loadLocalePreference());
     unawaited(_initConnectivityWatcher());
+    unawaited(MangaDownloadService.instance.ensureInitialized());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
         return;
