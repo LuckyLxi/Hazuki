@@ -399,7 +399,11 @@ class CloudSyncService {
     final data = Map<String, dynamic>.from(dataRaw);
     final prefs = await SharedPreferences.getInstance();
     for (final entry in data.entries) {
-      final sanitized = _sanitizeRestoredSetting(entry.key, entry.value);
+      final sanitized = _sanitizeRestoredSetting(
+        prefs: prefs,
+        key: entry.key,
+        value: entry.value,
+      );
       if (sanitized == null) {
         continue;
       }
@@ -407,7 +411,11 @@ class CloudSyncService {
     }
   }
 
-  dynamic _sanitizeRestoredSetting(String key, dynamic value) {
+  dynamic _sanitizeRestoredSetting({
+    required SharedPreferences prefs,
+    required String key,
+    required dynamic value,
+  }) {
     final normalizedKey = key.trim();
     if (normalizedKey == 'cookie_store_v1') {
       return null;
@@ -425,6 +433,20 @@ class CloudSyncService {
       }
       final sanitized = Map<String, dynamic>.from(decoded);
       sanitized.remove('account');
+
+      final localRaw = prefs.getString(normalizedKey);
+      if (localRaw == null || localRaw.trim().isEmpty) {
+        return jsonEncode(sanitized);
+      }
+      final localDecoded = jsonDecode(localRaw);
+      if (localDecoded is! Map) {
+        return jsonEncode(sanitized);
+      }
+      final localStore = Map<String, dynamic>.from(localDecoded);
+      final localAccount = localStore['account'];
+      if (localAccount != null) {
+        sanitized['account'] = localAccount;
+      }
       return jsonEncode(sanitized);
     } catch (_) {
       return value;
