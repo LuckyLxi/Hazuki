@@ -5,10 +5,14 @@ class AppearanceSettingsPage extends StatefulWidget {
     super.key,
     required this.appearanceSettings,
     required this.onAppearanceChanged,
+    required this.locale,
+    required this.onLocaleChanged,
   });
 
   final AppearanceSettingsData appearanceSettings;
   final Future<void> Function(AppearanceSettingsData next) onAppearanceChanged;
+  final Locale? locale;
+  final Future<void> Function(Locale? locale) onLocaleChanged;
 
   @override
   State<AppearanceSettingsPage> createState() => _AppearanceSettingsPageState();
@@ -16,11 +20,13 @@ class AppearanceSettingsPage extends StatefulWidget {
 
 class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
   late AppearanceSettingsData _settings;
+  late Locale? _locale;
 
   @override
   void initState() {
     super.initState();
     _settings = widget.appearanceSettings;
+    _locale = widget.locale;
   }
 
   Future<void> _apply(AppearanceSettingsData next) async {
@@ -30,55 +36,74 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
     await widget.onAppearanceChanged(next);
   }
 
-  String get _themeModeLabel {
+  Future<void> _applyLocale(Locale? locale) async {
+    setState(() {
+      _locale = locale;
+    });
+    await widget.onLocaleChanged(locale);
+  }
+
+  String _themeModeLabel(AppLocalizations strings) {
     return switch (_settings.themeMode) {
-      ThemeMode.light => '浅色',
-      ThemeMode.dark => '深色',
-      _ => '跟随系统',
+      ThemeMode.light => strings.displayThemeLight,
+      ThemeMode.dark => strings.displayThemeDark,
+      _ => strings.displayThemeSystem,
     };
   }
 
-  String get _displayModeLabel {
+  String _localeLabel(AppLocalizations strings) {
+    return switch (_locale?.languageCode) {
+      'zh' => strings.displayLanguageZhHans,
+      'en' => strings.displayLanguageEnglish,
+      _ => strings.displayLanguageSystem,
+    };
+  }
+
+  String _displayModeLabel(AppLocalizations strings) {
     final raw = _settings.displayModeRaw;
     if (raw == 'native:auto') {
-      return '自动';
+      return strings.displayRefreshRateAuto;
     }
     if (raw.startsWith('native:')) {
       final id = raw.substring('native:'.length);
-      return '已指定模式（ID: $id）';
+      return strings.displayRefreshRateSpecified(id);
     }
     return raw;
   }
 
   @override
   Widget build(BuildContext context) {
+    final strings = l10n(context);
     return Scaffold(
-      appBar: hazukiFrostedAppBar(context: context, title: const Text('外观')),
+      appBar: hazukiFrostedAppBar(
+        context: context,
+        title: Text(strings.displayTitle),
+      ),
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 8),
         children: [
           ListTile(
-            title: const Text('主题'),
-            subtitle: Text(_themeModeLabel),
+            title: Text(strings.displayThemeTitle),
+            subtitle: Text(_themeModeLabel(strings)),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
             child: SegmentedButton<ThemeMode>(
-              segments: const [
+              segments: [
                 ButtonSegment<ThemeMode>(
                   value: ThemeMode.light,
-                  label: Text('浅色'),
-                  icon: Icon(Icons.light_mode_outlined),
+                  label: Text(strings.displayThemeLight),
+                  icon: const Icon(Icons.light_mode_outlined),
                 ),
                 ButtonSegment<ThemeMode>(
                   value: ThemeMode.dark,
-                  label: Text('深色'),
-                  icon: Icon(Icons.dark_mode_outlined),
+                  label: Text(strings.displayThemeDark),
+                  icon: const Icon(Icons.dark_mode_outlined),
                 ),
                 ButtonSegment<ThemeMode>(
                   value: ThemeMode.system,
-                  label: Text('跟随系统'),
-                  icon: Icon(Icons.settings_suggest_outlined),
+                  label: Text(strings.displayThemeSystem),
+                  icon: const Icon(Icons.settings_suggest_outlined),
                 ),
               ],
               selected: {_settings.themeMode},
@@ -91,8 +116,50 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
           ),
           const Divider(height: 1),
           ListTile(
-            title: const Text('屏幕帧率'),
-            subtitle: Text(_displayModeLabel),
+            title: Text(strings.displayLanguageTitle),
+            subtitle: Text(_localeLabel(strings)),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () async {
+              final next = await showModalBottomSheet<Locale?>(
+                context: context,
+                builder: (sheetContext) {
+                  final sheetStrings = l10n(sheetContext);
+                  return SafeArea(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ListTile(
+                          title: Text(sheetStrings.displayLanguageSystem),
+                          onTap: () => Navigator.of(sheetContext).pop(),
+                        ),
+                        ListTile(
+                          title: Text(sheetStrings.displayLanguageZhHans),
+                          onTap: () => Navigator.of(
+                            sheetContext,
+                          ).pop(const Locale('zh')),
+                        ),
+                        ListTile(
+                          title: Text(sheetStrings.displayLanguageEnglish),
+                          onTap: () => Navigator.of(
+                            sheetContext,
+                          ).pop(const Locale('en')),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              );
+              if (_locale?.languageCode == next?.languageCode &&
+                  ((_locale != null) == (next != null))) {
+                return;
+              }
+              await _applyLocale(next);
+            },
+          ),
+          const Divider(height: 1),
+          ListTile(
+            title: Text(strings.displayRefreshRateTitle),
+            subtitle: Text(_displayModeLabel(strings)),
             trailing: const Icon(Icons.chevron_right),
             onTap: () async {
               await Navigator.of(context).push(
@@ -111,33 +178,35 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
           ),
           SwitchListTile(
             value: _settings.oledPureBlack,
-            title: const Text('OLED 优化'),
-            subtitle: const Text('开启后深色模式使用纯色背景'),
+            title: Text(strings.displayPureBlackTitle),
+            subtitle: Text(strings.displayPureBlackSubtitle),
             onChanged: (value) {
               unawaited(_apply(_settings.copyWith(oledPureBlack: value)));
             },
           ),
           SwitchListTile(
             value: _settings.dynamicColor,
-            title: const Text('动态取色'),
-            subtitle: const Text('根据系统壁纸自动提取主题色（Android 12+）'),
+            title: Text(strings.displayDynamicColorTitle),
+            subtitle: Text(strings.displayDynamicColorSubtitle),
             onChanged: (value) {
               unawaited(_apply(_settings.copyWith(dynamicColor: value)));
             },
           ),
           SwitchListTile(
             value: _settings.comicDetailDynamicColor,
-            title: const Text('漫画详情页动态取色'),
-            subtitle: const Text('开启后根据漫画封面生成漫画详情页动态主题'),
+            title: Text(strings.displayComicDynamicColorTitle),
+            subtitle: Text(strings.displayComicDynamicColorSubtitle),
             onChanged: (value) {
-              unawaited(_apply(_settings.copyWith(comicDetailDynamicColor: value)));
+              unawaited(
+                _apply(_settings.copyWith(comicDetailDynamicColor: value)),
+              );
             },
           ),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 14, 16, 8),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
             child: Text(
-              '配色方案',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+              strings.displayColorSchemeTitle,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
             ),
           ),
           Padding(
@@ -181,7 +250,7 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          preset.name,
+                          preset.labelBuilder(strings),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(fontSize: 12),

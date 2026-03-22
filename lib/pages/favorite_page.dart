@@ -52,7 +52,9 @@ class _FavoritePageState extends State<FavoritePage>
   final ScrollController _scrollController = ScrollController();
 
   List<ExploreComic> _comics = const [];
-  List<FavoriteFolder> _folders = const [FavoriteFolder(id: '0', name: '全部')];
+  List<FavoriteFolder> _folders = const [
+    FavoriteFolder(id: '0', name: '__favorite_all__'),
+  ];
   String _selectedFolderId = '0';
   String? _errorMessage;
   bool _initialLoading = true;
@@ -92,7 +94,7 @@ class _FavoritePageState extends State<FavoritePage>
       } else {
         setState(() {
           _comics = const [];
-          _folders = const [FavoriteFolder(id: '0', name: '全部')];
+          _folders = const [FavoriteFolder(id: '0', name: '__favorite_all__')];
           _selectedFolderId = '0';
           _errorMessage = null;
           _initialLoading = false;
@@ -163,14 +165,19 @@ class _FavoritePageState extends State<FavoritePage>
     );
   }
 
-  Future<FavoriteComicsResult> _loadFavoritesPage(int page, {String? folderId}) {
+  Future<FavoriteComicsResult> _loadFavoritesPage(
+    int page, {
+    String? folderId,
+  }) {
     final targetFolderId = (folderId ?? _selectedFolderId).trim();
     return HazukiSourceService.instance
         .loadFavoriteComics(page: page, folderId: targetFolderId)
         .timeout(
           _favoriteLoadTimeout,
           onTimeout: () {
-            return const FavoriteComicsResult.error('收藏加载超时，请下拉重试');
+            return FavoriteComicsResult.error(
+              l10n(context).favoriteLoadTimeout,
+            );
           },
         );
   }
@@ -252,7 +259,7 @@ class _FavoritePageState extends State<FavoritePage>
     if (!service.supportFavoriteFolderLoad) {
       if (mounted) {
         setState(() {
-          _folders = const [FavoriteFolder(id: '0', name: '全部')];
+          _folders = const [FavoriteFolder(id: '0', name: '__favorite_all__')];
           _selectedFolderId = '0';
         });
       }
@@ -274,14 +281,18 @@ class _FavoritePageState extends State<FavoritePage>
       setState(() {
         _loadingFolders = false;
       });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('读取收藏夹失败：${result.errorMessage}')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            l10n(context).favoriteFoldersLoadFailed(result.errorMessage!),
+          ),
+        ),
+      );
       return;
     }
 
     final folders = result.folders.isEmpty
-        ? const [FavoriteFolder(id: '0', name: '全部')]
+        ? const [FavoriteFolder(id: '0', name: '__favorite_all__')]
         : result.folders;
     final selectedExists = folders.any((e) => e.id == _selectedFolderId);
 
@@ -440,13 +451,14 @@ class _FavoritePageState extends State<FavoritePage>
         String? errorText;
         return StatefulBuilder(
           builder: (dialogContext, setDialogState) {
+            final strings = l10n(dialogContext);
             return AlertDialog(
-              title: const Text('新建收藏夹'),
+              title: Text(strings.favoriteCreateFolderTitle),
               content: TextField(
                 controller: controller,
                 autofocus: true,
                 decoration: InputDecoration(
-                  hintText: '请输入收藏夹名称',
+                  hintText: strings.favoriteCreateFolderHint,
                   border: const OutlineInputBorder(),
                   errorText: errorText,
                 ),
@@ -460,19 +472,22 @@ class _FavoritePageState extends State<FavoritePage>
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(dialogContext),
-                  child: const Text('取消'),
+                  child: Text(strings.commonCancel),
                 ),
                 FilledButton(
                   onPressed: () {
                     final text = controller.text.trim();
                     // 输入为空时显示错误，不关闭弹窗
                     if (text.isEmpty) {
-                      setDialogState(() => errorText = '收藏夹名称不能为空');
+                      setDialogState(
+                        () => errorText =
+                            strings.favoriteCreateFolderNameRequired,
+                      );
                       return;
                     }
                     Navigator.pop(dialogContext, text);
                   },
-                  child: const Text('确定'),
+                  child: Text(strings.commonConfirm),
                 ),
               ],
             );
@@ -492,9 +507,9 @@ class _FavoritePageState extends State<FavoritePage>
         return;
       }
       // 新建成功后显示 SnackBar 提示
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('已成功创建收藏夹「$name」')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n(context).favoriteCreated(name))),
+      );
       final created = _folders.where((e) => e.name == name).toList();
       if (created.isNotEmpty) {
         await _selectFolder(created.first.id);
@@ -503,9 +518,9 @@ class _FavoritePageState extends State<FavoritePage>
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('新建收藏夹失败：$e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n(context).favoriteCreateFailed('$e'))),
+      );
     }
   }
 
@@ -535,9 +550,9 @@ class _FavoritePageState extends State<FavoritePage>
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('切换排序失败：$e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n(context).favoriteSortChangeFailed('$e'))),
+      );
     }
   }
 
@@ -551,17 +566,20 @@ class _FavoritePageState extends State<FavoritePage>
     final ok = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
+        final strings = l10n(dialogContext);
         return AlertDialog(
-          title: const Text('删除收藏夹'),
-          content: Text('确定删除「${current?.name ?? currentId}」吗？'),
+          title: Text(strings.favoriteDeleteFolderTitle),
+          content: Text(
+            strings.favoriteDeleteFolderContent(current?.name ?? currentId),
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('取消'),
+              child: Text(strings.commonCancel),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('删除'),
+              child: Text(strings.comicDetailDelete),
             ),
           ],
         );
@@ -582,7 +600,7 @@ class _FavoritePageState extends State<FavoritePage>
       final updatedFolders = _folders.where((e) => e.id != currentId).toList();
       setState(() {
         _folders = updatedFolders.isEmpty
-            ? const [FavoriteFolder(id: '0', name: '全部')]
+            ? const [FavoriteFolder(id: '0', name: '__favorite_all__')]
             : updatedFolders;
       });
 
@@ -595,9 +613,9 @@ class _FavoritePageState extends State<FavoritePage>
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('删除收藏夹失败：$e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n(context).favoriteDeleteFailed('$e'))),
+      );
     }
   }
 
@@ -614,12 +632,15 @@ class _FavoritePageState extends State<FavoritePage>
         children: [
           Row(
             children: [
-              Text('收藏夹', style: Theme.of(context).textTheme.titleSmall),
+              Text(
+                l10n(context).favoriteFolderHeader,
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
               const Spacer(),
               if (service.supportFavoriteFolderDelete &&
                   _selectedFolderId != '0')
                 IconButton(
-                  tooltip: '删除当前收藏夹',
+                  tooltip: l10n(context).favoriteDeleteCurrentFolderTooltip,
                   onPressed: _deleteCurrentFolder,
                   icon: const Icon(Icons.delete_outline),
                 ),
@@ -643,7 +664,11 @@ class _FavoritePageState extends State<FavoritePage>
                       (folder) => Padding(
                         padding: const EdgeInsets.only(right: 8),
                         child: ChoiceChip(
-                          label: Text(folder.name),
+                          label: Text(
+                            folder.id == '0'
+                                ? l10n(context).favoriteAllFolder
+                                : folder.name,
+                          ),
                           selected: _selectedFolderId == folder.id,
                           onSelected: (_) => _selectFolder(folder.id),
                         ),
@@ -749,22 +774,23 @@ class _FavoritePageState extends State<FavoritePage>
   @override
   Widget build(BuildContext context) {
     super.build(context); // AutomaticKeepAliveClientMixin 必需调用
+    final strings = l10n(context);
     final isLogged = HazukiSourceService.instance.isLogged;
     if (!isLogged) {
-      return const Center(child: Text('请登录'));
+      return Center(child: Text(strings.favoriteLoginRequired));
     }
 
     Widget content;
     if (_initialLoading) {
-      content = const SizedBox(
+      content = SizedBox(
         height: 360,
         child: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              HazukiStickerLoadingIndicator(size: 120),
-              SizedBox(height: 10),
-              Text('加载中...'),
+              const HazukiStickerLoadingIndicator(size: 120),
+              const SizedBox(height: 10),
+              Text(strings.commonLoading),
             ],
           ),
         ),
@@ -781,13 +807,19 @@ class _FavoritePageState extends State<FavoritePage>
                 child: Text(_errorMessage!, textAlign: TextAlign.center),
               ),
               const SizedBox(height: 12),
-              FilledButton(onPressed: _refresh, child: const Text('重试')),
+              FilledButton(
+                onPressed: _refresh,
+                child: Text(strings.commonRetry),
+              ),
             ],
           ),
         ),
       );
     } else if (_comics.isEmpty) {
-      content = const SizedBox(height: 220, child: Center(child: Text('暂无收藏')));
+      content = SizedBox(
+        height: 220,
+        child: Center(child: Text(strings.favoriteEmpty)),
+      );
     } else {
       content = ListView.separated(
         physics: const NeverScrollableScrollPhysics(),
@@ -800,15 +832,15 @@ class _FavoritePageState extends State<FavoritePage>
     }
 
     final loadMoreFooter = _loadingMore
-        ? const Padding(
-            padding: EdgeInsets.symmetric(vertical: 10),
+        ? Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10),
             child: Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  HazukiStickerLoadingIndicator(size: 72),
-                  SizedBox(height: 8),
-                  Text('加载中...'),
+                  const HazukiStickerLoadingIndicator(size: 72),
+                  const SizedBox(height: 8),
+                  Text(strings.commonLoading),
                 ],
               ),
             ),

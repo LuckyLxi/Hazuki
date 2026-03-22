@@ -21,7 +21,7 @@ extension HazukiSourceServiceExploreCapability on HazukiSourceService {
 
     final engine = _engine;
     if (engine == null) {
-      throw Exception('漫画源尚未初始化完成');
+      throw Exception('source_not_initialized');
     }
 
     final hasExplore = _asBool(
@@ -35,7 +35,7 @@ extension HazukiSourceServiceExploreCapability on HazukiSourceService {
         (engine.evaluate('this.__hazuki_source.explore?.[0]?.type') ?? '')
             .toString();
     if (exploreType != 'multiPartPage') {
-      throw Exception('暂只支持 multiPartPage 发现页，当前类型: $exploreType');
+      throw Exception('explore_type_not_supported:$exploreType');
     }
 
     final dynamic result = engine.evaluate(
@@ -54,7 +54,7 @@ extension HazukiSourceServiceExploreCapability on HazukiSourceService {
         continue;
       }
       final map = Map<String, dynamic>.from(item);
-      final title = map['title']?.toString() ?? '未命名分区';
+      final title = map['title']?.toString() ?? '__untitled_section__';
       final list = map['comics'];
       if (list is! List) {
         continue;
@@ -64,11 +64,13 @@ extension HazukiSourceServiceExploreCapability on HazukiSourceService {
 
       final comics = _parseExploreComics(list);
       if (comics.isNotEmpty) {
-        sections.add(ExploreSection(
-          title: title,
-          comics: comics,
-          viewMoreUrl: viewMore?.isNotEmpty == true ? viewMore : null,
-        ));
+        sections.add(
+          ExploreSection(
+            title: title,
+            comics: comics,
+            viewMoreUrl: viewMore?.isNotEmpty == true ? viewMore : null,
+          ),
+        );
       }
     }
 

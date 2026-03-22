@@ -15,7 +15,7 @@ class _ComicCoverActionsSheet extends StatelessWidget {
         children: [
           ListTile(
             leading: const Icon(Icons.download_outlined),
-            title: const Text('保存图片'),
+            title: Text(l10n(context).comicDetailSaveImage),
             onTap: () {
               Navigator.of(context).pop();
               onSavePressed();
@@ -23,7 +23,7 @@ class _ComicCoverActionsSheet extends StatelessWidget {
           ),
           ListTile(
             leading: const Icon(Icons.close),
-            title: const Text('取消'),
+            title: Text(l10n(context).commonCancel),
             onTap: () => Navigator.of(context).pop(),
           ),
           const SizedBox(height: 8),

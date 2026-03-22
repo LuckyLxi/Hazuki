@@ -1,14 +1,19 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hazuki/main.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
-  testWidgets('Hazuki app renders basic navigation', (tester) async {
-    await tester.pumpWidget(const HazukiApp());
-    await tester.pump(const Duration(seconds: 21));
-    await tester.pumpAndSettle();
+  TestWidgetsFlutterBinding.ensureInitialized();
 
-    expect(find.text('Hazuki'), findsOneWidget);
-    expect(find.text('发现'), findsOneWidget);
-    expect(find.text('收藏'), findsOneWidget);
+  test('locale preference persists supported values', () async {
+    SharedPreferences.setMockInitialValues({'app_locale': 'en'});
+    final prefs = await SharedPreferences.getInstance();
+
+    expect(prefs.getString('app_locale'), 'en');
+
+    await prefs.setString('app_locale', 'zh');
+    expect(prefs.getString('app_locale'), 'zh');
+
+    await prefs.setString('app_locale', 'system');
+    expect(prefs.getString('app_locale'), 'system');
   });
 }

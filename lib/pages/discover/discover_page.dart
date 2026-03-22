@@ -80,12 +80,13 @@ class _DiscoverPageState extends State<DiscoverPage> {
         .timeout(
           _discoverLoadTimeout,
           onTimeout: () {
-            throw Exception('发现页加载超时，请下拉重试');
+            throw Exception('discover_load_timeout');
           },
         );
   }
 
   Future<void> _loadInitial() async {
+    final strings = l10n(context);
     try {
       final sections = await _loadSections();
       if (!mounted) {
@@ -99,8 +100,11 @@ class _DiscoverPageState extends State<DiscoverPage> {
       if (!mounted) {
         return;
       }
+      final errorMessage = e.toString().contains('discover_load_timeout')
+          ? strings.discoverLoadTimeout
+          : strings.discoverLoadFailed('$e');
       setState(() {
-        _errorMessage = '发现页加载失败：$e';
+        _errorMessage = errorMessage;
       });
     } finally {
       if (mounted) {
@@ -120,6 +124,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
       _refreshing = true;
     });
 
+    final strings = l10n(context);
     try {
       final sections = await _loadSections(forceRefresh: true);
       if (!mounted) {
@@ -133,8 +138,11 @@ class _DiscoverPageState extends State<DiscoverPage> {
       if (!mounted) {
         return;
       }
+      final errorMessage = e.toString().contains('discover_load_timeout')
+          ? strings.discoverLoadTimeout
+          : strings.discoverLoadFailed('$e');
       setState(() {
-        _errorMessage = '发现页加载失败：$e';
+        _errorMessage = errorMessage;
       });
     } finally {
       if (mounted) {
@@ -176,7 +184,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
               child: SizedBox(
                 height: height,
                 child: SearchBar(
-                  hintText: '搜索漫画',
+                  hintText: l10n(context).searchHint,
                   elevation: const WidgetStatePropertyAll(0),
                   backgroundColor: WidgetStatePropertyAll(
                     Theme.of(context).colorScheme.surfaceContainerHigh,
@@ -225,16 +233,17 @@ class _DiscoverPageState extends State<DiscoverPage> {
   }
 
   Widget _buildDiscoverView() {
+    final strings = l10n(context);
     if (_initialLoading) {
-      return const SizedBox(
+      return SizedBox(
         height: 360,
         child: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              HazukiStickerLoadingIndicator(size: 112),
-              SizedBox(height: 10),
-              Text('加载中...'),
+              const HazukiStickerLoadingIndicator(size: 112),
+              const SizedBox(height: 10),
+              Text(strings.commonLoading),
             ],
           ),
         ),
@@ -255,7 +264,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
               const SizedBox(height: 12),
               FilledButton(
                 onPressed: _refreshDiscover,
-                child: const Text('重试'),
+                child: Text(strings.commonRetry),
               ),
             ],
           ),
@@ -264,9 +273,9 @@ class _DiscoverPageState extends State<DiscoverPage> {
     }
 
     if (_sections.isEmpty) {
-      return const SizedBox(
+      return SizedBox(
         height: 220,
-        child: Center(child: Text('当前漫画源暂无发现页内容')),
+        child: Center(child: Text(strings.discoverEmpty)),
       );
     }
 
@@ -290,7 +299,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
                       ),
                     );
                   },
-                  child: const Text('查看更多'),
+                  child: Text(strings.discoverMore),
                 ),
             ],
           ),

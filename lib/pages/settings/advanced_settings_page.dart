@@ -43,16 +43,20 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final strings = l10n(context);
     return Scaffold(
-      appBar: hazukiFrostedAppBar(context: context, title: const Text('高级')),
+      appBar: hazukiFrostedAppBar(
+        context: context,
+        title: Text(strings.advancedTitle),
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
               children: [
                 ListTile(
                   leading: const Icon(Icons.bug_report_outlined),
-                  title: const Text('Debug'),
-                  subtitle: const Text('日志'),
+                  title: Text(strings.advancedDebugTitle),
+                  subtitle: Text(strings.advancedDebugSubtitle),
                   onTap: () {
                     Navigator.of(context).push(
                       MaterialPageRoute<void>(
@@ -63,15 +67,15 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
                 ),
                 SwitchListTile(
                   secondary: const Icon(Icons.tag_outlined),
-                  title: const Text('漫画 ID 搜索优化'),
-                  subtitle: const Text('提交搜索时自动过滤非数字字符，仅保留阿拉伯数字作为关键词'),
+                  title: Text(strings.advancedComicIdSearchTitle),
+                  subtitle: Text(strings.advancedComicIdSearchSubtitle),
                   value: _comicIdSearchEnhance,
                   onChanged: _toggleComicIdSearchEnhance,
                 ),
                 SwitchListTile(
                   secondary: const Icon(Icons.image_not_supported_outlined),
-                  title: const Text('无图模式'),
-                  subtitle: const Text('全局不显示图片（侧边栏登录头像除外）'),
+                  title: Text(strings.advancedNoImageModeTitle),
+                  subtitle: Text(strings.advancedNoImageModeSubtitle),
                   value: _noImageMode,
                   onChanged: _toggleNoImageMode,
                 ),

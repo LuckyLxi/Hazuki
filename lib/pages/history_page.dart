@@ -106,23 +106,26 @@ class _HistoryPageState extends State<HistoryPage> {
   Future<void> _deleteSelected() async {
     if (_selectedIds.isEmpty) return;
 
+    final strings = l10n(context);
     final confirm = await showGeneralDialog<bool>(
       context: context,
       barrierDismissible: true,
-      barrierLabel: '关闭',
+      barrierLabel: strings.commonClose,
       transitionDuration: const Duration(milliseconds: 250),
       pageBuilder: (context, anim1, anim2) {
         return AlertDialog(
-          title: const Text('删除历史记录'),
-          content: Text('你确定要删除选中的${_selectedIds.length}部漫画历史记录吗？'),
+          title: Text(strings.historyDeleteSelectedTitle),
+          content: Text(
+            strings.historyDeleteSelectedContent(_selectedIds.length),
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('取消'),
+              child: Text(strings.commonCancel),
             ),
             FilledButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('确定'),
+              child: Text(strings.commonConfirm),
             ),
           ],
         );
@@ -153,23 +156,24 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 
   Future<void> _clearAll() async {
+    final strings = l10n(context);
     final confirm = await showGeneralDialog<bool>(
       context: context,
       barrierDismissible: true,
-      barrierLabel: '关闭',
+      barrierLabel: strings.commonClose,
       transitionDuration: const Duration(milliseconds: 250),
       pageBuilder: (context, anim1, anim2) {
         return AlertDialog(
-          title: const Text('清空历史记录'),
-          content: const Text('你确定要清空所有历史记录吗？此操作不可恢复。'),
+          title: Text(strings.historyClearAllTitle),
+          content: Text(strings.historyClearAllContent),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('取消'),
+              child: Text(strings.commonCancel),
             ),
             FilledButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('确定'),
+              child: Text(strings.commonConfirm),
             ),
           ],
         );
@@ -197,24 +201,31 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 
   Future<void> _handleCopyComicId(ExploreComic comic) async {
+    final strings = l10n(context);
     await Clipboard.setData(ClipboardData(text: comic.id));
     if (!mounted) {
       return;
     }
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(const SnackBar(content: Text('已复制漫画ID')));
+    ).showSnackBar(SnackBar(content: Text(strings.historyCopiedComicId)));
   }
 
   Future<void> _handleToggleFavoriteFromHistory(ExploreComic comic) async {
     final isLogged = HazukiSourceService.instance.isLogged;
     final messenger = ScaffoldMessenger.of(context);
 
+    final strings = l10n(context);
+
     if (!isLogged) {
-      messenger.showSnackBar(const SnackBar(content: Text('请先登录')));
+      messenger.showSnackBar(
+        SnackBar(content: Text(strings.historyLoginRequired)),
+      );
       return;
     }
-    messenger.showSnackBar(const SnackBar(content: Text('正在处理收藏...')));
+    messenger.showSnackBar(
+      SnackBar(content: Text(strings.historyFavoriteProcessing)),
+    );
     try {
       final details = await HazukiSourceService.instance.loadComicDetails(
         comic.id,
@@ -222,7 +233,7 @@ class _HistoryPageState extends State<HistoryPage> {
       if (HazukiSourceService.instance.supportFavoriteFolderLoad &&
           HazukiSourceService.instance.supportFavoriteToggle) {
         messenger.showSnackBar(
-          const SnackBar(content: Text('多收藏夹请在漫画详情页内操作，正在执行默认操作...')),
+          SnackBar(content: Text(strings.historyFavoriteFolderNotice)),
         );
       }
       if (details.isFavorite) {
@@ -231,17 +242,23 @@ class _HistoryPageState extends State<HistoryPage> {
           isAdding: false,
           folderId: '0',
         );
-        messenger.showSnackBar(const SnackBar(content: Text('已取消收藏')));
+        messenger.showSnackBar(
+          SnackBar(content: Text(strings.historyFavoriteRemoved)),
+        );
       } else {
         await HazukiSourceService.instance.toggleFavorite(
           comicId: details.id,
           isAdding: true,
           folderId: '0',
         );
-        messenger.showSnackBar(const SnackBar(content: Text('已添加收藏')));
+        messenger.showSnackBar(
+          SnackBar(content: Text(strings.historyFavoriteAdded)),
+        );
       }
     } catch (e) {
-      messenger.showSnackBar(SnackBar(content: Text('收藏操作失败: $e')));
+      messenger.showSnackBar(
+        SnackBar(content: Text(strings.historyFavoriteFailed('$e'))),
+      );
     }
   }
 
@@ -323,10 +340,11 @@ class _HistoryPageState extends State<HistoryPage> {
     final originX = fingerOffset.dx < dx + menuWidth / 2 ? 0.0 : 1.0;
     final originY = showBelow ? -1.0 : 1.0;
 
+    final strings = l10n(context);
     final action = await showGeneralDialog<String>(
       context: context,
       barrierDismissible: true,
-      barrierLabel: '关闭',
+      barrierLabel: strings.commonClose,
       barrierColor: Colors.black26,
       transitionDuration: const Duration(milliseconds: 280),
       pageBuilder: (dialogContext, animation, secondaryAnimation) {
@@ -358,19 +376,19 @@ class _HistoryPageState extends State<HistoryPage> {
                     children: [
                       _HistoryMenuItem(
                         icon: Icons.copy,
-                        label: '复制漫画ID',
+                        label: strings.historyMenuCopyComicId,
                         onTap: () => Navigator.of(dialogContext).pop('copy'),
                       ),
                       _HistoryMenuItem(
                         icon: Icons.favorite_border,
-                        label: '收藏/取消收藏',
+                        label: strings.historyMenuToggleFavorite,
                         onTap: () =>
                             Navigator.of(dialogContext).pop('favorite'),
                       ),
                       Divider(height: 1, color: scheme.outlineVariant),
                       _HistoryMenuItem(
                         icon: Icons.delete_outline,
-                        label: '删除此记录',
+                        label: strings.historyMenuDeleteItem,
                         danger: true,
                         onTap: () => Navigator.of(dialogContext).pop('delete'),
                       ),
@@ -561,19 +579,20 @@ class _HistoryPageState extends State<HistoryPage> {
 
   @override
   Widget build(BuildContext context) {
+    final strings = l10n(context);
     final bodyContent = _loading
-        ? const Center(
+        ? Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                HazukiStickerLoadingIndicator(size: 112),
-                SizedBox(height: 10),
-                Text('加载中...'),
+                const HazukiStickerLoadingIndicator(size: 112),
+                const SizedBox(height: 10),
+                Text(strings.commonLoading),
               ],
             ),
           )
         : _history.isEmpty
-        ? const Center(child: Text('暂无历史记录'))
+        ? Center(child: Text(strings.historyEmpty))
         : ListView.builder(
             controller: _scrollController,
             physics: const AlwaysScrollableScrollPhysics(
@@ -588,13 +607,15 @@ class _HistoryPageState extends State<HistoryPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('历史记录'),
+        title: Text(strings.historyTitle),
         surfaceTintColor: Colors.transparent,
         scrolledUnderElevation: 0,
         actions: [
           if (_history.isNotEmpty)
             IconButton(
-              tooltip: _selectionMode ? '取消多选' : '多选',
+              tooltip: _selectionMode
+                  ? strings.historySelectionCancelTooltip
+                  : strings.historySelectionEnterTooltip,
               icon: Icon(_selectionMode ? Icons.close : Icons.checklist),
               onPressed: () {
                 setState(() {
@@ -605,7 +626,9 @@ class _HistoryPageState extends State<HistoryPage> {
             ),
           if (_history.isNotEmpty)
             IconButton(
-              tooltip: _selectionMode ? '删除选中的历史' : '清空所有历史',
+              tooltip: _selectionMode
+                  ? strings.historyDeleteSelectedTooltip
+                  : strings.historyClearAllTooltip,
               icon: const Icon(Icons.delete_outline),
               onPressed: _selectionMode ? _deleteSelected : _clearAll,
             ),

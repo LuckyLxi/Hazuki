@@ -1,6 +1,9 @@
 part of '../../main.dart';
 
-List<String> _normalizeComicMetaValues(List<String> rawValues, {String? label}) {
+List<String> _normalizeComicMetaValues(
+  List<String> rawValues, {
+  String? label,
+}) {
   final values = <String>[];
   final seen = <String>{};
 
@@ -13,7 +16,8 @@ List<String> _normalizeComicMetaValues(List<String> rawValues, {String? label}) 
     if (label != null && label.isNotEmpty) {
       final lower = text.toLowerCase();
       final lowerLabel = label.toLowerCase();
-      if (lower.startsWith('$lowerLabel:') || lower.startsWith('$lowerLabel\uFF1A')) {
+      if (lower.startsWith('$lowerLabel:') ||
+          lower.startsWith('$lowerLabel\uFF1A')) {
         text = text.substring(label.length + 1).trim();
       }
     }
@@ -54,10 +58,7 @@ bool _isComicAuthorKey(String key) {
 }
 
 class _ComicDetailIdRow extends StatelessWidget {
-  const _ComicDetailIdRow({
-    required this.id,
-    required this.onCopy,
-  });
+  const _ComicDetailIdRow({required this.id, required this.onCopy});
 
   final String id;
   final VoidCallback onCopy;
@@ -111,7 +112,12 @@ class _ComicDetailMetaRow extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    final valueStyle = Theme.of(context).textTheme.bodySmall;
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final valueStyle = theme.textTheme.bodySmall?.copyWith(
+      color: cs.onSecondaryContainer,
+      fontWeight: FontWeight.w500,
+    );
     final chips = values
         .map(
           (value) => Tooltip(
@@ -121,6 +127,10 @@ class _ComicDetailMetaRow extends StatelessWidget {
               child: ActionChip(
                 visualDensity: VisualDensity.compact,
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                backgroundColor: cs.secondaryContainer,
+                side: BorderSide(
+                  color: cs.outlineVariant.withValues(alpha: 0.2),
+                ),
                 labelPadding: const EdgeInsets.symmetric(horizontal: 4),
                 padding: EdgeInsets.zero,
                 label: Text(value.trim(), style: valueStyle),
@@ -136,7 +146,7 @@ class _ComicDetailMetaRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('$label: ', style: Theme.of(context).textTheme.bodyMedium),
+          Text('$label: ', style: theme.textTheme.bodyMedium),
           Expanded(child: Wrap(spacing: 6, runSpacing: 6, children: chips)),
         ],
       ),

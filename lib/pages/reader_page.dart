@@ -252,10 +252,11 @@ class _ReaderPageState extends State<ReaderPage>
   /// 长按保存图片确认弹窗
   Future<void> _showSaveImageDialog(String imageUrl) async {
     unawaited(HapticFeedback.heavyImpact());
+    final strings = l10n(context);
     final shouldSave = await showGeneralDialog<bool>(
       context: context,
       barrierDismissible: true,
-      barrierLabel: '关闭',
+      barrierLabel: strings.commonClose,
       transitionDuration: const Duration(milliseconds: 300),
       transitionBuilder: (context, anim1, anim2, child) {
         return Transform.scale(
@@ -269,16 +270,16 @@ class _ReaderPageState extends State<ReaderPage>
       },
       pageBuilder: (dialogContext, anim1, anim2) {
         return AlertDialog(
-          title: const Text('保存图片'),
-          content: const Text('是否将该漫画图片保存到本地？'),
+          title: Text(strings.readerSaveImageTitle),
+          content: Text(strings.readerSaveImageContent),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext, false),
-              child: const Text('取消'),
+              child: Text(strings.commonCancel),
             ),
             FilledButton(
               onPressed: () => Navigator.pop(dialogContext, true),
-              child: const Text('保存'),
+              child: Text(strings.commonSave),
             ),
           ],
         );
@@ -325,14 +326,14 @@ class _ReaderPageState extends State<ReaderPage>
       final file = File('${directory.path}/$saveName');
       await file.writeAsBytes(bytes, flush: true);
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('已保存到 ${file.path}')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(strings.comicDetailSavedToPath(file.path))),
+      );
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('保存失败：$e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(strings.comicDetailSaveFailed('$e'))),
+      );
     }
   }
 
@@ -402,7 +403,7 @@ class _ReaderPageState extends State<ReaderPage>
       }
       setState(() {
         _loadingImages = false;
-        _loadImagesError = '鍔犺浇绔犺妭澶辫触锛?e';
+        _loadImagesError = l10n(context).readerChapterLoadFailed('$e');
       });
     }
   }
@@ -801,7 +802,7 @@ class _ReaderPageState extends State<ReaderPage>
                       });
                       unawaited(_loadChapterImages());
                     },
-                    child: const Text('重试'),
+                    child: Text(l10n(context).commonRetry),
                   ),
                 ],
               ),
@@ -820,7 +821,7 @@ class _ReaderPageState extends State<ReaderPage>
           backgroundColor: readerBg,
           body: Center(
             child: Text(
-              '当前章节无图片',
+              l10n(context).readerCurrentChapterNoImages,
               style: TextStyle(color: readerTheme.colorScheme.onSurfaceVariant),
             ),
           ),
@@ -917,18 +918,18 @@ class _ReaderPageState extends State<ReaderPage>
                                   color: Colors.white.withValues(alpha: 0.18),
                                 ),
                               ),
-                              child: const Row(
+                              child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Icon(
+                                  const Icon(
                                     Icons.zoom_out_map_rounded,
                                     color: Colors.white,
                                     size: 15,
                                   ),
-                                  SizedBox(width: 6),
+                                  const SizedBox(width: 6),
                                   Text(
-                                    '还原大小',
-                                    style: TextStyle(
+                                    l10n(context).readerResetZoom,
+                                    style: const TextStyle(
                                       color: Colors.white,
                                       fontSize: 13,
                                       fontWeight: FontWeight.w500,

@@ -46,7 +46,9 @@ class _ComicDetailAppBarTitle extends StatelessWidget {
               overflow: TextOverflow.ellipsis,
             )
           : Text(
-              appBarUpdateTime.isNotEmpty ? '漫画更新时间：$appBarUpdateTime' : '漫画详情',
+              appBarUpdateTime.isNotEmpty
+                  ? l10n(context).comicDetailUpdatedAt(appBarUpdateTime)
+                  : l10n(context).comicDetailTitle,
               key: const ValueKey('default-appbar-update-time'),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -212,11 +214,11 @@ class _ComicDetailBody extends StatelessWidget {
               SliverPersistentHeader(
                 pinned: true,
                 delegate: _HazukiTabBarDelegate(
-                  const TabBar(
+                  TabBar(
                     tabs: [
-                      Tab(text: '详情'),
-                      Tab(text: '评论'),
-                      Tab(text: '相关'),
+                      Tab(text: l10n(context).comicDetailTabInfo),
+                      Tab(text: l10n(context).comicDetailTabComments),
+                      Tab(text: l10n(context).comicDetailTabRelated),
                     ],
                   ),
                   surface,

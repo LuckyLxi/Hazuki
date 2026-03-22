@@ -61,17 +61,19 @@ class _CloudSyncPageState extends State<CloudSyncPage> {
     }
     final config = _buildConfig();
     final uri = Uri.tryParse(config.url);
-    final urlValid = uri != null && uri.hasScheme && config.url.trim().isNotEmpty;
+    final urlValid =
+        uri != null && uri.hasScheme && config.url.trim().isNotEmpty;
+    final strings = l10n(context);
     if (config.enabled && !config.isComplete) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('请填写完整 URL、Username、Password')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(strings.cloudSyncIncompleteConfig)),
+      );
       return;
     }
     if (config.enabled && !urlValid) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('URL 格式无效，请包含 http/https')));
+      ).showSnackBar(SnackBar(content: Text(strings.cloudSyncInvalidUrl)));
       return;
     }
 
@@ -89,7 +91,9 @@ class _CloudSyncPageState extends State<CloudSyncPage> {
       } else {
         status = CloudSyncConnectionStatus(
           ok: false,
-          message: config.enabled ? '配置不完整' : '已关闭',
+          message: config.enabled
+              ? strings.cloudSyncStatusIncomplete
+              : strings.cloudSyncStatusDisabled,
           checkedAt: DateTime.now(),
         );
       }
@@ -101,14 +105,14 @@ class _CloudSyncPageState extends State<CloudSyncPage> {
       });
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('云同步配置已保存')));
+      ).showSnackBar(SnackBar(content: Text(strings.cloudSyncConfigSaved)));
     } catch (e) {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('保存失败: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(strings.cloudSyncSaveFailed('$e'))),
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -123,10 +127,11 @@ class _CloudSyncPageState extends State<CloudSyncPage> {
       return;
     }
     final config = _buildConfig();
+    final strings = l10n(context);
     if (!config.enabled || !config.isComplete) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('请先开启云同步并保存完整配置')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(strings.cloudSyncNeedCompleteConfig)),
+      );
       return;
     }
 
@@ -146,14 +151,14 @@ class _CloudSyncPageState extends State<CloudSyncPage> {
       });
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('上传备份完成')));
+      ).showSnackBar(SnackBar(content: Text(strings.cloudSyncUploadCompleted)));
     } catch (e) {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('上传失败: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(strings.cloudSyncUploadFailed('$e'))),
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -168,10 +173,11 @@ class _CloudSyncPageState extends State<CloudSyncPage> {
       return;
     }
     final config = _buildConfig();
+    final strings = l10n(context);
     if (!config.enabled || !config.isComplete) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('请先开启云同步并保存完整配置')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(strings.cloudSyncNeedCompleteConfig)),
+      );
       return;
     }
 
@@ -179,16 +185,16 @@ class _CloudSyncPageState extends State<CloudSyncPage> {
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          title: const Text('恢复备份'),
-          content: const Text('是否覆盖本地文件并恢复云端最新备份？'),
+          title: Text(strings.cloudSyncRestoreTitle),
+          content: Text(strings.cloudSyncRestoreContent),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('取消'),
+              child: Text(strings.commonCancel),
             ),
             FilledButton(
               onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: const Text('覆盖恢复'),
+              child: Text(strings.cloudSyncRestoreConfirm),
             ),
           ],
         );
@@ -202,7 +208,9 @@ class _CloudSyncPageState extends State<CloudSyncPage> {
       _syncing = true;
     });
     try {
-      await CloudSyncService.instance.restoreLatestBackup(configOverride: config);
+      await CloudSyncService.instance.restoreLatestBackup(
+        configOverride: config,
+      );
       final status = await CloudSyncService.instance.testConnection(
         configOverride: config,
       );
@@ -212,16 +220,16 @@ class _CloudSyncPageState extends State<CloudSyncPage> {
       setState(() {
         _status = status;
       });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('恢复备份完成，已覆盖本地数据')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(strings.cloudSyncRestoreCompleted)),
+      );
     } catch (e) {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('恢复失败: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(strings.cloudSyncRestoreFailed('$e'))),
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -233,17 +241,21 @@ class _CloudSyncPageState extends State<CloudSyncPage> {
 
   @override
   Widget build(BuildContext context) {
+    final strings = l10n(context);
     if (_loading) {
       return Scaffold(
-        appBar: hazukiFrostedAppBar(context: context, title: const Text('云同步')),
+        appBar: hazukiFrostedAppBar(
+          context: context,
+          title: Text(strings.cloudSyncTitle),
+        ),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     final status = _status;
     final statusText = status == null
-        ? '未检测'
-        : '${status.ok ? '已连接' : '未连接'}\n${status.message}';
+        ? strings.cloudSyncStatusUnchecked
+        : '${status.ok ? strings.cloudSyncStatusConnected : strings.cloudSyncStatusDisconnected}\n${status.message}';
     final statusColor = status == null
         ? Theme.of(context).colorScheme.outline
         : status.ok
@@ -251,14 +263,17 @@ class _CloudSyncPageState extends State<CloudSyncPage> {
         : Theme.of(context).colorScheme.error;
 
     return Scaffold(
-      appBar: hazukiFrostedAppBar(context: context, title: const Text('云同步')),
+      appBar: hazukiFrostedAppBar(
+        context: context,
+        title: Text(strings.cloudSyncTitle),
+      ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
           SwitchListTile(
             value: _enabled,
-            title: const Text('云同步'),
-            subtitle: const Text('开启后可上传与恢复云端备份'),
+            title: Text(strings.cloudSyncEnabledTitle),
+            subtitle: Text(strings.cloudSyncEnabledSubtitle),
             onChanged: (value) {
               setState(() {
                 _enabled = value;
@@ -269,19 +284,19 @@ class _CloudSyncPageState extends State<CloudSyncPage> {
           TextField(
             controller: _urlController,
             enabled: !_saving && !_syncing,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: 'URL',
-              border: OutlineInputBorder(),
-              helperText: '程序会自动拼接 /HazukiSync，无需手动填写',
+              border: const OutlineInputBorder(),
+              helperText: strings.cloudSyncUrlHelper,
             ),
           ),
           const SizedBox(height: 12),
           TextField(
             controller: _usernameController,
             enabled: !_saving && !_syncing,
-            decoration: const InputDecoration(
-              labelText: 'Username',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: strings.cloudSyncUsernameLabel,
+              border: const OutlineInputBorder(),
             ),
           ),
           const SizedBox(height: 12),
@@ -289,9 +304,9 @@ class _CloudSyncPageState extends State<CloudSyncPage> {
             controller: _passwordController,
             enabled: !_saving && !_syncing,
             obscureText: true,
-            decoration: const InputDecoration(
-              labelText: 'Password',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: strings.cloudSyncPasswordLabel,
+              border: const OutlineInputBorder(),
             ),
           ),
           const SizedBox(height: 16),
@@ -302,7 +317,9 @@ class _CloudSyncPageState extends State<CloudSyncPage> {
                 child: Container(
                   height: 52,
                   decoration: BoxDecoration(
-                    border: Border.all(color: statusColor.withValues(alpha: 0.7)),
+                    border: Border.all(
+                      color: statusColor.withValues(alpha: 0.7),
+                    ),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   alignment: Alignment.center,
@@ -329,7 +346,7 @@ class _CloudSyncPageState extends State<CloudSyncPage> {
                             height: 18,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Text('保存'),
+                        : Text(strings.cloudSyncSave),
                   ),
                 ),
               ),
@@ -342,7 +359,7 @@ class _CloudSyncPageState extends State<CloudSyncPage> {
                 child: OutlinedButton.icon(
                   onPressed: (_saving || _syncing) ? null : _uploadBackup,
                   icon: const Icon(Icons.cloud_upload_outlined),
-                  label: const Text('上传备份'),
+                  label: Text(strings.cloudSyncUpload),
                 ),
               ),
               const SizedBox(width: 12),
@@ -350,7 +367,7 @@ class _CloudSyncPageState extends State<CloudSyncPage> {
                 child: FilledButton.tonalIcon(
                   onPressed: (_saving || _syncing) ? null : _restoreBackup,
                   icon: const Icon(Icons.restore_outlined),
-                  label: const Text('恢复备份'),
+                  label: Text(strings.cloudSyncRestore),
                 ),
               ),
             ],

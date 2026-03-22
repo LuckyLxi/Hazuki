@@ -6,16 +6,17 @@ extension HazukiSourceServiceCategoryCapability on HazukiSourceService {
 
     final engine = _engine;
     if (engine == null) {
-      throw Exception('漫画源尚未初始化完成');
+      throw Exception('source_not_initialized');
     }
 
-    final hasCategory = _asBool(engine.evaluate('!!this.__hazuki_source.category'));
+    final hasCategory = _asBool(
+      engine.evaluate('!!this.__hazuki_source.category'),
+    );
     if (!hasCategory) {
       return const [];
     }
 
-    final dynamic result = engine.evaluate(
-      '''(() => {
+    final dynamic result = engine.evaluate('''(() => {
         const category = this.__hazuki_source.category;
         const parts = Array.isArray(category?.parts) ? category.parts : [];
         const groups = [];
@@ -32,9 +33,7 @@ extension HazukiSourceServiceCategoryCapability on HazukiSourceService {
           groups.push({ name, tags });
         }
         return groups;
-      })()''',
-      name: 'source_category_tag_groups.js',
-    );
+      })()''', name: 'source_category_tag_groups.js');
 
     final dynamic resolved = await _awaitJsResult(result);
     if (resolved is! List) {
@@ -73,11 +72,10 @@ extension HazukiSourceServiceCategoryCapability on HazukiSourceService {
 
     final engine = _engine;
     if (engine == null) {
-      throw Exception('漫画源尚未初始化完成');
+      throw Exception('source_not_initialized');
     }
 
-    final dynamic result = engine.evaluate(
-      '''(() => {
+    final dynamic result = engine.evaluate('''(() => {
         const rawOptions = this.__hazuki_source.categoryComics?.ranking?.options;
         if (!Array.isArray(rawOptions)) {
           return [];
@@ -96,9 +94,7 @@ extension HazukiSourceServiceCategoryCapability on HazukiSourceService {
             label: text.slice(idx + 1),
           };
         }).filter(Boolean);
-      })()''',
-      name: 'source_category_ranking_options.js',
-    );
+      })()''', name: 'source_category_ranking_options.js');
 
     final dynamic resolved = await _awaitJsResult(result);
     if (resolved is! List) {
@@ -122,13 +118,14 @@ extension HazukiSourceServiceCategoryCapability on HazukiSourceService {
     return options;
   }
 
-  Future<List<CategoryRankingOption>> loadCategoryRankingOptionsByViewMore(
-      {required String viewMoreUrl}) async {
+  Future<List<CategoryRankingOption>> loadCategoryRankingOptionsByViewMore({
+    required String viewMoreUrl,
+  }) async {
     await ensureInitialized();
 
     final engine = _engine;
     if (engine == null) {
-      throw Exception('漫画源尚未初始化完成');
+      throw Exception('source_not_initialized');
     }
 
     final raw = viewMoreUrl.trim();
@@ -206,7 +203,7 @@ extension HazukiSourceServiceCategoryCapability on HazukiSourceService {
 
     final engine = _engine;
     if (engine == null) {
-      throw Exception('漫画源尚未初始化完成');
+      throw Exception('source_not_initialized');
     }
 
     // 解析 jm.js 的 viewMore 格式：

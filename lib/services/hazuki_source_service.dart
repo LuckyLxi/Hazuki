@@ -63,7 +63,7 @@ class HazukiSourceService {
   SharedPreferences? _prefs;
   Future<void>? _initFuture;
 
-  String _statusText = '初始化中';
+  String _statusText = 'source_initializing';
   SourceMeta? _sourceMeta;
   Map<String, dynamic>? _favoritesDebugCache;
   bool _isWarmingUpFavoritesDebug = false;
@@ -131,7 +131,7 @@ class HazukiSourceService {
     await init();
 
     if (!isInitialized) {
-      throw Exception('漫画源尚未初始化完成: $_statusText');
+      throw Exception('source_not_initialized:$_statusText');
     }
   }
 
@@ -145,9 +145,9 @@ class HazukiSourceService {
       final meta = await _loadSourceMetadata(result.initFile, result.jmFile);
       _sourceMeta = meta;
       _statusText =
-          '${result.message}，已解析源: ${meta.name} (${meta.key}) v${meta.version}';
+          '${result.message}|${meta.name}|${meta.key}|${meta.version}';
     } catch (e) {
-      _statusText = 'jm.js 初始化失败: $e';
+      _statusText = 'source_init_failed:$e';
     }
   }
 
@@ -237,7 +237,8 @@ class HazukiSourceService {
 
     final result = await _loadSourceMetadata(initFile, jmFile);
     _sourceMeta = result;
-    _statusText = '漫画源已更新并重新加载: ${result.name} (${result.key}) v${result.version}';
+    _statusText =
+        'source_reloaded|${result.name}|${result.key}|${result.version}';
     return true;
   }
 
@@ -256,7 +257,7 @@ class HazukiSourceService {
       final meta = await _loadSourceMetadata(result.initFile, result.jmFile);
       _sourceMeta = meta;
       _statusText =
-          '${result.message}，已解析源: ${meta.name} (${meta.key}) v${meta.version}';
+          '${result.message}|${meta.name}|${meta.key}|${meta.version}';
       if (isLogged) {
         await _tryReloginFromStoredAccount(force: true);
       }
@@ -275,7 +276,7 @@ class HazukiSourceService {
   }) async {
     final engine = _engine;
     if (engine == null) {
-      throw Exception('漫画源尚未初始化完成');
+      throw Exception('source_not_initialized');
     }
 
     final normalizedKeyword = keyword.trim();
@@ -291,7 +292,7 @@ class HazukiSourceService {
       engine.evaluate('!!this.__hazuki_source.search?.load'),
     );
     if (!hasSearch || !hasSearchLoad) {
-      throw Exception('当前漫画源不支持搜索功能');
+      throw Exception('search_not_supported');
     }
 
     final optionsArg = jsonEncode([normalizedOrder]);
@@ -320,8 +321,6 @@ class HazukiSourceService {
 
     return SearchComicsResult(comics: comics, maxPage: maxPage);
   }
-
-
 
   dynamic _handleJsMessage(dynamic message) {
     if (message is! Map) {
@@ -415,9 +414,7 @@ class HazukiSourceService {
           '$url${connector}_hazuki_nocache=${DateTime.now().millisecondsSinceEpoch}';
     }
 
-    final headers = Map<String, dynamic>.from(
-      request['headers'] as Map? ?? {},
-    );
+    final headers = Map<String, dynamic>.from(request['headers'] as Map? ?? {});
     final bytes = request['bytes'] == true;
     final data = request['data'];
 
@@ -486,7 +483,8 @@ class HazukiSourceService {
           final requestUrl = response.requestOptions.uri.toString();
           await _saveCookiesFromHeaders(requestUrl, response.headers.map);
 
-          final skipLog = response.requestOptions.extra['skipNetworkDebugLog'] == true;
+          final skipLog =
+              response.requestOptions.extra['skipNetworkDebugLog'] == true;
           if (!skipLog) {
             final startedAt =
                 response.requestOptions.extra['hazukiStartedAt'] is DateTime
@@ -503,7 +501,9 @@ class HazukiSourceService {
               error: null,
               startedAt: startedAt,
               source: 'dio_direct',
-              requestHeaders: Map<String, dynamic>.from(response.requestOptions.headers),
+              requestHeaders: Map<String, dynamic>.from(
+                response.requestOptions.headers,
+              ),
               requestData: response.requestOptions.data,
               responseHeaders: responseHeadersForLog,
               responseBody: response.data,

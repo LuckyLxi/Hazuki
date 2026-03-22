@@ -108,8 +108,11 @@ class _ComicDetailHeaderSection extends StatelessWidget {
                   child: Text(
                     [
                       if (details!.likesCount.isNotEmpty)
-                        '${details!.likesCount}点赞',
-                      if (viewsText.isNotEmpty) '$viewsText浏览量',
+                        l10n(
+                          context,
+                        ).comicDetailLikesCount(details!.likesCount),
+                      if (viewsText.isNotEmpty)
+                        l10n(context).comicDetailViewsCount(viewsText),
                     ].join(' / '),
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -128,7 +131,9 @@ class _ComicDetailHeaderSection extends StatelessWidget {
                           : Icons.favorite_border,
                     ),
                     label: Text(
-                      (favoriteOverride ?? details!.isFavorite) ? '取消收藏' : '收藏',
+                      (favoriteOverride ?? details!.isFavorite)
+                          ? l10n(context).comicDetailUnfavorite
+                          : l10n(context).comicDetailFavorite,
                     ),
                     style: FilledButton.styleFrom(
                       backgroundColor: (favoriteOverride ?? details!.isFavorite)
@@ -161,7 +166,7 @@ class _ComicDetailHeaderSection extends StatelessWidget {
                 flex: 1,
                 child: TextButton(
                   onPressed: () => onShowChapters(details!),
-                  child: const Text('章节'),
+                  child: Text(l10n(context).comicDetailChapters),
                 ),
               ),
               const SizedBox(width: 8),
@@ -170,7 +175,7 @@ class _ComicDetailHeaderSection extends StatelessWidget {
                 child: FilledButton.icon(
                   onPressed: () => onOpenReader(details!),
                   icon: const Icon(Icons.menu_book_outlined),
-                  label: Text(_buildReaderButtonLabel()),
+                  label: Text(_buildReaderButtonLabel(context)),
                 ),
               ),
             ],
@@ -192,17 +197,17 @@ class _ComicDetailHeaderSection extends StatelessWidget {
     );
   }
 
-  String _buildReaderButtonLabel() {
+  String _buildReaderButtonLabel(BuildContext context) {
     if (details == null) {
-      return '阅读';
+      return l10n(context).comicDetailRead;
     }
     if (lastReadProgress != null &&
         details!.chapters.length > 1 &&
         (lastReadProgress!['index'] as int) >= 1 &&
         details!.chapters.containsKey(lastReadProgress!['epId'])) {
       final title = lastReadProgress!['title'] as String;
-      return '继续阅读 $title';
+      return l10n(context).comicDetailContinueReading(title);
     }
-    return '阅读';
+    return l10n(context).comicDetailRead;
   }
 }

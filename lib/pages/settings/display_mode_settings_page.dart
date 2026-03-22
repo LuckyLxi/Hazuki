@@ -11,7 +11,8 @@ class DisplayModeSettingsPage extends StatefulWidget {
   final Future<void> Function(String displayModeRaw) onDisplayModeChanged;
 
   @override
-  State<DisplayModeSettingsPage> createState() => _DisplayModeSettingsPageState();
+  State<DisplayModeSettingsPage> createState() =>
+      _DisplayModeSettingsPageState();
 }
 
 class _DisplayModeSettingsPageState extends State<DisplayModeSettingsPage> {
@@ -32,9 +33,10 @@ class _DisplayModeSettingsPageState extends State<DisplayModeSettingsPage> {
       if (!mounted) {
         return;
       }
+      final strings = l10n(context);
       setState(() {
         _loading = false;
-        _error = '仅 Android 支持屏幕帧率设置';
+        _error = strings.displayModeAndroidOnly;
       });
       return;
     }
@@ -43,15 +45,16 @@ class _DisplayModeSettingsPageState extends State<DisplayModeSettingsPage> {
       final list = await _displayModeChannel.invokeMethod<List<dynamic>>(
         'getDisplayModes',
       );
-      final modes =
-          (list ?? const <dynamic>[])
-              .whereType<Map>()
-              .map((item) => Map<String, dynamic>.from(item))
-              .toList();
+      final modes = (list ?? const <dynamic>[])
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
       final hasCurrent = modes.any(
         (mode) => mode['raw']?.toString() == widget.currentDisplayModeRaw,
       );
-      final selected = hasCurrent ? widget.currentDisplayModeRaw : 'native:auto';
+      final selected = hasCurrent
+          ? widget.currentDisplayModeRaw
+          : 'native:auto';
       final activeMode = modes.cast<Map<String, dynamic>?>().firstWhere(
         (mode) => mode?['isActive'] == true,
         orElse: () => null,
@@ -69,14 +72,16 @@ class _DisplayModeSettingsPageState extends State<DisplayModeSettingsPage> {
       if (!mounted) {
         return;
       }
+      final strings = l10n(context);
       setState(() {
         _loading = false;
-        _error = '读取屏幕模式失败：$e';
+        _error = strings.displayModeReadFailed('$e');
       });
     }
   }
 
   Future<void> _onSelect(String raw) async {
+    final strings = l10n(context);
     setState(() {
       _selectedRaw = raw;
     });
@@ -94,45 +99,53 @@ class _DisplayModeSettingsPageState extends State<DisplayModeSettingsPage> {
             false;
       }
       if (!applied) {
-        throw Exception('系统拒绝了该显示模式');
+        throw Exception(strings.displayModeSystemRejected);
       }
       await widget.onDisplayModeChanged(raw);
       await _loadModes();
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('已应用屏幕帧率，若未生效请重启应用')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(strings.displayModeApplied)));
     } catch (e) {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('设置失败：$e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(strings.displayModeSetFailed('$e'))),
+      );
     }
   }
 
-  String _modeLabel(Map<String, dynamic> mode) {
-    return mode['label']?.toString() ?? mode['raw']?.toString() ?? '未知模式';
+  String _modeLabel(BuildContext context, Map<String, dynamic> mode) {
+    return mode['label']?.toString() ??
+        mode['raw']?.toString() ??
+        l10n(context).displayModeUnknownMode;
   }
 
-  String _activeModeLabel() {
+  String _activeModeLabel(BuildContext context) {
     if (_activeRaw == null) {
-      return '未知';
+      return l10n(context).displayModeUnknown;
     }
-    final active = _modes.where((mode) => mode['raw']?.toString() == _activeRaw);
+    final active = _modes.where(
+      (mode) => mode['raw']?.toString() == _activeRaw,
+    );
     if (active.isEmpty) {
       return _activeRaw!;
     }
-    return _modeLabel(active.first);
+    return _modeLabel(context, active.first);
   }
 
   @override
   Widget build(BuildContext context) {
+    final strings = l10n(context);
     return Scaffold(
-      appBar: hazukiFrostedAppBar(context: context, title: const Text('屏幕帧率')),
+      appBar: hazukiFrostedAppBar(
+        context: context,
+        title: Text(strings.displayRefreshRateTitle),
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
@@ -155,7 +168,9 @@ class _DisplayModeSettingsPageState extends State<DisplayModeSettingsPage> {
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                     child: Text(
-                      '当前系统模式：${_activeModeLabel()}',
+                      strings.displayModeCurrentLabel(
+                        _activeModeLabel(context),
+                      ),
                       style: Theme.of(context).textTheme.bodyMedium,
                     ),
                   ),
@@ -165,15 +180,17 @@ class _DisplayModeSettingsPageState extends State<DisplayModeSettingsPage> {
                     final isPreferred = mode['isPreferred'] == true;
                     return RadioListTile<String>(
                       value: raw,
-                      title: Text(_modeLabel(mode)),
+                      title: Text(_modeLabel(context, mode)),
                       subtitle: isActive
-                          ? const Text('系统当前')
-                          : (isPreferred ? const Text('已选择') : null),
+                          ? Text(strings.displayModeCurrentSubtitle)
+                          : (isPreferred
+                                ? Text(strings.displayModeSelectedSubtitle)
+                                : null),
                     );
                   }),
-                  const Padding(
-                    padding: EdgeInsets.fromLTRB(16, 8, 16, 16),
-                    child: Text('提示：部分机型会受系统省电或应用白名单策略影响。'),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                    child: Text(strings.displayModeHint),
                   ),
                 ],
               ),

@@ -1,194 +1,194 @@
 part of '../hazuki_source_service.dart';
 
 extension HazukiSourceServiceAccountSessionCapability on HazukiSourceService {
-String? get currentAccount {
-  final accountData = _loadAccountDataSync();
-  if (accountData == null || accountData.isEmpty) {
-    return null;
-  }
-  return accountData.first;
-}
-
-bool get isLogged => _loadAccountDataSync() != null;
-
-Future<void> login({
-  required String account,
-  required String password,
-}) async {
-  await ensureInitialized();
-
-  final engine = _engine;
-  final sourceMeta = _sourceMeta;
-  if (engine == null || sourceMeta == null) {
-    throw Exception('漫画源尚未初始化完成');
+  String? get currentAccount {
+    final accountData = _loadAccountDataSync();
+    if (accountData == null || accountData.isEmpty) {
+      return null;
+    }
+    return accountData.first;
   }
 
-  final supportsAccount = _asBool(
-    engine.evaluate('!!this.__hazuki_source.account?.login'),
-  );
-  if (!supportsAccount) {
-    throw Exception('当前漫画源不支持账号密码登录');
-  }
+  bool get isLogged => _loadAccountDataSync() != null;
 
-  final script =
-      'this.__hazuki_source.account.login(${jsonEncode(account)}, ${jsonEncode(password)})';
-  final startedAt = DateTime.now();
-  dynamic resolvedResult;
+  Future<void> login({
+    required String account,
+    required String password,
+  }) async {
+    await ensureInitialized();
 
-  try {
-    final result = engine.evaluate(script, name: 'source_login.js');
-    resolvedResult = await _awaitJsResult(result);
-    _lastLoginDebugInfo = {
-      'time': DateTime.now().toIso8601String(),
-      'ok': true,
-      'account': account,
-      'durationMs': DateTime.now().difference(startedAt).inMilliseconds,
-      'result': _jsonSafe(resolvedResult),
-    };
-    _appendNetworkLog(
-      method: 'LOGIN',
-      url: 'source://account.login',
-      statusCode: 200,
-      error: null,
-      startedAt: startedAt,
-      source: 'source_login',
-      requestHeaders: const {},
-      requestData: {'account': account},
-      responseHeaders: const {},
-      responseBody: _jsonSafe(resolvedResult),
+    final engine = _engine;
+    final sourceMeta = _sourceMeta;
+    if (engine == null || sourceMeta == null) {
+      throw Exception('source_not_initialized');
+    }
+
+    final supportsAccount = _asBool(
+      engine.evaluate('!!this.__hazuki_source.account?.login'),
     );
-    await _saveSourceData(sourceMeta.key, 'account', [account, password]);
-  } catch (e) {
-    _lastLoginDebugInfo = {
-      'time': DateTime.now().toIso8601String(),
-      'ok': false,
-      'account': account,
-      'durationMs': DateTime.now().difference(startedAt).inMilliseconds,
-      'error': e.toString(),
-      'result': _jsonSafe(resolvedResult),
-    };
-    _appendNetworkLog(
-      method: 'LOGIN',
-      url: 'source://account.login',
-      statusCode: null,
-      error: e.toString(),
-      startedAt: startedAt,
-      source: 'source_login',
-      requestHeaders: const {},
-      requestData: {'account': account},
-      responseHeaders: const {},
-      responseBody: _jsonSafe(resolvedResult),
-    );
-    throw Exception('登录失败: $e');
-  }
-}
+    if (!supportsAccount) {
+      throw Exception('account_login_not_supported');
+    }
 
-Future<void> logout() async {
-  final engine = _engine;
-  final sourceMeta = _sourceMeta;
-  if (engine == null || sourceMeta == null) {
-    return;
-  }
+    final script =
+        'this.__hazuki_source.account.login(${jsonEncode(account)}, ${jsonEncode(password)})';
+    final startedAt = DateTime.now();
+    dynamic resolvedResult;
 
-  final hasLogout = _asBool(
-    engine.evaluate('!!this.__hazuki_source.account?.logout'),
-  );
-
-  if (hasLogout) {
     try {
-      final result = engine.evaluate(
-        'this.__hazuki_source.account.logout()',
-        name: 'source_logout.js',
+      final result = engine.evaluate(script, name: 'source_login.js');
+      resolvedResult = await _awaitJsResult(result);
+      _lastLoginDebugInfo = {
+        'time': DateTime.now().toIso8601String(),
+        'ok': true,
+        'account': account,
+        'durationMs': DateTime.now().difference(startedAt).inMilliseconds,
+        'result': _jsonSafe(resolvedResult),
+      };
+      _appendNetworkLog(
+        method: 'LOGIN',
+        url: 'source://account.login',
+        statusCode: 200,
+        error: null,
+        startedAt: startedAt,
+        source: 'source_login',
+        requestHeaders: const {},
+        requestData: {'account': account},
+        responseHeaders: const {},
+        responseBody: _jsonSafe(resolvedResult),
       );
-      if (result is Future) {
-        await result;
+      await _saveSourceData(sourceMeta.key, 'account', [account, password]);
+    } catch (e) {
+      _lastLoginDebugInfo = {
+        'time': DateTime.now().toIso8601String(),
+        'ok': false,
+        'account': account,
+        'durationMs': DateTime.now().difference(startedAt).inMilliseconds,
+        'error': e.toString(),
+        'result': _jsonSafe(resolvedResult),
+      };
+      _appendNetworkLog(
+        method: 'LOGIN',
+        url: 'source://account.login',
+        statusCode: null,
+        error: e.toString(),
+        startedAt: startedAt,
+        source: 'source_login',
+        requestHeaders: const {},
+        requestData: {'account': account},
+        responseHeaders: const {},
+        responseBody: _jsonSafe(resolvedResult),
+      );
+      throw Exception('login_failed:$e');
+    }
+  }
+
+  Future<void> logout() async {
+    final engine = _engine;
+    final sourceMeta = _sourceMeta;
+    if (engine == null || sourceMeta == null) {
+      return;
+    }
+
+    final hasLogout = _asBool(
+      engine.evaluate('!!this.__hazuki_source.account?.logout'),
+    );
+
+    if (hasLogout) {
+      try {
+        final result = engine.evaluate(
+          'this.__hazuki_source.account.logout()',
+          name: 'source_logout.js',
+        );
+        if (result is Future) {
+          await result;
+        }
+      } catch (_) {}
+    }
+
+    await _deleteSourceData(sourceMeta.key, 'account');
+  }
+
+  Future<T> _runWithReloginRetry<T>(Future<T> Function() action) async {
+    try {
+      return await action();
+    } catch (e) {
+      if (!_isLoginExpiredError(e)) {
+        rethrow;
       }
-    } catch (_) {}
+
+      await _clearCookiesForFavoriteDomains();
+      final reloginOk = await _tryReloginFromStoredAccount(force: true);
+      if (!reloginOk) {
+        rethrow;
+      }
+
+      return await action();
+    }
   }
 
-  await _deleteSourceData(sourceMeta.key, 'account');
-}
+  Future<void> _ensureFavoriteSessionReady() async {
+    await ensureInitialized();
 
-Future<T> _runWithReloginRetry<T>(Future<T> Function() action) async {
-  try {
-    return await action();
-  } catch (e) {
-    if (!_isLoginExpiredError(e)) {
-      rethrow;
+    if (!isLogged) {
+      return;
     }
 
-    await _clearCookiesForFavoriteDomains();
-    final reloginOk = await _tryReloginFromStoredAccount(force: true);
-    if (!reloginOk) {
-      rethrow;
-    }
-
-    return await action();
-  }
-}
-
-Future<void> _ensureFavoriteSessionReady() async {
-  await ensureInitialized();
-
-  if (!isLogged) {
-    return;
-  }
-
-  final now = DateTime.now();
-  final last = _lastReloginAt;
-  if (last != null && now.difference(last) < const Duration(minutes: 8)) {
-    return;
-  }
-
-  await _tryReloginFromStoredAccount();
-}
-
-bool _isLoginExpiredError(Object error) {
-  final msg = error.toString().toLowerCase();
-  return msg.contains('login expired') ||
-      msg.contains('unauthorized') ||
-      msg.contains('status 401') ||
-      msg.contains('http 401') ||
-      msg.contains('401');
-}
-
-Future<bool> _tryReloginFromStoredAccount({bool force = false}) async {
-  final accountData = _loadAccountDataSync();
-  if (accountData == null || accountData.length < 2) {
-    return false;
-  }
-
-  if (!force) {
+    final now = DateTime.now();
     final last = _lastReloginAt;
-    if (last != null &&
-        DateTime.now().difference(last) < const Duration(minutes: 8)) {
+    if (last != null && now.difference(last) < const Duration(minutes: 8)) {
+      return;
+    }
+
+    await _tryReloginFromStoredAccount();
+  }
+
+  bool _isLoginExpiredError(Object error) {
+    final msg = error.toString().toLowerCase();
+    return msg.contains('login expired') ||
+        msg.contains('unauthorized') ||
+        msg.contains('status 401') ||
+        msg.contains('http 401') ||
+        msg.contains('401');
+  }
+
+  Future<bool> _tryReloginFromStoredAccount({bool force = false}) async {
+    final accountData = _loadAccountDataSync();
+    if (accountData == null || accountData.length < 2) {
+      return false;
+    }
+
+    if (!force) {
+      final last = _lastReloginAt;
+      if (last != null &&
+          DateTime.now().difference(last) < const Duration(minutes: 8)) {
+        return true;
+      }
+    }
+
+    try {
+      await login(account: accountData[0], password: accountData[1]);
+      _lastReloginAt = DateTime.now();
       return true;
+    } catch (_) {
+      return false;
     }
   }
 
-  try {
-    await login(account: accountData[0], password: accountData[1]);
-    _lastReloginAt = DateTime.now();
-    return true;
-  } catch (_) {
-    return false;
+  Future<void> _clearCookiesForFavoriteDomains() async {
+    final all = _loadCookieStore();
+    all.removeWhere((cookie) {
+      final domain = cookie.domain.toLowerCase();
+      return domain.contains('jmcomic') ||
+          domain.contains('18comic') ||
+          domain.contains('jm365') ||
+          domain.contains('cdn-msp') ||
+          domain.contains('cdnhth') ||
+          domain.contains('cdntwice') ||
+          domain.contains('cdnsha') ||
+          domain.contains('cdnaspa') ||
+          domain.contains('cdnntr');
+    });
+    await _saveCookieStore(all);
   }
-}
-
-Future<void> _clearCookiesForFavoriteDomains() async {
-  final all = _loadCookieStore();
-  all.removeWhere((cookie) {
-    final domain = cookie.domain.toLowerCase();
-    return domain.contains('jmcomic') ||
-        domain.contains('18comic') ||
-        domain.contains('jm365') ||
-        domain.contains('cdn-msp') ||
-        domain.contains('cdnhth') ||
-        domain.contains('cdntwice') ||
-        domain.contains('cdnsha') ||
-        domain.contains('cdnaspa') ||
-        domain.contains('cdnntr');
-  });
-  await _saveCookieStore(all);
-}
 }

@@ -48,7 +48,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
   @override
   void initState() {
     super.initState();
-    _searchOrder = _searchOrderLabels.containsKey(widget.initialOrder)
+    _searchOrder = _searchOrderKeys.contains(widget.initialOrder)
         ? widget.initialOrder
         : 'mr';
     _searchController.text = widget.initialKeyword;
@@ -251,7 +251,8 @@ class _SearchResultsPageState extends State<SearchResultsPage>
   }
 
   void _onSearchOrderSelected(String order) {
-    if (!_searchOrderLabels.containsKey(order) || order == _searchOrder) {
+    final orderLabels = searchOrderLabels(context);
+    if (!orderLabels.containsKey(order) || order == _searchOrder) {
       return;
     }
     setState(() {
@@ -262,20 +263,24 @@ class _SearchResultsPageState extends State<SearchResultsPage>
     }
   }
 
-  String get _currentSearchOrderLabel =>
-      _searchOrderLabels[_searchOrder] ?? '最新';
+  String get _currentSearchOrderLabel {
+    final strings = l10n(context);
+    return searchOrderLabels(context)[_searchOrder] ??
+        strings.searchOrderLatest;
+  }
 
   Future<SearchComicsResult> _loadSearchPage({
     required String keyword,
     required int page,
     required String order,
   }) {
+    final timeoutMessage = l10n(context).searchTimeout;
     return HazukiSourceService.instance
         .searchComics(keyword: keyword, page: page, order: order)
         .timeout(
           _searchLoadTimeout,
           onTimeout: () {
-            throw Exception('搜索超时，请稍后重试');
+            throw Exception(timeoutMessage);
           },
         );
   }
@@ -350,7 +355,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
         return;
       }
       setState(() {
-        _searchErrorMessage = '搜索失败：$e';
+        _searchErrorMessage = l10n(context).searchFailed('$e');
       });
     } finally {
       if (mounted && requestToken == _searchRequestToken) {
@@ -622,7 +627,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
                     child: SearchBar(
                       focusNode: _searchFocusNode,
                       controller: _searchController,
-                      hintText: '搜索漫画',
+                      hintText: l10n(context).searchHint,
                       elevation: const WidgetStatePropertyAll(0),
                       backgroundColor: WidgetStatePropertyAll(
                         Theme.of(context).colorScheme.surfaceContainerHigh,
@@ -655,13 +660,13 @@ class _SearchResultsPageState extends State<SearchResultsPage>
                           child: _searchController.text.isNotEmpty
                               ? IconButton(
                                   key: const ValueKey('results-clear'),
-                                  tooltip: '清空',
+                                  tooltip: l10n(context).searchClearTooltip,
                                   onPressed: _clearSearch,
                                   icon: const Icon(Icons.close),
                                 )
                               : IconButton(
                                   key: const ValueKey('results-submit'),
-                                  tooltip: '搜索',
+                                  tooltip: l10n(context).searchSubmitTooltip,
                                   onPressed: () => unawaited(_submitSearch()),
                                   icon: const Icon(Icons.arrow_forward),
                                 ),
@@ -724,7 +729,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
                           child: SearchBar(
                             focusNode: _collapsedSearchFocusNode,
                             controller: _collapsedSearchController,
-                            hintText: '搜索漫画',
+                            hintText: l10n(context).searchHint,
                             elevation: const WidgetStatePropertyAll(0),
                             backgroundColor: WidgetStatePropertyAll(
                               Theme.of(
@@ -762,7 +767,9 @@ class _SearchResultsPageState extends State<SearchResultsPage>
                                         key: const ValueKey(
                                           'collapsed-results-clear',
                                         ),
-                                        tooltip: '清空',
+                                        tooltip: l10n(
+                                          context,
+                                        ).searchClearTooltip,
                                         onPressed: _clearSearch,
                                         icon: const Icon(Icons.close),
                                       )
@@ -770,7 +777,9 @@ class _SearchResultsPageState extends State<SearchResultsPage>
                                         key: const ValueKey(
                                           'collapsed-results-submit',
                                         ),
-                                        tooltip: '搜索',
+                                        tooltip: l10n(
+                                          context,
+                                        ).searchSubmitTooltip,
                                         onPressed: () =>
                                             unawaited(_submitSearch()),
                                         icon: const Icon(Icons.arrow_forward),
@@ -804,23 +813,24 @@ class _SearchResultsPageState extends State<SearchResultsPage>
   }
 
   Widget _buildSearchResultState() {
+    final strings = l10n(context);
     if (_searchKeyword.isEmpty) {
-      return const SizedBox(
+      return SizedBox(
         height: 240,
-        child: Center(child: Text('输入关键词开始搜索')),
+        child: Center(child: Text(strings.searchStartPrompt)),
       );
     }
 
     if (_searchLoading && _searchComics.isEmpty) {
-      return const SizedBox(
+      return SizedBox(
         height: 360,
         child: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              HazukiStickerLoadingIndicator(size: 120),
-              SizedBox(height: 12),
-              Text('正在搜索...'),
+              const HazukiStickerLoadingIndicator(size: 120),
+              const SizedBox(height: 12),
+              Text(strings.searchLoading),
             ],
           ),
         ),
@@ -841,7 +851,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
               const SizedBox(height: 12),
               FilledButton(
                 onPressed: () => unawaited(_submitSearch()),
-                child: const Text('重试'),
+                child: Text(strings.commonRetry),
               ),
             ],
           ),
@@ -850,7 +860,10 @@ class _SearchResultsPageState extends State<SearchResultsPage>
     }
 
     if (_searchComics.isEmpty) {
-      return const SizedBox(height: 220, child: Center(child: Text('什么也没搜到')));
+      return SizedBox(
+        height: 220,
+        child: Center(child: Text(strings.searchEmpty)),
+      );
     }
 
     return const SizedBox.shrink();
@@ -993,7 +1006,10 @@ class _SearchResultsPageState extends State<SearchResultsPage>
                 },
                 child: _collapsedSearchExpanded
                     ? const SizedBox(key: ValueKey('appbar-title-hidden'))
-                    : const Text('搜索', key: ValueKey('appbar-title-search')),
+                    : Text(
+                        l10n(context).searchTitle,
+                        key: const ValueKey('appbar-title-search'),
+                      ),
               ),
               AnimatedContainer(
                 duration: const Duration(milliseconds: 220),
@@ -1023,10 +1039,11 @@ class _SearchResultsPageState extends State<SearchResultsPage>
                     )
                   : PopupMenuButton<String>(
                       key: const ValueKey('search-actions-sort'),
-                      tooltip: '排序',
+                      tooltip: l10n(context).searchSortTooltip,
                       initialValue: _searchOrder,
                       onSelected: _onSearchOrderSelected,
-                      itemBuilder: (context) => _searchOrderLabels.entries
+                      itemBuilder: (context) => searchOrderLabels(context)
+                          .entries
                           .map(
                             (entry) => CheckedPopupMenuItem<String>(
                               value: entry.key,
@@ -1081,15 +1098,15 @@ class _SearchResultsPageState extends State<SearchResultsPage>
 
                 if (resultIndex == _searchComics.length) {
                   if (_searchLoadingMore) {
-                    return const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 10),
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 10),
                       child: Center(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            HazukiStickerLoadingIndicator(size: 72),
-                            SizedBox(height: 8),
-                            Text('加载中...'),
+                            const HazukiStickerLoadingIndicator(size: 72),
+                            const SizedBox(height: 8),
+                            Text(l10n(context).commonLoading),
                           ],
                         ),
                       ),

@@ -6,11 +6,15 @@ class HazukiHomePage extends StatefulWidget {
     this.initialTabIndex = 0,
     required this.appearanceSettings,
     required this.onAppearanceChanged,
+    required this.locale,
+    required this.onLocaleChanged,
   });
 
   final int initialTabIndex;
   final AppearanceSettingsData appearanceSettings;
   final Future<void> Function(AppearanceSettingsData next) onAppearanceChanged;
+  final Locale? locale;
+  final Future<void> Function(Locale? locale) onLocaleChanged;
 
   @override
   State<HazukiHomePage> createState() => _HazukiHomePageState();
@@ -21,9 +25,9 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
   static const _mediaChannel = MethodChannel('hazuki.comics/media');
 
   late int _currentIndex;
-  String _username = '未登录';
+  String _username = '';
   String? _avatarUrl;
-  String _firstUseText = '首次使用时间加载中...';
+  String _firstUseText = '';
   int _authVersion = 0;
   DateTime? _lastBackPressedAt;
   double _discoverSearchMorphProgress = 0;
@@ -53,7 +57,12 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
       await HazukiSourceService.instance.ensureInitialized();
     } catch (_) {}
 
-    final username = HazukiSourceService.instance.currentAccount ?? '未登录';
+    if (!mounted) {
+      return;
+    }
+    final strings = l10n(context);
+    final username =
+        HazukiSourceService.instance.currentAccount ?? strings.homeGuestUser;
     String? avatar;
     if (HazukiSourceService.instance.isLogged) {
       try {
@@ -80,13 +89,16 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
       await prefs.setString(_firstUseDateKey, firstUseRaw);
     }
 
-    final firstUse = DateTime.tryParse(firstUseRaw)?.toLocal();
-    final text = firstUse == null
-        ? '首次使用本应用'
-        : "${firstUse.year}-${firstUse.month.toString().padLeft(2, '0')}-${firstUse.day.toString().padLeft(2, '0')} 首次使用";
     if (!mounted) {
       return;
     }
+    final strings = l10n(context);
+    final firstUse = DateTime.tryParse(firstUseRaw)?.toLocal();
+    final text = firstUse == null
+        ? strings.homeFirstUseUnknown
+        : strings.homeFirstUseFormatted(
+            '${firstUse.year}-${firstUse.month.toString().padLeft(2, '0')}-${firstUse.day.toString().padLeft(2, '0')}',
+          );
     setState(() {
       _firstUseText = text;
     });
@@ -99,7 +111,7 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
     return showGeneralDialog<T>(
       context: context,
       barrierDismissible: barrierDismissible,
-      barrierLabel: '对话框',
+      barrierLabel: l10n(context).dialogBarrierLabel,
       barrierColor: Colors.black45,
       transitionDuration: const Duration(milliseconds: 260),
       pageBuilder: (buildContext, animation, secondaryAnimation) {
@@ -131,18 +143,19 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
   }
 
   Future<bool> _showLogoutConfirmDialog() async {
+    final strings = l10n(context);
     final result = await _showAnimatedDialog<bool>(
       child: AlertDialog(
-        title: const Text('退出登录'),
-        content: const Text('确定要退出登录吗？'),
+        title: Text(strings.homeLogoutTitle),
+        content: Text(strings.homeLogoutContent),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
+            child: Text(strings.commonCancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('退出登录'),
+            child: Text(strings.homeLogoutTitle),
           ),
         ],
       ),
@@ -159,6 +172,8 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
     String? errorText;
     var profileUsername = _username;
     var profileAvatarUrl = (_avatarUrl ?? '').trim();
+
+    final strings = l10n(context);
 
     await _showAnimatedDialog<void>(
       barrierDismissible: true,
@@ -221,7 +236,7 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             Text(
-                              '登录',
+                              strings.homeLoginTitle,
                               style: Theme.of(
                                 dialogContext,
                               ).textTheme.headlineSmall,
@@ -230,9 +245,9 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
                             TextField(
                               controller: accountController,
                               enabled: !loading,
-                              decoration: const InputDecoration(
-                                labelText: '账号',
-                                border: OutlineInputBorder(),
+                              decoration: InputDecoration(
+                                labelText: strings.homeLoginAccountLabel,
+                                border: const OutlineInputBorder(),
                               ),
                             ),
                             const SizedBox(height: 16),
@@ -241,10 +256,12 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
                               enabled: !loading,
                               obscureText: !passwordVisible,
                               decoration: InputDecoration(
-                                labelText: '密码',
+                                labelText: strings.homeLoginPasswordLabel,
                                 border: const OutlineInputBorder(),
                                 suffixIcon: IconButton(
-                                  tooltip: passwordVisible ? '隐藏密码' : '显示密码',
+                                  tooltip: passwordVisible
+                                      ? strings.homeLoginHidePassword
+                                      : strings.homeLoginShowPassword,
                                   onPressed: loading
                                       ? null
                                       : () {
@@ -279,7 +296,7 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
                                   onPressed: loading
                                       ? null
                                       : () => Navigator.pop(dialogContext),
-                                  child: const Text('取消'),
+                                  child: Text(strings.commonCancel),
                                 ),
                                 const SizedBox(width: 8),
                                 FilledButton(
@@ -293,7 +310,8 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
                                           if (account.isEmpty ||
                                               password.isEmpty) {
                                             setDialogState(() {
-                                              errorText = '账号和密码不能为空';
+                                              errorText =
+                                                  strings.homeLoginEmptyError;
                                             });
                                             return;
                                           }
@@ -349,8 +367,10 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
                                             ScaffoldMessenger.of(
                                               context,
                                             ).showSnackBar(
-                                              const SnackBar(
-                                                content: Text('登录成功'),
+                                              SnackBar(
+                                                content: Text(
+                                                  strings.homeLoginSuccess,
+                                                ),
                                               ),
                                             );
                                           } catch (e) {
@@ -368,7 +388,7 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
                                             strokeWidth: 2,
                                           ),
                                         )
-                                      : const Text('登录'),
+                                      : Text(strings.homeLoginTitle),
                                 ),
                               ],
                             ),
@@ -403,22 +423,23 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
     unawaited(_syncUserProfile());
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(const SnackBar(content: Text('已退出登录')));
+    ).showSnackBar(SnackBar(content: Text(l10n(context).homeLoggedOut)));
   }
 
   Future<bool> _showSaveAvatarConfirmDialog() async {
+    final strings = l10n(context);
     final result = await _showAnimatedDialog<bool>(
       child: AlertDialog(
-        title: const Text('保存头像'),
-        content: const Text('将当前头像保存到相册吗？'),
+        title: Text(strings.homeSaveAvatarTitle),
+        content: Text(strings.homeSaveAvatarContent),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
+            child: Text(strings.commonCancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('保存'),
+            child: Text(strings.commonSave),
           ),
         ],
       ),
@@ -432,6 +453,7 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
       return;
     }
 
+    final strings = l10n(context);
     try {
       final bytes = await HazukiSourceService.instance.downloadImageBytes(
         normalized,
@@ -448,16 +470,16 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('头像已保存到 ${file.path}')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(strings.homeAvatarSaved(file.path))),
+      );
     } catch (e) {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('头像保存失败：$e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(strings.homeAvatarSaveFailed('$e'))),
+      );
     }
   }
 
@@ -505,7 +527,7 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
         const Divider(height: 1),
         ListTile(
           leading: const Icon(Icons.logout),
-          title: const Text('退出登录'),
+          title: Text(l10n(context).homeLogoutTitle),
           onTap: onLogoutTap,
         ),
       ],
@@ -543,9 +565,9 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
     if (last == null || now.difference(last) > const Duration(seconds: 2)) {
       _lastBackPressedAt = now;
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('再按一次返回退出')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n(context).homePressBackAgainToExit)),
+        );
       }
       return false;
     }
@@ -625,7 +647,7 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
                               const SizedBox(width: 8),
                               Expanded(
                                 child: Text(
-                                  '搜索漫画',
+                                  l10n(context).homeSearchHint,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: Theme.of(context).textTheme.bodyMedium
@@ -694,26 +716,26 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
           actions: [
             if (_currentIndex == 1 && _favoriteAppBarActions.showSort)
               PopupMenuButton<String>(
-                tooltip: '排序',
+                tooltip: l10n(context).homeSortTooltip,
                 initialValue: _favoriteAppBarActions.currentSortOrder,
                 onSelected: _onFavoriteSortSelected,
                 itemBuilder: (context) => [
                   CheckedPopupMenuItem<String>(
                     value: 'mr',
                     checked: _favoriteAppBarActions.currentSortOrder == 'mr',
-                    child: const Text('收藏时间'),
+                    child: Text(l10n(context).homeFavoriteSortByFavoriteTime),
                   ),
                   CheckedPopupMenuItem<String>(
                     value: 'mp',
                     checked: _favoriteAppBarActions.currentSortOrder == 'mp',
-                    child: const Text('更新时间'),
+                    child: Text(l10n(context).homeFavoriteSortByUpdateTime),
                   ),
                 ],
                 icon: const Icon(Icons.sort_rounded),
               ),
             if (_currentIndex == 1 && _favoriteAppBarActions.showCreateFolder)
               IconButton(
-                tooltip: '新建收藏夹',
+                tooltip: l10n(context).homeCreateFavoriteFolder,
                 onPressed: _onFavoriteCreateFolderPressed,
                 icon: const Icon(Icons.create_new_folder_outlined),
               ),
@@ -768,7 +790,7 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
                 const Divider(height: 1),
                 ListTile(
                   leading: const Icon(Icons.history_outlined),
-                  title: const Text('历史记录'),
+                  title: Text(l10n(context).homeMenuHistory),
                   onTap: () {
                     Navigator.pop(context);
                     Navigator.of(context).push(
@@ -780,7 +802,7 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
                 ),
                 ListTile(
                   leading: const Icon(Icons.category_outlined),
-                  title: const Text('标签分类'),
+                  title: Text(l10n(context).homeMenuCategories),
                   onTap: () {
                     Navigator.pop(context);
                     Navigator.of(context).push(
@@ -792,7 +814,7 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
                 ),
                 ListTile(
                   leading: const Icon(Icons.leaderboard_outlined),
-                  title: const Text('排行榜'),
+                  title: Text(l10n(context).homeMenuRanking),
                   onTap: () {
                     Navigator.pop(context);
                     Navigator.of(context).push(
@@ -804,7 +826,7 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
                 ),
                 ListTile(
                   leading: const Icon(Icons.settings_outlined),
-                  title: const Text('设置'),
+                  title: Text(l10n(context).settingsTitle),
                   onTap: () {
                     Navigator.pop(context);
                     Navigator.of(context).push(
@@ -812,6 +834,8 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
                         builder: (_) => SettingsPage(
                           appearanceSettings: widget.appearanceSettings,
                           onAppearanceChanged: widget.onAppearanceChanged,
+                          locale: widget.locale,
+                          onLocaleChanged: widget.onLocaleChanged,
                         ),
                       ),
                     );
@@ -819,7 +843,7 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
                 ),
                 ListTile(
                   leading: const Icon(Icons.alt_route_outlined),
-                  title: const Text('线路'),
+                  title: Text(l10n(context).homeMenuLines),
                   onTap: () {
                     Navigator.pop(context);
                     Navigator.of(context).push(
@@ -897,16 +921,16 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
               _currentIndex = index;
             });
           },
-          destinations: const [
+          destinations: [
             NavigationDestination(
-              icon: Icon(Icons.explore_outlined),
-              selectedIcon: Icon(Icons.explore),
-              label: '发现',
+              icon: const Icon(Icons.explore_outlined),
+              selectedIcon: const Icon(Icons.explore),
+              label: l10n(context).homeTabDiscover,
             ),
             NavigationDestination(
-              icon: Icon(Icons.favorite_border),
-              selectedIcon: Icon(Icons.favorite),
-              label: '收藏',
+              icon: const Icon(Icons.favorite_border),
+              selectedIcon: const Icon(Icons.favorite),
+              label: l10n(context).homeTabFavorite,
             ),
           ],
         ),

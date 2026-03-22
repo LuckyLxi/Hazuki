@@ -34,7 +34,7 @@ class _FavoritesDebugPageState extends State<FavoritesDebugPage> {
     }
     ScaffoldMessenger.of(
       context,
-    ).showSnackBar(const SnackBar(content: Text('已复制调试信息')));
+    ).showSnackBar(SnackBar(content: Text(l10n(context).favoritesDebugCopied)));
   }
 
   Future<void> _loadNetworkDebugInfo() async {
@@ -131,13 +131,15 @@ class _FavoritesDebugPageState extends State<FavoritesDebugPage> {
     final copy = Map<String, dynamic>.from(source);
     final logs = (copy['recentNetworkLogs'] is List)
         ? List<Map<String, dynamic>>.from(
-            (copy['recentNetworkLogs'] as List)
-                .whereType<Map>()
-                .map((e) => Map<String, dynamic>.from(e)),
+            (copy['recentNetworkLogs'] as List).whereType<Map>().map(
+              (e) => Map<String, dynamic>.from(e),
+            ),
           )
         : <Map<String, dynamic>>[];
 
-    final targetLogs = importantOnly ? logs.where(_isImportantLog).toList() : logs;
+    final targetLogs = importantOnly
+        ? logs.where(_isImportantLog).toList()
+        : logs;
 
     final normalizedLogs = targetLogs.map((log) {
       final item = Map<String, dynamic>.from(log);
@@ -155,8 +157,7 @@ class _FavoritesDebugPageState extends State<FavoritesDebugPage> {
 
     if (importantOnly) {
       copy['filterMode'] = 'important_only';
-      copy['filterReason'] =
-          '仅显示重要日志（错误日志、HTTP>=400、登录相关、含关键错误关键词）';
+      copy['filterReason'] = l10n(context).favoritesDebugFilterReason;
     } else {
       copy.remove('filterMode');
       copy.remove('filterReason');
@@ -192,8 +193,12 @@ class _FavoritesDebugPageState extends State<FavoritesDebugPage> {
     final source = (log['source'] ?? '').toString().toLowerCase();
     final url = (log['url'] ?? '').toString().toLowerCase();
     final error = (log['error'] ?? '').toString().toLowerCase();
-    final responsePreview = (log['responseBodyPreview'] ?? '').toString().toLowerCase();
-    final responseFull = (log['responseBodyFull'] ?? '').toString().toLowerCase();
+    final responsePreview = (log['responseBodyPreview'] ?? '')
+        .toString()
+        .toLowerCase();
+    final responseFull = (log['responseBodyFull'] ?? '')
+        .toString()
+        .toLowerCase();
 
     final hasError = error.isNotEmpty && error != 'null';
     if (hasError) {
@@ -247,10 +252,11 @@ class _FavoritesDebugPageState extends State<FavoritesDebugPage> {
 
   @override
   Widget build(BuildContext context) {
+    final strings = l10n(context);
     return Scaffold(
       appBar: hazukiFrostedAppBar(
         context: context,
-        title: const Text('Debug'),
+        title: Text(strings.advancedDebugTitle),
         actions: [
           IconButton(
             onPressed: (_loading || _fullLoading)
@@ -264,59 +270,61 @@ class _FavoritesDebugPageState extends State<FavoritesDebugPage> {
                     });
                   },
             icon: Icon(
-              _importantOnly
-                  ? Icons.filter_alt
-                  : Icons.filter_alt_outlined,
+              _importantOnly ? Icons.filter_alt : Icons.filter_alt_outlined,
             ),
-            tooltip: '筛查重要日志',
+            tooltip: strings.favoritesDebugFilterImportantTooltip,
           ),
           IconButton(
             onPressed: (_loading || _fullLoading) ? null : _copyDebugText,
             icon: const Icon(Icons.copy_outlined),
-            tooltip: '复制',
+            tooltip: strings.favoritesDebugCopyTooltip,
           ),
           IconButton(
-            onPressed: (_loading || _fullLoading) ? null : _loadNetworkDebugInfo,
+            onPressed: (_loading || _fullLoading)
+                ? null
+                : _loadNetworkDebugInfo,
             icon: const Icon(Icons.refresh),
-            tooltip: '刷新网络日志',
+            tooltip: strings.favoritesDebugRefreshTooltip,
           ),
         ],
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _errorText != null
-              ? Center(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: SelectableText('调试信息加载失败：$_errorText'),
-                  ),
-                )
-              : ListView(
-                  physics: const ClampingScrollPhysics(),
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    FilledButton.tonalIcon(
-                      onPressed: _fullLoading ? null : _loadFullDebugInfo,
-                      icon: _fullLoading
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.science_outlined),
-                      label: const Text('手动执行完整抓取（慢）'),
-                    ),
-                    const SizedBox(height: 12),
-                    SelectableText(
-                      _debugText,
-                      style: const TextStyle(
-                        fontFamily: 'monospace',
-                        fontSize: 12,
-                        height: 1.4,
-                      ),
-                    ),
-                  ],
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: SelectableText(
+                  strings.favoritesDebugLoadFailed(_errorText!),
                 ),
+              ),
+            )
+          : ListView(
+              physics: const ClampingScrollPhysics(),
+              padding: const EdgeInsets.all(16),
+              children: [
+                FilledButton.tonalIcon(
+                  onPressed: _fullLoading ? null : _loadFullDebugInfo,
+                  icon: _fullLoading
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.science_outlined),
+                  label: Text(strings.favoritesDebugFullFetchButton),
+                ),
+                const SizedBox(height: 12),
+                SelectableText(
+                  _debugText,
+                  style: const TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 12,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
     );
   }
 }

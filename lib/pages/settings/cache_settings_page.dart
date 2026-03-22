@@ -61,11 +61,12 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
   }
 
   Future<void> _chooseCacheMaxSize() async {
-    const presets = <(String label, int mb)>[
-      ('默认 400MB', 400),
-      ('轻量 600MB', 600),
-      ('均衡 1024MB', 1024),
-      ('重度 2048MB', 2048),
+    final strings = l10n(context);
+    final presets = <(String label, int mb)>[
+      (strings.cachePresetDefault, 400),
+      (strings.cachePresetLite, 600),
+      (strings.cachePresetBalanced, 1024),
+      (strings.cachePresetHeavy, 2048),
     ];
 
     final controller = TextEditingController();
@@ -90,15 +91,15 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Text(
-                      '设置缓存最大容量',
-                      style: TextStyle(
+                    Text(
+                      strings.cacheMaxSizeTitle,
+                      style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 8),
-                    const Text('最低 400MB，可选择预设或自定义输入'),
+                    Text(strings.cacheMaxSizeHint),
                     const SizedBox(height: 10),
                     ...presets.map(
                       (preset) => ListTile(
@@ -120,10 +121,10 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
                     TextField(
                       controller: controller,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: '自定义（MB）',
-                        hintText: '例如 1024',
-                        border: OutlineInputBorder(),
+                      decoration: InputDecoration(
+                        labelText: strings.cacheCustomMbLabel,
+                        hintText: strings.cacheCustomMbHint,
+                        border: const OutlineInputBorder(),
                       ),
                       onChanged: (value) {
                         final parsed = int.tryParse(value.trim());
@@ -140,7 +141,7 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
                       onPressed: () {
                         Navigator.pop(sheetContext, selectedMb);
                       },
-                      child: const Text('确定'),
+                      child: Text(strings.commonConfirm),
                     ),
                   ],
                 ),
@@ -162,12 +163,13 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
     if (!mounted) {
       return;
     }
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text('缓存上限已设为 ${normalizedMb}MB')));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(strings.cacheLimitUpdated('$normalizedMb'))),
+    );
   }
 
   Future<void> _chooseAutoCleanMode() async {
+    final strings = l10n(context);
     final result = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
@@ -182,9 +184,9 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Text(
-                      '缓存自动清理',
-                      style: TextStyle(
+                    Text(
+                      strings.cacheAutoCleanTitle,
+                      style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
                       ),
@@ -201,8 +203,8 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
                             ? Icons.radio_button_checked
                             : Icons.radio_button_unchecked,
                       ),
-                      title: const Text('超过上限自动清理'),
-                      subtitle: const Text('按最旧缓存优先删除，直到低于上限'),
+                      title: Text(strings.cacheAutoCleanOverflowTitle),
+                      subtitle: Text(strings.cacheAutoCleanOverflowSubtitle),
                     ),
                     ListTile(
                       onTap: () {
@@ -215,13 +217,13 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
                             ? Icons.radio_button_checked
                             : Icons.radio_button_unchecked,
                       ),
-                      title: const Text('每七天清理一次'),
-                      subtitle: const Text('删除 7 天前缓存文件'),
+                      title: Text(strings.cacheAutoCleanSevenDaysTitle),
+                      subtitle: Text(strings.cacheAutoCleanSevenDaysSubtitle),
                     ),
                     const SizedBox(height: 8),
                     FilledButton(
                       onPressed: () => Navigator.pop(sheetContext, selected),
-                      child: const Text('确定'),
+                      child: Text(strings.commonConfirm),
                     ),
                   ],
                 ),
@@ -243,26 +245,31 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
     }
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(result == 'seven_days' ? '已设为每七天清理一次' : '已设为超过上限自动清理'),
+        content: Text(
+          result == 'seven_days'
+              ? strings.cacheAutoCleanSevenDaysApplied
+              : strings.cacheAutoCleanOverflowApplied,
+        ),
       ),
     );
   }
 
   Future<void> _clearCacheNow() async {
+    final strings = l10n(context);
     final confirm = await showGeneralDialog<bool>(
       context: context,
       barrierDismissible: true,
-      barrierLabel: '关闭',
+      barrierLabel: strings.cacheClearBarrierLabel,
       barrierColor: Colors.black54,
       transitionDuration: const Duration(milliseconds: 240),
       pageBuilder: (ctx, anim1, anim2) {
         return AlertDialog(
-          title: const Text('清理缓存'),
-          content: const Text('确定要清理所有图片缓存吗？此操作不可逆。'),
+          title: Text(strings.cacheClearTitle),
+          content: Text(strings.cacheClearContent),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('取消'),
+              child: Text(strings.commonCancel),
             ),
             FilledButton(
               style: FilledButton.styleFrom(
@@ -270,7 +277,7 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
                 foregroundColor: Theme.of(context).colorScheme.onError,
               ),
               onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('确定清理'),
+              child: Text(strings.cacheClearConfirm),
             ),
           ],
         );
@@ -303,14 +310,14 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
       }
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('缓存清理成功')));
+      ).showSnackBar(SnackBar(content: Text(strings.cacheCleared)));
     } catch (e) {
       if (!mounted) {
         return;
       }
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('清理失败：$e')));
+      ).showSnackBar(SnackBar(content: Text(strings.cacheClearFailed('$e'))));
     } finally {
       if (mounted) {
         await _loadCacheStatus();
@@ -320,25 +327,34 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final strings = l10n(context);
     return Scaffold(
-      appBar: hazukiFrostedAppBar(context: context, title: const Text('缓存设置')),
+      appBar: hazukiFrostedAppBar(
+        context: context,
+        title: Text(strings.cacheSettingsTitle),
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
               children: [
                 ListTile(
                   leading: const Icon(Icons.sd_storage_outlined),
-                  title: const Text('缓存大小'),
+                  title: Text(strings.cacheSizeTitle),
                   subtitle: Text(
-                    '当前 ${_formatBytes(_usedBytes)} / 上限 ${_formatBytes(_maxBytes)}',
+                    strings.cacheSizeSummary(
+                      _formatBytes(_usedBytes),
+                      _formatBytes(_maxBytes),
+                    ),
                   ),
                   onTap: _chooseCacheMaxSize,
                 ),
                 ListTile(
                   leading: const Icon(Icons.auto_delete_outlined),
-                  title: const Text('缓存自动清理'),
+                  title: Text(strings.cacheAutoCleanTitle),
                   subtitle: Text(
-                    _autoCleanMode == 'seven_days' ? '每七天清理一次' : '超过上限自动清理',
+                    _autoCleanMode == 'seven_days'
+                        ? strings.cacheAutoCleanModeSummary
+                        : strings.cacheAutoCleanModeOverflowSummary,
                   ),
                   onTap: _chooseAutoCleanMode,
                 ),
@@ -349,12 +365,12 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
                     color: Theme.of(context).colorScheme.error,
                   ),
                   title: Text(
-                    '立即清理缓存',
+                    strings.cacheClearNowTitle,
                     style: TextStyle(
                       color: Theme.of(context).colorScheme.error,
                     ),
                   ),
-                  subtitle: const Text('清空本地下载的所有图片缓存，释放存储空间'),
+                  subtitle: Text(strings.cacheClearNowSubtitle),
                   onTap: _clearCacheNow,
                 ),
               ],

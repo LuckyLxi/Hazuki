@@ -9,6 +9,8 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'l10n/app_localizations.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -71,6 +73,8 @@ Future<void> setHazukiNoImageMode(bool enabled) async {
   await prefs.setBool(_noImageModeKey, enabled);
 }
 
+AppLocalizations l10n(BuildContext context) => AppLocalizations.of(context)!;
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await _loadGlobalUiFlags();
@@ -116,23 +120,72 @@ class AppearanceSettingsData {
 }
 
 class HazukiColorPreset {
-  const HazukiColorPreset({required this.name, required this.seedColor});
+  const HazukiColorPreset({
+    required this.labelBuilder,
+    required this.seedColor,
+  });
 
-  final String name;
+  final String Function(AppLocalizations strings) labelBuilder;
   final Color seedColor;
 }
 
 const List<HazukiColorPreset> kHazukiColorPresets = [
-  HazukiColorPreset(name: '薄荷绿', seedColor: Color(0xFF009688)),
-  HazukiColorPreset(name: '海盐蓝', seedColor: Color(0xFF0288D1)),
-  HazukiColorPreset(name: '暮光紫', seedColor: Color(0xFF7E57C2)),
-  HazukiColorPreset(name: '樱花粉', seedColor: Color(0xFFEC407A)),
-  HazukiColorPreset(name: '珊瑚橙', seedColor: Color(0xFFFF7043)),
-  HazukiColorPreset(name: '琥珀黄', seedColor: Color(0xFFFFB300)),
-  HazukiColorPreset(name: '青柠绿', seedColor: Color(0xFF7CB342)),
-  HazukiColorPreset(name: '石墨灰', seedColor: Color(0xFF546E7A)),
-  HazukiColorPreset(name: '莓果红', seedColor: Color(0xFFC62828)),
+  HazukiColorPreset(
+    labelBuilder: _displayPresetMintGreen,
+    seedColor: Color(0xFF009688),
+  ),
+  HazukiColorPreset(
+    labelBuilder: _displayPresetSeaSaltBlue,
+    seedColor: Color(0xFF0288D1),
+  ),
+  HazukiColorPreset(
+    labelBuilder: _displayPresetTwilightPurple,
+    seedColor: Color(0xFF7E57C2),
+  ),
+  HazukiColorPreset(
+    labelBuilder: _displayPresetCherryBlossomPink,
+    seedColor: Color(0xFFEC407A),
+  ),
+  HazukiColorPreset(
+    labelBuilder: _displayPresetCoralOrange,
+    seedColor: Color(0xFFFF7043),
+  ),
+  HazukiColorPreset(
+    labelBuilder: _displayPresetAmberYellow,
+    seedColor: Color(0xFFFFB300),
+  ),
+  HazukiColorPreset(
+    labelBuilder: _displayPresetLimeGreen,
+    seedColor: Color(0xFF7CB342),
+  ),
+  HazukiColorPreset(
+    labelBuilder: _displayPresetGraphiteGray,
+    seedColor: Color(0xFF546E7A),
+  ),
+  HazukiColorPreset(
+    labelBuilder: _displayPresetBerryRed,
+    seedColor: Color(0xFFC62828),
+  ),
 ];
+
+String _displayPresetMintGreen(AppLocalizations strings) =>
+    strings.displayPresetMintGreen;
+String _displayPresetSeaSaltBlue(AppLocalizations strings) =>
+    strings.displayPresetSeaSaltBlue;
+String _displayPresetTwilightPurple(AppLocalizations strings) =>
+    strings.displayPresetTwilightPurple;
+String _displayPresetCherryBlossomPink(AppLocalizations strings) =>
+    strings.displayPresetCherryBlossomPink;
+String _displayPresetCoralOrange(AppLocalizations strings) =>
+    strings.displayPresetCoralOrange;
+String _displayPresetAmberYellow(AppLocalizations strings) =>
+    strings.displayPresetAmberYellow;
+String _displayPresetLimeGreen(AppLocalizations strings) =>
+    strings.displayPresetLimeGreen;
+String _displayPresetGraphiteGray(AppLocalizations strings) =>
+    strings.displayPresetGraphiteGray;
+String _displayPresetBerryRed(AppLocalizations strings) =>
+    strings.displayPresetBerryRed;
 
 class HazukiApp extends StatefulWidget {
   const HazukiApp({super.key});
@@ -187,6 +240,7 @@ class _HazukiAppState extends State<HazukiApp> {
   static const _comicDetailDynamicColorKey =
       'appearance_comic_detail_dynamic_color';
   static const _sourceUpdateSkipDateKey = 'source_update_skip_date';
+  static const _localeKey = 'app_locale';
 
   final Connectivity _connectivity = Connectivity();
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
@@ -202,11 +256,13 @@ class _HazukiAppState extends State<HazukiApp> {
     displayModeRaw: 'native:auto',
     comicDetailDynamicColor: false,
   );
+  Locale? _locale;
 
   @override
   void initState() {
     super.initState();
     unawaited(_loadAppearance());
+    unawaited(_loadLocalePreference());
     unawaited(_initConnectivityWatcher());
     unawaited(_checkSourceUpdateInBackground());
     unawaited(CloudSyncService.instance.autoSyncOnce());
@@ -283,6 +339,37 @@ class _HazukiAppState extends State<HazukiApp> {
     }
     setState(() {
       _appearance = next;
+    });
+  }
+
+  Future<void> _loadLocalePreference() async {
+    final prefs = await SharedPreferences.getInstance();
+    final localeTag = prefs.getString(_localeKey);
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _locale = switch (localeTag) {
+        'zh' => const Locale('zh'),
+        'en' => const Locale('en'),
+        _ => null,
+      };
+    });
+  }
+
+  Future<void> _updateLocalePreference(Locale? locale) async {
+    final prefs = await SharedPreferences.getInstance();
+    final localeTag = switch (locale?.languageCode) {
+      'zh' => 'zh',
+      'en' => 'en',
+      _ => 'system',
+    };
+    await prefs.setString(_localeKey, localeTag);
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _locale = localeTag == 'system' ? null : locale;
     });
   }
 
@@ -403,14 +490,22 @@ class _HazukiAppState extends State<HazukiApp> {
       child: StatefulBuilder(
         builder: (dialogContext, setDialogState) {
           return AlertDialog(
-            title: const Text('漫画源有更新'),
+            title: Text(l10n(dialogContext).sourceUpdateAvailableTitle),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('本地漫画源版本号：${check.localVersion}'),
+                Text(
+                  l10n(
+                    dialogContext,
+                  ).sourceUpdateLocalVersion(check.localVersion),
+                ),
                 const SizedBox(height: 6),
-                Text('云端漫画源版本号：${check.remoteVersion}'),
+                Text(
+                  l10n(
+                    dialogContext,
+                  ).sourceUpdateRemoteVersion(check.remoteVersion),
+                ),
                 if (downloading) ...[
                   const SizedBox(height: 16),
                   LinearProgressIndicator(
@@ -419,8 +514,10 @@ class _HazukiAppState extends State<HazukiApp> {
                   const SizedBox(height: 8),
                   Text(
                     indeterminate
-                        ? '下载中...'
-                        : '下载中 ${(progress * 100).toStringAsFixed(0)}%',
+                        ? l10n(dialogContext).sourceUpdateDownloading
+                        : l10n(dialogContext).sourceUpdateDownloadingProgress(
+                            (progress * 100).toStringAsFixed(0),
+                          ),
                   ),
                 ],
                 if (errorText != null) ...[
@@ -441,7 +538,7 @@ class _HazukiAppState extends State<HazukiApp> {
                     : () => Navigator.of(
                         dialogContext,
                       ).pop(_SourceUpdateDialogAction.skipToday),
-                child: const Text('今日不再提醒'),
+                child: Text(l10n(dialogContext).comicDetailRemindLaterToday),
               ),
               TextButton(
                 onPressed: downloading
@@ -449,7 +546,7 @@ class _HazukiAppState extends State<HazukiApp> {
                     : () => Navigator.of(
                         dialogContext,
                       ).pop(_SourceUpdateDialogAction.cancel),
-                child: const Text('取消'),
+                child: Text(l10n(dialogContext).commonCancel),
               ),
               FilledButton(
                 onPressed: downloading
@@ -492,11 +589,13 @@ class _HazukiAppState extends State<HazukiApp> {
                         } else {
                           setDialogState(() {
                             downloading = false;
-                            errorText = '下载失败，请稍后重试';
+                            errorText = l10n(
+                              dialogContext,
+                            ).sourceUpdateDownloadFailed;
                           });
                         }
                       },
-                child: const Text('下载'),
+                child: Text(l10n(dialogContext).sourceUpdateDownload),
               ),
             ],
           );
@@ -575,7 +674,15 @@ class _HazukiAppState extends State<HazukiApp> {
       builder: (lightDynamic, darkDynamic) {
         return MaterialApp(
           debugShowCheckedModeBanner: false,
-          title: 'Hazuki',
+          onGenerateTitle: (context) => l10n(context).appTitle,
+          locale: _locale,
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
           themeMode: _appearance.themeMode,
           theme: _buildLightTheme(lightDynamic),
           darkTheme: _buildDarkTheme(darkDynamic),
@@ -583,6 +690,8 @@ class _HazukiAppState extends State<HazukiApp> {
             key: ValueKey(_homeRefreshTick),
             appearanceSettings: _appearance,
             onAppearanceChanged: _updateAppearance,
+            locale: _locale,
+            onLocaleChanged: _updateLocalePreference,
           ),
         );
       },

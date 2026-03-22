@@ -5,13 +5,13 @@ class _ComicDetailLoadingView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
+    return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          HazukiStickerLoadingIndicator(size: 112),
-          SizedBox(height: 10),
-          Text('加载中...'),
+          const HazukiStickerLoadingIndicator(size: 112),
+          const SizedBox(height: 10),
+          Text(l10n(context).comicDetailLoading),
         ],
       ),
     );
@@ -56,13 +56,14 @@ class _ComicDetailInfoTab extends StatelessWidget {
               children: [
                 if (details!.description.isNotEmpty) ...[
                   Text(
-                    '简介',
+                    l10n(context).comicDetailSummary,
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   const SizedBox(height: 6),
                   _ExpandableDescription(text: details!.description),
                 ],
-                if (details!.id.trim().isNotEmpty || details!.tags.isNotEmpty) ...[
+                if (details!.id.trim().isNotEmpty ||
+                    details!.tags.isNotEmpty) ...[
                   const SizedBox(height: 12),
                   metaSectionBuilder(details!),
                 ],
@@ -95,7 +96,7 @@ class _ComicDetailRelatedTab extends StatelessWidget {
     }
 
     if (details!.recommend.isEmpty) {
-      return const Center(child: Text('暂无相关漫画'));
+      return Center(child: Text(l10n(context).comicDetailNoRelatedComics));
     }
 
     return GridView.builder(
@@ -117,10 +118,7 @@ class _ComicDetailRelatedTab extends StatelessWidget {
           onTap: () {
             Navigator.of(context).push(
               MaterialPageRoute<void>(
-                builder: (_) => ComicDetailPage(
-                  comic: comic,
-                  heroTag: heroTag,
-                ),
+                builder: (_) => ComicDetailPage(comic: comic, heroTag: heroTag),
               ),
             );
           },
@@ -134,9 +132,9 @@ class _ComicDetailRelatedTab extends StatelessWidget {
                     borderRadius: BorderRadius.circular(8),
                     child: comic.cover.isEmpty
                         ? Container(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .surfaceContainerHighest,
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.surfaceContainerHighest,
                             child: const Center(
                               child: Icon(Icons.image_not_supported_outlined),
                             ),
@@ -146,9 +144,9 @@ class _ComicDetailRelatedTab extends StatelessWidget {
                             fit: BoxFit.cover,
                             width: double.infinity,
                             loading: Container(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .surfaceContainerHighest,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.surfaceContainerHighest,
                               alignment: Alignment.center,
                               child: const SizedBox(
                                 width: 18,
@@ -159,9 +157,9 @@ class _ComicDetailRelatedTab extends StatelessWidget {
                               ),
                             ),
                             error: Container(
-                              color: Theme.of(context)
-                                  .colorScheme
-                                  .surfaceContainerHighest,
+                              color: Theme.of(
+                                context,
+                              ).colorScheme.surfaceContainerHighest,
                               alignment: Alignment.center,
                               child: const Icon(Icons.broken_image_outlined),
                             ),
@@ -233,7 +231,9 @@ class _ExpandableDescriptionState extends State<_ExpandableDescription> {
                 maxLines: _expanded ? null : (isOverflowing ? 6 : null),
                 overflow: _expanded
                     ? TextOverflow.visible
-                    : (isOverflowing ? TextOverflow.ellipsis : TextOverflow.clip),
+                    : (isOverflowing
+                          ? TextOverflow.ellipsis
+                          : TextOverflow.clip),
               ),
             ),
             if (isOverflowing)
@@ -250,13 +250,17 @@ class _ExpandableDescriptionState extends State<_ExpandableDescription> {
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       Text(
-                        _expanded ? '收起' : '展开',
+                        _expanded
+                            ? l10n(context).comicDetailCollapse
+                            : l10n(context).comicDetailExpand,
                         style: theme.textTheme.labelMedium?.copyWith(
                           color: theme.colorScheme.primary,
                         ),
                       ),
                       Icon(
-                        _expanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                        _expanded
+                            ? Icons.keyboard_arrow_up
+                            : Icons.keyboard_arrow_down,
                         size: 16,
                         color: theme.colorScheme.primary,
                       ),
@@ -270,4 +274,3 @@ class _ExpandableDescriptionState extends State<_ExpandableDescription> {
     );
   }
 }
-

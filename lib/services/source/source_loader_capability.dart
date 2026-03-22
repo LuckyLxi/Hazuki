@@ -20,7 +20,7 @@ extension HazukiSourceServiceSourceLoaderCapability on HazukiSourceService {
       return _SourceLoadResult(
         initFile: initFile,
         jmFile: jmFile,
-        message: '已加载本地漫画源',
+        message: 'source_loaded_from_local_cache',
       );
     }
 
@@ -30,11 +30,11 @@ extension HazukiSourceServiceSourceLoaderCapability on HazukiSourceService {
       return _SourceLoadResult(
         initFile: initFile,
         jmFile: jmFile,
-        message: '首次启动已下载 jm.js',
+        message: 'source_downloaded_on_first_launch',
       );
     }
 
-    throw Exception('无法下载 jm.js，且本地无可用缓存');
+    throw Exception('source_download_failed_without_cache');
   }
 
   Future<SourceMeta> _loadSourceMetadata(File initFile, File jmFile) async {
@@ -70,7 +70,7 @@ extension HazukiSourceServiceSourceLoaderCapability on HazukiSourceService {
     );
 
     if (name.isEmpty || key.isEmpty || version.isEmpty) {
-      throw Exception('源信息不完整，无法解析 name/key/version');
+      throw Exception('source_metadata_incomplete');
     }
 
     final settingsDefaults = _parseSettingsDefaultMap(

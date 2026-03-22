@@ -120,7 +120,7 @@ class _CommentsPageState extends State<CommentsPage>
         return;
       }
       setState(() {
-        _errorMessage = '加载评论失败：$e';
+        _errorMessage = l10n(context).commentsLoadFailed('$e');
       });
     } finally {
       if (mounted) {
@@ -205,16 +205,16 @@ class _CommentsPageState extends State<CommentsPage>
     }
 
     if (!HazukiSourceService.instance.isLogged) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('请先登录后再评论')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n(context).commentsLoginRequiredToSend)),
+      );
       return;
     }
 
     if (!HazukiSourceService.instance.supportCommentSend) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('当前漫画源不支持发送评论')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n(context).commentsSourceNotSupported)),
+      );
       return;
     }
 
@@ -238,17 +238,17 @@ class _CommentsPageState extends State<CommentsPage>
       setState(() {
         _replyToComment = null;
       });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('评论发送成功')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n(context).commentsSendSuccess)),
+      );
       await _loadInitial();
     } catch (e) {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('发送失败：$e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n(context).commentsSendFailed('$e'))),
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -269,11 +269,15 @@ class _CommentsPageState extends State<CommentsPage>
       title: Row(
         children: [
           Expanded(
-            child: Text(comment.userName.isEmpty ? '匿名用户' : comment.userName),
+            child: Text(
+              comment.userName.isEmpty
+                  ? l10n(context).commentsAnonymousUser
+                  : comment.userName,
+            ),
           ),
           if (hasReply)
             Text(
-              '回复 ${comment.replyCount}',
+              l10n(context).commentsReplyCount('${comment.replyCount}'),
               style: Theme.of(context).textTheme.bodySmall,
             ),
         ],
@@ -289,7 +293,7 @@ class _CommentsPageState extends State<CommentsPage>
       trailing: comment.id == null
           ? null
           : IconButton(
-              tooltip: '回复',
+              tooltip: l10n(context).commentsReplyTooltip,
               onPressed: () => _setReplyTarget(comment),
               icon: const Icon(Icons.reply_outlined),
             ),
@@ -302,7 +306,9 @@ class _CommentsPageState extends State<CommentsPage>
       return const SizedBox.shrink();
     }
 
-    final name = replyTo.userName.isEmpty ? '匿名用户' : replyTo.userName;
+    final name = replyTo.userName.isEmpty
+        ? l10n(context).commentsAnonymousUser
+        : replyTo.userName;
     final preview = replyTo.content.replaceAll('\n', ' ').trim();
 
     return Container(
@@ -321,7 +327,7 @@ class _CommentsPageState extends State<CommentsPage>
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  '回复 @$name',
+                  l10n(context).commentsReplyToUser(name),
                   style: Theme.of(context).textTheme.labelLarge,
                 ),
                 if (preview.isNotEmpty)
@@ -335,7 +341,7 @@ class _CommentsPageState extends State<CommentsPage>
             ),
           ),
           IconButton(
-            tooltip: '取消回复',
+            tooltip: l10n(context).commentsCancelReplyTooltip,
             onPressed: _clearReplyTarget,
             icon: const Icon(Icons.close),
           ),
@@ -346,8 +352,12 @@ class _CommentsPageState extends State<CommentsPage>
 
   Widget _buildBottomComposer() {
     final hint = _replyToComment == null
-        ? '写下你的评论…'
-        : '回复 ${_replyToComment!.userName.isEmpty ? '匿名用户' : _replyToComment!.userName}…';
+        ? l10n(context).commentsComposerHint
+        : l10n(context).commentsReplyComposerHint(
+            _replyToComment!.userName.isEmpty
+                ? l10n(context).commentsAnonymousUser
+                : _replyToComment!.userName,
+          );
 
     // SafeArea 仅处理顶部，底部由外层布局（Scaffold bottomNavigationBar 或 Column）统一管理
     return Material(
@@ -380,7 +390,11 @@ class _CommentsPageState extends State<CommentsPage>
                   const SizedBox(width: 10),
                   FilledButton(
                     onPressed: _sendingComment ? null : _submitComment,
-                    child: Text(_sendingComment ? '发送中…' : '发送'),
+                    child: Text(
+                      _sendingComment
+                          ? l10n(context).commentsSending
+                          : l10n(context).commentsSend,
+                    ),
                   ),
                 ],
               ),
@@ -401,12 +415,12 @@ class _CommentsPageState extends State<CommentsPage>
         key: const ValueKey('loading'),
         padding: const EdgeInsets.only(top: 100),
         alignment: Alignment.topCenter,
-        child: const Column(
+        child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            HazukiStickerLoadingIndicator(size: 120),
-            SizedBox(height: 10),
-            Text('加载中...'),
+            const HazukiStickerLoadingIndicator(size: 120),
+            const SizedBox(height: 10),
+            Text(l10n(context).commonLoading),
           ],
         ),
       );
@@ -422,7 +436,10 @@ class _CommentsPageState extends State<CommentsPage>
               padding: const EdgeInsets.all(16),
               child: Text(_errorMessage!, textAlign: TextAlign.center),
             ),
-            FilledButton(onPressed: _loadInitial, child: const Text('重试')),
+            FilledButton(
+              onPressed: _loadInitial,
+              child: Text(l10n(context).commonRetry),
+            ),
           ],
         ),
       );
@@ -431,7 +448,7 @@ class _CommentsPageState extends State<CommentsPage>
         key: const ValueKey('empty'),
         padding: const EdgeInsets.only(top: 80),
         alignment: Alignment.topCenter,
-        child: const Text('暂无评论'),
+        child: Text(l10n(context).commentsEmpty),
       );
     } else {
       content = ListView.separated(
@@ -446,15 +463,15 @@ class _CommentsPageState extends State<CommentsPage>
     }
 
     final loadMoreFooter = _loadingMore
-        ? const Padding(
-            padding: EdgeInsets.symmetric(vertical: 10),
+        ? Padding(
+            padding: const EdgeInsets.symmetric(vertical: 10),
             child: Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  HazukiStickerLoadingIndicator(size: 72),
-                  SizedBox(height: 8),
-                  Text('加载中...'),
+                  const HazukiStickerLoadingIndicator(size: 72),
+                  const SizedBox(height: 8),
+                  Text(l10n(context).commonLoading),
                 ],
               ),
             ),
@@ -505,7 +522,10 @@ class _CommentsPageState extends State<CommentsPage>
     }
 
     return Scaffold(
-      appBar: hazukiFrostedAppBar(context: context, title: const Text('评论')),
+      appBar: hazukiFrostedAppBar(
+        context: context,
+        title: Text(l10n(context).commentsTitle),
+      ),
       resizeToAvoidBottomInset: true,
       body: bodyList,
       // 独立页面模式：bottomNavigationBar + Scaffold 的 resizeToAvoidBottomInset 配合，

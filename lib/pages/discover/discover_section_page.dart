@@ -87,12 +87,12 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
 
     try {
       final nextPage = _currentPage + 1;
-      final result =
-          await HazukiSourceService.instance.loadCategoryComicsByViewMore(
-        viewMoreUrl: viewMoreUrl,
-        page: nextPage,
-        order: _selectedSortValue ?? 'mr',
-      );
+      final result = await HazukiSourceService.instance
+          .loadCategoryComicsByViewMore(
+            viewMoreUrl: viewMoreUrl,
+            page: nextPage,
+            order: _selectedSortValue ?? 'mr',
+          );
 
       if (!mounted) return;
 
@@ -112,13 +112,13 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
         // 没有更多数据 or 已达最大页
         // 注意：用原始返回数量判断是否还有下一页，避免因为去重后 incoming 为空而误判结束
         final maxPage = result.maxPage;
-        _hasMore = result.comics.isNotEmpty &&
-            (maxPage == null || nextPage < maxPage);
+        _hasMore =
+            result.comics.isNotEmpty && (maxPage == null || nextPage < maxPage);
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = '加载失败：$e';
+        _errorMessage = l10n(context).discoverSectionLoadFailed('$e');
       });
     } finally {
       if (mounted) {
@@ -184,6 +184,8 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
 
   @override
   Widget build(BuildContext context) {
+    final strings = l10n(context);
+
     return Scaffold(
       appBar: hazukiFrostedAppBar(
         context: context,
@@ -205,7 +207,9 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
                               child: SizedBox(
                                 width: 16,
                                 height: 16,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
                               ),
                             ),
                           )
@@ -232,33 +236,34 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
               Expanded(
                 child: _comics.isEmpty
                     ? (_loadingMore || _sortLoading)
-                        ? const Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                HazukiStickerLoadingIndicator(size: 72),
-                                SizedBox(height: 10),
-                                Text('加载中...'),
-                              ],
-                            ),
-                          )
-                        : const Center(child: Text('暂无漫画'))
+                          ? Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const HazukiStickerLoadingIndicator(size: 72),
+                                  const SizedBox(height: 10),
+                                  Text(strings.commonLoading),
+                                ],
+                              ),
+                            )
+                          : Center(child: Text(strings.discoverSectionEmpty))
                     : GridView.builder(
                         controller: _scrollController,
                         padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
                         itemCount: _comics.length,
                         gridDelegate:
                             const SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: 3,
-                          mainAxisSpacing: 10,
-                          crossAxisSpacing: 10,
-                          childAspectRatio: 0.57,
-                        ),
+                              crossAxisCount: 3,
+                              mainAxisSpacing: 10,
+                              crossAxisSpacing: 10,
+                              childAspectRatio: 0.57,
+                            ),
                         itemBuilder: (context, index) {
                           final comic = _comics[index];
                           final heroTag = _comicCoverHeroTag(
                             comic,
-                            salt: 'discover-more-${widget.section.title}-$index',
+                            salt:
+                                'discover-more-${widget.section.title}-$index',
                           );
                           return InkWell(
                             borderRadius: BorderRadius.circular(8),
@@ -306,8 +311,8 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
                                                   height: 18,
                                                   child:
                                                       CircularProgressIndicator(
-                                                    strokeWidth: 2,
-                                                  ),
+                                                        strokeWidth: 2,
+                                                      ),
                                                 ),
                                               ),
                                               error: Container(
@@ -335,7 +340,9 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
                                     comic.subTitle,
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: Theme.of(context).textTheme.bodySmall,
+                                    style: Theme.of(
+                                      context,
+                                    ).textTheme.bodySmall,
                                   ),
                               ],
                             ),
@@ -344,14 +351,14 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
                       ),
               ),
               if (_loadingMore && _comics.isNotEmpty)
-                const Padding(
-                  padding: EdgeInsets.only(bottom: 10),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      HazukiStickerLoadingIndicator(size: 72),
-                      SizedBox(height: 8),
-                      Text('加载中...'),
+                      const HazukiStickerLoadingIndicator(size: 72),
+                      const SizedBox(height: 8),
+                      Text(strings.commonLoading),
                     ],
                   ),
                 ),
@@ -385,7 +392,7 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
                         const SizedBox(width: 8),
                         TextButton(
                           onPressed: _loadMore,
-                          child: const Text('重试'),
+                          child: Text(strings.commonRetry),
                         ),
                       ],
                     ),

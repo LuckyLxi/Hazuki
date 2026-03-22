@@ -17,15 +17,13 @@ class _HazukiTabBarDelegate extends SliverPersistentHeaderDelegate {
     double shrinkOffset,
     bool overlapsContent,
   ) {
-    return ColoredBox(
-      color: surfaceColor,
-      child: tabBar,
-    );
+    return ColoredBox(color: surfaceColor, child: tabBar);
   }
 
   @override
   bool shouldRebuild(covariant _HazukiTabBarDelegate oldDelegate) {
-    return tabBar != oldDelegate.tabBar || surfaceColor != oldDelegate.surfaceColor;
+    return tabBar != oldDelegate.tabBar ||
+        surfaceColor != oldDelegate.surfaceColor;
   }
 }
 
@@ -44,7 +42,7 @@ class _SpringBottomSheetRoute<T> extends PageRoute<T> {
   Color get barrierColor => Colors.black54;
 
   @override
-  String? get barrierLabel => 'Dismiss';
+  String? get barrierLabel => null;
 
   @override
   bool get maintainState => true;
@@ -99,20 +97,13 @@ class _SpringBottomSheetRoute<T> extends PageRoute<T> {
           alignment: Alignment.bottomCenter,
           child: GestureDetector(
             onTap: () {}, // 防透传
-            child: SlideTransition(
-              position: slideIn,
-              child: child,
-            ),
+            child: SlideTransition(position: slideIn, child: child),
           ),
         ),
       ),
     );
   }
 }
-
-
-
-
 
 class _ChaptersPanelSheet extends StatelessWidget {
   const _ChaptersPanelSheet({
@@ -166,14 +157,16 @@ class _ChaptersPanelSheet extends StatelessWidget {
                 child: Row(
                   children: [
                     Text(
-                      '章节',
+                      l10n(context).comicDetailChapters,
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(width: 8),
                     Text(
-                      '共 ${chapters.length} 话',
+                      l10n(
+                        context,
+                      ).comicDetailChapterCount('${chapters.length}'),
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: cs.onSurfaceVariant,
                       ),

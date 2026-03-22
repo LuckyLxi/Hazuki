@@ -55,7 +55,9 @@ class _LineSettingsPageState extends State<LineSettingsPage> {
       final apiCount = apiDomains.isEmpty ? 4 : apiDomains.length;
       var selectedApi = snapshot['apiDomain']?.toString() ?? '1';
       final selectedApiInt = int.tryParse(selectedApi);
-      if (selectedApiInt == null || selectedApiInt < 1 || selectedApiInt > apiCount) {
+      if (selectedApiInt == null ||
+          selectedApiInt < 1 ||
+          selectedApiInt > apiCount) {
         selectedApi = '1';
       }
 
@@ -83,9 +85,10 @@ class _LineSettingsPageState extends State<LineSettingsPage> {
       if (!mounted) {
         return;
       }
+      final strings = l10n(context);
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('线路信息加载失败: $e')));
+      ).showSnackBar(SnackBar(content: Text(strings.lineLoadFailed('$e'))));
     } finally {
       if (mounted) {
         setState(() {
@@ -95,7 +98,8 @@ class _LineSettingsPageState extends State<LineSettingsPage> {
     }
   }
 
-  List<DropdownMenuItem<String>> _buildApiItems() {
+  List<DropdownMenuItem<String>> _buildApiItems(BuildContext context) {
+    final strings = l10n(context);
     final items = <DropdownMenuItem<String>>[];
     final count = _apiDomains.isEmpty ? 4 : _apiDomains.length;
     for (var i = 1; i <= count; i++) {
@@ -104,18 +108,28 @@ class _LineSettingsPageState extends State<LineSettingsPage> {
       items.add(
         DropdownMenuItem<String>(
           value: value,
-          child: Text(host.isEmpty ? '线路$value' : '线路$value  ($host)'),
+          child: Text(
+            host.isEmpty
+                ? strings.lineOptionLabel(value)
+                : strings.lineOptionWithHostLabel(value, host),
+          ),
         ),
       );
     }
     return items;
   }
 
-  List<DropdownMenuItem<String>> _buildImageItems() {
+  List<DropdownMenuItem<String>> _buildImageItems(BuildContext context) {
+    final strings = l10n(context);
     final items = <DropdownMenuItem<String>>[];
     for (var i = 1; i <= _imageStreamCount; i++) {
       final value = '$i';
-      items.add(DropdownMenuItem<String>(value: value, child: Text('分流$value')));
+      items.add(
+        DropdownMenuItem<String>(
+          value: value,
+          child: Text(strings.lineImageStreamLabel(value)),
+        ),
+      );
     }
     return items;
   }
@@ -137,16 +151,18 @@ class _LineSettingsPageState extends State<LineSettingsPage> {
       if (!mounted) {
         return;
       }
+      final strings = l10n(context);
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('API 域名分流已切到线路$value')));
+      ).showSnackBar(SnackBar(content: Text(strings.lineApiSwitched(value))));
     } catch (e) {
       if (!mounted) {
         return;
       }
+      final strings = l10n(context);
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('切换失败: $e')));
+      ).showSnackBar(SnackBar(content: Text(strings.lineSwitchFailed('$e'))));
     }
   }
 
@@ -159,7 +175,10 @@ class _LineSettingsPageState extends State<LineSettingsPage> {
     });
 
     try {
-      await HazukiSourceService.instance.updateLineSetting('imageStream', value);
+      await HazukiSourceService.instance.updateLineSetting(
+        'imageStream',
+        value,
+      );
       await HazukiSourceService.instance.refreshLines(
         refreshApiDomains: false,
         refreshImageHost: true,
@@ -168,16 +187,18 @@ class _LineSettingsPageState extends State<LineSettingsPage> {
       if (!mounted) {
         return;
       }
+      final strings = l10n(context);
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('图片域名分流已切到分流$value')));
+      ).showSnackBar(SnackBar(content: Text(strings.lineImageSwitched(value))));
     } catch (e) {
       if (!mounted) {
         return;
       }
+      final strings = l10n(context);
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('切换失败: $e')));
+      ).showSnackBar(SnackBar(content: Text(strings.lineSwitchFailed('$e'))));
     }
   }
 
@@ -194,32 +215,41 @@ class _LineSettingsPageState extends State<LineSettingsPage> {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('已更新启动自动刷新设置')));
+      final strings = l10n(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(strings.lineRefreshOnStartUpdated)),
+      );
     } catch (e) {
       if (!mounted) {
         return;
       }
+      final strings = l10n(context);
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('保存失败: $e')));
+      ).showSnackBar(SnackBar(content: Text(strings.lineSaveFailed('$e'))));
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final strings = l10n(context);
     final colorScheme = Theme.of(context).colorScheme;
 
     if (_loading) {
       return Scaffold(
-        appBar: hazukiFrostedAppBar(context: context, title: const Text('线路')),
+        appBar: hazukiFrostedAppBar(
+          context: context,
+          title: Text(strings.lineSettingsTitle),
+        ),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
 
     return Scaffold(
-      appBar: hazukiFrostedAppBar(context: context, title: const Text('线路')),
+      appBar: hazukiFrostedAppBar(
+        context: context,
+        title: Text(strings.lineSettingsTitle),
+      ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(12, 12, 12, 20),
         children: [
@@ -232,11 +262,14 @@ class _LineSettingsPageState extends State<LineSettingsPage> {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.route_outlined, color: colorScheme.onPrimaryContainer),
+                Icon(
+                  Icons.route_outlined,
+                  color: colorScheme.onPrimaryContainer,
+                ),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    '你可以分别切换 API 与图片分流，切换后会自动应用到后续请求。',
+                    strings.lineIntro,
                     style: TextStyle(color: colorScheme.onPrimaryContainer),
                   ),
                 ),
@@ -258,15 +291,15 @@ class _LineSettingsPageState extends State<LineSettingsPage> {
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(Icons.cloud_outlined),
-                    title: const Text('API 域名分流'),
-                    subtitle: const Text('用于接口请求，建议网络异常时切换'),
+                    title: Text(strings.lineApiTitle),
+                    subtitle: Text(strings.lineApiSubtitle),
                   ),
                   DropdownButtonFormField<String>(
                     initialValue: _selectedApiDomain,
-                    items: _buildApiItems(),
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                      labelText: '选择 API 线路',
+                    items: _buildApiItems(context),
+                    decoration: InputDecoration(
+                      border: const OutlineInputBorder(),
+                      labelText: strings.lineSelectApiLabel,
                       isDense: true,
                     ),
                     onChanged: _onApiChanged,
@@ -290,19 +323,19 @@ class _LineSettingsPageState extends State<LineSettingsPage> {
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     leading: const Icon(Icons.image_outlined),
-                    title: const Text('图片域名分流'),
+                    title: Text(strings.lineImageTitle),
                     subtitle: Text(
                       _currentImageHost.trim().isEmpty
-                          ? '当前未获取到图片域名'
-                          : '当前域名：$_currentImageHost',
+                          ? strings.lineImageHostUnavailable
+                          : strings.lineImageHostCurrent(_currentImageHost),
                     ),
                   ),
                   DropdownButtonFormField<String>(
                     initialValue: _selectedImageStream,
-                    items: _buildImageItems(),
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                      labelText: '选择图片分流',
+                    items: _buildImageItems(context),
+                    decoration: InputDecoration(
+                      border: const OutlineInputBorder(),
+                      labelText: strings.lineSelectImageLabel,
                       isDense: true,
                     ),
                     onChanged: _onImageStreamChanged,
@@ -322,8 +355,8 @@ class _LineSettingsPageState extends State<LineSettingsPage> {
               children: [
                 SwitchListTile(
                   secondary: const Icon(Icons.autorenew_rounded),
-                  title: const Text('启动时刷新域名列表'),
-                  subtitle: const Text('每次打开应用时自动更新 API 域名池'),
+                  title: Text(strings.lineRefreshOnStartTitle),
+                  subtitle: Text(strings.lineRefreshOnStartSubtitle),
                   value: _refreshDomainsOnStart,
                   onChanged: _onRefreshDomainsOnStartChanged,
                 ),
@@ -335,7 +368,7 @@ class _LineSettingsPageState extends State<LineSettingsPage> {
                     child: FilledButton.tonalIcon(
                       onPressed: _loadSnapshot,
                       icon: const Icon(Icons.refresh),
-                      label: const Text('刷新线路状态'),
+                      label: Text(strings.lineRefreshStatusButton),
                     ),
                   ),
                 ),

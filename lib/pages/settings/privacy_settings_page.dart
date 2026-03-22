@@ -48,7 +48,6 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
 
   Future<void> _toggleBiometricAuth(bool value) async {
     if (value) {
-      // Trying to authenticate before enabling it
       try {
         final success = await _channel.invokeMethod('authenticate');
         if (success != true) {
@@ -57,9 +56,6 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
       } catch (_) {
         return;
       }
-    } else {
-      // Turning off requires auth too for security, or we just allow it depending on threat model.
-      // Let's just allow toggling off. But to actually make it safe, we could require auth, but user requested straightforward toggle.
     }
 
     setState(() {
@@ -86,31 +82,35 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final strings = l10n(context);
     return Scaffold(
-      appBar: hazukiFrostedAppBar(context: context, title: const Text('隐私设置')),
+      appBar: hazukiFrostedAppBar(
+        context: context,
+        title: Text(strings.privacySettingsTitle),
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
               children: [
                 SwitchListTile(
                   secondary: const Icon(Icons.blur_on_outlined),
-                  title: const Text('模糊任务栏应用页面'),
-                  subtitle: const Text('切到近期任务时任务卡片显示为纯黑'),
+                  title: Text(strings.privacyBlurTaskTitle),
+                  subtitle: Text(strings.privacyBlurTaskSubtitle),
                   value: _blurBackground,
                   onChanged: _toggleBlurBackground,
                 ),
                 const Divider(height: 1),
                 SwitchListTile(
                   secondary: const Icon(Icons.fingerprint_outlined),
-                  title: const Text('生物认证解锁'),
-                  subtitle: const Text('每次进入软件需验证指纹'),
+                  title: Text(strings.privacyBiometricUnlockTitle),
+                  subtitle: Text(strings.privacyBiometricUnlockSubtitle),
                   value: _biometricAuth,
                   onChanged: _toggleBiometricAuth,
                 ),
                 SwitchListTile(
                   secondary: const Icon(Icons.lock_clock_outlined),
-                  title: const Text('退出软件需重新验证'),
-                  subtitle: const Text('即使应用在后台，只要不在前台，再次打开便需要重新认证'),
+                  title: Text(strings.privacyAuthOnResumeTitle),
+                  subtitle: Text(strings.privacyAuthOnResumeSubtitle),
                   value: _authOnResume,
                   onChanged: _biometricAuth ? _toggleAuthOnResume : null,
                 ),

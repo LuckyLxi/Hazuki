@@ -2,15 +2,28 @@ part of '../../main.dart';
 
 const Duration _searchLoadTimeout = Duration(seconds: 25);
 const double _searchAppBarRevealOffset = 68;
-const Map<String, String> _searchOrderLabels = {
-  'mr': '最新',
-  'mv': '总排行',
-  'mv_m': '月排行',
-  'mv_w': '周排行',
-  'mv_t': '日排行',
-  'mp': '最多图片',
-  'tf': '最多喜欢',
+const Set<String> _searchOrderKeys = {
+  'mr',
+  'mv',
+  'mv_m',
+  'mv_w',
+  'mv_t',
+  'mp',
+  'tf',
 };
+
+Map<String, String> searchOrderLabels(BuildContext context) {
+  final strings = l10n(context);
+  return {
+    'mr': strings.searchOrderLatest,
+    'mv': strings.searchOrderTotalRanking,
+    'mv_m': strings.searchOrderMonthlyRanking,
+    'mv_w': strings.searchOrderWeeklyRanking,
+    'mv_t': strings.searchOrderDailyRanking,
+    'mp': strings.searchOrderMostImages,
+    'tf': strings.searchOrderMostLikes,
+  };
+}
 
 class SearchPage extends StatelessWidget {
   const SearchPage({super.key, this.initialKeyword});
@@ -166,23 +179,24 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
     if (!mounted) {
       return;
     }
+    final strings = l10n(context);
     final confirm = await showGeneralDialog<bool>(
       context: context,
       barrierDismissible: true,
-      barrierLabel: '关闭',
+      barrierLabel: strings.commonClose,
       transitionDuration: const Duration(milliseconds: 250),
       pageBuilder: (context, anim1, anim2) {
         return AlertDialog(
-          title: const Text('清空历史记录'),
-          content: const Text('你确定要清空所有搜索记录吗？'),
+          title: Text(strings.searchClearHistoryTitle),
+          content: Text(strings.searchClearHistoryContent),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('取消'),
+              child: Text(strings.commonCancel),
             ),
             FilledButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('确定'),
+              child: Text(strings.commonConfirm),
             ),
           ],
         );
@@ -212,7 +226,7 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
       child: SearchBar(
         focusNode: _searchFocusNode,
         controller: _searchController,
-        hintText: '搜索漫画',
+        hintText: l10n(context).searchHint,
         elevation: const WidgetStatePropertyAll(0),
         backgroundColor: WidgetStatePropertyAll(
           Theme.of(context).colorScheme.surfaceContainerHigh,
@@ -240,7 +254,7 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
             child: _searchController.text.isNotEmpty
                 ? IconButton(
                     key: ValueKey(clearKey),
-                    tooltip: '清空',
+                    tooltip: l10n(context).searchClearTooltip,
                     onPressed: () {
                       _searchController.clear();
                       setState(() {});
@@ -250,7 +264,7 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
                   )
                 : IconButton(
                     key: ValueKey(submitKey),
-                    tooltip: '搜索',
+                    tooltip: l10n(context).searchSubmitTooltip,
                     onPressed: () =>
                         unawaited(_openResults(_searchController.text)),
                     icon: const Icon(Icons.arrow_forward),
@@ -356,7 +370,7 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
         Padding(
           padding: const EdgeInsets.only(bottom: 12, left: 4),
           child: Text(
-            '搜索历史',
+            l10n(context).searchHistoryTitle,
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
@@ -427,7 +441,7 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
           : null,
       appBar: hazukiFrostedAppBar(
         context: context,
-        title: const Text('搜索'),
+        title: Text(l10n(context).searchTitle),
         actions: [
           _buildCollapsedSearchBox(),
           AnimatedContainer(

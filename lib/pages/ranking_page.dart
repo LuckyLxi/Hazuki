@@ -87,7 +87,7 @@ class _RankingPageState extends State<RankingPage> {
     return HazukiSourceService.instance.loadCategoryRankingOptions().timeout(
       _loadTimeout,
       onTimeout: () {
-        throw Exception('排行榜分类加载超时，请稍后重试');
+        throw Exception(l10n(context).rankingLoadOptionsTimeout);
       },
     );
   }
@@ -101,7 +101,7 @@ class _RankingPageState extends State<RankingPage> {
         .timeout(
           _loadTimeout,
           onTimeout: () {
-            throw Exception('排行榜加载超时，请稍后重试');
+            throw Exception(l10n(context).rankingLoadTimeout);
           },
         );
   }
@@ -126,9 +126,9 @@ class _RankingPageState extends State<RankingPage> {
       final selected = rankingOptions.isEmpty
           ? null
           : (_selectedRankingValue != null &&
-                  rankingOptions.any((e) => e.value == _selectedRankingValue)
-              ? _selectedRankingValue
-              : rankingOptions.first.value);
+                    rankingOptions.any((e) => e.value == _selectedRankingValue)
+                ? _selectedRankingValue
+                : rankingOptions.first.value);
 
       setState(() {
         _rankingOptions = rankingOptions;
@@ -147,7 +147,7 @@ class _RankingPageState extends State<RankingPage> {
         return;
       }
       setState(() {
-        _errorMessage = '排行榜加载失败：$e';
+        _errorMessage = l10n(context).rankingLoadFailed('$e');
       });
     } finally {
       if (mounted) {
@@ -168,7 +168,8 @@ class _RankingPageState extends State<RankingPage> {
       return;
     }
 
-    if (append && (_rankingLoading || _rankingLoadingMore || !_rankingHasMore)) {
+    if (append &&
+        (_rankingLoading || _rankingLoadingMore || !_rankingHasMore)) {
       return;
     }
 
@@ -215,7 +216,8 @@ class _RankingPageState extends State<RankingPage> {
           final reachedMax =
               result.maxPage != null && targetPage >= result.maxPage!;
           final noNewItems = _rankingComics.length == previousCount;
-          _rankingHasMore = !reachedMax && result.comics.isNotEmpty && !noNewItems;
+          _rankingHasMore =
+              !reachedMax && result.comics.isNotEmpty && !noNewItems;
         } else {
           _rankingComics = result.comics;
           final reachedMax =
@@ -230,7 +232,7 @@ class _RankingPageState extends State<RankingPage> {
         return;
       }
       setState(() {
-        _errorMessage = '排行榜加载失败：$e';
+        _errorMessage = l10n(context).rankingLoadFailed('$e');
       });
     } finally {
       if (mounted && requestToken == _rankingRequestToken) {
@@ -293,10 +295,10 @@ class _RankingPageState extends State<RankingPage> {
                       color: index == 0
                           ? Colors.red.shade400
                           : (index == 1
-                              ? Colors.orange.shade400
-                              : (index == 2
-                                  ? Colors.amber.shade400
-                                  : Theme.of(context).colorScheme.outline)),
+                                ? Colors.orange.shade400
+                                : (index == 2
+                                      ? Colors.amber.shade400
+                                      : Theme.of(context).colorScheme.outline)),
                     ),
                   ),
                 ),
@@ -353,10 +355,12 @@ class _RankingPageState extends State<RankingPage> {
 
   @override
   Widget build(BuildContext context) {
+    final strings = l10n(context);
+
     return Scaffold(
       appBar: hazukiFrostedAppBar(
         context: context,
-        title: const Text('排行榜'),
+        title: Text(strings.rankingTitle),
       ),
       body: Stack(
         children: [
@@ -365,123 +369,125 @@ class _RankingPageState extends State<RankingPage> {
             child: _initialLoading
                 ? ListView(
                     physics: const AlwaysScrollableScrollPhysics(),
-                    children: const [
-                      SizedBox(height: 160),
+                    children: [
+                      const SizedBox(height: 160),
                       Center(
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            HazukiStickerLoadingIndicator(size: 112),
-                            SizedBox(height: 10),
-                            Text('加载中...'),
+                            const HazukiStickerLoadingIndicator(size: 112),
+                            const SizedBox(height: 10),
+                            Text(strings.commonLoading),
                           ],
                         ),
                       ),
                     ],
                   )
                 : (_errorMessage != null &&
-                        _rankingOptions.isEmpty &&
-                        _rankingComics.isEmpty)
-                    ? ListView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        padding: const EdgeInsets.all(16),
-                        children: [
-                          const SizedBox(height: 90),
-                          Text(
-                            _errorMessage!,
-                            textAlign: TextAlign.center,
-                          ),
-                          const SizedBox(height: 12),
-                          Center(
-                            child: FilledButton(
-                              onPressed: () {
-                                unawaited(_loadInitial(forceRefresh: true));
-                              },
-                              child: const Text('重试'),
-                            ),
-                          ),
-                        ],
-                      )
-                    : ListView(
-                        controller: _scrollController,
-                        physics: const AlwaysScrollableScrollPhysics(
-                          parent: ClampingScrollPhysics(),
+                      _rankingOptions.isEmpty &&
+                      _rankingComics.isEmpty)
+                ? ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(16),
+                    children: [
+                      const SizedBox(height: 90),
+                      Text(_errorMessage!, textAlign: TextAlign.center),
+                      const SizedBox(height: 12),
+                      Center(
+                        child: FilledButton(
+                          onPressed: () {
+                            unawaited(_loadInitial(forceRefresh: true));
+                          },
+                          child: Text(strings.commonRetry),
                         ),
-                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-                        children: [
-                          if (_errorMessage != null)
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 8),
-                              child: Text(
-                                _errorMessage!,
-                                style: TextStyle(
-                                  color: Theme.of(context).colorScheme.error,
-                                ),
-                              ),
-                            ),
-                          if (_rankingOptions.isEmpty)
-                            const Text('当前漫画源暂无排行榜分类')
-                          else
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: _rankingOptions.map((option) {
-                                return ChoiceChip(
-                                  label: Text(option.label),
-                                  selected: _selectedRankingValue == option.value,
-                                  onSelected: (_) => _onSelectRankingOption(option.value),
-                                );
-                              }).toList(),
-                            ),
-                          const SizedBox(height: 10),
-                          if (_rankingLoading && _rankingComics.isEmpty)
-                            const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 26),
-                              child: Center(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    HazukiStickerLoadingIndicator(size: 96),
-                                    SizedBox(height: 10),
-                                    Text('加载中...'),
-                                  ],
-                                ),
-                              ),
-                            )
-                          else if (_rankingComics.isEmpty)
-                            const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 20),
-                              child: Center(child: Text('暂无排行榜内容')),
-                            )
-                          else
-                            for (int i = 0; i < _rankingComics.length; i++)
-                              _buildRankingComicItem(_rankingComics[i], i),
-                          if (_rankingLoadingMore)
-                            const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 14),
-                              child: Center(
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    HazukiStickerLoadingIndicator(size: 72),
-                                    SizedBox(height: 8),
-                                    Text('加载中...'),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          if (!_rankingLoading && !_rankingLoadingMore && !_rankingHasMore)
-                            const Padding(
-                              padding: EdgeInsets.only(top: 12, bottom: 6),
-                              child: Center(child: Text('已经到底了')),
-                            ),
-                          if (_refreshing)
-                            const Padding(
-                              padding: EdgeInsets.only(top: 8),
-                              child: SizedBox.shrink(),
-                            ),
-                        ],
                       ),
+                    ],
+                  )
+                : ListView(
+                    controller: _scrollController,
+                    physics: const AlwaysScrollableScrollPhysics(
+                      parent: ClampingScrollPhysics(),
+                    ),
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+                    children: [
+                      if (_errorMessage != null)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Text(
+                            _errorMessage!,
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                            ),
+                          ),
+                        ),
+                      if (_rankingOptions.isEmpty)
+                        Text(strings.rankingEmptyOptions)
+                      else
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: _rankingOptions.map((option) {
+                            return ChoiceChip(
+                              label: Text(option.label),
+                              selected: _selectedRankingValue == option.value,
+                              onSelected: (_) =>
+                                  _onSelectRankingOption(option.value),
+                            );
+                          }).toList(),
+                        ),
+                      const SizedBox(height: 10),
+                      if (_rankingLoading && _rankingComics.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 26),
+                          child: Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const HazukiStickerLoadingIndicator(size: 96),
+                                const SizedBox(height: 10),
+                                Text(strings.commonLoading),
+                              ],
+                            ),
+                          ),
+                        )
+                      else if (_rankingComics.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 20),
+                          child: Center(
+                            child: Text(strings.rankingEmptyComics),
+                          ),
+                        )
+                      else
+                        for (int i = 0; i < _rankingComics.length; i++)
+                          _buildRankingComicItem(_rankingComics[i], i),
+                      if (_rankingLoadingMore)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          child: Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const HazukiStickerLoadingIndicator(size: 72),
+                                const SizedBox(height: 8),
+                                Text(strings.commonLoading),
+                              ],
+                            ),
+                          ),
+                        ),
+                      if (!_rankingLoading &&
+                          !_rankingLoadingMore &&
+                          !_rankingHasMore)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 12, bottom: 6),
+                          child: Center(child: Text(strings.rankingReachedEnd)),
+                        ),
+                      if (_refreshing)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 8),
+                          child: SizedBox.shrink(),
+                        ),
+                    ],
+                  ),
           ),
           Positioned(
             right: 16,

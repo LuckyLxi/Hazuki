@@ -1,0 +1,669 @@
+{
+  "@@locale": "en",
+  "appTitle": "Hazuki",
+  "settingsTitle": "Settings",
+  "settingsCacheTitle": "Cache",
+  "settingsCacheSubtitle": "Cache-related settings",
+  "settingsDisplayTitle": "Display",
+  "settingsDisplaySubtitle": "Interface and language settings",
+  "settingsReadingTitle": "Reading",
+  "settingsReadingSubtitle": "Reader settings",
+  "settingsPrivacyTitle": "Privacy",
+  "settingsPrivacySubtitle": "Privacy-related features",
+  "settingsCloudSyncTitle": "Cloud Sync",
+  "settingsCloudSyncSubtitle": "Upload and restore backups",
+  "settingsAdvancedTitle": "Advanced",
+  "settingsAdvancedSubtitle": "Experimental features",
+  "settingsAboutTitle": "About",
+  "displayTitle": "Display",
+  "displayThemeTitle": "Theme",
+  "displayThemeLight": "Light",
+  "displayThemeDark": "Dark",
+  "displayThemeSystem": "Follow system",
+  "displayPresetMintGreen": "Mint Green",
+  "displayPresetSeaSaltBlue": "Sea Salt Blue",
+  "displayPresetTwilightPurple": "Twilight Purple",
+  "displayPresetCherryBlossomPink": "Cherry Blossom Pink",
+  "displayPresetCoralOrange": "Coral Orange",
+  "displayPresetAmberYellow": "Amber Yellow",
+  "displayPresetLimeGreen": "Lime Green",
+  "displayPresetGraphiteGray": "Graphite Gray",
+  "displayPresetBerryRed": "Berry Red",
+  "displayLanguageTitle": "Language",
+  "displayLanguageSubtitle": "Switch the app display language",
+  "displayLanguageSystem": "Follow system",
+  "displayLanguageZhHans": "简体中文",
+  "displayLanguageEnglish": "English",
+  "displayRefreshRateTitle": "Refresh rate",
+  "displayRefreshRateAuto": "Auto",
+  "displayRefreshRateSpecified": "Specified mode (ID: {id})",
+  "@displayRefreshRateSpecified": {
+    "placeholders": {
+      "id": {}
+    }
+  },
+  "displayPureBlackTitle": "Pure black mode",
+  "displayPureBlackSubtitle": "Use a pure black background in dark mode",
+  "displayDynamicColorTitle": "Dynamic color",
+  "displayDynamicColorSubtitle": "Extract theme colors from the system wallpaper automatically (Android 12+)",
+  "displayComicDynamicColorTitle": "Comic detail dynamic color",
+  "displayComicDynamicColorSubtitle": "Generate a dynamic theme for the comic detail page from the cover image",
+  "displayColorSchemeTitle": "Color scheme",
+  "homeGuestUser": "Not signed in",
+  "homeFirstUseLoading": "Loading first-use time...",
+  "homeFirstUseUnknown": "First time using this app",
+  "homeFirstUseFormatted": "First used on {date}",
+  "@homeFirstUseFormatted": {
+    "placeholders": {
+      "date": {}
+    }
+  },
+  "homeLogoutTitle": "Sign out",
+  "homeLogoutContent": "Are you sure you want to sign out?",
+  "homeLoginTitle": "Sign in",
+  "homeLoginAccountLabel": "Account",
+  "homeLoginPasswordLabel": "Password",
+  "homeLoginHidePassword": "Hide password",
+  "homeLoginShowPassword": "Show password",
+  "homeLoginEmptyError": "Account and password cannot be empty",
+  "homeLoginSuccess": "Signed in successfully",
+  "homeLoggedOut": "Signed out",
+  "homeSaveAvatarTitle": "Save avatar",
+  "homeSaveAvatarContent": "Save the current avatar to your gallery?",
+  "homeAvatarSaved": "Avatar saved to {path}",
+  "@homeAvatarSaved": {
+    "placeholders": {
+      "path": {}
+    }
+  },
+  "homeAvatarSaveFailed": "Failed to save avatar: {error}",
+  "@homeAvatarSaveFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "homePressBackAgainToExit": "Press back again to exit",
+  "homeSearchHint": "Search comics",
+  "homeSortTooltip": "Sort",
+  "homeFavoriteSortByFavoriteTime": "Favorite time",
+  "homeFavoriteSortByUpdateTime": "Update time",
+  "homeCreateFavoriteFolder": "New folder",
+  "homeMenuHistory": "History",
+  "homeMenuCategories": "Categories",
+  "homeMenuRanking": "Ranking",
+  "homeMenuLines": "Lines",
+  "homeTabDiscover": "Discover",
+  "homeTabFavorite": "Favorites",
+  "dialogBarrierLabel": "Dialog",
+  "aboutTitle": "About",
+  "aboutVersion": "Version 1.0.0",
+  "aboutDescription": "A third-party JMComic client",
+  "aboutProjectTitle": "Project",
+  "aboutProjectSubtitle": "GitHub (https://github.com/LuckyLxi/Hazuki)",
+  "aboutFeedbackTitle": "Feedback",
+  "aboutFeedbackSubtitle": "Report any issues you encounter while reading",
+  "aboutOpenLinkFailed": "Unable to open the link",
+  "aboutOpenFeedbackFailed": "Unable to open the feedback link",
+  "aboutLicenseTitle": "License",
+  "aboutLicenseSubtitle": "GPL-3.0 License",
+  "aboutLicenseSnackbar": "This project is licensed under GPL-3.0",
+  "aboutThanksTitle": "Acknowledgements",
+  "aboutThanksSubtitle": "Outstanding projects that inspired this app",
+  "aboutThanksDialogTitle": "Acknowledgements",
+  "aboutThanksDialogContent": "This project was developed with reference to and thanks to the following open-source projects:\n\n• Venera: reference for login flow implementation\n• Animeko: reference for interface layout design",
+  "commonConfirm": "OK",
+  "commonCancel": "Cancel",
+  "commonClose": "Close",
+  "commonSave": "Save",
+  "commonLoading": "Loading...",
+  "commonRetry": "Retry",
+  "searchTitle": "Search",
+  "searchHint": "Search comics",
+  "searchHistoryTitle": "Search history",
+  "searchClearTooltip": "Clear",
+  "searchSubmitTooltip": "Search",
+  "searchClearHistoryTitle": "Clear history",
+  "searchClearHistoryContent": "Are you sure you want to clear all search history?",
+  "historyTitle": "History",
+  "historyEmpty": "No history yet",
+  "historySelectionCancelTooltip": "Exit multi-select",
+  "historySelectionEnterTooltip": "Multi-select",
+  "historyDeleteSelectedTooltip": "Delete selected history",
+  "historyClearAllTooltip": "Clear all history",
+  "historyDeleteSelectedTitle": "Delete history",
+  "historyDeleteSelectedContent": "Are you sure you want to delete the history of {count} selected comics?",
+  "@historyDeleteSelectedContent": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "historyClearAllTitle": "Clear history",
+  "historyClearAllContent": "Are you sure you want to clear all history? This action cannot be undone.",
+  "historyCopiedComicId": "Comic ID copied",
+  "historyLoginRequired": "Please sign in first",
+  "historyFavoriteProcessing": "Processing favorite...",
+  "historyFavoriteFolderNotice": "For multiple favorite folders, please use the comic detail page. Performing the default action...",
+  "historyFavoriteRemoved": "Removed from favorites",
+  "historyFavoriteAdded": "Added to favorites",
+  "historyFavoriteFailed": "Favorite action failed: {error}",
+  "@historyFavoriteFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "historyMenuCopyComicId": "Copy comic ID",
+  "historyMenuToggleFavorite": "Favorite / Unfavorite",
+  "historyMenuDeleteItem": "Delete this record",
+  "discoverLoadTimeout": "Discover page loading timed out. Pull down to retry.",
+  "discoverLoadFailed": "Failed to load discover page: {error}",
+  "@discoverLoadFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "discoverEmpty": "No discover content is available for the current source",
+  "discoverMore": "See more",
+  "aboutThirdPartyLicensesTitle": "Third-party licenses",
+  "aboutThirdPartyLicensesSubtitle": "View the open-source libraries used by this app",
+  "searchOrderLatest": "Latest",
+  "searchOrderTotalRanking": "Top overall",
+  "searchOrderMonthlyRanking": "Top monthly",
+  "searchOrderWeeklyRanking": "Top weekly",
+  "searchOrderDailyRanking": "Top daily",
+  "searchOrderMostImages": "Most images",
+  "searchOrderMostLikes": "Most likes",
+  "searchTimeout": "Search timed out. Please try again later.",
+  "searchFailed": "Search failed: {error}",
+  "@searchFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "searchStartPrompt": "Enter keywords to start searching",
+  "searchLoading": "Searching...",
+  "searchEmpty": "No results found",
+  "searchSortTooltip": "Sort",
+  "comicDetailFavoriteAdded": "Added to favorites",
+  "comicDetailFavoriteRemoved": "Removed from favorites",
+  "comicDetailFavoriteActionFailed": "Favorite action failed: {error}",
+  "@comicDetailFavoriteActionFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "comicDetailManageFavorites": "Manage favorites",
+  "comicDetailCreateFavoriteFolder": "New favorite folder",
+  "comicDetailFavoriteFolderNameHint": "Enter a folder name",
+  "comicDetailFavoriteFolderNameRequired": "Folder name cannot be empty",
+  "comicDetailCreateFavoriteFolderFailed": "Failed to create favorite folder: {error}",
+  "@comicDetailCreateFavoriteFolderFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "comicDetailDeleteFavoriteFolder": "Delete favorite folder",
+  "comicDetailDeleteFavoriteFolderContent": "Delete this folder? Comics in this folder will lose their grouping.",
+  "comicDetailDelete": "Delete",
+  "comicDetailDeleteFavoriteFolderFailed": "Failed to delete favorite folder: {error}",
+  "@comicDetailDeleteFavoriteFolderFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "comicDetailFavoriteFoldersLoadFailed": "Failed to load favorite folders: {error}",
+  "@comicDetailFavoriteFoldersLoadFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "comicDetailNoFavoriteFolders": "No favorite folders yet",
+  "comicDetailDeleteFavoriteFolderTooltip": "Delete folder",
+  "comicDetailCreateFavoriteFolderTooltip": "New folder",
+  "comicDetailSingleFolderHint": "The current source only supports adding this comic to one favorite folder",
+  "comicDetailMultipleFoldersHint": "You can select multiple favorite folders for this comic",
+  "comicDetailSelectAtLeastOneFolder": "Please select at least one favorite folder",
+  "comicDetailFavoriteSettingsUpdated": "Favorite settings updated",
+  "comicDetailFavoriteSettingsUpdateFailed": "Failed to update favorite settings: {error}",
+  "@comicDetailFavoriteSettingsUpdateFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "comicDetailNoChapterInfo": "No chapter information available",
+  "comicDetailNoChapters": "This comic has no chapters yet",
+  "comicDetailAuthor": "Author",
+  "comicDetailTags": "Tags",
+  "comicDetailCopiedId": "Copied ID",
+  "comicDetailCopiedPrefix": "Copied: {value}",
+  "@comicDetailCopiedPrefix": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "comicDetailSavedToPath": "Saved to {path}",
+  "@comicDetailSavedToPath": {
+    "placeholders": {
+      "path": {}
+    }
+  },
+  "comicDetailSaveFailed": "Failed to save: {error}",
+  "@comicDetailSaveFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "comicDetailLoading": "Loading...",
+  "comicDetailSummary": "Summary",
+  "comicDetailNoRelatedComics": "No related comics yet",
+  "comicDetailCollapse": "Collapse",
+  "comicDetailExpand": "Expand",
+  "comicDetailUpdatedAt": "Updated at: {time}",
+  "@comicDetailUpdatedAt": {
+    "placeholders": {
+      "time": {}
+    }
+  },
+  "comicDetailTitle": "Comic details",
+  "comicDetailTabInfo": "Details",
+  "comicDetailTabComments": "Comments",
+  "comicDetailTabRelated": "Related",
+  "comicDetailChapters": "Chapters",
+  "comicDetailChapterCount": "{count} chapters",
+  "@comicDetailChapterCount": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "comicDetailLikesCount": "{count} likes",
+  "@comicDetailLikesCount": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "comicDetailViewsCount": "{count} views",
+  "@comicDetailViewsCount": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "comicDetailFavorite": "Favorite",
+  "comicDetailUnfavorite": "Unfavorite",
+  "comicDetailRead": "Read",
+  "comicDetailContinueReading": "Continue reading {title}",
+  "@comicDetailContinueReading": {
+    "placeholders": {
+      "title": {}
+    }
+  },
+  "comicDetailSaveImage": "Save image",
+  "comicDetailRemindLaterToday": "Don't remind again today",
+  "sourceUpdateAvailableTitle": "Source update available",
+  "sourceUpdateLocalVersion": "Local source version: {version}",
+  "@sourceUpdateLocalVersion": {
+    "placeholders": {
+      "version": {}
+    }
+  },
+  "sourceUpdateRemoteVersion": "Cloud source version: {version}",
+  "@sourceUpdateRemoteVersion": {
+    "placeholders": {
+      "version": {}
+    }
+  },
+  "sourceUpdateDownloading": "Downloading...",
+  "sourceUpdateDownloadingProgress": "Downloading {progress}%",
+  "@sourceUpdateDownloadingProgress": {
+    "placeholders": {
+      "progress": {}
+    }
+  },
+  "sourceUpdateDownloadFailed": "Download failed. Please try again later.",
+  "sourceUpdateDownload": "Download",
+  "readingSettingsTitle": "Reading settings",
+  "readingImmersiveModeTitle": "Immersive mode",
+  "readingImmersiveModeSubtitle": "Hide the status bar and bottom navigation bar automatically when entering the reader",
+  "readingKeepScreenOnTitle": "Keep screen on",
+  "readingKeepScreenOnSubtitle": "Keep the screen awake while reading to prevent auto lock",
+  "readingCustomBrightnessTitle": "Custom brightness",
+  "readingCustomBrightnessSubtitle": "Override the system brightness inside the reader when enabled",
+  "readingBrightnessLabel": "Brightness {value}",
+  "@readingBrightnessLabel": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "readingPinchToZoomTitle": "Pinch to zoom",
+  "readingPinchToZoomSubtitle": "Allow two-finger pinch gestures to zoom comic images",
+  "readingLongPressSaveTitle": "Long press to save images",
+  "readingLongPressSaveSubtitle": "Allow saving the current comic image by long pressing it",
+  "privacySettingsTitle": "Privacy settings",
+  "privacyBlurTaskTitle": "Blur app in recent tasks",
+  "privacyBlurTaskSubtitle": "Show a pure black task card when switching to recent apps",
+  "privacyBiometricUnlockTitle": "Biometric unlock",
+  "privacyBiometricUnlockSubtitle": "Require fingerprint verification each time the app is opened",
+  "privacyAuthOnResumeTitle": "Require verification after leaving app",
+  "privacyAuthOnResumeSubtitle": "Require authentication again whenever the app returns to foreground",
+  "lineSettingsTitle": "Lines",
+  "lineLoadFailed": "Failed to load line information: {error}",
+  "@lineLoadFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "lineOptionLabel": "Line {value}",
+  "@lineOptionLabel": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "lineOptionWithHostLabel": "Line {value} ({host})",
+  "@lineOptionWithHostLabel": {
+    "placeholders": {
+      "value": {},
+      "host": {}
+    }
+  },
+  "lineImageStreamLabel": "Stream {value}",
+  "@lineImageStreamLabel": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "lineApiSwitched": "API domain stream switched to line {value}",
+  "@lineApiSwitched": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "lineImageSwitched": "Image domain stream switched to stream {value}",
+  "@lineImageSwitched": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "lineSwitchFailed": "Switch failed: {error}",
+  "@lineSwitchFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "lineRefreshOnStartUpdated": "Startup auto-refresh setting updated",
+  "lineSaveFailed": "Save failed: {error}",
+  "@lineSaveFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "lineIntro": "You can switch API and image streams separately, and changes will apply automatically to subsequent requests.",
+  "lineApiTitle": "API domain stream",
+  "lineApiSubtitle": "Used for API requests. Switch it if the network is unstable.",
+  "lineSelectApiLabel": "Select API line",
+  "lineImageTitle": "Image domain stream",
+  "lineImageHostUnavailable": "Current image domain is unavailable",
+  "lineImageHostCurrent": "Current domain: {host}",
+  "@lineImageHostCurrent": {
+    "placeholders": {
+      "host": {}
+    }
+  },
+  "lineSelectImageLabel": "Select image stream",
+  "lineRefreshOnStartTitle": "Refresh domain list on startup",
+  "lineRefreshOnStartSubtitle": "Automatically update the API domain pool each time the app opens",
+  "lineRefreshStatusButton": "Refresh line status",
+  "displayModeAndroidOnly": "Only Android supports refresh rate settings",
+  "displayModeReadFailed": "Failed to read display modes: {error}",
+  "@displayModeReadFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "displayModeSystemRejected": "The system rejected this display mode",
+  "displayModeApplied": "Refresh rate applied. Restart the app if it does not take effect.",
+  "displayModeSetFailed": "Failed to apply setting: {error}",
+  "@displayModeSetFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "displayModeUnknown": "Unknown",
+  "displayModeUnknownMode": "Unknown mode",
+  "displayModeCurrentLabel": "Current system mode: {mode}",
+  "@displayModeCurrentLabel": {
+    "placeholders": {
+      "mode": {}
+    }
+  },
+  "displayModeCurrentSubtitle": "Current system mode",
+  "displayModeSelectedSubtitle": "Selected",
+  "displayModeHint": "Note: some devices may be affected by system power saving or app whitelist policies.",
+  "cachePresetDefault": "Default 400MB",
+  "cachePresetLite": "Light 600MB",
+  "cachePresetBalanced": "Balanced 1024MB",
+  "cachePresetHeavy": "Heavy 2048MB",
+  "cacheMaxSizeTitle": "Set maximum cache size",
+  "cacheMaxSizeHint": "Minimum 400MB. Choose a preset or enter a custom value.",
+  "cacheCustomMbLabel": "Custom (MB)",
+  "cacheCustomMbHint": "For example, 1024",
+  "cacheLimitUpdated": "Cache limit set to {value}MB",
+  "@cacheLimitUpdated": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "cacheAutoCleanTitle": "Cache auto-clean",
+  "cacheAutoCleanOverflowTitle": "Clean automatically when limit is exceeded",
+  "cacheAutoCleanOverflowSubtitle": "Delete the oldest cache first until usage drops below the limit",
+  "cacheAutoCleanSevenDaysTitle": "Clean every seven days",
+  "cacheAutoCleanSevenDaysSubtitle": "Delete cache files older than 7 days",
+  "cacheAutoCleanSevenDaysApplied": "Set to clean every seven days",
+  "cacheAutoCleanOverflowApplied": "Set to clean automatically when limit is exceeded",
+  "cacheClearBarrierLabel": "Close",
+  "cacheClearTitle": "Clear cache",
+  "cacheClearContent": "Are you sure you want to clear all image cache? This action cannot be undone.",
+  "cacheClearConfirm": "Clear now",
+  "cacheCleared": "Cache cleared successfully",
+  "cacheClearFailed": "Failed to clear cache: {error}",
+  "@cacheClearFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "cacheSettingsTitle": "Cache settings",
+  "cacheSizeTitle": "Cache size",
+  "cacheSizeSummary": "Current {used} / Limit {max}",
+  "@cacheSizeSummary": {
+    "placeholders": {
+      "used": {},
+      "max": {}
+    }
+  },
+  "cacheAutoCleanModeSummary": "Clean every seven days",
+  "cacheAutoCleanModeOverflowSummary": "Clean automatically when limit is exceeded",
+  "cacheClearNowTitle": "Clear cache now",
+  "cacheClearNowSubtitle": "Remove all locally downloaded image cache to free up storage space",
+  "cloudSyncIncompleteConfig": "Please fill in the complete URL, Username, and Password",
+  "cloudSyncInvalidUrl": "Invalid URL format. Please include http/https",
+  "cloudSyncStatusIncomplete": "Configuration incomplete",
+  "cloudSyncStatusDisabled": "Disabled",
+  "cloudSyncConfigSaved": "Cloud sync configuration saved",
+  "cloudSyncSaveFailed": "Save failed: {error}",
+  "@cloudSyncSaveFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "cloudSyncNeedCompleteConfig": "Please enable cloud sync and save a complete configuration first",
+  "cloudSyncUploadCompleted": "Backup upload completed",
+  "cloudSyncUploadFailed": "Upload failed: {error}",
+  "@cloudSyncUploadFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "cloudSyncRestoreTitle": "Restore backup",
+  "cloudSyncRestoreContent": "Overwrite local files and restore the latest cloud backup?",
+  "cloudSyncRestoreConfirm": "Overwrite and restore",
+  "cloudSyncRestoreCompleted": "Backup restored and local data overwritten",
+  "cloudSyncRestoreFailed": "Restore failed: {error}",
+  "@cloudSyncRestoreFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "cloudSyncTitle": "Cloud sync",
+  "cloudSyncStatusUnchecked": "Unchecked",
+  "cloudSyncStatusConnected": "Connected",
+  "cloudSyncStatusDisconnected": "Disconnected",
+  "cloudSyncEnabledTitle": "Cloud sync",
+  "cloudSyncEnabledSubtitle": "Enable uploading and restoring cloud backups",
+  "cloudSyncUrlHelper": "The app will append /HazukiSync automatically, so you do not need to enter it manually",
+  "cloudSyncUsernameLabel": "Username",
+  "cloudSyncPasswordLabel": "Password",
+  "cloudSyncSave": "Save",
+  "cloudSyncUpload": "Upload backup",
+  "cloudSyncRestore": "Restore backup",
+  "favoritesDebugCopied": "Debug information copied",
+  "favoritesDebugFilterReason": "Show only important logs (error logs, HTTP>=400, login-related entries, and entries containing critical error keywords)",
+  "favoritesDebugFilterImportantTooltip": "Filter important logs",
+  "favoritesDebugCopyTooltip": "Copy",
+  "favoritesDebugRefreshTooltip": "Refresh network logs",
+  "favoritesDebugLoadFailed": "Failed to load debug information: {error}",
+  "@favoritesDebugLoadFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "favoritesDebugFullFetchButton": "Run full fetch manually (slow)",
+  "tagCategoryLoadTimeout": "Tag categories timed out while loading. Please try again later.",
+  "tagCategoryLoadFailed": "Failed to load tag categories: {error}",
+  "@tagCategoryLoadFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "tagCategoryTitle": "Tag categories",
+  "tagCategoryEmpty": "No tag categories are available for the current source",
+  "rankingLoadOptionsTimeout": "Ranking categories timed out while loading. Please try again later.",
+  "rankingLoadTimeout": "Rankings timed out while loading. Please try again later.",
+  "rankingLoadFailed": "Failed to load rankings: {error}",
+  "@rankingLoadFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "rankingTitle": "Rankings",
+  "rankingEmptyOptions": "No ranking categories are available for the current source",
+  "rankingEmptyComics": "No ranking content available",
+  "rankingReachedEnd": "You've reached the end",
+  "favoriteAllFolder": "All",
+  "favoriteLoadTimeout": "Favorites timed out while loading. Pull down to retry.",
+  "favoriteFoldersLoadFailed": "Failed to load favorite folders: {error}",
+  "@favoriteFoldersLoadFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "favoriteCreated": "Favorite folder \"{name}\" created successfully",
+  "@favoriteCreated": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "favoriteCreateFailed": "Failed to create favorite folder: {error}",
+  "@favoriteCreateFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "favoriteSortChangeFailed": "Failed to change sort order: {error}",
+  "@favoriteSortChangeFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "favoriteDeleteFailed": "Failed to delete favorite folder: {error}",
+  "@favoriteDeleteFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "favoriteFolderHeader": "Favorite folders",
+  "favoriteDeleteCurrentFolderTooltip": "Delete current favorite folder",
+  "favoriteLoginRequired": "Please sign in",
+  "favoriteEmpty": "No favorites yet",
+  "favoriteCreateFolderTitle": "New favorite folder",
+  "favoriteCreateFolderHint": "Enter a folder name",
+  "favoriteCreateFolderNameRequired": "Folder name cannot be empty",
+  "favoriteDeleteFolderTitle": "Delete favorite folder",
+  "favoriteDeleteFolderContent": "Delete \"{name}\"?",
+  "@favoriteDeleteFolderContent": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "discoverSectionLoadFailed": "Load failed: {error}",
+  "@discoverSectionLoadFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "discoverSectionEmpty": "No comics available",
+  "commentsTitle": "Comments",
+  "commentsLoadFailed": "Failed to load comments: {error}",
+  "@commentsLoadFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "commentsLoginRequiredToSend": "Please sign in before commenting",
+  "commentsSourceNotSupported": "The current source does not support sending comments",
+  "commentsSendSuccess": "Comment sent successfully",
+  "commentsSendFailed": "Failed to send: {error}",
+  "@commentsSendFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "commentsAnonymousUser": "Anonymous user",
+  "commentsReplyCount": "Replies {count}",
+  "@commentsReplyCount": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "commentsReplyTooltip": "Reply",
+  "commentsReplyToUser": "Reply to @{name}",
+  "@commentsReplyToUser": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "commentsCancelReplyTooltip": "Cancel reply",
+  "commentsComposerHint": "Write your comment…",
+  "commentsReplyComposerHint": "Reply to {name}…",
+  "@commentsReplyComposerHint": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "commentsSending": "Sending…",
+  "commentsSend": "Send",
+  "commentsEmpty": "No comments yet",
+  "readerSaveImageTitle": "Save image",
+  "readerSaveImageContent": "Save this comic image locally?",
+  "readerChapterLoadFailed": "Failed to load chapter: {error}",
+  "@readerChapterLoadFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "readerCurrentChapterNoImages": "No images in the current chapter",
+  "readerResetZoom": "Reset zoom",
+  "advancedTitle": "Advanced",
+  "advancedDebugTitle": "Debug",
+  "advancedDebugSubtitle": "Logs",
+  "advancedComicIdSearchTitle": "Comic ID search optimization",
+  "advancedComicIdSearchSubtitle": "Automatically remove non-digit characters on search submission and keep only Arabic numerals as the keyword",
+  "advancedNoImageModeTitle": "No-image mode",
+  "advancedNoImageModeSubtitle": "Hide images globally (except the login avatar in the sidebar)"
+}

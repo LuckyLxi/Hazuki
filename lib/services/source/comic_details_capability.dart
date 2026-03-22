@@ -4,7 +4,7 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
   Future<ComicDetailsData> loadComicDetails(String comicId) async {
     final normalizedComicId = comicId.trim();
     if (normalizedComicId.isEmpty) {
-      throw Exception('漫画ID不能为空');
+      throw Exception('comic_id_empty');
     }
 
     final memoryCached = _getComicDetailsFromMemoryCache(normalizedComicId);
@@ -14,7 +14,7 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
 
     final engine = _engine;
     if (engine == null) {
-      throw Exception('漫画源尚未初始化完成');
+      throw Exception('source_not_initialized');
     }
 
     final dynamic result = engine.evaluate('''(async () => {
@@ -50,7 +50,7 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
       })()''', name: 'source_comic_detail.js');
     final dynamic resolved = result is Future ? await result : result;
     if (resolved is! Map) {
-      throw Exception('漫画详情返回格式无效');
+      throw Exception('comic_details_invalid_response');
     }
 
     final map = Map<String, dynamic>.from(resolved);
@@ -85,7 +85,7 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
     if (chapters.isEmpty) {
       final fallbackId = normalizedComicId;
       if (fallbackId.isNotEmpty) {
-        chapters[fallbackId] = '第1話';
+        chapters[fallbackId] = '__default_chapter_1__';
       }
     }
 
@@ -113,17 +113,13 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
         if (id.isEmpty || title.isEmpty) {
           continue;
         }
-        final subTitle = (recommendMap['subTitle'] ?? recommendMap['subtitle'] ?? '')
-            .toString()
-            .trim();
+        final subTitle =
+            (recommendMap['subTitle'] ?? recommendMap['subtitle'] ?? '')
+                .toString()
+                .trim();
         final cover = recommendMap['cover']?.toString().trim() ?? '';
         recommend.add(
-          ExploreComic(
-            id: id,
-            title: title,
-            subTitle: subTitle,
-            cover: cover,
-          ),
+          ExploreComic(id: id, title: title, subTitle: subTitle, cover: cover),
         );
       }
     }
@@ -267,9 +263,10 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
           ExploreComic(
             id: rid,
             title: title,
-            subTitle: (recommendMap['subTitle'] ?? recommendMap['subtitle'] ?? '')
-                .toString()
-                .trim(),
+            subTitle:
+                (recommendMap['subTitle'] ?? recommendMap['subtitle'] ?? '')
+                    .toString()
+                    .trim(),
             cover: recommendMap['cover']?.toString().trim() ?? '',
           ),
         );

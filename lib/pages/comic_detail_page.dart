@@ -266,9 +266,9 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
     }
 
     if (!HazukiSourceService.instance.isLogged) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Please log in first')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n(context).historyLoginRequired)),
+      );
       return;
     }
 
@@ -306,16 +306,24 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
       setState(() {
         _favoriteOverride = isAdding;
       });
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(isAdding ? '已加入收藏' : '已取消收藏')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isAdding
+                ? l10n(context).comicDetailFavoriteAdded
+                : l10n(context).comicDetailFavoriteRemoved,
+          ),
+        ),
+      );
     } catch (e) {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Favorite action failed: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l10n(context).comicDetailFavoriteActionFailed('$e')),
+        ),
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -428,6 +436,7 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
 
               Future<void> addFolder() async {
                 final controller = TextEditingController();
+                final strings = l10n(context);
                 final name = await showDialog<String>(
                   context: sheetContext,
                   builder: (dialogContext) {
@@ -437,12 +446,15 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
                       child: StatefulBuilder(
                         builder: (dialogContext, setDialogState) {
                           return AlertDialog(
-                            title: const Text('新增收藏夹'),
+                            title: Text(
+                              strings.comicDetailCreateFavoriteFolder,
+                            ),
                             content: TextField(
                               controller: controller,
                               autofocus: true,
                               decoration: InputDecoration(
-                                hintText: '请输入收藏夹名称',
+                                hintText:
+                                    strings.comicDetailFavoriteFolderNameHint,
                                 border: const OutlineInputBorder(),
                                 errorText: errorText,
                               ),
@@ -455,20 +467,21 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
                             actions: [
                               TextButton(
                                 onPressed: () => Navigator.pop(dialogContext),
-                                child: const Text('取消'),
+                                child: Text(strings.commonCancel),
                               ),
                               FilledButton(
                                 onPressed: () {
                                   final text = controller.text.trim();
                                   if (text.isEmpty) {
                                     setDialogState(
-                                      () => errorText = '收藏夹名称不能为空',
+                                      () => errorText = strings
+                                          .comicDetailFavoriteFolderNameRequired,
                                     );
                                     return;
                                   }
                                   Navigator.pop(dialogContext, text);
                                 },
-                                child: const Text('确认'),
+                                child: Text(strings.commonConfirm),
                               ),
                             ],
                           );
@@ -503,30 +516,37 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
                     return;
                   }
                   setSheetState(() => isLoading = false);
-                  ScaffoldMessenger.of(
-                    sheetContext,
-                  ).showSnackBar(SnackBar(content: Text('创建收藏夹失败: $e')));
+                  ScaffoldMessenger.of(sheetContext).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        strings.comicDetailCreateFavoriteFolderFailed('$e'),
+                      ),
+                    ),
+                  );
                 }
               }
 
               Future<void> deleteFolder(String folderId) async {
+                final strings = l10n(context);
                 final ok = await showDialog<bool>(
                   context: sheetContext,
                   builder: (dialogContext) {
                     return Theme(
                       data: themedData,
                       child: AlertDialog(
-                        title: const Text('删除收藏夹'),
-                        content: const Text('删除这个收藏夹吗？位于该收藏夹中的漫画将失去分组。'),
+                        title: Text(strings.comicDetailDeleteFavoriteFolder),
+                        content: Text(
+                          strings.comicDetailDeleteFavoriteFolderContent,
+                        ),
                         actions: [
                           TextButton(
                             onPressed: () =>
                                 Navigator.pop(dialogContext, false),
-                            child: const Text('取消'),
+                            child: Text(strings.commonCancel),
                           ),
                           FilledButton(
                             onPressed: () => Navigator.pop(dialogContext, true),
-                            child: const Text('删除'),
+                            child: Text(strings.comicDetailDelete),
                           ),
                         ],
                       ),
@@ -554,22 +574,26 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
                     return;
                   }
                   setSheetState(() => isLoading = false);
-                  ScaffoldMessenger.of(
-                    sheetContext,
-                  ).showSnackBar(SnackBar(content: Text('删除收藏夹失败: $e')));
+                  ScaffoldMessenger.of(sheetContext).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        strings.comicDetailDeleteFavoriteFolderFailed('$e'),
+                      ),
+                    ),
+                  );
                 }
               }
 
               Widget buildLoadingBody() {
-                return const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 24),
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 24),
                   child: Center(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        HazukiStickerLoadingIndicator(size: 112),
-                        SizedBox(height: 10),
-                        Text('加载中...'),
+                        const HazukiStickerLoadingIndicator(size: 112),
+                        const SizedBox(height: 10),
+                        Text(l10n(context).commonLoading),
                       ],
                     ),
                   ),
@@ -582,7 +606,9 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
                     padding: const EdgeInsets.symmetric(vertical: 24),
                     child: Center(
                       child: Text(
-                        '加载收藏夹失败: $loadError',
+                        l10n(
+                          context,
+                        ).comicDetailFavoriteFoldersLoadFailed('$loadError'),
                         style: TextStyle(
                           color: Theme.of(sheetContext).colorScheme.error,
                         ),
@@ -592,9 +618,9 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
                 }
 
                 if (folders.isEmpty) {
-                  return const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                    child: Text('暂无收藏夹'),
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Text(l10n(context).comicDetailNoFavoriteFolders),
                   );
                 }
 
@@ -638,7 +664,9 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
                                 service.supportFavoriteFolderDelete)
                               IconButton(
                                 icon: const Icon(Icons.delete_outline),
-                                tooltip: '删除收藏夹',
+                                tooltip: l10n(
+                                  context,
+                                ).comicDetailDeleteFavoriteFolderTooltip,
                                 onPressed: () => deleteFolder(folder.id),
                               ),
                           ],
@@ -738,10 +766,10 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
                           children: [
                             Row(
                               children: [
-                                const Expanded(
+                                Expanded(
                                   child: Text(
-                                    '管理收藏',
-                                    style: TextStyle(
+                                    l10n(context).comicDetailManageFavorites,
+                                    style: const TextStyle(
                                       fontSize: 18,
                                       fontWeight: FontWeight.w600,
                                     ),
@@ -751,7 +779,9 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
                                     !isLoading &&
                                     loadError == null)
                                   IconButton(
-                                    tooltip: '新建收藏夹',
+                                    tooltip: l10n(
+                                      context,
+                                    ).comicDetailCreateFavoriteFolderTooltip,
                                     onPressed: addFolder,
                                     icon: const Icon(
                                       Icons.create_new_folder_outlined,
@@ -761,8 +791,10 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
                             ),
                             Text(
                               singleFolderOnly
-                                  ? '当前漫画源仅支持将该漫画加入一个收藏夹'
-                                  : '可为该漫画选择多个收藏夹',
+                                  ? l10n(context).comicDetailSingleFolderHint
+                                  : l10n(
+                                      context,
+                                    ).comicDetailMultipleFoldersHint,
                               style: Theme.of(sheetContext).textTheme.bodySmall,
                             ),
                             const SizedBox(height: 10),
@@ -777,8 +809,12 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
                                         ScaffoldMessenger.of(
                                           sheetContext,
                                         ).showSnackBar(
-                                          const SnackBar(
-                                            content: Text('请至少选择一个收藏夹'),
+                                          SnackBar(
+                                            content: Text(
+                                              l10n(
+                                                context,
+                                              ).comicDetailSelectAtLeastOneFolder,
+                                            ),
                                           ),
                                         );
                                         return;
@@ -792,7 +828,7 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
                                         ),
                                       });
                                     },
-                              child: const Text('保存'),
+                              child: Text(l10n(context).commonSave),
                             ),
                           ],
                         ),
@@ -865,16 +901,22 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('收藏设置已更新')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l10n(context).comicDetailFavoriteSettingsUpdated),
+        ),
+      );
     } catch (e) {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('更新收藏失败: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            l10n(context).comicDetailFavoriteSettingsUpdateFailed('$e'),
+          ),
+        ),
+      );
     } finally {
       if (mounted) {
         setState(() {
@@ -886,9 +928,9 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
 
   void _showChaptersPanel(ComicDetailsData details) {
     if (details.chapters.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('暂无章节信息')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n(context).comicDetailNoChapterInfo)),
+      );
       return;
     }
 
@@ -930,9 +972,9 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('当前漫画暂无章节')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n(context).comicDetailNoChapters)),
+      );
       return;
     }
 
@@ -985,10 +1027,9 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
   }
 
   Widget _buildDetailMetaSection(ComicDetailsData details) {
-    const authorLabel = '\u4f5c\u8005';
-    const tagLabel = '\u6807\u7b7e';
-    const copiedIdText = '\u5df2\u590d\u5236 ID';
-    const copiedPrefix = '\u5df2\u590d\u5236: ';
+    final strings = l10n(context);
+    final authorLabel = strings.comicDetailAuthor;
+    final tagLabel = strings.comicDetailTags;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1004,9 +1045,9 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
             if (!mounted) {
               return;
             }
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(const SnackBar(content: Text(copiedIdText)));
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(strings.comicDetailCopiedId)),
+            );
           },
         ),
         _ComicDetailMetaRow(
@@ -1031,9 +1072,9 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
             if (!mounted) {
               return;
             }
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(SnackBar(content: Text('$copiedPrefix$value')));
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(strings.comicDetailCopiedPrefix(value))),
+            );
           },
         ),
         _ComicDetailMetaRow(
@@ -1062,9 +1103,9 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
             if (!mounted) {
               return;
             }
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(SnackBar(content: Text('$copiedPrefix$value')));
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(strings.comicDetailCopiedPrefix(value))),
+            );
           },
         ),
       ],
@@ -1094,16 +1135,18 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('已保存到 ${file.path}')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l10n(context).comicDetailSavedToPath(file.path)),
+        ),
+      );
     } catch (e) {
       if (!mounted) {
         return;
       }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('保存失败: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n(context).comicDetailSaveFailed('$e'))),
+      );
     }
   }
 
@@ -1233,5 +1276,3 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
     );
   }
 }
-
-

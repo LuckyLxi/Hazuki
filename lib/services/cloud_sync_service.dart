@@ -109,7 +109,7 @@ class CloudSyncService {
     if (!config.isComplete) {
       return CloudSyncConnectionStatus(
         ok: false,
-        message: '配置不完整',
+        message: 'cloud_sync_config_incomplete',
         checkedAt: DateTime.now(),
       );
     }
@@ -126,13 +126,13 @@ class CloudSyncService {
       await _deleteIfExists(dio, probeUrl);
       return CloudSyncConnectionStatus(
         ok: true,
-        message: '已连接',
+        message: 'cloud_sync_connected',
         checkedAt: DateTime.now(),
       );
     } catch (e) {
       return CloudSyncConnectionStatus(
         ok: false,
-        message: '连接失败: $e',
+        message: 'cloud_sync_connection_failed:$e',
         checkedAt: DateTime.now(),
       );
     }
@@ -141,7 +141,7 @@ class CloudSyncService {
   Future<void> uploadBackup({CloudSyncConfig? configOverride}) async {
     final config = configOverride ?? await loadConfig();
     if (!config.isComplete) {
-      throw Exception('云同步配置不完整');
+      throw Exception('cloud_sync_config_incomplete');
     }
 
     final dio = _buildDio(config);
@@ -205,7 +205,7 @@ class CloudSyncService {
   Future<void> restoreLatestBackup({CloudSyncConfig? configOverride}) async {
     final config = configOverride ?? await loadConfig();
     if (!config.isComplete) {
-      throw Exception('云同步配置不完整');
+      throw Exception('cloud_sync_config_incomplete');
     }
 
     final dio = _buildDio(config);
@@ -213,7 +213,7 @@ class CloudSyncService {
     final state = await _readRemoteState(dio, rootUrl);
     final latestSlot = state['latestSlot'] as int?;
     if (latestSlot == null || latestSlot < 1 || latestSlot > 3) {
-      throw Exception('云端没有可恢复的备份');
+      throw Exception('cloud_sync_no_backup_available');
     }
 
     final backupDirUrl = '$rootUrl/backup_$latestSlot';
@@ -270,7 +270,7 @@ class CloudSyncService {
     if (code >= 200 && code < 300) {
       return;
     }
-    throw Exception('目录创建失败($code)');
+    throw Exception('cloud_sync_directory_create_failed:$code');
   }
 
   Future<void> _putString(Dio dio, String url, String content) async {
@@ -283,7 +283,7 @@ class CloudSyncService {
     );
     final code = response.statusCode ?? 0;
     if (code < 200 || code >= 300) {
-      throw Exception('上传失败($code)');
+      throw Exception('cloud_sync_upload_failed:$code');
     }
   }
 
@@ -296,7 +296,7 @@ class CloudSyncService {
     if (code >= 200 && code < 300) {
       return;
     }
-    throw Exception('删除失败($code)');
+    throw Exception('cloud_sync_delete_failed:$code');
   }
 
   Future<String> _getString(Dio dio, String url) async {
@@ -306,7 +306,7 @@ class CloudSyncService {
     );
     final code = response.statusCode ?? 0;
     if (code < 200 || code >= 300) {
-      throw Exception('下载失败($code)');
+      throw Exception('cloud_sync_download_failed:$code');
     }
     final bytes = response.data ?? const <int>[];
     return utf8.decode(bytes);
@@ -408,14 +408,14 @@ class CloudSyncService {
     try {
       decoded = jsonDecode(content);
     } catch (e) {
-      throw Exception('settings.json 解析失败: $e');
+      throw Exception('cloud_sync_settings_parse_failed:$e');
     }
     if (decoded is! Map) {
-      throw Exception('settings.json 格式错误');
+      throw Exception('cloud_sync_settings_invalid_format');
     }
     final dataRaw = decoded['data'];
     if (dataRaw is! Map) {
-      throw Exception('settings.json 缺少 data');
+      throw Exception('cloud_sync_settings_missing_data');
     }
     final data = Map<String, dynamic>.from(dataRaw);
     final prefs = await SharedPreferences.getInstance();
@@ -429,10 +429,10 @@ class CloudSyncService {
     try {
       decoded = jsonDecode(content);
     } catch (e) {
-      throw Exception('reading.sqlite 解析失败: $e');
+      throw Exception('cloud_sync_reading_parse_failed:$e');
     }
     if (decoded is! Map) {
-      throw Exception('reading.sqlite 格式错误');
+      throw Exception('cloud_sync_reading_invalid_format');
     }
     final map = Map<String, dynamic>.from(decoded);
     final prefs = await SharedPreferences.getInstance();

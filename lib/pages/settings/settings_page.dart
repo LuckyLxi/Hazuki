@@ -5,21 +5,29 @@ class SettingsPage extends StatelessWidget {
     super.key,
     required this.appearanceSettings,
     required this.onAppearanceChanged,
+    required this.locale,
+    required this.onLocaleChanged,
   });
 
   final AppearanceSettingsData appearanceSettings;
   final Future<void> Function(AppearanceSettingsData next) onAppearanceChanged;
+  final Locale? locale;
+  final Future<void> Function(Locale? locale) onLocaleChanged;
 
   @override
   Widget build(BuildContext context) {
+    final strings = l10n(context);
     return Scaffold(
-      appBar: hazukiFrostedAppBar(context: context, title: const Text('设置')),
+      appBar: hazukiFrostedAppBar(
+        context: context,
+        title: Text(strings.settingsTitle),
+      ),
       body: ListView(
         children: [
           ListTile(
             leading: const Icon(Icons.cached_outlined),
-            title: const Text('缓存'),
-            subtitle: const Text('缓存相关设置'),
+            title: Text(strings.settingsCacheTitle),
+            subtitle: Text(strings.settingsCacheSubtitle),
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute<void>(
@@ -30,14 +38,16 @@ class SettingsPage extends StatelessWidget {
           ),
           ListTile(
             leading: const Icon(Icons.palette_outlined),
-            title: const Text('外观'),
-            subtitle: const Text('软件界面相关设置'),
+            title: Text(strings.settingsDisplayTitle),
+            subtitle: Text(strings.settingsDisplaySubtitle),
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute<void>(
                   builder: (_) => AppearanceSettingsPage(
                     appearanceSettings: appearanceSettings,
                     onAppearanceChanged: onAppearanceChanged,
+                    locale: locale,
+                    onLocaleChanged: onLocaleChanged,
                   ),
                 ),
               );
@@ -45,8 +55,8 @@ class SettingsPage extends StatelessWidget {
           ),
           ListTile(
             leading: const Icon(Icons.auto_stories_outlined),
-            title: const Text('阅读'),
-            subtitle: const Text('阅读器设置'),
+            title: Text(strings.settingsReadingTitle),
+            subtitle: Text(strings.settingsReadingSubtitle),
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute<void>(
@@ -57,8 +67,8 @@ class SettingsPage extends StatelessWidget {
           ),
           ListTile(
             leading: const Icon(Icons.security_outlined),
-            title: const Text('隐私'),
-            subtitle: const Text('隐私相关功能'),
+            title: Text(strings.settingsPrivacyTitle),
+            subtitle: Text(strings.settingsPrivacySubtitle),
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute<void>(
@@ -69,20 +79,18 @@ class SettingsPage extends StatelessWidget {
           ),
           ListTile(
             leading: const Icon(Icons.cloud_sync_outlined),
-            title: const Text('云同步'),
-            subtitle: const Text('上传与恢复备份'),
+            title: Text(strings.settingsCloudSyncTitle),
+            subtitle: Text(strings.settingsCloudSyncSubtitle),
             onTap: () {
               Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => const CloudSyncPage(),
-                ),
+                MaterialPageRoute<void>(builder: (_) => const CloudSyncPage()),
               );
             },
           ),
           ListTile(
             leading: const Icon(Icons.settings_applications_outlined),
-            title: const Text('高级'),
-            subtitle: const Text('实验性功能'),
+            title: Text(strings.settingsAdvancedTitle),
+            subtitle: Text(strings.settingsAdvancedSubtitle),
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute<void>(
@@ -94,13 +102,11 @@ class SettingsPage extends StatelessWidget {
 
           ListTile(
             leading: const Icon(Icons.info_outline),
-            title: const Text('关于'),
+            title: Text(strings.settingsAboutTitle),
             subtitle: const Text('Hazuki'),
             onTap: () {
               Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => const AboutPage(),
-                ),
+                MaterialPageRoute<void>(builder: (_) => const AboutPage()),
               );
             },
           ),

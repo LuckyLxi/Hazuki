@@ -72,6 +72,7 @@ class _ReadingSettingsPageState extends State<ReadingSettingsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final strings = l10n(context);
     final brightnessText = (_brightnessValue * 100).round().toString();
     final sliderActiveColor = Theme.of(context).colorScheme.primary;
     final sliderInactiveColor = Theme.of(
@@ -79,27 +80,30 @@ class _ReadingSettingsPageState extends State<ReadingSettingsPage> {
     ).colorScheme.onSurface.withValues(alpha: 0.24);
 
     return Scaffold(
-      appBar: hazukiFrostedAppBar(context: context, title: const Text('阅读设置')),
+      appBar: hazukiFrostedAppBar(
+        context: context,
+        title: Text(strings.readingSettingsTitle),
+      ),
       body: ListView(
         children: [
           SwitchListTile(
             secondary: const Icon(Icons.fullscreen_outlined),
-            title: const Text('沉浸模式'),
-            subtitle: const Text('开启后进入阅读器自动隐藏状态栏和底部导航栏'),
+            title: Text(strings.readingImmersiveModeTitle),
+            subtitle: Text(strings.readingImmersiveModeSubtitle),
             value: _immersiveMode,
             onChanged: _toggleImmersiveMode,
           ),
           SwitchListTile(
             secondary: const Icon(Icons.screen_lock_portrait_outlined),
-            title: const Text('屏幕常亮'),
-            subtitle: const Text('开启后阅读时保持屏幕常亮，不自动锁屏'),
+            title: Text(strings.readingKeepScreenOnTitle),
+            subtitle: Text(strings.readingKeepScreenOnSubtitle),
             value: _keepScreenOn,
             onChanged: _toggleKeepScreenOn,
           ),
           SwitchListTile(
             secondary: const Icon(Icons.brightness_medium_outlined),
-            title: const Text('自定义亮度'),
-            subtitle: const Text('开启后可在阅读器内按此设置覆盖系统亮度'),
+            title: Text(strings.readingCustomBrightnessTitle),
+            subtitle: Text(strings.readingCustomBrightnessSubtitle),
             value: _customBrightness,
             onChanged: _toggleCustomBrightness,
           ),
@@ -108,10 +112,12 @@ class _ReadingSettingsPageState extends State<ReadingSettingsPage> {
               Icons.wb_sunny_outlined,
               color: _customBrightness
                   ? Theme.of(context).colorScheme.onSurface
-                  : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.38),
+                  : Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.38),
             ),
             title: Text(
-              '亮度 $brightnessText',
+              strings.readingBrightnessLabel(brightnessText),
               style: TextStyle(
                 color: _customBrightness
                     ? Theme.of(context).colorScheme.onSurface
@@ -133,15 +139,15 @@ class _ReadingSettingsPageState extends State<ReadingSettingsPage> {
           const Divider(height: 1),
           SwitchListTile(
             secondary: const Icon(Icons.zoom_in_outlined),
-            title: const Text('双指缩放'),
-            subtitle: const Text('启用后可双指捏合对漫画图片进行放大查看'),
+            title: Text(strings.readingPinchToZoomTitle),
+            subtitle: Text(strings.readingPinchToZoomSubtitle),
             value: _pinchToZoom,
             onChanged: _togglePinchToZoom,
           ),
           SwitchListTile(
             secondary: const Icon(Icons.save_alt_outlined),
-            title: const Text('长按保存图片'),
-            subtitle: const Text('启用后长按漫画图片可保存该图片'),
+            title: Text(strings.readingLongPressSaveTitle),
+            subtitle: Text(strings.readingLongPressSaveSubtitle),
             value: _longPressToSave,
             onChanged: _toggleLongPressToSave,
           ),
