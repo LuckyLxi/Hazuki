@@ -5,10 +5,12 @@ class FavoritePage extends StatefulWidget {
     super.key,
     required this.authVersion,
     this.onAppBarActionsChanged,
+    this.onRequestLogin,
   });
 
   final int authVersion;
   final ValueChanged<FavoriteAppBarActionsState>? onAppBarActionsChanged;
+  final Future<void> Function()? onRequestLogin;
 
   @override
   State<FavoritePage> createState() => _FavoritePageState();
@@ -789,20 +791,67 @@ class _FavoritePageState extends State<FavoritePage>
     final isLogged = HazukiSourceService.instance.isLogged;
     if (!isLogged) {
       return Center(
-        child: FilledButton.icon(
-          style: FilledButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 18),
-            textStyle: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 24),
+          padding: const EdgeInsets.fromLTRB(24, 26, 24, 24),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(28),
+            border: Border.all(
+              color: Theme.of(context).colorScheme.outlineVariant,
             ),
           ),
-          onPressed: () {
-            final homeState =
-                context.findAncestorStateOfType<_HazukiHomePageState>();
-            homeState?._showLoginDialog();
-          },
-          icon: const Icon(Icons.login_rounded, size: 22),
-          label: Text(strings.favoriteLoginRequired),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primaryContainer,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.favorite_border_rounded,
+                  size: 34,
+                  color: Theme.of(context).colorScheme.onPrimaryContainer,
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                strings.favoriteLoginRequired,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                strings.historyLoginRequired,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              FilledButton.icon(
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(220, 52),
+                  shape: const StadiumBorder(),
+                  textStyle: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                onPressed: widget.onRequestLogin == null
+                    ? null
+                    : () {
+                        unawaited(widget.onRequestLogin!());
+                      },
+                icon: const Icon(Icons.login_rounded, size: 22),
+                label: Text(strings.homeLoginTitle),
+              ),
+            ],
+          ),
         ),
       );
     }

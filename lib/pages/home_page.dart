@@ -1087,6 +1087,7 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
                         authVersion: _authVersion,
                         onAppBarActionsChanged:
                             _handleFavoriteAppBarActionsChanged,
+                        onRequestLogin: _showLoginDialog,
                       ),
                     ),
                   ),

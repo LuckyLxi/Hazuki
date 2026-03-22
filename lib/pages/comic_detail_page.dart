@@ -949,11 +949,12 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
             data: themedData,
             child: _ChaptersPanelSheet(
               details: details,
-              onDownloadTap: () {
+              onDownloadConfirm: (selectedEpIds) {
+                Navigator.of(routeContext).pop();
                 unawaited(
-                  _showChapterDownloadSheet(
+                  _enqueueChapterDownloads(
                     details,
-                    navigatorContext: routeContext,
+                    selectedEpIds: selectedEpIds,
                   ),
                 );
               },
@@ -975,25 +976,11 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
     );
   }
 
-  Future<void> _showChapterDownloadSheet(
+  Future<void> _enqueueChapterDownloads(
     ComicDetailsData details, {
-    required BuildContext navigatorContext,
+    required Set<String> selectedEpIds,
   }) async {
-    final selectedEpIds = await Navigator.of(navigatorContext).push<Set<String>>(
-      _SpringBottomSheetRoute(
-        builder: (sheetContext) {
-          final themedData = _buildDetailTheme(Theme.of(sheetContext));
-          return Theme(
-            data: themedData,
-            child: _ChapterDownloadSelectionSheet(
-              details: details,
-              initialSelectedEpIds: const <String>{},
-            ),
-          );
-        },
-      ),
-    );
-    if (selectedEpIds == null || selectedEpIds.isEmpty) {
+    if (selectedEpIds.isEmpty) {
       return;
     }
     final targets = <MangaChapterDownloadTarget>[];

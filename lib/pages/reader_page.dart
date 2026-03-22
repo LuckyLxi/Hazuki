@@ -50,6 +50,7 @@ class _ReaderPageState extends State<ReaderPage>
   final Map<String, ImageProvider> _providerCache = <String, ImageProvider>{};
   final Map<String, Future<ImageProvider>> _providerFutureCache =
       <String, Future<ImageProvider>>{};
+  final Map<String, double> _imageAspectRatioCache = <String, double>{};
   final List<Completer<void>> _decodeWaiters = <Completer<void>>[];
 
   static const int _maxUnscrambleConcurrency = 5;
@@ -106,6 +107,7 @@ class _ReaderPageState extends State<ReaderPage>
         .where((e) => e.trim().isNotEmpty)
         .toList();
     if (initialImages.isNotEmpty) {
+      _imageAspectRatioCache.clear();
       _images = initialImages;
       _itemKeys.clear();
       _itemKeys.addAll(List.generate(_images.length, (_) => GlobalKey()));
@@ -414,6 +416,7 @@ class _ReaderPageState extends State<ReaderPage>
         return;
       }
       setState(() {
+        _imageAspectRatioCache.clear();
         _images = images.where((e) => e.trim().isNotEmpty).toList();
         _itemKeys.clear();
         _itemKeys.addAll(List.generate(_images.length, (_) => GlobalKey()));
@@ -607,13 +610,33 @@ class _ReaderPageState extends State<ReaderPage>
       return existing;
     }
 
-    final created = _buildImageProvider(url).then((provider) {
-      _providerCache[url] = provider;
-      return provider;
-    });
+    final created = _buildImageProvider(url)
+        .then((provider) {
+          _providerCache[url] = provider;
+          return provider;
+        })
+        .catchError((Object error, StackTrace stackTrace) {
+          _providerFutureCache.remove(url);
+          throw error;
+        });
 
     _providerFutureCache[url] = created;
     return created;
+  }
+
+  Future<void> _rememberAspectRatioFromBytes(String url, Uint8List bytes) async {
+    if (_imageAspectRatioCache.containsKey(url)) {
+      return;
+    }
+    try {
+      final codec = await instantiateImageCodec(bytes);
+      final frame = await codec.getNextFrame();
+      final image = frame.image;
+      if (image.height <= 0) {
+        return;
+      }
+      _imageAspectRatioCache[url] = image.width / image.height;
+    } catch (_) {}
   }
 
   int _calcJmSegments(String epId, String imageUrl) {
@@ -698,7 +721,12 @@ class _ReaderPageState extends State<ReaderPage>
     }
 
     if (sourceService.isLocalImagePath(url)) {
-      return FileImage(File(sourceService.normalizeLocalImagePath(url)));
+      final file = File(sourceService.normalizeLocalImagePath(url));
+      try {
+        final bytes = await file.readAsBytes();
+        await _rememberAspectRatioFromBytes(url, bytes);
+      } catch (_) {}
+      return FileImage(file);
     }
 
     final segments = sourceService.calculateJmImageSegments(widget.epId, url);
@@ -713,9 +741,18 @@ class _ReaderPageState extends State<ReaderPage>
         comicId: widget.comicId,
         epId: widget.epId,
       );
+      await _rememberAspectRatioFromBytes(url, prepared.bytes);
       return MemoryImage(prepared.bytes);
     } catch (_) {
-      return NetworkImage(url);
+      final rawBytes = await sourceService.downloadImageBytes(
+        url,
+        comicId: widget.comicId,
+        epId: widget.epId,
+        keepInMemory: true,
+      );
+      final restoredBytes = await _unscrambleJmImage(rawBytes, segments);
+      await _rememberAspectRatioFromBytes(url, restoredBytes);
+      return MemoryImage(restoredBytes);
     } finally {
       _releaseUnscramblePermit();
     }
@@ -733,6 +770,7 @@ class _ReaderPageState extends State<ReaderPage>
       itemBuilder: (context, index) {
         final url = _images[index];
         final cachedProvider = _providerCache[url];
+        final placeholderAspectRatio = _imageAspectRatioCache[url] ?? (3 / 4);
 
         if (_noImageModeEnabled) {
           return AspectRatio(
@@ -780,9 +818,21 @@ class _ReaderPageState extends State<ReaderPage>
               if (snapshot.hasData) {
                 return buildImage(snapshot.data!);
               }
-              return const AspectRatio(
-                aspectRatio: 3 / 4,
-                child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+              if (snapshot.hasError) {
+                return AspectRatio(
+                  aspectRatio: placeholderAspectRatio,
+                  child: Container(
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    alignment: Alignment.center,
+                    child: const Icon(Icons.broken_image_outlined),
+                  ),
+                );
+              }
+              return AspectRatio(
+                aspectRatio: placeholderAspectRatio,
+                child: const Center(
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
               );
             },
           );
@@ -800,7 +850,7 @@ class _ReaderPageState extends State<ReaderPage>
     return PageView.builder(
       key: ValueKey('${widget.comicId}-${widget.epId}-rtl'),
       controller: _pageController,
-      reverse: true,
+      reverse: false,
       itemCount: _images.length,
       physics: (_pinchToZoom && _isZoomed)
           ? const NeverScrollableScrollPhysics()
@@ -866,6 +916,13 @@ class _ReaderPageState extends State<ReaderPage>
           builder: (context, snapshot) {
             if (snapshot.hasData) {
               return buildImage(snapshot.data!);
+            }
+            if (snapshot.hasError) {
+              return Container(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                alignment: Alignment.center,
+                child: const Icon(Icons.broken_image_outlined),
+              );
             }
             return const ColoredBox(
               color: Colors.black,
@@ -1026,10 +1083,12 @@ class _ReaderPageState extends State<ReaderPage>
                       transformationController: _zoomController,
                       panEnabled: true,
                       scaleEnabled: true,
+                      panAxis: PanAxis.free,
                       // 允许全方位平移和缩放，boundaryMargin 设为零防止图片拖出屏幕边界
-                      boundaryMargin: EdgeInsets.zero,
+                      boundaryMargin: const EdgeInsets.all(120),
                       // 不锁定轴向，支持全方位触发放大
                       constrained: true,
+                      clipBehavior: Clip.none,
                       minScale: 1.0,
                       maxScale: 5.0,
                       child: _readerMode == _ReaderMode.rightToLeft

@@ -70,8 +70,6 @@ class _SpringBottomSheetRoute<T> extends PageRoute<T> {
     Widget child,
   ) {
     final isReversing = animation.status == AnimationStatus.reverse;
-
-    // 使用 easeOutBack 带来轻度弹性，摒弃之前用力过猛的自制曲线
     final slideIn = Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
         .animate(
           CurvedAnimation(
@@ -96,7 +94,7 @@ class _SpringBottomSheetRoute<T> extends PageRoute<T> {
         child: Align(
           alignment: Alignment.bottomCenter,
           child: GestureDetector(
-            onTap: () {}, // 防透传
+            onTap: () {},
             child: SlideTransition(position: slideIn, child: child),
           ),
         ),
@@ -105,229 +103,231 @@ class _SpringBottomSheetRoute<T> extends PageRoute<T> {
   }
 }
 
-class _ChaptersPanelSheet extends StatelessWidget {
+class _ChaptersPanelSheet extends StatefulWidget {
   const _ChaptersPanelSheet({
     required this.details,
     required this.onChapterTap,
-    required this.onDownloadTap,
+    required this.onDownloadConfirm,
   });
 
   final ComicDetailsData details;
   final void Function(String epId, String chapterTitle, int index) onChapterTap;
-  final VoidCallback onDownloadTap;
+  final ValueChanged<Set<String>> onDownloadConfirm;
+
+  @override
+  State<_ChaptersPanelSheet> createState() => _ChaptersPanelSheetState();
+}
+
+class _ChaptersPanelSheetState extends State<_ChaptersPanelSheet> {
+  bool _showDownloadSelection = false;
+  final Set<String> _selectedEpIds = <String>{};
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final chapters = details.chapters;
+    final chapters = widget.details.chapters;
     final screenH = MediaQuery.of(context).size.height;
 
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        // 这一层用于在弹性回环（弹窗跳得比屏幕底部更高）时，遮挡住屏幕底部的空缺
-        Positioned(
-          left: 0,
-          right: 0,
-          bottom: -200,
-          height: 200,
-          child: ColoredBox(color: cs.surface),
-        ),
-        Container(
-          constraints: BoxConstraints(maxHeight: screenH * 0.65),
-          decoration: BoxDecoration(
-            color: cs.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+    return PopScope(
+      canPop: !_showDownloadSelection,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && _showDownloadSelection) {
+          setState(() {
+            _showDownloadSelection = false;
+          });
+        }
+      },
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: -200,
+            height: 200,
+            child: ColoredBox(color: cs.surface),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(top: 10, bottom: 4),
-                child: Container(
-                  width: 36,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: cs.onSurfaceVariant.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(2),
+          Container(
+            constraints: BoxConstraints(maxHeight: screenH * 0.65),
+            decoration: BoxDecoration(
+              color: cs.surface,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(top: 10, bottom: 4),
+                  child: Container(
+                    width: 36,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: cs.onSurfaceVariant.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
                   ),
                 ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-                child: Row(
-                  children: [
-                    Text(
-                      l10n(context).comicDetailChapters,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
+                  child: Row(
+                    children: [
+                      if (_showDownloadSelection)
+                        IconButton(
+                          tooltip: l10n(context).commonClose,
+                          onPressed: () {
+                            setState(() {
+                              _showDownloadSelection = false;
+                            });
+                          },
+                          icon: const Icon(Icons.arrow_back_rounded),
+                        ),
+                      Text(
+                        _showDownloadSelection
+                            ? l10n(context).downloadsDownloadChaptersTitle
+                            : l10n(context).comicDetailChapters,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      l10n(
-                        context,
-                      ).comicDetailChapterCount('${chapters.length}'),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: cs.onSurfaceVariant,
+                      const SizedBox(width: 8),
+                      Text(
+                        _showDownloadSelection
+                            ? '${_selectedEpIds.length}/${chapters.length}'
+                            : l10n(
+                                context,
+                              ).comicDetailChapterCount('${chapters.length}'),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
                       ),
+                      const Spacer(),
+                      if (!_showDownloadSelection)
+                        IconButton(
+                          tooltip: l10n(context).downloadsDownloadAction,
+                          onPressed: () {
+                            setState(() {
+                              _showDownloadSelection = true;
+                            });
+                          },
+                          icon: const Icon(Icons.download_outlined),
+                        ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                Flexible(
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 220),
+                    switchInCurve: Curves.easeOutCubic,
+                    switchOutCurve: Curves.easeInCubic,
+                    child: _showDownloadSelection
+                        ? _buildDownloadSelection(context, chapters)
+                        : _buildChapterGrid(chapters),
+                  ),
+                ),
+                if (_showDownloadSelection)
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      16,
+                      0,
+                      16,
+                      MediaQuery.of(context).padding.bottom + 12,
                     ),
-                    const Spacer(),
-                    IconButton(
-                      tooltip: l10n(context).downloadsDownloadAction,
-                      onPressed: onDownloadTap,
+                    child: FilledButton.icon(
+                      onPressed: _selectedEpIds.isEmpty
+                          ? null
+                          : () => widget.onDownloadConfirm(
+                              Set<String>.from(_selectedEpIds),
+                            ),
                       icon: const Icon(Icons.download_outlined),
+                      label: Text(l10n(context).downloadsDownloadAction),
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(48),
+                      ),
                     ),
-                  ],
-                ),
+                  )
+                else
+                  SizedBox(height: MediaQuery.of(context).padding.bottom + 8),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildChapterGrid(Map<String, String> chapters) {
+    return GridView.builder(
+      key: const ValueKey('chapter-grid'),
+      padding: const EdgeInsets.all(14),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 3,
+        mainAxisSpacing: 8,
+        crossAxisSpacing: 8,
+        childAspectRatio: 2.8,
+      ),
+      itemCount: chapters.length,
+      itemBuilder: (context, index) {
+        final entry = chapters.entries.elementAt(index);
+        return _ChapterChip(
+          label: entry.value,
+          onTap: () => widget.onChapterTap(entry.key, entry.value, index),
+        );
+      },
+    );
+  }
+
+  Widget _buildDownloadSelection(
+    BuildContext context,
+    Map<String, String> chapters,
+  ) {
+    final chapterEntries = chapters.entries.toList();
+    return Column(
+      key: const ValueKey('download-grid'),
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              l10n(context).downloadsDownloadChaptersSubtitle,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
-              const Divider(height: 1),
-              Flexible(
-                child: GridView.builder(
-                  padding: const EdgeInsets.all(14),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3,
-                    mainAxisSpacing: 8,
-                    crossAxisSpacing: 8,
-                    childAspectRatio: 2.8,
-                  ),
-                  itemCount: chapters.length,
-                  itemBuilder: (context, index) {
-                    final entry = chapters.entries.elementAt(index);
-                    return _ChapterChip(
-                      label: entry.value,
-                      onTap: () => onChapterTap(entry.key, entry.value, index),
-                    );
-                  },
-                ),
-              ),
-              SizedBox(height: MediaQuery.of(context).padding.bottom + 8),
-            ],
+            ),
+          ),
+        ),
+        Expanded(
+          child: GridView.builder(
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
+              childAspectRatio: 2.8,
+            ),
+            itemCount: chapterEntries.length,
+            itemBuilder: (context, index) {
+              final entry = chapterEntries[index];
+              final selected = _selectedEpIds.contains(entry.key);
+              return _SelectableChapterChip(
+                label: entry.value,
+                selected: selected,
+                onTap: () {
+                  setState(() {
+                    if (selected) {
+                      _selectedEpIds.remove(entry.key);
+                    } else {
+                      _selectedEpIds.add(entry.key);
+                    }
+                  });
+                },
+              );
+            },
           ),
         ),
       ],
-    );
-  }
-}
-
-class _ChapterDownloadSelectionSheet extends StatefulWidget {
-  const _ChapterDownloadSelectionSheet({
-    required this.details,
-    required this.initialSelectedEpIds,
-  });
-
-  final ComicDetailsData details;
-  final Set<String> initialSelectedEpIds;
-
-  @override
-  State<_ChapterDownloadSelectionSheet> createState() =>
-      _ChapterDownloadSelectionSheetState();
-}
-
-class _ChapterDownloadSelectionSheetState
-    extends State<_ChapterDownloadSelectionSheet> {
-  late final Set<String> _selectedEpIds = <String>{
-    ...widget.initialSelectedEpIds,
-  };
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    final chapters = widget.details.chapters.entries.toList();
-    final bottomInset = MediaQuery.of(context).padding.bottom;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: SafeArea(
-        top: false,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(top: 12, bottom: 4),
-              child: Container(
-                width: 36,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: cs.onSurfaceVariant.withValues(alpha: 0.28),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    l10n(context).downloadsDownloadChaptersTitle,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    l10n(context).downloadsDownloadChaptersSubtitle,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: cs.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Flexible(
-              child: GridView.builder(
-                padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-                shrinkWrap: true,
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  mainAxisSpacing: 8,
-                  crossAxisSpacing: 8,
-                  childAspectRatio: 2.8,
-                ),
-                itemCount: chapters.length,
-                itemBuilder: (context, index) {
-                  final entry = chapters[index];
-                  final selected = _selectedEpIds.contains(entry.key);
-                  return _SelectableChapterChip(
-                    label: entry.value,
-                    selected: selected,
-                    onTap: () {
-                      setState(() {
-                        if (selected) {
-                          _selectedEpIds.remove(entry.key);
-                        } else {
-                          _selectedEpIds.add(entry.key);
-                        }
-                      });
-                    },
-                  );
-                },
-              ),
-            ),
-            Padding(
-              padding: EdgeInsets.fromLTRB(16, 0, 16, bottomInset + 12),
-              child: FilledButton.icon(
-                onPressed: _selectedEpIds.isEmpty
-                    ? null
-                    : () => Navigator.of(context).pop<Set<String>>(
-                        Set<String>.from(_selectedEpIds),
-                      ),
-                icon: const Icon(Icons.download_outlined),
-                label: Text(l10n(context).downloadsDownloadAction),
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size.fromHeight(48),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
