@@ -658,11 +658,14 @@ class _SearchResultsPageState extends State<SearchResultsPage>
                             );
                           },
                           child: _searchController.text.isNotEmpty
-                              ? IconButton(
-                                  key: const ValueKey('results-clear'),
-                                  tooltip: l10n(context).searchClearTooltip,
-                                  onPressed: _clearSearch,
-                                  icon: const Icon(Icons.close),
+                              ? Semantics(
+                                  label: l10n(context).searchClearTooltip,
+                                  button: true,
+                                  child: IconButton(
+                                    key: const ValueKey('results-clear'),
+                                    onPressed: _clearSearch,
+                                    icon: const Icon(Icons.close),
+                                  ),
                                 )
                               : IconButton(
                                   key: const ValueKey('results-submit'),
@@ -763,15 +766,16 @@ class _SearchResultsPageState extends State<SearchResultsPage>
                                 },
                                 child:
                                     _collapsedSearchController.text.isNotEmpty
-                                    ? IconButton(
-                                        key: const ValueKey(
-                                          'collapsed-results-clear',
+                                    ? Semantics(
+                                        label: l10n(context).searchClearTooltip,
+                                        button: true,
+                                        child: IconButton(
+                                          key: const ValueKey(
+                                            'collapsed-results-clear',
+                                          ),
+                                          onPressed: _clearSearch,
+                                          icon: const Icon(Icons.close),
                                         ),
-                                        tooltip: l10n(
-                                          context,
-                                        ).searchClearTooltip,
-                                        onPressed: _clearSearch,
-                                        icon: const Icon(Icons.close),
                                       )
                                     : IconButton(
                                         key: const ValueKey(
