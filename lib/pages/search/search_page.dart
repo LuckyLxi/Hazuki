@@ -50,6 +50,7 @@ class _SearchEntryPage extends StatefulWidget {
 class _SearchEntryPageState extends State<_SearchEntryPage> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
+  final FocusNode _pageFocusNode = FocusNode(skipTraversal: true);
   final ScrollController _scrollController = ScrollController();
 
   List<String> _historyList = [];
@@ -77,6 +78,7 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
     _scrollController.removeListener(_onScroll);
     _searchController.dispose();
     _searchFocusNode.dispose();
+    _pageFocusNode.dispose();
     _scrollController.dispose();
     super.dispose();
   }
@@ -190,7 +192,7 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
   }
 
   Future<void> _confirmClearHistory() async {
-    FocusScope.of(context).unfocus();
+    _pageFocusNode.requestFocus();
     await Future<void>.delayed(const Duration(milliseconds: 80));
     if (!mounted) {
       return;
@@ -201,6 +203,7 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
       barrierDismissible: true,
       barrierLabel: strings.commonClose,
       transitionDuration: const Duration(milliseconds: 250),
+      requestFocus: false,
       pageBuilder: (context, anim1, anim2) {
         return AlertDialog(
           title: Text(strings.searchClearHistoryTitle),
@@ -228,6 +231,10 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
         );
       },
     );
+    if (!mounted) {
+      return;
+    }
+    _pageFocusNode.requestFocus();
     if (confirm == true) {
       await _clearHistory();
     }
@@ -439,46 +446,50 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      floatingActionButton: _historyList.isNotEmpty
-          ? GestureDetector(
-              onLongPress: _confirmClearHistory,
-              child: FloatingActionButton(
-                onPressed: () {
-                  setState(() {
-                    _historyEditMode = !_historyEditMode;
-                  });
-                },
-                child: Icon(
-                  _historyEditMode ? Icons.done : Icons.delete_outline,
+    return Focus(
+      focusNode: _pageFocusNode,
+      skipTraversal: true,
+      child: Scaffold(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        floatingActionButton: _historyList.isNotEmpty
+            ? GestureDetector(
+                onLongPress: _confirmClearHistory,
+                child: FloatingActionButton(
+                  onPressed: () {
+                    setState(() {
+                      _historyEditMode = !_historyEditMode;
+                    });
+                  },
+                  child: Icon(
+                    _historyEditMode ? Icons.done : Icons.delete_outline,
+                  ),
                 ),
-              ),
-            )
-          : null,
-      appBar: hazukiFrostedAppBar(
-        context: context,
-        title: Text(l10n(context).searchTitle),
-        actions: [
-          _buildCollapsedSearchBox(),
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOutCubic,
-            width: _showCollapsedSearch ? 12 : 0,
-          ),
-        ],
-      ),
-      body: ListView(
-        controller: _scrollController,
-        physics: const AlwaysScrollableScrollPhysics(
-          parent: ClampingScrollPhysics(),
+              )
+            : null,
+        appBar: hazukiFrostedAppBar(
+          context: context,
+          title: Text(l10n(context).searchTitle),
+          actions: [
+            _buildCollapsedSearchBox(),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+              width: _showCollapsedSearch ? 12 : 0,
+            ),
+          ],
         ),
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-        children: [
-          _buildTopSearchBox(),
-          const SizedBox(height: 18),
-          _buildHistoryView(),
-        ],
+        body: ListView(
+          controller: _scrollController,
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: ClampingScrollPhysics(),
+          ),
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+          children: [
+            _buildTopSearchBox(),
+            const SizedBox(height: 18),
+            _buildHistoryView(),
+          ],
+        ),
       ),
     );
   }
