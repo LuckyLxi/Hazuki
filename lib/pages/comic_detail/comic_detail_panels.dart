@@ -170,85 +170,192 @@ class _ChaptersPanelSheetState extends State<_ChaptersPanelSheet> {
                 ),
                 Padding(
                   padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-                  child: Row(
-                    children: [
-                      if (_showDownloadSelection)
-                        IconButton(
-                          tooltip: l10n(context).commonClose,
-                          onPressed: () {
-                            setState(() {
-                              _showDownloadSelection = false;
-                            });
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 240),
+                    switchInCurve: Curves.easeOutCubic,
+                    switchOutCurve: Curves.easeInCubic,
+                    transitionBuilder: (child, animation) {
+                      final offsetAnimation = Tween<Offset>(
+                        begin: const Offset(0.08, 0),
+                        end: Offset.zero,
+                      ).animate(animation);
+                      return FadeTransition(
+                        opacity: animation,
+                        child: SlideTransition(
+                          position: offsetAnimation,
+                          child: child,
+                        ),
+                      );
+                    },
+                    child: Row(
+                      key: ValueKey<bool>(_showDownloadSelection),
+                      children: [
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 200),
+                          child: _showDownloadSelection
+                              ? IconButton(
+                                  key: const ValueKey('download_back'),
+                                  tooltip: l10n(context).commonClose,
+                                  onPressed: () {
+                                    setState(() {
+                                      _showDownloadSelection = false;
+                                    });
+                                  },
+                                  icon: const Icon(Icons.arrow_back_rounded),
+                                )
+                              : const SizedBox(
+                                  key: ValueKey('download_back_hidden'),
+                                  width: 0,
+                                  height: 0,
+                                ),
+                        ),
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 220),
+                          switchInCurve: Curves.easeOutCubic,
+                          switchOutCurve: Curves.easeInCubic,
+                          transitionBuilder: (child, animation) {
+                            return FadeTransition(
+                              opacity: animation,
+                              child: SlideTransition(
+                                position: Tween<Offset>(
+                                  begin: const Offset(0, 0.18),
+                                  end: Offset.zero,
+                                ).animate(animation),
+                                child: child,
+                              ),
+                            );
                           },
-                          icon: const Icon(Icons.arrow_back_rounded),
+                          child: Text(
+                            _showDownloadSelection
+                                ? l10n(context).downloadsDownloadChaptersTitle
+                                : l10n(context).comicDetailChapters,
+                            key: ValueKey<String>(
+                              _showDownloadSelection ? 'download_title' : 'chapter_title',
+                            ),
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ),
-                      Text(
-                        _showDownloadSelection
-                            ? l10n(context).downloadsDownloadChaptersTitle
-                            : l10n(context).comicDetailChapters,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        _showDownloadSelection
-                            ? '${_selectedEpIds.length}/${chapters.length}'
-                            : l10n(
-                                context,
-                              ).comicDetailChapterCount('${chapters.length}'),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: cs.onSurfaceVariant,
-                        ),
-                      ),
-                      const Spacer(),
-                      if (!_showDownloadSelection)
-                        IconButton(
-                          tooltip: l10n(context).downloadsDownloadAction,
-                          onPressed: () {
-                            setState(() {
-                              _showDownloadSelection = true;
-                            });
+                        const SizedBox(width: 8),
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 220),
+                          transitionBuilder: (child, animation) {
+                            return FadeTransition(opacity: animation, child: child);
                           },
-                          icon: const Icon(Icons.download_outlined),
+                          child: Text(
+                            _showDownloadSelection
+                                ? '${_selectedEpIds.length}/${chapters.length}'
+                                : l10n(
+                                    context,
+                                  ).comicDetailChapterCount('${chapters.length}'),
+                            key: ValueKey<String>(
+                              _showDownloadSelection
+                                  ? 'download_count_${_selectedEpIds.length}'
+                                  : 'chapter_count_${chapters.length}',
+                            ),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: cs.onSurfaceVariant,
+                            ),
+                          ),
                         ),
-                    ],
+                        const Spacer(),
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 200),
+                          transitionBuilder: (child, animation) {
+                            return FadeTransition(
+                              opacity: animation,
+                              child: ScaleTransition(
+                                scale: Tween<double>(begin: 0.9, end: 1).animate(animation),
+                                child: child,
+                              ),
+                            );
+                          },
+                          child: !_showDownloadSelection
+                              ? IconButton(
+                                  key: const ValueKey('download_enter'),
+                                  tooltip: l10n(context).downloadsDownloadAction,
+                                  onPressed: () {
+                                    setState(() {
+                                      _showDownloadSelection = true;
+                                    });
+                                  },
+                                  icon: const Icon(Icons.download_outlined),
+                                )
+                              : const SizedBox(
+                                  key: ValueKey('download_enter_hidden'),
+                                  width: 0,
+                                  height: 0,
+                                ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 const Divider(height: 1),
                 Flexible(
                   child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 220),
+                    duration: const Duration(milliseconds: 260),
                     switchInCurve: Curves.easeOutCubic,
                     switchOutCurve: Curves.easeInCubic,
+                    transitionBuilder: (child, animation) {
+                      return FadeTransition(
+                        opacity: animation,
+                        child: SlideTransition(
+                          position: Tween<Offset>(
+                            begin: const Offset(0.04, 0.02),
+                            end: Offset.zero,
+                          ).animate(animation),
+                          child: child,
+                        ),
+                      );
+                    },
                     child: _showDownloadSelection
                         ? _buildDownloadSelection(context, chapters)
                         : _buildChapterGrid(chapters),
                   ),
                 ),
-                if (_showDownloadSelection)
-                  Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      16,
-                      0,
-                      16,
-                      MediaQuery.of(context).padding.bottom + 12,
-                    ),
-                    child: FilledButton.icon(
-                      onPressed: _selectedEpIds.isEmpty
-                          ? null
-                          : () => widget.onDownloadConfirm(
-                              Set<String>.from(_selectedEpIds),
-                            ),
-                      icon: const Icon(Icons.download_outlined),
-                      label: Text(l10n(context).downloadsDownloadAction),
-                      style: FilledButton.styleFrom(
-                        minimumSize: const Size.fromHeight(48),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 240),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  transitionBuilder: (child, animation) {
+                    return FadeTransition(
+                      opacity: animation,
+                      child: SizeTransition(
+                        sizeFactor: animation,
+                        axisAlignment: -1,
+                        child: child,
                       ),
-                    ),
-                  )
-                else
-                  SizedBox(height: MediaQuery.of(context).padding.bottom + 8),
+                    );
+                  },
+                  child: _showDownloadSelection
+                      ? Padding(
+                          key: const ValueKey('download_footer_visible'),
+                          padding: EdgeInsets.fromLTRB(
+                            16,
+                            0,
+                            16,
+                            MediaQuery.of(context).padding.bottom + 12,
+                          ),
+                          child: FilledButton.icon(
+                            onPressed: _selectedEpIds.isEmpty
+                                ? null
+                                : () => widget.onDownloadConfirm(
+                                    Set<String>.from(_selectedEpIds),
+                                  ),
+                            icon: const Icon(Icons.download_outlined),
+                            label: Text(l10n(context).downloadsDownloadAction),
+                            style: FilledButton.styleFrom(
+                              minimumSize: const Size.fromHeight(48),
+                            ),
+                          ),
+                        )
+                      : SizedBox(
+                          key: const ValueKey('download_footer_hidden'),
+                          height: MediaQuery.of(context).padding.bottom + 8,
+                        ),
+                ),
               ],
             ),
           ),

@@ -8,6 +8,7 @@ class HazukiHomePage extends StatefulWidget {
     required this.onAppearanceChanged,
     required this.locale,
     required this.onLocaleChanged,
+    this.refreshTick = 0,
   });
 
   final int initialTabIndex;
@@ -15,6 +16,7 @@ class HazukiHomePage extends StatefulWidget {
   final Future<void> Function(AppearanceSettingsData next) onAppearanceChanged;
   final Locale? locale;
   final Future<void> Function(Locale? locale) onLocaleChanged;
+  final int refreshTick;
 
   @override
   State<HazukiHomePage> createState() => _HazukiHomePageState();
@@ -65,6 +67,10 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
     if (oldLocaleCode != newLocaleCode) {
       unawaited(_loadFirstUseText());
       unawaited(_syncUserProfile());
+    }
+    if (oldWidget.refreshTick != widget.refreshTick) {
+      unawaited(_syncUserProfile());
+      unawaited(_loadOtherSettings());
     }
   }
 

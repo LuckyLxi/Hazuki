@@ -319,8 +319,9 @@ class MangaDownloadService extends ChangeNotifier {
 
   static final MangaDownloadService instance = MangaDownloadService._();
 
-  static const String _statePrefsKey = 'manga_download_service_state_v1';
-  static const String _metadataFileName = 'metadata.json';
+  static const String _statePrefsKey = 'manga_download_service_state_v2';
+  static const String _metadataFileName = 'comic.json';
+  static const String _legacyMetadataFileName = 'metadata.json';
 
   SharedPreferences? _prefs;
   Future<void>? _initFuture;
@@ -487,16 +488,21 @@ class MangaDownloadService extends ChangeNotifier {
     final task = _tasks.removeAt(index);
     final rootDir = await _ensureRootDir();
     final comicDir = Directory('${rootDir.path}/${task.comicId}');
-    final wasDownloading = task.status == MangaDownloadTaskStatus.downloading;
+    final downloadedComic = downloadedComicById(task.comicId);
     if (task.currentChapterEpId?.isNotEmpty == true) {
       try {
-        final chapterDir = Directory('${comicDir.path}/${task.currentChapterEpId}');
-        if (await chapterDir.exists()) {
+        final chapterDir = await _resolveChapterDirForEpId(
+          comicDir: comicDir,
+          epId: task.currentChapterEpId!,
+          targets: task.targets,
+          downloadedComic: downloadedComic,
+        );
+        if (chapterDir != null && await chapterDir.exists()) {
           await chapterDir.delete(recursive: true);
         }
       } catch (_) {}
     }
-    if (!wasDownloading && downloadedComicById(task.comicId) == null) {
+    if (downloadedComic == null) {
       try {
         if (await comicDir.exists()) {
           await comicDir.delete(recursive: true);
@@ -509,48 +515,45 @@ class MangaDownloadService extends ChangeNotifier {
 
   Future<void> _init() async {
     _prefs = await SharedPreferences.getInstance();
-    await _ensureRootDir();
+    final rootDir = await _ensureRootDir();
     final raw = _prefs?.getString(_statePrefsKey);
-    if (raw == null || raw.isEmpty) {
-      return;
-    }
-    try {
-      final decoded = jsonDecode(raw);
-      if (decoded is! Map) {
-        return;
-      }
-      final map = Map<String, dynamic>.from(decoded);
-      final tasksRaw = map['tasks'];
-      if (tasksRaw is List) {
-        for (final item in tasksRaw) {
-          if (item is Map) {
-            var task = MangaDownloadTask.fromJson(Map<String, dynamic>.from(item));
-            if (task.status == MangaDownloadTaskStatus.downloading) {
-              task = task.copyWith(
-                status: MangaDownloadTaskStatus.queued,
-                currentImageIndex: 0,
-                currentImageTotal: 0,
-                clearCurrentChapterEpId: true,
-                clearCurrentChapterTitle: true,
-              );
+    if (raw != null && raw.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(raw);
+        if (decoded is Map) {
+          final map = Map<String, dynamic>.from(decoded);
+          final tasksRaw = map['tasks'];
+          if (tasksRaw is List) {
+            for (final item in tasksRaw) {
+              if (item is Map) {
+                var task = MangaDownloadTask.fromJson(Map<String, dynamic>.from(item));
+                if (task.status == MangaDownloadTaskStatus.downloading) {
+                  task = task.copyWith(
+                    status: MangaDownloadTaskStatus.queued,
+                    clearErrorMessage: true,
+                  );
+                }
+                _tasks.add(task);
+              }
             }
-            _tasks.add(task);
+          }
+          final downloadedRaw = map['downloaded'];
+          if (downloadedRaw is List) {
+            for (final item in downloadedRaw) {
+              if (item is Map) {
+                _downloaded.add(
+                  DownloadedMangaComic.fromJson(Map<String, dynamic>.from(item)),
+                );
+              }
+            }
           }
         }
-      }
-      final downloadedRaw = map['downloaded'];
-      if (downloadedRaw is List) {
-        for (final item in downloadedRaw) {
-          if (item is Map) {
-            _downloaded.add(
-              DownloadedMangaComic.fromJson(Map<String, dynamic>.from(item)),
-            );
-          }
-        }
-      }
-      _tasks.sort((a, b) => a.createdAtMillis.compareTo(b.createdAtMillis));
-      _downloaded.sort((a, b) => b.updatedAtMillis.compareTo(a.updatedAtMillis));
-    } catch (_) {}
+      } catch (_) {}
+    }
+    await _scanDownloadedFromDisk(rootDir);
+    _tasks.sort((a, b) => a.createdAtMillis.compareTo(b.createdAtMillis));
+    _downloaded.sort((a, b) => b.updatedAtMillis.compareTo(a.updatedAtMillis));
+    await _persistState();
     if (_tasks.isNotEmpty) {
       unawaited(_processQueue());
     }
@@ -643,10 +646,6 @@ class MangaDownloadService extends ChangeNotifier {
 
       for (final target in task.targets) {
         if (await _shouldAbortTask(task.comicId)) {
-          await _cleanupTaskChapterDir(
-            comicDir.path,
-            _latestTask(task.comicId)?.currentChapterEpId,
-          );
           return;
         }
         if (existingChapterIds.contains(target.epId)) {
@@ -663,16 +662,25 @@ class MangaDownloadService extends ChangeNotifier {
           comicId: task.comicId,
           epId: target.epId,
         );
-        final chapterDir = Directory('${comicDir.path}/${target.epId}');
+        if (await _shouldAbortTask(task.comicId)) {
+          return;
+        }
+        final chapterDir = _chapterDirForTarget(comicDir, target);
         if (!await chapterDir.exists()) {
           await chapterDir.create(recursive: true);
         }
 
         final savedPaths = <String>[];
+        for (var i = 0; i < imageUrls.length; i++) {
+          final existingPath = await _findExistingImagePath(chapterDir, i + 1);
+          if (existingPath != null) {
+            savedPaths.add(existingPath);
+          }
+        }
         task = task.copyWith(
           currentChapterEpId: target.epId,
           currentChapterTitle: target.title,
-          currentImageIndex: 0,
+          currentImageIndex: savedPaths.length,
           currentImageTotal: imageUrls.length,
         );
         if (!_replaceTask(task.comicId, task)) {
@@ -680,9 +688,8 @@ class MangaDownloadService extends ChangeNotifier {
         }
         await _persistState();
         notifyListeners();
-        for (var i = 0; i < imageUrls.length; i++) {
+        for (var i = savedPaths.length; i < imageUrls.length; i++) {
           if (await _shouldAbortTask(task.comicId)) {
-            await _cleanupTaskChapterDir(comicDir.path, target.epId);
             return;
           }
           final imageUrl = imageUrls[i];
@@ -691,6 +698,9 @@ class MangaDownloadService extends ChangeNotifier {
             comicId: task.comicId,
             epId: target.epId,
           );
+          if (await _shouldAbortTask(task.comicId)) {
+            return;
+          }
           final fileName =
               '${(i + 1).toString().padLeft(4, '0')}.${prepared.extension}';
           final file = File('${chapterDir.path}/$fileName');
@@ -801,20 +811,66 @@ class MangaDownloadService extends ChangeNotifier {
     return latest.status == MangaDownloadTaskStatus.paused;
   }
 
-  Future<void> _cleanupTaskChapterDir(
-    String comicDirPath,
-    String? chapterEpId,
-  ) async {
-    final normalized = chapterEpId?.trim() ?? '';
-    if (normalized.isEmpty) {
-      return;
+  Directory _chapterDirForTarget(
+    Directory comicDir,
+    MangaChapterDownloadTarget target,
+  ) {
+    final chapterNumber = (target.index + 1).toString().padLeft(3, '0');
+    final safeTitle = _sanitizeFileName(target.title);
+    final dirName = safeTitle.isEmpty
+        ? 'Manga第$chapterNumber话'
+        : 'Manga第$chapterNumber话_$safeTitle';
+    return Directory('${comicDir.path}/$dirName');
+  }
+
+  Future<Directory?> _resolveChapterDirForEpId({
+    required Directory comicDir,
+    required String epId,
+    required List<MangaChapterDownloadTarget> targets,
+    DownloadedMangaComic? downloadedComic,
+  }) async {
+    for (final chapter in downloadedComic?.chapters ?? const <DownloadedMangaChapter>[]) {
+      if (chapter.epId != epId || chapter.imagePaths.isEmpty) {
+        continue;
+      }
+      final file = File(chapter.imagePaths.first);
+      return file.parent;
     }
+    for (final target in targets) {
+      if (target.epId != epId) {
+        continue;
+      }
+      final dir = _chapterDirForTarget(comicDir, target);
+      if (await dir.exists()) {
+        return dir;
+      }
+    }
+    return null;
+  }
+
+  Future<String?> _findExistingImagePath(Directory chapterDir, int imageIndex) async {
+    final prefix = '${imageIndex.toString().padLeft(4, '0')}.';
     try {
-      final chapterDir = Directory('$comicDirPath/$normalized');
-      if (await chapterDir.exists()) {
-        await chapterDir.delete(recursive: true);
+      await for (final entity in chapterDir.list()) {
+        if (entity is! File) {
+          continue;
+        }
+        final name = entity.uri.pathSegments.isEmpty
+            ? ''
+            : entity.uri.pathSegments.last;
+        if (name.startsWith(prefix)) {
+          return entity.path;
+        }
       }
     } catch (_) {}
+    return null;
+  }
+
+  String _sanitizeFileName(String raw) {
+    return raw
+        .replaceAll(RegExp(r'[\\/:*?"<>|]'), '_')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
   }
 
   Future<String?> _downloadCoverIfNeeded({
@@ -825,17 +881,18 @@ class MangaDownloadService extends ChangeNotifier {
     if (normalized.isEmpty) {
       return null;
     }
-    final existing = File('${comicDir.path}/cover.jpg');
-    if (await existing.exists()) {
+    final existing = await _findLocalCoverFile(comicDir);
+    if (existing != null) {
       return existing.path;
     }
+    final target = File('${comicDir.path}/漫画封面.jpg');
     try {
       final bytes = await HazukiSourceService.instance.downloadImageBytes(
         normalized,
         keepInMemory: false,
       );
-      await existing.writeAsBytes(bytes, flush: true);
-      return existing.path;
+      await target.writeAsBytes(bytes, flush: true);
+      return target.path;
     } catch (_) {
       return null;
     }
@@ -857,5 +914,154 @@ class MangaDownloadService extends ChangeNotifier {
   ) async {
     final file = File('${comicDir.path}/$_metadataFileName');
     await file.writeAsString(jsonEncode(comic.toJson()), flush: true);
+    final legacy = File('${comicDir.path}/$_legacyMetadataFileName');
+    if (await legacy.exists()) {
+      try {
+        await legacy.delete();
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _scanDownloadedFromDisk(Directory rootDir) async {
+    try {
+      await for (final entity in rootDir.list()) {
+        if (entity is! Directory) {
+          continue;
+        }
+        final comic = await _readComicFromDirectory(entity);
+        if (comic != null) {
+          _upsertDownloadedComic(comic);
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<DownloadedMangaComic?> _readComicFromDirectory(Directory comicDir) async {
+    final currentFile = File('${comicDir.path}/$_metadataFileName');
+    final legacyFile = File('${comicDir.path}/$_legacyMetadataFileName');
+    File? metadataFile;
+    if (await currentFile.exists()) {
+      metadataFile = currentFile;
+    } else if (await legacyFile.exists()) {
+      metadataFile = legacyFile;
+    }
+    if (metadataFile == null) {
+      return null;
+    }
+    try {
+      final decoded = jsonDecode(await metadataFile.readAsString());
+      if (decoded is! Map) {
+        return null;
+      }
+      final comic = DownloadedMangaComic.fromJson(
+        Map<String, dynamic>.from(decoded),
+      );
+      final normalizedCoverPath = await _normalizeCoverPath(comicDir, comic.localCoverPath);
+      final normalizedChapters = await _normalizeChapterPaths(
+        comicDir: comicDir,
+        chapters: comic.chapters,
+      );
+      return comic.copyWith(
+        localCoverPath: normalizedCoverPath,
+        chapters: normalizedChapters,
+        updatedAtMillis: DateTime.now().millisecondsSinceEpoch,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<String?> _normalizeCoverPath(Directory comicDir, String? currentPath) async {
+    final normalized = currentPath?.trim() ?? '';
+    if (normalized.isNotEmpty && await File(normalized).exists()) {
+      return normalized;
+    }
+    final file = await _findLocalCoverFile(comicDir);
+    return file?.path;
+  }
+
+  Future<File?> _findLocalCoverFile(Directory comicDir) async {
+    for (final name in const [
+      '漫画封面.jpg',
+      '漫画封面.jpeg',
+      '漫画封面.png',
+      '漫画封面.webp',
+      'cover.jpg',
+      'cover.jpeg',
+      'cover.png',
+      'cover.webp',
+    ]) {
+      final file = File('${comicDir.path}/$name');
+      if (await file.exists()) {
+        return file;
+      }
+    }
+    return null;
+  }
+
+  Future<List<DownloadedMangaChapter>> _normalizeChapterPaths({
+    required Directory comicDir,
+    required List<DownloadedMangaChapter> chapters,
+  }) async {
+    final normalized = <DownloadedMangaChapter>[];
+    for (final chapter in chapters) {
+      final collected = <String>[];
+      for (final path in chapter.imagePaths) {
+        final trimmed = path.trim();
+        if (trimmed.isEmpty) {
+          continue;
+        }
+        final file = File(trimmed);
+        if (await file.exists()) {
+          collected.add(file.path);
+        }
+      }
+      if (collected.isEmpty) {
+        final chapterDir = await _findChapterDirectoryByChapter(chapter, comicDir);
+        if (chapterDir != null) {
+          final files = await chapterDir
+              .list()
+              .where((entity) => entity is File)
+              .cast<File>()
+              .toList();
+          files.sort((a, b) => a.path.compareTo(b.path));
+          collected.addAll(files.map((file) => file.path));
+        }
+      }
+      if (collected.isEmpty) {
+        continue;
+      }
+      normalized.add(
+        DownloadedMangaChapter(
+          epId: chapter.epId,
+          title: chapter.title,
+          index: chapter.index,
+          imagePaths: collected,
+        ),
+      );
+    }
+    normalized.sort((a, b) => a.index.compareTo(b.index));
+    return normalized;
+  }
+
+  Future<Directory?> _findChapterDirectoryByChapter(
+    DownloadedMangaChapter chapter,
+    Directory comicDir,
+  ) async {
+    final chapterNumber = (chapter.index + 1).toString().padLeft(3, '0');
+    try {
+      await for (final entity in comicDir.list()) {
+        if (entity is! Directory) {
+          continue;
+        }
+        final name = entity.uri.pathSegments.isEmpty
+            ? ''
+            : entity.uri.pathSegments.last;
+        if (name.startsWith('Manga第$chapterNumber话')) {
+          return entity;
+        }
+      }
+    } catch (_) {}
+    return null;
   }
 }

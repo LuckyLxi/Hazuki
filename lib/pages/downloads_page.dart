@@ -45,21 +45,34 @@ class _DownloadsPageState extends State<DownloadsPage>
     });
   }
 
-  Future<void> _deleteSelected() async {
-    if (_selectedComicIds.isEmpty) {
-      return;
-    }
+  Future<bool?> _showAnimatedDeleteDialog({
+    required String title,
+    required String content,
+  }) {
     final strings = l10n(context);
-    final confirmed = await showDialog<bool>(
+    return showGeneralDialog<bool>(
       context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: Text(strings.downloadsDeleteSelectedTitle),
-          content: Text(
-            strings.downloadsDeleteSelectedContent(
-              '${_selectedComicIds.length}',
-            ),
+      barrierDismissible: true,
+      barrierLabel: strings.commonClose,
+      transitionDuration: const Duration(milliseconds: 260),
+      transitionBuilder: (dialogContext, animation, secondaryAnimation, child) {
+        final curved = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        );
+        return FadeTransition(
+          opacity: curved,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.92, end: 1).animate(curved),
+            child: child,
           ),
+        );
+      },
+      pageBuilder: (dialogContext, animation, secondaryAnimation) {
+        return AlertDialog(
+          title: Text(title),
+          content: Text(content),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(dialogContext, false),
@@ -72,6 +85,19 @@ class _DownloadsPageState extends State<DownloadsPage>
           ],
         );
       },
+    );
+  }
+
+  Future<void> _deleteSelected() async {
+    if (_selectedComicIds.isEmpty) {
+      return;
+    }
+    final strings = l10n(context);
+    final confirmed = await _showAnimatedDeleteDialog(
+      title: strings.downloadsDeleteSelectedTitle,
+      content: strings.downloadsDeleteSelectedContent(
+        '${_selectedComicIds.length}',
+      ),
     );
     if (confirmed != true) {
       return;
@@ -88,26 +114,9 @@ class _DownloadsPageState extends State<DownloadsPage>
 
   Future<void> _deleteSingleComic(DownloadedMangaComic comic) async {
     final strings = l10n(context);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: Text(strings.downloadsDeleteSelectedTitle),
-          content: Text(
-            strings.downloadsDeleteSelectedContent('1'),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: Text(strings.commonCancel),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(dialogContext, true),
-              child: Text(strings.comicDetailDelete),
-            ),
-          ],
-        );
-      },
+    final confirmed = await _showAnimatedDeleteDialog(
+      title: strings.downloadsDeleteSelectedTitle,
+      content: strings.downloadsDeleteSelectedContent('1'),
     );
     if (confirmed != true) {
       return;
@@ -124,6 +133,14 @@ class _DownloadsPageState extends State<DownloadsPage>
   }
 
   Future<void> _deleteTask(String comicId) async {
+    final strings = l10n(context);
+    final confirmed = await _showAnimatedDeleteDialog(
+      title: strings.comicDetailDelete,
+      content: strings.downloadsDeleteSelectedContent('1'),
+    );
+    if (confirmed != true) {
+      return;
+    }
     await MangaDownloadService.instance.deleteTask(comicId);
   }
 
@@ -140,10 +157,32 @@ class _DownloadsPageState extends State<DownloadsPage>
   PreferredSizeWidget _buildAppBar(AppLocalizations strings) {
     return hazukiFrostedAppBar(
       context: context,
-      title: Text(
-        _selectionMode
-            ? strings.downloadsSelectionTitle('${_selectedComicIds.length}')
-            : strings.downloadsTitle,
+      title: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 220),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        transitionBuilder: (child, animation) {
+          return FadeTransition(
+            opacity: animation,
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0, 0.18),
+                end: Offset.zero,
+              ).animate(animation),
+              child: child,
+            ),
+          );
+        },
+        child: Text(
+          _selectionMode
+              ? strings.downloadsSelectionTitle('${_selectedComicIds.length}')
+              : strings.downloadsTitle,
+          key: ValueKey<String>(
+            _selectionMode
+                ? 'selection_${_selectedComicIds.length}_${_tabController.index}'
+                : 'title_${_tabController.index}',
+          ),
+        ),
       ),
       bottom: TabBar(
         controller: _tabController,
@@ -153,29 +192,66 @@ class _DownloadsPageState extends State<DownloadsPage>
         ],
       ),
       actions: [
-        if (_tabController.index == 1)
-          IconButton(
-            tooltip: _selectionMode
-                ? strings.commonClose
-                : strings.downloadsActionSelect,
-            onPressed: () {
-              setState(() {
-                if (_selectionMode) {
-                  _selectionEnabled = false;
-                  _selectedComicIds.clear();
-                } else {
-                  _selectionEnabled = true;
-                }
-              });
-            },
-            icon: Icon(_selectionMode ? Icons.close : Icons.checklist_rounded),
-          ),
-        if (_selectionMode)
-          IconButton(
-            tooltip: strings.comicDetailDelete,
-            onPressed: _deleteSelected,
-            icon: const Icon(Icons.delete_outline),
-          ),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 220),
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeInCubic,
+          transitionBuilder: (child, animation) {
+            return FadeTransition(
+              opacity: animation,
+              child: ScaleTransition(
+                scale: Tween<double>(begin: 0.86, end: 1).animate(animation),
+                child: child,
+              ),
+            );
+          },
+          child: _tabController.index == 1
+              ? IconButton(
+                  key: ValueKey<String>('select_${_selectionMode ? 'on' : 'off'}'),
+                  tooltip: _selectionMode
+                      ? strings.commonClose
+                      : strings.downloadsActionSelect,
+                  onPressed: () {
+                    setState(() {
+                      if (_selectionMode) {
+                        _selectionEnabled = false;
+                        _selectedComicIds.clear();
+                      } else {
+                        _selectionEnabled = true;
+                      }
+                    });
+                  },
+                  icon: Icon(
+                    _selectionMode ? Icons.close : Icons.checklist_rounded,
+                  ),
+                )
+              : const SizedBox.shrink(key: ValueKey<String>('select_hidden')),
+        ),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 220),
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeInCubic,
+          transitionBuilder: (child, animation) {
+            return FadeTransition(
+              opacity: animation,
+              child: SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0.2, 0),
+                  end: Offset.zero,
+                ).animate(animation),
+                child: child,
+              ),
+            );
+          },
+          child: _selectionMode
+              ? IconButton(
+                  key: const ValueKey<String>('delete_selection'),
+                  tooltip: strings.comicDetailDelete,
+                  onPressed: _deleteSelected,
+                  icon: const Icon(Icons.delete_outline),
+                )
+              : const SizedBox.shrink(key: ValueKey<String>('delete_hidden')),
+        ),
       ],
     );
   }

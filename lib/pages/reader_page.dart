@@ -1081,14 +1081,13 @@ class _ReaderPageState extends State<ReaderPage>
                 _pinchToZoom
                   ? InteractiveViewer(
                       transformationController: _zoomController,
-                      panEnabled: true,
+                      panEnabled: _isZoomed,
                       scaleEnabled: true,
                       panAxis: PanAxis.free,
-                      // 允许全方位平移和缩放，boundaryMargin 设为零防止图片拖出屏幕边界
-                      boundaryMargin: const EdgeInsets.all(120),
-                      // 不锁定轴向，支持全方位触发放大
+                      // 仅在放大后允许拖动，避免原始大小时图片被上下左右移动。
+                      boundaryMargin: EdgeInsets.zero,
                       constrained: true,
-                      clipBehavior: Clip.none,
+                      clipBehavior: Clip.hardEdge,
                       minScale: 1.0,
                       maxScale: 5.0,
                       child: _readerMode == _ReaderMode.rightToLeft

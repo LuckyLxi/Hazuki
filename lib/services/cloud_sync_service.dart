@@ -59,7 +59,6 @@ class CloudSyncService {
   static const _usernameKey = 'cloud_sync_username';
   static const _passwordKey = 'cloud_sync_password';
 
-  static const _stateFileName = 'state.json';
   static const _settingsFileName = 'settings.json';
   static const _readingFileName = 'reading.sqlite';
   static const _searchHistoryFileName = 'search_history.jsonl';
@@ -148,9 +147,7 @@ class CloudSyncService {
     final rootUrl = _rootUrl(config.url);
     await _ensureDir(dio, rootUrl);
 
-    final state = await _readRemoteState(dio, rootUrl);
-    final nextSlot = ((state['latestSlot'] as int? ?? 0) % 3) + 1;
-    final backupDirUrl = '$rootUrl/backup_$nextSlot';
+    final backupDirUrl = '$rootUrl/backup';
     await _ensureDir(dio, backupDirUrl);
 
     final snapshot = await _buildLocalSnapshotFiles();
@@ -171,35 +168,6 @@ class CloudSyncService {
       'searchCount': snapshot.searchCount,
     };
     await _putString(dio, '$backupDirUrl/manifest.json', jsonEncode(manifest));
-
-    final backups = <Map<String, dynamic>>[];
-    final oldBackups = (state['backups'] as List?) ?? const [];
-    for (final item in oldBackups) {
-      if (item is! Map) {
-        continue;
-      }
-      final map = Map<String, dynamic>.from(item);
-      final slot = map['slot'];
-      if (slot is int && slot != nextSlot) {
-        backups.add(map);
-      }
-    }
-    backups.add({'slot': nextSlot, 'updatedAtMs': nowMs});
-    backups.sort((a, b) {
-      final av = (a['updatedAtMs'] as int?) ?? 0;
-      final bv = (b['updatedAtMs'] as int?) ?? 0;
-      return bv.compareTo(av);
-    });
-    if (backups.length > 3) {
-      backups.removeRange(3, backups.length);
-    }
-
-    final nextState = {
-      'latestSlot': nextSlot,
-      'updatedAtMs': nowMs,
-      'backups': backups,
-    };
-    await _putString(dio, '$rootUrl/$_stateFileName', jsonEncode(nextState));
   }
 
   Future<void> restoreLatestBackup({CloudSyncConfig? configOverride}) async {
@@ -210,13 +178,7 @@ class CloudSyncService {
 
     final dio = _buildDio(config);
     final rootUrl = _rootUrl(config.url);
-    final state = await _readRemoteState(dio, rootUrl);
-    final latestSlot = state['latestSlot'] as int?;
-    if (latestSlot == null || latestSlot < 1 || latestSlot > 3) {
-      throw Exception('cloud_sync_no_backup_available');
-    }
-
-    final backupDirUrl = '$rootUrl/backup_$latestSlot';
+    final backupDirUrl = '$rootUrl/backup';
     final settingsText = await _getString(
       dio,
       '$backupDirUrl/$_settingsFileName',
@@ -312,21 +274,6 @@ class CloudSyncService {
     return utf8.decode(bytes);
   }
 
-  Future<Map<String, dynamic>> _readRemoteState(Dio dio, String rootUrl) async {
-    try {
-      final text = await _getString(dio, '$rootUrl/$_stateFileName');
-      final decoded = jsonDecode(text);
-      if (decoded is Map) {
-        return Map<String, dynamic>.from(decoded);
-      }
-    } catch (_) {}
-    return {
-      'latestSlot': 0,
-      'updatedAtMs': 0,
-      'backups': const [],
-    };
-  }
-
   Future<_LocalSnapshot> _buildLocalSnapshotFiles() async {
     final prefs = await SharedPreferences.getInstance();
     final settingsMap = <String, dynamic>{};
@@ -420,7 +367,11 @@ class CloudSyncService {
     final data = Map<String, dynamic>.from(dataRaw);
     final prefs = await SharedPreferences.getInstance();
     for (final entry in data.entries) {
-      final sanitized = _sanitizeRestoredSetting(entry.key, entry.value);
+      final sanitized = _sanitizeRestoredSetting(
+        prefs,
+        entry.key,
+        entry.value,
+      );
       if (sanitized == null) {
         continue;
       }
@@ -428,7 +379,11 @@ class CloudSyncService {
     }
   }
 
-  dynamic _sanitizeRestoredSetting(String key, dynamic value) {
+  dynamic _sanitizeRestoredSetting(
+    SharedPreferences prefs,
+    String key,
+    dynamic value,
+  ) {
     final normalizedKey = key.trim();
     if (normalizedKey == 'cookie_store_v1') {
       return null;
@@ -445,7 +400,13 @@ class CloudSyncService {
         return value;
       }
       final sanitized = Map<String, dynamic>.from(decoded);
-      sanitized.remove('account');
+      final existingRaw = prefs.getString(normalizedKey);
+      if (existingRaw != null && existingRaw.trim().isNotEmpty) {
+        final existingDecoded = jsonDecode(existingRaw);
+        if (existingDecoded is Map && existingDecoded['account'] != null) {
+          sanitized['account'] = existingDecoded['account'];
+        }
+      }
       return jsonEncode(sanitized);
     } catch (_) {
       return value;

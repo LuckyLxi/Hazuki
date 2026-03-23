@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'l10n/app_localizations.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -74,6 +75,22 @@ Future<void> _loadGlobalUiFlags() async {
   hazukiNoImageModeNotifier.value = prefs.getBool(_noImageModeKey) ?? false;
 }
 
+Future<void> _ensureAndroidNoMediaMarker() async {
+  if (!Platform.isAndroid) {
+    return;
+  }
+  try {
+    final externalDir = await getExternalStorageDirectory();
+    if (externalDir == null) {
+      return;
+    }
+    final noMediaFile = File('${externalDir.path}/.nomedia');
+    if (!await noMediaFile.exists()) {
+      await noMediaFile.writeAsString('', flush: true);
+    }
+  } catch (_) {}
+}
+
 Future<void> setHazukiNoImageMode(bool enabled) async {
   hazukiNoImageModeNotifier.value = enabled;
   final prefs = await SharedPreferences.getInstance();
@@ -85,6 +102,8 @@ AppLocalizations l10n(BuildContext context) => AppLocalizations.of(context)!;
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await _loadGlobalUiFlags();
+  await _ensureAndroidNoMediaMarker();
+  await MangaDownloadService.instance.ensureInitialized();
   runApp(const HazukiApp());
 }
 
@@ -253,6 +272,7 @@ class _HazukiAppState extends State<HazukiApp> {
   bool _hasConnectivity = true;
   bool _isShowingSourceUpdateDialog = false;
   bool _showInitialSourceBootstrapOverlay = false;
+  bool _showInitialSourceBootstrapIntro = false;
   bool _sourceBootstrapIndeterminate = true;
   double _sourceBootstrapProgress = 0;
   String? _sourceBootstrapErrorText;
@@ -399,11 +419,22 @@ class _HazukiAppState extends State<HazukiApp> {
 
     if (!hasLocalSource) {
       setState(() {
-        _showInitialSourceBootstrapOverlay = true;
+        _showInitialSourceBootstrapIntro = true;
+        _showInitialSourceBootstrapOverlay = false;
         _sourceBootstrapIndeterminate = true;
         _sourceBootstrapProgress = 0;
         _sourceBootstrapErrorText = null;
       });
+      unawaited(() async {
+        await Future<void>.delayed(const Duration(milliseconds: 900));
+        if (!mounted || !_showInitialSourceBootstrapIntro) {
+          return;
+        }
+        setState(() {
+          _showInitialSourceBootstrapIntro = false;
+          _showInitialSourceBootstrapOverlay = true;
+        });
+      }());
       try {
         await HazukiSourceService.instance.init(
           onSourceDownloadProgress: (received, total) {
@@ -435,6 +466,7 @@ class _HazukiAppState extends State<HazukiApp> {
         return;
       }
       setState(() {
+        _showInitialSourceBootstrapIntro = false;
         _showInitialSourceBootstrapOverlay = false;
       });
       await Future<void>.delayed(const Duration(milliseconds: 280));
@@ -792,7 +824,9 @@ class _HazukiAppState extends State<HazukiApp> {
                   ),
                 Positioned.fill(
                   child: IgnorePointer(
-                    ignoring: !_showInitialSourceBootstrapOverlay,
+                    ignoring:
+                        !_showInitialSourceBootstrapOverlay &&
+                        !_showInitialSourceBootstrapIntro,
                     child: AnimatedSwitcher(
                       duration: const Duration(milliseconds: 280),
                       switchInCurve: Curves.easeOutCubic,
@@ -814,85 +848,100 @@ class _HazukiAppState extends State<HazukiApp> {
                           ),
                         );
                       },
-                      child: _showInitialSourceBootstrapOverlay
-                          ? ColoredBox(
-                              key: const ValueKey(
-                                'initial-source-bootstrap-overlay',
-                              ),
-                              color: Colors.black.withValues(alpha: 0.18),
-                              child: Center(
-                                child: Container(
-                                  width: 332,
-                                  padding: const EdgeInsets.fromLTRB(
-                                    20,
-                                    18,
-                                    20,
-                                    18,
+                      child:
+                          _showInitialSourceBootstrapOverlay ||
+                                  _showInitialSourceBootstrapIntro
+                              ? ColoredBox(
+                                  key: ValueKey(
+                                    _showInitialSourceBootstrapOverlay
+                                        ? 'initial-source-bootstrap-overlay'
+                                        : 'initial-source-bootstrap-intro',
                                   ),
-                                  decoration: BoxDecoration(
-                                    color: scheme.surface,
-                                    borderRadius: BorderRadius.circular(28),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withValues(
-                                          alpha: 0.14,
-                                        ),
-                                        blurRadius: 24,
-                                        offset: const Offset(0, 10),
+                                  color: _showInitialSourceBootstrapOverlay
+                                      ? Colors.black.withValues(alpha: 0.18)
+                                      : Colors.transparent,
+                                  child: Center(
+                                    child: Container(
+                                      width: 332,
+                                      padding: const EdgeInsets.fromLTRB(
+                                        20,
+                                        18,
+                                        20,
+                                        18,
                                       ),
-                                    ],
-                                  ),
-                                  child: Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        l10n(context)
-                                            .sourceBootstrapDownloading,
-                                        style: Theme.of(
-                                          context,
-                                        ).textTheme.titleMedium,
-                                      ),
-                                      const SizedBox(height: 14),
-                                      LinearProgressIndicator(
-                                        value: _sourceBootstrapIndeterminate
-                                            ? null
-                                            : _sourceBootstrapProgress,
-                                        borderRadius: BorderRadius.circular(
-                                          999,
-                                        ),
-                                        minHeight: 8,
-                                      ),
-                                      const SizedBox(height: 10),
-                                      Text(
-                                        _sourceBootstrapErrorText ??
-                                            (_sourceBootstrapIndeterminate
-                                                ? l10n(context)
-                                                      .sourceBootstrapPreparing
-                                                : l10n(context)
-                                                      .sourceBootstrapProgress(
-                                                        (_sourceBootstrapProgress *
-                                                                100)
-                                                            .toStringAsFixed(0),
-                                                      )),
-                                        style: Theme.of(context)
-                                            .textTheme
-                                            .bodySmall
-                                            ?.copyWith(
-                                              color: scheme.onSurfaceVariant,
+                                      decoration: BoxDecoration(
+                                        color: scheme.surface,
+                                        borderRadius: BorderRadius.circular(28),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: Colors.black.withValues(
+                                              alpha: 0.14,
                                             ),
+                                            blurRadius: 24,
+                                            offset: const Offset(0, 10),
+                                          ),
+                                        ],
                                       ),
-                                    ],
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            l10n(context)
+                                                .sourceBootstrapDownloading,
+                                            style: Theme.of(
+                                              context,
+                                            ).textTheme.titleMedium,
+                                          ),
+                                          const SizedBox(height: 14),
+                                          if (_showInitialSourceBootstrapOverlay)
+                                            ...[
+                                              LinearProgressIndicator(
+                                                value:
+                                                    _sourceBootstrapIndeterminate
+                                                        ? null
+                                                        : _sourceBootstrapProgress,
+                                                borderRadius:
+                                                    BorderRadius.circular(999),
+                                                minHeight: 8,
+                                              ),
+                                              const SizedBox(height: 10),
+                                            ],
+                                          Text(
+                                            _sourceBootstrapErrorText ??
+                                                (_showInitialSourceBootstrapIntro
+                                                    ? l10n(context)
+                                                          .sourceBootstrapPreparing
+                                                    : _sourceBootstrapIndeterminate
+                                                    ? l10n(context)
+                                                          .sourceBootstrapPreparing
+                                                    : l10n(context)
+                                                          .sourceBootstrapProgress(
+                                                            (_sourceBootstrapProgress *
+                                                                    100)
+                                                                .toStringAsFixed(
+                                                                  0,
+                                                                ),
+                                                          )),
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .bodySmall
+                                                ?.copyWith(
+                                                  color:
+                                                      scheme.onSurfaceVariant,
+                                                ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : const SizedBox.shrink(
+                                  key: ValueKey(
+                                    'initial-source-bootstrap-overlay-empty',
                                   ),
                                 ),
-                              ),
-                            )
-                          : const SizedBox.shrink(
-                              key: ValueKey(
-                                'initial-source-bootstrap-overlay-empty',
-                              ),
-                            ),
                     ),
                   ),
                 ),
@@ -900,11 +949,11 @@ class _HazukiAppState extends State<HazukiApp> {
             );
           },
           home: HazukiHomePage(
-            key: ValueKey(_homeRefreshTick),
             appearanceSettings: _appearance,
             onAppearanceChanged: _updateAppearance,
             locale: _locale,
             onLocaleChanged: _updateLocalePreference,
+            refreshTick: _homeRefreshTick,
           ),
         );
       },
