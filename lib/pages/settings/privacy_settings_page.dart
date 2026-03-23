@@ -1,0 +1,121 @@
+part of '../../main.dart';
+
+class PrivacySettingsPage extends StatefulWidget {
+  const PrivacySettingsPage({super.key});
+
+  @override
+  State<PrivacySettingsPage> createState() => _PrivacySettingsPageState();
+}
+
+class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
+  static const _channel = MethodChannel('hazuki.comics/privacy');
+
+  bool _blurBackground = false;
+  bool _biometricAuth = false;
+  bool _authOnResume = false;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSettings();
+  }
+
+  Future<void> _loadSettings() async {
+    try {
+      final dynamic result = await _channel.invokeMethod('getPrivacySettings');
+      if (result is Map) {
+        setState(() {
+          _blurBackground = result['blurBackground'] == true;
+          _biometricAuth = result['biometricAuth'] == true;
+          _authOnResume = result['authOnResume'] == true;
+          _loading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
+  }
+
+  Future<void> _toggleBlurBackground(bool value) async {
+    setState(() => _blurBackground = value);
+    try {
+      await _channel.invokeMethod('setBlurBackground', {'enabled': value});
+    } catch (_) {}
+  }
+
+  Future<void> _toggleBiometricAuth(bool value) async {
+    if (value) {
+      try {
+        final success = await _channel.invokeMethod('authenticate');
+        if (success != true) {
+          return;
+        }
+      } catch (_) {
+        return;
+      }
+    }
+
+    setState(() {
+      _biometricAuth = value;
+      if (!value) {
+        _authOnResume = false;
+      }
+    });
+    try {
+      await _channel.invokeMethod('setBiometricAuth', {'enabled': value});
+      if (!value) {
+        await _channel.invokeMethod('setAuthOnResume', {'enabled': false});
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _toggleAuthOnResume(bool value) async {
+    if (!_biometricAuth) return;
+    setState(() => _authOnResume = value);
+    try {
+      await _channel.invokeMethod('setAuthOnResume', {'enabled': value});
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = l10n(context);
+    return Scaffold(
+      appBar: hazukiFrostedAppBar(
+        context: context,
+        title: Text(strings.privacySettingsTitle),
+      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
+              children: [
+                SwitchListTile(
+                  secondary: const Icon(Icons.blur_on_outlined),
+                  title: Text(strings.privacyBlurTaskTitle),
+                  subtitle: Text(strings.privacyBlurTaskSubtitle),
+                  value: _blurBackground,
+                  onChanged: _toggleBlurBackground,
+                ),
+                const Divider(height: 1),
+                SwitchListTile(
+                  secondary: const Icon(Icons.fingerprint_outlined),
+                  title: Text(strings.privacyBiometricUnlockTitle),
+                  subtitle: Text(strings.privacyBiometricUnlockSubtitle),
+                  value: _biometricAuth,
+                  onChanged: _toggleBiometricAuth,
+                ),
+                SwitchListTile(
+                  secondary: const Icon(Icons.lock_clock_outlined),
+                  title: Text(strings.privacyAuthOnResumeTitle),
+                  subtitle: Text(strings.privacyAuthOnResumeSubtitle),
+                  value: _authOnResume,
+                  onChanged: _biometricAuth ? _toggleAuthOnResume : null,
+                ),
+              ],
+            ),
+    );
+  }
+}

@@ -1,0 +1,186 @@
+class FavoriteFolder {
+  const FavoriteFolder({
+    required this.id,
+    required this.name,
+  });
+
+  final String id;
+  final String name;
+}
+
+class FavoriteFoldersResult {
+  const FavoriteFoldersResult.success({
+    required this.folders,
+    required this.favoritedFolderIds,
+  }) : errorMessage = null;
+
+  const FavoriteFoldersResult.error(this.errorMessage)
+      : folders = const [],
+        favoritedFolderIds = const <String>{};
+
+  final List<FavoriteFolder> folders;
+  final Set<String> favoritedFolderIds;
+  final String? errorMessage;
+}
+
+class FavoriteComicsResult {
+  const FavoriteComicsResult.success(
+    this.comics, {
+    this.maxPage,
+  }) : errorMessage = null;
+
+  const FavoriteComicsResult.error(this.errorMessage)
+      : comics = const [],
+        maxPage = null;
+
+  final List<ExploreComic> comics;
+  final int? maxPage;
+  final String? errorMessage;
+}
+
+class ExploreSection {
+  const ExploreSection({
+    required this.title,
+    required this.comics,
+    this.viewMoreUrl,
+  });
+
+  final String title;
+  final List<ExploreComic> comics;
+  /// jm.js 专栏 viewMore 字段，如 "category:禁漫天堂@0"，可用于分页加载更多
+  final String? viewMoreUrl;
+}
+
+class ExploreComic {
+  const ExploreComic({
+    required this.id,
+    required this.title,
+    required this.subTitle,
+    required this.cover,
+  });
+
+  final String id;
+  final String title;
+  final String subTitle;
+  final String cover;
+}
+
+class SearchComicsResult {
+  const SearchComicsResult({
+    required this.comics,
+    required this.maxPage,
+  });
+
+  final List<ExploreComic> comics;
+  final int? maxPage;
+}
+
+class CategoryTagGroup {
+  const CategoryTagGroup({
+    required this.name,
+    required this.tags,
+  });
+
+  final String name;
+  final List<String> tags;
+}
+
+class CategoryRankingOption {
+  const CategoryRankingOption({
+    required this.value,
+    required this.label,
+  });
+
+  final String value;
+  final String label;
+}
+
+class CategoryComicsResult {
+  const CategoryComicsResult({
+    required this.comics,
+    required this.maxPage,
+  });
+
+  final List<ExploreComic> comics;
+  final int? maxPage;
+}
+
+class ComicDetailsData {
+  const ComicDetailsData({
+    required this.id,
+    required this.title,
+    required this.subTitle,
+    required this.cover,
+    required this.description,
+    required this.updateTime,
+    required this.likesCount,
+    required this.chapters,
+    required this.tags,
+    required this.recommend,
+    required this.isFavorite,
+    required this.subId,
+  });
+
+  final String id;
+  final String title;
+  final String subTitle;
+  final String cover;
+  final String description;
+  final String updateTime;
+  final String likesCount;
+  final Map<String, String> chapters;
+  final Map<String, List<String>> tags;
+  final List<ExploreComic> recommend;
+  final bool isFavorite;
+  final String subId;
+}
+
+class ComicCommentData {
+  const ComicCommentData({
+    required this.avatar,
+    required this.userName,
+    required this.time,
+    required this.content,
+    this.id,
+    this.replyCount,
+    this.isLiked,
+    this.score,
+    this.voteStatus,
+  });
+
+  final String avatar;
+  final String userName;
+  final String time;
+  final String content;
+  final String? id;
+  final int? replyCount;
+  final bool? isLiked;
+  final int? score;
+  final int? voteStatus;
+}
+
+class ComicCommentsPageResult {
+  const ComicCommentsPageResult({
+    required this.comments,
+    required this.maxPage,
+  });
+
+  final List<ComicCommentData> comments;
+  final int? maxPage;
+}
+
+class SourceMeta {
+  const SourceMeta({
+    required this.name,
+    required this.key,
+    required this.version,
+    required this.supportsAccount,
+    required this.settingsDefaults,
+  });
+
+  final String name;
+  final String key;
+  final String version;
+  final bool supportsAccount;
+  final Map<String, dynamic> settingsDefaults;
+}

@@ -1,0 +1,69 @@
+{
+	"configurations" : 
+	[
+		{
+			"directories" : 
+			[
+				{
+					"build" : ".",
+					"jsonFile" : "directory-.-Debug-d0094a50bb2071803777.json",
+					"minimumCMakeVersion" : 
+					{
+						"string" : "3.7"
+					},
+					"projectIndex" : 0,
+					"source" : ".",
+					"targetIndexes" : 
+					[
+						0,
+						1
+					]
+				}
+			],
+			"name" : "Debug",
+			"projects" : 
+			[
+				{
+					"directoryIndexes" : 
+					[
+						0
+					],
+					"name" : "quickjs",
+					"targetIndexes" : 
+					[
+						0,
+						1
+					]
+				}
+			],
+			"targets" : 
+			[
+				{
+					"directoryIndex" : 0,
+					"id" : "qjs::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-qjs-Debug-4fdc265e24fc07540b12.json",
+					"name" : "qjs",
+					"projectIndex" : 0
+				},
+				{
+					"directoryIndex" : 0,
+					"id" : "quickjs::@6890427a1f51a3e7e1df",
+					"jsonFile" : "target-quickjs-Debug-74b4004c0d1b478d9044.json",
+					"name" : "quickjs",
+					"projectIndex" : 0
+				}
+			]
+		}
+	],
+	"kind" : "codemodel",
+	"paths" : 
+	{
+		"build" : "D:/Project/hazuki/third_party/flutter_qjs/android/.cxx/Debug/12p6y6y1/x86_64",
+		"source" : "D:/Project/hazuki/third_party/flutter_qjs/android/src/main/cxx"
+	},
+	"version" : 
+	{
+		"major" : 2,
+		"minor" : 3
+	}
+}

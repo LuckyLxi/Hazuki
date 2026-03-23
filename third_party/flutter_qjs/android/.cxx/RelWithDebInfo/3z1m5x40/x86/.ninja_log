@@ -1,0 +1,14 @@
+# ninja log v5
+69	257	7944347739186214	CMakeFiles/quickjs.dir/D_/Project/hazuki/third_party/flutter_qjs/cxx/quickjs/cutils.c.o	cd4acd157754788e
+1	313	7944347739742780	CMakeFiles/quickjs.dir/D_/Project/hazuki/third_party/flutter_qjs/cxx/quickjs/libunicode.c.o	b8c9b678981ad516
+46	485	7944347741454792	CMakeFiles/quickjs.dir/D_/Project/hazuki/third_party/flutter_qjs/cxx/quickjs/libregexp.c.o	b335d133d6be1cf
+97	880	7944347745361889	CMakeFiles/qjs.dir/D_/Project/hazuki/third_party/flutter_qjs/cxx/ffi.cpp.o	1a40b89ac468fb75
+24	25852	7944347993801872	CMakeFiles/quickjs.dir/D_/Project/hazuki/third_party/flutter_qjs/cxx/quickjs/quickjs.c.o	79de1bfd2daecf8d
+25853	26049	7944347996580659	libquickjs.a	bc3e2c4c3e30b639
+26049	26187	7944347998419716	D:/Project/hazuki/build/flutter_qjs/intermediates/cxx/RelWithDebInfo/3z1m5x40/obj/x86/libqjs.so	8cb225cce3aa2d49
+6	155	7944350785410830	D:/Project/hazuki/build/flutter_qjs/intermediates/cxx/RelWithDebInfo/3z1m5x40/obj/x86/libqjs.so	8cb225cce3aa2d49
+6	161	7945069599498727	D:/Project/hazuki/build/flutter_qjs/intermediates/cxx/RelWithDebInfo/3z1m5x40/obj/x86/libqjs.so	8cb225cce3aa2d49
+6	171	7945637789845250	D:/Project/hazuki/build/flutter_qjs/intermediates/cxx/RelWithDebInfo/3z1m5x40/obj/x86/libqjs.so	8cb225cce3aa2d49
+6	149	7945695201114500	D:/Project/hazuki/build/flutter_qjs/intermediates/cxx/RelWithDebInfo/3z1m5x40/obj/x86/libqjs.so	8cb225cce3aa2d49
+6	162	7945872802858099	D:/Project/hazuki/build/flutter_qjs/intermediates/cxx/RelWithDebInfo/3z1m5x40/obj/x86/libqjs.so	8cb225cce3aa2d49
+6	149	7945975040857264	D:/Project/hazuki/build/flutter_qjs/intermediates/cxx/RelWithDebInfo/3z1m5x40/obj/x86/libqjs.so	8cb225cce3aa2d49

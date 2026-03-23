@@ -1,0 +1,4 @@
+D:/Project/hazuki/third_party/flutter_qjs/android/.cxx/Debug/12p6y6y1/x86/CMakeFiles/quickjs.dir
+D:/Project/hazuki/third_party/flutter_qjs/android/.cxx/Debug/12p6y6y1/x86/CMakeFiles/qjs.dir
+D:/Project/hazuki/third_party/flutter_qjs/android/.cxx/Debug/12p6y6y1/x86/CMakeFiles/edit_cache.dir
+D:/Project/hazuki/third_party/flutter_qjs/android/.cxx/Debug/12p6y6y1/x86/CMakeFiles/rebuild_cache.dir

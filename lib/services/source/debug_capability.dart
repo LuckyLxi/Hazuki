@@ -1,0 +1,308 @@
+part of '../hazuki_source_service.dart';
+
+extension HazukiSourceServiceDebugCapability on HazukiSourceService {
+Future<void> warmUpFavoritesDebugInfo() async {
+  if (!isLogged) {
+    return;
+  }
+  if (_isWarmingUpFavoritesDebug) {
+    return;
+  }
+  _isWarmingUpFavoritesDebug = true;
+  try {
+    await _collectFavoritesDebugInfoCore();
+  } catch (_) {
+    // 静默预热，不向 UI 抛错
+  } finally {
+    _isWarmingUpFavoritesDebug = false;
+  }
+}
+
+Future<Map<String, dynamic>> collectFavoritesDebugInfo({
+  bool forceRefresh = true,
+}) async {
+  if (!forceRefresh && _favoritesDebugCache != null) {
+    return _favoritesDebugCache!;
+  }
+  return _collectFavoritesDebugInfoCore();
+}
+
+Future<Map<String, dynamic>> _collectFavoritesDebugInfoCore() async {
+  final engine = _engine;
+  if (engine == null) {
+    throw Exception('漫画源尚未初始化完成');
+  }
+
+  final info = <String, dynamic>{
+    'statusText': _statusText,
+    'platform': Platform.operatingSystem,
+    'sourceMeta': {
+      'name': _sourceMeta?.name,
+      'key': _sourceMeta?.key,
+      'version': _sourceMeta?.version,
+      'supportsAccount': _sourceMeta?.supportsAccount,
+    },
+    'isLogged': isLogged,
+    'currentAccount': currentAccount,
+    'generatedAt': DateTime.now().toIso8601String(),
+    'checks': <String, dynamic>{},
+    'calls': <String, dynamic>{},
+    'favoritePageLoadResult': <String, dynamic>{},
+  };
+
+  final checks = info['checks'] as Map<String, dynamic>;
+  checks['hasSource'] = _asBool(engine.evaluate('!!this.__hazuki_source'));
+  checks['hasFavorites'] = _asBool(
+    engine.evaluate('!!this.__hazuki_source?.favorites'),
+  );
+  checks['multiFolder'] = _jsonSafe(
+    engine.evaluate('this.__hazuki_source?.favorites?.multiFolder'),
+  );
+  checks['hasLoadFolders'] = _asBool(
+    engine.evaluate('!!this.__hazuki_source?.favorites?.loadFolders'),
+  );
+  checks['hasLoadComics'] = _asBool(
+    engine.evaluate('!!this.__hazuki_source?.favorites?.loadComics'),
+  );
+  checks['hasLoadNext'] = _asBool(
+    engine.evaluate('!!this.__hazuki_source?.favorites?.loadNext'),
+  );
+
+  final calls = info['calls'] as Map<String, dynamic>;
+  calls['loadFolders(null)'] = await _debugJsCall(
+    code: 'this.__hazuki_source.favorites?.loadFolders?.(null)',
+    name: 'debug_favorites_loadFolders.js',
+  );
+  calls['loadComics(1, "0")'] = await _debugJsCall(
+    code: 'this.__hazuki_source.favorites?.loadComics?.(1, "0")',
+    name: 'debug_favorites_loadComics_0.js',
+  );
+  calls['loadComics(1, null)'] = await _debugJsCall(
+    code: 'this.__hazuki_source.favorites?.loadComics?.(1, null)',
+    name: 'debug_favorites_loadComics_null.js',
+  );
+  calls['loadNext(null, "0")'] = await _debugJsCall(
+    code: 'this.__hazuki_source.favorites?.loadNext?.(null, "0")',
+    name: 'debug_favorites_loadNext.js',
+  );
+
+  final pageLoad = await loadFavoriteComics(page: 1, folderId: '0');
+  final pageLoadInfo = info['favoritePageLoadResult'] as Map<String, dynamic>;
+  pageLoadInfo['errorMessage'] = pageLoad.errorMessage;
+  pageLoadInfo['count'] = pageLoad.comics.length;
+  pageLoadInfo['firstFive'] = pageLoad.comics
+      .take(5)
+      .map(
+        (comic) => {
+          'id': comic.id,
+          'title': comic.title,
+          'subTitle': comic.subTitle,
+          'cover': comic.cover,
+        },
+      )
+      .toList();
+
+  _favoritesDebugCache = info;
+  return info;
+}
+
+Future<dynamic> _awaitJsResult(dynamic result) async {
+  if (result is Future) {
+    return await result;
+  }
+  return result;
+}
+
+void _appendNetworkLog({
+  required String method,
+  required String url,
+  required int? statusCode,
+  required String? error,
+  required DateTime startedAt,
+  String source = 'js_http',
+  Map<String, dynamic>? requestHeaders,
+  Object? requestData,
+  Map<String, dynamic>? responseHeaders,
+  Object? responseBody,
+}) {
+  final endedAt = DateTime.now();
+  final durationMs = endedAt.difference(startedAt).inMilliseconds;
+  final isImportant = _isImportantNetworkLogForStorage(
+    source: source,
+    url: url,
+    statusCode: statusCode,
+    error: error,
+    durationMs: durationMs,
+  );
+  final requestHeadersSafe = isImportant ? _jsonSafe(requestHeaders) : null;
+  final requestDataSafe = isImportant ? _jsonSafe(requestData) : null;
+  final responseHeadersSafe = isImportant ? _jsonSafe(responseHeaders) : null;
+  final responseBodyFull = isImportant ? _toBodyFull(responseBody) : null;
+  final responseBodyPreview = isImportant
+      ? _toBodyPreview(responseBodyFull)
+      : _toBodyPreview(_toBodyFull(responseBody));
+
+  final dedupKey = [
+    source,
+    method,
+    url,
+    statusCode?.toString() ?? 'null',
+    error ?? '',
+    requestHeadersSafe?.toString() ?? '',
+    requestDataSafe?.toString() ?? '',
+    responseHeadersSafe?.toString() ?? '',
+    responseBodyPreview ?? '',
+  ].join('|');
+
+  final existingIndex = _recentNetworkLogs.indexWhere(
+    (log) => log['dedupKey'] == dedupKey,
+  );
+  if (existingIndex >= 0) {
+    final existing = _recentNetworkLogs[existingIndex];
+    final mergedCount = (existing['mergedCount'] as int? ?? 1) + 1;
+    existing['mergedCount'] = mergedCount;
+    existing['lastSeenAt'] = endedAt.toIso8601String();
+    existing['durationMs'] = durationMs;
+    existing['statusCode'] = statusCode;
+    existing['error'] = error;
+    existing['responseBodyPreview'] = responseBodyPreview;
+    existing['responseBodyFull'] = responseBodyFull;
+    existing['responseHeaders'] = responseHeadersSafe;
+    _networkLogDedupedCount++;
+    return;
+  }
+
+  _recentNetworkLogs.add({
+    'time': endedAt.toIso8601String(),
+    'lastSeenAt': endedAt.toIso8601String(),
+    'mergedCount': 1,
+    'dedupKey': dedupKey,
+    'source': source,
+    'method': method,
+    'url': url,
+    'statusCode': statusCode,
+    'durationMs': durationMs,
+    'requestHeaders': requestHeadersSafe,
+    'requestData': requestDataSafe,
+    'responseHeaders': responseHeadersSafe,
+    'responseBodyPreview': responseBodyPreview,
+    'responseBodyFull': responseBodyFull,
+    'error': error,
+  });
+  if (_recentNetworkLogs.length > 300) {
+    _recentNetworkLogs.removeRange(0, _recentNetworkLogs.length - 300);
+  }
+}
+
+bool _isImportantNetworkLogForStorage({
+  required String source,
+  required String url,
+  required int? statusCode,
+  required String? error,
+  required int durationMs,
+}) {
+  final normalizedSource = source.toLowerCase();
+  final normalizedUrl = url.toLowerCase();
+  final normalizedError = (error ?? '').toLowerCase();
+
+  if (normalizedError.isNotEmpty && normalizedError != 'null') {
+    return true;
+  }
+  if (statusCode != null && statusCode >= 400) {
+    return true;
+  }
+  if (durationMs >= 2500) {
+    return true;
+  }
+  if (normalizedSource.contains('login') ||
+      normalizedSource.contains('avatar') ||
+      normalizedSource.contains('source_version')) {
+    return true;
+  }
+  if (normalizedUrl.contains('/login') ||
+      normalizedUrl.contains('/favorite') ||
+      normalizedUrl.contains('/user') ||
+      normalizedUrl.contains('/daily') ||
+      normalizedUrl.contains('/daily_chk') ||
+      normalizedUrl.contains('index.json') ||
+      normalizedUrl.contains('/jm.js')) {
+    return true;
+  }
+  return false;
+}
+
+String? _toBodyFull(Object? value) {
+  if (value == null) {
+    return null;
+  }
+  if (value is List<int>) {
+    return '[bytes length=${value.length}]';
+  }
+  return value.toString();
+}
+
+String? _toBodyPreview(String? fullBody) {
+  if (fullBody == null) {
+    return null;
+  }
+  if (fullBody.length <= 800) {
+    return fullBody;
+  }
+  return '${fullBody.substring(0, 800)}...';
+}
+
+Future<Map<String, dynamic>> collectNetworkDebugInfo() async {
+  final info = <String, dynamic>{
+    'statusText': _statusText,
+    'platform': Platform.operatingSystem,
+    'sourceMeta': {
+      'name': _sourceMeta?.name,
+      'key': _sourceMeta?.key,
+      'version': _sourceMeta?.version,
+    },
+    'isLogged': isLogged,
+    'currentAccount': currentAccount,
+    'generatedAt': DateTime.now().toIso8601String(),
+    'networkLogStats': {
+      'keptCount': _recentNetworkLogs.length,
+      'dedupedCount': _networkLogDedupedCount,
+    },
+    'lastLoginDebugInfo': _lastLoginDebugInfo,
+    'lastSourceVersionDebugInfo': _lastSourceVersionDebugInfo,
+    'recentNetworkLogs': _recentNetworkLogs.map((e) {
+      final copy = Map<String, dynamic>.from(e);
+      copy.remove('dedupKey');
+      return copy;
+    }).toList(),
+  };
+  return info;
+}
+
+Future<Map<String, dynamic>> _debugJsCall({
+  required String code,
+  required String name,
+}) async {
+  final engine = _engine;
+  if (engine == null) {
+    return {'ok': false, 'error': 'engine is null'};
+  }
+
+  try {
+    final result = engine.evaluate(code, name: name);
+    final resolved = await _awaitJsResult(
+      result,
+    ).timeout(const Duration(seconds: 20));
+    return {'ok': true, 'data': _jsonSafe(resolved)};
+  } catch (e) {
+    return {'ok': false, 'error': e.toString()};
+  }
+}
+
+dynamic _jsonSafe(dynamic value) {
+  try {
+    return jsonDecode(jsonEncode(value));
+  } catch (_) {
+    return value?.toString();
+  }
+}
+}

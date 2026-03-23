@@ -1,0 +1,58 @@
+name: Build Android arm64-v8a
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+
+jobs:
+  build-android-arm64:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Build Android APK (arm64-v8a only)
+        run: flutter build apk --release --target-platform android-arm64
+
+      - name: Locate APK artifact
+        id: locate_apk
+        shell: bash
+        run: |
+          shopt -s nullglob
+          apks=(build/app/outputs/flutter-apk/*arm64-v8a*release*.apk build/app/outputs/flutter-apk/*release*.apk)
+
+          if [ ${#apks[@]} -eq 0 ]; then
+            echo "No release APK found under build/app/outputs/flutter-apk" >&2
+            find build/app/outputs -maxdepth 3 -type f -name '*.apk' -print || true
+            exit 1
+          fi
+
+          printf 'Resolved APK: %s\n' "${apks[0]}"
+          echo "apk_path=${apks[0]}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload arm64-v8a APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: hazuki-android-arm64-v8a
+          path: ${{ steps.locate_apk.outputs.apk_path }}
+          if-no-files-found: error

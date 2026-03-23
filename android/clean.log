@@ -1,0 +1,41 @@
+> Task :gradle:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :gradle:compileKotlin UP-TO-DATE
+> Task :gradle:compileJava NO-SOURCE
+> Task :gradle:compileGroovy NO-SOURCE
+> Task :gradle:pluginDescriptors UP-TO-DATE
+> Task :gradle:processResources UP-TO-DATE
+> Task :gradle:classes UP-TO-DATE
+> Task :gradle:jar UP-TO-DATE
+
+> Configure project :app
+WARNING: The option setting 'android.ndk.suppressMinSdkVersionError=21' is experimental.
+
+> Task :clean FAILED
+
+[Incubating] Problems report is available at: file:///D:/Project/hazuki/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':clean'.
+> java.io.IOException: Unable to delete directory 'D:\Project\hazuki\build'
+    Failed to delete some children. This might happen because a process has files open or has its working directory set in the target directory.
+    - D:\Project\hazuki\build\app\outputs\flutter-apk\app-arm64-v8a-release.apk
+    - D:\Project\hazuki\build\app\outputs\flutter-apk
+    - D:\Project\hazuki\build\app\outputs
+    - D:\Project\hazuki\build\app
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 9.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/8.14/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 3s
+5 actionable tasks: 1 executed, 4 up-to-date

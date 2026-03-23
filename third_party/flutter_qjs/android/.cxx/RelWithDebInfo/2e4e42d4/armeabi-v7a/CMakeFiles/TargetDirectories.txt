@@ -1,0 +1,4 @@
+D:/Project/Hazuki/third_party/flutter_qjs/android/.cxx/RelWithDebInfo/2e4e42d4/armeabi-v7a/CMakeFiles/quickjs.dir
+D:/Project/Hazuki/third_party/flutter_qjs/android/.cxx/RelWithDebInfo/2e4e42d4/armeabi-v7a/CMakeFiles/qjs.dir
+D:/Project/Hazuki/third_party/flutter_qjs/android/.cxx/RelWithDebInfo/2e4e42d4/armeabi-v7a/CMakeFiles/edit_cache.dir
+D:/Project/Hazuki/third_party/flutter_qjs/android/.cxx/RelWithDebInfo/2e4e42d4/armeabi-v7a/CMakeFiles/rebuild_cache.dir
