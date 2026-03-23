@@ -79,12 +79,43 @@ Future<void> _ensureAndroidNoMediaMarker() async {
   if (!Platform.isAndroid) {
     return;
   }
+
+  final markerDirs = <String>{};
+
   try {
     final externalDir = await getExternalStorageDirectory();
-    if (externalDir == null) {
-      return;
+    if (externalDir != null) {
+      markerDirs.add(externalDir.parent.path);
+      markerDirs.add(externalDir.path);
+      markerDirs.add('${externalDir.path}/comic_source');
     }
-    final noMediaFile = File('${externalDir.path}/.nomedia');
+  } catch (_) {}
+
+  try {
+    final externalCacheDirs = await getExternalCacheDirectories();
+    if (externalCacheDirs != null) {
+      for (final dir in externalCacheDirs) {
+        markerDirs.add(dir.parent.path);
+        markerDirs.add(dir.path);
+      }
+    }
+  } catch (_) {}
+
+  for (final dirPath in markerDirs) {
+    await _ensureNoMediaFile(dirPath);
+  }
+}
+
+Future<void> _ensureNoMediaFile(String dirPath) async {
+  if (dirPath.trim().isEmpty) {
+    return;
+  }
+  try {
+    final dir = Directory(dirPath);
+    if (!await dir.exists()) {
+      await dir.create(recursive: true);
+    }
+    final noMediaFile = File('${dir.path}/.nomedia');
     if (!await noMediaFile.exists()) {
       await noMediaFile.writeAsString('', flush: true);
     }
@@ -277,6 +308,7 @@ class _HazukiAppState extends State<HazukiApp> {
   double _sourceBootstrapProgress = 0;
   String? _sourceBootstrapErrorText;
   int _homeRefreshTick = 0;
+  bool _allowDiscoverInitialLoad = false;
 
   AppearanceSettingsData _appearance = const AppearanceSettingsData(
     themeMode: ThemeMode.system,
@@ -418,7 +450,9 @@ class _HazukiAppState extends State<HazukiApp> {
     }
 
     if (!hasLocalSource) {
+      var bootstrapSucceeded = false;
       setState(() {
+        _allowDiscoverInitialLoad = false;
         _showInitialSourceBootstrapIntro = true;
         _showInitialSourceBootstrapOverlay = false;
         _sourceBootstrapIndeterminate = true;
@@ -451,6 +485,8 @@ class _HazukiAppState extends State<HazukiApp> {
             });
           },
         );
+        await HazukiSourceService.instance.ensureInitialized();
+        bootstrapSucceeded = true;
       } catch (e) {
         if (!mounted) {
           return;
@@ -462,7 +498,7 @@ class _HazukiAppState extends State<HazukiApp> {
         });
         await Future<void>.delayed(const Duration(seconds: 2));
       }
-      if (!mounted) {
+      if (!mounted || !bootstrapSucceeded) {
         return;
       }
       setState(() {
@@ -474,16 +510,18 @@ class _HazukiAppState extends State<HazukiApp> {
         return;
       }
       setState(() {
+        _allowDiscoverInitialLoad = true;
         _homeRefreshTick++;
       });
       return;
     }
 
-    await HazukiSourceService.instance.init();
+    await HazukiSourceService.instance.ensureInitialized();
     if (!mounted) {
       return;
     }
     setState(() {
+      _allowDiscoverInitialLoad = true;
       _homeRefreshTick++;
     });
     _scheduleSourceUpdateDialogCheck();
@@ -815,13 +853,8 @@ class _HazukiAppState extends State<HazukiApp> {
             final scheme = Theme.of(context).colorScheme;
             return Stack(
               children: [
-                if (!_showInitialSourceBootstrapOverlay && child != null) child,
-                if (_showInitialSourceBootstrapOverlay)
-                  Positioned.fill(
-                    child: ColoredBox(
-                      color: Theme.of(context).scaffoldBackgroundColor,
-                    ),
-                  ),
+                // ignore: use_null_aware_elements
+                if (child != null) child,
                 Positioned.fill(
                   child: IgnorePointer(
                     ignoring:
@@ -857,9 +890,7 @@ class _HazukiAppState extends State<HazukiApp> {
                                         ? 'initial-source-bootstrap-overlay'
                                         : 'initial-source-bootstrap-intro',
                                   ),
-                                  color: _showInitialSourceBootstrapOverlay
-                                      ? Colors.black.withValues(alpha: 0.18)
-                                      : Colors.transparent,
+                                  color: Colors.transparent,
                                   child: Center(
                                     child: Container(
                                       width: 332,
@@ -953,6 +984,7 @@ class _HazukiAppState extends State<HazukiApp> {
             onAppearanceChanged: _updateAppearance,
             locale: _locale,
             onLocaleChanged: _updateLocalePreference,
+            allowDiscoverInitialLoad: _allowDiscoverInitialLoad,
             refreshTick: _homeRefreshTick,
           ),
         );

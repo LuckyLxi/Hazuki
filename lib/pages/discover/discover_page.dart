@@ -5,10 +5,12 @@ class DiscoverPage extends StatefulWidget {
     super.key,
     this.onSearchMorphProgressChanged,
     this.onSearchTap,
+    this.allowInitialLoad = true,
   });
 
   final ValueChanged<double>? onSearchMorphProgressChanged;
   final VoidCallback? onSearchTap;
+  final bool allowInitialLoad;
 
   @override
   State<DiscoverPage> createState() => _DiscoverPageState();
@@ -36,7 +38,9 @@ class _DiscoverPageState extends State<DiscoverPage> {
       }
       widget.onSearchMorphProgressChanged?.call(_searchMorphProgress);
     });
-    unawaited(_loadInitial());
+    if (widget.allowInitialLoad) {
+      unawaited(_loadInitial());
+    }
   }
 
   @override
@@ -45,6 +49,9 @@ class _DiscoverPageState extends State<DiscoverPage> {
     if (oldWidget.onSearchMorphProgressChanged !=
         widget.onSearchMorphProgressChanged) {
       widget.onSearchMorphProgressChanged?.call(_searchMorphProgress);
+    }
+    if (!oldWidget.allowInitialLoad && widget.allowInitialLoad && _initialLoading) {
+      unawaited(_loadInitial());
     }
   }
 
@@ -235,6 +242,9 @@ class _DiscoverPageState extends State<DiscoverPage> {
   Widget _buildDiscoverView() {
     final strings = l10n(context);
     if (_initialLoading) {
+      if (!widget.allowInitialLoad) {
+        return const SizedBox(height: 360);
+      }
       return SizedBox(
         height: 360,
         child: Center(

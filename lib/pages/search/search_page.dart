@@ -2,6 +2,8 @@ part of '../../main.dart';
 
 const Duration _searchLoadTimeout = Duration(seconds: 25);
 const double _searchAppBarRevealOffset = 68;
+const int _searchHistoryCollapsedMaxRows = 4;
+const double _searchHistoryChipSpacing = 8;
 const Set<String> _searchOrderKeys = {
   'mr',
   'mv',
@@ -150,6 +152,54 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
       _historyEditMode = false;
       _historyExpanded = false;
     });
+  }
+
+  double _estimateHistoryChipWidth(String keyword, BuildContext context) {
+    final chipTheme = ChipTheme.of(context);
+    final textStyle =
+        chipTheme.labelStyle ??
+        Theme.of(context).textTheme.labelLarge ??
+        const TextStyle(fontSize: 14);
+    final painter = TextPainter(
+      text: TextSpan(text: keyword, style: textStyle),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+      maxLines: 1,
+    )..layout();
+    final horizontalExtra = _historyEditMode ? 72.0 : 40.0;
+    return painter.width + horizontalExtra;
+  }
+
+  int _computeCollapsedHistoryVisibleCount(double maxWidth) {
+    if (_historyList.isEmpty || maxWidth <= 0 || maxWidth.isInfinite) {
+      return _historyList.length;
+    }
+
+    var rowCount = 1;
+    var rowWidth = 0.0;
+    var visibleCount = 0;
+
+    for (final keyword in _historyList) {
+      final chipWidth = math.min(
+        maxWidth,
+        _estimateHistoryChipWidth(keyword, context),
+      );
+      final nextWidth = rowWidth == 0
+          ? chipWidth
+          : rowWidth + _searchHistoryChipSpacing + chipWidth;
+      if (rowWidth > 0 && nextWidth > maxWidth) {
+        rowCount += 1;
+        if (rowCount > _searchHistoryCollapsedMaxRows) {
+          break;
+        }
+        rowWidth = chipWidth;
+      } else {
+        rowWidth = nextWidth;
+      }
+      visibleCount += 1;
+    }
+
+    return visibleCount.clamp(1, _historyList.length);
   }
 
   Future<void> _openResults(String rawKeyword) async {
@@ -359,64 +409,71 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
       return const SizedBox.shrink();
     }
 
-    final isTooLong = _historyList.length > 24;
-    final displayList = (_historyExpanded || !isTooLong)
-        ? _historyList
-        : _historyList.sublist(0, 24);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final collapsedCount = _computeCollapsedHistoryVisibleCount(
+          constraints.maxWidth,
+        );
+        final isTooLong = collapsedCount < _historyList.length;
+        final displayList = (_historyExpanded || !isTooLong)
+            ? _historyList
+            : _historyList.sublist(0, collapsedCount);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(bottom: 12, left: 4),
-          child: Text(
-            l10n(context).searchHistoryTitle,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ),
-        AnimatedSize(
-          duration: const Duration(milliseconds: 320),
-          curve: Curves.easeOutCubic,
-          alignment: Alignment.topCenter,
-          child: Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: displayList.map((keyword) {
-              if (_historyEditMode) {
-                return InputChip(
-                  label: Text(keyword),
-                  deleteIcon: const Icon(Icons.cancel, size: 18),
-                  onDeleted: () => _removeHistory(keyword),
-                  onPressed: () => _removeHistory(keyword),
-                );
-              }
-              return ActionChip(
-                label: Text(keyword),
-                onPressed: () => unawaited(_openResults(keyword)),
-              );
-            }).toList(),
-          ),
-        ),
-        if (isTooLong)
-          Container(
-            alignment: Alignment.center,
-            margin: const EdgeInsets.only(top: 8),
-            child: IconButton(
-              icon: Icon(
-                _historyExpanded
-                    ? Icons.keyboard_arrow_up
-                    : Icons.keyboard_arrow_down,
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12, left: 4),
+              child: Text(
+                l10n(context).searchHistoryTitle,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
-              onPressed: () {
-                setState(() {
-                  _historyExpanded = !_historyExpanded;
-                });
-              },
             ),
-          ),
-      ],
+            AnimatedSize(
+              duration: const Duration(milliseconds: 320),
+              curve: Curves.easeOutCubic,
+              alignment: Alignment.topCenter,
+              child: Wrap(
+                spacing: _searchHistoryChipSpacing,
+                runSpacing: 8,
+                children: displayList.map((keyword) {
+                  if (_historyEditMode) {
+                    return InputChip(
+                      label: Text(keyword),
+                      deleteIcon: const Icon(Icons.cancel, size: 18),
+                      onDeleted: () => _removeHistory(keyword),
+                      onPressed: () => _removeHistory(keyword),
+                    );
+                  }
+                  return ActionChip(
+                    label: Text(keyword),
+                    onPressed: () => unawaited(_openResults(keyword)),
+                  );
+                }).toList(),
+              ),
+            ),
+            if (isTooLong)
+              Container(
+                alignment: Alignment.center,
+                margin: const EdgeInsets.only(top: 8),
+                child: IconButton(
+                  icon: Icon(
+                    _historyExpanded
+                        ? Icons.keyboard_arrow_up
+                        : Icons.keyboard_arrow_down,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _historyExpanded = !_historyExpanded;
+                    });
+                  },
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 

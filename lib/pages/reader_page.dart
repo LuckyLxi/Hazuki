@@ -82,9 +82,15 @@ class _ReaderPageState extends State<ReaderPage>
   bool _tapToTurnPage = false;
   bool _pinchToZoom = false;
   bool _longPressToSave = false;
-  // 整屏缩放控制器 & 是否处于放大状态
+  // 缩放控制器与当前缩放状态
   final TransformationController _zoomController = TransformationController();
+  final Map<String, TransformationController> _listZoomControllers =
+      <String, TransformationController>{};
+  final Map<String, VoidCallback> _listZoomListeners =
+      <String, VoidCallback>{};
   bool _isZoomed = false;
+  String? _zoomedListImageUrl;
+  bool _rtlZoomInteracting = false;
   // 还原动画控制器
   late final AnimationController _resetAnimController;
 
@@ -107,12 +113,14 @@ class _ReaderPageState extends State<ReaderPage>
         .where((e) => e.trim().isNotEmpty)
         .toList();
     if (initialImages.isNotEmpty) {
+      _disposeListZoomControllers();
       _imageAspectRatioCache.clear();
       _images = initialImages;
       _itemKeys.clear();
       _itemKeys.addAll(List.generate(_images.length, (_) => GlobalKey()));
       _rebuildImageIndexMap();
       _loadingImages = false;
+      _isZoomed = false;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _prefetchAround(0);
         unawaited(_prefetchAheadFrom(0));
@@ -128,6 +136,7 @@ class _ReaderPageState extends State<ReaderPage>
     _scrollController.removeListener(_onScrollPrefetch);
     _scrollController.dispose();
     _pageController.dispose();
+    _disposeListZoomControllers();
     _zoomController.removeListener(_onZoomChanged);
     _zoomController.dispose();
     _resetAnimController.dispose();
@@ -144,8 +153,15 @@ class _ReaderPageState extends State<ReaderPage>
 
   /// 监听缩放矩阵变化，更新 _isZoomed 状态以控制还原按钮可见性
   void _onZoomChanged() {
+    if (_readerMode != _ReaderMode.rightToLeft) {
+      return;
+    }
     final scale = _zoomController.value.getMaxScaleOnAxis();
     final zoomed = scale > 1.05;
+    if (_rtlZoomInteracting) {
+      _isZoomed = zoomed;
+      return;
+    }
     if (zoomed != _isZoomed && mounted) {
       setState(() => _isZoomed = zoomed);
     }
@@ -160,10 +176,65 @@ class _ReaderPageState extends State<ReaderPage>
     setState(() {});
   }
 
+  void _disposeListZoomControllers() {
+    for (final entry in _listZoomListeners.entries) {
+      _listZoomControllers[entry.key]?.removeListener(entry.value);
+    }
+    for (final controller in _listZoomControllers.values) {
+      controller.dispose();
+    }
+    _listZoomListeners.clear();
+    _listZoomControllers.clear();
+    _zoomedListImageUrl = null;
+  }
+
+  TransformationController _listZoomControllerFor(String url) {
+    final existing = _listZoomControllers[url];
+    if (existing != null) {
+      return existing;
+    }
+
+    final controller = TransformationController();
+    void listener() {
+      if (!mounted || _readerMode != _ReaderMode.topToBottom) {
+        return;
+      }
+      final zoomed = controller.value.getMaxScaleOnAxis() > 1.05;
+      final isActive = _zoomedListImageUrl == url;
+      if (zoomed) {
+        if (!isActive || !_isZoomed) {
+          setState(() {
+            _zoomedListImageUrl = url;
+            _isZoomed = true;
+          });
+        }
+      } else if (isActive && _isZoomed) {
+        setState(() {
+          _zoomedListImageUrl = null;
+          _isZoomed = false;
+        });
+      }
+    }
+
+    controller.addListener(listener);
+    _listZoomControllers[url] = controller;
+    _listZoomListeners[url] = listener;
+    return controller;
+  }
+
   /// 平滑动画将缩放矩阵还原为原始大小
   void _resetZoom() {
+    final controller = _readerMode == _ReaderMode.topToBottom
+        ? (_zoomedListImageUrl == null
+              ? null
+              : _listZoomControllers[_zoomedListImageUrl!])
+        : _zoomController;
+    if (controller == null) {
+      return;
+    }
+
     // 从当前矩阵插值到单位矩阵（即原始 1:1 大小）
-    final Matrix4 start = _zoomController.value.clone();
+    final Matrix4 start = controller.value.clone();
     final Matrix4 end = Matrix4.identity();
     _resetAnimController.reset();
     final Animation<double> anim = CurvedAnimation(
@@ -177,15 +248,88 @@ class _ReaderPageState extends State<ReaderPage>
       for (var i = 0; i < 16; i++) {
         current[i] = start[i] + (end[i] - start[i]) * t;
       }
-      _zoomController.value = current;
+      controller.value = current;
     }
 
     anim.addListener(listener);
     _resetAnimController.forward().whenComplete(() {
       anim.removeListener(listener);
       // 精确归零，防止浮点误差
-      _zoomController.value = Matrix4.identity();
+      controller.value = Matrix4.identity();
     });
+  }
+
+  void _resetZoomImmediately() {
+    _resetAnimController.stop();
+    if (_readerMode == _ReaderMode.topToBottom) {
+      final url = _zoomedListImageUrl;
+      if (url != null) {
+        _listZoomControllers[url]?.value = Matrix4.identity();
+      }
+      _zoomedListImageUrl = null;
+    } else {
+      _zoomController.value = Matrix4.identity();
+      _rtlZoomInteracting = false;
+    }
+    _isZoomed = false;
+  }
+
+  Widget _wrapPageWithPinchZoom({required int index, required Widget child}) {
+    if (!_pinchToZoom ||
+        _readerMode != _ReaderMode.rightToLeft ||
+        index != _currentPageIndex) {
+      return child;
+    }
+    return InteractiveViewer(
+      transformationController: _zoomController,
+      panEnabled: _isZoomed,
+      scaleEnabled: true,
+      panAxis: PanAxis.free,
+      boundaryMargin: EdgeInsets.zero,
+      constrained: true,
+      clipBehavior: Clip.hardEdge,
+      minScale: 1.0,
+      maxScale: 5.0,
+      onInteractionStart: (_) {
+        _rtlZoomInteracting = true;
+      },
+      onInteractionEnd: (_) {
+        if (!mounted) {
+          _rtlZoomInteracting = false;
+          return;
+        }
+        final zoomed = _zoomController.value.getMaxScaleOnAxis() > 1.05;
+        setState(() {
+          _rtlZoomInteracting = false;
+          _isZoomed = zoomed;
+        });
+        if (!zoomed) {
+          _zoomController.value = Matrix4.identity();
+        }
+      },
+      child: child,
+    );
+  }
+
+  Widget _wrapListImageWithPinchZoom({
+    required String url,
+    required Widget child,
+  }) {
+    if (!_pinchToZoom || _readerMode != _ReaderMode.topToBottom) {
+      return child;
+    }
+    return InteractiveViewer(
+      transformationController: _listZoomControllerFor(url),
+      panEnabled: _zoomedListImageUrl == url && _isZoomed,
+      scaleEnabled: true,
+      panAxis: PanAxis.free,
+      boundaryMargin: EdgeInsets.zero,
+      constrained: true,
+      clipBehavior: Clip.hardEdge,
+      minScale: 1.0,
+      maxScale: 5.0,
+      child: child,
+    );
   }
 
   Future<void> _loadReadingSettings() async {
@@ -416,6 +560,7 @@ class _ReaderPageState extends State<ReaderPage>
         return;
       }
       setState(() {
+        _disposeListZoomControllers();
         _imageAspectRatioCache.clear();
         _images = images.where((e) => e.trim().isNotEmpty).toList();
         _itemKeys.clear();
@@ -424,6 +569,7 @@ class _ReaderPageState extends State<ReaderPage>
         _loadingImages = false;
         _loadImagesError = null;
         _currentPageIndex = 0;
+        _isZoomed = false;
       });
       _pageIndexNotifier.value = 0;
       if (!_noImageModeEnabled) {
@@ -611,8 +757,13 @@ class _ReaderPageState extends State<ReaderPage>
     }
 
     final created = _buildImageProvider(url)
-        .then((provider) {
+        .then((provider) async {
           _providerCache[url] = provider;
+          if (mounted) {
+            try {
+              await precacheImage(provider, context);
+            } catch (_) {}
+          }
           return provider;
         })
         .catchError((Object error, StackTrace stackTrace) {
@@ -782,26 +933,30 @@ class _ReaderPageState extends State<ReaderPage>
 
         Widget buildImage(ImageProvider provider) {
           return _wrapImageWidget(
-            Image(
-              key: ValueKey(url),
-              image: provider,
-              fit: BoxFit.fitWidth,
-              width: double.infinity,
-              filterQuality: FilterQuality.medium,
-              frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-                if (wasSynchronouslyLoaded || frame != null) {
-                  return child;
-                }
-                return const ColoredBox(color: Colors.black);
-              },
-              errorBuilder: (_, _, _) {
-                return Container(
-                  height: 120,
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                  alignment: Alignment.center,
-                  child: const Icon(Icons.broken_image_outlined),
-                );
-              },
+            _wrapListImageWithPinchZoom(
+              url: url,
+              child: Image(
+                key: ValueKey(url),
+                image: provider,
+                fit: BoxFit.fitWidth,
+                width: double.infinity,
+                filterQuality: FilterQuality.medium,
+                gaplessPlayback: true,
+                frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+                  if (wasSynchronouslyLoaded || frame != null) {
+                    return child;
+                  }
+                  return const ColoredBox(color: Colors.black);
+                },
+                errorBuilder: (_, _, _) {
+                  return Container(
+                    height: 120,
+                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                    alignment: Alignment.center,
+                    child: const Icon(Icons.broken_image_outlined),
+                  );
+                },
+              ),
             ),
             url,
           );
@@ -851,15 +1006,21 @@ class _ReaderPageState extends State<ReaderPage>
       key: ValueKey('${widget.comicId}-${widget.epId}-rtl'),
       controller: _pageController,
       reverse: false,
+      allowImplicitScrolling: true,
       itemCount: _images.length,
-      physics: (_pinchToZoom && _isZoomed)
+      physics: (_pinchToZoom && (_isZoomed || _rtlZoomInteracting))
           ? const NeverScrollableScrollPhysics()
           : const PageScrollPhysics(),
       onPageChanged: (index) {
-        if (_currentPageIndex != index) {
-          _currentPageIndex = index;
-          _pageIndexNotifier.value = index;
+        final pageChanged = _currentPageIndex != index;
+        final zoomWasActive = _isZoomed;
+        _resetZoomImmediately();
+        if (pageChanged || zoomWasActive) {
+          setState(() {
+            _currentPageIndex = index;
+          });
         }
+        _pageIndexNotifier.value = index;
         if (!_noImageModeEnabled) {
           _prefetchAround(index);
           unawaited(_prefetchAheadFrom(index));
@@ -875,30 +1036,34 @@ class _ReaderPageState extends State<ReaderPage>
 
         Widget buildImage(ImageProvider provider) {
           return _wrapImageWidget(
-            ColoredBox(
-              color: Colors.black,
-              child: Center(
-                child: Image(
-                  key: ValueKey('reader-page-$url'),
-                  image: provider,
-                  fit: BoxFit.contain,
-                  width: double.infinity,
-                  height: double.infinity,
-                  filterQuality: FilterQuality.medium,
-                  frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-                    if (wasSynchronouslyLoaded || frame != null) {
-                      return child;
-                    }
-                    return const ColoredBox(color: Colors.black);
-                  },
-                  errorBuilder: (_, _, _) {
-                    return Container(
-                      color:
-                          Theme.of(context).colorScheme.surfaceContainerHighest,
-                      alignment: Alignment.center,
-                      child: const Icon(Icons.broken_image_outlined),
-                    );
-                  },
+            _wrapPageWithPinchZoom(
+              index: index,
+              child: ColoredBox(
+                color: Colors.black,
+                child: Center(
+                  child: Image(
+                    key: ValueKey('reader-page-$url'),
+                    image: provider,
+                    fit: BoxFit.contain,
+                    width: double.infinity,
+                    height: double.infinity,
+                    filterQuality: FilterQuality.medium,
+                    gaplessPlayback: true,
+                    frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+                      if (wasSynchronouslyLoaded || frame != null) {
+                        return child;
+                      }
+                      return const ColoredBox(color: Colors.black);
+                    },
+                    errorBuilder: (_, _, _) {
+                      return Container(
+                        color:
+                            Theme.of(context).colorScheme.surfaceContainerHighest,
+                        alignment: Alignment.center,
+                        child: const Icon(Icons.broken_image_outlined),
+                      );
+                    },
+                  ),
                 ),
               ),
             ),
@@ -969,7 +1134,7 @@ class _ReaderPageState extends State<ReaderPage>
     final tapPagingEnabled =
         _readerMode == _ReaderMode.rightToLeft &&
         _tapToTurnPage &&
-        !(_pinchToZoom && _isZoomed);
+        !(_pinchToZoom && (_isZoomed || _rtlZoomInteracting));
     if (!tapPagingEnabled) {
       return child;
     }
@@ -1078,25 +1243,9 @@ class _ReaderPageState extends State<ReaderPage>
           child: Stack(
             children: [
               _wrapReaderTapPaging(
-                _pinchToZoom
-                  ? InteractiveViewer(
-                      transformationController: _zoomController,
-                      panEnabled: _isZoomed,
-                      scaleEnabled: true,
-                      panAxis: PanAxis.free,
-                      // 仅在放大后允许拖动，避免原始大小时图片被上下左右移动。
-                      boundaryMargin: EdgeInsets.zero,
-                      constrained: true,
-                      clipBehavior: Clip.hardEdge,
-                      minScale: 1.0,
-                      maxScale: 5.0,
-                      child: _readerMode == _ReaderMode.rightToLeft
-                          ? _buildReaderPageView()
-                          : _buildReaderListView(),
-                    )
-                  : (_readerMode == _ReaderMode.rightToLeft
-                        ? _buildReaderPageView()
-                        : _buildReaderListView()),
+                _readerMode == _ReaderMode.rightToLeft
+                    ? _buildReaderPageView()
+                    : _buildReaderListView(),
               ),
               Positioned(
                 left: 12,

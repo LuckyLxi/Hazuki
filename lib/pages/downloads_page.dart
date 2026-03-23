@@ -546,51 +546,57 @@ class _DownloadedComicCover extends StatelessWidget {
     required this.comic,
     this.heroTag,
     this.onTap,
+    this.width = 84,
+    this.height = 118,
+    this.borderRadius = 12,
   });
 
   final DownloadedMangaComic comic;
   final String? heroTag;
   final VoidCallback? onTap;
+  final double width;
+  final double height;
+  final double borderRadius;
 
   @override
   Widget build(BuildContext context) {
     final localPath = comic.localCoverPath?.trim();
-    final borderRadius = BorderRadius.circular(12);
+    final radius = BorderRadius.circular(borderRadius);
     Widget child;
     if (localPath != null && localPath.isNotEmpty) {
       final file = File(localPath);
       if (file.existsSync()) {
         child = ClipRRect(
-          borderRadius: borderRadius,
+          borderRadius: radius,
           child: Image.file(
             file,
-            width: 84,
-            height: 118,
+            width: width,
+            height: height,
             fit: BoxFit.cover,
           ),
         );
       } else {
-        child = _buildFallback(context, borderRadius);
+        child = _buildFallback(context, radius);
       }
     } else if (comic.coverUrl.trim().isNotEmpty) {
       child = ClipRRect(
-        borderRadius: borderRadius,
+        borderRadius: radius,
         child: HazukiCachedImage(
           url: comic.coverUrl,
-          width: 84,
-          height: 118,
+          width: width,
+          height: height,
           fit: BoxFit.cover,
         ),
       );
     } else {
-      child = _buildFallback(context, borderRadius);
+      child = _buildFallback(context, radius);
     }
     if (heroTag != null) {
       child = Hero(tag: heroTag!, child: child);
     }
     if (onTap != null) {
       child = InkWell(
-        borderRadius: borderRadius,
+        borderRadius: radius,
         onTap: onTap,
         child: child,
       );
@@ -598,13 +604,13 @@ class _DownloadedComicCover extends StatelessWidget {
     return child;
   }
 
-  Widget _buildFallback(BuildContext context, BorderRadius borderRadius) {
+  Widget _buildFallback(BuildContext context, BorderRadius radius) {
     return Container(
-      width: 84,
-      height: 118,
+      width: width,
+      height: height,
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: borderRadius,
+        borderRadius: radius,
       ),
       alignment: Alignment.center,
       child: const Icon(Icons.image_not_supported_outlined),
@@ -639,6 +645,9 @@ class DownloadedComicDetailPage extends StatelessWidget {
               _DownloadedComicCover(
                 comic: comic,
                 heroTag: _coverHeroTag,
+                width: 116,
+                height: 162,
+                borderRadius: 16,
                 onTap: () {
                   Navigator.of(context).push(
                     PageRouteBuilder<void>(
@@ -654,14 +663,22 @@ class DownloadedComicDetailPage extends StatelessWidget {
                   );
                 },
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 18),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       comic.title,
-                      style: Theme.of(context).textTheme.titleLarge,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            height: 1.25,
+                          ) ??
+                          const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            height: 1.25,
+                          ),
                     ),
                     if (comic.subTitle.isNotEmpty) ...[
                       const SizedBox(height: 6),
@@ -683,9 +700,8 @@ class DownloadedComicDetailPage extends StatelessWidget {
           ),
           if (comic.description.trim().isNotEmpty) ...[
             const SizedBox(height: 18),
-            Text(
-              comic.description,
-              style: Theme.of(context).textTheme.bodyMedium,
+            _DownloadedComicExpandableDescription(
+              text: comic.description.trim(),
             ),
           ],
           const SizedBox(height: 20),
@@ -725,6 +741,108 @@ class DownloadedComicDetailPage extends StatelessWidget {
           }),
         ],
       ),
+    );
+  }
+}
+
+class _DownloadedComicExpandableDescription extends StatefulWidget {
+  const _DownloadedComicExpandableDescription({required this.text});
+
+  final String text;
+
+  @override
+  State<_DownloadedComicExpandableDescription> createState() =>
+      _DownloadedComicExpandableDescriptionState();
+}
+
+class _DownloadedComicExpandableDescriptionState
+    extends State<_DownloadedComicExpandableDescription> {
+  static const int _collapsedMaxLines = 5;
+
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final textStyle =
+        theme.textTheme.bodyMedium ?? const TextStyle(fontSize: 14, height: 1.5);
+    final textScaler = MediaQuery.textScalerOf(context);
+    final textDirection = Directionality.of(context);
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final textPainter = TextPainter(
+          text: TextSpan(text: widget.text, style: textStyle),
+          maxLines: _collapsedMaxLines,
+          textDirection: textDirection,
+          textScaler: textScaler,
+        )..layout(maxWidth: constraints.maxWidth);
+
+        final isOverflowing = textPainter.didExceedMaxLines;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            AnimatedSize(
+              duration: const Duration(milliseconds: 280),
+              curve: Curves.easeOutCubic,
+              alignment: Alignment.topCenter,
+              clipBehavior: Clip.hardEdge,
+              child: Text(
+                widget.text,
+                style: textStyle,
+                maxLines: _expanded ? null : (isOverflowing ? _collapsedMaxLines : null),
+                overflow: _expanded ? TextOverflow.visible : TextOverflow.ellipsis,
+              ),
+            ),
+            if (isOverflowing)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(999),
+                    onTap: () {
+                      setState(() {
+                        _expanded = !_expanded;
+                      });
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 4,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _expanded
+                                ? l10n(context).comicDetailCollapse
+                                : l10n(context).comicDetailExpand,
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: theme.colorScheme.primary,
+                            ),
+                          ),
+                          const SizedBox(width: 2),
+                          AnimatedRotation(
+                            turns: _expanded ? 0.5 : 0,
+                            duration: const Duration(milliseconds: 220),
+                            curve: Curves.easeOutCubic,
+                            child: Icon(
+                              Icons.keyboard_arrow_down,
+                              size: 18,
+                              color: theme.colorScheme.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }

@@ -8,6 +8,7 @@ class HazukiHomePage extends StatefulWidget {
     required this.onAppearanceChanged,
     required this.locale,
     required this.onLocaleChanged,
+    this.allowDiscoverInitialLoad = true,
     this.refreshTick = 0,
   });
 
@@ -16,6 +17,7 @@ class HazukiHomePage extends StatefulWidget {
   final Future<void> Function(AppearanceSettingsData next) onAppearanceChanged;
   final Locale? locale;
   final Future<void> Function(Locale? locale) onLocaleChanged;
+  final bool allowDiscoverInitialLoad;
   final int refreshTick;
 
   @override
@@ -1065,6 +1067,7 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
                       curve: Curves.easeOut,
                       opacity: _currentIndex == 0 ? 1 : 0,
                       child: DiscoverPage(
+                        allowInitialLoad: widget.allowDiscoverInitialLoad,
                         onSearchMorphProgressChanged:
                             _handleDiscoverSearchMorphProgressChanged,
                       ),
