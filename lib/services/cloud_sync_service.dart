@@ -148,8 +148,9 @@ class CloudSyncService {
     final rootUrl = _rootUrl(config.url);
     await _ensureDir(dio, rootUrl);
 
-    const backupSlot = 1;
-    final backupDirUrl = '$rootUrl/backup_$backupSlot';
+    final state = await _readRemoteState(dio, rootUrl);
+    final nextSlot = ((state['latestSlot'] as int? ?? 0) % 3) + 1;
+    final backupDirUrl = '$rootUrl/backup_$nextSlot';
     await _ensureDir(dio, backupDirUrl);
 
     final snapshot = await _buildLocalSnapshotFiles();
@@ -171,12 +172,32 @@ class CloudSyncService {
     };
     await _putString(dio, '$backupDirUrl/manifest.json', jsonEncode(manifest));
 
+    final backups = <Map<String, dynamic>>[];
+    final oldBackups = (state['backups'] as List?) ?? const [];
+    for (final item in oldBackups) {
+      if (item is! Map) {
+        continue;
+      }
+      final map = Map<String, dynamic>.from(item);
+      final slot = map['slot'];
+      if (slot is int && slot != nextSlot) {
+        backups.add(map);
+      }
+    }
+    backups.add({'slot': nextSlot, 'updatedAtMs': nowMs});
+    backups.sort((a, b) {
+      final av = (a['updatedAtMs'] as int?) ?? 0;
+      final bv = (b['updatedAtMs'] as int?) ?? 0;
+      return bv.compareTo(av);
+    });
+    if (backups.length > 3) {
+      backups.removeRange(3, backups.length);
+    }
+
     final nextState = {
-      'latestSlot': backupSlot,
+      'latestSlot': nextSlot,
       'updatedAtMs': nowMs,
-      'backups': [
-        {'slot': backupSlot, 'updatedAtMs': nowMs},
-      ],
+      'backups': backups,
     };
     await _putString(dio, '$rootUrl/$_stateFileName', jsonEncode(nextState));
   }
@@ -399,11 +420,7 @@ class CloudSyncService {
     final data = Map<String, dynamic>.from(dataRaw);
     final prefs = await SharedPreferences.getInstance();
     for (final entry in data.entries) {
-      final sanitized = _sanitizeRestoredSetting(
-        prefs: prefs,
-        key: entry.key,
-        value: entry.value,
-      );
+      final sanitized = _sanitizeRestoredSetting(entry.key, entry.value);
       if (sanitized == null) {
         continue;
       }
@@ -411,11 +428,7 @@ class CloudSyncService {
     }
   }
 
-  dynamic _sanitizeRestoredSetting({
-    required SharedPreferences prefs,
-    required String key,
-    required dynamic value,
-  }) {
+  dynamic _sanitizeRestoredSetting(String key, dynamic value) {
     final normalizedKey = key.trim();
     if (normalizedKey == 'cookie_store_v1') {
       return null;
@@ -433,20 +446,6 @@ class CloudSyncService {
       }
       final sanitized = Map<String, dynamic>.from(decoded);
       sanitized.remove('account');
-
-      final localRaw = prefs.getString(normalizedKey);
-      if (localRaw == null || localRaw.trim().isEmpty) {
-        return jsonEncode(sanitized);
-      }
-      final localDecoded = jsonDecode(localRaw);
-      if (localDecoded is! Map) {
-        return jsonEncode(sanitized);
-      }
-      final localStore = Map<String, dynamic>.from(localDecoded);
-      final localAccount = localStore['account'];
-      if (localAccount != null) {
-        sanitized['account'] = localAccount;
-      }
       return jsonEncode(sanitized);
     } catch (_) {
       return value;

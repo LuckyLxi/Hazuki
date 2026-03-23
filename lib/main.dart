@@ -252,7 +252,6 @@ class _HazukiAppState extends State<HazukiApp> {
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   bool _hasConnectivity = true;
   bool _isShowingSourceUpdateDialog = false;
-  Future<void>? _sourceUpdateDialogCheckFuture;
   bool _showInitialSourceBootstrapOverlay = false;
   bool _sourceBootstrapIndeterminate = true;
   double _sourceBootstrapProgress = 0;
@@ -275,7 +274,6 @@ class _HazukiAppState extends State<HazukiApp> {
     unawaited(_loadAppearance());
     unawaited(_loadLocalePreference());
     unawaited(_initConnectivityWatcher());
-    unawaited(MangaDownloadService.instance.ensureInitialized());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
         return;
@@ -491,16 +489,10 @@ class _HazukiAppState extends State<HazukiApp> {
 
   void _scheduleSourceUpdateDialogCheck() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _sourceUpdateDialogCheckFuture != null) {
+      if (!mounted) {
         return;
       }
-      final future = _runSourceUpdateDialogCheck();
-      _sourceUpdateDialogCheckFuture = future;
-      unawaited(
-        future.whenComplete(() {
-          _sourceUpdateDialogCheckFuture = null;
-        }),
-      );
+      unawaited(_runSourceUpdateDialogCheck());
     });
   }
 
@@ -518,40 +510,7 @@ class _HazukiAppState extends State<HazukiApp> {
   }
 
   Future<void> _runSourceRecovery() async {
-    final refreshed =
-        await HazukiSourceService.instance.refreshSourceOnNetworkRecovery();
-    if (!mounted) {
-      return;
-    }
-    if (refreshed) {
-      setState(() {
-        _homeRefreshTick++;
-      });
-    }
-    _scheduleSourceUpdateDialogCheck();
-  }
-
-  Future<void> _showSourceUpdatedPrompt({
-    required String fromVersion,
-    required String toVersion,
-  }) async {
-    if (!mounted) {
-      return;
-    }
-    final normalizedFrom = fromVersion.trim();
-    final normalizedTo = toVersion.trim();
-    var message = normalizedTo;
-    if (normalizedFrom.isNotEmpty &&
-        normalizedTo.isNotEmpty &&
-        normalizedFrom != normalizedTo) {
-      message = '$normalizedFrom → $normalizedTo';
-    } else if (normalizedFrom.isNotEmpty && normalizedTo.isEmpty) {
-      message = normalizedFrom;
-    }
-    final localeCode = Localizations.localeOf(context).languageCode;
-    final title = localeCode == 'zh' ? '漫画源已更新' : 'Source updated';
-    final promptMessage = message.isEmpty ? title : '$title $message';
-    await showHazukiPrompt(context, promptMessage);
+    await HazukiSourceService.instance.refreshSourceOnNetworkRecovery();
   }
 
   String _formatTodayKey() {
@@ -698,30 +657,25 @@ class _HazukiAppState extends State<HazukiApp> {
                           indeterminate = true;
                         });
 
-                        var ok = false;
-                        try {
-                          ok = await HazukiSourceService.instance
-                              .downloadJmSourceAndReload(
-                                onProgress: (received, total) {
-                                  if (!dialogContext.mounted) {
-                                    return;
+                        final ok = await HazukiSourceService.instance
+                            .downloadJmSourceAndReload(
+                              onProgress: (received, total) {
+                                if (!dialogContext.mounted) {
+                                  return;
+                                }
+                                setDialogState(() {
+                                  if (total > 0) {
+                                    indeterminate = false;
+                                    progress = (received / total).clamp(
+                                      0.0,
+                                      1.0,
+                                    );
+                                  } else {
+                                    indeterminate = true;
                                   }
-                                  setDialogState(() {
-                                    if (total > 0) {
-                                      indeterminate = false;
-                                      progress = (received / total).clamp(
-                                        0.0,
-                                        1.0,
-                                      );
-                                    } else {
-                                      indeterminate = true;
-                                    }
-                                  });
-                                },
-                              );
-                        } catch (_) {
-                          ok = false;
-                        }
+                                });
+                              },
+                            );
 
                         if (!dialogContext.mounted) {
                           return;
@@ -749,8 +703,6 @@ class _HazukiAppState extends State<HazukiApp> {
 
     if (result == _SourceUpdateDialogAction.skipToday) {
       await prefs.setString(_sourceUpdateSkipDateKey, _formatTodayKey());
-    } else if (result == _SourceUpdateDialogAction.downloaded) {
-      await prefs.remove(_sourceUpdateSkipDateKey);
     }
 
     if (!mounted) {
@@ -759,21 +711,6 @@ class _HazukiAppState extends State<HazukiApp> {
     }
 
     _isShowingSourceUpdateDialog = false;
-    if (result == _SourceUpdateDialogAction.downloaded) {
-      final appliedVersionSource =
-          HazukiSourceService.instance.sourceMeta?.version;
-      final appliedVersion =
-          appliedVersionSource != null &&
-                  appliedVersionSource.trim().isNotEmpty
-              ? appliedVersionSource.trim()
-              : check.remoteVersion;
-      unawaited(
-        _showSourceUpdatedPrompt(
-          fromVersion: check.localVersion,
-          toVersion: appliedVersion,
-        ),
-      );
-    }
     return result;
   }
 
@@ -846,7 +783,13 @@ class _HazukiAppState extends State<HazukiApp> {
             final scheme = Theme.of(context).colorScheme;
             return Stack(
               children: [
-                if (child != null) child,
+                if (!_showInitialSourceBootstrapOverlay && child != null) child,
+                if (_showInitialSourceBootstrapOverlay)
+                  Positioned.fill(
+                    child: ColoredBox(
+                      color: Theme.of(context).scaffoldBackgroundColor,
+                    ),
+                  ),
                 Positioned.fill(
                   child: IgnorePointer(
                     ignoring: !_showInitialSourceBootstrapOverlay,
@@ -872,70 +815,76 @@ class _HazukiAppState extends State<HazukiApp> {
                         );
                       },
                       child: _showInitialSourceBootstrapOverlay
-                          ? Center(
+                          ? ColoredBox(
                               key: const ValueKey(
                                 'initial-source-bootstrap-overlay',
                               ),
-                              child: Container(
-                                width: 332,
-                                padding: const EdgeInsets.fromLTRB(
-                                  20,
-                                  18,
-                                  20,
-                                  18,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: scheme.surface,
-                                  borderRadius: BorderRadius.circular(28),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.black.withValues(
-                                        alpha: 0.14,
+                              color: Colors.black.withValues(alpha: 0.18),
+                              child: Center(
+                                child: Container(
+                                  width: 332,
+                                  padding: const EdgeInsets.fromLTRB(
+                                    20,
+                                    18,
+                                    20,
+                                    18,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: scheme.surface,
+                                    borderRadius: BorderRadius.circular(28),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(
+                                          alpha: 0.14,
+                                        ),
+                                        blurRadius: 24,
+                                        offset: const Offset(0, 10),
                                       ),
-                                      blurRadius: 24,
-                                      offset: const Offset(0, 10),
-                                    ),
-                                  ],
-                                ),
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      l10n(context).sourceBootstrapDownloading,
-                                      style: Theme.of(
-                                        context,
-                                      ).textTheme.titleMedium,
-                                    ),
-                                    const SizedBox(height: 14),
-                                    LinearProgressIndicator(
-                                      value: _sourceBootstrapIndeterminate
-                                          ? null
-                                          : _sourceBootstrapProgress,
-                                      borderRadius: BorderRadius.circular(999),
-                                      minHeight: 8,
-                                    ),
-                                    const SizedBox(height: 10),
-                                    Text(
-                                      _sourceBootstrapErrorText ??
-                                          (_sourceBootstrapIndeterminate
-                                              ? l10n(context)
-                                                    .sourceBootstrapPreparing
-                                              : l10n(context)
-                                                    .sourceBootstrapProgress(
-                                                      (_sourceBootstrapProgress *
-                                                              100)
-                                                          .toStringAsFixed(0),
-                                                    )),
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodySmall
-                                          ?.copyWith(
-                                            color: scheme.onSurfaceVariant,
-                                          ),
-                                    ),
-                                  ],
+                                    ],
+                                  ),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        l10n(context)
+                                            .sourceBootstrapDownloading,
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.titleMedium,
+                                      ),
+                                      const SizedBox(height: 14),
+                                      LinearProgressIndicator(
+                                        value: _sourceBootstrapIndeterminate
+                                            ? null
+                                            : _sourceBootstrapProgress,
+                                        borderRadius: BorderRadius.circular(
+                                          999,
+                                        ),
+                                        minHeight: 8,
+                                      ),
+                                      const SizedBox(height: 10),
+                                      Text(
+                                        _sourceBootstrapErrorText ??
+                                            (_sourceBootstrapIndeterminate
+                                                ? l10n(context)
+                                                      .sourceBootstrapPreparing
+                                                : l10n(context)
+                                                      .sourceBootstrapProgress(
+                                                        (_sourceBootstrapProgress *
+                                                                100)
+                                                            .toStringAsFixed(0),
+                                                      )),
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.copyWith(
+                                              color: scheme.onSurfaceVariant,
+                                            ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             )
@@ -951,11 +900,11 @@ class _HazukiAppState extends State<HazukiApp> {
             );
           },
           home: HazukiHomePage(
+            key: ValueKey(_homeRefreshTick),
             appearanceSettings: _appearance,
             onAppearanceChanged: _updateAppearance,
             locale: _locale,
             onLocaleChanged: _updateLocalePreference,
-            sourceRefreshTick: _homeRefreshTick,
           ),
         );
       },

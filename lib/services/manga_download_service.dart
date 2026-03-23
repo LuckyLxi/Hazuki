@@ -66,7 +66,6 @@ class MangaDownloadTask {
     this.currentChapterTitle,
     this.currentImageIndex = 0,
     this.currentImageTotal = 0,
-    this.completedImageFileNames = const <String>[],
     this.errorMessage,
   });
 
@@ -84,21 +83,16 @@ class MangaDownloadTask {
   final String? currentChapterTitle;
   final int currentImageIndex;
   final int currentImageTotal;
-  final List<String> completedImageFileNames;
   final String? errorMessage;
 
   int get totalCount => targets.length;
   int get completedCount => completedEpIds.length;
-  int get resumedImageCount => completedImageFileNames.length;
   double get progressValue {
     if (targets.isEmpty) {
       return 0;
     }
-    final effectiveImageIndex = currentImageIndex > resumedImageCount
-        ? currentImageIndex
-        : resumedImageCount;
     final chapterFraction = currentImageTotal > 0
-        ? (effectiveImageIndex / currentImageTotal).clamp(0.0, 1.0)
+        ? (currentImageIndex / currentImageTotal).clamp(0.0, 1.0)
         : 0.0;
     return ((completedCount + chapterFraction) / totalCount).clamp(0.0, 1.0);
   }
@@ -112,11 +106,9 @@ class MangaDownloadTask {
     String? currentChapterTitle,
     int? currentImageIndex,
     int? currentImageTotal,
-    List<String>? completedImageFileNames,
     String? errorMessage,
     bool clearCurrentChapterEpId = false,
     bool clearCurrentChapterTitle = false,
-    bool clearCompletedImageFileNames = false,
     bool clearErrorMessage = false,
   }) {
     return MangaDownloadTask(
@@ -139,9 +131,6 @@ class MangaDownloadTask {
           : (currentChapterTitle ?? this.currentChapterTitle),
       currentImageIndex: currentImageIndex ?? this.currentImageIndex,
       currentImageTotal: currentImageTotal ?? this.currentImageTotal,
-      completedImageFileNames: clearCompletedImageFileNames
-          ? const <String>[]
-          : (completedImageFileNames ?? this.completedImageFileNames),
       errorMessage: clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
     );
   }
@@ -161,7 +150,6 @@ class MangaDownloadTask {
     'currentChapterTitle': currentChapterTitle,
     'currentImageIndex': currentImageIndex,
     'currentImageTotal': currentImageTotal,
-    'completedImageFileNames': completedImageFileNames,
     'errorMessage': errorMessage,
   };
 
@@ -187,16 +175,6 @@ class MangaDownloadTask {
         }
       }
     }
-    final completedImageFileNames = <String>[];
-    final completedImagesRaw = map['completedImageFileNames'];
-    if (completedImagesRaw is List) {
-      for (final item in completedImagesRaw) {
-        final value = item.toString().trim();
-        if (value.isNotEmpty) {
-          completedImageFileNames.add(value);
-        }
-      }
-    }
     return MangaDownloadTask(
       comicId: (map['comicId'] ?? '').toString(),
       title: (map['title'] ?? '').toString(),
@@ -214,7 +192,6 @@ class MangaDownloadTask {
       currentChapterTitle: map['currentChapterTitle']?.toString(),
       currentImageIndex: (map['currentImageIndex'] as num?)?.toInt() ?? 0,
       currentImageTotal: (map['currentImageTotal'] as num?)?.toInt() ?? 0,
-      completedImageFileNames: completedImageFileNames,
       errorMessage: map['errorMessage']?.toString(),
     );
   }
@@ -475,18 +452,13 @@ class MangaDownloadService extends ChangeNotifier {
 
   Future<void> pauseTask(String comicId) async {
     await ensureInitialized();
-    final latest = _latestTask(comicId);
-    if (latest == null || latest.status == MangaDownloadTaskStatus.paused) {
+    final index = _tasks.indexWhere((item) => item.comicId == comicId);
+    if (index < 0) {
       return;
     }
-    if (!_replaceTask(
-      comicId,
-      latest.copyWith(
-        status: MangaDownloadTaskStatus.paused,
-      ),
-    )) {
-      return;
-    }
+    _tasks[index] = _tasks[index].copyWith(
+      status: MangaDownloadTaskStatus.paused,
+    );
     await _persistState();
     notifyListeners();
   }
@@ -537,42 +509,48 @@ class MangaDownloadService extends ChangeNotifier {
 
   Future<void> _init() async {
     _prefs = await SharedPreferences.getInstance();
-    final rootDir = await _ensureRootDir();
+    await _ensureRootDir();
     final raw = _prefs?.getString(_statePrefsKey);
-    if (raw != null && raw.isNotEmpty) {
-      try {
-        final decoded = jsonDecode(raw);
-        if (decoded is Map) {
-          final map = Map<String, dynamic>.from(decoded);
-          final tasksRaw = map['tasks'];
-          if (tasksRaw is List) {
-            for (final item in tasksRaw) {
-              if (item is Map) {
-                var task = MangaDownloadTask.fromJson(Map<String, dynamic>.from(item));
-                if (task.status == MangaDownloadTaskStatus.downloading) {
-                  task = task.copyWith(status: MangaDownloadTaskStatus.queued);
-                }
-                _tasks.add(task);
-              }
+    if (raw == null || raw.isEmpty) {
+      return;
+    }
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) {
+        return;
+      }
+      final map = Map<String, dynamic>.from(decoded);
+      final tasksRaw = map['tasks'];
+      if (tasksRaw is List) {
+        for (final item in tasksRaw) {
+          if (item is Map) {
+            var task = MangaDownloadTask.fromJson(Map<String, dynamic>.from(item));
+            if (task.status == MangaDownloadTaskStatus.downloading) {
+              task = task.copyWith(
+                status: MangaDownloadTaskStatus.queued,
+                currentImageIndex: 0,
+                currentImageTotal: 0,
+                clearCurrentChapterEpId: true,
+                clearCurrentChapterTitle: true,
+              );
             }
-          }
-          final downloadedRaw = map['downloaded'];
-          if (downloadedRaw is List) {
-            for (final item in downloadedRaw) {
-              if (item is Map) {
-                _downloaded.add(
-                  DownloadedMangaComic.fromJson(Map<String, dynamic>.from(item)),
-                );
-              }
-            }
+            _tasks.add(task);
           }
         }
-      } catch (_) {}
-    }
-    await _scanExistingDownloadedComics(rootDir);
-    _tasks.sort((a, b) => a.createdAtMillis.compareTo(b.createdAtMillis));
-    _downloaded.sort((a, b) => b.updatedAtMillis.compareTo(a.updatedAtMillis));
-    await _persistState();
+      }
+      final downloadedRaw = map['downloaded'];
+      if (downloadedRaw is List) {
+        for (final item in downloadedRaw) {
+          if (item is Map) {
+            _downloaded.add(
+              DownloadedMangaComic.fromJson(Map<String, dynamic>.from(item)),
+            );
+          }
+        }
+      }
+      _tasks.sort((a, b) => a.createdAtMillis.compareTo(b.createdAtMillis));
+      _downloaded.sort((a, b) => b.updatedAtMillis.compareTo(a.updatedAtMillis));
+    } catch (_) {}
     if (_tasks.isNotEmpty) {
       unawaited(_processQueue());
     }
@@ -672,12 +650,10 @@ class MangaDownloadService extends ChangeNotifier {
           return;
         }
         if (existingChapterIds.contains(target.epId)) {
-          if (!_updateTaskFromLatest(task.comicId, (latest) {
-            task = latest.copyWith(
-              completedEpIds: {...latest.completedEpIds, target.epId},
-            );
-            return task;
-          })) {
+          task = task.copyWith(
+            completedEpIds: {...task.completedEpIds, target.epId},
+          );
+          if (!_replaceTask(task.comicId, task)) {
             return;
           }
           continue;
@@ -692,45 +668,21 @@ class MangaDownloadService extends ChangeNotifier {
           await chapterDir.create(recursive: true);
         }
 
-        final existingFileNames = await _listExistingChapterImageFileNames(
-          chapterDir,
+        final savedPaths = <String>[];
+        task = task.copyWith(
+          currentChapterEpId: target.epId,
+          currentChapterTitle: target.title,
+          currentImageIndex: 0,
+          currentImageTotal: imageUrls.length,
         );
-        final resumableEntries = <MapEntry<String, int>>[];
-        for (final fileName in existingFileNames) {
-          final imageIndex = _parseDownloadedImageIndex(fileName);
-          if (imageIndex == null || imageIndex >= imageUrls.length) {
-            continue;
-          }
-          resumableEntries.add(MapEntry(fileName, imageIndex));
-        }
-        resumableEntries.sort((a, b) => a.value.compareTo(b.value));
-        final resumableFileNames = resumableEntries.map((entry) => entry.key).toList();
-        final resumedSavedPaths = resumableFileNames
-            .map((name) => '${chapterDir.path}/$name')
-            .toList();
-        final completedIndexes = resumableEntries
-            .map((entry) => entry.value)
-            .toSet();
-        final savedPaths = <String>[...resumedSavedPaths];
-        if (!_updateTaskFromLatest(task.comicId, (latest) {
-          task = latest.copyWith(
-            currentChapterEpId: target.epId,
-            currentChapterTitle: target.title,
-            currentImageIndex: resumedSavedPaths.length,
-            currentImageTotal: imageUrls.length,
-            completedImageFileNames: resumableFileNames,
-          );
-          return task;
-        })) {
+        if (!_replaceTask(task.comicId, task)) {
           return;
         }
         await _persistState();
         notifyListeners();
         for (var i = 0; i < imageUrls.length; i++) {
-          if (completedIndexes.contains(i)) {
-            continue;
-          }
           if (await _shouldAbortTask(task.comicId)) {
+            await _cleanupTaskChapterDir(comicDir.path, target.epId);
             return;
           }
           final imageUrl = imageUrls[i];
@@ -744,34 +696,19 @@ class MangaDownloadService extends ChangeNotifier {
           final file = File('${chapterDir.path}/$fileName');
           await file.writeAsBytes(prepared.bytes, flush: true);
           savedPaths.add(file.path);
-          completedIndexes.add(i);
-          final nextCompletedFileNames = [
-            ...?(_latestTask(task.comicId)?.completedImageFileNames),
-          ];
-          if (!nextCompletedFileNames.contains(fileName)) {
-            nextCompletedFileNames.add(fileName);
-            nextCompletedFileNames.sort();
-          }
-          if (await _shouldAbortTask(task.comicId)) {
-            return;
-          }
-          if (!_updateTaskFromLatest(task.comicId, (latest) {
-            task = latest.copyWith(
-              currentChapterEpId: target.epId,
-              currentChapterTitle: target.title,
-              currentImageIndex: nextCompletedFileNames.length,
-              currentImageTotal: imageUrls.length,
-              completedImageFileNames: nextCompletedFileNames,
-            );
-            return task;
-          })) {
+          task = task.copyWith(
+            currentChapterEpId: target.epId,
+            currentChapterTitle: target.title,
+            currentImageIndex: i + 1,
+            currentImageTotal: imageUrls.length,
+          );
+          if (!_replaceTask(task.comicId, task)) {
             return;
           }
           await _persistState();
           notifyListeners();
         }
 
-        savedPaths.sort();
         downloadedChapters.add(
           DownloadedMangaChapter(
             epId: target.epId,
@@ -782,17 +719,14 @@ class MangaDownloadService extends ChangeNotifier {
         );
         downloadedChapters.sort((a, b) => a.index.compareTo(b.index));
 
-        if (!_updateTaskFromLatest(task.comicId, (latest) {
-          task = latest.copyWith(
-            completedEpIds: {...latest.completedEpIds, target.epId},
-            clearCurrentChapterEpId: true,
-            clearCurrentChapterTitle: true,
-            currentImageIndex: 0,
-            currentImageTotal: 0,
-            clearCompletedImageFileNames: true,
-          );
-          return task;
-        })) {
+        task = task.copyWith(
+          completedEpIds: {...task.completedEpIds, target.epId},
+          clearCurrentChapterEpId: true,
+          clearCurrentChapterTitle: true,
+          currentImageIndex: 0,
+          currentImageTotal: 0,
+        );
+        if (!_replaceTask(task.comicId, task)) {
           return;
         }
 
@@ -820,23 +754,16 @@ class MangaDownloadService extends ChangeNotifier {
         task.comicId,
         latest.copyWith(
           status: MangaDownloadTaskStatus.failed,
+          clearCurrentChapterEpId: true,
+          clearCurrentChapterTitle: true,
+          currentImageIndex: 0,
+          currentImageTotal: 0,
           errorMessage: e.toString(),
         ),
       );
       await _persistState();
       notifyListeners();
     }
-  }
-
-  bool _updateTaskFromLatest(
-    String comicId,
-    MangaDownloadTask Function(MangaDownloadTask latest) transform,
-  ) {
-    final latest = _latestTask(comicId);
-    if (latest == null || latest.status == MangaDownloadTaskStatus.paused) {
-      return false;
-    }
-    return _replaceTask(comicId, transform(latest));
   }
 
   bool _replaceTask(String comicId, MangaDownloadTask next) {
@@ -890,40 +817,6 @@ class MangaDownloadService extends ChangeNotifier {
     } catch (_) {}
   }
 
-  Future<List<String>> _listExistingChapterImageFileNames(Directory chapterDir) async {
-    if (!await chapterDir.exists()) {
-      return const <String>[];
-    }
-    final names = <String>[];
-    await for (final entity in chapterDir.list()) {
-      if (entity is! File) {
-        continue;
-      }
-      final segments = entity.path.split(RegExp(r'[\\/]'));
-      if (segments.isEmpty) {
-        continue;
-      }
-      final name = segments.last.trim();
-      if (RegExp(r'^\d{4}\.[A-Za-z0-9]+$').hasMatch(name)) {
-        names.add(name);
-      }
-    }
-    names.sort();
-    return names;
-  }
-
-  int? _parseDownloadedImageIndex(String fileName) {
-    final match = RegExp(r'^(\d{4})\.[A-Za-z0-9]+$').firstMatch(fileName.trim());
-    if (match == null) {
-      return null;
-    }
-    final sequence = int.tryParse(match.group(1) ?? '');
-    if (sequence == null || sequence <= 0) {
-      return null;
-    }
-    return sequence - 1;
-  }
-
   Future<String?> _downloadCoverIfNeeded({
     required MangaDownloadTask task,
     required Directory comicDir,
@@ -946,131 +839,6 @@ class MangaDownloadService extends ChangeNotifier {
     } catch (_) {
       return null;
     }
-  }
-
-  Future<void> _scanExistingDownloadedComics(Directory rootDir) async {
-    if (!await rootDir.exists()) {
-      return;
-    }
-    await for (final entity in rootDir.list()) {
-      if (entity is! Directory) {
-        continue;
-      }
-      final comic = await _loadDownloadedComicFromDirectory(entity);
-      if (comic == null) {
-        continue;
-      }
-      _upsertDownloadedComic(comic);
-    }
-  }
-
-  Future<DownloadedMangaComic?> _loadDownloadedComicFromDirectory(
-    Directory comicDir,
-  ) async {
-    final metadataFile = File('${comicDir.path}/$_metadataFileName');
-    if (await metadataFile.exists()) {
-      try {
-        final raw = await metadataFile.readAsString();
-        final decoded = jsonDecode(raw);
-        if (decoded is Map) {
-          final comic = DownloadedMangaComic.fromJson(
-            Map<String, dynamic>.from(decoded),
-          );
-          return comic.copyWith(
-            localCoverPath: await _resolveLocalCoverPath(comicDir),
-            updatedAtMillis: await _resolveDirectoryUpdatedAtMillis(comicDir),
-          );
-        }
-      } catch (_) {}
-    }
-
-    final chapters = await _scanDownloadedChapters(comicDir);
-    final localCoverPath = await _resolveLocalCoverPath(comicDir);
-    if (chapters.isEmpty && localCoverPath == null) {
-      return null;
-    }
-
-    return DownloadedMangaComic(
-      comicId: _lastPathSegment(comicDir.path),
-      title: _lastPathSegment(comicDir.path),
-      subTitle: '',
-      description: '',
-      coverUrl: '',
-      localCoverPath: localCoverPath,
-      chapters: chapters,
-      updatedAtMillis: await _resolveDirectoryUpdatedAtMillis(comicDir),
-    );
-  }
-
-  Future<List<DownloadedMangaChapter>> _scanDownloadedChapters(
-    Directory comicDir,
-  ) async {
-    final chapters = <DownloadedMangaChapter>[];
-    await for (final entity in comicDir.list()) {
-      if (entity is! Directory) {
-        continue;
-      }
-      final epId = _lastPathSegment(entity.path);
-      if (epId.isEmpty) {
-        continue;
-      }
-      final fileNames = await _listExistingChapterImageFileNames(entity);
-      if (fileNames.isEmpty) {
-        continue;
-      }
-      final imagePaths = fileNames.map((name) => '${entity.path}/$name').toList();
-      final chapterIndex = int.tryParse(epId) ?? chapters.length;
-      chapters.add(
-        DownloadedMangaChapter(
-          epId: epId,
-          title: epId,
-          index: chapterIndex,
-          imagePaths: imagePaths,
-        ),
-      );
-    }
-    chapters.sort((a, b) {
-      final byIndex = a.index.compareTo(b.index);
-      if (byIndex != 0) {
-        return byIndex;
-      }
-      return a.epId.compareTo(b.epId);
-    });
-    return chapters;
-  }
-
-  Future<String?> _resolveLocalCoverPath(Directory comicDir) async {
-    const candidateNames = <String>[
-      'cover.jpg',
-      'cover.jpeg',
-      'cover.png',
-      'cover.webp',
-      'cover.avif',
-    ];
-    for (final name in candidateNames) {
-      final file = File('${comicDir.path}/$name');
-      if (await file.exists()) {
-        return file.path;
-      }
-    }
-    return null;
-  }
-
-  Future<int> _resolveDirectoryUpdatedAtMillis(Directory dir) async {
-    try {
-      return (await dir.stat()).modified.millisecondsSinceEpoch;
-    } catch (_) {
-      return DateTime.now().millisecondsSinceEpoch;
-    }
-  }
-
-  String _lastPathSegment(String path) {
-    final normalized = path.trim();
-    if (normalized.isEmpty) {
-      return '';
-    }
-    final segments = normalized.split(RegExp(r'[\\/]'));
-    return segments.isEmpty ? '' : segments.last.trim();
   }
 
   void _upsertDownloadedComic(DownloadedMangaComic comic) {

@@ -342,9 +342,6 @@ class HazukiSourceService {
     _sourceMeta = result;
     _statusText =
         'source_reloaded|${result.name}|${result.key}|${result.version}';
-    if (isLogged) {
-      await _tryReloginFromStoredAccount(force: true);
-    }
     return true;
   }
 
