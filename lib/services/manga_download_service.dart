@@ -8,12 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/hazuki_models.dart';
 import 'hazuki_source_service.dart';
 
-enum MangaDownloadTaskStatus {
-  queued,
-  downloading,
-  paused,
-  failed,
-}
+enum MangaDownloadTaskStatus { queued, downloading, paused, failed }
 
 MangaDownloadTaskStatus _mangaDownloadTaskStatusFromRaw(String? raw) {
   return switch (raw) {
@@ -129,8 +124,7 @@ class MangaDownloadTask {
       completedEpIds: completedEpIds ?? this.completedEpIds,
       status: status ?? this.status,
       createdAtMillis: createdAtMillis,
-      updatedAtMillis:
-          updatedAtMillis ?? DateTime.now().millisecondsSinceEpoch,
+      updatedAtMillis: updatedAtMillis ?? DateTime.now().millisecondsSinceEpoch,
       currentChapterEpId: clearCurrentChapterEpId
           ? null
           : (currentChapterEpId ?? this.currentChapterEpId),
@@ -142,7 +136,9 @@ class MangaDownloadTask {
       completedImageFileNames: clearCompletedImageFileNames
           ? const <String>[]
           : (completedImageFileNames ?? this.completedImageFileNames),
-      errorMessage: clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
+      errorMessage: clearErrorMessage
+          ? null
+          : (errorMessage ?? this.errorMessage),
     );
   }
 
@@ -172,7 +168,9 @@ class MangaDownloadTask {
       for (final item in targetsRaw) {
         if (item is Map) {
           targets.add(
-            MangaChapterDownloadTarget.fromJson(Map<String, dynamic>.from(item)),
+            MangaChapterDownloadTarget.fromJson(
+              Map<String, dynamic>.from(item),
+            ),
           );
         }
       }
@@ -206,9 +204,11 @@ class MangaDownloadTask {
       targets: targets,
       completedEpIds: completedEpIds,
       status: _mangaDownloadTaskStatusFromRaw(map['status']?.toString()),
-      createdAtMillis: (map['createdAtMillis'] as num?)?.toInt() ??
+      createdAtMillis:
+          (map['createdAtMillis'] as num?)?.toInt() ??
           DateTime.now().millisecondsSinceEpoch,
-      updatedAtMillis: (map['updatedAtMillis'] as num?)?.toInt() ??
+      updatedAtMillis:
+          (map['updatedAtMillis'] as num?)?.toInt() ??
           DateTime.now().millisecondsSinceEpoch,
       currentChapterEpId: map['currentChapterEpId']?.toString(),
       currentChapterTitle: map['currentChapterTitle']?.toString(),
@@ -294,8 +294,7 @@ class DownloadedMangaComic {
       coverUrl: coverUrl,
       localCoverPath: localCoverPath ?? this.localCoverPath,
       chapters: chapters ?? this.chapters,
-      updatedAtMillis:
-          updatedAtMillis ?? DateTime.now().millisecondsSinceEpoch,
+      updatedAtMillis: updatedAtMillis ?? DateTime.now().millisecondsSinceEpoch,
     );
   }
 
@@ -331,7 +330,8 @@ class DownloadedMangaComic {
       coverUrl: (map['coverUrl'] ?? '').toString(),
       localCoverPath: map['localCoverPath']?.toString(),
       chapters: chapters,
-      updatedAtMillis: (map['updatedAtMillis'] as num?)?.toInt() ??
+      updatedAtMillis:
+          (map['updatedAtMillis'] as num?)?.toInt() ??
           DateTime.now().millisecondsSinceEpoch,
     );
   }
@@ -344,6 +344,7 @@ class MangaDownloadService extends ChangeNotifier {
 
   static const String _statePrefsKey = 'manga_download_service_state_v1';
   static const String _metadataFileName = 'metadata.json';
+  static const String _taskFileName = 'task.json';
 
   SharedPreferences? _prefs;
   Future<void>? _initFuture;
@@ -351,9 +352,8 @@ class MangaDownloadService extends ChangeNotifier {
   final List<MangaDownloadTask> _tasks = <MangaDownloadTask>[];
   final List<DownloadedMangaComic> _downloaded = <DownloadedMangaComic>[];
 
-  List<MangaDownloadTask> get tasks => List<MangaDownloadTask>.unmodifiable(
-    _tasks,
-  );
+  List<MangaDownloadTask> get tasks =>
+      List<MangaDownloadTask>.unmodifiable(_tasks);
   List<DownloadedMangaComic> get downloadedComics =>
       List<DownloadedMangaComic>.unmodifiable(_downloaded);
 
@@ -440,7 +440,8 @@ class MangaDownloadService extends ChangeNotifier {
           subTitle: details.subTitle,
           description: description,
           coverUrl: coverUrl,
-          targets: normalizedTargets..sort((a, b) => a.index.compareTo(b.index)),
+          targets: normalizedTargets
+            ..sort((a, b) => a.index.compareTo(b.index)),
           completedEpIds: <String>{},
           status: MangaDownloadTaskStatus.queued,
           createdAtMillis: now,
@@ -449,13 +450,17 @@ class MangaDownloadService extends ChangeNotifier {
       );
     }
     await _persistState();
+    await _syncTaskSnapshots();
     notifyListeners();
     unawaited(_processQueue());
   }
 
   Future<void> deleteDownloadedComics(Iterable<String> comicIds) async {
     await ensureInitialized();
-    final ids = comicIds.map((e) => e.trim()).where((e) => e.isNotEmpty).toSet();
+    final ids = comicIds
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .toSet();
     if (ids.isEmpty) {
       return;
     }
@@ -470,6 +475,7 @@ class MangaDownloadService extends ChangeNotifier {
     }
     _downloaded.removeWhere((item) => ids.contains(item.comicId));
     await _persistState();
+    await _syncTaskSnapshots();
     notifyListeners();
   }
 
@@ -481,13 +487,12 @@ class MangaDownloadService extends ChangeNotifier {
     }
     if (!_replaceTask(
       comicId,
-      latest.copyWith(
-        status: MangaDownloadTaskStatus.paused,
-      ),
+      latest.copyWith(status: MangaDownloadTaskStatus.paused),
     )) {
       return;
     }
     await _persistState();
+    await _syncTaskSnapshots();
     notifyListeners();
   }
 
@@ -502,6 +507,7 @@ class MangaDownloadService extends ChangeNotifier {
       clearErrorMessage: true,
     );
     await _persistState();
+    await _syncTaskSnapshots();
     notifyListeners();
     unawaited(_processQueue());
   }
@@ -518,7 +524,9 @@ class MangaDownloadService extends ChangeNotifier {
     final wasDownloading = task.status == MangaDownloadTaskStatus.downloading;
     if (task.currentChapterEpId?.isNotEmpty == true) {
       try {
-        final chapterDir = Directory('${comicDir.path}/${task.currentChapterEpId}');
+        final chapterDir = Directory(
+          '${comicDir.path}/${task.currentChapterEpId}',
+        );
         if (await chapterDir.exists()) {
           await chapterDir.delete(recursive: true);
         }
@@ -532,6 +540,7 @@ class MangaDownloadService extends ChangeNotifier {
       } catch (_) {}
     }
     await _persistState();
+    await _syncTaskSnapshots();
     notifyListeners();
   }
 
@@ -548,7 +557,9 @@ class MangaDownloadService extends ChangeNotifier {
           if (tasksRaw is List) {
             for (final item in tasksRaw) {
               if (item is Map) {
-                var task = MangaDownloadTask.fromJson(Map<String, dynamic>.from(item));
+                var task = MangaDownloadTask.fromJson(
+                  Map<String, dynamic>.from(item),
+                );
                 if (task.status == MangaDownloadTaskStatus.downloading) {
                   task = task.copyWith(status: MangaDownloadTaskStatus.queued);
                 }
@@ -561,7 +572,9 @@ class MangaDownloadService extends ChangeNotifier {
             for (final item in downloadedRaw) {
               if (item is Map) {
                 _downloaded.add(
-                  DownloadedMangaComic.fromJson(Map<String, dynamic>.from(item)),
+                  DownloadedMangaComic.fromJson(
+                    Map<String, dynamic>.from(item),
+                  ),
                 );
               }
             }
@@ -570,9 +583,11 @@ class MangaDownloadService extends ChangeNotifier {
       } catch (_) {}
     }
     await _scanExistingDownloadedComics(rootDir);
+    await _restoreTaskSnapshots(rootDir);
     _tasks.sort((a, b) => a.createdAtMillis.compareTo(b.createdAtMillis));
     _downloaded.sort((a, b) => b.updatedAtMillis.compareTo(a.updatedAtMillis));
     await _persistState();
+    await _syncTaskSnapshots();
     if (_tasks.isNotEmpty) {
       unawaited(_processQueue());
     }
@@ -630,6 +645,7 @@ class MangaDownloadService extends ChangeNotifier {
       return;
     }
     await _persistState();
+    await _syncTaskSnapshots();
     notifyListeners();
 
     try {
@@ -639,7 +655,8 @@ class MangaDownloadService extends ChangeNotifier {
         await comicDir.create(recursive: true);
       }
 
-      var downloadedComic = downloadedComicById(task.comicId) ??
+      var downloadedComic =
+          downloadedComicById(task.comicId) ??
           DownloadedMangaComic(
             comicId: task.comicId,
             title: task.title,
@@ -655,7 +672,9 @@ class MangaDownloadService extends ChangeNotifier {
         task: task,
         comicDir: comicDir,
       );
-      downloadedComic = downloadedComic.copyWith(localCoverPath: localCoverPath);
+      downloadedComic = downloadedComic.copyWith(
+        localCoverPath: localCoverPath,
+      );
 
       final downloadedChapters = <DownloadedMangaChapter>[
         ...downloadedComic.chapters,
@@ -704,7 +723,9 @@ class MangaDownloadService extends ChangeNotifier {
           resumableEntries.add(MapEntry(fileName, imageIndex));
         }
         resumableEntries.sort((a, b) => a.value.compareTo(b.value));
-        final resumableFileNames = resumableEntries.map((entry) => entry.key).toList();
+        final resumableFileNames = resumableEntries
+            .map((entry) => entry.key)
+            .toList();
         final resumedSavedPaths = resumableFileNames
             .map((name) => '${chapterDir.path}/$name')
             .toList();
@@ -725,6 +746,7 @@ class MangaDownloadService extends ChangeNotifier {
           return;
         }
         await _persistState();
+        await _syncTaskSnapshots();
         notifyListeners();
         for (var i = 0; i < imageUrls.length; i++) {
           if (completedIndexes.contains(i)) {
@@ -768,6 +790,7 @@ class MangaDownloadService extends ChangeNotifier {
             return;
           }
           await _persistState();
+          await _syncTaskSnapshots();
           notifyListeners();
         }
 
@@ -803,6 +826,7 @@ class MangaDownloadService extends ChangeNotifier {
         _upsertDownloadedComic(downloadedComic);
         await _writeMetadataFile(comicDir, downloadedComic);
         await _persistState();
+        await _syncTaskSnapshots();
         notifyListeners();
       }
 
@@ -810,6 +834,7 @@ class MangaDownloadService extends ChangeNotifier {
       _upsertDownloadedComic(downloadedComic);
       await _writeMetadataFile(comicDir, downloadedComic);
       await _persistState();
+      await _syncTaskSnapshots();
       notifyListeners();
     } catch (e) {
       final latest = _latestTask(task.comicId);
@@ -824,6 +849,7 @@ class MangaDownloadService extends ChangeNotifier {
         ),
       );
       await _persistState();
+      await _syncTaskSnapshots();
       notifyListeners();
     }
   }
@@ -890,7 +916,9 @@ class MangaDownloadService extends ChangeNotifier {
     } catch (_) {}
   }
 
-  Future<List<String>> _listExistingChapterImageFileNames(Directory chapterDir) async {
+  Future<List<String>> _listExistingChapterImageFileNames(
+    Directory chapterDir,
+  ) async {
     if (!await chapterDir.exists()) {
       return const <String>[];
     }
@@ -913,7 +941,9 @@ class MangaDownloadService extends ChangeNotifier {
   }
 
   int? _parseDownloadedImageIndex(String fileName) {
-    final match = RegExp(r'^(\d{4})\.[A-Za-z0-9]+$').firstMatch(fileName.trim());
+    final match = RegExp(
+      r'^(\d{4})\.[A-Za-z0-9]+$',
+    ).firstMatch(fileName.trim());
     if (match == null) {
       return null;
     }
@@ -968,24 +998,30 @@ class MangaDownloadService extends ChangeNotifier {
     Directory comicDir,
   ) async {
     final metadataFile = File('${comicDir.path}/$_metadataFileName');
+    final scannedChapters = await _scanDownloadedChapters(comicDir);
+    final scannedLocalCoverPath = await _resolveLocalCoverPath(comicDir);
     if (await metadataFile.exists()) {
       try {
         final raw = await metadataFile.readAsString();
         final decoded = jsonDecode(raw);
         if (decoded is Map) {
-          final comic = DownloadedMangaComic.fromJson(
+          final comic = _parseDownloadedComicMetadata(
             Map<String, dynamic>.from(decoded),
+            comicDir: comicDir,
+            fallbackChapters: scannedChapters,
+            fallbackLocalCoverPath: scannedLocalCoverPath,
           );
-          return comic.copyWith(
-            localCoverPath: await _resolveLocalCoverPath(comicDir),
-            updatedAtMillis: await _resolveDirectoryUpdatedAtMillis(comicDir),
-          );
+          if (comic != null) {
+            return comic.copyWith(
+              updatedAtMillis: await _resolveDirectoryUpdatedAtMillis(comicDir),
+            );
+          }
         }
       } catch (_) {}
     }
 
-    final chapters = await _scanDownloadedChapters(comicDir);
-    final localCoverPath = await _resolveLocalCoverPath(comicDir);
+    final chapters = scannedChapters;
+    final localCoverPath = scannedLocalCoverPath;
     if (chapters.isEmpty && localCoverPath == null) {
       return null;
     }
@@ -1018,7 +1054,9 @@ class MangaDownloadService extends ChangeNotifier {
       if (fileNames.isEmpty) {
         continue;
       }
-      final imagePaths = fileNames.map((name) => '${entity.path}/$name').toList();
+      final imagePaths = fileNames
+          .map((name) => '${entity.path}/$name')
+          .toList();
       final chapterIndex = int.tryParse(epId) ?? chapters.length;
       chapters.add(
         DownloadedMangaChapter(
@@ -1056,6 +1094,277 @@ class MangaDownloadService extends ChangeNotifier {
     return null;
   }
 
+  Future<void> _restoreTaskSnapshots(Directory rootDir) async {
+    await for (final entity in rootDir.list()) {
+      if (entity is! Directory) {
+        continue;
+      }
+      final taskFile = File('${entity.path}/$_taskFileName');
+      if (!await taskFile.exists()) {
+        continue;
+      }
+      try {
+        final raw = await taskFile.readAsString();
+        final decoded = jsonDecode(raw);
+        if (decoded is! Map) {
+          continue;
+        }
+        var task = MangaDownloadTask.fromJson(
+          Map<String, dynamic>.from(decoded),
+        );
+        if (task.comicId.trim().isEmpty) {
+          continue;
+        }
+        if (task.status == MangaDownloadTaskStatus.downloading) {
+          task = task.copyWith(status: MangaDownloadTaskStatus.queued);
+        }
+        if (_latestTask(task.comicId) == null) {
+          _tasks.add(task);
+        }
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _syncTaskSnapshots() async {
+    try {
+      final rootDir = await _ensureRootDir();
+      final activeIds = _tasks.map((task) => task.comicId).toSet();
+      await for (final entity in rootDir.list()) {
+        if (entity is! Directory) {
+          continue;
+        }
+        final comicId = _lastPathSegment(entity.path);
+        final taskFile = File('${entity.path}/$_taskFileName');
+        if (activeIds.contains(comicId)) {
+          continue;
+        }
+        if (await taskFile.exists()) {
+          await taskFile.delete();
+        }
+      }
+      for (final task in _tasks) {
+        final comicDir = Directory('${rootDir.path}/${task.comicId}');
+        if (!await comicDir.exists()) {
+          await comicDir.create(recursive: true);
+        }
+        final taskFile = File('${comicDir.path}/$_taskFileName');
+        await taskFile.writeAsString(jsonEncode(task.toJson()), flush: true);
+      }
+    } catch (_) {}
+  }
+
+  DownloadedMangaComic? _parseDownloadedComicMetadata(
+    Map<String, dynamic> map, {
+    required Directory comicDir,
+    required List<DownloadedMangaChapter> fallbackChapters,
+    required String? fallbackLocalCoverPath,
+  }) {
+    final chapters = _parseDownloadedChaptersFromMetadata(
+      map,
+      comicDir: comicDir,
+      fallbackChapters: fallbackChapters,
+    );
+    final title = _firstNonEmptyString(map, const [
+      'title',
+      'name',
+      'comicTitle',
+      'comic_name',
+    ]);
+    final comicId =
+        _firstNonEmptyString(map, const ['comicId', 'id', 'comic_id']) ??
+        _lastPathSegment(comicDir.path);
+    final localCoverPath =
+        _resolvePathFromMetadataValue(
+          map['localCoverPath'] ?? map['coverPath'] ?? map['cover_path'],
+          comicDir: comicDir,
+          preferComicDir: true,
+        ) ??
+        fallbackLocalCoverPath;
+    final coverUrl = _firstNonEmptyString(map, const [
+      'coverUrl',
+      'cover',
+      'cover_url',
+    ]);
+    if (title == null &&
+        chapters.isEmpty &&
+        (localCoverPath == null || localCoverPath.isEmpty) &&
+        (coverUrl == null || coverUrl.isEmpty)) {
+      return null;
+    }
+    return DownloadedMangaComic(
+      comicId: comicId,
+      title: title ?? _lastPathSegment(comicDir.path),
+      subTitle:
+          _firstNonEmptyString(map, const [
+            'subTitle',
+            'subtitle',
+            'sub_title',
+            'author',
+          ]) ??
+          '',
+      description:
+          _firstNonEmptyString(map, const [
+            'description',
+            'intro',
+            'summary',
+          ]) ??
+          '',
+      coverUrl: coverUrl ?? '',
+      localCoverPath: localCoverPath,
+      chapters: chapters,
+      updatedAtMillis:
+          (map['updatedAtMillis'] as num?)?.toInt() ??
+          DateTime.now().millisecondsSinceEpoch,
+    );
+  }
+
+  List<DownloadedMangaChapter> _parseDownloadedChaptersFromMetadata(
+    Map<String, dynamic> map, {
+    required Directory comicDir,
+    required List<DownloadedMangaChapter> fallbackChapters,
+  }) {
+    final chaptersById = <String, DownloadedMangaChapter>{
+      for (final chapter in fallbackChapters) chapter.epId: chapter,
+    };
+    final raw =
+        map['chapters'] ??
+        map['chapterList'] ??
+        map['chapter_list'] ??
+        map['eps'];
+    if (raw is List) {
+      for (var i = 0; i < raw.length; i++) {
+        final item = raw[i];
+        if (item is! Map) {
+          continue;
+        }
+        final chapter = _parseDownloadedChapterMetadata(
+          Map<String, dynamic>.from(item),
+          comicDir: comicDir,
+          fallbackIndex: i,
+        );
+        if (chapter == null) {
+          continue;
+        }
+        chaptersById[chapter.epId] = chapter;
+      }
+    }
+    final chapters = chaptersById.values.toList()
+      ..sort((a, b) {
+        final byIndex = a.index.compareTo(b.index);
+        if (byIndex != 0) {
+          return byIndex;
+        }
+        return a.epId.compareTo(b.epId);
+      });
+    return chapters;
+  }
+
+  DownloadedMangaChapter? _parseDownloadedChapterMetadata(
+    Map<String, dynamic> map, {
+    required Directory comicDir,
+    required int fallbackIndex,
+  }) {
+    final epId =
+        _firstNonEmptyString(map, const [
+          'epId',
+          'id',
+          'chapterId',
+          'chapter_id',
+        ]) ??
+        _firstNonEmptyString(map, const ['title', 'name']) ??
+        '$fallbackIndex';
+    final imagePaths = <String>[];
+    final rawImages =
+        map['imagePaths'] ?? map['images'] ?? map['pages'] ?? map['files'];
+    if (rawImages is List) {
+      for (final item in rawImages) {
+        final resolved = _resolvePathFromMetadataValue(
+          item,
+          comicDir: comicDir,
+        );
+        if (resolved != null) {
+          imagePaths.add(resolved);
+        }
+      }
+    }
+    if (imagePaths.isEmpty) {
+      final chapterDir = Directory('${comicDir.path}/$epId');
+      if (chapterDir.existsSync()) {
+        final files =
+            chapterDir
+                .listSync()
+                .whereType<File>()
+                .map((file) => file.path)
+                .where(
+                  (path) => RegExp(
+                    r'\.(jpg|jpeg|png|webp|gif|avif)$',
+                    caseSensitive: false,
+                  ).hasMatch(path),
+                )
+                .toList()
+              ..sort();
+        imagePaths.addAll(files);
+      }
+    }
+    if (imagePaths.isEmpty) {
+      return null;
+    }
+    return DownloadedMangaChapter(
+      epId: epId,
+      title:
+          _firstNonEmptyString(map, const ['title', 'name', 'chapterTitle']) ??
+          epId,
+      index:
+          (map['index'] as num?)?.toInt() ??
+          (map['order'] as num?)?.toInt() ??
+          (map['sort'] as num?)?.toInt() ??
+          fallbackIndex,
+      imagePaths: imagePaths,
+    );
+  }
+
+  String? _firstNonEmptyString(Map<String, dynamic> map, List<String> keys) {
+    for (final key in keys) {
+      final value = map[key]?.toString().trim();
+      if (value != null && value.isNotEmpty) {
+        return value;
+      }
+    }
+    return null;
+  }
+
+  String? _resolvePathFromMetadataValue(
+    Object? raw, {
+    required Directory comicDir,
+    bool preferComicDir = false,
+  }) {
+    final value = raw?.toString().trim() ?? '';
+    if (value.isEmpty) {
+      return null;
+    }
+    if (value.startsWith('http://') || value.startsWith('https://')) {
+      return value;
+    }
+    final normalized = value.startsWith('file://')
+        ? Uri.parse(value).toFilePath()
+        : value;
+    final direct = File(normalized);
+    if (direct.isAbsolute && direct.existsSync()) {
+      return direct.path;
+    }
+    final relativeToComic = File('${comicDir.path}/$normalized');
+    if (relativeToComic.existsSync()) {
+      return relativeToComic.path;
+    }
+    if (!preferComicDir) {
+      final relativeToParent = File('${comicDir.parent.path}/$normalized');
+      if (relativeToParent.existsSync()) {
+        return relativeToParent.path;
+      }
+    }
+    return direct.isAbsolute ? direct.path : null;
+  }
+
   Future<int> _resolveDirectoryUpdatedAtMillis(Directory dir) async {
     try {
       return (await dir.stat()).modified.millisecondsSinceEpoch;
@@ -1074,7 +1383,9 @@ class MangaDownloadService extends ChangeNotifier {
   }
 
   void _upsertDownloadedComic(DownloadedMangaComic comic) {
-    final index = _downloaded.indexWhere((item) => item.comicId == comic.comicId);
+    final index = _downloaded.indexWhere(
+      (item) => item.comicId == comic.comicId,
+    );
     if (index >= 0) {
       _downloaded[index] = comic;
     } else {
