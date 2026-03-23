@@ -4,7 +4,6 @@ import 'dart:math' as math;
 import 'dart:io';
 import 'dart:ui';
 
-import 'package:crypto/crypto.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
@@ -287,7 +286,8 @@ PreferredSizeWidget hazukiFrostedAppBar({
   );
 }
 
-class _HazukiAppState extends State<HazukiApp> {
+class _HazukiAppState extends State<HazukiApp>
+    with WidgetsBindingObserver {
   static const _themeModeKey = 'appearance_theme_mode';
   static const _oledPureBlackKey = 'appearance_oled_pure_black';
   static const _dynamicColorKey = 'appearance_dynamic_color';
@@ -301,6 +301,7 @@ class _HazukiAppState extends State<HazukiApp> {
   final Connectivity _connectivity = Connectivity();
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   bool _hasConnectivity = true;
+  bool _isCheckingSourceUpdate = false;
   bool _isShowingSourceUpdateDialog = false;
   bool _showInitialSourceBootstrapOverlay = false;
   bool _showInitialSourceBootstrapIntro = false;
@@ -323,6 +324,7 @@ class _HazukiAppState extends State<HazukiApp> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     unawaited(_loadAppearance());
     unawaited(_loadLocalePreference());
     unawaited(_initConnectivityWatcher());
@@ -336,7 +338,16 @@ class _HazukiAppState extends State<HazukiApp> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      _scheduleSourceUpdateDialogCheck();
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _connectivitySubscription?.cancel();
     super.dispose();
   }
@@ -558,8 +569,11 @@ class _HazukiAppState extends State<HazukiApp> {
   }
 
   void _scheduleSourceUpdateDialogCheck() {
+    if (_isCheckingSourceUpdate || _isShowingSourceUpdateDialog) {
+      return;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) {
+      if (!mounted || _isCheckingSourceUpdate || _isShowingSourceUpdateDialog) {
         return;
       }
       unawaited(_runSourceUpdateDialogCheck());
@@ -567,20 +581,37 @@ class _HazukiAppState extends State<HazukiApp> {
   }
 
   Future<void> _runSourceUpdateDialogCheck() async {
-    await Future<void>.delayed(const Duration(milliseconds: 120));
-    final result = await _showSourceUpdateDialogIfNeeded();
-    if (!mounted) {
+    if (_isCheckingSourceUpdate || _isShowingSourceUpdateDialog) {
       return;
     }
-    if (result == _SourceUpdateDialogAction.downloaded) {
-      setState(() {
-        _homeRefreshTick++;
-      });
+
+    _isCheckingSourceUpdate = true;
+    try {
+      await Future<void>.delayed(const Duration(milliseconds: 120));
+      if (!mounted) {
+        return;
+      }
+      final result = await _showSourceUpdateDialogIfNeeded();
+      if (!mounted) {
+        return;
+      }
+      if (result == _SourceUpdateDialogAction.downloaded) {
+        setState(() {
+          _homeRefreshTick++;
+        });
+      }
+    } finally {
+      _isCheckingSourceUpdate = false;
     }
   }
 
   Future<void> _runSourceRecovery() async {
-    await HazukiSourceService.instance.refreshSourceOnNetworkRecovery();
+    final refreshed = await HazukiSourceService.instance
+        .refreshSourceOnNetworkRecovery();
+    if (!mounted || !refreshed) {
+      return;
+    }
+    _scheduleSourceUpdateDialogCheck();
   }
 
   String _formatTodayKey() {
@@ -985,6 +1016,9 @@ class _HazukiAppState extends State<HazukiApp> {
             locale: _locale,
             onLocaleChanged: _updateLocalePreference,
             allowDiscoverInitialLoad: _allowDiscoverInitialLoad,
+            hideDiscoverLoadingUntilAllowed:
+                _showInitialSourceBootstrapOverlay ||
+                _showInitialSourceBootstrapIntro,
             refreshTick: _homeRefreshTick,
           ),
         );

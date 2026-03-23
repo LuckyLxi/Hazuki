@@ -856,18 +856,48 @@ class MangaDownloadService extends ChangeNotifier {
     int chapterIndex,
     Directory comicDir,
   ) async {
-    final chapterNumber = (chapterIndex + 1).toString().padLeft(3, '0');
+    final targetChapterNumber = chapterIndex + 1;
+    final directories = <({Directory directory, int? chapterNumber})>[];
     try {
       await for (final entity in comicDir.list()) {
         if (entity is! Directory) {
           continue;
         }
         final name = _entityBaseName(entity);
-        if (name.startsWith('Manga第$chapterNumber话')) {
+        if (name.startsWith('.')) {
+          continue;
+        }
+        final files = await _listImageFiles(entity);
+        if (files.isEmpty) {
+          continue;
+        }
+        final chapterNumber = _extractChapterNumberFromDirectoryName(name);
+        if (chapterNumber == targetChapterNumber) {
           return entity;
         }
+        directories.add((directory: entity, chapterNumber: chapterNumber));
       }
     } catch (_) {}
+
+    directories.sort((a, b) {
+      final aNumber = a.chapterNumber;
+      final bNumber = b.chapterNumber;
+      if (aNumber != null && bNumber != null) {
+        final diff = aNumber.compareTo(bNumber);
+        if (diff != 0) {
+          return diff;
+        }
+      } else if (aNumber != null) {
+        return -1;
+      } else if (bNumber != null) {
+        return 1;
+      }
+      return _entityBaseName(a.directory).compareTo(_entityBaseName(b.directory));
+    });
+
+    if (chapterIndex >= 0 && chapterIndex < directories.length) {
+      return directories[chapterIndex].directory;
+    }
     return null;
   }
 
@@ -978,9 +1008,13 @@ class MangaDownloadService extends ChangeNotifier {
         comicDir: comicDir,
         chapters: comic.chapters,
       );
+      final scannedChapters = await _scanChapterDirectoriesFromDisk(comicDir);
       final normalized = comic.copyWith(
         localCoverPath: normalizedCoverPath,
-        chapters: normalizedChapters,
+        chapters: _mergeRecoveredChapters(
+          normalizedChapters: normalizedChapters,
+          scannedChapters: scannedChapters,
+        ),
         updatedAtMillis: DateTime.now().millisecondsSinceEpoch,
       );
       await _restoreDownloadedComicMetadata(comicDir, normalized);
@@ -1027,6 +1061,27 @@ class MangaDownloadService extends ChangeNotifier {
     } catch (_) {}
   }
 
+  List<DownloadedMangaChapter> _mergeRecoveredChapters({
+    required List<DownloadedMangaChapter> normalizedChapters,
+    required List<DownloadedMangaChapter> scannedChapters,
+  }) {
+    if (normalizedChapters.isEmpty) {
+      return scannedChapters;
+    }
+    if (scannedChapters.isEmpty) {
+      return normalizedChapters;
+    }
+    final mergedByIndex = <int, DownloadedMangaChapter>{
+      for (final chapter in normalizedChapters) chapter.index: chapter,
+    };
+    for (final chapter in scannedChapters) {
+      mergedByIndex.putIfAbsent(chapter.index, () => chapter);
+    }
+    final merged = mergedByIndex.values.toList();
+    merged.sort((a, b) => a.index.compareTo(b.index));
+    return merged;
+  }
+
   String _entityBaseName(FileSystemEntity entity) {
     return _baseNameFromPath(entity.path);
   }
@@ -1043,51 +1098,108 @@ class MangaDownloadService extends ChangeNotifier {
   Future<List<DownloadedMangaChapter>> _scanChapterDirectoriesFromDisk(
     Directory comicDir,
   ) async {
-    final chapters = <DownloadedMangaChapter>[];
-    final pattern = RegExp(r'^Manga第(\d+)话(?:_.+)?$');
+    final directories = <({Directory directory, List<File> files, int? chapterNumber})>[];
     try {
       await for (final entity in comicDir.list()) {
         if (entity is! Directory) {
           continue;
         }
         final name = _entityBaseName(entity);
-        final match = pattern.firstMatch(name);
-        if (match == null) {
+        if (name.startsWith('.')) {
           continue;
         }
-        final chapterNumber = int.tryParse(match.group(1) ?? '');
-        if (chapterNumber == null || chapterNumber <= 0) {
-          continue;
-        }
-        final files = await entity
-            .list()
-            .where((child) => child is File)
-            .cast<File>()
-            .toList();
-        files.sort((a, b) => a.path.compareTo(b.path));
+        final files = await _listImageFiles(entity);
         if (files.isEmpty) {
           continue;
         }
+        directories.add((
+          directory: entity,
+          files: files,
+          chapterNumber: _extractChapterNumberFromDirectoryName(name),
+        ));
+      }
+    } catch (_) {}
+
+    directories.sort((a, b) {
+      final aNumber = a.chapterNumber;
+      final bNumber = b.chapterNumber;
+      if (aNumber != null && bNumber != null) {
+        final diff = aNumber.compareTo(bNumber);
+        if (diff != 0) {
+          return diff;
+        }
+      } else if (aNumber != null) {
+        return -1;
+      } else if (bNumber != null) {
+        return 1;
+      }
+      return _entityBaseName(a.directory).compareTo(_entityBaseName(b.directory));
+    });
+
+    final chapters = <DownloadedMangaChapter>[];
+    final usedChapterNumbers = <int>{};
+    var nextFallbackChapterNumber = 1;
+    for (final item in directories) {
+      var chapterNumber = item.chapterNumber;
+      if (chapterNumber == null ||
+          chapterNumber <= 0 ||
+          usedChapterNumbers.contains(chapterNumber)) {
+        while (usedChapterNumbers.contains(nextFallbackChapterNumber)) {
+          nextFallbackChapterNumber++;
+        }
+        chapterNumber = nextFallbackChapterNumber;
+      }
+      usedChapterNumbers.add(chapterNumber);
+      final name = _entityBaseName(item.directory);
+      chapters.add(
+        DownloadedMangaChapter(
+          epId: 'local_$chapterNumber',
+          title: _fallbackChapterTitle(name, chapterNumber),
+          index: chapterNumber - 1,
+          imagePaths: item.files.map((file) => file.path).toList(),
+        ),
+      );
+    }
+
+    if (chapters.isEmpty) {
+      final rootFiles = await _listImageFiles(comicDir, excludeCoverFiles: true);
+      if (rootFiles.isNotEmpty) {
         chapters.add(
           DownloadedMangaChapter(
-            epId: 'local_$chapterNumber',
-            title: _fallbackChapterTitle(name, chapterNumber),
-            index: chapterNumber - 1,
-            imagePaths: files.map((file) => file.path).toList(),
+            epId: 'local_1',
+            title: '第1话',
+            index: 0,
+            imagePaths: rootFiles.map((file) => file.path).toList(),
           ),
         );
       }
-    } catch (_) {}
+    }
+
     chapters.sort((a, b) => a.index.compareTo(b.index));
     return chapters;
   }
 
   String _fallbackChapterTitle(String directoryName, int chapterNumber) {
-    final separatorIndex = directoryName.indexOf('_');
-    if (separatorIndex >= 0 && separatorIndex < directoryName.length - 1) {
-      final legacyTitle = directoryName.substring(separatorIndex + 1).trim();
+    final normalized = directoryName.trim();
+    final separatorIndex = normalized.indexOf('_');
+    if (separatorIndex >= 0 && separatorIndex < normalized.length - 1) {
+      final legacyTitle = normalized.substring(separatorIndex + 1).trim();
       if (legacyTitle.isNotEmpty) {
         return legacyTitle;
+      }
+    }
+    if (normalized.isNotEmpty) {
+      final chapterText = chapterNumber.toString();
+      final genericPatterns = <RegExp>[
+        RegExp('^Manga第0*$chapterText话\$', caseSensitive: false),
+        RegExp('^第0*$chapterText[话話章卷回]\$', caseSensitive: false),
+        RegExp('^0*$chapterText\$'),
+      ];
+      final isGenericDirectoryName = genericPatterns.any(
+        (pattern) => pattern.hasMatch(normalized),
+      );
+      if (!isGenericDirectoryName) {
+        return normalized;
       }
     }
     return '第$chapterNumber话';
@@ -1111,22 +1223,84 @@ class MangaDownloadService extends ChangeNotifier {
   }
 
   Future<File?> _findLocalCoverFile(Directory comicDir) async {
-    for (final name in const [
-      '漫画封面.jpg',
-      '漫画封面.jpeg',
-      '漫画封面.png',
-      '漫画封面.webp',
-      'cover.jpg',
-      'cover.jpeg',
-      'cover.png',
-      'cover.webp',
+    try {
+      await for (final entity in comicDir.list()) {
+        if (entity is! File) {
+          continue;
+        }
+        if (_isLocalCoverFileName(_entityBaseName(entity))) {
+          return entity;
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  int? _extractChapterNumberFromDirectoryName(String directoryName) {
+    final normalized = directoryName.trim();
+    if (normalized.isEmpty) {
+      return null;
+    }
+    for (final pattern in <RegExp>[
+      RegExp(r'^Manga第0*(\d+)话(?:_.+)?$', caseSensitive: false),
+      RegExp(r'^第\s*0*(\d+)\s*[话話章卷回](?:_.+)?$', caseSensitive: false),
+      RegExp(r'^0*(\d+)(?:$|[_\-\s\.])'),
+      RegExp(r'(?<!\d)0*(\d+)(?!\d)'),
     ]) {
-      final file = File('${comicDir.path}/$name');
-      if (await file.exists()) {
-        return file;
+      final match = pattern.firstMatch(normalized);
+      final value = int.tryParse(match?.group(1) ?? '');
+      if (value != null && value > 0) {
+        return value;
       }
     }
     return null;
+  }
+
+  Future<List<File>> _listImageFiles(
+    Directory directory, {
+    bool excludeCoverFiles = false,
+  }) async {
+    final files = <File>[];
+    try {
+      await for (final entity in directory.list()) {
+        if (entity is! File) {
+          continue;
+        }
+        final name = _entityBaseName(entity);
+        if (!_isImageFileName(name)) {
+          continue;
+        }
+        if (excludeCoverFiles && _isLocalCoverFileName(name)) {
+          continue;
+        }
+        files.add(entity);
+      }
+    } catch (_) {}
+    files.sort((a, b) => a.path.compareTo(b.path));
+    return files;
+  }
+
+  bool _isImageFileName(String fileName) {
+    final lower = fileName.toLowerCase();
+    return lower.endsWith('.jpg') ||
+        lower.endsWith('.jpeg') ||
+        lower.endsWith('.png') ||
+        lower.endsWith('.webp') ||
+        lower.endsWith('.gif') ||
+        lower.endsWith('.bmp') ||
+        lower.endsWith('.avif');
+  }
+
+  bool _isLocalCoverFileName(String fileName) {
+    final lower = fileName.toLowerCase();
+    return lower == '漫画封面.jpg' ||
+        lower == '漫画封面.jpeg' ||
+        lower == '漫画封面.png' ||
+        lower == '漫画封面.webp' ||
+        lower == 'cover.jpg' ||
+        lower == 'cover.jpeg' ||
+        lower == 'cover.png' ||
+        lower == 'cover.webp';
   }
 
   Future<List<DownloadedMangaChapter>> _normalizeChapterPaths({
@@ -1149,12 +1323,7 @@ class MangaDownloadService extends ChangeNotifier {
       if (collected.isEmpty) {
         final chapterDir = await _findChapterDirectoryByChapter(chapter, comicDir);
         if (chapterDir != null) {
-          final files = await chapterDir
-              .list()
-              .where((entity) => entity is File)
-              .cast<File>()
-              .toList();
-          files.sort((a, b) => a.path.compareTo(b.path));
+          final files = await _listImageFiles(chapterDir);
           collected.addAll(files.map((file) => file.path));
         }
       }

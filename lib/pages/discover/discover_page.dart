@@ -6,11 +6,13 @@ class DiscoverPage extends StatefulWidget {
     this.onSearchMorphProgressChanged,
     this.onSearchTap,
     this.allowInitialLoad = true,
+    this.hideLoadingUntilInitialLoadAllowed = false,
   });
 
   final ValueChanged<double>? onSearchMorphProgressChanged;
   final VoidCallback? onSearchTap;
   final bool allowInitialLoad;
+  final bool hideLoadingUntilInitialLoadAllowed;
 
   @override
   State<DiscoverPage> createState() => _DiscoverPageState();
@@ -242,7 +244,8 @@ class _DiscoverPageState extends State<DiscoverPage> {
   Widget _buildDiscoverView() {
     final strings = l10n(context);
     if (_initialLoading) {
-      if (!widget.allowInitialLoad) {
+      if (!widget.allowInitialLoad &&
+          widget.hideLoadingUntilInitialLoadAllowed) {
         return const SizedBox(height: 360);
       }
       return SizedBox(

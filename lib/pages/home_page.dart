@@ -9,6 +9,7 @@ class HazukiHomePage extends StatefulWidget {
     required this.locale,
     required this.onLocaleChanged,
     this.allowDiscoverInitialLoad = true,
+    this.hideDiscoverLoadingUntilAllowed = false,
     this.refreshTick = 0,
   });
 
@@ -18,6 +19,7 @@ class HazukiHomePage extends StatefulWidget {
   final Locale? locale;
   final Future<void> Function(Locale? locale) onLocaleChanged;
   final bool allowDiscoverInitialLoad;
+  final bool hideDiscoverLoadingUntilAllowed;
   final int refreshTick;
 
   @override
@@ -1068,6 +1070,8 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
                       opacity: _currentIndex == 0 ? 1 : 0,
                       child: DiscoverPage(
                         allowInitialLoad: widget.allowDiscoverInitialLoad,
+                        hideLoadingUntilInitialLoadAllowed:
+                            widget.hideDiscoverLoadingUntilAllowed,
                         onSearchMorphProgressChanged:
                             _handleDiscoverSearchMorphProgressChanged,
                       ),

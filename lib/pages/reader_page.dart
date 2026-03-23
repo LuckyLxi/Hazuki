@@ -459,38 +459,46 @@ class _ReaderPageState extends State<ReaderPage>
     );
     if (shouldSave != true || !mounted) return;
     try {
+      final sourceService = HazukiSourceService.instance;
       Uint8List bytes;
-      // 优先从已解扰的缓存中获取图片，避免保存切片原图
-      final cachedProvider = _providerCache[imageUrl];
-      if (cachedProvider is MemoryImage) {
-        bytes = cachedProvider.bytes;
+      String outputExtension = 'png';
+
+      if (sourceService.isLocalImagePath(imageUrl)) {
+        final file = File(sourceService.normalizeLocalImagePath(imageUrl));
+        bytes = await file.readAsBytes();
+        final localExtMatch = RegExp(
+          r'\.([a-zA-Z0-9]+)$',
+          caseSensitive: false,
+        ).firstMatch(file.path);
+        outputExtension =
+            localExtMatch?.group(1)?.toLowerCase().trim().isNotEmpty == true
+            ? localExtMatch!.group(1)!.toLowerCase()
+            : 'jpg';
       } else {
-        // 缓存中没有，重新下载并解扰
-        final rawBytes = await HazukiSourceService.instance.downloadImageBytes(
+        final prepared = await sourceService.prepareChapterImageData(
           imageUrl,
           comicId: widget.comicId,
           epId: widget.epId,
         );
-        final segments = _calcJmSegments(widget.epId, imageUrl);
-        if (segments > 1 && !imageUrl.toLowerCase().endsWith('.gif')) {
-          bytes = await _unscrambleJmImage(rawBytes, segments);
-        } else {
-          bytes = rawBytes;
-        }
+        bytes = prepared.bytes;
+        outputExtension = prepared.extension;
       }
+
       final uri = Uri.tryParse(imageUrl);
       final lastSegment = uri?.pathSegments.isNotEmpty == true
           ? uri!.pathSegments.last
           : '';
-      final defaultName = 'hazuki_${DateTime.now().millisecondsSinceEpoch}.png';
+      final defaultName =
+          'hazuki_${DateTime.now().millisecondsSinceEpoch}.$outputExtension';
       final fileName = lastSegment.isEmpty
           ? defaultName
           : lastSegment.split('?').first;
-      // 解扰后的图片是 PNG 格式，替换原扩展名
-      final saveName = fileName.replaceAll(
-        RegExp(r'\.(webp|jpg|jpeg)$', caseSensitive: false),
-        '.png',
-      );
+      final saveName = fileName.contains('.')
+          ? fileName.replaceAll(
+              RegExp(r'\.([a-zA-Z0-9]+)$', caseSensitive: false),
+              '.$outputExtension',
+            )
+          : '$fileName.$outputExtension';
       final directory = Directory('/storage/emulated/0/Pictures/Hazuki');
       if (!await directory.exists()) {
         await directory.create(recursive: true);
@@ -790,81 +798,6 @@ class _ReaderPageState extends State<ReaderPage>
     } catch (_) {}
   }
 
-  int _calcJmSegments(String epId, String imageUrl) {
-    const scrambleId = 220980;
-    final id = int.tryParse(epId) ?? 0;
-    if (id < scrambleId) {
-      return 0;
-    }
-    if (id < 268850) {
-      return 10;
-    }
-
-    final uri = Uri.tryParse(imageUrl);
-    final last = uri?.pathSegments.isNotEmpty == true
-        ? uri!.pathSegments.last
-        : imageUrl.split('/').last;
-    final pictureName = last.endsWith('.webp')
-        ? last.substring(0, last.length - 5)
-        : last;
-
-    final digest = md5.convert(utf8.encode('$id$pictureName')).toString();
-    final charCode = digest.codeUnitAt(digest.length - 1);
-
-    if (id > 421926) {
-      final remainder = charCode % 8;
-      return remainder * 2 + 2;
-    }
-    final remainder = charCode % 10;
-    return remainder * 2 + 2;
-  }
-
-  Future<Uint8List> _unscrambleJmImage(Uint8List data, int segments) async {
-    final codec = await instantiateImageCodec(data);
-    final frame = await codec.getNextFrame();
-    final image = frame.image;
-    final width = image.width;
-    final height = image.height;
-    final src = await image.toByteData(format: ImageByteFormat.rawRgba);
-    if (src == null) {
-      return data;
-    }
-
-    final blockSize = height ~/ segments;
-    final remainder = height % segments;
-    final srcBytes = src.buffer.asUint8List();
-    final dstBytes = Uint8List(srcBytes.length);
-
-    var destY = 0;
-    for (var i = segments - 1; i >= 0; i--) {
-      final startY = i * blockSize;
-      final currentHeight = blockSize + (i == segments - 1 ? remainder : 0);
-      final rowBytes = width * 4;
-      for (var y = 0; y < currentHeight; y++) {
-        final srcOffset = ((startY + y) * width) * 4;
-        final dstOffset = ((destY + y) * width) * 4;
-        dstBytes.setRange(dstOffset, dstOffset + rowBytes, srcBytes, srcOffset);
-      }
-      destY += currentHeight;
-    }
-
-    final buffer = await ImmutableBuffer.fromUint8List(dstBytes);
-    final descriptor = ImageDescriptor.raw(
-      buffer,
-      width: width,
-      height: height,
-      pixelFormat: PixelFormat.rgba8888,
-      rowBytes: width * 4,
-    );
-    final outCodec = await descriptor.instantiateCodec();
-    final outFrame = await outCodec.getNextFrame();
-    final png = await outFrame.image.toByteData(format: ImageByteFormat.png);
-    if (png == null) {
-      return data;
-    }
-    return png.buffer.asUint8List();
-  }
-
   Future<ImageProvider> _buildImageProvider(String url) async {
     final sourceService = HazukiSourceService.instance;
     if (_noImageModeEnabled) {
@@ -880,11 +813,6 @@ class _ReaderPageState extends State<ReaderPage>
       return FileImage(file);
     }
 
-    final segments = sourceService.calculateJmImageSegments(widget.epId, url);
-    if (segments <= 1 || url.toLowerCase().endsWith('.gif')) {
-      return NetworkImage(url);
-    }
-
     await _acquireUnscramblePermit();
     try {
       final prepared = await sourceService.prepareChapterImageData(
@@ -894,16 +822,6 @@ class _ReaderPageState extends State<ReaderPage>
       );
       await _rememberAspectRatioFromBytes(url, prepared.bytes);
       return MemoryImage(prepared.bytes);
-    } catch (_) {
-      final rawBytes = await sourceService.downloadImageBytes(
-        url,
-        comicId: widget.comicId,
-        epId: widget.epId,
-        keepInMemory: true,
-      );
-      final restoredBytes = await _unscrambleJmImage(rawBytes, segments);
-      await _rememberAspectRatioFromBytes(url, restoredBytes);
-      return MemoryImage(restoredBytes);
     } finally {
       _releaseUnscramblePermit();
     }
