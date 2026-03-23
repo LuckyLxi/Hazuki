@@ -584,6 +584,7 @@ class MangaDownloadService extends ChangeNotifier {
     }
     await _scanExistingDownloadedComics(rootDir);
     await _restoreTaskSnapshots(rootDir);
+    _reconcileDownloadedComicsWithActiveTasks();
     _tasks.sort((a, b) => a.createdAtMillis.compareTo(b.createdAtMillis));
     _downloaded.sort((a, b) => b.updatedAtMillis.compareTo(a.updatedAtMillis));
     await _persistState();
@@ -679,6 +680,12 @@ class MangaDownloadService extends ChangeNotifier {
       final downloadedChapters = <DownloadedMangaChapter>[
         ...downloadedComic.chapters,
       ];
+      final targetIds = task.targets.map((target) => target.epId).toSet();
+      downloadedChapters.removeWhere(
+        (chapter) =>
+            targetIds.contains(chapter.epId) &&
+            !task.completedEpIds.contains(chapter.epId),
+      );
       final existingChapterIds = downloadedChapters.map((e) => e.epId).toSet();
       final sourceService = HazukiSourceService.instance;
 
@@ -1153,6 +1160,35 @@ class MangaDownloadService extends ChangeNotifier {
     } catch (_) {}
   }
 
+  void _reconcileDownloadedComicsWithActiveTasks() {
+    if (_tasks.isEmpty || _downloaded.isEmpty) {
+      return;
+    }
+    for (final task in _tasks) {
+      final downloadedIndex = _downloaded.indexWhere(
+        (comic) => comic.comicId == task.comicId,
+      );
+      if (downloadedIndex < 0) {
+        continue;
+      }
+      final targetIds = task.targets.map((target) => target.epId).toSet();
+      final filteredChapters = _downloaded[downloadedIndex].chapters
+          .where(
+            (chapter) =>
+                !targetIds.contains(chapter.epId) ||
+                task.completedEpIds.contains(chapter.epId),
+          )
+          .toList();
+      if (filteredChapters.length ==
+          _downloaded[downloadedIndex].chapters.length) {
+        continue;
+      }
+      _downloaded[downloadedIndex] = _downloaded[downloadedIndex].copyWith(
+        chapters: filteredChapters,
+      );
+    }
+  }
+
   DownloadedMangaComic? _parseDownloadedComicMetadata(
     Map<String, dynamic> map, {
     required Directory comicDir,
@@ -1247,6 +1283,40 @@ class MangaDownloadService extends ChangeNotifier {
         }
         chaptersById[chapter.epId] = chapter;
       }
+    } else if (raw is Map) {
+      var index = 0;
+      for (final entry in raw.entries) {
+        final value = entry.value;
+        if (value is Map) {
+          final chapter = _parseDownloadedChapterMetadata(
+            {
+              ...Map<String, dynamic>.from(value),
+              if ((value['epId'] ?? '').toString().trim().isEmpty)
+                'epId': entry.key,
+              if ((value['id'] ?? '').toString().trim().isEmpty)
+                'id': entry.key,
+            },
+            comicDir: comicDir,
+            fallbackIndex: index,
+          );
+          if (chapter != null) {
+            chaptersById[chapter.epId] = chapter;
+          }
+        } else {
+          final chapter = _parseDownloadedChapterMetadata(
+            <String, dynamic>{
+              'epId': entry.key,
+              'title': value?.toString() ?? entry.key.toString(),
+            },
+            comicDir: comicDir,
+            fallbackIndex: index,
+          );
+          if (chapter != null) {
+            chaptersById[chapter.epId] = chapter;
+          }
+        }
+        index++;
+      }
     }
     final chapters = chaptersById.values.toList()
       ..sort((a, b) {
@@ -1275,11 +1345,24 @@ class MangaDownloadService extends ChangeNotifier {
         '$fallbackIndex';
     final imagePaths = <String>[];
     final rawImages =
-        map['imagePaths'] ?? map['images'] ?? map['pages'] ?? map['files'];
+        map['imagePaths'] ??
+        map['images'] ??
+        map['pages'] ??
+        map['files'] ??
+        map['image_map'];
     if (rawImages is List) {
       for (final item in rawImages) {
-        final resolved = _resolvePathFromMetadataValue(
-          item,
+        final resolved = _resolveImagePathEntry(item, comicDir: comicDir);
+        if (resolved != null) {
+          imagePaths.add(resolved);
+        }
+      }
+    } else if (rawImages is Map) {
+      final orderedEntries = rawImages.entries.toList()
+        ..sort((a, b) => a.key.toString().compareTo(b.key.toString()));
+      for (final entry in orderedEntries) {
+        final resolved = _resolveImagePathEntry(
+          entry.value,
           comicDir: comicDir,
         );
         if (resolved != null) {
@@ -1363,6 +1446,16 @@ class MangaDownloadService extends ChangeNotifier {
       }
     }
     return direct.isAbsolute ? direct.path : null;
+  }
+
+  String? _resolveImagePathEntry(Object? raw, {required Directory comicDir}) {
+    if (raw is Map) {
+      return _resolvePathFromMetadataValue(
+        raw['path'] ?? raw['file'] ?? raw['url'] ?? raw['src'],
+        comicDir: comicDir,
+      );
+    }
+    return _resolvePathFromMetadataValue(raw, comicDir: comicDir);
   }
 
   Future<int> _resolveDirectoryUpdatedAtMillis(Directory dir) async {
