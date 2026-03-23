@@ -901,11 +901,11 @@ class _HazukiAppState extends State<HazukiApp> {
             );
           },
           home: HazukiHomePage(
-            key: ValueKey(_homeRefreshTick),
             appearanceSettings: _appearance,
             onAppearanceChanged: _updateAppearance,
             locale: _locale,
             onLocaleChanged: _updateLocalePreference,
+            sourceRefreshTick: _homeRefreshTick,
           ),
         );
       },
