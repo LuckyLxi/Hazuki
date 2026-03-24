@@ -12,6 +12,7 @@ class _CloudSyncPageState extends State<CloudSyncPage> {
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
 
+  bool _passwordVisible = false;
   bool _enabled = false;
   bool _loading = true;
   bool _saving = false;
@@ -388,10 +389,22 @@ class _CloudSyncPageState extends State<CloudSyncPage> {
                   TextField(
                     controller: _passwordController,
                     enabled: controlsEnabled,
-                    obscureText: true,
+                    obscureText: !_passwordVisible,
                     decoration: InputDecoration(
                       labelText: strings.cloudSyncPasswordLabel,
                       border: const OutlineInputBorder(),
+                      suffixIcon: IconButton(
+                        onPressed: () {
+                          setState(() {
+                            _passwordVisible = !_passwordVisible;
+                          });
+                        },
+                        icon: Icon(
+                          _passwordVisible
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
+                        ),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 16),

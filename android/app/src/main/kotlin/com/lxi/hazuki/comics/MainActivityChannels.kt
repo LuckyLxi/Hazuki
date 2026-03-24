@@ -1,9 +1,16 @@
 package com.lxi.hazuki.comics
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.media.MediaScannerConnection
 import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.Settings
 import android.util.Log
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
@@ -19,12 +26,25 @@ class MainActivityChannels(
 ) {
     private var pendingSaveTextResult: MethodChannel.Result? = null
     private var pendingSaveTextContent: String? = null
+    private var pendingStorageAccessResult: MethodChannel.Result? = null
 
     private val createJsonDocumentLauncher =
         activity.registerForActivityResult(
             ActivityResultContracts.CreateDocument("application/json"),
         ) { uri ->
             handleCreateJsonDocumentResult(uri)
+        }
+    private val manageStorageAccessLauncher =
+        activity.registerForActivityResult(
+            ActivityResultContracts.StartActivityForResult(),
+        ) {
+            completePendingStorageAccessResult(hasStorageAccess())
+        }
+    private val requestLegacyStoragePermissionsLauncher =
+        activity.registerForActivityResult(
+            ActivityResultContracts.RequestMultiplePermissions(),
+        ) {
+            completePendingStorageAccessResult(hasStorageAccess())
         }
     fun register(flutterEngine: FlutterEngine) {
         registerPrivacyChannel(flutterEngine)
@@ -80,6 +100,8 @@ class MainActivityChannels(
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, MEDIA_CHANNEL)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
+                    "hasStorageAccess" -> result.success(hasStorageAccess())
+                    "requestStorageAccess" -> requestStorageAccess(result)
                     "scanFile" -> {
                         val path = call.argument<String>("path")
                         if (path.isNullOrBlank()) {
@@ -126,6 +148,72 @@ class MainActivityChannels(
                     else -> result.notImplemented()
                 }
             }
+    }
+
+    private fun hasStorageAccess(): Boolean {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            return Environment.isExternalStorageManager()
+        }
+        return ContextCompat.checkSelfPermission(
+            activity,
+            Manifest.permission.READ_EXTERNAL_STORAGE,
+        ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun requestStorageAccess(result: MethodChannel.Result) {
+        if (hasStorageAccess()) {
+            result.success(true)
+            return
+        }
+        if (pendingStorageAccessResult != null) {
+            result.error(
+                "storage_access_in_progress",
+                "Another storage access request is already in progress",
+                null,
+            )
+            return
+        }
+
+        pendingStorageAccessResult = result
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                launchManageStorageAccessSettings()
+            } else {
+                requestLegacyStoragePermissionsLauncher.launch(
+                    arrayOf(
+                        Manifest.permission.READ_EXTERNAL_STORAGE,
+                        Manifest.permission.WRITE_EXTERNAL_STORAGE,
+                    ),
+                )
+            }
+        } catch (e: Exception) {
+            pendingStorageAccessResult = null
+            result.error(
+                "storage_access_launch_failed",
+                "Failed to request storage access: ${e.message}",
+                null,
+            )
+        }
+    }
+
+    private fun launchManageStorageAccessSettings() {
+        val intent =
+            Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                data = Uri.parse("package:${activity.packageName}")
+            }
+        try {
+            manageStorageAccessLauncher.launch(intent)
+        } catch (_: Exception) {
+            manageStorageAccessLauncher.launch(
+                Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION),
+            )
+        }
+    }
+
+    private fun completePendingStorageAccessResult(granted: Boolean) {
+        val result = pendingStorageAccessResult ?: return
+        pendingStorageAccessResult = null
+        result.success(granted)
     }
 
     private fun handleCreateJsonDocumentResult(uri: Uri?) {

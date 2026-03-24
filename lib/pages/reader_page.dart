@@ -45,6 +45,7 @@ class _ReaderPageState extends State<ReaderPage>
     with SingleTickerProviderStateMixin {
   final ScrollController _scrollController = ScrollController();
   final PageController _pageController = PageController();
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   bool get _noImageModeEnabled => hazukiNoImageModeNotifier.value;
   final Map<String, ImageProvider> _providerCache = <String, ImageProvider>{};
@@ -70,6 +71,9 @@ class _ReaderPageState extends State<ReaderPage>
   final Map<String, int> _imageIndexMap = <String, int>{};
   final ValueNotifier<int> _pageIndexNotifier = ValueNotifier<int>(0);
   final List<GlobalKey> _itemKeys = <GlobalKey>[];
+  bool _controlsVisible = false;
+  bool _sliderDragging = false;
+  double _sliderDragValue = 0;
   List<String> _images = const [];
   bool _loadingImages = true;
   String? _loadImagesError;
@@ -353,7 +357,7 @@ class _ReaderPageState extends State<ReaderPage>
       _immersiveMode = immersiveMode;
       _keepScreenOn = keepScreenOn;
       _customBrightness = customBrightness;
-      _brightnessValue = brightnessValue.clamp(0.0, 1.0);
+      _brightnessValue = math.max(0.0, math.min(brightnessValue, 1.0));
       _readerMode = readerMode;
       _tapToTurnPage = prefs.getBool('reader_tap_to_turn_page') ?? false;
       _pinchToZoom = prefs.getBool('reader_pinch_to_zoom') ?? false;
@@ -393,6 +397,133 @@ class _ReaderPageState extends State<ReaderPage>
         });
       } catch (_) {}
     }
+  }
+
+  void _toggleControlsVisibility() {
+    setState(() {
+      _controlsVisible = !_controlsVisible;
+    });
+  }
+
+  void _openReaderSettingsDrawer() {
+    _scaffoldKey.currentState?.openEndDrawer();
+  }
+
+  void _setDisplayedPageIndex(int index) {
+    if (_images.isEmpty) {
+      if (_pageIndexNotifier.value != 0) {
+        _pageIndexNotifier.value = 0;
+      }
+      return;
+    }
+    final normalized = math.max(0, math.min(index, _images.length - 1));
+    if (_pageIndexNotifier.value != normalized) {
+      _pageIndexNotifier.value = normalized;
+    }
+  }
+
+  Future<void> _persistReaderBool(String key, bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(key, value);
+  }
+
+  Future<void> _persistReaderDouble(String key, double value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(key, value);
+  }
+
+  Future<void> _persistReaderString(String key, String value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(key, value);
+  }
+
+  Future<void> _updateReaderModeSetting(_ReaderMode? value) async {
+    if (value == null) {
+      return;
+    }
+    final changed = _readerMode != value;
+    setState(() {
+      _readerMode = value;
+    });
+    await _persistReaderString('reader_reading_mode', value.prefsValue);
+    if (changed) {
+      _resetZoomImmediately();
+      _syncReaderPositionAfterModeChange();
+    }
+  }
+
+  Future<void> _toggleTapToTurnPageSetting(bool value) async {
+    setState(() {
+      _tapToTurnPage = value;
+    });
+    await _persistReaderBool('reader_tap_to_turn_page', value);
+  }
+
+  Future<void> _toggleImmersiveModeSetting(bool value) async {
+    setState(() {
+      _immersiveMode = value;
+    });
+    await _persistReaderBool('reader_immersive_mode', value);
+    await _applyReaderDisplaySettings();
+  }
+
+  Future<void> _toggleKeepScreenOnSetting(bool value) async {
+    setState(() {
+      _keepScreenOn = value;
+    });
+    await _persistReaderBool('reader_keep_screen_on', value);
+    await _applyReaderDisplaySettings();
+  }
+
+  Future<void> _toggleCustomBrightnessSetting(bool value) async {
+    setState(() {
+      _customBrightness = value;
+    });
+    await _persistReaderBool('reader_custom_brightness', value);
+    await _applyReaderDisplaySettings();
+  }
+
+  Future<void> _updateBrightnessSetting(double value) async {
+    final normalized = math.max(0.0, math.min(value, 1.0));
+    setState(() {
+      _brightnessValue = normalized;
+    });
+    await _persistReaderDouble('reader_brightness_value', normalized);
+    await _applyReaderDisplaySettings();
+  }
+
+  Future<void> _togglePinchToZoomSetting(bool value) async {
+    if (!value) {
+      _resetZoomImmediately();
+    }
+    setState(() {
+      _pinchToZoom = value;
+    });
+    await _persistReaderBool('reader_pinch_to_zoom', value);
+  }
+
+  Future<void> _toggleLongPressToSaveSetting(bool value) async {
+    setState(() {
+      _longPressToSave = value;
+    });
+    await _persistReaderBool('reader_long_press_save', value);
+  }
+
+  void _syncReaderPositionAfterModeChange() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _images.isEmpty) {
+        return;
+      }
+      final target = math.max(0, math.min(_currentPageIndex, _images.length - 1));
+      _setDisplayedPageIndex(target);
+      if (_readerMode == _ReaderMode.rightToLeft) {
+        if (_pageController.hasClients) {
+          _pageController.jumpToPage(target);
+        }
+      } else {
+        unawaited(_scrollToListReaderPage(target, animate: false));
+      }
+    });
   }
 
   Future<void> _recordReadingProgress() async {
@@ -584,7 +715,7 @@ class _ReaderPageState extends State<ReaderPage>
         _zoomInteracting = false;
         _activePointerCount = 0;
       });
-      _pageIndexNotifier.value = 0;
+      _setDisplayedPageIndex(0);
       if (!_noImageModeEnabled) {
         _prefetchAround(0);
         unawaited(_prefetchAheadFrom(0));
@@ -601,9 +732,7 @@ class _ReaderPageState extends State<ReaderPage>
   }
 
   void _onScrollPrefetch() {
-    if (_noImageModeEnabled ||
-        !_scrollController.hasClients ||
-        _images.isEmpty) {
+    if (!_scrollController.hasClients || _images.isEmpty) {
       return;
     }
     final position = _scrollController.position;
@@ -635,10 +764,12 @@ class _ReaderPageState extends State<ReaderPage>
 
     if (_currentPageIndex != normalizedIndex) {
       _currentPageIndex = normalizedIndex;
-      _pageIndexNotifier.value = normalizedIndex;
     }
-    _prefetchAround(normalizedIndex);
-    unawaited(_prefetchAheadFrom(normalizedIndex));
+    _setDisplayedPageIndex(normalizedIndex);
+    if (!_noImageModeEnabled) {
+      _prefetchAround(normalizedIndex);
+      unawaited(_prefetchAheadFrom(normalizedIndex));
+    }
   }
 
   void _prefetchAround(int currentIndex) {
@@ -953,7 +1084,7 @@ class _ReaderPageState extends State<ReaderPage>
             _currentPageIndex = index;
           });
         }
-        _pageIndexNotifier.value = index;
+        _setDisplayedPageIndex(index);
         if (!_noImageModeEnabled) {
           _prefetchAround(index);
           unawaited(_prefetchAheadFrom(index));
@@ -1034,19 +1165,81 @@ class _ReaderPageState extends State<ReaderPage>
     );
   }
 
-  Future<void> _goToReaderPage(int index) async {
-    if (!_pageController.hasClients || _images.isEmpty) {
+  Future<void> _scrollToListReaderPage(
+    int index, {
+    bool animate = true,
+  }) async {
+    if (!_scrollController.hasClients || _images.isEmpty) {
       return;
     }
     final target = math.max(0, math.min(index, _images.length - 1));
-    if (target == _currentPageIndex) {
+    final visibleContext =
+        target < _itemKeys.length ? _itemKeys[target].currentContext : null;
+    if (visibleContext != null) {
+      await Scrollable.ensureVisible(
+        visibleContext,
+        duration: animate ? const Duration(milliseconds: 360) : Duration.zero,
+        curve: Curves.easeOutCubic,
+        alignment: 0,
+      );
       return;
     }
-    await _pageController.animateToPage(
-      target,
-      duration: const Duration(milliseconds: 220),
-      curve: Curves.easeOutCubic,
+
+    final maxScrollExtent = _scrollController.position.maxScrollExtent;
+    final ratio = _images.length <= 1 ? 0.0 : target / (_images.length - 1);
+    final estimatedOffset = math.max(
+      0.0,
+      math.min(maxScrollExtent * ratio, maxScrollExtent),
     );
+    if (animate) {
+      await _scrollController.animateTo(
+        estimatedOffset,
+        duration: const Duration(milliseconds: 320),
+        curve: Curves.easeOutCubic,
+      );
+    } else {
+      _scrollController.jumpTo(estimatedOffset);
+    }
+
+    if (!mounted) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      final exactContext =
+          target < _itemKeys.length ? _itemKeys[target].currentContext : null;
+      if (exactContext != null) {
+        Scrollable.ensureVisible(
+          exactContext,
+          duration: animate ? const Duration(milliseconds: 220) : Duration.zero,
+          curve: Curves.easeOutCubic,
+          alignment: 0,
+        );
+      }
+    });
+  }
+
+  Future<void> _goToReaderPage(int index) async {
+    if (_images.isEmpty) {
+      return;
+    }
+    final target = math.max(0, math.min(index, _images.length - 1));
+    _setDisplayedPageIndex(target);
+    if (_readerMode == _ReaderMode.rightToLeft) {
+      if (!_pageController.hasClients || target == _currentPageIndex) {
+        return;
+      }
+      _resetZoomImmediately();
+      await _pageController.animateToPage(
+        target,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+      );
+      return;
+    }
+    await _scrollToListReaderPage(target);
   }
 
   Future<void> _goToPreviousPage() async {
@@ -1064,31 +1257,378 @@ class _ReaderPageState extends State<ReaderPage>
   }
 
   Widget _wrapReaderTapPaging(Widget child) {
-    final tapPagingEnabled =
-        _readerMode == _ReaderMode.rightToLeft && _tapToTurnPage;
-    if (!tapPagingEnabled) {
-      return child;
-    }
     return LayoutBuilder(
       builder: (context, constraints) {
+        final tapPagingEnabled =
+            _readerMode == _ReaderMode.rightToLeft && _tapToTurnPage;
         final leftTriggerWidth = constraints.maxWidth * 0.25;
         final rightTriggerStart = constraints.maxWidth * 0.75;
         return GestureDetector(
           behavior: HitTestBehavior.translucent,
           onTapUp: (details) {
-            if (_pageNavigationLocked) {
+            if (_activePointerCount > 1) {
               return;
             }
             final dx = details.localPosition.dx;
-            if (dx <= leftTriggerWidth) {
-              unawaited(_goToPreviousPage());
-            } else if (dx >= rightTriggerStart) {
-              unawaited(_goToNextPage());
+            final isCenterTap = dx > leftTriggerWidth && dx < rightTriggerStart;
+            if (tapPagingEnabled && !_pageNavigationLocked) {
+              if (dx <= leftTriggerWidth) {
+                unawaited(_goToPreviousPage());
+                return;
+              }
+              if (dx >= rightTriggerStart) {
+                unawaited(_goToNextPage());
+                return;
+              }
+            }
+            if (isCenterTap) {
+              _toggleControlsVisibility();
             }
           },
           child: child,
         );
       },
+    );
+  }
+
+  Widget _buildReaderSettingsDrawer() {
+    final strings = l10n(context);
+    final theme = Theme.of(context);
+    final sliderActiveColor = theme.colorScheme.primary;
+    final sliderInactiveColor = theme.colorScheme.onSurface.withValues(
+      alpha: 0.24,
+    );
+    final brightnessText = (_brightnessValue * 100).round().toString();
+    final drawerWidth = math.min(MediaQuery.sizeOf(context).width * 0.88, 360.0);
+
+    return Drawer(
+      width: drawerWidth,
+      child: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.only(bottom: 24),
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      strings.readingSettingsTitle,
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  Builder(
+                    builder: (drawerContext) {
+                      return IconButton(
+                        tooltip: strings.commonClose,
+                        onPressed: () => Navigator.of(drawerContext).pop(),
+                        icon: const Icon(Icons.close_rounded),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            ListTile(
+              leading: const Icon(Icons.chrome_reader_mode_outlined),
+              title: Text(strings.readingModeTitle),
+              subtitle: Text(strings.readingModeSubtitle),
+              trailing: DropdownButtonHideUnderline(
+                child: DropdownButton<_ReaderMode>(
+                  value: _readerMode,
+                  borderRadius: BorderRadius.circular(18),
+                  onChanged: _updateReaderModeSetting,
+                  items: [
+                    DropdownMenuItem(
+                      value: _ReaderMode.topToBottom,
+                      child: Text(strings.readingModeTopToBottom),
+                    ),
+                    DropdownMenuItem(
+                      value: _ReaderMode.rightToLeft,
+                      child: Text(strings.readingModeRightToLeft),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            SwitchListTile(
+              secondary: const Icon(Icons.touch_app_outlined),
+              title: Text(strings.readingTapToTurnPageTitle),
+              subtitle: Text(strings.readingTapToTurnPageSubtitle),
+              value: _tapToTurnPage,
+              onChanged: _readerMode == _ReaderMode.rightToLeft
+                  ? _toggleTapToTurnPageSetting
+                  : null,
+            ),
+            SwitchListTile(
+              secondary: const Icon(Icons.fullscreen_outlined),
+              title: Text(strings.readingImmersiveModeTitle),
+              subtitle: Text(strings.readingImmersiveModeSubtitle),
+              value: _immersiveMode,
+              onChanged: _toggleImmersiveModeSetting,
+            ),
+            SwitchListTile(
+              secondary: const Icon(Icons.screen_lock_portrait_outlined),
+              title: Text(strings.readingKeepScreenOnTitle),
+              subtitle: Text(strings.readingKeepScreenOnSubtitle),
+              value: _keepScreenOn,
+              onChanged: _toggleKeepScreenOnSetting,
+            ),
+            SwitchListTile(
+              secondary: const Icon(Icons.brightness_medium_outlined),
+              title: Text(strings.readingCustomBrightnessTitle),
+              subtitle: Text(strings.readingCustomBrightnessSubtitle),
+              value: _customBrightness,
+              onChanged: _toggleCustomBrightnessSetting,
+            ),
+            ListTile(
+              leading: Icon(
+                Icons.wb_sunny_outlined,
+                color: _customBrightness
+                    ? theme.colorScheme.onSurface
+                    : theme.colorScheme.onSurface.withValues(alpha: 0.38),
+              ),
+              title: Text(
+                strings.readingBrightnessLabel(brightnessText),
+                style: TextStyle(
+                  color: _customBrightness
+                      ? theme.colorScheme.onSurface
+                      : theme.colorScheme.onSurface.withValues(alpha: 0.38),
+                ),
+              ),
+              subtitle: Slider(
+                value: _brightnessValue,
+                min: 0,
+                max: 1,
+                divisions: 100,
+                onChanged: _customBrightness ? _updateBrightnessSetting : null,
+                activeColor: sliderActiveColor,
+                inactiveColor: sliderInactiveColor,
+              ),
+            ),
+            const Divider(height: 1),
+            SwitchListTile(
+              secondary: const Icon(Icons.zoom_in_outlined),
+              title: Text(strings.readingPinchToZoomTitle),
+              subtitle: Text(strings.readingPinchToZoomSubtitle),
+              value: _pinchToZoom,
+              onChanged: _togglePinchToZoomSetting,
+            ),
+            SwitchListTile(
+              secondary: const Icon(Icons.save_alt_outlined),
+              title: Text(strings.readingLongPressSaveTitle),
+              subtitle: Text(strings.readingLongPressSaveSubtitle),
+              value: _longPressToSave,
+              onChanged: _toggleLongPressToSaveSetting,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReaderTopControls(ThemeData readerTheme) {
+    return SafeArea(
+      bottom: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+        child: IgnorePointer(
+          ignoring: !_controlsVisible,
+          child: AnimatedSlide(
+            offset: _controlsVisible ? Offset.zero : const Offset(0, -0.32),
+            duration: const Duration(milliseconds: 260),
+            curve: Curves.easeOutBack,
+            child: AnimatedScale(
+              scale: _controlsVisible ? 1.0 : 0.96,
+              duration: const Duration(milliseconds: 260),
+              curve: Curves.easeOutBack,
+              child: AnimatedOpacity(
+                opacity: _controlsVisible ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOutCubic,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.64),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.12),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      IconButton(
+                        onPressed: () => Navigator.of(context).maybePop(),
+                        icon: const Icon(
+                          Icons.arrow_back_rounded,
+                          color: Colors.white,
+                        ),
+                      ),
+                      Expanded(
+                        child: Text(
+                          widget.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: readerTheme.textTheme.titleMedium?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: l10n(context).readingSettingsTitle,
+                        onPressed: _openReaderSettingsDrawer,
+                        icon: const Icon(
+                          Icons.tune_rounded,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReaderBottomControls(ThemeData readerTheme) {
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        child: IgnorePointer(
+          ignoring: !_controlsVisible,
+          child: AnimatedSlide(
+            offset: _controlsVisible ? Offset.zero : const Offset(0, 0.36),
+            duration: const Duration(milliseconds: 260),
+            curve: Curves.easeOutBack,
+            child: AnimatedScale(
+              scale: _controlsVisible ? 1.0 : 0.96,
+              duration: const Duration(milliseconds: 260),
+              curve: Curves.easeOutBack,
+              child: AnimatedOpacity(
+                opacity: _controlsVisible ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOutCubic,
+                child: ValueListenableBuilder<int>(
+                  valueListenable: _pageIndexNotifier,
+                  builder: (context, pageIndex, _) {
+                    final maxIndex = math.max(_images.length - 1, 0);
+                    final rawSliderValue =
+                        _sliderDragging ? _sliderDragValue : pageIndex.toDouble();
+                    final sliderValue = math.min(
+                      math.max(rawSliderValue, 0.0),
+                      maxIndex.toDouble(),
+                    );
+                    final displayIndex = math.max(
+                      0,
+                      math.min(
+                        _sliderDragging ? sliderValue.round() : pageIndex,
+                        maxIndex,
+                      ),
+                    );
+                    final canDrag = _images.length > 1;
+                    return Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.68),
+                        borderRadius: BorderRadius.circular(24),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.12),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 36,
+                            child: Text(
+                              '${displayIndex + 1}',
+                              textAlign: TextAlign.center,
+                              style: readerTheme.textTheme.labelLarge?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                          Expanded(
+                            child: SliderTheme(
+                              data: SliderTheme.of(context).copyWith(
+                                activeTrackColor: Colors.white,
+                                inactiveTrackColor: Colors.white.withValues(
+                                  alpha: 0.22,
+                                ),
+                                thumbColor: readerTheme.colorScheme.primary,
+                                overlayColor: readerTheme.colorScheme.primary
+                                    .withValues(alpha: 0.18),
+                                trackHeight: 3.2,
+                              ),
+                              child: Slider(
+                                min: 0,
+                                max: maxIndex.toDouble(),
+                                divisions: canDrag ? maxIndex : null,
+                                value: sliderValue,
+                                onChangeStart: canDrag
+                                    ? (value) {
+                                        setState(() {
+                                          _sliderDragging = true;
+                                          _sliderDragValue = value;
+                                        });
+                                      }
+                                    : null,
+                                onChanged: canDrag
+                                    ? (value) {
+                                        setState(() {
+                                          _sliderDragging = true;
+                                          _sliderDragValue = value;
+                                        });
+                                      }
+                                    : null,
+                                onChangeEnd: canDrag
+                                    ? (value) {
+                                        final target = math.max(
+                                          0,
+                                          math.min(value.round(), maxIndex),
+                                        );
+                                        setState(() {
+                                          _sliderDragging = false;
+                                          _sliderDragValue = target.toDouble();
+                                        });
+                                        unawaited(_goToReaderPage(target));
+                                      }
+                                    : null,
+                              ),
+                            ),
+                          ),
+                          SizedBox(
+                            width: 36,
+                            child: Text(
+                              '${_images.length}',
+                              textAlign: TextAlign.center,
+                              style: readerTheme.textTheme.labelLarge?.copyWith(
+                                color: Colors.white.withValues(alpha: 0.88),
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
@@ -1171,7 +1711,10 @@ class _ReaderPageState extends State<ReaderPage>
       duration: const Duration(milliseconds: 320),
       curve: Curves.easeOutCubic,
       child: Scaffold(
+        key: _scaffoldKey,
         backgroundColor: readerBg,
+        endDrawerEnableOpenDragGesture: false,
+        endDrawer: _buildReaderSettingsDrawer(),
         body: SafeArea(
           top: false,
           bottom: false,
@@ -1189,40 +1732,22 @@ class _ReaderPageState extends State<ReaderPage>
                 ),
               ),
               Positioned(
-                left: 12,
-                bottom: 12,
-                child: IgnorePointer(
-                  child: ValueListenableBuilder<int>(
-                    valueListenable: _pageIndexNotifier,
-                    builder: (context, pageIndex, _) {
-                      final pageText =
-                          '${widget.chapterTitle}  ${pageIndex + 1}/${_images.length}';
-                      return Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.62),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          pageText,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
+                top: 0,
+                left: 0,
+                right: 0,
+                child: _buildReaderTopControls(readerTheme),
               ),
-              // 还原按钮：使用 AnimatedScale + AnimatedOpacity 实现弹出/收起动画
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: _buildReaderBottomControls(readerTheme),
+              ),
               if (_pinchToZoom)
-                Positioned(
-                  bottom: 72,
+                AnimatedPositioned(
+                  duration: const Duration(milliseconds: 260),
+                  curve: Curves.easeOutBack,
+                  bottom: _controlsVisible ? 104 : 24,
                   left: 0,
                   right: 0,
                   child: Center(

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/hazuki_models.dart';
@@ -323,6 +324,7 @@ class MangaDownloadService extends ChangeNotifier {
   static const String _metadataFileName = 'comic.json';
   static const String _legacyMetadataFileName = 'metadata.json';
   static const int _maxNestedComicScanDepth = 3;
+  static const MethodChannel _mediaChannel = MethodChannel('hazuki.comics/media');
 
   SharedPreferences? _prefs;
   Future<void>? _initFuture;
@@ -529,6 +531,7 @@ class MangaDownloadService extends ChangeNotifier {
 
   Future<void> _init() async {
     _prefs = await SharedPreferences.getInstance();
+    await _ensureAndroidDownloadsAccess();
     final rootDir = await _ensureRootDir();
     final raw = _prefs?.getString(_statePrefsKey);
     _logScan(
@@ -603,6 +606,53 @@ class MangaDownloadService extends ChangeNotifier {
     await _persistState();
     if (_tasks.isNotEmpty) {
       unawaited(_processQueue());
+    }
+  }
+
+  Future<void> _ensureAndroidDownloadsAccess() async {
+    if (!Platform.isAndroid) {
+      return;
+    }
+
+    try {
+      final hasAccess =
+          await _mediaChannel.invokeMethod<bool>('hasStorageAccess') ?? false;
+      if (hasAccess) {
+        return;
+      }
+
+      _logScan(
+        'Requesting Android downloads access',
+        level: 'warning',
+        content: {
+          'path': '/storage/emulated/0/Download/Hazuki_Manga',
+        },
+      );
+
+      final granted =
+          await _mediaChannel.invokeMethod<bool>('requestStorageAccess') ?? false;
+      _logScan(
+        granted
+            ? 'Granted Android downloads access'
+            : 'Android downloads access not granted',
+        level: granted ? 'info' : 'warning',
+        content: {
+          'path': '/storage/emulated/0/Download/Hazuki_Manga',
+          'granted': granted,
+        },
+      );
+    } on MissingPluginException catch (e) {
+      _logScan(
+        'Android downloads access channel unavailable',
+        level: 'warning',
+        content: {'error': e.toString()},
+      );
+    } catch (e) {
+      _logScan(
+        'Android downloads access request failed',
+        level: 'warning',
+        content: {'error': e.toString()},
+      );
     }
   }
 
@@ -1313,7 +1363,16 @@ class MangaDownloadService extends ChangeNotifier {
           legacy ??= entity;
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      _logScan(
+        'Metadata file scan failed',
+        level: 'warning',
+        content: {
+          'comicDir': comicDir.path,
+          'error': e.toString(),
+        },
+      );
+    }
     return current ?? legacy;
   }
 
@@ -1351,7 +1410,17 @@ class MangaDownloadService extends ChangeNotifier {
           }
           await visit(entity, depth + 1);
         }
-      } catch (_) {}
+      } catch (e) {
+        _logScan(
+          'Chapter directory scan failed',
+          level: 'warning',
+          content: {
+            'parentDir': parent.path,
+            'depth': depth,
+            'error': e.toString(),
+          },
+        );
+      }
     }
 
     await visit(comicDir, 1);
@@ -1521,7 +1590,17 @@ class MangaDownloadService extends ChangeNotifier {
             return found;
           }
         }
-      } catch (_) {}
+      } catch (e) {
+        _logScan(
+          'Cover file scan failed',
+          level: 'warning',
+          content: {
+            'directory': directory.path,
+            'depth': depth,
+            'error': e.toString(),
+          },
+        );
+      }
       return null;
     }
 

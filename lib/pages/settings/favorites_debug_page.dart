@@ -12,7 +12,7 @@ class LogsPage extends StatelessWidget {
         appBar: hazukiFrostedAppBar(
           context: context,
           title: Text(strings.advancedDebugTitle),
-          actions: const [_ApplicationLogsAppBarExportButton()],
+          actions: const [_LogsAppBarExportButton()],
           bottom: TabBar(
             tabs: [
               Tab(
@@ -39,23 +39,22 @@ class FavoritesDebugPage extends LogsPage {
   const FavoritesDebugPage({super.key});
 }
 
-class _ApplicationLogsAppBarExportButton extends StatefulWidget {
-  const _ApplicationLogsAppBarExportButton();
+class _LogsAppBarExportButton extends StatefulWidget {
+  const _LogsAppBarExportButton();
 
   @override
-  State<_ApplicationLogsAppBarExportButton> createState() =>
-      _ApplicationLogsAppBarExportButtonState();
+  State<_LogsAppBarExportButton> createState() =>
+      _LogsAppBarExportButtonState();
 }
 
-class _ApplicationLogsAppBarExportButtonState
-    extends State<_ApplicationLogsAppBarExportButton> {
+class _LogsAppBarExportButtonState extends State<_LogsAppBarExportButton> {
   static const MethodChannel _mediaChannel = MethodChannel(
     'hazuki.comics/media',
   );
 
   bool _exporting = false;
 
-  String _buildSuggestedFileName() {
+  String _buildSuggestedFileName(String prefix) {
     final now = DateTime.now();
     final yyyy = now.year.toString().padLeft(4, '0');
     final mm = now.month.toString().padLeft(2, '0');
@@ -63,10 +62,49 @@ class _ApplicationLogsAppBarExportButtonState
     final hh = now.hour.toString().padLeft(2, '0');
     final mi = now.minute.toString().padLeft(2, '0');
     final ss = now.second.toString().padLeft(2, '0');
-    return 'hazuki_application_logs_$yyyy$mm${dd}_$hh$mi$ss.json';
+    return 'hazuki_${prefix}_logs_$yyyy$mm${dd}_$hh$mi$ss.json';
   }
 
-  Future<void> _exportLogs() async {
+  Future<void> _saveLogsFile({
+    required String prefix,
+    required String content,
+  }) async {
+    final savedUri = await _mediaChannel.invokeMethod<String>('saveTextFile', {
+      'suggestedFileName': _buildSuggestedFileName(prefix),
+      'content': content,
+    });
+    if (!mounted) {
+      return;
+    }
+    if (savedUri != null && savedUri.isNotEmpty) {
+      unawaited(
+        showHazukiPrompt(context, l10n(context).logsApplicationExportSuccess),
+      );
+    }
+  }
+
+  Future<void> _exportApplicationLogs() async {
+    final debugInfo = await HazukiSourceService.instance
+        .collectApplicationDebugInfo()
+        .timeout(const Duration(seconds: 10));
+    final prettyText = const JsonEncoder.withIndent('  ').convert(debugInfo);
+    await _saveLogsFile(prefix: 'application', content: prettyText);
+  }
+
+  Future<void> _exportNetworkLogs() async {
+    final debugInfo = await HazukiSourceService.instance
+        .collectNetworkDebugInfo()
+        .timeout(const Duration(seconds: 10));
+    if (!mounted) {
+      return;
+    }
+    final prettyText = _NetworkLogsFormatter(
+      context,
+    ).buildExportText(source: debugInfo);
+    await _saveLogsFile(prefix: 'network', content: prettyText);
+  }
+
+  Future<void> _handleExport({required bool exportNetworkLogs}) async {
     if (_exporting) {
       return;
     }
@@ -75,21 +113,10 @@ class _ApplicationLogsAppBarExportButtonState
     });
     final strings = l10n(context);
     try {
-      final debugInfo = await HazukiSourceService.instance
-          .collectApplicationDebugInfo()
-          .timeout(const Duration(seconds: 10));
-      final prettyText = const JsonEncoder.withIndent('  ').convert(debugInfo);
-      final savedUri = await _mediaChannel.invokeMethod<String>('saveTextFile', {
-        'suggestedFileName': _buildSuggestedFileName(),
-        'content': prettyText,
-      });
-      if (!mounted) {
-        return;
-      }
-      if (savedUri != null && savedUri.isNotEmpty) {
-        unawaited(
-          showHazukiPrompt(context, strings.logsApplicationExportSuccess),
-        );
+      if (exportNetworkLogs) {
+        await _exportNetworkLogs();
+      } else {
+        await _exportApplicationLogs();
       }
     } catch (e) {
       if (!mounted) {
@@ -120,28 +147,394 @@ class _ApplicationLogsAppBarExportButtonState
     return AnimatedBuilder(
       animation: controller,
       builder: (context, _) {
-        final visible = controller.index == 1;
-        return AnimatedSwitcher(
-          duration: const Duration(milliseconds: 180),
-          switchInCurve: Curves.easeOutCubic,
-          switchOutCurve: Curves.easeInCubic,
-          child: !visible
-              ? const SizedBox.shrink(key: ValueKey<String>('app_logs_export_hidden'))
-              : IconButton(
-                  key: const ValueKey<String>('app_logs_export_visible'),
-                  tooltip: strings.logsApplicationExportTooltip,
-                  onPressed: _exporting ? null : _exportLogs,
-                  icon: _exporting
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.save_alt_rounded),
-                ),
+        final exportNetworkLogs = controller.index == 0;
+        return IconButton(
+          key: ValueKey<String>(
+            exportNetworkLogs
+                ? 'network_logs_export_visible'
+                : 'app_logs_export_visible',
+          ),
+          tooltip: strings.logsApplicationExportTooltip,
+          onPressed: _exporting
+              ? null
+              : () => _handleExport(exportNetworkLogs: exportNetworkLogs),
+          icon: _exporting
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.save_alt_rounded),
         );
       },
     );
+  }
+}
+
+class _NetworkLogsFormatter {
+  const _NetworkLogsFormatter(this.context);
+
+  final BuildContext context;
+
+  String buildPrettyText({
+    required Map<String, dynamic> source,
+    required bool importantOnly,
+  }) {
+    final viewData = buildMap(
+      source: source,
+      importantOnly: importantOnly,
+      includeFullBody: false,
+    );
+    return const JsonEncoder.withIndent('  ').convert(viewData);
+  }
+
+  String buildCopyText({
+    required Map<String, dynamic> source,
+    required bool importantOnly,
+  }) {
+    final copyData = buildMap(
+      source: source,
+      importantOnly: importantOnly,
+      includeFullBody: true,
+      compactFullBodyForUnimportant: true,
+      includeHeaders: true,
+    );
+    return const JsonEncoder.withIndent('  ').convert(copyData);
+  }
+
+  String buildExportText({required Map<String, dynamic> source}) {
+    final exportData = buildMap(
+      source: source,
+      importantOnly: false,
+      includeFullBody: true,
+      compactFullBodyForUnimportant: true,
+    );
+    return const JsonEncoder.withIndent('  ').convert(exportData);
+  }
+
+  Map<String, dynamic> buildMap({
+    required Map<String, dynamic> source,
+    required bool importantOnly,
+    required bool includeFullBody,
+    bool compactFullBodyForUnimportant = false,
+    bool includeHeaders = false,
+  }) {
+    final logs = _readLogs(source);
+    final importantLogs = logs.where(_isImportantLog).toList();
+    final targetLogs = importantOnly ? importantLogs : _limitUnimportantLogs(logs);
+    final normalizedLogs = targetLogs
+        .map(
+          (log) => _normalizeLog(
+            log: log,
+            includeFullBody: includeFullBody,
+            compactFullBodyForUnimportant: compactFullBodyForUnimportant,
+            includeHeaders: includeHeaders,
+          ),
+        )
+        .toList();
+
+    final baseStats = source['networkLogStats'] is Map
+        ? Map<String, dynamic>.from(
+            (source['networkLogStats'] as Map).map(
+              (key, value) => MapEntry(key.toString(), value),
+            ),
+          )
+        : <String, dynamic>{};
+
+    final result = <String, dynamic>{
+      'generatedAt': source['generatedAt'],
+      'statusText': source['statusText'],
+      'platform': source['platform'],
+      'sourceMeta': _normalizePayload(
+        source['sourceMeta'],
+        compactStrings: false,
+      ),
+      'isLogged': source['isLogged'],
+      if (_hasMeaningfulValue(source['lastLoginDebugInfo']))
+        'lastLoginDebugInfo': _normalizePayload(
+          source['lastLoginDebugInfo'],
+          compactStrings: !includeFullBody,
+        ),
+      if (_hasMeaningfulValue(source['lastSourceVersionDebugInfo']))
+        'lastSourceVersionDebugInfo': _normalizePayload(
+          source['lastSourceVersionDebugInfo'],
+          compactStrings: !includeFullBody,
+        ),
+      if (importantOnly) 'filterMode': 'important_only',
+      if (importantOnly)
+        'filterReason': l10n(context).favoritesDebugFilterReason,
+      'networkLogStats': {
+        ..._pruneMap(baseStats),
+        'visibleCount': normalizedLogs.length,
+        'totalCountBeforeFilter': logs.length,
+        'importantCount': importantLogs.length,
+        'noiseDroppedCount': logs.length - targetLogs.length,
+      },
+      'recentNetworkLogs': normalizedLogs,
+    };
+    return _pruneMap(result);
+  }
+
+  List<Map<String, dynamic>> _readLogs(Map<String, dynamic> source) {
+    return source['recentNetworkLogs'] is List
+        ? List<Map<String, dynamic>>.from(
+            (source['recentNetworkLogs'] as List).whereType<Map>().map(
+              (entry) => Map<String, dynamic>.from(entry),
+            ),
+          )
+        : <Map<String, dynamic>>[];
+  }
+
+  Map<String, dynamic> _normalizeLog({
+    required Map<String, dynamic> log,
+    required bool includeFullBody,
+    required bool compactFullBodyForUnimportant,
+    required bool includeHeaders,
+  }) {
+    final isImportant = _isImportantLog(log);
+    final mergedCount = log['mergedCount'] is num
+        ? (log['mergedCount'] as num).toInt()
+        : 1;
+    final result = <String, dynamic>{
+      'time': log['time'],
+      if (mergedCount > 1) 'lastSeenAt': log['lastSeenAt'],
+      if (mergedCount > 1) 'mergedCount': mergedCount,
+      'source': log['source'],
+      'method': log['method'],
+      'statusCode': log['statusCode'],
+      'durationMs': log['durationMs'],
+      'url': log['url'],
+      if (_hasMeaningfulValue(log['error'])) 'error': log['error'],
+      if (isImportant && _hasMeaningfulValue(log['requestData']))
+        'requestData': _normalizePayload(
+          log['requestData'],
+          compactStrings: !includeFullBody,
+        ),
+      if (isImportant && includeHeaders && _hasMeaningfulValue(log['requestHeaders']))
+        'requestHeaders': _normalizePayload(
+          log['requestHeaders'],
+          compactStrings: false,
+        ),
+      if (isImportant && includeHeaders && _hasMeaningfulValue(log['responseHeaders']))
+        'responseHeaders': _normalizePayload(
+          log['responseHeaders'],
+          compactStrings: false,
+        ),
+      if (_hasMeaningfulValue(log['responseBodyPreview']))
+        'responseBodyPreview': _toCompactBody(
+          log['responseBodyPreview'],
+          keep: isImportant ? 320 : 160,
+        ),
+      if (includeFullBody && _hasMeaningfulValue(log['responseBodyFull']))
+        'responseBodyFull': compactFullBodyForUnimportant && !isImportant
+            ? _toCompactBody(log['responseBodyFull'], keep: 320)
+            : _normalizePayload(
+                log['responseBodyFull'],
+                compactStrings: false,
+              ),
+    };
+    return _pruneMap(result);
+  }
+
+  dynamic _normalizePayload(
+    dynamic value, {
+    required bool compactStrings,
+  }) {
+    if (value == null) {
+      return null;
+    }
+    if (value is String) {
+      return compactStrings ? _toCompactBody(value) : value;
+    }
+    if (value is Map) {
+      final result = <String, dynamic>{};
+      for (final entry in value.entries) {
+        final normalized = _normalizePayload(
+          entry.value,
+          compactStrings: compactStrings,
+        );
+        if (_hasMeaningfulValue(normalized)) {
+          result[entry.key.toString()] = normalized;
+        }
+      }
+      return result;
+    }
+    if (value is Iterable) {
+      final items = value
+          .map(
+            (item) => _normalizePayload(item, compactStrings: compactStrings),
+          )
+          .where(_hasMeaningfulValue)
+          .toList();
+      return items;
+    }
+    return value;
+  }
+
+  Map<String, dynamic> _pruneMap(Map<String, dynamic> source) {
+    final result = <String, dynamic>{};
+    for (final entry in source.entries) {
+      final pruned = _pruneValue(entry.value);
+      if (_hasMeaningfulValue(pruned)) {
+        result[entry.key] = pruned;
+      }
+    }
+    return result;
+  }
+
+  dynamic _pruneValue(dynamic value) {
+    if (value is Map) {
+      return _pruneMap(
+        Map<String, dynamic>.from(
+          value.map((key, nested) => MapEntry(key.toString(), nested)),
+        ),
+      );
+    }
+    if (value is Iterable) {
+      final items = value
+          .map(_pruneValue)
+          .where(_hasMeaningfulValue)
+          .toList();
+      return items;
+    }
+    if (value is String) {
+      final text = value.trim();
+      if (text.isEmpty || text.toLowerCase() == 'null') {
+        return null;
+      }
+      return value;
+    }
+    return value;
+  }
+
+  bool _hasMeaningfulValue(dynamic value) {
+    if (value == null) {
+      return false;
+    }
+    if (value is String) {
+      final text = value.trim();
+      return text.isNotEmpty && text.toLowerCase() != 'null';
+    }
+    if (value is Map) {
+      return value.isNotEmpty;
+    }
+    if (value is Iterable) {
+      return value.isNotEmpty;
+    }
+    return true;
+  }
+
+  List<Map<String, dynamic>> _limitUnimportantLogs(
+    List<Map<String, dynamic>> logs,
+  ) {
+    const maxUnimportantLogs = 8;
+    final importantLogs = <Map<String, dynamic>>[];
+    final unimportantLogs = <Map<String, dynamic>>[];
+
+    for (final log in logs) {
+      if (_isImportantLog(log)) {
+        importantLogs.add(log);
+      } else {
+        unimportantLogs.add(log);
+      }
+    }
+
+    if (unimportantLogs.length <= maxUnimportantLogs) {
+      return [...importantLogs, ...unimportantLogs];
+    }
+
+    final recentUnimportant = unimportantLogs
+        .skip(unimportantLogs.length - maxUnimportantLogs)
+        .toList();
+    return [...importantLogs, ...recentUnimportant];
+  }
+
+  String _toCompactBody(dynamic body, {int keep = 240}) {
+    if (body == null) {
+      return 'null';
+    }
+    final text = body.toString();
+    if (text.length <= keep) {
+      return text;
+    }
+    final omitted = text.length - keep;
+    return '${text.substring(0, keep)}... [omitted $omitted chars]';
+  }
+
+  bool _isImportantLog(Map<String, dynamic> log) {
+    final statusCode = log['statusCode'] is num
+        ? (log['statusCode'] as num).toInt()
+        : null;
+    final method = (log['method'] ?? '').toString().toUpperCase();
+    final source = (log['source'] ?? '').toString().toLowerCase();
+    final url = (log['url'] ?? '').toString().toLowerCase();
+    final error = (log['error'] ?? '').toString().toLowerCase();
+    final responsePreview = (log['responseBodyPreview'] ?? '')
+        .toString()
+        .toLowerCase();
+    final responseFull = (log['responseBodyFull'] ?? '')
+        .toString()
+        .toLowerCase();
+
+    final hasError = error.isNotEmpty && error != 'null';
+    if (hasError) {
+      return true;
+    }
+
+    final isSlowRequest =
+        log['durationMs'] is num && (log['durationMs'] as num).toInt() >= 2500;
+    if (isSlowRequest) {
+      return true;
+    }
+
+    if (statusCode != null && statusCode >= 400) {
+      return true;
+    }
+
+    final authChainRelated =
+        source.contains('login') ||
+        source.contains('avatar') ||
+        source.contains('source_version') ||
+        method == 'LOGIN' ||
+        url.contains('/login') ||
+        url.contains('/user') ||
+        url.contains('/favorite') ||
+        url.contains('index.json') ||
+        url.contains('/jm.js') ||
+        url.contains('/daily') ||
+        url.contains('/daily_chk') ||
+        url.contains('source://avatar') ||
+        url.contains('source://account.login') ||
+        url.contains('signin') ||
+        url.contains('auth');
+    if (authChainRelated) {
+      return true;
+    }
+
+    const keywords = [
+      'error',
+      'failed',
+      'exception',
+      'timeout',
+      'unauthorized',
+      'forbidden',
+      'denied',
+      'invalid',
+      'login expired',
+      'not legal.user',
+      'auth_fail',
+      'uid',
+      'photo',
+      '401',
+      '403',
+      '500',
+      '502',
+      '503',
+      '504',
+    ];
+
+    final combined = '$error\n$responsePreview\n$responseFull';
+    return keywords.any(combined.contains);
   }
 }
 
@@ -250,224 +643,80 @@ class _NetworkLogsTabState extends State<_NetworkLogsTab>
     }
   }
 
+  _NetworkLogsFormatter get _formatter => _NetworkLogsFormatter(context);
+
   String _buildDebugTextFromRaw(Map<String, dynamic> source) {
-    final viewData = _buildDebugMap(
+    return _formatter.buildPrettyText(
       source: source,
       importantOnly: _importantOnly,
-      includeFullBody: false,
     );
-    return const JsonEncoder.withIndent('  ').convert(viewData);
   }
 
   String _buildCopyTextFromRaw(Map<String, dynamic> source) {
-    final copyData = _buildDebugMap(
+    return _formatter.buildCopyText(
       source: source,
       importantOnly: _importantOnly,
-      includeFullBody: true,
-      compactFullBodyForUnimportant: true,
     );
-    return const JsonEncoder.withIndent('  ').convert(copyData);
-  }
-
-  Map<String, dynamic> _buildDebugMap({
-    required Map<String, dynamic> source,
-    required bool importantOnly,
-    required bool includeFullBody,
-    bool compactFullBodyForUnimportant = false,
-  }) {
-    final copy = Map<String, dynamic>.from(source);
-    final logs = (copy['recentNetworkLogs'] is List)
-        ? List<Map<String, dynamic>>.from(
-            (copy['recentNetworkLogs'] as List).whereType<Map>().map(
-              (e) => Map<String, dynamic>.from(e),
-            ),
-          )
-        : <Map<String, dynamic>>[];
-
-    final targetLogs = importantOnly
-        ? logs.where(_isImportantLog).toList()
-        : _limitUnimportantLogs(logs);
-
-    final normalizedLogs = targetLogs.map((log) {
-      final item = Map<String, dynamic>.from(log);
-      final isImportant = _isImportantLog(item);
-      if (!includeFullBody && item.containsKey('responseBodyFull')) {
-        item.remove('responseBodyFull');
-      } else if (includeFullBody &&
-          compactFullBodyForUnimportant &&
-          !isImportant &&
-          item.containsKey('responseBodyFull')) {
-        item['responseBodyFull'] = _toCompactBody(item['responseBodyFull']);
-      }
-      return item;
-    }).toList();
-
-    if (importantOnly) {
-      copy['filterMode'] = 'important_only';
-      copy['filterReason'] = l10n(context).favoritesDebugFilterReason;
-    } else {
-      copy.remove('filterMode');
-      copy.remove('filterReason');
-    }
-
-    copy['recentNetworkLogs'] = normalizedLogs;
-    copy['networkLogStats'] = {
-      ...(copy['networkLogStats'] as Map? ?? const {}),
-      'visibleCount': normalizedLogs.length,
-      'totalCountBeforeFilter': logs.length,
-      'importantCount': logs.where(_isImportantLog).length,
-      'noiseDroppedCount': logs.length - normalizedLogs.length,
-    };
-    return copy;
-  }
-
-  List<Map<String, dynamic>> _limitUnimportantLogs(
-    List<Map<String, dynamic>> logs,
-  ) {
-    const maxUnimportantLogs = 12;
-    final importantLogs = <Map<String, dynamic>>[];
-    final unimportantLogs = <Map<String, dynamic>>[];
-
-    for (final log in logs) {
-      if (_isImportantLog(log)) {
-        importantLogs.add(log);
-      } else {
-        unimportantLogs.add(log);
-      }
-    }
-
-    if (unimportantLogs.length <= maxUnimportantLogs) {
-      return [...importantLogs, ...unimportantLogs];
-    }
-
-    final recentUnimportant = unimportantLogs
-        .skip(unimportantLogs.length - maxUnimportantLogs)
-        .toList();
-    return [...importantLogs, ...recentUnimportant];
-  }
-
-  String _toCompactBody(dynamic body) {
-    if (body == null) {
-      return 'null';
-    }
-    final text = body.toString();
-    const keep = 240;
-    if (text.length <= keep) {
-      return text;
-    }
-    final omitted = text.length - keep;
-    return '${text.substring(0, keep)}... [omitted $omitted chars]';
-  }
-
-  bool _isImportantLog(Map<String, dynamic> log) {
-    final statusCode = log['statusCode'] is num
-        ? (log['statusCode'] as num).toInt()
-        : null;
-    final method = (log['method'] ?? '').toString().toUpperCase();
-    final source = (log['source'] ?? '').toString().toLowerCase();
-    final url = (log['url'] ?? '').toString().toLowerCase();
-    final error = (log['error'] ?? '').toString().toLowerCase();
-    final responsePreview = (log['responseBodyPreview'] ?? '')
-        .toString()
-        .toLowerCase();
-    final responseFull = (log['responseBodyFull'] ?? '')
-        .toString()
-        .toLowerCase();
-
-    final hasError = error.isNotEmpty && error != 'null';
-    if (hasError) {
-      return true;
-    }
-
-    final isSlowRequest =
-        log['durationMs'] is num && (log['durationMs'] as num).toInt() >= 2500;
-    if (isSlowRequest) {
-      return true;
-    }
-
-    if (statusCode != null && statusCode >= 400) {
-      return true;
-    }
-
-    final authChainRelated =
-        source.contains('login') ||
-        source.contains('avatar') ||
-        source.contains('source_version') ||
-        method == 'LOGIN' ||
-        url.contains('/login') ||
-        url.contains('/user') ||
-        url.contains('/favorite') ||
-        url.contains('index.json') ||
-        url.contains('/jm.js') ||
-        url.contains('/daily') ||
-        url.contains('/daily_chk') ||
-        url.contains('source://avatar') ||
-        url.contains('source://account.login') ||
-        url.contains('signin') ||
-        url.contains('auth');
-    if (authChainRelated) {
-      return true;
-    }
-
-    const keywords = [
-      'error',
-      'failed',
-      'exception',
-      'timeout',
-      'unauthorized',
-      'forbidden',
-      'denied',
-      'invalid',
-      'login expired',
-      'not legal.user',
-      'auth_fail',
-      'uid',
-      'photo',
-      '401',
-      '403',
-      '500',
-      '502',
-      '503',
-      '504',
-    ];
-
-    final combined = '$error\n$responsePreview\n$responseFull';
-    return keywords.any(combined.contains);
   }
 
   Widget _buildActionBar(BuildContext context) {
     final strings = l10n(context);
-    return Wrap(
-      spacing: 12,
-      runSpacing: 12,
-      children: [
-        FilledButton.tonalIcon(
-          onPressed: (_loading || _fullLoading)
-              ? null
-              : () {
-                  setState(() {
-                    _importantOnly = !_importantOnly;
-                    if (_rawDebugInfo != null) {
-                      _debugText = _buildDebugTextFromRaw(_rawDebugInfo!);
-                    }
-                  });
-                },
-          icon: Icon(
-            _importantOnly ? Icons.filter_alt : Icons.filter_alt_outlined,
-          ),
-          label: Text(strings.favoritesDebugFilterImportantTooltip),
+    final disabled = _loading || _fullLoading;
+    final buttons = <Widget>[
+      FilledButton.tonalIcon(
+        onPressed: disabled
+            ? null
+            : () {
+                setState(() {
+                  _importantOnly = !_importantOnly;
+                  if (_rawDebugInfo != null) {
+                    _debugText = _buildDebugTextFromRaw(_rawDebugInfo!);
+                  }
+                });
+              },
+        icon: Icon(
+          _importantOnly ? Icons.filter_alt : Icons.filter_alt_outlined,
         ),
-        OutlinedButton.icon(
-          onPressed: (_loading || _fullLoading) ? null : _copyDebugText,
-          icon: const Icon(Icons.copy_outlined),
-          label: Text(strings.favoritesDebugCopyTooltip),
-        ),
-        OutlinedButton.icon(
-          onPressed: (_loading || _fullLoading) ? null : _loadNetworkDebugInfo,
-          icon: const Icon(Icons.refresh_rounded),
-          label: Text(strings.favoritesDebugRefreshTooltip),
-        ),
-      ],
+        label: Text(strings.favoritesDebugFilterImportantTooltip),
+      ),
+      OutlinedButton.icon(
+        onPressed: disabled ? null : _copyDebugText,
+        icon: const Icon(Icons.copy_outlined),
+        label: Text(strings.favoritesDebugCopyTooltip),
+      ),
+      OutlinedButton.icon(
+        onPressed: disabled ? null : _loadNetworkDebugInfo,
+        icon: const Icon(Icons.refresh_rounded),
+        label: Text(strings.favoritesDebugRefreshTooltip),
+      ),
+      FilledButton.tonalIcon(
+        onPressed: _fullLoading ? null : _loadFullDebugInfo,
+        icon: _fullLoading
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.science_outlined),
+        label: Text(strings.favoritesDebugFullFetchButton),
+      ),
+    ];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final useTwoColumns = constraints.maxWidth >= 320;
+        final itemWidth = useTwoColumns
+            ? (constraints.maxWidth - 12) / 2
+            : constraints.maxWidth;
+        return Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            for (final button in buttons)
+              SizedBox(width: itemWidth, child: button),
+          ],
+        );
+      },
     );
   }
 
@@ -496,18 +745,6 @@ class _NetworkLogsTabState extends State<_NetworkLogsTab>
       padding: const EdgeInsets.all(16),
       children: [
         _buildActionBar(context),
-        const SizedBox(height: 12),
-        FilledButton.tonalIcon(
-          onPressed: _fullLoading ? null : _loadFullDebugInfo,
-          icon: _fullLoading
-              ? const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.science_outlined),
-          label: Text(strings.favoritesDebugFullFetchButton),
-        ),
         const SizedBox(height: 12),
         _LogsTextCard(
           icon: Icons.wifi_tethering_rounded,
