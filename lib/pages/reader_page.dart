@@ -89,6 +89,8 @@ class _ReaderPageState extends State<ReaderPage>
   int _activePointerCount = 0;
   bool get _zoomGestureActive =>
       _pinchToZoom && (_isZoomed || _zoomInteracting || _activePointerCount > 1);
+  bool get _pageNavigationLocked =>
+      _pinchToZoom && (_zoomInteracting || _isZoomed || _activePointerCount > 1);
   // 还原动画控制器
   late final AnimationController _resetAnimController;
 
@@ -296,19 +298,17 @@ class _ReaderPageState extends State<ReaderPage>
     _isZoomed = false;
   }
 
-  Widget _wrapPageWithPinchZoom({required int index, required Widget child}) {
-    if (!_pinchToZoom ||
-        _readerMode != _ReaderMode.rightToLeft ||
-        index != _currentPageIndex) {
-      return child;
-    }
+  Widget _buildZoomableReader({
+    required Widget child,
+    bool constrained = true,
+  }) {
     return InteractiveViewer(
       transformationController: _zoomController,
       panEnabled: _isZoomed || _zoomInteracting,
       scaleEnabled: true,
       panAxis: PanAxis.free,
-      boundaryMargin: const EdgeInsets.all(48),
-      constrained: true,
+      boundaryMargin: EdgeInsets.zero,
+      constrained: constrained,
       clipBehavior: Clip.hardEdge,
       minScale: 1.0,
       maxScale: 5.0,
@@ -319,25 +319,20 @@ class _ReaderPageState extends State<ReaderPage>
     );
   }
 
-  Widget _wrapListViewWithPinchZoom(Widget child) {
-    if (!_pinchToZoom || _readerMode != _ReaderMode.topToBottom) {
+  Widget _wrapPageWithPinchZoom({required int index, required Widget child}) {
+    if (!_pinchToZoom ||
+        _readerMode != _ReaderMode.rightToLeft ||
+        index != _currentPageIndex) {
       return child;
     }
-    return InteractiveViewer(
-      transformationController: _zoomController,
-      panEnabled: _isZoomed || _zoomInteracting,
-      scaleEnabled: true,
-      panAxis: PanAxis.free,
-      boundaryMargin: const EdgeInsets.all(48),
-      constrained: true,
-      clipBehavior: Clip.hardEdge,
-      minScale: 1.0,
-      maxScale: 5.0,
-      onInteractionStart: _handleZoomInteractionStart,
-      onInteractionUpdate: _handleZoomInteractionUpdate,
-      onInteractionEnd: _handleZoomInteractionEnd,
-      child: child,
-    );
+    return _buildZoomableReader(child: child);
+  }
+
+  Widget _buildTopToBottomReaderView() {
+    if (!_pinchToZoom || _readerMode != _ReaderMode.topToBottom) {
+      return _buildReaderListView();
+    }
+    return _buildZoomableReader(child: _buildReaderListView());
   }
 
   Future<void> _loadReadingSettings() async {
@@ -837,6 +832,84 @@ class _ReaderPageState extends State<ReaderPage>
     }
   }
 
+  Widget _buildReaderListItem(int index) {
+    final url = _images[index];
+    final cachedProvider = _providerCache[url];
+    final placeholderAspectRatio = _imageAspectRatioCache[url] ?? (3 / 4);
+
+    if (_noImageModeEnabled) {
+      return AspectRatio(
+        key: index < _itemKeys.length ? _itemKeys[index] : null,
+        aspectRatio: 3 / 4,
+        child: const SizedBox.expand(),
+      );
+    }
+
+    Widget buildImage(ImageProvider provider) {
+      return _wrapImageWidget(
+        Image(
+          key: ValueKey(url),
+          image: provider,
+          fit: BoxFit.fitWidth,
+          width: double.infinity,
+          filterQuality: FilterQuality.medium,
+          gaplessPlayback: true,
+          frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+            if (wasSynchronouslyLoaded || frame != null) {
+              return child;
+            }
+            return const ColoredBox(color: Colors.black);
+          },
+          errorBuilder: (_, _, _) {
+            return Container(
+              height: 120,
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
+              alignment: Alignment.center,
+              child: const Icon(Icons.broken_image_outlined),
+            );
+          },
+        ),
+        url,
+      );
+    }
+
+    Widget content;
+    if (cachedProvider != null) {
+      content = buildImage(cachedProvider);
+    } else {
+      content = FutureBuilder<ImageProvider>(
+        key: ValueKey(url),
+        future: _getOrCreateImageProviderFuture(url),
+        builder: (context, snapshot) {
+          if (snapshot.hasData) {
+            return buildImage(snapshot.data!);
+          }
+          if (snapshot.hasError) {
+            return AspectRatio(
+              aspectRatio: placeholderAspectRatio,
+              child: Container(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                alignment: Alignment.center,
+                child: const Icon(Icons.broken_image_outlined),
+              ),
+            );
+          }
+          return AspectRatio(
+            aspectRatio: placeholderAspectRatio,
+            child: const Center(
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          );
+        },
+      );
+    }
+
+    return Container(
+      key: index < _itemKeys.length ? _itemKeys[index] : null,
+      child: content,
+    );
+  }
+
   Widget _buildReaderListView() {
     return ListView.builder(
       key: ValueKey('${widget.comicId}-${widget.epId}'),
@@ -846,83 +919,7 @@ class _ReaderPageState extends State<ReaderPage>
       physics: _zoomGestureActive
           ? const NeverScrollableScrollPhysics()
           : const _ReaderScrollPhysics(),
-      itemBuilder: (context, index) {
-        final url = _images[index];
-        final cachedProvider = _providerCache[url];
-        final placeholderAspectRatio = _imageAspectRatioCache[url] ?? (3 / 4);
-
-        if (_noImageModeEnabled) {
-          return AspectRatio(
-            key: index < _itemKeys.length ? _itemKeys[index] : null,
-            aspectRatio: 3 / 4,
-            child: const SizedBox.expand(),
-          );
-        }
-
-        Widget buildImage(ImageProvider provider) {
-          return _wrapImageWidget(
-            Image(
-              key: ValueKey(url),
-              image: provider,
-              fit: BoxFit.fitWidth,
-              width: double.infinity,
-              filterQuality: FilterQuality.medium,
-              gaplessPlayback: true,
-              frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-                if (wasSynchronouslyLoaded || frame != null) {
-                  return child;
-                }
-                return const ColoredBox(color: Colors.black);
-              },
-              errorBuilder: (_, _, _) {
-                return Container(
-                  height: 120,
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                  alignment: Alignment.center,
-                  child: const Icon(Icons.broken_image_outlined),
-                );
-              },
-            ),
-            url,
-          );
-        }
-
-        Widget content;
-        if (cachedProvider != null) {
-          content = buildImage(cachedProvider);
-        } else {
-          content = FutureBuilder<ImageProvider>(
-            key: ValueKey(url),
-            future: _getOrCreateImageProviderFuture(url),
-            builder: (context, snapshot) {
-              if (snapshot.hasData) {
-                return buildImage(snapshot.data!);
-              }
-              if (snapshot.hasError) {
-                return AspectRatio(
-                  aspectRatio: placeholderAspectRatio,
-                  child: Container(
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                    alignment: Alignment.center,
-                    child: const Icon(Icons.broken_image_outlined),
-                  ),
-                );
-              }
-              return AspectRatio(
-                aspectRatio: placeholderAspectRatio,
-                child: const Center(
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-              );
-            },
-          );
-        }
-
-        return Container(
-          key: index < _itemKeys.length ? _itemKeys[index] : null,
-          child: content,
-        );
-      },
+      itemBuilder: (context, index) => _buildReaderListItem(index),
     );
   }
 
@@ -933,10 +930,21 @@ class _ReaderPageState extends State<ReaderPage>
       reverse: false,
       allowImplicitScrolling: true,
       itemCount: _images.length,
-      physics: _zoomGestureActive
+      physics: _pageNavigationLocked
           ? const NeverScrollableScrollPhysics()
           : const PageScrollPhysics(),
       onPageChanged: (index) {
+        if (_pageNavigationLocked) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted ||
+                !_pageController.hasClients ||
+                _currentPageIndex == index) {
+              return;
+            }
+            _pageController.jumpToPage(_currentPageIndex);
+          });
+          return;
+        }
         final pageChanged = _currentPageIndex != index;
         final zoomWasActive = _isZoomed;
         _resetZoomImmediately();
@@ -1057,9 +1065,7 @@ class _ReaderPageState extends State<ReaderPage>
 
   Widget _wrapReaderTapPaging(Widget child) {
     final tapPagingEnabled =
-        _readerMode == _ReaderMode.rightToLeft &&
-        _tapToTurnPage &&
-        !_zoomGestureActive;
+        _readerMode == _ReaderMode.rightToLeft && _tapToTurnPage;
     if (!tapPagingEnabled) {
       return child;
     }
@@ -1070,6 +1076,9 @@ class _ReaderPageState extends State<ReaderPage>
         return GestureDetector(
           behavior: HitTestBehavior.translucent,
           onTapUp: (details) {
+            if (_pageNavigationLocked) {
+              return;
+            }
             final dx = details.localPosition.dx;
             if (dx <= leftTriggerWidth) {
               unawaited(_goToPreviousPage());
@@ -1176,7 +1185,7 @@ class _ReaderPageState extends State<ReaderPage>
                 child: _wrapReaderTapPaging(
                   _readerMode == _ReaderMode.rightToLeft
                       ? _buildReaderPageView()
-                      : _wrapListViewWithPinchZoom(_buildReaderListView()),
+                      : _buildTopToBottomReaderView(),
                 ),
               ),
               Positioned(

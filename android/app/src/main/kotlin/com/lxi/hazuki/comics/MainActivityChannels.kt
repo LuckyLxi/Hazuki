@@ -1,6 +1,9 @@
 package com.lxi.hazuki.comics
 
 import android.media.MediaScannerConnection
+import android.net.Uri
+import android.util.Log
+import androidx.activity.result.contract.ActivityResultContracts
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
@@ -14,6 +17,15 @@ class MainActivityChannels(
     private val privacyManager: PrivacyManager,
     private val displayModeManager: DisplayModeManager,
 ) {
+    private var pendingSaveTextResult: MethodChannel.Result? = null
+    private var pendingSaveTextContent: String? = null
+
+    private val createJsonDocumentLauncher =
+        activity.registerForActivityResult(
+            ActivityResultContracts.CreateDocument("application/json"),
+        ) { uri ->
+            handleCreateJsonDocumentResult(uri)
+        }
     fun register(flutterEngine: FlutterEngine) {
         registerPrivacyChannel(flutterEngine)
         registerDisplayModeChannel(flutterEngine)
@@ -77,9 +89,75 @@ class MainActivityChannels(
                         MediaScannerConnection.scanFile(activity, arrayOf(path), null, null)
                         result.success(true)
                     }
+                    "saveTextFile" -> {
+                        if (pendingSaveTextResult != null) {
+                            result.error(
+                                "save_in_progress",
+                                "Another saveTextFile request is already in progress",
+                                null,
+                            )
+                            return@setMethodCallHandler
+                        }
+
+                        val suggestedFileName =
+                            call.argument<String>("suggestedFileName")
+                                ?.takeIf { it.isNotBlank() }
+                                ?: "hazuki_application_logs.json"
+                        val content = call.argument<String>("content")
+                        if (content == null) {
+                            result.error("missing_content", "Missing text content", null)
+                            return@setMethodCallHandler
+                        }
+
+                        pendingSaveTextResult = result
+                        pendingSaveTextContent = content
+                        try {
+                            createJsonDocumentLauncher.launch(suggestedFileName)
+                        } catch (e: Exception) {
+                            pendingSaveTextResult = null
+                            pendingSaveTextContent = null
+                            result.error(
+                                "save_launch_failed",
+                                "Failed to launch document picker: ${e.message}",
+                                null,
+                            )
+                        }
+                    }
                     else -> result.notImplemented()
                 }
             }
+    }
+
+    private fun handleCreateJsonDocumentResult(uri: Uri?) {
+        val result = pendingSaveTextResult ?: return
+        val content = pendingSaveTextContent
+        pendingSaveTextResult = null
+        pendingSaveTextContent = null
+
+        if (uri == null) {
+            result.success(null)
+            return
+        }
+
+        if (content == null) {
+            result.error("missing_content", "Missing pending text content", null)
+            return
+        }
+
+        try {
+            activity.contentResolver.openOutputStream(uri)?.use { output ->
+                output.write(content.toByteArray(Charsets.UTF_8))
+                output.flush()
+            } ?: throw IllegalStateException("Unable to open output stream")
+            result.success(uri.toString())
+        } catch (e: Exception) {
+            Log.e("MainActivityChannels", "Failed to save text file", e)
+            result.error(
+                "save_write_failed",
+                "Failed to save text file: ${e.message}",
+                null,
+            )
+        }
     }
 
     private fun registerReaderDisplayChannel(flutterEngine: FlutterEngine) {

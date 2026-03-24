@@ -1109,7 +1109,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cloudSyncRestore => 'Restore backup';
 
   @override
-  String get favoritesDebugCopied => 'Debug information copied';
+  String get favoritesDebugCopied => 'Network logs copied';
 
   @override
   String get favoritesDebugFilterReason => 'Show only important logs (error logs, HTTP>=400, login-related entries, and entries containing critical error keywords)';
@@ -1125,11 +1125,42 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String favoritesDebugLoadFailed(Object error) {
-    return 'Failed to load debug information: $error';
+    return 'Failed to load network logs: $error';
   }
 
   @override
-  String get favoritesDebugFullFetchButton => 'Run full fetch manually (slow)';
+  String get favoritesDebugFullFetchButton => 'Run full network fetch manually (slow)';
+
+  @override
+  String get logsNetworkTitle => 'Network logs';
+
+  @override
+  String get logsApplicationTitle => 'Application logs';
+
+  @override
+  String get logsApplicationCopied => 'Application logs copied';
+
+  @override
+  String get logsApplicationRefreshTooltip => 'Refresh application logs';
+
+  @override
+  String logsApplicationLoadFailed(Object error) {
+    return 'Failed to load application logs: $error';
+  }
+
+  @override
+  String get logsApplicationEmpty => 'No application logs yet';
+
+  @override
+  String get logsApplicationExportTooltip => 'Export logs';
+
+  @override
+  String get logsApplicationExportSuccess => 'Log file exported';
+
+  @override
+  String logsApplicationExportFailed(Object error) {
+    return 'Failed to export log file: $error';
+  }
 
   @override
   String get tagCategoryLoadTimeout => 'Tag categories timed out while loading. Please try again later.';
@@ -1315,10 +1346,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get advancedTitle => 'Advanced';
 
   @override
-  String get advancedDebugTitle => 'Debug';
+  String get advancedDebugTitle => 'Logs';
 
   @override
-  String get advancedDebugSubtitle => 'Logs';
+  String get advancedDebugSubtitle => 'Network logs and application logs';
 
   @override
   String get advancedComicIdSearchTitle => 'Comic ID search optimization';

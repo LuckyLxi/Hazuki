@@ -1107,7 +1107,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get cloudSyncRestore => '恢复备份';
 
   @override
-  String get favoritesDebugCopied => '已复制调试信息';
+  String get favoritesDebugCopied => '已复制网络日志';
 
   @override
   String get favoritesDebugFilterReason => '仅显示重要日志（错误日志、HTTP>=400、登录相关、含关键错误关键词）';
@@ -1123,11 +1123,42 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String favoritesDebugLoadFailed(Object error) {
-    return '调试信息加载失败：$error';
+    return '网络日志加载失败：$error';
   }
 
   @override
-  String get favoritesDebugFullFetchButton => '手动执行完整抓取（慢）';
+  String get favoritesDebugFullFetchButton => '手动执行完整网络抓取（慢）';
+
+  @override
+  String get logsNetworkTitle => '网络日志';
+
+  @override
+  String get logsApplicationTitle => '应用日志';
+
+  @override
+  String get logsApplicationCopied => '已复制应用日志';
+
+  @override
+  String get logsApplicationRefreshTooltip => '刷新应用日志';
+
+  @override
+  String logsApplicationLoadFailed(Object error) {
+    return '应用日志加载失败：$error';
+  }
+
+  @override
+  String get logsApplicationEmpty => '暂无应用日志';
+
+  @override
+  String get logsApplicationExportTooltip => '导出日志';
+
+  @override
+  String get logsApplicationExportSuccess => '日志文件已导出';
+
+  @override
+  String logsApplicationExportFailed(Object error) {
+    return '导出日志文件失败：$error';
+  }
 
   @override
   String get tagCategoryLoadTimeout => '标签分类加载超时，请稍后重试';
@@ -1313,10 +1344,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get advancedTitle => '高级';
 
   @override
-  String get advancedDebugTitle => 'Debug';
+  String get advancedDebugTitle => '日志';
 
   @override
-  String get advancedDebugSubtitle => '日志';
+  String get advancedDebugSubtitle => '网络日志与应用日志';
 
   @override
   String get advancedComicIdSearchTitle => '漫画 ID 搜索优化';

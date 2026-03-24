@@ -605,18 +605,37 @@
   "cloudSyncSave": "保存",
   "cloudSyncUpload": "上传备份",
   "cloudSyncRestore": "恢复备份",
-  "favoritesDebugCopied": "已复制调试信息",
+  "favoritesDebugCopied": "已复制网络日志",
   "favoritesDebugFilterReason": "仅显示重要日志（错误日志、HTTP>=400、登录相关、含关键错误关键词）",
   "favoritesDebugFilterImportantTooltip": "筛查重要日志",
   "favoritesDebugCopyTooltip": "复制",
   "favoritesDebugRefreshTooltip": "刷新网络日志",
-  "favoritesDebugLoadFailed": "调试信息加载失败：{error}",
+  "favoritesDebugLoadFailed": "网络日志加载失败：{error}",
   "@favoritesDebugLoadFailed": {
     "placeholders": {
       "error": {}
     }
   },
-  "favoritesDebugFullFetchButton": "手动执行完整抓取（慢）",
+  "favoritesDebugFullFetchButton": "手动执行完整网络抓取（慢）",
+  "logsNetworkTitle": "网络日志",
+  "logsApplicationTitle": "应用日志",
+  "logsApplicationCopied": "已复制应用日志",
+  "logsApplicationRefreshTooltip": "刷新应用日志",
+  "logsApplicationLoadFailed": "应用日志加载失败：{error}",
+  "@logsApplicationLoadFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "logsApplicationEmpty": "暂无应用日志",
+  "logsApplicationExportTooltip": "导出日志",
+  "logsApplicationExportSuccess": "日志文件已导出",
+  "logsApplicationExportFailed": "导出日志文件失败：{error}",
+  "@logsApplicationExportFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
   "tagCategoryLoadTimeout": "标签分类加载超时，请稍后重试",
   "tagCategoryLoadFailed": "标签分类加载失败：{error}",
   "@tagCategoryLoadFailed": {
@@ -743,8 +762,8 @@
   "readerCurrentChapterNoImages": "当前章节无图片",
   "readerResetZoom": "还原大小",
   "advancedTitle": "高级",
-  "advancedDebugTitle": "Debug",
-  "advancedDebugSubtitle": "日志",
+  "advancedDebugTitle": "日志",
+  "advancedDebugSubtitle": "网络日志与应用日志",
   "advancedComicIdSearchTitle": "漫画 ID 搜索优化",
   "advancedComicIdSearchSubtitle": "提交搜索时自动过滤非数字字符，仅保留阿拉伯数字作为关键词",
   "advancedNoImageModeTitle": "无图模式",

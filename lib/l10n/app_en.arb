@@ -605,18 +605,37 @@
   "cloudSyncSave": "Save",
   "cloudSyncUpload": "Upload backup",
   "cloudSyncRestore": "Restore backup",
-  "favoritesDebugCopied": "Debug information copied",
+  "favoritesDebugCopied": "Network logs copied",
   "favoritesDebugFilterReason": "Show only important logs (error logs, HTTP>=400, login-related entries, and entries containing critical error keywords)",
   "favoritesDebugFilterImportantTooltip": "Filter important logs",
   "favoritesDebugCopyTooltip": "Copy",
   "favoritesDebugRefreshTooltip": "Refresh network logs",
-  "favoritesDebugLoadFailed": "Failed to load debug information: {error}",
+  "favoritesDebugLoadFailed": "Failed to load network logs: {error}",
   "@favoritesDebugLoadFailed": {
     "placeholders": {
       "error": {}
     }
   },
-  "favoritesDebugFullFetchButton": "Run full fetch manually (slow)",
+  "favoritesDebugFullFetchButton": "Run full network fetch manually (slow)",
+  "logsNetworkTitle": "Network logs",
+  "logsApplicationTitle": "Application logs",
+  "logsApplicationCopied": "Application logs copied",
+  "logsApplicationRefreshTooltip": "Refresh application logs",
+  "logsApplicationLoadFailed": "Failed to load application logs: {error}",
+  "@logsApplicationLoadFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "logsApplicationEmpty": "No application logs yet",
+  "logsApplicationExportTooltip": "Export logs",
+  "logsApplicationExportSuccess": "Log file exported",
+  "logsApplicationExportFailed": "Failed to export log file: {error}",
+  "@logsApplicationExportFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
   "tagCategoryLoadTimeout": "Tag categories timed out while loading. Please try again later.",
   "tagCategoryLoadFailed": "Failed to load tag categories: {error}",
   "@tagCategoryLoadFailed": {
@@ -743,8 +762,8 @@
   "readerCurrentChapterNoImages": "No images in the current chapter",
   "readerResetZoom": "Reset zoom",
   "advancedTitle": "Advanced",
-  "advancedDebugTitle": "Debug",
-  "advancedDebugSubtitle": "Logs",
+  "advancedDebugTitle": "Logs",
+  "advancedDebugSubtitle": "Network logs and application logs",
   "advancedComicIdSearchTitle": "Comic ID search optimization",
   "advancedComicIdSearchSubtitle": "Automatically remove non-digit characters on search submission and keep only Arabic numerals as the keyword",
   "advancedNoImageModeTitle": "No-image mode",

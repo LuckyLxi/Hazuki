@@ -54,13 +54,13 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
           : ListView(
               children: [
                 ListTile(
-                  leading: const Icon(Icons.bug_report_outlined),
+                  leading: const Icon(Icons.receipt_long_outlined),
                   title: Text(strings.advancedDebugTitle),
                   subtitle: Text(strings.advancedDebugSubtitle),
                   onTap: () {
                     Navigator.of(context).push(
                       MaterialPageRoute<void>(
-                        builder: (_) => const FavoritesDebugPage(),
+                        builder: (_) => const LogsPage(),
                       ),
                     );
                   },

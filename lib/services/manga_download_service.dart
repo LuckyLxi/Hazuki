@@ -336,6 +336,19 @@ class MangaDownloadService extends ChangeNotifier {
   List<DownloadedMangaComic> get downloadedComics =>
       List<DownloadedMangaComic>.unmodifiable(_downloaded);
 
+  void _logScan(
+    String title, {
+    Object? content,
+    String level = 'info',
+  }) {
+    HazukiSourceService.instance.addApplicationLog(
+      level: level,
+      title: title,
+      content: content,
+      source: 'download_scan',
+    );
+  }
+
   Future<void> ensureInitialized() async {
     final inFlight = _initFuture;
     if (inFlight != null) {
@@ -518,6 +531,13 @@ class MangaDownloadService extends ChangeNotifier {
     _prefs = await SharedPreferences.getInstance();
     final rootDir = await _ensureRootDir();
     final raw = _prefs?.getString(_statePrefsKey);
+    _logScan(
+      'Downloads scan bootstrap',
+      content: {
+        'rootDir': rootDir.path,
+        'hasPersistedState': raw != null && raw.isNotEmpty,
+      },
+    );
     if (raw != null && raw.isNotEmpty) {
       try {
         final decoded = jsonDecode(raw);
@@ -527,7 +547,9 @@ class MangaDownloadService extends ChangeNotifier {
           if (tasksRaw is List) {
             for (final item in tasksRaw) {
               if (item is Map) {
-                var task = MangaDownloadTask.fromJson(Map<String, dynamic>.from(item));
+                var task = MangaDownloadTask.fromJson(
+                  Map<String, dynamic>.from(item),
+                );
                 if (task.status == MangaDownloadTaskStatus.downloading) {
                   task = task.copyWith(
                     status: MangaDownloadTaskStatus.queued,
@@ -548,12 +570,36 @@ class MangaDownloadService extends ChangeNotifier {
               }
             }
           }
+          _logScan(
+            'Restored persisted download state',
+            content: {
+              'taskCount': _tasks.length,
+              'downloadedCount': _downloaded.length,
+            },
+          );
         }
-      } catch (_) {}
+      } catch (e) {
+        _logScan(
+          'Failed to parse persisted download state',
+          level: 'warning',
+          content: {
+            'rootDir': rootDir.path,
+            'error': e.toString(),
+          },
+        );
+      }
     }
     await _scanDownloadedFromDisk(rootDir);
     _tasks.sort((a, b) => a.createdAtMillis.compareTo(b.createdAtMillis));
     _downloaded.sort((a, b) => b.updatedAtMillis.compareTo(a.updatedAtMillis));
+    _logScan(
+      'Downloads scan finished',
+      content: {
+        'rootDir': rootDir.path,
+        'taskCount': _tasks.length,
+        'downloadedCount': _downloaded.length,
+      },
+    );
     await _persistState();
     if (_tasks.isNotEmpty) {
       unawaited(_processQueue());
@@ -564,6 +610,10 @@ class MangaDownloadService extends ChangeNotifier {
     final dir = Directory('/storage/emulated/0/Download/Hazuki_Manga');
     if (!await dir.exists()) {
       await dir.create(recursive: true);
+      _logScan(
+        'Created downloads root directory',
+        content: {'path': dir.path},
+      );
     }
     return dir;
   }
@@ -936,27 +986,93 @@ class MangaDownloadService extends ChangeNotifier {
   }
 
   Future<void> _scanDownloadedFromDisk(Directory rootDir) async {
+    var scannedDirectories = 0;
+    var recoveredComics = 0;
+    _logScan(
+      'Scanning downloads root directory',
+      content: {'path': rootDir.path},
+    );
     try {
       await for (final entity in rootDir.list()) {
         if (entity is! Directory) {
           continue;
         }
+        scannedDirectories++;
+        _logScan(
+          'Scanning comic directory',
+          content: {
+            'path': entity.path,
+            'name': _entityBaseName(entity),
+          },
+        );
         final comic = await _readComicFromDirectory(entity);
         if (comic != null) {
+          recoveredComics++;
           _upsertDownloadedComic(comic);
+          _logScan(
+            'Recovered downloaded comic',
+            content: {
+              'path': entity.path,
+              'comicId': comic.comicId,
+              'title': comic.title,
+              'chapterCount': comic.chapters.length,
+              'hasCover': comic.localCoverPath != null,
+            },
+          );
+        } else {
+          _logScan(
+            'Skipped comic directory',
+            level: 'warning',
+            content: {
+              'path': entity.path,
+              'reason': 'no_metadata_and_no_images',
+            },
+          );
         }
       }
-    } catch (_) {}
+      _logScan(
+        'Completed downloads root directory scan',
+        content: {
+          'path': rootDir.path,
+          'scannedDirectories': scannedDirectories,
+          'recoveredComics': recoveredComics,
+        },
+      );
+    } catch (e) {
+      _logScan(
+        'Downloads root directory scan failed',
+        level: 'error',
+        content: {
+          'path': rootDir.path,
+          'scannedDirectories': scannedDirectories,
+          'recoveredComics': recoveredComics,
+          'error': e.toString(),
+        },
+      );
+    }
   }
 
   Future<DownloadedMangaComic?> _readComicFromDirectory(Directory comicDir) async {
     final metadataFile = await _findMetadataFile(comicDir);
     if (metadataFile == null) {
+      _logScan(
+        'Metadata file not found, using fallback scan',
+        level: 'warning',
+        content: {'comicDir': comicDir.path},
+      );
       return _fallbackDownloadedComicFromDirectory(comicDir);
     }
     try {
       final decoded = jsonDecode(await metadataFile.readAsString());
       if (decoded is! Map) {
+        _logScan(
+          'Metadata file format invalid, using fallback scan',
+          level: 'warning',
+          content: {
+            'comicDir': comicDir.path,
+            'metadataFile': metadataFile.path,
+          },
+        );
         return _fallbackDownloadedComicFromDirectory(comicDir);
       }
       final comic = DownloadedMangaComic.fromJson(
@@ -982,8 +1098,29 @@ class MangaDownloadService extends ChangeNotifier {
         updatedAtMillis: DateTime.now().millisecondsSinceEpoch,
       );
       await _restoreDownloadedComicMetadata(comicDir, normalized);
+      _logScan(
+        'Metadata-based recovery succeeded',
+        content: {
+          'comicDir': comicDir.path,
+          'metadataFile': metadataFile.path,
+          'comicId': normalized.comicId,
+          'normalizedChapterCount': normalizedChapters.length,
+          'scannedChapterCount': scannedChapters.length,
+          'mergedChapterCount': normalized.chapters.length,
+          'hasCover': normalized.localCoverPath != null,
+        },
+      );
       return normalized;
-    } catch (_) {
+    } catch (e) {
+      _logScan(
+        'Metadata read failed, using fallback scan',
+        level: 'warning',
+        content: {
+          'comicDir': comicDir.path,
+          'metadataFile': metadataFile.path,
+          'error': e.toString(),
+        },
+      );
       return _fallbackDownloadedComicFromDirectory(comicDir);
     }
   }
@@ -993,12 +1130,25 @@ class MangaDownloadService extends ChangeNotifier {
   ) async {
     final comicId = _baseNameFromPath(comicDir.path);
     if (comicId.isEmpty) {
+      _logScan(
+        'Fallback scan skipped because comic directory name is empty',
+        level: 'warning',
+        content: {'comicDir': comicDir.path},
+      );
       return null;
     }
 
     final chapters = await _scanChapterDirectoriesFromDisk(comicDir);
     final localCover = await _findLocalCoverFile(comicDir);
     if (chapters.isEmpty && localCover == null) {
+      _logScan(
+        'Fallback scan found no chapters or cover',
+        level: 'warning',
+        content: {
+          'comicDir': comicDir.path,
+          'comicId': comicId,
+        },
+      );
       return null;
     }
 
@@ -1013,6 +1163,15 @@ class MangaDownloadService extends ChangeNotifier {
       updatedAtMillis: await _readUpdatedAtMillis(comicDir),
     );
     await _restoreDownloadedComicMetadata(comicDir, rebuilt);
+    _logScan(
+      'Fallback recovery succeeded',
+      content: {
+        'comicDir': comicDir.path,
+        'comicId': comicId,
+        'chapterCount': chapters.length,
+        'hasCover': localCover != null,
+      },
+    );
     return rebuilt;
   }
 
@@ -1237,6 +1396,7 @@ class MangaDownloadService extends ChangeNotifier {
     final chapters = <DownloadedMangaChapter>[];
     final usedChapterNumbers = <int>{};
     var nextFallbackChapterNumber = 1;
+    var usedRootFiles = false;
     for (final item in directories) {
       var chapterNumber = item.chapterNumber;
       if (chapterNumber == null ||
@@ -1262,6 +1422,7 @@ class MangaDownloadService extends ChangeNotifier {
     if (chapters.isEmpty) {
       final rootFiles = await _listImageFiles(comicDir, excludeCoverFiles: true);
       if (rootFiles.isNotEmpty) {
+        usedRootFiles = true;
         chapters.add(
           DownloadedMangaChapter(
             epId: 'local_1',
@@ -1274,6 +1435,19 @@ class MangaDownloadService extends ChangeNotifier {
     }
 
     chapters.sort((a, b) => a.index.compareTo(b.index));
+    _logScan(
+      'Scanned chapter directories',
+      content: {
+        'comicDir': comicDir.path,
+        'candidateDirectoryCount': directories.length,
+        'chapterCount': chapters.length,
+        'usedRootFiles': usedRootFiles,
+        'directories': directories
+            .map((item) => _entityBaseName(item.directory))
+            .take(20)
+            .toList(),
+      },
+    );
     return chapters;
   }
 

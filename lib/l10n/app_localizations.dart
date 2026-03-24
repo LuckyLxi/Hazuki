@@ -2096,7 +2096,7 @@ abstract class AppLocalizations {
   /// No description provided for @favoritesDebugCopied.
   ///
   /// In en, this message translates to:
-  /// **'Debug information copied'**
+  /// **'Network logs copied'**
   String get favoritesDebugCopied;
 
   /// No description provided for @favoritesDebugFilterReason.
@@ -2126,14 +2126,68 @@ abstract class AppLocalizations {
   /// No description provided for @favoritesDebugLoadFailed.
   ///
   /// In en, this message translates to:
-  /// **'Failed to load debug information: {error}'**
+  /// **'Failed to load network logs: {error}'**
   String favoritesDebugLoadFailed(Object error);
 
   /// No description provided for @favoritesDebugFullFetchButton.
   ///
   /// In en, this message translates to:
-  /// **'Run full fetch manually (slow)'**
+  /// **'Run full network fetch manually (slow)'**
   String get favoritesDebugFullFetchButton;
+
+  /// No description provided for @logsNetworkTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Network logs'**
+  String get logsNetworkTitle;
+
+  /// No description provided for @logsApplicationTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Application logs'**
+  String get logsApplicationTitle;
+
+  /// No description provided for @logsApplicationCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Application logs copied'**
+  String get logsApplicationCopied;
+
+  /// No description provided for @logsApplicationRefreshTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh application logs'**
+  String get logsApplicationRefreshTooltip;
+
+  /// No description provided for @logsApplicationLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load application logs: {error}'**
+  String logsApplicationLoadFailed(Object error);
+
+  /// No description provided for @logsApplicationEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No application logs yet'**
+  String get logsApplicationEmpty;
+
+  /// No description provided for @logsApplicationExportTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Export logs'**
+  String get logsApplicationExportTooltip;
+
+  /// No description provided for @logsApplicationExportSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Log file exported'**
+  String get logsApplicationExportSuccess;
+
+  /// No description provided for @logsApplicationExportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to export log file: {error}'**
+  String logsApplicationExportFailed(Object error);
 
   /// No description provided for @tagCategoryLoadTimeout.
   ///
@@ -2444,13 +2498,13 @@ abstract class AppLocalizations {
   /// No description provided for @advancedDebugTitle.
   ///
   /// In en, this message translates to:
-  /// **'Debug'**
+  /// **'Logs'**
   String get advancedDebugTitle;
 
   /// No description provided for @advancedDebugSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Logs'**
+  /// **'Network logs and application logs'**
   String get advancedDebugSubtitle;
 
   /// No description provided for @advancedComicIdSearchTitle.

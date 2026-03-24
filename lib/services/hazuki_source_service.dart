@@ -98,6 +98,7 @@ class HazukiSourceService {
   bool _isWarmingUpFavoritesDebug = false;
   bool _isRefreshingSource = false;
   final List<Map<String, dynamic>> _recentNetworkLogs = [];
+  final List<Map<String, dynamic>> _recentApplicationLogs = [];
   int _networkLogDedupedCount = 0;
   Map<String, dynamic>? _lastLoginDebugInfo;
   Map<String, dynamic>? _lastSourceVersionDebugInfo;
@@ -511,6 +512,12 @@ class HazukiSourceService {
         result = Platform.operatingSystem;
         break;
       case 'log':
+        addApplicationLog(
+          level: map['level']?.toString() ?? 'info',
+          title: map['title']?.toString() ?? 'Application',
+          content: map['content'],
+          source: 'js_console',
+        );
         result = null;
         break;
       default:

@@ -695,115 +695,378 @@ class _HazukiAppState extends State<HazukiApp>
       barrierDismissible: false,
       child: StatefulBuilder(
         builder: (dialogContext, setDialogState) {
-          return AlertDialog(
-            title: Text(l10n(dialogContext).sourceUpdateAvailableTitle),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  l10n(
-                    dialogContext,
-                  ).sourceUpdateLocalVersion(check.localVersion),
+          final strings = l10n(dialogContext);
+          final theme = Theme.of(dialogContext);
+          final colorScheme = theme.colorScheme;
+          final textTheme = theme.textTheme;
+
+          Widget buildVersionCard({
+            required IconData icon,
+            required Color accent,
+            required String text,
+          }) {
+            return Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerHighest.withValues(
+                  alpha: 0.52,
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  l10n(
-                    dialogContext,
-                  ).sourceUpdateRemoteVersion(check.remoteVersion),
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(
+                  color: accent.withValues(alpha: 0.20),
                 ),
-                if (downloading) ...[
-                  const SizedBox(height: 16),
-                  LinearProgressIndicator(
-                    value: indeterminate ? null : progress,
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: accent.withValues(alpha: 0.14),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Icon(icon, color: accent, size: 20),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    indeterminate
-                        ? l10n(dialogContext).sourceUpdateDownloading
-                        : l10n(dialogContext).sourceUpdateDownloadingProgress(
-                            (progress * 100).toStringAsFixed(0),
-                          ),
-                  ),
-                ],
-                if (errorText != null) ...[
-                  const SizedBox(height: 10),
-                  Text(
-                    errorText!,
-                    style: TextStyle(
-                      color: Theme.of(dialogContext).colorScheme.error,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      text,
+                      style: textTheme.bodyMedium?.copyWith(
+                        height: 1.35,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ],
-              ],
+              ),
+            );
+          }
+
+          return Dialog(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            insetPadding: const EdgeInsets.symmetric(horizontal: 24),
+            clipBehavior: Clip.antiAlias,
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 388),
+              decoration: BoxDecoration(
+                color: colorScheme.surface.withValues(alpha: 0.96),
+                borderRadius: BorderRadius.circular(30),
+                border: Border.all(
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.28),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.18),
+                    blurRadius: 28,
+                    offset: const Offset(0, 16),
+                  ),
+                ],
+              ),
+              child: AnimatedSize(
+                duration: const Duration(milliseconds: 320),
+                curve: Curves.easeOutCubic,
+                alignment: Alignment.topCenter,
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 56,
+                            height: 56,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  colorScheme.primary,
+                                  colorScheme.tertiary,
+                                ],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Icon(
+                              Icons.system_update_alt_rounded,
+                              color: colorScheme.onPrimary,
+                              size: 28,
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  strings.sourceUpdateAvailableTitle,
+                                  style: textTheme.titleLarge?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    height: 1.15,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 6,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.primaryContainer
+                                        .withValues(alpha: 0.82),
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                  child: Text(
+                                    strings.sourceUpdateRemoteVersion(
+                                      check.remoteVersion,
+                                    ),
+                                    style: textTheme.labelMedium?.copyWith(
+                                      color: colorScheme.onPrimaryContainer,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              colorScheme.primaryContainer.withValues(
+                                alpha: 0.84,
+                              ),
+                              colorScheme.secondaryContainer.withValues(
+                                alpha: 0.72,
+                              ),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(26),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            buildVersionCard(
+                              icon: Icons.history_rounded,
+                              accent: colorScheme.onSurfaceVariant,
+                              text: strings.sourceUpdateLocalVersion(
+                                check.localVersion,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            buildVersionCard(
+                              icon: Icons.auto_awesome_rounded,
+                              accent: colorScheme.primary,
+                              text: strings.sourceUpdateRemoteVersion(
+                                check.remoteVersion,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 220),
+                        switchInCurve: Curves.easeOutCubic,
+                        switchOutCurve: Curves.easeInCubic,
+                        child: errorText == null
+                            ? const SizedBox.shrink(
+                                key: ValueKey<String>('source-update-error-empty'),
+                              )
+                            : Padding(
+                                key: const ValueKey<String>(
+                                  'source-update-error-visible',
+                                ),
+                                padding: const EdgeInsets.only(top: 12),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                    vertical: 12,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.errorContainer
+                                        .withValues(alpha: 0.78),
+                                    borderRadius: BorderRadius.circular(18),
+                                  ),
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Icon(
+                                        Icons.error_outline_rounded,
+                                        color: colorScheme.onErrorContainer,
+                                        size: 20,
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Text(
+                                          errorText!,
+                                          style: textTheme.bodyMedium?.copyWith(
+                                            color: colorScheme.onErrorContainer,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                      ),
+                      const SizedBox(height: 18),
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 220),
+                        switchInCurve: Curves.easeOutCubic,
+                        switchOutCurve: Curves.easeInCubic,
+                        child: downloading
+                            ? Container(
+                                key: const ValueKey<String>(
+                                  'source-update-downloading',
+                                ),
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: colorScheme.surfaceContainerHighest
+                                      .withValues(alpha: 0.52),
+                                  borderRadius: BorderRadius.circular(22),
+                                ),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Icon(
+                                          Icons.downloading_rounded,
+                                          color: colorScheme.primary,
+                                          size: 20,
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: Text(
+                                            indeterminate
+                                                ? strings
+                                                      .sourceUpdateDownloading
+                                                : strings
+                                                      .sourceUpdateDownloadingProgress(
+                                                        (
+                                                          progress * 100
+                                                        ).toStringAsFixed(0),
+                                                      ),
+                                            style: textTheme.titleMedium
+                                                ?.copyWith(
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 14),
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(999),
+                                      child: LinearProgressIndicator(
+                                        minHeight: 8,
+                                        value: indeterminate ? null : progress,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              )
+                            : Column(
+                                key: const ValueKey<String>(
+                                  'source-update-actions',
+                                ),
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  FilledButton.icon(
+                                    style: FilledButton.styleFrom(
+                                      minimumSize: const Size.fromHeight(52),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(18),
+                                      ),
+                                    ),
+                                    onPressed: () async {
+                                      setDialogState(() {
+                                        downloading = true;
+                                        errorText = null;
+                                        progress = 0;
+                                        indeterminate = true;
+                                      });
+
+                                      final ok = await HazukiSourceService.instance
+                                          .downloadJmSourceAndReload(
+                                            onProgress: (received, total) {
+                                              if (!dialogContext.mounted) {
+                                                return;
+                                              }
+                                              setDialogState(() {
+                                                if (total > 0) {
+                                                  indeterminate = false;
+                                                  progress = (received / total)
+                                                      .clamp(0.0, 1.0);
+                                                } else {
+                                                  indeterminate = true;
+                                                }
+                                              });
+                                            },
+                                          );
+
+                                      if (!dialogContext.mounted) {
+                                        return;
+                                      }
+                                      if (ok) {
+                                        Navigator.of(dialogContext).pop(
+                                          _SourceUpdateDialogAction.downloaded,
+                                        );
+                                      } else {
+                                        setDialogState(() {
+                                          downloading = false;
+                                          errorText = strings
+                                              .sourceUpdateDownloadFailed;
+                                        });
+                                      }
+                                    },
+                                    icon: const Icon(Icons.download_rounded),
+                                    label: Text(strings.sourceUpdateDownload),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Wrap(
+                                    alignment: WrapAlignment.end,
+                                    spacing: 6,
+                                    runSpacing: 6,
+                                    children: [
+                                      TextButton(
+                                        onPressed: () => Navigator.of(
+                                          dialogContext,
+                                        ).pop(_SourceUpdateDialogAction.skipToday),
+                                        child: Text(
+                                          strings.comicDetailRemindLaterToday,
+                                        ),
+                                      ),
+                                      TextButton(
+                                        onPressed: () => Navigator.of(
+                                          dialogContext,
+                                        ).pop(_SourceUpdateDialogAction.cancel),
+                                        child: Text(strings.commonCancel),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
-            actions: [
-              TextButton(
-                onPressed: downloading
-                    ? null
-                    : () => Navigator.of(
-                        dialogContext,
-                      ).pop(_SourceUpdateDialogAction.skipToday),
-                child: Text(l10n(dialogContext).comicDetailRemindLaterToday),
-              ),
-              TextButton(
-                onPressed: downloading
-                    ? null
-                    : () => Navigator.of(
-                        dialogContext,
-                      ).pop(_SourceUpdateDialogAction.cancel),
-                child: Text(l10n(dialogContext).commonCancel),
-              ),
-              FilledButton(
-                onPressed: downloading
-                    ? null
-                    : () async {
-                        setDialogState(() {
-                          downloading = true;
-                          errorText = null;
-                          progress = 0;
-                          indeterminate = true;
-                        });
-
-                        final ok = await HazukiSourceService.instance
-                            .downloadJmSourceAndReload(
-                              onProgress: (received, total) {
-                                if (!dialogContext.mounted) {
-                                  return;
-                                }
-                                setDialogState(() {
-                                  if (total > 0) {
-                                    indeterminate = false;
-                                    progress = (received / total).clamp(
-                                      0.0,
-                                      1.0,
-                                    );
-                                  } else {
-                                    indeterminate = true;
-                                  }
-                                });
-                              },
-                            );
-
-                        if (!dialogContext.mounted) {
-                          return;
-                        }
-                        if (ok) {
-                          Navigator.of(
-                            dialogContext,
-                          ).pop(_SourceUpdateDialogAction.downloaded);
-                        } else {
-                          setDialogState(() {
-                            downloading = false;
-                            errorText = l10n(
-                              dialogContext,
-                            ).sourceUpdateDownloadFailed;
-                          });
-                        }
-                      },
-                child: Text(l10n(dialogContext).sourceUpdateDownload),
-              ),
-            ],
           );
         },
       ),
