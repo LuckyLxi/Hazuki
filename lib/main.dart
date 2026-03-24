@@ -299,6 +299,7 @@ class _HazukiAppState extends State<HazukiApp>
   static const _localeKey = 'app_locale';
 
   final Connectivity _connectivity = Connectivity();
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   bool _hasConnectivity = true;
   bool _isCheckingSourceUpdate = false;
@@ -626,8 +627,14 @@ class _HazukiAppState extends State<HazukiApp>
     required Widget child,
     bool barrierDismissible = true,
   }) {
+    final dialogContext =
+        _navigatorKey.currentState?.overlay?.context ??
+        _navigatorKey.currentContext;
+    if (dialogContext == null) {
+      return Future<T?>.value(null);
+    }
     return showGeneralDialog<T>(
-      context: context,
+      context: dialogContext,
       barrierDismissible: barrierDismissible,
       barrierLabel: 'source-update-dialog',
       barrierColor: Colors.black45,
@@ -867,6 +874,7 @@ class _HazukiAppState extends State<HazukiApp>
     return DynamicColorBuilder(
       builder: (lightDynamic, darkDynamic) {
         return MaterialApp(
+          navigatorKey: _navigatorKey,
           debugShowCheckedModeBanner: false,
           onGenerateTitle: (context) => l10n(context).appTitle,
           locale: _locale,

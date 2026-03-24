@@ -84,13 +84,11 @@ class _ReaderPageState extends State<ReaderPage>
   bool _longPressToSave = false;
   // 缩放控制器与当前缩放状态
   final TransformationController _zoomController = TransformationController();
-  final Map<String, TransformationController> _listZoomControllers =
-      <String, TransformationController>{};
-  final Map<String, VoidCallback> _listZoomListeners =
-      <String, VoidCallback>{};
   bool _isZoomed = false;
-  String? _zoomedListImageUrl;
-  bool _rtlZoomInteracting = false;
+  bool _zoomInteracting = false;
+  int _activePointerCount = 0;
+  bool get _zoomGestureActive =>
+      _pinchToZoom && (_isZoomed || _zoomInteracting || _activePointerCount > 1);
   // 还原动画控制器
   late final AnimationController _resetAnimController;
 
@@ -113,7 +111,7 @@ class _ReaderPageState extends State<ReaderPage>
         .where((e) => e.trim().isNotEmpty)
         .toList();
     if (initialImages.isNotEmpty) {
-      _disposeListZoomControllers();
+      _zoomController.value = Matrix4.identity();
       _imageAspectRatioCache.clear();
       _images = initialImages;
       _itemKeys.clear();
@@ -121,6 +119,8 @@ class _ReaderPageState extends State<ReaderPage>
       _rebuildImageIndexMap();
       _loadingImages = false;
       _isZoomed = false;
+      _zoomInteracting = false;
+      _activePointerCount = 0;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _prefetchAround(0);
         unawaited(_prefetchAheadFrom(0));
@@ -136,7 +136,6 @@ class _ReaderPageState extends State<ReaderPage>
     _scrollController.removeListener(_onScrollPrefetch);
     _scrollController.dispose();
     _pageController.dispose();
-    _disposeListZoomControllers();
     _zoomController.removeListener(_onZoomChanged);
     _zoomController.dispose();
     _resetAnimController.dispose();
@@ -153,12 +152,9 @@ class _ReaderPageState extends State<ReaderPage>
 
   /// 监听缩放矩阵变化，更新 _isZoomed 状态以控制还原按钮可见性
   void _onZoomChanged() {
-    if (_readerMode != _ReaderMode.rightToLeft) {
-      return;
-    }
     final scale = _zoomController.value.getMaxScaleOnAxis();
     final zoomed = scale > 1.05;
-    if (_rtlZoomInteracting) {
+    if (_zoomInteracting) {
       _isZoomed = zoomed;
       return;
     }
@@ -176,62 +172,86 @@ class _ReaderPageState extends State<ReaderPage>
     setState(() {});
   }
 
-  void _disposeListZoomControllers() {
-    for (final entry in _listZoomListeners.entries) {
-      _listZoomControllers[entry.key]?.removeListener(entry.value);
+  void _handleReaderPointerDown(PointerDownEvent _) {
+    final previousCount = _activePointerCount;
+    _activePointerCount = previousCount + 1;
+    if (!_pinchToZoom || previousCount > 1 || _activePointerCount <= 1 || !mounted) {
+      return;
     }
-    for (final controller in _listZoomControllers.values) {
-      controller.dispose();
-    }
-    _listZoomListeners.clear();
-    _listZoomControllers.clear();
-    _zoomedListImageUrl = null;
+    setState(() {
+      _zoomInteracting = true;
+    });
   }
 
-  TransformationController _listZoomControllerFor(String url) {
-    final existing = _listZoomControllers[url];
-    if (existing != null) {
-      return existing;
+  void _handleReaderPointerEnd(PointerEvent _) {
+    final previousCount = _activePointerCount;
+    _activePointerCount = math.max(0, previousCount - 1);
+    if (!_pinchToZoom || previousCount <= 1 || _activePointerCount > 1) {
+      return;
     }
-
-    final controller = TransformationController();
-    void listener() {
-      if (!mounted || _readerMode != _ReaderMode.topToBottom) {
-        return;
+    final zoomed = _zoomController.value.getMaxScaleOnAxis() > 1.05;
+    if (!mounted) {
+      _zoomInteracting = false;
+      _isZoomed = zoomed;
+      if (!zoomed) {
+        _zoomController.value = Matrix4.identity();
       }
-      final zoomed = controller.value.getMaxScaleOnAxis() > 1.05;
-      final isActive = _zoomedListImageUrl == url;
-      if (zoomed) {
-        if (!isActive || !_isZoomed) {
-          setState(() {
-            _zoomedListImageUrl = url;
-            _isZoomed = true;
-          });
-        }
-      } else if (isActive && _isZoomed) {
-        setState(() {
-          _zoomedListImageUrl = null;
-          _isZoomed = false;
-        });
-      }
+      return;
     }
+    setState(() {
+      _zoomInteracting = false;
+      _isZoomed = zoomed;
+    });
+    if (!zoomed) {
+      _zoomController.value = Matrix4.identity();
+    }
+  }
 
-    controller.addListener(listener);
-    _listZoomControllers[url] = controller;
-    _listZoomListeners[url] = listener;
-    return controller;
+  void _handleZoomInteractionStart(ScaleStartDetails _) {
+    if (!mounted) {
+      _zoomInteracting = true;
+      return;
+    }
+    setState(() {
+      _zoomInteracting = true;
+    });
+  }
+
+  void _handleZoomInteractionUpdate(ScaleUpdateDetails _) {
+    final zoomed = _zoomController.value.getMaxScaleOnAxis() > 1.05;
+    if (!mounted) {
+      _isZoomed = zoomed;
+      return;
+    }
+    if (zoomed != _isZoomed) {
+      setState(() {
+        _isZoomed = zoomed;
+      });
+    }
+  }
+
+  void _handleZoomInteractionEnd(ScaleEndDetails _) {
+    final zoomed = _zoomController.value.getMaxScaleOnAxis() > 1.05;
+    if (!mounted) {
+      _zoomInteracting = _activePointerCount > 1;
+      _isZoomed = zoomed;
+      if (!zoomed) {
+        _zoomController.value = Matrix4.identity();
+      }
+      return;
+    }
+    setState(() {
+      _zoomInteracting = _activePointerCount > 1;
+      _isZoomed = zoomed;
+    });
+    if (!zoomed) {
+      _zoomController.value = Matrix4.identity();
+    }
   }
 
   /// 平滑动画将缩放矩阵还原为原始大小
   void _resetZoom() {
-    final controller = _readerMode == _ReaderMode.topToBottom
-        ? (_zoomedListImageUrl == null
-              ? null
-              : _listZoomControllers[_zoomedListImageUrl!])
-        : _zoomController;
-    if (controller == null) {
-      return;
-    }
+    final controller = _zoomController;
 
     // 从当前矩阵插值到单位矩阵（即原始 1:1 大小）
     final Matrix4 start = controller.value.clone();
@@ -256,21 +276,23 @@ class _ReaderPageState extends State<ReaderPage>
       anim.removeListener(listener);
       // 精确归零，防止浮点误差
       controller.value = Matrix4.identity();
+      if (!mounted) {
+        _isZoomed = false;
+        _zoomInteracting = false;
+        return;
+      }
+      setState(() {
+        _isZoomed = false;
+        _zoomInteracting = false;
+      });
     });
   }
 
   void _resetZoomImmediately() {
     _resetAnimController.stop();
-    if (_readerMode == _ReaderMode.topToBottom) {
-      final url = _zoomedListImageUrl;
-      if (url != null) {
-        _listZoomControllers[url]?.value = Matrix4.identity();
-      }
-      _zoomedListImageUrl = null;
-    } else {
-      _zoomController.value = Matrix4.identity();
-      _rtlZoomInteracting = false;
-    }
+    _zoomController.value = Matrix4.identity();
+    _zoomInteracting = false;
+    _activePointerCount = 0;
     _isZoomed = false;
   }
 
@@ -282,52 +304,38 @@ class _ReaderPageState extends State<ReaderPage>
     }
     return InteractiveViewer(
       transformationController: _zoomController,
-      panEnabled: _isZoomed,
+      panEnabled: _isZoomed || _zoomInteracting,
       scaleEnabled: true,
       panAxis: PanAxis.free,
-      boundaryMargin: EdgeInsets.zero,
+      boundaryMargin: const EdgeInsets.all(48),
       constrained: true,
       clipBehavior: Clip.hardEdge,
       minScale: 1.0,
       maxScale: 5.0,
-      onInteractionStart: (_) {
-        _rtlZoomInteracting = true;
-      },
-      onInteractionEnd: (_) {
-        if (!mounted) {
-          _rtlZoomInteracting = false;
-          return;
-        }
-        final zoomed = _zoomController.value.getMaxScaleOnAxis() > 1.05;
-        setState(() {
-          _rtlZoomInteracting = false;
-          _isZoomed = zoomed;
-        });
-        if (!zoomed) {
-          _zoomController.value = Matrix4.identity();
-        }
-      },
+      onInteractionStart: _handleZoomInteractionStart,
+      onInteractionUpdate: _handleZoomInteractionUpdate,
+      onInteractionEnd: _handleZoomInteractionEnd,
       child: child,
     );
   }
 
-  Widget _wrapListImageWithPinchZoom({
-    required String url,
-    required Widget child,
-  }) {
+  Widget _wrapListViewWithPinchZoom(Widget child) {
     if (!_pinchToZoom || _readerMode != _ReaderMode.topToBottom) {
       return child;
     }
     return InteractiveViewer(
-      transformationController: _listZoomControllerFor(url),
-      panEnabled: _zoomedListImageUrl == url && _isZoomed,
+      transformationController: _zoomController,
+      panEnabled: _isZoomed || _zoomInteracting,
       scaleEnabled: true,
       panAxis: PanAxis.free,
-      boundaryMargin: EdgeInsets.zero,
+      boundaryMargin: const EdgeInsets.all(48),
       constrained: true,
       clipBehavior: Clip.hardEdge,
       minScale: 1.0,
       maxScale: 5.0,
+      onInteractionStart: _handleZoomInteractionStart,
+      onInteractionUpdate: _handleZoomInteractionUpdate,
+      onInteractionEnd: _handleZoomInteractionEnd,
       child: child,
     );
   }
@@ -568,7 +576,7 @@ class _ReaderPageState extends State<ReaderPage>
         return;
       }
       setState(() {
-        _disposeListZoomControllers();
+        _zoomController.value = Matrix4.identity();
         _imageAspectRatioCache.clear();
         _images = images.where((e) => e.trim().isNotEmpty).toList();
         _itemKeys.clear();
@@ -578,6 +586,8 @@ class _ReaderPageState extends State<ReaderPage>
         _loadImagesError = null;
         _currentPageIndex = 0;
         _isZoomed = false;
+        _zoomInteracting = false;
+        _activePointerCount = 0;
       });
       _pageIndexNotifier.value = 0;
       if (!_noImageModeEnabled) {
@@ -833,7 +843,7 @@ class _ReaderPageState extends State<ReaderPage>
       padding: EdgeInsets.zero,
       itemCount: _images.length,
       controller: _scrollController,
-      physics: (_pinchToZoom && _isZoomed)
+      physics: _zoomGestureActive
           ? const NeverScrollableScrollPhysics()
           : const _ReaderScrollPhysics(),
       itemBuilder: (context, index) {
@@ -851,30 +861,27 @@ class _ReaderPageState extends State<ReaderPage>
 
         Widget buildImage(ImageProvider provider) {
           return _wrapImageWidget(
-            _wrapListImageWithPinchZoom(
-              url: url,
-              child: Image(
-                key: ValueKey(url),
-                image: provider,
-                fit: BoxFit.fitWidth,
-                width: double.infinity,
-                filterQuality: FilterQuality.medium,
-                gaplessPlayback: true,
-                frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-                  if (wasSynchronouslyLoaded || frame != null) {
-                    return child;
-                  }
-                  return const ColoredBox(color: Colors.black);
-                },
-                errorBuilder: (_, _, _) {
-                  return Container(
-                    height: 120,
-                    color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                    alignment: Alignment.center,
-                    child: const Icon(Icons.broken_image_outlined),
-                  );
-                },
-              ),
+            Image(
+              key: ValueKey(url),
+              image: provider,
+              fit: BoxFit.fitWidth,
+              width: double.infinity,
+              filterQuality: FilterQuality.medium,
+              gaplessPlayback: true,
+              frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+                if (wasSynchronouslyLoaded || frame != null) {
+                  return child;
+                }
+                return const ColoredBox(color: Colors.black);
+              },
+              errorBuilder: (_, _, _) {
+                return Container(
+                  height: 120,
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  alignment: Alignment.center,
+                  child: const Icon(Icons.broken_image_outlined),
+                );
+              },
             ),
             url,
           );
@@ -926,7 +933,7 @@ class _ReaderPageState extends State<ReaderPage>
       reverse: false,
       allowImplicitScrolling: true,
       itemCount: _images.length,
-      physics: (_pinchToZoom && (_isZoomed || _rtlZoomInteracting))
+      physics: _zoomGestureActive
           ? const NeverScrollableScrollPhysics()
           : const PageScrollPhysics(),
       onPageChanged: (index) {
@@ -1052,20 +1059,21 @@ class _ReaderPageState extends State<ReaderPage>
     final tapPagingEnabled =
         _readerMode == _ReaderMode.rightToLeft &&
         _tapToTurnPage &&
-        !(_pinchToZoom && (_isZoomed || _rtlZoomInteracting));
+        !_zoomGestureActive;
     if (!tapPagingEnabled) {
       return child;
     }
     return LayoutBuilder(
       builder: (context, constraints) {
+        final leftTriggerWidth = constraints.maxWidth * 0.25;
+        final rightTriggerStart = constraints.maxWidth * 0.75;
         return GestureDetector(
           behavior: HitTestBehavior.translucent,
           onTapUp: (details) {
-            final isLeftSide =
-                details.localPosition.dx <= constraints.maxWidth / 2;
-            if (isLeftSide) {
+            final dx = details.localPosition.dx;
+            if (dx <= leftTriggerWidth) {
               unawaited(_goToPreviousPage());
-            } else {
+            } else if (dx >= rightTriggerStart) {
               unawaited(_goToNextPage());
             }
           },
@@ -1160,10 +1168,16 @@ class _ReaderPageState extends State<ReaderPage>
           bottom: false,
           child: Stack(
             children: [
-              _wrapReaderTapPaging(
-                _readerMode == _ReaderMode.rightToLeft
-                    ? _buildReaderPageView()
-                    : _buildReaderListView(),
+              Listener(
+                behavior: HitTestBehavior.translucent,
+                onPointerDown: _handleReaderPointerDown,
+                onPointerUp: _handleReaderPointerEnd,
+                onPointerCancel: _handleReaderPointerEnd,
+                child: _wrapReaderTapPaging(
+                  _readerMode == _ReaderMode.rightToLeft
+                      ? _buildReaderPageView()
+                      : _wrapListViewWithPinchZoom(_buildReaderListView()),
+                ),
               ),
               Positioned(
                 left: 12,

@@ -27,6 +27,10 @@ extension HazukiSourceServiceImagePrepareCapability on HazukiSourceService {
   }
 
   int calculateJmImageSegments(String epId, String imageUrl) {
+    if ((_sourceMeta?.key ?? '').toLowerCase() != 'jm') {
+      return 0;
+    }
+
     const scrambleId = 220980;
     final id = int.tryParse(epId) ?? 0;
     if (id < scrambleId) {
@@ -36,14 +40,7 @@ extension HazukiSourceServiceImagePrepareCapability on HazukiSourceService {
       return 10;
     }
 
-    final uri = Uri.tryParse(imageUrl);
-    final last = uri?.pathSegments.isNotEmpty == true
-        ? uri!.pathSegments.last
-        : imageUrl.split('/').last;
-    final pictureName = last.endsWith('.webp')
-        ? last.substring(0, last.length - 5)
-        : last;
-
+    final pictureName = _extractJmPictureName(imageUrl);
     final digest = md5.convert(utf8.encode('$id$pictureName')).toString();
     final charCode = digest.codeUnitAt(digest.length - 1);
 
@@ -53,6 +50,53 @@ extension HazukiSourceServiceImagePrepareCapability on HazukiSourceService {
     }
     final remainder = charCode % 10;
     return remainder * 2 + 2;
+  }
+
+  String _extractJmPictureName(String imageUrl) {
+    final normalizedUrl = imageUrl.trim();
+    final slashIndex = normalizedUrl.lastIndexOf('/');
+    final lastSegment = slashIndex >= 0
+        ? normalizedUrl.substring(slashIndex + 1)
+        : normalizedUrl;
+    if (lastSegment.length > 5) {
+      return lastSegment.substring(0, lastSegment.length - 5);
+    }
+    final dotIndex = lastSegment.lastIndexOf('.');
+    if (dotIndex > 0) {
+      return lastSegment.substring(0, dotIndex);
+    }
+    return lastSegment;
+  }
+
+  Future<int?> _resolveSourceDeclaredImageSegments(
+    String imageUrl, {
+    required String comicId,
+    required String epId,
+  }) async {
+    try {
+      final engine = _engine;
+      if (engine == null) {
+        return null;
+      }
+      final dynamic configRaw = engine.evaluate(
+        'this.__hazuki_source.comic?.onImageLoad?.(${jsonEncode(imageUrl)}, ${jsonEncode(comicId)}, ${jsonEncode(epId)}) ?? {}',
+        name: 'source_on_image_prepare.js',
+      );
+      final dynamic config = await _awaitJsResult(configRaw);
+      if (config is! Map) {
+        return null;
+      }
+      final modifyImage = config['modifyImage']?.toString().trim() ?? '';
+      if (modifyImage.isEmpty) {
+        return 0;
+      }
+      final match = RegExp(
+        r'(?:const|let|var)\s+num\s*=\s*(\d+)\b',
+      ).firstMatch(modifyImage);
+      return int.tryParse(match?.group(1) ?? '');
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<PreparedChapterImageData> prepareChapterImageData(
@@ -66,8 +110,13 @@ extension HazukiSourceServiceImagePrepareCapability on HazukiSourceService {
       epId: epId,
       keepInMemory: false,
     );
-    final segments = calculateJmImageSegments(epId, imageUrl);
-    if (segments > 1 && !imageUrl.toLowerCase().endsWith('.gif')) {
+    final declaredSegments = await _resolveSourceDeclaredImageSegments(
+      imageUrl,
+      comicId: comicId,
+      epId: epId,
+    );
+    final segments = declaredSegments ?? calculateJmImageSegments(epId, imageUrl);
+    if (segments > 1 && _imageExtensionFromUrl(imageUrl) != 'gif') {
       final fixed = await _unscrambleJmImageBytes(rawBytes, segments);
       return PreparedChapterImageData(
         bytes: fixed,
