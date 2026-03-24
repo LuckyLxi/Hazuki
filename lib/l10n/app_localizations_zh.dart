@@ -700,7 +700,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String readingBrightnessLabel(Object value) {
     return '亮度 $value';
   }
-
+ 
+  @override
+  String get readingPageIndicatorTitle => '页数指示器';
+ 
+  @override
+  String get readingPageIndicatorSubtitle => '在阅读器左下角显示第几话与当前页数/总页数';
+ 
   @override
   String get readingPinchToZoomTitle => '双指缩放';
 
@@ -1336,7 +1342,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get readerCurrentChapterNoImages => '当前章节无图片';
-
+ 
+  @override
+  String readerPageIndicator(Object chapter, Object current, Object total) {
+    return '第$chapter话 $current/$total';
+  }
+ 
   @override
   String get readerResetZoom => '还原大小';
 

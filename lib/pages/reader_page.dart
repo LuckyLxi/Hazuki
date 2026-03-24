@@ -58,6 +58,7 @@ class _ReaderPageState extends State<ReaderPage>
   static const bool _defaultImmersiveMode = true;
   static const bool _defaultKeepScreenOn = true;
   static const bool _defaultCustomBrightness = false;
+  static const bool _defaultPageIndicator = false;
   static const double _defaultBrightnessValue = 0.5;
   static const int _prefetchAroundCount = 14;
   static const int _prefetchAheadCount = 12;
@@ -77,6 +78,8 @@ class _ReaderPageState extends State<ReaderPage>
   List<String> _images = const [];
   bool _loadingImages = true;
   String? _loadImagesError;
+  ComicDetailsData? _chapterDetailsCache;
+  bool _chapterPanelLoading = false;
   // 阅读设置
   bool _immersiveMode = _defaultImmersiveMode;
   bool _keepScreenOn = _defaultKeepScreenOn;
@@ -84,6 +87,7 @@ class _ReaderPageState extends State<ReaderPage>
   double _brightnessValue = _defaultBrightnessValue;
   _ReaderMode _readerMode = _ReaderMode.topToBottom;
   bool _tapToTurnPage = false;
+  bool _pageIndicator = _defaultPageIndicator;
   bool _pinchToZoom = false;
   bool _longPressToSave = false;
   // 缩放控制器与当前缩放状态
@@ -347,6 +351,8 @@ class _ReaderPageState extends State<ReaderPage>
         prefs.getBool('reader_keep_screen_on') ?? _defaultKeepScreenOn;
     final customBrightness =
         prefs.getBool('reader_custom_brightness') ?? _defaultCustomBrightness;
+    final pageIndicator =
+        prefs.getBool('reader_page_indicator') ?? _defaultPageIndicator;
     final brightnessValue =
         prefs.getDouble('reader_brightness_value') ?? _defaultBrightnessValue;
     final readerMode = _readerModeFromRaw(
@@ -357,6 +363,7 @@ class _ReaderPageState extends State<ReaderPage>
       _immersiveMode = immersiveMode;
       _keepScreenOn = keepScreenOn;
       _customBrightness = customBrightness;
+      _pageIndicator = pageIndicator;
       _brightnessValue = math.max(0.0, math.min(brightnessValue, 1.0));
       _readerMode = readerMode;
       _tapToTurnPage = prefs.getBool('reader_tap_to_turn_page') ?? false;
@@ -492,6 +499,13 @@ class _ReaderPageState extends State<ReaderPage>
     await _applyReaderDisplaySettings();
   }
 
+  Future<void> _togglePageIndicatorSetting(bool value) async {
+    setState(() {
+      _pageIndicator = value;
+    });
+    await _persistReaderBool('reader_page_indicator', value);
+  }
+
   Future<void> _togglePinchToZoomSetting(bool value) async {
     if (!value) {
       _resetZoomImmediately();
@@ -507,6 +521,96 @@ class _ReaderPageState extends State<ReaderPage>
       _longPressToSave = value;
     });
     await _persistReaderBool('reader_long_press_save', value);
+  }
+
+  Future<void> _openChaptersPanel() async {
+    if (_chapterPanelLoading) {
+      return;
+    }
+    setState(() {
+      _chapterPanelLoading = true;
+    });
+    try {
+      final details =
+          _chapterDetailsCache ??
+          await HazukiSourceService.instance.loadComicDetails(widget.comicId);
+      _chapterDetailsCache ??= details;
+      if (!mounted) {
+        return;
+      }
+      Navigator.of(context).push(
+        _SpringBottomSheetRoute(
+          builder: (routeContext) {
+            final themedData = widget.comicTheme ?? Theme.of(routeContext);
+            return Theme(
+              data: themedData,
+              child: _ChaptersPanelSheet(
+                details: details,
+                onDownloadConfirm: (_) {
+                  Navigator.of(routeContext).pop();
+                },
+                onChapterTap: (epId, chapterTitle, index) {
+                  unawaited(
+                    _handleChapterSelectedFromPanel(
+                      routeContext,
+                      epId,
+                      chapterTitle,
+                      index,
+                    ),
+                  );
+                },
+              ),
+            );
+          },
+        ),
+      );
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      unawaited(
+        showHazukiPrompt(
+          context,
+          l10n(context).readerChapterLoadFailed('$e'),
+          isError: true,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _chapterPanelLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _handleChapterSelectedFromPanel(
+    BuildContext routeContext,
+    String epId,
+    String chapterTitle,
+    int index,
+  ) async {
+    Navigator.of(routeContext).pop();
+    if (epId == widget.epId) {
+      return;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 280));
+    if (!mounted) {
+      return;
+    }
+    await Navigator.of(context).pushReplacement(
+      MaterialPageRoute<void>(
+        builder: (_) => ReaderPage(
+          title: widget.title,
+          chapterTitle: chapterTitle,
+          comicId: widget.comicId,
+          epId: epId,
+          chapterIndex: index,
+          images: const [],
+          comicTheme: widget.comicTheme,
+        ),
+      ),
+    );
   }
 
   void _syncReaderPositionAfterModeChange() {
@@ -1411,6 +1515,13 @@ class _ReaderPageState extends State<ReaderPage>
             ),
             const Divider(height: 1),
             SwitchListTile(
+              secondary: const Icon(Icons.format_list_numbered_outlined),
+              title: Text(strings.readingPageIndicatorTitle),
+              subtitle: Text(strings.readingPageIndicatorSubtitle),
+              value: _pageIndicator,
+              onChanged: _togglePageIndicatorSetting,
+            ),
+            SwitchListTile(
               secondary: const Icon(Icons.zoom_in_outlined),
               title: Text(strings.readingPinchToZoomTitle),
               subtitle: Text(strings.readingPinchToZoomSubtitle),
@@ -1488,6 +1599,67 @@ class _ReaderPageState extends State<ReaderPage>
                       ),
                     ],
                   ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildReaderPageIndicator(ThemeData readerTheme) {
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        child: IgnorePointer(
+          ignoring: true,
+          child: AnimatedSlide(
+            offset: _controlsVisible ? const Offset(0, 0.24) : Offset.zero,
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            child: AnimatedOpacity(
+              opacity: _controlsVisible ? 0.0 : 1.0,
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOutCubic,
+              child: Align(
+                alignment: Alignment.bottomLeft,
+                child: ValueListenableBuilder<int>(
+                  valueListenable: _pageIndexNotifier,
+                  builder: (context, pageIndex, _) {
+                    final strings = l10n(context);
+                    final chapter = math.max(1, widget.chapterIndex + 1);
+                    final current = math.max(
+                      1,
+                      math.min(pageIndex + 1, _images.length),
+                    );
+                    final total = math.max(_images.length, 1);
+                    return Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.64),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.12),
+                        ),
+                      ),
+                      child: Text(
+                        strings.readerPageIndicator(
+                          chapter.toString(),
+                          current.toString(),
+                          total.toString(),
+                        ),
+                        style: readerTheme.textTheme.labelMedium?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ),
             ),
@@ -1619,6 +1791,35 @@ class _ReaderPageState extends State<ReaderPage>
                               ),
                             ),
                           ),
+                          const SizedBox(width: 4),
+                          SizedBox(
+                            width: 36,
+                            height: 36,
+                            child: IconButton(
+                              tooltip: l10n(context).comicDetailChapters,
+                              padding: EdgeInsets.zero,
+                              visualDensity: VisualDensity.compact,
+                              onPressed: _chapterPanelLoading
+                                  ? null
+                                  : _openChaptersPanel,
+                              icon: _chapterPanelLoading
+                                  ? const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        valueColor: AlwaysStoppedAnimation<Color>(
+                                          Colors.white,
+                                        ),
+                                      ),
+                                    )
+                                  : const Icon(
+                                      Icons.menu_book_rounded,
+                                      color: Colors.white,
+                                      size: 18,
+                                    ),
+                            ),
+                          ),
                         ],
                       ),
                     );
@@ -1737,6 +1938,13 @@ class _ReaderPageState extends State<ReaderPage>
                 right: 0,
                 child: _buildReaderTopControls(readerTheme),
               ),
+              if (_pageIndicator)
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: _buildReaderPageIndicator(readerTheme),
+                ),
               Positioned(
                 left: 0,
                 right: 0,
@@ -1811,9 +2019,9 @@ class _ReaderPageState extends State<ReaderPage>
   }
 }
 
-/// 闃呰鍣ㄤ笓鐢ㄦ粴鍔ㄧ墿鐞嗗紩鎿庯細
-/// - 鍩轰簬 ClampingScrollPhysics锛屽埌椤?鍒板簳涓嶄細瓒婄晫鍥炲脊
-/// - 浣跨敤榛樿鐢╁姩閫熷害锛?000 px/s锛夛紝閬垮厤杩囧ぇ鎯€у鑷村揩閫熶笅鍒掓椂鍐插洖椤堕儴
+/// 阅读器专用滚动物理引擎：
+/// - 基于 ClampingScrollPhysics，到顶部/到底部不会越界回弹
+/// - 使用默认滑动速度（1000 px/s），避免过大惯性导致快速下滑时冲回顶部
 class _ReaderScrollPhysics extends ClampingScrollPhysics {
   const _ReaderScrollPhysics({super.parent});
 

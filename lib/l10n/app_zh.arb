@@ -363,6 +363,8 @@
       "value": {}
     }
   },
+  "readingPageIndicatorTitle": "页数指示器",
+  "readingPageIndicatorSubtitle": "在阅读器左下角显示第几话与当前页数/总页数",
   "readingPinchToZoomTitle": "双指缩放",
   "readingPinchToZoomSubtitle": "启用后可双指捏合对漫画图片进行放大查看",
   "readingLongPressSaveTitle": "长按保存图片",
@@ -760,6 +762,14 @@
     }
   },
   "readerCurrentChapterNoImages": "当前章节无图片",
+  "readerPageIndicator": "第{chapter}话 {current}/{total}",
+  "@readerPageIndicator": {
+    "placeholders": {
+      "chapter": {},
+      "current": {},
+      "total": {}
+    }
+  },
   "readerResetZoom": "还原大小",
   "advancedTitle": "高级",
   "advancedDebugTitle": "日志",

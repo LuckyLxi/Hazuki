@@ -1378,7 +1378,19 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Brightness {value}'**
   String readingBrightnessLabel(Object value);
-
+ 
+  /// No description provided for @readingPageIndicatorTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Page indicator'**
+  String get readingPageIndicatorTitle;
+ 
+  /// No description provided for @readingPageIndicatorSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Show the chapter number and current page/total pages in the lower-left corner of the reader'**
+  String get readingPageIndicatorSubtitle;
+ 
   /// No description provided for @readingPinchToZoomTitle.
   ///
   /// In en, this message translates to:
@@ -2482,7 +2494,13 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No images in the current chapter'**
   String get readerCurrentChapterNoImages;
-
+ 
+  /// No description provided for @readerPageIndicator.
+  ///
+  /// In en, this message translates to:
+  /// **'Chapter {chapter} {current}/{total}'**
+  String readerPageIndicator(Object chapter, Object current, Object total);
+ 
   /// No description provided for @readerResetZoom.
   ///
   /// In en, this message translates to:

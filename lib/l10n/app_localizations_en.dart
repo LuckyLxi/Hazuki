@@ -701,7 +701,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String readingBrightnessLabel(Object value) {
     return 'Brightness $value';
   }
-
+ 
+  @override
+  String get readingPageIndicatorTitle => 'Page indicator';
+ 
+  @override
+  String get readingPageIndicatorSubtitle =>
+      'Show the chapter number and current page/total pages in the lower-left corner of the reader';
+ 
   @override
   String get readingPinchToZoomTitle => 'Pinch to zoom';
 
@@ -1338,7 +1345,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get readerCurrentChapterNoImages => 'No images in the current chapter';
-
+ 
+  @override
+  String readerPageIndicator(Object chapter, Object current, Object total) {
+    return 'Chapter $chapter $current/$total';
+  }
+ 
   @override
   String get readerResetZoom => 'Reset zoom';
 

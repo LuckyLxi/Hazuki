@@ -363,6 +363,8 @@
       "value": {}
     }
   },
+  "readingPageIndicatorTitle": "Page indicator",
+  "readingPageIndicatorSubtitle": "Show the chapter number and current page/total pages in the lower-left corner of the reader",
   "readingPinchToZoomTitle": "Pinch to zoom",
   "readingPinchToZoomSubtitle": "Allow two-finger pinch gestures to zoom comic images",
   "readingLongPressSaveTitle": "Long press to save images",
@@ -760,6 +762,14 @@
     }
   },
   "readerCurrentChapterNoImages": "No images in the current chapter",
+  "readerPageIndicator": "Chapter {chapter} {current}/{total}",
+  "@readerPageIndicator": {
+    "placeholders": {
+      "chapter": {},
+      "current": {},
+      "total": {}
+    }
+  },
   "readerResetZoom": "Reset zoom",
   "advancedTitle": "Advanced",
   "advancedDebugTitle": "Logs",

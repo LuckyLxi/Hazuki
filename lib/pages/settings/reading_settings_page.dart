@@ -14,6 +14,7 @@ class _ReadingSettingsPageState extends State<ReadingSettingsPage> {
   bool _keepScreenOn = true;
   bool _customBrightness = false;
   double _brightnessValue = 0.5;
+  bool _pageIndicator = false;
   bool _pinchToZoom = false;
   bool _longPressToSave = false;
 
@@ -33,6 +34,7 @@ class _ReadingSettingsPageState extends State<ReadingSettingsPage> {
       _keepScreenOn = prefs.getBool('reader_keep_screen_on') ?? true;
       _customBrightness = prefs.getBool('reader_custom_brightness') ?? false;
       _brightnessValue = prefs.getDouble('reader_brightness_value') ?? 0.5;
+      _pageIndicator = prefs.getBool('reader_page_indicator') ?? false;
       _pinchToZoom = prefs.getBool('reader_pinch_to_zoom') ?? false;
       _longPressToSave = prefs.getBool('reader_long_press_save') ?? false;
     });
@@ -77,6 +79,12 @@ class _ReadingSettingsPageState extends State<ReadingSettingsPage> {
     setState(() => _brightnessValue = value);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setDouble('reader_brightness_value', value);
+  }
+
+  Future<void> _togglePageIndicator(bool value) async {
+    setState(() => _pageIndicator = value);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('reader_page_indicator', value);
   }
 
   Future<void> _togglePinchToZoom(bool value) async {
@@ -189,6 +197,13 @@ class _ReadingSettingsPageState extends State<ReadingSettingsPage> {
             ),
           ),
           const Divider(height: 1),
+          SwitchListTile(
+            secondary: const Icon(Icons.format_list_numbered_outlined),
+            title: Text(strings.readingPageIndicatorTitle),
+            subtitle: Text(strings.readingPageIndicatorSubtitle),
+            value: _pageIndicator,
+            onChanged: _togglePageIndicator,
+          ),
           SwitchListTile(
             secondary: const Icon(Icons.zoom_in_outlined),
             title: Text(strings.readingPinchToZoomTitle),

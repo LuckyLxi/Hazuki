@@ -331,18 +331,16 @@ class HazukiSourceService {
       return false;
     }
 
+    final downloadedVersion = _extractSourceVersion(jmScript);
     await jmFile.writeAsString(jmScript);
 
-    _lastReloginAt = null;
-    _favoritesDebugCache = null;
-    _exploreSectionsMemoryCache = null;
-    _exploreSectionsMemoryCachedAt = null;
-    _sourceMeta = null;
-
-    final result = await _loadSourceMetadata(initFile, jmFile);
-    _sourceMeta = result;
-    _statusText =
-        'source_reloaded|${result.name}|${result.key}|${result.version}';
+    _lastSourceVersionDebugInfo = {
+      'checkedAt': DateTime.now().toIso8601String(),
+      'resolvedFrom': 'downloaded_jm_script',
+      'remoteVersion': downloadedVersion,
+      'outcome': 'downloaded_waiting_for_restart',
+    };
+    _statusText = 'source_downloaded_waiting_for_restart|$downloadedVersion';
     return true;
   }
 
