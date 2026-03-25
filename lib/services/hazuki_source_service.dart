@@ -99,6 +99,7 @@ class HazukiSourceService {
   bool _isRefreshingSource = false;
   final List<Map<String, dynamic>> _recentNetworkLogs = [];
   final List<Map<String, dynamic>> _recentApplicationLogs = [];
+  final List<Map<String, dynamic>> _recentReaderLogs = [];
   int _networkLogDedupedCount = 0;
   Map<String, dynamic>? _lastLoginDebugInfo;
   Map<String, dynamic>? _lastSourceVersionDebugInfo;

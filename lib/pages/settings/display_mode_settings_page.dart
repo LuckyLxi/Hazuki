@@ -237,255 +237,121 @@ class _DisplayModeSettingsPageState extends State<DisplayModeSettingsPage> {
     return null;
   }
 
-  Map<String, dynamic>? _highestRefreshMode() {
-    final candidates = _modes.where((mode) => !_isAutoMode(mode)).toList();
-    if (candidates.isEmpty) {
-      return null;
-    }
-    candidates.sort((a, b) {
-      final rateCompare = _refreshRateOf(b).compareTo(_refreshRateOf(a));
-      if (rateCompare != 0) {
-        return rateCompare;
-      }
-      final aPixels = _intField(a, 'width') * _intField(a, 'height');
-      final bPixels = _intField(b, 'width') * _intField(b, 'height');
-      return bPixels.compareTo(aPixels);
-    });
-    return candidates.first;
+  Widget _buildSectionCard(BuildContext context, {required Widget child}) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.8),
+        ),
+      ),
+      child: child,
+    );
   }
 
-  Widget _buildSummaryTile(
+  Widget _buildInfoRow(
     BuildContext context, {
-    required IconData icon,
     required String label,
     required String value,
   }) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: colorScheme.surface.withValues(alpha: 0.72),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.62),
-        ),
-      ),
-      child: Column(
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(icon, size: 16, color: colorScheme.primary),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelMedium?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w700,
+          Expanded(
+            child: Text(
+              label,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurface,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOverviewCard(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final strings = l10n(context);
+
+    return _buildSectionCard(
+      context,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    strings.displayRefreshRateTitle,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: colorScheme.onSurface,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.titleSmall?.copyWith(
-              color: colorScheme.onSurface,
-              fontWeight: FontWeight.w800,
-              height: 1.2,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMetricChip(
-    BuildContext context, {
-    required IconData icon,
-    required String label,
-  }) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: colorScheme.primaryContainer.withValues(alpha: 0.72),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: colorScheme.onPrimaryContainer),
-          const SizedBox(width: 5),
-          Text(
-            label,
-            style: theme.textTheme.labelMedium?.copyWith(
-              color: colorScheme.onPrimaryContainer,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHeroCard(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final highest = _highestRefreshMode();
-    final highestRefreshLabel = highest == null
-        ? null
-        : _formatRefreshRate(_refreshRateOf(highest));
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.56),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.60),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer.withValues(alpha: 0.88),
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(
-                  Icons.bolt_rounded,
-                  size: 20,
-                  color: colorScheme.onPrimaryContainer,
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      l10n(context).displayRefreshRateTitle,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        color: colorScheme.onSurface,
-                        fontWeight: FontWeight.w800,
-                      ),
+                if (_applying)
+                  SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: colorScheme.primary,
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      l10n(context).displayModeHint,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                        height: 1.35,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 12),
-              if (_applying)
-                SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.2,
-                    color: colorScheme.primary,
                   ),
-                )
-              else if (highestRefreshLabel != null)
-                _buildMetricChip(
-                  context,
-                  icon: Icons.flash_on_rounded,
-                  label: highestRefreshLabel,
-                ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              Expanded(
-                child: _buildSummaryTile(
-                  context,
-                  icon: Icons.radio_button_checked_rounded,
-                  label: l10n(context).displayModeCurrentSubtitle,
-                  value: _activeModeLabel(context),
-                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              strings.displayModeHint,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                height: 1.4,
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _buildSummaryTile(
-                  context,
-                  icon: Icons.check_circle_outline_rounded,
-                  label: l10n(context).displayModeSelectedSubtitle,
-                  value: _selectedModeLabel(context),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildModeBadge(
-    BuildContext context, {
-    required IconData icon,
-    required String label,
-    bool emphasized = false,
-  }) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final foreground = emphasized
-        ? colorScheme.primary
-        : colorScheme.onSurfaceVariant;
-    final background = emphasized
-        ? colorScheme.primaryContainer.withValues(alpha: 0.60)
-        : colorScheme.surfaceContainerHighest.withValues(alpha: 0.72);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: emphasized
-              ? colorScheme.primary.withValues(alpha: 0.20)
-              : colorScheme.outlineVariant.withValues(alpha: 0.48),
+            ),
+            const SizedBox(height: 12),
+            Divider(
+              height: 1,
+              color: colorScheme.outlineVariant.withValues(alpha: 0.7),
+            ),
+            const SizedBox(height: 12),
+            _buildInfoRow(
+              context,
+              label: strings.displayModeCurrentSubtitle,
+              value: _activeModeLabel(context),
+            ),
+            _buildInfoRow(
+              context,
+              label: strings.displayModeSelectedSubtitle,
+              value: _selectedModeLabel(context),
+            ),
+          ],
         ),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: foreground),
-          const SizedBox(width: 5),
-          Text(
-            label,
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: foreground,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
     );
   }
 
-  Widget _buildSelectionIndicator(
+  Widget _buildSelectionIcon(
     BuildContext context, {
     required bool selected,
     required bool active,
@@ -494,47 +360,30 @@ class _DisplayModeSettingsPageState extends State<DisplayModeSettingsPage> {
     final colorScheme = Theme.of(context).colorScheme;
     if (busy) {
       return SizedBox(
-        width: 24,
-        height: 24,
+        width: 20,
+        height: 20,
         child: CircularProgressIndicator(
-          strokeWidth: 2.2,
+          strokeWidth: 2,
           color: colorScheme.primary,
         ),
       );
     }
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 180),
-      width: 24,
-      height: 24,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: selected ? colorScheme.primary : Colors.transparent,
-        border: Border.all(
-          color: selected
-              ? colorScheme.primary
-              : active
-              ? colorScheme.secondary
-              : colorScheme.outlineVariant,
-          width: 1.4,
-        ),
-      ),
-      child: Icon(
-        selected
-            ? Icons.check_rounded
-            : active
-            ? Icons.radio_button_checked_rounded
-            : Icons.circle_outlined,
-        size: 14,
-        color: selected
-            ? colorScheme.onPrimary
-            : active
-            ? colorScheme.secondary
-            : colorScheme.outline,
-      ),
+    return Icon(
+      selected
+          ? Icons.check_circle_rounded
+          : active
+          ? Icons.radio_button_checked_rounded
+          : Icons.radio_button_unchecked_rounded,
+      color: selected
+          ? colorScheme.primary
+          : active
+          ? colorScheme.secondary
+          : colorScheme.outline,
+      size: 22,
     );
   }
 
-  Widget _buildModeLeading(
+  Widget _buildModeRateBox(
     BuildContext context,
     Map<String, dynamic> mode, {
     required bool selected,
@@ -543,50 +392,37 @@ class _DisplayModeSettingsPageState extends State<DisplayModeSettingsPage> {
     final colorScheme = theme.colorScheme;
     final refreshRate = _refreshRateOf(mode);
     final isAuto = _isAutoMode(mode);
-    final foreground = selected
-        ? colorScheme.primary
-        : colorScheme.onSurface.withValues(alpha: 0.86);
-    final background = selected
-        ? colorScheme.primaryContainer.withValues(alpha: 0.72)
-        : colorScheme.surfaceContainerHighest.withValues(alpha: 0.78);
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 180),
-      width: 56,
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 9),
+    return Container(
+      width: 60,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
       decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: selected
-              ? colorScheme.primary.withValues(alpha: 0.20)
-              : colorScheme.outlineVariant.withValues(alpha: 0.42),
-        ),
+        color: selected
+            ? colorScheme.primary.withValues(alpha: 0.10)
+            : colorScheme.surfaceContainerHighest.withValues(alpha: 0.7),
+        borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (isAuto)
-            Icon(Icons.auto_awesome_rounded, color: foreground, size: 18)
-          else
-            Text(
-              refreshRate > 0 ? _compactRefreshRate(refreshRate) : '--',
-              maxLines: 1,
-              overflow: TextOverflow.fade,
-              style: theme.textTheme.titleMedium?.copyWith(
-                color: foreground,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.3,
-              ),
-            ),
-          const SizedBox(height: 4),
           Text(
-            isAuto ? 'Auto' : 'Hz',
+            isAuto
+                ? 'Auto'
+                : (refreshRate > 0 ? _compactRefreshRate(refreshRate) : '--'),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.titleSmall?.copyWith(
+              color: selected ? colorScheme.primary : colorScheme.onSurface,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            isAuto ? '' : 'Hz',
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: theme.textTheme.labelSmall?.copyWith(
-              color: foreground.withValues(alpha: 0.82),
-              fontWeight: FontWeight.w700,
+              color: colorScheme.onSurfaceVariant,
             ),
           ),
         ],
@@ -600,118 +436,71 @@ class _DisplayModeSettingsPageState extends State<DisplayModeSettingsPage> {
     final colorScheme = theme.colorScheme;
     final raw = mode['raw']?.toString() ?? 'native:auto';
     final details = _modeDetails(mode);
-    final refreshRate = _refreshRateOf(mode);
     final isSelected = raw == _selectedRaw;
     final isActive = raw == _activeRaw;
     final isPreferred = mode['isPreferred'] == true;
     final isBusy = _applying && _applyingRaw == raw;
-    final badges = <Widget>[
-      if (refreshRate > 0)
-        _buildModeBadge(
-          context,
-          icon: Icons.bolt_rounded,
-          label: _formatRefreshRate(refreshRate),
-          emphasized: isSelected,
-        ),
-      if (isActive)
-        _buildModeBadge(
-          context,
-          icon: Icons.radio_button_checked_rounded,
-          label: strings.displayModeCurrentSubtitle,
-          emphasized: true,
-        ),
-      if (isPreferred)
-        _buildModeBadge(
-          context,
-          icon: Icons.check_circle_outline_rounded,
-          label: strings.displayModeSelectedSubtitle,
-          emphasized: isSelected,
-        ),
+    final subtitleParts = <String>[
+      ?details,
+      if (isActive) strings.displayModeCurrentSubtitle,
+      if (isPreferred) strings.displayModeSelectedSubtitle,
     ];
+    final subtitle = subtitleParts.join(' · ');
 
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         onTap: _applying ? null : () => unawaited(_onSelect(raw)),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOutCubic,
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+        child: Container(
+          padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             color: isSelected
-                ? colorScheme.primaryContainer.withValues(alpha: 0.24)
-                : colorScheme.surface.withValues(alpha: 0.74),
-            borderRadius: BorderRadius.circular(20),
+                ? colorScheme.primaryContainer.withValues(alpha: 0.25)
+                : colorScheme.surface,
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: isSelected
                   ? colorScheme.primary
                   : isActive
-                  ? colorScheme.secondary.withValues(alpha: 0.72)
-                  : colorScheme.outlineVariant.withValues(alpha: 0.72),
-              width: isSelected ? 1.6 : 1,
+                  ? colorScheme.secondary.withValues(alpha: 0.7)
+                  : colorScheme.outlineVariant.withValues(alpha: 0.8),
             ),
-            boxShadow: isSelected
-                ? [
-                    BoxShadow(
-                      color: colorScheme.primary.withValues(alpha: 0.08),
-                      blurRadius: 12,
-                      offset: const Offset(0, 6),
-                    ),
-                  ]
-                : null,
           ),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildModeLeading(context, mode, selected: isSelected),
+              _buildModeRateBox(context, mode, selected: isSelected),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            _modeLabel(context, mode),
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w800,
-                              color: colorScheme.onSurface,
-                              height: 1.2,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        _buildSelectionIndicator(
-                          context,
-                          selected: isSelected,
-                          active: isActive,
-                          busy: isBusy,
-                        ),
-                      ],
+                    Text(
+                      _modeLabel(context, mode),
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        color: colorScheme.onSurface,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                    if (details != null) ...[
+                    if (subtitle.isNotEmpty) ...[
                       const SizedBox(height: 4),
                       Text(
-                        details,
+                        subtitle,
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: colorScheme.onSurfaceVariant,
-                          height: 1.3,
+                          height: 1.35,
                         ),
-                      ),
-                    ],
-                    if (badges.isNotEmpty) ...[
-                      const SizedBox(height: 10),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
-                        children: badges,
                       ),
                     ],
                   ],
                 ),
+              ),
+              const SizedBox(width: 12),
+              _buildSelectionIcon(
+                context,
+                selected: isSelected,
+                active: isActive,
+                busy: isBusy,
               ),
             ],
           ),
@@ -725,8 +514,8 @@ class _DisplayModeSettingsPageState extends State<DisplayModeSettingsPage> {
     return Container(
       height: height,
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.42),
-        borderRadius: BorderRadius.circular(20),
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(16),
       ),
     );
   }
@@ -737,15 +526,15 @@ class _DisplayModeSettingsPageState extends State<DisplayModeSettingsPage> {
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
       children: [
-        _buildPlaceholderCard(context, height: 156),
-        const SizedBox(height: 14),
+        _buildPlaceholderCard(context, height: 140),
+        const SizedBox(height: 16),
+        _buildPlaceholderCard(context, height: 84),
+        const SizedBox(height: 10),
+        _buildPlaceholderCard(context, height: 84),
+        const SizedBox(height: 10),
+        _buildPlaceholderCard(context, height: 84),
+        const SizedBox(height: 16),
         const Center(child: CircularProgressIndicator(strokeWidth: 2.4)),
-        const SizedBox(height: 14),
-        _buildPlaceholderCard(context, height: 92),
-        const SizedBox(height: 10),
-        _buildPlaceholderCard(context, height: 92),
-        const SizedBox(height: 10),
-        _buildPlaceholderCard(context, height: 92),
       ],
     );
   }
@@ -759,73 +548,43 @@ class _DisplayModeSettingsPageState extends State<DisplayModeSettingsPage> {
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(16, 20, 16, 24),
       children: [
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: colorScheme.errorContainer.withValues(alpha: 0.52),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: colorScheme.error.withValues(alpha: 0.22),
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: colorScheme.error.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: Icon(
-                      Icons.error_outline_rounded,
-                      color: colorScheme.error,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          strings.displayRefreshRateTitle,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                            color: colorScheme.onErrorContainer,
-                          ),
+        _buildSectionCard(
+          context,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.error_outline_rounded, color: colorScheme.error),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        _error!,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.onSurface,
+                          height: 1.45,
                         ),
-                        const SizedBox(height: 6),
-                        Text(
-                          _error!,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onErrorContainer.withValues(
-                              alpha: 0.88,
-                            ),
-                            height: 1.4,
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
+                  ],
+                ),
+                if (Platform.isAndroid) ...[
+                  const SizedBox(height: 16),
+                  FilledButton.icon(
+                    onPressed: _applying
+                        ? null
+                        : () {
+                            unawaited(_loadModes());
+                          },
+                    icon: const Icon(Icons.refresh_rounded),
+                    label: Text(strings.commonRetry),
                   ),
                 ],
-              ),
-              if (Platform.isAndroid) ...[
-                const SizedBox(height: 16),
-                FilledButton.icon(
-                  onPressed: _applying
-                      ? null
-                      : () {
-                          unawaited(_loadModes());
-                        },
-                  icon: const Icon(Icons.refresh_rounded),
-                  label: Text(strings.commonRetry),
-                ),
               ],
-            ],
+            ),
           ),
         ),
       ],
@@ -837,26 +596,19 @@ class _DisplayModeSettingsPageState extends State<DisplayModeSettingsPage> {
       children: [
         RefreshIndicator(
           onRefresh: () => _loadModes(showLoader: false),
-          child: CustomScrollView(
+          child: ListView(
             key: const ValueKey('display-mode-content'),
             physics: const AlwaysScrollableScrollPhysics(),
-            slivers: [
-              SliverPadding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                sliver: SliverList(
-                  delegate: SliverChildListDelegate([
-                    _buildHeroCard(context),
-                    const SizedBox(height: 12),
-                    ..._modes.map((mode) {
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: _buildModeCard(context, mode),
-                      );
-                    }),
-                    const SizedBox(height: 8),
-                  ]),
-                ),
-              ),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+            children: [
+              _buildOverviewCard(context),
+              const SizedBox(height: 16),
+              ..._modes.map((mode) {
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 10),
+                  child: _buildModeCard(context, mode),
+                );
+              }),
             ],
           ),
         ),

@@ -638,6 +638,16 @@
       "error": {}
     }
   },
+  "logsReaderTitle": "Reader logs",
+  "logsReaderCopied": "Reader logs copied",
+  "logsReaderRefreshTooltip": "Refresh reader logs",
+  "logsReaderLoadFailed": "Failed to load reader logs: {error}",
+  "@logsReaderLoadFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "logsReaderEmpty": "No reader logs yet",
   "tagCategoryLoadTimeout": "Tag categories timed out while loading. Please try again later.",
   "tagCategoryLoadFailed": "Failed to load tag categories: {error}",
   "@tagCategoryLoadFailed": {
@@ -773,7 +783,7 @@
   "readerResetZoom": "Reset zoom",
   "advancedTitle": "Advanced",
   "advancedDebugTitle": "Logs",
-  "advancedDebugSubtitle": "Network logs and application logs",
+  "advancedDebugSubtitle": "Network, application, and reader logs",
   "advancedComicIdSearchTitle": "Comic ID search optimization",
   "advancedComicIdSearchSubtitle": "Automatically remove non-digit characters on search submission and keep only Arabic numerals as the keyword",
   "advancedNoImageModeTitle": "No-image mode",

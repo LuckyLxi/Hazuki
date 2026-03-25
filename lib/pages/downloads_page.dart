@@ -13,6 +13,7 @@ class _DownloadsPageState extends State<DownloadsPage>
   late final TabController _tabController;
   final Set<String> _selectedComicIds = <String>{};
   bool _selectionEnabled = false;
+  bool _scanningDownloaded = false;
 
   bool get _selectionMode =>
       _tabController.index == 1 &&
@@ -154,6 +155,87 @@ class _DownloadsPageState extends State<DownloadsPage>
     });
   }
 
+  Future<void> _scanDownloadedComics() async {
+    if (_scanningDownloaded) {
+      return;
+    }
+    setState(() {
+      _scanningDownloaded = true;
+    });
+    try {
+      final result = await MangaDownloadService.instance.scanDownloadedComics();
+      if (!mounted) {
+        return;
+      }
+      final isZh = Localizations.localeOf(context).languageCode.toLowerCase().startsWith(
+        'zh',
+      );
+      final message = !result.permissionGranted
+          ? (isZh
+                ? '未获得文件访问权限，无法扫描本地漫画'
+                : 'File access permission was not granted. Unable to scan local comics.')
+          : result.recoveredComics > 0
+          ? (isZh
+                ? '扫描完成，已扫描 ${result.scannedDirectories} 个目录，恢复 ${result.recoveredComics} 部漫画'
+                : 'Scan complete. Scanned ${result.scannedDirectories} folders and recovered ${result.recoveredComics} comics.')
+          : (isZh
+                ? '扫描完成，未发现可恢复的已下载漫画'
+                : 'Scan complete. No recoverable downloaded comics were found.');
+      await showHazukiPrompt(context, message);
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      final isZh = Localizations.localeOf(context).languageCode.toLowerCase().startsWith(
+        'zh',
+      );
+      await showHazukiPrompt(
+        context,
+        isZh ? '扫描失败：$e' : 'Scan failed: $e',
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _scanningDownloaded = false;
+        });
+      }
+    }
+  }
+
+  Widget? _buildScanButton(bool ready) {
+    if (!ready || _tabController.index != 1 || _selectionMode) {
+      return null;
+    }
+    final isZh = Localizations.localeOf(context).languageCode.toLowerCase().startsWith(
+      'zh',
+    );
+    return FloatingActionButton.small(
+      tooltip: isZh ? '扫描本地漫画' : 'Scan local comics',
+      onPressed: _scanningDownloaded ? null : _scanDownloadedComics,
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 180),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        child: _scanningDownloaded
+            ? SizedBox(
+                key: const ValueKey<String>('scan_loading'),
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2.2,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    Theme.of(context).colorScheme.onPrimaryContainer,
+                  ),
+                ),
+              )
+            : const Icon(
+                Icons.manage_search_rounded,
+                key: ValueKey<String>('scan_icon'),
+              ),
+      ),
+    );
+  }
+
   PreferredSizeWidget _buildAppBar(AppLocalizations strings) {
     return hazukiFrostedAppBar(
       context: context,
@@ -265,6 +347,23 @@ class _DownloadsPageState extends State<DownloadsPage>
         final ready = snapshot.connectionState == ConnectionState.done;
         return Scaffold(
           appBar: _buildAppBar(strings),
+          floatingActionButton: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 220),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeInCubic,
+            transitionBuilder: (child, animation) {
+              return FadeTransition(
+                opacity: animation,
+                child: ScaleTransition(
+                  scale: Tween<double>(begin: 0.86, end: 1).animate(animation),
+                  child: child,
+                ),
+              );
+            },
+            child:
+                _buildScanButton(ready) ??
+                const SizedBox.shrink(key: ValueKey<String>('scan_hidden')),
+          ),
           body: !ready
               ? const Center(child: CircularProgressIndicator())
               : AnimatedBuilder(

@@ -2201,6 +2201,36 @@ abstract class AppLocalizations {
   /// **'Failed to export log file: {error}'**
   String logsApplicationExportFailed(Object error);
 
+  /// No description provided for @logsReaderTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reader logs'**
+  String get logsReaderTitle;
+
+  /// No description provided for @logsReaderCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Reader logs copied'**
+  String get logsReaderCopied;
+
+  /// No description provided for @logsReaderRefreshTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh reader logs'**
+  String get logsReaderRefreshTooltip;
+
+  /// No description provided for @logsReaderLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load reader logs: {error}'**
+  String logsReaderLoadFailed(Object error);
+
+  /// No description provided for @logsReaderEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No reader logs yet'**
+  String get logsReaderEmpty;
+
   /// No description provided for @tagCategoryLoadTimeout.
   ///
   /// In en, this message translates to:
@@ -2522,7 +2552,7 @@ abstract class AppLocalizations {
   /// No description provided for @advancedDebugSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Network logs and application logs'**
+  /// **'Network, application, and reader logs'**
   String get advancedDebugSubtitle;
 
   /// No description provided for @advancedComicIdSearchTitle.

@@ -758,135 +758,187 @@ class _HazukiAppState extends State<HazukiApp>
           final localVersionLabel = isZh ? '本地版本' : 'Local';
           final remoteVersionLabel = isZh ? '云端版本' : 'Cloud';
 
-          Widget buildHeader({
+          const dialogMaxWidth = 360.0;
+          final availableMessage =
+              isZh
+                  ? '检测到新的漫画源版本，下载完成后重启软件即可生效。'
+                  : 'A new source version is available. Download it now and restart the app to apply it.';
+          final downloadingMessage =
+              isZh
+                  ? '正在下载并替换漫画源文件，请保持网络连接。'
+                  : 'Downloading and replacing the source package. Please keep the network connected.';
+          final restartHint =
+              isZh
+                  ? '关闭并重新打开软件后即可完成更新。'
+                  : 'Close and reopen the app to finish applying the update.';
+
+          double resolveDialogRadius() {
+            switch (phase) {
+              case _SourceUpdateDialogPhase.available:
+                return 28;
+              case _SourceUpdateDialogPhase.downloading:
+                return 24;
+              case _SourceUpdateDialogPhase.restartRequired:
+                return 26;
+            }
+          }
+
+          EdgeInsets resolveDialogPadding() {
+            switch (phase) {
+              case _SourceUpdateDialogPhase.available:
+                return const EdgeInsets.fromLTRB(20, 20, 20, 18);
+              case _SourceUpdateDialogPhase.downloading:
+                return const EdgeInsets.fromLTRB(20, 18, 20, 18);
+              case _SourceUpdateDialogPhase.restartRequired:
+                return const EdgeInsets.fromLTRB(20, 20, 20, 20);
+            }
+          }
+
+          Color resolveAccentColor() {
+            switch (phase) {
+              case _SourceUpdateDialogPhase.available:
+                return colorScheme.primary;
+              case _SourceUpdateDialogPhase.downloading:
+                return colorScheme.primary;
+              case _SourceUpdateDialogPhase.restartRequired:
+                return colorScheme.tertiary;
+            }
+          }
+
+          Widget buildLeadingIcon({
             required IconData icon,
-            required List<Color> colors,
-            required String title,
-            required String subtitle,
-            required Color iconColor,
-            required Color badgeBackground,
-            required Color badgeForeground,
-            required String badgeText,
+            required Color accent,
           }) {
             return Container(
-              padding: const EdgeInsets.all(20),
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: colors,
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(28),
+                color: accent.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(14),
               ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 60,
-                    height: 60,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.20),
-                      borderRadius: BorderRadius.circular(22),
-                    ),
-                    child: Icon(icon, color: iconColor, size: 30),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          style: textTheme.titleLarge?.copyWith(
-                            color: iconColor,
-                            fontWeight: FontWeight.w800,
-                            height: 1.14,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          subtitle,
-                          style: textTheme.bodyMedium?.copyWith(
-                            color: iconColor.withValues(alpha: 0.88),
-                            height: 1.4,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: badgeBackground,
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Text(
-                            badgeText,
-                            style: textTheme.labelMedium?.copyWith(
-                              color: badgeForeground,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+              child: Icon(icon, color: accent, size: 22),
             );
           }
 
-          Widget buildVersionCard({
+          Widget buildPanel({required Widget child}) {
+            return Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.36),
+                ),
+              ),
+              child: child,
+            );
+          }
+
+          Widget buildHeader({
+            required IconData icon,
+            required String title,
+            required String subtitle,
+            required Color accent,
+            String? badgeText,
+          }) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    buildLeadingIcon(icon: icon, accent: accent),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            title,
+                            style: textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              height: 1.16,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            subtitle,
+                            style: textTheme.bodyMedium?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                              height: 1.45,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                if (badgeText != null) ...[
+                  const SizedBox(height: 14),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: accent.withValues(alpha: 0.10),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      badgeText,
+                      style: textTheme.labelMedium?.copyWith(
+                        color: accent,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            );
+          }
+
+          Widget buildVersionRow({
             required IconData icon,
             required Color accent,
             required String label,
             required String value,
           }) {
-            return Expanded(
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest.withValues(
-                    alpha: 0.56,
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  borderRadius: BorderRadius.circular(22),
-                  border: Border.all(
-                    color: accent.withValues(alpha: 0.18),
+                  child: Icon(icon, color: accent, size: 18),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        label,
+                        style: textTheme.labelMedium?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        value,
+                        style: textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          height: 1.2,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: accent.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Icon(icon, color: accent, size: 20),
-                    ),
-                    const SizedBox(height: 14),
-                    Text(
-                      label,
-                      style: textTheme.labelMedium?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      value,
-                      style: textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        height: 1.2,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              ],
             );
           }
 
@@ -894,8 +946,11 @@ class _HazukiAppState extends State<HazukiApp>
             return Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
-                color: colorScheme.errorContainer.withValues(alpha: 0.86),
-                borderRadius: BorderRadius.circular(18),
+                color: colorScheme.errorContainer.withValues(alpha: 0.72),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: colorScheme.error.withValues(alpha: 0.10),
+                ),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -903,7 +958,7 @@ class _HazukiAppState extends State<HazukiApp>
                   Icon(
                     Icons.error_outline_rounded,
                     color: colorScheme.onErrorContainer,
-                    size: 20,
+                    size: 18,
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -912,7 +967,7 @@ class _HazukiAppState extends State<HazukiApp>
                       style: textTheme.bodyMedium?.copyWith(
                         color: colorScheme.onErrorContainer,
                         fontWeight: FontWeight.w600,
-                        height: 1.35,
+                        height: 1.4,
                       ),
                     ),
                   ),
@@ -930,52 +985,53 @@ class _HazukiAppState extends State<HazukiApp>
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     buildHeader(
-                      icon: Icons.auto_awesome_rounded,
-                      colors: [
-                        colorScheme.primary,
-                        colorScheme.tertiary,
-                      ],
+                      icon: Icons.system_update_alt_rounded,
                       title: strings.sourceUpdateAvailableTitle,
-                      subtitle: strings.sourceUpdateLocalVersion(
-                        check.localVersion,
-                      ),
-                      iconColor: colorScheme.onPrimary,
-                      badgeBackground: colorScheme.onPrimary.withValues(
-                        alpha: 0.14,
-                      ),
-                      badgeForeground: colorScheme.onPrimary,
+                      subtitle: availableMessage,
+                      accent: colorScheme.primary,
                       badgeText: strings.sourceUpdateRemoteVersion(
                         check.remoteVersion,
                       ),
                     ),
                     const SizedBox(height: 18),
-                    Row(
-                      children: [
-                        buildVersionCard(
-                          icon: Icons.history_rounded,
-                          accent: colorScheme.onSurfaceVariant,
-                          label: localVersionLabel,
-                          value: check.localVersion,
-                        ),
-                        const SizedBox(width: 12),
-                        buildVersionCard(
-                          icon: Icons.cloud_download_rounded,
-                          accent: colorScheme.primary,
-                          label: remoteVersionLabel,
-                          value: check.remoteVersion,
-                        ),
-                      ],
+                    buildPanel(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          buildVersionRow(
+                            icon: Icons.history_rounded,
+                            accent: colorScheme.onSurfaceVariant,
+                            label: localVersionLabel,
+                            value: check.localVersion,
+                          ),
+                          const SizedBox(height: 12),
+                          Divider(
+                            height: 1,
+                            thickness: 1,
+                            color: colorScheme.outlineVariant.withValues(
+                              alpha: 0.32,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          buildVersionRow(
+                            icon: Icons.cloud_download_outlined,
+                            accent: colorScheme.primary,
+                            label: remoteVersionLabel,
+                            value: check.remoteVersion,
+                          ),
+                        ],
+                      ),
                     ),
                     if (errorText != null) ...[
-                      const SizedBox(height: 14),
+                      const SizedBox(height: 12),
                       buildErrorCard(errorText!),
                     ],
-                    const SizedBox(height: 20),
-                    FilledButton.icon(
+                    const SizedBox(height: 18),
+                    FilledButton(
                       style: FilledButton.styleFrom(
-                        minimumSize: const Size.fromHeight(54),
+                        minimumSize: const Size.fromHeight(50),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(16),
                         ),
                       ),
                       onPressed: () async {
@@ -1024,14 +1080,13 @@ class _HazukiAppState extends State<HazukiApp>
                           });
                         }
                       },
-                      icon: const Icon(Icons.download_rounded),
-                      label: Text(strings.sourceUpdateDownload),
+                      child: Text(strings.sourceUpdateDownload),
                     ),
-                    const SizedBox(height: 10),
-                    Wrap(
-                      alignment: WrapAlignment.end,
-                      spacing: 6,
-                      runSpacing: 6,
+                    const SizedBox(height: 8),
+                    OverflowBar(
+                      alignment: MainAxisAlignment.end,
+                      spacing: 4,
+                      overflowSpacing: 4,
                       children: [
                         TextButton(
                           onPressed: () => Navigator.of(
@@ -1055,6 +1110,7 @@ class _HazukiAppState extends State<HazukiApp>
                     : strings.sourceUpdateDownloadingProgress(
                         (progress * 100).toStringAsFixed(0),
                       );
+                final percentLabel = '${(progress * 100).toStringAsFixed(0)}%';
                 return Column(
                   key: const ValueKey<String>('source-update-phase-downloading'),
                   mainAxisSize: MainAxisSize.min,
@@ -1062,52 +1118,55 @@ class _HazukiAppState extends State<HazukiApp>
                   children: [
                     buildHeader(
                       icon: Icons.downloading_rounded,
-                      colors: [
-                        colorScheme.primaryContainer,
-                        colorScheme.secondaryContainer,
-                      ],
-                      title: progressLabel,
-                      subtitle: strings.sourceUpdateRemoteVersion(
+                      title: strings.sourceUpdateDownloading,
+                      subtitle: downloadingMessage,
+                      accent: colorScheme.primary,
+                      badgeText: strings.sourceUpdateRemoteVersion(
                         check.remoteVersion,
                       ),
-                      iconColor: colorScheme.onPrimaryContainer,
-                      badgeBackground: colorScheme.onPrimaryContainer
-                          .withValues(alpha: 0.10),
-                      badgeForeground: colorScheme.onPrimaryContainer,
-                      badgeText: strings.sourceUpdateAvailableTitle,
                     ),
                     const SizedBox(height: 18),
-                    Container(
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        color: colorScheme.surfaceContainerHighest.withValues(
-                          alpha: 0.56,
-                        ),
-                        borderRadius: BorderRadius.circular(24),
-                      ),
+                    buildPanel(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            progressLabel,
-                            style: textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w800,
-                            ),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  progressLabel,
+                                  style: textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    height: 1.2,
+                                  ),
+                                ),
+                              ),
+                              if (!indeterminate)
+                                Text(
+                                  percentLabel,
+                                  style: textTheme.labelLarge?.copyWith(
+                                    color: colorScheme.primary,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                            ],
                           ),
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 14),
                           ClipRRect(
                             borderRadius: BorderRadius.circular(999),
                             child: LinearProgressIndicator(
-                              minHeight: 10,
+                              minHeight: 8,
                               value: indeterminate ? null : progress,
                             ),
                           ),
                           const SizedBox(height: 12),
                           Text(
-                            strings.sourceUpdateRemoteVersion(check.remoteVersion),
+                            indeterminate
+                                ? downloadingMessage
+                                : restartHint,
                             style: textTheme.bodySmall?.copyWith(
                               color: colorScheme.onSurfaceVariant,
-                              height: 1.35,
+                              height: 1.4,
                             ),
                           ),
                         ],
@@ -1123,76 +1182,47 @@ class _HazukiAppState extends State<HazukiApp>
                   children: [
                     buildHeader(
                       icon: Icons.restart_alt_rounded,
-                      colors: [
-                        colorScheme.tertiary,
-                        colorScheme.primary,
-                      ],
                       title: restartTitle,
                       subtitle: restartMessage,
-                      iconColor: colorScheme.onPrimary,
-                      badgeBackground: colorScheme.onPrimary.withValues(
-                        alpha: 0.14,
-                      ),
-                      badgeForeground: colorScheme.onPrimary,
+                      accent: colorScheme.tertiary,
                       badgeText: strings.sourceUpdateRemoteVersion(
                         check.remoteVersion,
                       ),
                     ),
                     const SizedBox(height: 18),
-                    Container(
-                      padding: const EdgeInsets.all(18),
-                      decoration: BoxDecoration(
-                        color: colorScheme.primaryContainer.withValues(
-                          alpha: 0.46,
-                        ),
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(
-                          color: colorScheme.primary.withValues(alpha: 0.14),
-                        ),
-                      ),
-                      child: Row(
+                    buildPanel(
+                      child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Container(
-                            width: 42,
-                            height: 42,
-                            decoration: BoxDecoration(
-                              color: colorScheme.primary.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: Icon(
-                              Icons.check_rounded,
-                              color: colorScheme.primary,
-                              size: 22,
-                            ),
+                          buildVersionRow(
+                            icon: Icons.cloud_done_rounded,
+                            accent: colorScheme.tertiary,
+                            label: remoteVersionLabel,
+                            value: check.remoteVersion,
                           ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              restartMessage,
-                              style: textTheme.bodyMedium?.copyWith(
-                                color: colorScheme.onSurface,
-                                height: 1.4,
-                                fontWeight: FontWeight.w600,
-                              ),
+                          const SizedBox(height: 12),
+                          Text(
+                            restartHint,
+                            style: textTheme.bodyMedium?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                              height: 1.45,
                             ),
                           ),
                         ],
                       ),
                     ),
-                    const SizedBox(height: 20),
-                    FilledButton.icon(
+                    const SizedBox(height: 18),
+                    FilledButton(
                       style: FilledButton.styleFrom(
-                        minimumSize: const Size.fromHeight(54),
+                        minimumSize: const Size.fromHeight(50),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
+                          borderRadius: BorderRadius.circular(16),
                         ),
                       ),
                       onPressed: () => Navigator.of(dialogContext).pop(
                         _SourceUpdateDialogAction.downloaded,
                       ),
-                      icon: const Icon(Icons.check_rounded),
-                      label: Text(strings.commonConfirm),
+                      child: Text(strings.commonConfirm),
                     ),
                   ],
                 );
@@ -1203,62 +1233,63 @@ class _HazukiAppState extends State<HazukiApp>
             backgroundColor: Colors.transparent,
             elevation: 0,
             insetPadding: const EdgeInsets.symmetric(horizontal: 24),
-            clipBehavior: Clip.antiAlias,
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 396),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 320),
+              curve: Curves.easeInOutCubic,
+              width: double.infinity,
+              constraints: const BoxConstraints(maxWidth: dialogMaxWidth),
+              padding: resolveDialogPadding(),
+              clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(
-                color: colorScheme.surface.withValues(alpha: 0.97),
-                borderRadius: BorderRadius.circular(32),
+                color: colorScheme.surface,
+                borderRadius: BorderRadius.circular(resolveDialogRadius()),
                 border: Border.all(
-                  color: colorScheme.outlineVariant.withValues(alpha: 0.22),
+                  color: resolveAccentColor().withValues(alpha: 0.14),
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.18),
-                    blurRadius: 32,
-                    offset: const Offset(0, 18),
+                    color: Colors.black.withValues(alpha: 0.12),
+                    blurRadius: 24,
+                    offset: const Offset(0, 14),
                   ),
                 ],
               ),
               child: AnimatedSize(
-                duration: const Duration(milliseconds: 340),
-                curve: Curves.easeOutCubic,
+                duration: const Duration(milliseconds: 320),
+                curve: Curves.easeInOutCubic,
                 alignment: Alignment.center,
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 320),
-                    switchInCurve: Curves.easeOutCubic,
-                    switchOutCurve: Curves.easeInCubic,
-                    layoutBuilder: (currentChild, previousChildren) {
-                      return Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          ...previousChildren,
-                          ?currentChild,
-                        ],
-                      );
-                    },
-                    transitionBuilder: (child, animation) {
-                      final curved = CurvedAnimation(
-                        parent: animation,
-                        curve: Curves.easeOutCubic,
-                        reverseCurve: Curves.easeInCubic,
-                      );
-                      return ClipRect(
-                        child: FadeTransition(
-                          opacity: curved,
-                          child: SizeTransition(
-                            sizeFactor: curved,
-                            axis: Axis.vertical,
-                            axisAlignment: 0,
-                            child: child,
-                          ),
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 280),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  layoutBuilder: (currentChild, previousChildren) {
+                    return Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        ...previousChildren,
+                        ?currentChild,
+                      ],
+                    );
+                  },
+                  transitionBuilder: (child, animation) {
+                    final curved = CurvedAnimation(
+                      parent: animation,
+                      curve: Curves.easeOutCubic,
+                      reverseCurve: Curves.easeInCubic,
+                    );
+                    return ClipRect(
+                      child: FadeTransition(
+                        opacity: curved,
+                        child: SizeTransition(
+                          sizeFactor: curved,
+                          axis: Axis.vertical,
+                          axisAlignment: 0,
+                          child: child,
                         ),
-                      );
-                    },
-                    child: buildDialogScene(),
-                  ),
+                      ),
+                    );
+                  },
+                  child: buildDialogScene(),
                 ),
               ),
             ),

@@ -1170,6 +1170,23 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get logsReaderTitle => 'Reader logs';
+
+  @override
+  String get logsReaderCopied => 'Reader logs copied';
+
+  @override
+  String get logsReaderRefreshTooltip => 'Refresh reader logs';
+
+  @override
+  String logsReaderLoadFailed(Object error) {
+    return 'Failed to load reader logs: $error';
+  }
+
+  @override
+  String get logsReaderEmpty => 'No reader logs yet';
+
+  @override
   String get tagCategoryLoadTimeout => 'Tag categories timed out while loading. Please try again later.';
 
   @override
@@ -1361,7 +1378,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get advancedDebugTitle => 'Logs';
 
   @override
-  String get advancedDebugSubtitle => 'Network logs and application logs';
+  String get advancedDebugSubtitle => 'Network, application, and reader logs';
 
   @override
   String get advancedComicIdSearchTitle => 'Comic ID search optimization';

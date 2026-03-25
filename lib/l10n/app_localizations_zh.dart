@@ -1167,6 +1167,23 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get logsReaderTitle => '阅读器日志';
+
+  @override
+  String get logsReaderCopied => '已复制阅读器日志';
+
+  @override
+  String get logsReaderRefreshTooltip => '刷新阅读器日志';
+
+  @override
+  String logsReaderLoadFailed(Object error) {
+    return '阅读器日志加载失败：$error';
+  }
+
+  @override
+  String get logsReaderEmpty => '暂无阅读器日志';
+
+  @override
   String get tagCategoryLoadTimeout => '标签分类加载超时，请稍后重试';
 
   @override
@@ -1358,7 +1375,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get advancedDebugTitle => '日志';
 
   @override
-  String get advancedDebugSubtitle => '网络日志与应用日志';
+  String get advancedDebugSubtitle => '网络日志、应用日志与阅读器日志';
 
   @override
   String get advancedComicIdSearchTitle => '漫画 ID 搜索优化';

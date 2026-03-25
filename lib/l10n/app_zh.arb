@@ -638,6 +638,16 @@
       "error": {}
     }
   },
+  "logsReaderTitle": "阅读器日志",
+  "logsReaderCopied": "已复制阅读器日志",
+  "logsReaderRefreshTooltip": "刷新阅读器日志",
+  "logsReaderLoadFailed": "阅读器日志加载失败：{error}",
+  "@logsReaderLoadFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "logsReaderEmpty": "暂无阅读器日志",
   "tagCategoryLoadTimeout": "标签分类加载超时，请稍后重试",
   "tagCategoryLoadFailed": "标签分类加载失败：{error}",
   "@tagCategoryLoadFailed": {
@@ -773,7 +783,7 @@
   "readerResetZoom": "还原大小",
   "advancedTitle": "高级",
   "advancedDebugTitle": "日志",
-  "advancedDebugSubtitle": "网络日志与应用日志",
+  "advancedDebugSubtitle": "网络日志、应用日志与阅读器日志",
   "advancedComicIdSearchTitle": "漫画 ID 搜索优化",
   "advancedComicIdSearchSubtitle": "提交搜索时自动过滤非数字字符，仅保留阿拉伯数字作为关键词",
   "advancedNoImageModeTitle": "无图模式",

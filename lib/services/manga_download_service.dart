@@ -315,6 +315,18 @@ class DownloadedMangaComic {
   }
 }
 
+class MangaDownloadedScanResult {
+  const MangaDownloadedScanResult({
+    required this.permissionGranted,
+    required this.scannedDirectories,
+    required this.recoveredComics,
+  });
+
+  final bool permissionGranted;
+  final int scannedDirectories;
+  final int recoveredComics;
+}
+
 class MangaDownloadService extends ChangeNotifier {
   MangaDownloadService._();
 
@@ -323,6 +335,8 @@ class MangaDownloadService extends ChangeNotifier {
   static const String _statePrefsKey = 'manga_download_service_state_v2';
   static const String _metadataFileName = 'comic.json';
   static const String _legacyMetadataFileName = 'metadata.json';
+  static const String _downloadsRootPath =
+      '/storage/emulated/0/Download/Hazuki_Manga';
   static const int _maxNestedComicScanDepth = 3;
   static const MethodChannel _mediaChannel = MethodChannel('hazuki.comics/media');
 
@@ -360,6 +374,31 @@ class MangaDownloadService extends ChangeNotifier {
     final future = _init();
     _initFuture = future;
     await future;
+  }
+
+  Future<MangaDownloadedScanResult> scanDownloadedComics() async {
+    await ensureInitialized();
+    final hasAccess = await _ensureAndroidDownloadsAccess();
+    if (!hasAccess) {
+      return const MangaDownloadedScanResult(
+        permissionGranted: false,
+        scannedDirectories: 0,
+        recoveredComics: 0,
+      );
+    }
+    final rootDir = await _ensureRootDir();
+    final result = await _scanDownloadedFromDisk(rootDir);
+    _downloaded
+      ..clear()
+      ..addAll(result.comics);
+    _downloaded.sort((a, b) => b.updatedAtMillis.compareTo(a.updatedAtMillis));
+    await _persistState();
+    notifyListeners();
+    return MangaDownloadedScanResult(
+      permissionGranted: true,
+      scannedDirectories: result.scannedDirectories,
+      recoveredComics: result.recoveredComics,
+    );
   }
 
   DownloadedMangaComic? downloadedComicById(String comicId) {
@@ -453,6 +492,10 @@ class MangaDownloadService extends ChangeNotifier {
     if (ids.isEmpty) {
       return;
     }
+    final hasAccess = await _ensureAndroidDownloadsAccess();
+    if (!hasAccess) {
+      return;
+    }
     final rootDir = await _ensureRootDir();
     for (final comicId in ids) {
       try {
@@ -501,6 +544,10 @@ class MangaDownloadService extends ChangeNotifier {
     if (index < 0) {
       return;
     }
+    final hasAccess = await _ensureAndroidDownloadsAccess();
+    if (!hasAccess) {
+      return;
+    }
     final task = _tasks.removeAt(index);
     final rootDir = await _ensureRootDir();
     final comicDir = Directory('${rootDir.path}/${task.comicId}');
@@ -531,13 +578,10 @@ class MangaDownloadService extends ChangeNotifier {
 
   Future<void> _init() async {
     _prefs = await SharedPreferences.getInstance();
-    await _ensureAndroidDownloadsAccess();
-    final rootDir = await _ensureRootDir();
     final raw = _prefs?.getString(_statePrefsKey);
     _logScan(
-      'Downloads scan bootstrap',
+      'Downloads state bootstrap',
       content: {
-        'rootDir': rootDir.path,
         'hasPersistedState': raw != null && raw.isNotEmpty,
       },
     );
@@ -573,6 +617,7 @@ class MangaDownloadService extends ChangeNotifier {
               }
             }
           }
+          _sanitizeRestoredDownloadedState();
           _logScan(
             'Restored persisted download state',
             content: {
@@ -586,46 +631,40 @@ class MangaDownloadService extends ChangeNotifier {
           'Failed to parse persisted download state',
           level: 'warning',
           content: {
-            'rootDir': rootDir.path,
             'error': e.toString(),
           },
         );
       }
     }
-    await _scanDownloadedFromDisk(rootDir);
     _tasks.sort((a, b) => a.createdAtMillis.compareTo(b.createdAtMillis));
     _downloaded.sort((a, b) => b.updatedAtMillis.compareTo(a.updatedAtMillis));
     _logScan(
-      'Downloads scan finished',
+      'Downloads state restore finished',
       content: {
-        'rootDir': rootDir.path,
         'taskCount': _tasks.length,
         'downloadedCount': _downloaded.length,
       },
     );
     await _persistState();
-    if (_tasks.isNotEmpty) {
-      unawaited(_processQueue());
-    }
   }
 
-  Future<void> _ensureAndroidDownloadsAccess() async {
+  Future<bool> _ensureAndroidDownloadsAccess() async {
     if (!Platform.isAndroid) {
-      return;
+      return true;
     }
 
     try {
       final hasAccess =
           await _mediaChannel.invokeMethod<bool>('hasStorageAccess') ?? false;
       if (hasAccess) {
-        return;
+        return true;
       }
 
       _logScan(
         'Requesting Android downloads access',
         level: 'warning',
         content: {
-          'path': '/storage/emulated/0/Download/Hazuki_Manga',
+          'path': _downloadsRootPath,
         },
       );
 
@@ -637,27 +676,30 @@ class MangaDownloadService extends ChangeNotifier {
             : 'Android downloads access not granted',
         level: granted ? 'info' : 'warning',
         content: {
-          'path': '/storage/emulated/0/Download/Hazuki_Manga',
+          'path': _downloadsRootPath,
           'granted': granted,
         },
       );
+      return granted;
     } on MissingPluginException catch (e) {
       _logScan(
         'Android downloads access channel unavailable',
         level: 'warning',
         content: {'error': e.toString()},
       );
+      return false;
     } catch (e) {
       _logScan(
         'Android downloads access request failed',
         level: 'warning',
         content: {'error': e.toString()},
       );
+      return false;
     }
   }
 
   Future<Directory> _ensureRootDir() async {
-    final dir = Directory('/storage/emulated/0/Download/Hazuki_Manga');
+    final dir = Directory(_downloadsRootPath);
     if (!await dir.exists()) {
       await dir.create(recursive: true);
       _logScan(
@@ -678,6 +720,43 @@ class MangaDownloadService extends ChangeNotifier {
       'downloaded': _downloaded.map((e) => e.toJson()).toList(),
     };
     await prefs.setString(_statePrefsKey, jsonEncode(payload));
+  }
+
+  void _sanitizeRestoredDownloadedState() {
+    final sanitized = <DownloadedMangaComic>[];
+    for (final comic in _downloaded) {
+      final normalized = _sanitizeDownloadedComicState(comic);
+      if (normalized != null) {
+        sanitized.add(normalized);
+      }
+    }
+    _downloaded
+      ..clear()
+      ..addAll(sanitized);
+    _downloaded.sort((a, b) => b.updatedAtMillis.compareTo(a.updatedAtMillis));
+  }
+
+  DownloadedMangaComic? _sanitizeDownloadedComicState(
+    DownloadedMangaComic comic,
+  ) {
+    final task = taskByComicId(comic.comicId);
+    final filteredChapters = comic.chapters
+        .where(
+          (chapter) =>
+              !_shouldIgnoreRecoveredChapterForIncompleteTask(chapter, task),
+        )
+        .toList();
+    final mergedChapters = _mergeRecoveredChapters(
+      normalizedChapters: filteredChapters,
+      scannedChapters: const <DownloadedMangaChapter>[],
+    );
+    if (mergedChapters.isEmpty) {
+      return null;
+    }
+    return comic.copyWith(
+      chapters: mergedChapters,
+      updatedAtMillis: comic.updatedAtMillis,
+    );
   }
 
   Future<void> _processQueue() async {
@@ -715,6 +794,12 @@ class MangaDownloadService extends ChangeNotifier {
     notifyListeners();
 
     try {
+      if (!await _ensureAndroidDownloadsAccess()) {
+        throw FileSystemException(
+          'Android downloads access not granted',
+          _downloadsRootPath,
+        );
+      }
       final rootDir = await _ensureRootDir();
       final comicDir = Directory('${rootDir.path}/${task.comicId}');
       if (!await comicDir.exists()) {
@@ -1035,9 +1120,14 @@ class MangaDownloadService extends ChangeNotifier {
     }
   }
 
-  Future<void> _scanDownloadedFromDisk(Directory rootDir) async {
+  Future<({
+    List<DownloadedMangaComic> comics,
+    int scannedDirectories,
+    int recoveredComics,
+  })> _scanDownloadedFromDisk(Directory rootDir) async {
     var scannedDirectories = 0;
     var recoveredComics = 0;
+    final comics = <DownloadedMangaComic>[];
     _logScan(
       'Scanning downloads root directory',
       content: {'path': rootDir.path},
@@ -1058,7 +1148,7 @@ class MangaDownloadService extends ChangeNotifier {
         final comic = await _readComicFromDirectory(entity);
         if (comic != null) {
           recoveredComics++;
-          _upsertDownloadedComic(comic);
+          comics.add(comic);
           _logScan(
             'Recovered downloaded comic',
             content: {
@@ -1075,7 +1165,7 @@ class MangaDownloadService extends ChangeNotifier {
             level: 'warning',
             content: {
               'path': entity.path,
-              'reason': 'no_metadata_and_no_images',
+              'reason': 'no_completed_chapters',
             },
           );
         }
@@ -1100,6 +1190,11 @@ class MangaDownloadService extends ChangeNotifier {
         },
       );
     }
+    return (
+      comics: comics,
+      scannedDirectories: scannedDirectories,
+      recoveredComics: recoveredComics,
+    );
   }
 
   Future<DownloadedMangaComic?> _readComicFromDirectory(Directory comicDir) async {
@@ -1147,20 +1242,33 @@ class MangaDownloadService extends ChangeNotifier {
         ),
         updatedAtMillis: DateTime.now().millisecondsSinceEpoch,
       );
-      await _restoreDownloadedComicMetadata(comicDir, normalized);
+      final sanitized = _sanitizeDownloadedComicState(normalized);
+      if (sanitized == null) {
+        _logScan(
+          'Metadata-based recovery skipped because no completed chapters were found',
+          level: 'warning',
+          content: {
+            'comicDir': comicDir.path,
+            'metadataFile': metadataFile.path,
+            'comicId': normalized.comicId,
+          },
+        );
+        return null;
+      }
+      await _restoreDownloadedComicMetadata(comicDir, sanitized);
       _logScan(
         'Metadata-based recovery succeeded',
         content: {
           'comicDir': comicDir.path,
           'metadataFile': metadataFile.path,
-          'comicId': normalized.comicId,
+          'comicId': sanitized.comicId,
           'normalizedChapterCount': normalizedChapters.length,
           'scannedChapterCount': scannedChapters.length,
-          'mergedChapterCount': normalized.chapters.length,
-          'hasCover': normalized.localCoverPath != null,
+          'mergedChapterCount': sanitized.chapters.length,
+          'hasCover': sanitized.localCoverPath != null,
         },
       );
-      return normalized;
+      return sanitized;
     } catch (e) {
       _logScan(
         'Metadata read failed, using fallback scan',
@@ -1190,13 +1298,14 @@ class MangaDownloadService extends ChangeNotifier {
 
     final chapters = await _scanChapterDirectoriesFromDisk(comicDir);
     final localCover = await _findLocalCoverFile(comicDir);
-    if (chapters.isEmpty && localCover == null) {
+    if (chapters.isEmpty) {
       _logScan(
-        'Fallback scan found no chapters or cover',
+        'Fallback scan found no completed chapters',
         level: 'warning',
         content: {
           'comicDir': comicDir.path,
           'comicId': comicId,
+          'hasCover': localCover != null,
         },
       );
       return null;
@@ -1212,17 +1321,29 @@ class MangaDownloadService extends ChangeNotifier {
       chapters: chapters,
       updatedAtMillis: await _readUpdatedAtMillis(comicDir),
     );
-    await _restoreDownloadedComicMetadata(comicDir, rebuilt);
+    final sanitized = _sanitizeDownloadedComicState(rebuilt);
+    if (sanitized == null) {
+      _logScan(
+        'Fallback recovery skipped because only incomplete chapters were found',
+        level: 'warning',
+        content: {
+          'comicDir': comicDir.path,
+          'comicId': comicId,
+        },
+      );
+      return null;
+    }
+    await _restoreDownloadedComicMetadata(comicDir, sanitized);
     _logScan(
       'Fallback recovery succeeded',
       content: {
         'comicDir': comicDir.path,
         'comicId': comicId,
-        'chapterCount': chapters.length,
-        'hasCover': localCover != null,
+        'chapterCount': sanitized.chapters.length,
+        'hasCover': sanitized.localCoverPath != null,
       },
     );
-    return rebuilt;
+    return sanitized;
   }
 
   Future<void> _restoreDownloadedComicMetadata(
@@ -1245,26 +1366,28 @@ class MangaDownloadService extends ChangeNotifier {
     final scannedByIndex = <int, DownloadedMangaChapter>{
       for (final chapter in scannedChapters) chapter.index: chapter,
     };
-    final merged = <DownloadedMangaChapter>[];
-    final usedIndexes = <int>{};
+    final mergedByIndex = <int, DownloadedMangaChapter>{};
 
     for (final chapter in normalizedChapters) {
-      merged.add(
-        _sanitizeRecoveredChapter(
-          chapter,
-          fallback: scannedByIndex[chapter.index],
-        ),
+      final sanitized = _sanitizeRecoveredChapter(
+        chapter,
+        fallback: scannedByIndex[chapter.index],
       );
-      usedIndexes.add(chapter.index);
+      mergedByIndex[sanitized.index] = _preferRecoveredChapter(
+        mergedByIndex[sanitized.index],
+        sanitized,
+      );
     }
     for (final chapter in scannedChapters) {
-      if (!usedIndexes.add(chapter.index)) {
-        continue;
-      }
-      merged.add(_sanitizeRecoveredChapter(chapter));
+      final sanitized = _sanitizeRecoveredChapter(chapter);
+      mergedByIndex[sanitized.index] = _preferRecoveredChapter(
+        mergedByIndex[sanitized.index],
+        sanitized,
+      );
     }
 
-    merged.sort((a, b) => a.index.compareTo(b.index));
+    final merged = mergedByIndex.values.toList()
+      ..sort((a, b) => a.index.compareTo(b.index));
     return merged;
   }
 
@@ -1321,6 +1444,37 @@ class MangaDownloadService extends ChangeNotifier {
     );
   }
 
+  bool _isLocalRecoveredEpId(String epId) {
+    return RegExp(r'^local_\d+$').hasMatch(epId.trim());
+  }
+
+  DownloadedMangaChapter _preferRecoveredChapter(
+    DownloadedMangaChapter? current,
+    DownloadedMangaChapter candidate,
+  ) {
+    if (current == null) {
+      return candidate;
+    }
+    final currentIsLocal = _isLocalRecoveredEpId(current.epId);
+    final candidateIsLocal = _isLocalRecoveredEpId(candidate.epId);
+    if (currentIsLocal != candidateIsLocal) {
+      return candidateIsLocal ? current : candidate;
+    }
+    if (candidate.imagePaths.length != current.imagePaths.length) {
+      return candidate.imagePaths.length > current.imagePaths.length
+          ? candidate
+          : current;
+    }
+    final currentHasValidTitle = !_isInvalidRecoveredChapterTitle(current.title);
+    final candidateHasValidTitle = !_isInvalidRecoveredChapterTitle(
+      candidate.title,
+    );
+    if (currentHasValidTitle != candidateHasValidTitle) {
+      return candidateHasValidTitle ? candidate : current;
+    }
+    return current;
+  }
+
   String _normalizeRecoveredChapterTitle(
     String rawTitle, {
     required int chapterNumber,
@@ -1346,6 +1500,39 @@ class MangaDownloadService extends ChangeNotifier {
       RegExp(r'^第\s*0+\s*[话話章卷回]$'),
       RegExp(r'^Manga第0+话$', caseSensitive: false),
     ].any((pattern) => pattern.hasMatch(normalized));
+  }
+
+  bool _shouldIgnoreRecoveredChapterForIncompleteTask(
+    DownloadedMangaChapter chapter,
+    MangaDownloadTask? task,
+  ) {
+    if (task == null || !_isLocalRecoveredEpId(chapter.epId)) {
+      return false;
+    }
+    for (final target in task.targets) {
+      if (task.completedEpIds.contains(target.epId)) {
+        continue;
+      }
+      if (target.index == chapter.index) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  Set<String> _blockedChapterDirectoryPathsForTask(Directory comicDir) {
+    final task = taskByComicId(_baseNameFromPath(comicDir.path));
+    if (task == null) {
+      return const <String>{};
+    }
+    final blocked = <String>{};
+    for (final target in task.targets) {
+      if (task.completedEpIds.contains(target.epId)) {
+        continue;
+      }
+      blocked.add(_chapterDirForTarget(comicDir, target).path);
+    }
+    return blocked;
   }
 
   Future<File?> _findMetadataFile(Directory comicDir) async {
@@ -1461,12 +1648,18 @@ class MangaDownloadService extends ChangeNotifier {
     Directory comicDir,
   ) async {
     final directories = await _collectChapterDirectoriesFromDisk(comicDir);
+    final blockedDirectoryPaths = _blockedChapterDirectoryPathsForTask(comicDir);
 
     final chapters = <DownloadedMangaChapter>[];
     final usedChapterNumbers = <int>{};
     var nextFallbackChapterNumber = 1;
     var usedRootFiles = false;
+    var skippedIncompleteDirectories = 0;
     for (final item in directories) {
+      if (blockedDirectoryPaths.contains(item.directory.path)) {
+        skippedIncompleteDirectories++;
+        continue;
+      }
       var chapterNumber = item.chapterNumber;
       if (chapterNumber == null ||
           chapterNumber <= 0 ||
@@ -1509,6 +1702,7 @@ class MangaDownloadService extends ChangeNotifier {
       content: {
         'comicDir': comicDir.path,
         'candidateDirectoryCount': directories.length,
+        'skippedIncompleteDirectories': skippedIncompleteDirectories,
         'chapterCount': chapters.length,
         'usedRootFiles': usedRootFiles,
         'directories': directories

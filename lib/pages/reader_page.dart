@@ -101,6 +101,93 @@ class _ReaderPageState extends State<ReaderPage>
       _pinchToZoom && (_zoomInteracting || _isZoomed || _activePointerCount > 1);
   // 还原动画控制器
   late final AnimationController _resetAnimController;
+  int _lastLoggedVisiblePageIndex = -1;
+
+  Map<String, dynamic> _readerLogPayload([Map<String, dynamic>? extra]) {
+    final payload = <String, dynamic>{
+      'comicId': widget.comicId,
+      'epId': widget.epId,
+      'chapterTitle': widget.chapterTitle,
+      'chapterIndex': widget.chapterIndex,
+      'readerMode': _readerMode.prefsValue,
+      'currentPageIndex': _currentPageIndex,
+      'currentPage': _images.isEmpty
+          ? 0
+          : math.min(_currentPageIndex + 1, _images.length),
+      'totalPages': _images.length,
+      'controlsVisible': _controlsVisible,
+      'tapToTurnPage': _tapToTurnPage,
+      'pageIndicator': _pageIndicator,
+      'pinchToZoom': _pinchToZoom,
+      'longPressToSave': _longPressToSave,
+      'immersiveMode': _immersiveMode,
+      'keepScreenOn': _keepScreenOn,
+      'customBrightness': _customBrightness,
+      'brightnessValue': _brightnessValue,
+    };
+    if (extra != null) {
+      payload.addAll(extra);
+    }
+    return payload;
+  }
+
+  void _logReaderEvent(
+    String title, {
+    String level = 'info',
+    String source = 'reader_ui',
+    Object? content,
+  }) {
+    HazukiSourceService.instance.addReaderLog(
+      level: level,
+      title: title,
+      source: source,
+      content: content ?? _readerLogPayload(),
+    );
+  }
+
+  void _logVisiblePageChange({
+    required int index,
+    required String trigger,
+  }) {
+    if (_images.isEmpty) {
+      return;
+    }
+    final normalizedIndex = math.max(0, math.min(index, _images.length - 1));
+    if (_lastLoggedVisiblePageIndex == normalizedIndex) {
+      return;
+    }
+    _lastLoggedVisiblePageIndex = normalizedIndex;
+    _logReaderEvent(
+      'Reader visible page changed',
+      source: 'reader_position',
+      content: _readerLogPayload({
+        'trigger': trigger,
+        'pageIndex': normalizedIndex,
+        'page': normalizedIndex + 1,
+      }),
+    );
+  }
+
+  void _handleBrightnessChangeEnd(double value) {
+    final normalized = math.max(0.0, math.min(value, 1.0));
+    _logReaderEvent(
+      'Reader brightness adjusted',
+      source: 'reader_settings',
+      content: _readerLogPayload({
+        'setting': 'brightness',
+        'value': normalized,
+        'brightnessPercent': (normalized * 100).round(),
+      }),
+    );
+  }
+
+  void _handleBackPressed() {
+    _logReaderEvent(
+      'Reader back pressed',
+      source: 'reader_navigation',
+    );
+    Navigator.of(context).maybePop();
+  }
 
   @override
   void initState() {
@@ -120,6 +207,14 @@ class _ReaderPageState extends State<ReaderPage>
     final initialImages = widget.images
         .where((e) => e.trim().isNotEmpty)
         .toList();
+    _logReaderEvent(
+      'Reader session started',
+      source: 'reader_lifecycle',
+      content: _readerLogPayload({
+        'incomingImageCount': widget.images.length,
+        'hasInitialImages': initialImages.isNotEmpty,
+      }),
+    );
     if (initialImages.isNotEmpty) {
       _zoomController.value = Matrix4.identity();
       _imageAspectRatioCache.clear();
@@ -131,12 +226,21 @@ class _ReaderPageState extends State<ReaderPage>
       _isZoomed = false;
       _zoomInteracting = false;
       _activePointerCount = 0;
+      _logReaderEvent(
+        'Reader initial images ready',
+        source: 'reader_data',
+        content: _readerLogPayload({
+          'trigger': 'constructor_images',
+          'imageCount': _images.length,
+        }),
+      );
+      _logVisiblePageChange(index: 0, trigger: 'constructor_images');
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _prefetchAround(0);
         unawaited(_prefetchAheadFrom(0));
       });
     } else {
-      unawaited(_loadChapterImages());
+      unawaited(_loadChapterImages(trigger: 'initial_load'));
     }
   }
 
@@ -156,6 +260,16 @@ class _ReaderPageState extends State<ReaderPage>
       }
     }
     _decodeWaiters.clear();
+    _logReaderEvent(
+      'Reader session closed',
+      source: 'reader_lifecycle',
+      content: _readerLogPayload({
+        'lastVisiblePageIndex': _pageIndexNotifier.value,
+        'lastVisiblePage': _images.isEmpty
+            ? 0
+            : math.min(_pageIndexNotifier.value + 1, _images.length),
+      }),
+    );
     unawaited(_restoreReaderDisplay());
     super.dispose();
   }
@@ -370,6 +484,13 @@ class _ReaderPageState extends State<ReaderPage>
       _pinchToZoom = prefs.getBool('reader_pinch_to_zoom') ?? false;
       _longPressToSave = prefs.getBool('reader_long_press_save') ?? false;
     });
+    _logReaderEvent(
+      'Reader settings loaded',
+      source: 'reader_settings',
+      content: _readerLogPayload({
+        'settingsLoaded': true,
+      }),
+    );
     await _applyReaderDisplaySettings();
   }
 
@@ -407,12 +528,24 @@ class _ReaderPageState extends State<ReaderPage>
   }
 
   void _toggleControlsVisibility() {
+    final nextVisible = !_controlsVisible;
     setState(() {
-      _controlsVisible = !_controlsVisible;
+      _controlsVisible = nextVisible;
     });
+    _logReaderEvent(
+      'Reader controls toggled',
+      source: 'reader_ui',
+      content: _readerLogPayload({
+        'controlsVisible': nextVisible,
+      }),
+    );
   }
 
   void _openReaderSettingsDrawer() {
+    _logReaderEvent(
+      'Reader settings drawer opened',
+      source: 'reader_settings',
+    );
     _scaffoldKey.currentState?.openEndDrawer();
   }
 
@@ -448,11 +581,21 @@ class _ReaderPageState extends State<ReaderPage>
     if (value == null) {
       return;
     }
+    final previousMode = _readerMode.prefsValue;
     final changed = _readerMode != value;
     setState(() {
       _readerMode = value;
     });
     await _persistReaderString('reader_reading_mode', value.prefsValue);
+    _logReaderEvent(
+      changed ? 'Reader mode changed' : 'Reader mode reselected',
+      source: 'reader_settings',
+      content: _readerLogPayload({
+        'setting': 'reading_mode',
+        'previousValue': previousMode,
+        'nextValue': value.prefsValue,
+      }),
+    );
     if (changed) {
       _resetZoomImmediately();
       _syncReaderPositionAfterModeChange();
@@ -464,6 +607,14 @@ class _ReaderPageState extends State<ReaderPage>
       _tapToTurnPage = value;
     });
     await _persistReaderBool('reader_tap_to_turn_page', value);
+    _logReaderEvent(
+      'Reader tap to turn page toggled',
+      source: 'reader_settings',
+      content: _readerLogPayload({
+        'setting': 'tap_to_turn_page',
+        'value': value,
+      }),
+    );
   }
 
   Future<void> _toggleImmersiveModeSetting(bool value) async {
@@ -471,6 +622,14 @@ class _ReaderPageState extends State<ReaderPage>
       _immersiveMode = value;
     });
     await _persistReaderBool('reader_immersive_mode', value);
+    _logReaderEvent(
+      'Reader immersive mode toggled',
+      source: 'reader_settings',
+      content: _readerLogPayload({
+        'setting': 'immersive_mode',
+        'value': value,
+      }),
+    );
     await _applyReaderDisplaySettings();
   }
 
@@ -479,6 +638,14 @@ class _ReaderPageState extends State<ReaderPage>
       _keepScreenOn = value;
     });
     await _persistReaderBool('reader_keep_screen_on', value);
+    _logReaderEvent(
+      'Reader keep screen on toggled',
+      source: 'reader_settings',
+      content: _readerLogPayload({
+        'setting': 'keep_screen_on',
+        'value': value,
+      }),
+    );
     await _applyReaderDisplaySettings();
   }
 
@@ -487,6 +654,14 @@ class _ReaderPageState extends State<ReaderPage>
       _customBrightness = value;
     });
     await _persistReaderBool('reader_custom_brightness', value);
+    _logReaderEvent(
+      'Reader custom brightness toggled',
+      source: 'reader_settings',
+      content: _readerLogPayload({
+        'setting': 'custom_brightness',
+        'value': value,
+      }),
+    );
     await _applyReaderDisplaySettings();
   }
 
@@ -504,6 +679,14 @@ class _ReaderPageState extends State<ReaderPage>
       _pageIndicator = value;
     });
     await _persistReaderBool('reader_page_indicator', value);
+    _logReaderEvent(
+      'Reader page indicator toggled',
+      source: 'reader_settings',
+      content: _readerLogPayload({
+        'setting': 'page_indicator',
+        'value': value,
+      }),
+    );
   }
 
   Future<void> _togglePinchToZoomSetting(bool value) async {
@@ -514,6 +697,14 @@ class _ReaderPageState extends State<ReaderPage>
       _pinchToZoom = value;
     });
     await _persistReaderBool('reader_pinch_to_zoom', value);
+    _logReaderEvent(
+      'Reader pinch to zoom toggled',
+      source: 'reader_settings',
+      content: _readerLogPayload({
+        'setting': 'pinch_to_zoom',
+        'value': value,
+      }),
+    );
   }
 
   Future<void> _toggleLongPressToSaveSetting(bool value) async {
@@ -521,15 +712,31 @@ class _ReaderPageState extends State<ReaderPage>
       _longPressToSave = value;
     });
     await _persistReaderBool('reader_long_press_save', value);
+    _logReaderEvent(
+      'Reader long press to save toggled',
+      source: 'reader_settings',
+      content: _readerLogPayload({
+        'setting': 'long_press_to_save',
+        'value': value,
+      }),
+    );
   }
 
   Future<void> _openChaptersPanel() async {
     if (_chapterPanelLoading) {
       return;
     }
+    final hadCachedChapterDetails = _chapterDetailsCache != null;
     setState(() {
       _chapterPanelLoading = true;
     });
+    _logReaderEvent(
+      'Reader chapters panel requested',
+      source: 'reader_navigation',
+      content: _readerLogPayload({
+        'hadCachedChapterDetails': hadCachedChapterDetails,
+      }),
+    );
     try {
       final details =
           _chapterDetailsCache ??
@@ -538,6 +745,13 @@ class _ReaderPageState extends State<ReaderPage>
       if (!mounted) {
         return;
       }
+      _logReaderEvent(
+        'Reader chapters panel opened',
+        source: 'reader_navigation',
+        content: _readerLogPayload({
+          'hadCachedChapterDetails': hadCachedChapterDetails,
+        }),
+      );
       Navigator.of(context).push(
         _SpringBottomSheetRoute(
           builder: (routeContext) {
@@ -565,6 +779,15 @@ class _ReaderPageState extends State<ReaderPage>
         ),
       );
     } catch (e) {
+      _logReaderEvent(
+        'Reader chapters panel failed',
+        level: 'error',
+        source: 'reader_navigation',
+        content: _readerLogPayload({
+          'hadCachedChapterDetails': hadCachedChapterDetails,
+          'error': '$e',
+        }),
+      );
       if (!mounted) {
         return;
       }
@@ -592,8 +815,27 @@ class _ReaderPageState extends State<ReaderPage>
   ) async {
     Navigator.of(routeContext).pop();
     if (epId == widget.epId) {
+      _logReaderEvent(
+        'Reader chapter selection ignored',
+        source: 'reader_navigation',
+        content: _readerLogPayload({
+          'targetEpId': epId,
+          'targetChapterTitle': chapterTitle,
+          'targetChapterIndex': index,
+          'reason': 'already_current_chapter',
+        }),
+      );
       return;
     }
+    _logReaderEvent(
+      'Reader chapter selected',
+      source: 'reader_navigation',
+      content: _readerLogPayload({
+        'targetEpId': epId,
+        'targetChapterTitle': chapterTitle,
+        'targetChapterIndex': index,
+      }),
+    );
     await Future<void>.delayed(const Duration(milliseconds: 280));
     if (!mounted) {
       return;
@@ -620,6 +862,15 @@ class _ReaderPageState extends State<ReaderPage>
       }
       final target = math.max(0, math.min(_currentPageIndex, _images.length - 1));
       _setDisplayedPageIndex(target);
+      _logReaderEvent(
+        'Reader position synced after mode change',
+        source: 'reader_navigation',
+        content: _readerLogPayload({
+          'targetPageIndex': target,
+          'targetPage': target + 1,
+        }),
+      );
+      _logVisiblePageChange(index: target, trigger: 'mode_changed_sync');
       if (_readerMode == _ReaderMode.rightToLeft) {
         if (_pageController.hasClients) {
           _pageController.jumpToPage(target);
@@ -663,6 +914,13 @@ class _ReaderPageState extends State<ReaderPage>
   Future<void> _showSaveImageDialog(String imageUrl) async {
     unawaited(HapticFeedback.heavyImpact());
     final strings = l10n(context);
+    _logReaderEvent(
+      'Reader save image dialog opened',
+      source: 'reader_media',
+      content: _readerLogPayload({
+        'imageUrl': imageUrl,
+      }),
+    );
     final shouldSave = await showGeneralDialog<bool>(
       context: context,
       barrierDismissible: true,
@@ -695,7 +953,23 @@ class _ReaderPageState extends State<ReaderPage>
         );
       },
     );
-    if (shouldSave != true || !mounted) return;
+    if (shouldSave != true || !mounted) {
+      _logReaderEvent(
+        'Reader save image cancelled',
+        source: 'reader_media',
+        content: _readerLogPayload({
+          'imageUrl': imageUrl,
+        }),
+      );
+      return;
+    }
+    _logReaderEvent(
+      'Reader save image confirmed',
+      source: 'reader_media',
+      content: _readerLogPayload({
+        'imageUrl': imageUrl,
+      }),
+    );
     try {
       final sourceService = HazukiSourceService.instance;
       Uint8List bytes;
@@ -744,10 +1018,27 @@ class _ReaderPageState extends State<ReaderPage>
       final file = File('${directory.path}/$saveName');
       await file.writeAsBytes(bytes, flush: true);
       if (!mounted) return;
+      _logReaderEvent(
+        'Reader image saved',
+        source: 'reader_media',
+        content: _readerLogPayload({
+          'imageUrl': imageUrl,
+          'savedPath': file.path,
+        }),
+      );
       unawaited(
         showHazukiPrompt(context, strings.comicDetailSavedToPath(file.path)),
       );
     } catch (e) {
+      _logReaderEvent(
+        'Reader image save failed',
+        level: 'error',
+        source: 'reader_media',
+        content: _readerLogPayload({
+          'imageUrl': imageUrl,
+          'error': '$e',
+        }),
+      );
       if (!mounted) return;
       unawaited(
         showHazukiPrompt(
@@ -796,7 +1087,14 @@ class _ReaderPageState extends State<ReaderPage>
     }
   }
 
-  Future<void> _loadChapterImages() async {
+  Future<void> _loadChapterImages({String trigger = 'manual'}) async {
+    _logReaderEvent(
+      'Reader chapter images loading started',
+      source: 'reader_data',
+      content: _readerLogPayload({
+        'trigger': trigger,
+      }),
+    );
     try {
       final images = await HazukiSourceService.instance.loadChapterImages(
         comicId: widget.comicId,
@@ -819,12 +1117,31 @@ class _ReaderPageState extends State<ReaderPage>
         _zoomInteracting = false;
         _activePointerCount = 0;
       });
+      _lastLoggedVisiblePageIndex = -1;
+      _logReaderEvent(
+        'Reader chapter images loading finished',
+        source: 'reader_data',
+        content: _readerLogPayload({
+          'trigger': trigger,
+          'imageCount': _images.length,
+        }),
+      );
       _setDisplayedPageIndex(0);
+      _logVisiblePageChange(index: 0, trigger: 'chapter_images_loaded');
       if (!_noImageModeEnabled) {
         _prefetchAround(0);
         unawaited(_prefetchAheadFrom(0));
       }
     } catch (e) {
+      _logReaderEvent(
+        'Reader chapter images loading failed',
+        level: 'error',
+        source: 'reader_data',
+        content: _readerLogPayload({
+          'trigger': trigger,
+          'error': '$e',
+        }),
+      );
       if (!mounted) {
         return;
       }
@@ -868,6 +1185,7 @@ class _ReaderPageState extends State<ReaderPage>
 
     if (_currentPageIndex != normalizedIndex) {
       _currentPageIndex = normalizedIndex;
+      _logVisiblePageChange(index: normalizedIndex, trigger: 'scroll');
     }
     _setDisplayedPageIndex(normalizedIndex);
     if (!_noImageModeEnabled) {
@@ -1189,6 +1507,7 @@ class _ReaderPageState extends State<ReaderPage>
           });
         }
         _setDisplayedPageIndex(index);
+        _logVisiblePageChange(index: index, trigger: 'page_swipe');
         if (!_noImageModeEnabled) {
           _prefetchAround(index);
           unawaited(_prefetchAheadFrom(index));
@@ -1325,11 +1644,24 @@ class _ReaderPageState extends State<ReaderPage>
     });
   }
 
-  Future<void> _goToReaderPage(int index) async {
+  Future<void> _goToReaderPage(int index, {String trigger = 'manual'}) async {
     if (_images.isEmpty) {
       return;
     }
     final target = math.max(0, math.min(index, _images.length - 1));
+    _logReaderEvent(
+      'Reader page navigation requested',
+      source: 'reader_navigation',
+      content: _readerLogPayload({
+        'trigger': trigger,
+        'fromPageIndex': _currentPageIndex,
+        'fromPage': _images.isEmpty
+            ? 0
+            : math.min(_currentPageIndex + 1, _images.length),
+        'targetPageIndex': target,
+        'targetPage': target + 1,
+      }),
+    );
     _setDisplayedPageIndex(target);
     if (_readerMode == _ReaderMode.rightToLeft) {
       if (!_pageController.hasClients || target == _currentPageIndex) {
@@ -1350,14 +1682,20 @@ class _ReaderPageState extends State<ReaderPage>
     if (_currentPageIndex <= 0) {
       return;
     }
-    await _goToReaderPage(_currentPageIndex - 1);
+    await _goToReaderPage(
+      _currentPageIndex - 1,
+      trigger: 'tap_previous_zone',
+    );
   }
 
   Future<void> _goToNextPage() async {
     if (_currentPageIndex >= _images.length - 1) {
       return;
     }
-    await _goToReaderPage(_currentPageIndex + 1);
+    await _goToReaderPage(
+      _currentPageIndex + 1,
+      trigger: 'tap_next_zone',
+    );
   }
 
   Widget _wrapReaderTapPaging(Widget child) {
@@ -1509,6 +1847,7 @@ class _ReaderPageState extends State<ReaderPage>
                 max: 1,
                 divisions: 100,
                 onChanged: _customBrightness ? _updateBrightnessSetting : null,
+                onChangeEnd: _customBrightness ? _handleBrightnessChangeEnd : null,
                 activeColor: sliderActiveColor,
                 inactiveColor: sliderInactiveColor,
               ),
@@ -1572,7 +1911,7 @@ class _ReaderPageState extends State<ReaderPage>
                   child: Row(
                     children: [
                       IconButton(
-                        onPressed: () => Navigator.of(context).maybePop(),
+                        onPressed: _handleBackPressed,
                         icon: const Icon(
                           Icons.arrow_back_rounded,
                           color: Colors.white,
@@ -1774,7 +2113,12 @@ class _ReaderPageState extends State<ReaderPage>
                                           _sliderDragging = false;
                                           _sliderDragValue = target.toDouble();
                                         });
-                                        unawaited(_goToReaderPage(target));
+                                        unawaited(
+                                          _goToReaderPage(
+                                            target,
+                                            trigger: 'bottom_slider',
+                                          ),
+                                        );
                                       }
                                     : null,
                               ),
@@ -1878,7 +2222,9 @@ class _ReaderPageState extends State<ReaderPage>
                         _loadingImages = true;
                         _loadImagesError = null;
                       });
-                      unawaited(_loadChapterImages());
+                      unawaited(
+                        _loadChapterImages(trigger: 'retry_after_error'),
+                      );
                     },
                     child: Text(l10n(context).commonRetry),
                   ),

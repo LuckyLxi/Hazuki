@@ -127,6 +127,68 @@ extension HazukiSourceServiceDebugCapability on HazukiSourceService {
     );
   }
 
+  void addReaderLog({
+    required String level,
+    required String title,
+    Object? content,
+    String source = 'reader',
+  }) {
+    _appendReaderLog(
+      level: level,
+      title: title,
+      content: content,
+      source: source,
+    );
+  }
+
+  void _appendReaderLog({
+    required String level,
+    required String title,
+    Object? content,
+    String source = 'reader',
+  }) {
+    final now = DateTime.now();
+    final normalizedLevel = level.trim().isEmpty ? 'info' : level.trim();
+    final titleText = title.trim().isEmpty ? 'Reader' : title.trim();
+    final safeContent = _jsonSafe(content);
+    final contentText = _toBodyFull(safeContent) ?? 'null';
+    final dedupKey = [
+      source,
+      normalizedLevel.toLowerCase(),
+      titleText,
+      contentText,
+    ].join('|');
+
+    final existingIndex = _recentReaderLogs.indexWhere(
+      (log) => log['dedupKey'] == dedupKey,
+    );
+    if (existingIndex >= 0) {
+      final existing = _recentReaderLogs[existingIndex];
+      existing['mergedCount'] = (existing['mergedCount'] as int? ?? 1) + 1;
+      existing['lastSeenAt'] = now.toIso8601String();
+      existing['level'] = normalizedLevel;
+      existing['title'] = titleText;
+      existing['content'] = safeContent;
+      existing['contentPreview'] = _toBodyPreview(contentText);
+      return;
+    }
+
+    _recentReaderLogs.add({
+      'time': now.toIso8601String(),
+      'lastSeenAt': now.toIso8601String(),
+      'mergedCount': 1,
+      'dedupKey': dedupKey,
+      'source': source,
+      'level': normalizedLevel,
+      'title': titleText,
+      'content': safeContent,
+      'contentPreview': _toBodyPreview(contentText),
+    });
+    if (_recentReaderLogs.length > 600) {
+      _recentReaderLogs.removeRange(0, _recentReaderLogs.length - 600);
+    }
+  }
+
   void _appendApplicationLog({
     required String level,
     required String title,
@@ -359,6 +421,30 @@ extension HazukiSourceServiceDebugCapability on HazukiSourceService {
         'keptCount': _recentApplicationLogs.length,
       },
       'recentApplicationLogs': _recentApplicationLogs.map((e) {
+        final copy = Map<String, dynamic>.from(e);
+        copy.remove('dedupKey');
+        return copy;
+      }).toList(),
+    };
+    return info;
+  }
+
+  Future<Map<String, dynamic>> collectReaderDebugInfo() async {
+    final info = <String, dynamic>{
+      'statusText': _statusText,
+      'platform': Platform.operatingSystem,
+      'sourceMeta': {
+        'name': _sourceMeta?.name,
+        'key': _sourceMeta?.key,
+        'version': _sourceMeta?.version,
+      },
+      'isLogged': isLogged,
+      'currentAccount': currentAccount,
+      'generatedAt': DateTime.now().toIso8601String(),
+      'readerLogStats': {
+        'keptCount': _recentReaderLogs.length,
+      },
+      'recentReaderLogs': _recentReaderLogs.map((e) {
         final copy = Map<String, dynamic>.from(e);
         copy.remove('dedupKey');
         return copy;

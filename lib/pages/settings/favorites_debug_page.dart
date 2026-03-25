@@ -7,7 +7,7 @@ class LogsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final strings = l10n(context);
     return DefaultTabController(
-      length: 2,
+      length: 3,
       child: Scaffold(
         appBar: hazukiFrostedAppBar(
           context: context,
@@ -23,11 +23,15 @@ class LogsPage extends StatelessWidget {
                 icon: const Icon(Icons.description_outlined),
                 text: strings.logsApplicationTitle,
               ),
+              Tab(
+                icon: const Icon(Icons.chrome_reader_mode_outlined),
+                text: strings.logsReaderTitle,
+              ),
             ],
           ),
         ),
         body: const TabBarView(
-          children: [_NetworkLogsTab(), _ApplicationLogsTab()],
+          children: [_NetworkLogsTab(), _ApplicationLogsTab(), _ReaderLogsTab()],
         ),
       ),
     );
@@ -91,6 +95,14 @@ class _LogsAppBarExportButtonState extends State<_LogsAppBarExportButton> {
     await _saveLogsFile(prefix: 'application', content: prettyText);
   }
 
+  Future<void> _exportReaderLogs() async {
+    final debugInfo = await HazukiSourceService.instance
+        .collectReaderDebugInfo()
+        .timeout(const Duration(seconds: 10));
+    final prettyText = const JsonEncoder.withIndent('  ').convert(debugInfo);
+    await _saveLogsFile(prefix: 'reader', content: prettyText);
+  }
+
   Future<void> _exportNetworkLogs() async {
     final debugInfo = await HazukiSourceService.instance
         .collectNetworkDebugInfo()
@@ -104,7 +116,7 @@ class _LogsAppBarExportButtonState extends State<_LogsAppBarExportButton> {
     await _saveLogsFile(prefix: 'network', content: prettyText);
   }
 
-  Future<void> _handleExport({required bool exportNetworkLogs}) async {
+  Future<void> _handleExport({required int tabIndex}) async {
     if (_exporting) {
       return;
     }
@@ -113,10 +125,17 @@ class _LogsAppBarExportButtonState extends State<_LogsAppBarExportButton> {
     });
     final strings = l10n(context);
     try {
-      if (exportNetworkLogs) {
-        await _exportNetworkLogs();
-      } else {
-        await _exportApplicationLogs();
+      switch (tabIndex) {
+        case 0:
+          await _exportNetworkLogs();
+          break;
+        case 2:
+          await _exportReaderLogs();
+          break;
+        case 1:
+        default:
+          await _exportApplicationLogs();
+          break;
       }
     } catch (e) {
       if (!mounted) {
@@ -147,17 +166,19 @@ class _LogsAppBarExportButtonState extends State<_LogsAppBarExportButton> {
     return AnimatedBuilder(
       animation: controller,
       builder: (context, _) {
-        final exportNetworkLogs = controller.index == 0;
+        final tabIndex = controller.index;
+        final exportKey = switch (tabIndex) {
+          0 => 'network_logs_export_visible',
+          1 => 'app_logs_export_visible',
+          2 => 'reader_logs_export_visible',
+          _ => 'logs_export_visible',
+        };
         return IconButton(
-          key: ValueKey<String>(
-            exportNetworkLogs
-                ? 'network_logs_export_visible'
-                : 'app_logs_export_visible',
-          ),
+          key: ValueKey<String>(exportKey),
           tooltip: strings.logsApplicationExportTooltip,
           onPressed: _exporting
               ? null
-              : () => _handleExport(exportNetworkLogs: exportNetworkLogs),
+              : () => _handleExport(tabIndex: tabIndex),
           icon: _exporting
               ? const SizedBox(
                   width: 18,
@@ -886,6 +907,143 @@ class _ApplicationLogsTabState extends State<_ApplicationLogsTab>
         _LogsTextCard(
           icon: Icons.description_outlined,
           title: strings.logsApplicationTitle,
+          text: _debugText,
+        ),
+      ],
+    );
+  }
+}
+
+class _ReaderLogsTab extends StatefulWidget {
+  const _ReaderLogsTab();
+
+  @override
+  State<_ReaderLogsTab> createState() => _ReaderLogsTabState();
+}
+
+class _ReaderLogsTabState extends State<_ReaderLogsTab>
+    with AutomaticKeepAliveClientMixin<_ReaderLogsTab> {
+  String _debugText = '';
+  String? _errorText;
+  bool _loading = true;
+  Map<String, dynamic>? _rawDebugInfo;
+
+  @override
+  bool get wantKeepAlive => true;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadReaderDebugInfo());
+  }
+
+  Future<void> _copyDebugText() async {
+    if (_debugText.isEmpty) {
+      return;
+    }
+    await Clipboard.setData(ClipboardData(text: _debugText));
+    if (!mounted) {
+      return;
+    }
+    unawaited(showHazukiPrompt(context, l10n(context).logsReaderCopied));
+  }
+
+  Future<void> _loadReaderDebugInfo() async {
+    setState(() {
+      _loading = true;
+      _errorText = null;
+    });
+
+    try {
+      final debugInfo = await HazukiSourceService.instance
+          .collectReaderDebugInfo()
+          .timeout(const Duration(seconds: 10));
+      final prettyText = const JsonEncoder.withIndent('  ').convert(debugInfo);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _rawDebugInfo = Map<String, dynamic>.from(debugInfo);
+        _debugText = prettyText;
+      });
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _errorText = e.toString();
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  bool _hasLogs() {
+    final logs = _rawDebugInfo?['recentReaderLogs'];
+    return logs is List && logs.isNotEmpty;
+  }
+
+  Widget _buildActionBar(BuildContext context) {
+    final strings = l10n(context);
+    return Wrap(
+      spacing: 12,
+      runSpacing: 12,
+      children: [
+        OutlinedButton.icon(
+          onPressed: _loading ? null : _copyDebugText,
+          icon: const Icon(Icons.copy_outlined),
+          label: Text(strings.favoritesDebugCopyTooltip),
+        ),
+        OutlinedButton.icon(
+          onPressed: _loading ? null : _loadReaderDebugInfo,
+          icon: const Icon(Icons.refresh_rounded),
+          label: Text(strings.logsReaderRefreshTooltip),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    final strings = l10n(context);
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_errorText != null) {
+      return ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          _LogsErrorCard(
+            icon: Icons.chrome_reader_mode_outlined,
+            title: strings.logsReaderTitle,
+            message: strings.logsReaderLoadFailed(_errorText!),
+            onRetry: _loadReaderDebugInfo,
+          ),
+        ],
+      );
+    }
+    return ListView(
+      physics: const ClampingScrollPhysics(),
+      padding: const EdgeInsets.all(16),
+      children: [
+        _buildActionBar(context),
+        const SizedBox(height: 12),
+        if (!_hasLogs()) ...[
+          _LogsEmptyCard(
+            icon: Icons.inbox_outlined,
+            title: strings.logsReaderTitle,
+            message: strings.logsReaderEmpty,
+          ),
+          const SizedBox(height: 12),
+        ],
+        _LogsTextCard(
+          icon: Icons.chrome_reader_mode_outlined,
+          title: strings.logsReaderTitle,
           text: _debugText,
         ),
       ],
