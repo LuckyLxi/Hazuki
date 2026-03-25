@@ -1423,6 +1423,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get advancedDebugSubtitle => '网络日志、应用日志与阅读器日志';
 
   @override
+  String get advancedSoftwareLogCaptureTitle => '记录软件日志';
+
+  @override
+  String get advancedSoftwareLogCaptureSubtitle => '关闭后将不再抓取网络日志、应用日志与阅读器日志';
+
+  @override
   String get advancedComicIdSearchTitle => '漫画 ID 搜索优化';
 
   @override

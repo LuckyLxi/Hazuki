@@ -109,6 +109,7 @@ AppLocalizations l10n(BuildContext context) => AppLocalizations.of(context)!;
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await _loadGlobalUiFlags();
+  await HazukiSourceService.instance.loadSoftwareLogCaptureEnabled();
   await _ensureAndroidNoMediaMarker();
   await MangaDownloadService.instance.ensureInitialized();
   runApp(const HazukiApp());

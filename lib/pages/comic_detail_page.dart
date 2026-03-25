@@ -988,14 +988,16 @@ class _FavoriteFoldersMorphDialogState
           _loadError = result.errorMessage;
           return;
         }
+        final favorited = Set<String>.from(result.favoritedFolderIds);
+        if (favorited.isEmpty &&
+            widget.singleFolderOnly &&
+            (widget.favoriteOverride ?? widget.initialIsFavorite)) {
+          favorited.add('0');
+        }
         _loadError = null;
         _folders = List<FavoriteFolder>.from(result.folders);
-        _initialFavorited = Set<String>.from(result.favoritedFolderIds);
-        _selected = Set<String>.from(_initialFavorited);
-        if (_selected.isEmpty &&
-            (widget.favoriteOverride ?? widget.initialIsFavorite)) {
-          _selected = <String>{'0'};
-        }
+        _initialFavorited = favorited;
+        _selected = Set<String>.from(favorited);
       });
     } catch (e) {
       if (!mounted) {
@@ -1134,10 +1136,24 @@ class _FavoriteFoldersMorphDialogState
         return;
       }
       setState(() {
-        _folders = _folders.where((e) => e.id != folderId).toList();
-        _selected = Set<String>.from(_selected)..remove(folderId);
-        _initialFavorited = Set<String>.from(_initialFavorited)
+        final deletedASelectedFolder =
+            _selected.contains(folderId) || _initialFavorited.contains(folderId);
+        final nextSelected = Set<String>.from(_selected)..remove(folderId);
+        final nextInitialFavorited = Set<String>.from(_initialFavorited)
           ..remove(folderId);
+        if (deletedASelectedFolder &&
+            widget.singleFolderOnly &&
+            nextSelected.isEmpty) {
+          nextSelected.add('0');
+        }
+        if (deletedASelectedFolder &&
+            widget.singleFolderOnly &&
+            nextInitialFavorited.isEmpty) {
+          nextInitialFavorited.add('0');
+        }
+        _folders = _folders.where((e) => e.id != folderId).toList();
+        _selected = nextSelected;
+        _initialFavorited = nextInitialFavorited;
         _loadError = null;
         _busy = false;
       });
@@ -1382,78 +1398,94 @@ class _FavoriteFoldersMorphDialogState
   Widget _buildExpandedContent(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    return SizedBox(
-      key: ValueKey<String>(
-        _loadError == null
-            ? 'favorite_dialog_loaded'
-            : 'favorite_dialog_error',
-      ),
-      width: double.infinity,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  l10n(context).comicDetailManageFavorites,
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final hasBoundedHeight = constraints.maxHeight.isFinite;
+        return SizedBox(
+          key: ValueKey<String>(
+            _loadError == null
+                ? 'favorite_dialog_loaded'
+                : 'favorite_dialog_error',
+          ),
+          width: double.infinity,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: hasBoundedHeight ? constraints.maxHeight : 0,
+            ),
+            child: Column(
+              mainAxisSize:
+                  hasBoundedHeight ? MainAxisSize.max : MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        l10n(context).comicDetailManageFavorites,
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    if (_service.supportFavoriteFolderAdd && _loadError == null)
+                      IconButton(
+                        tooltip:
+                            l10n(context).comicDetailCreateFavoriteFolderTooltip,
+                        onPressed: _busy ? null : _addFolder,
+                        icon: const Icon(Icons.create_new_folder_outlined),
+                      ),
+                    IconButton(
+                      tooltip: l10n(context).commonClose,
+                      onPressed: _busy ? null : () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+                  ],
+                ),
+                Text(
+                  widget.singleFolderOnly
+                      ? l10n(context).comicDetailSingleFolderHint
+                      : l10n(context).comicDetailMultipleFoldersHint,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: cs.onSurfaceVariant,
                   ),
                 ),
-              ),
-              if (_service.supportFavoriteFolderAdd && _loadError == null)
-                IconButton(
-                  tooltip: l10n(context).comicDetailCreateFavoriteFolderTooltip,
-                  onPressed: _busy ? null : _addFolder,
-                  icon: const Icon(Icons.create_new_folder_outlined),
+                const SizedBox(height: 16),
+                _buildDialogBody(context),
+                if (hasBoundedHeight)
+                  const Spacer()
+                else
+                  const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed:
+                            _busy ? null : () => Navigator.of(context).pop(),
+                        child: Text(l10n(context).commonClose),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton(
+                        onPressed: _busy
+                            ? null
+                            : _loadError != null
+                            ? () => unawaited(_loadFolders())
+                            : _handleSave,
+                        child: Text(
+                          _loadError != null
+                              ? l10n(context).commonRetry
+                              : l10n(context).commonSave,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              IconButton(
-                tooltip: l10n(context).commonClose,
-                onPressed: _busy ? null : () => Navigator.of(context).pop(),
-                icon: const Icon(Icons.close_rounded),
-              ),
-            ],
-          ),
-          Text(
-            widget.singleFolderOnly
-                ? l10n(context).comicDetailSingleFolderHint
-                : l10n(context).comicDetailMultipleFoldersHint,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: cs.onSurfaceVariant,
+              ],
             ),
           ),
-          const SizedBox(height: 16),
-          _buildDialogBody(context),
-          const SizedBox(height: 18),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: _busy ? null : () => Navigator.of(context).pop(),
-                  child: Text(l10n(context).commonClose),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: FilledButton(
-                  onPressed: _busy
-                      ? null
-                      : _loadError != null
-                      ? () => unawaited(_loadFolders())
-                      : _handleSave,
-                  child: Text(
-                    _loadError != null
-                        ? l10n(context).commonRetry
-                        : l10n(context).commonSave,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 

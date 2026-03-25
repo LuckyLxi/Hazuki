@@ -12,6 +12,7 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
 
   bool _comicIdSearchEnhance = false;
   bool _noImageMode = false;
+  bool _softwareLogCaptureEnabled = false;
   bool _hasCustomEditedSource = false;
   bool _loading = true;
 
@@ -25,10 +26,13 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
     final prefs = await SharedPreferences.getInstance();
     final hasCustomEditedSource =
         await HazukiSourceService.instance.hasCustomEditedJmSource();
+    final softwareLogCaptureEnabled = await HazukiSourceService.instance
+        .loadSoftwareLogCaptureEnabled();
     if (!mounted) return;
     setState(() {
       _comicIdSearchEnhance = prefs.getBool(_keyComicIdSearchEnhance) ?? false;
       _noImageMode = prefs.getBool(_noImageModeKey) ?? false;
+      _softwareLogCaptureEnabled = softwareLogCaptureEnabled;
       _hasCustomEditedSource = hasCustomEditedSource;
       _loading = false;
     });
@@ -43,6 +47,11 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
   Future<void> _toggleNoImageMode(bool value) async {
     setState(() => _noImageMode = value);
     await setHazukiNoImageMode(value);
+  }
+
+  Future<void> _toggleSoftwareLogCaptureEnabled(bool value) async {
+    setState(() => _softwareLogCaptureEnabled = value);
+    await HazukiSourceService.instance.setSoftwareLogCaptureEnabled(value);
   }
 
   Future<void> _refreshCustomEditedSourceState() async {
@@ -107,6 +116,13 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
                       ),
                     );
                   },
+                ),
+                SwitchListTile(
+                  secondary: const Icon(Icons.bug_report_outlined),
+                  title: Text(strings.advancedSoftwareLogCaptureTitle),
+                  subtitle: Text(strings.advancedSoftwareLogCaptureSubtitle),
+                  value: _softwareLogCaptureEnabled,
+                  onChanged: _toggleSoftwareLogCaptureEnabled,
                 ),
                 ListTile(
                   leading: const Icon(Icons.javascript_rounded),

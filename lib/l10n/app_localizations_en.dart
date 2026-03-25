@@ -1423,6 +1423,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get advancedDebugSubtitle => 'Network, application, and reader logs';
 
   @override
+  String get advancedSoftwareLogCaptureTitle => 'Record software logs';
+
+  @override
+  String get advancedSoftwareLogCaptureSubtitle => 'When turned off, network, application, and reader logs will no longer be captured';
+
+  @override
   String get advancedComicIdSearchTitle => 'Comic ID search optimization';
 
   @override

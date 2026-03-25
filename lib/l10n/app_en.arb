@@ -784,6 +784,8 @@
   "advancedTitle": "Advanced",
   "advancedDebugTitle": "Logs",
   "advancedDebugSubtitle": "Network, application, and reader logs",
+  "advancedSoftwareLogCaptureTitle": "Record software logs",
+  "advancedSoftwareLogCaptureSubtitle": "When turned off, network, application, and reader logs will no longer be captured",
   "advancedComicIdSearchTitle": "Comic ID search optimization",
   "advancedComicIdSearchSubtitle": "Automatically remove non-digit characters on search submission and keep only Arabic numerals as the keyword",
   "advancedNoImageModeTitle": "No-image mode",

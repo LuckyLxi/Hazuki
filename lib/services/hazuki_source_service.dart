@@ -97,12 +97,27 @@ class HazukiSourceService {
   Map<String, dynamic>? _favoritesDebugCache;
   bool _isWarmingUpFavoritesDebug = false;
   bool _isRefreshingSource = false;
+  bool _softwareLogCaptureEnabled = false;
   final List<Map<String, dynamic>> _recentNetworkLogs = [];
   final List<Map<String, dynamic>> _recentApplicationLogs = [];
   final List<Map<String, dynamic>> _recentReaderLogs = [];
   int _networkLogDedupedCount = 0;
-  Map<String, dynamic>? _lastLoginDebugInfo;
-  Map<String, dynamic>? _lastSourceVersionDebugInfo;
+  Map<String, dynamic>? _lastLoginDebugInfoStorage;
+  Map<String, dynamic>? _lastSourceVersionDebugInfoStorage;
+
+  Map<String, dynamic>? get _lastLoginDebugInfo =>
+      _softwareLogCaptureEnabled ? _lastLoginDebugInfoStorage : null;
+  set _lastLoginDebugInfo(Map<String, dynamic>? value) {
+    _lastLoginDebugInfoStorage = _softwareLogCaptureEnabled ? value : null;
+  }
+
+  Map<String, dynamic>? get _lastSourceVersionDebugInfo =>
+      _softwareLogCaptureEnabled ? _lastSourceVersionDebugInfoStorage : null;
+  set _lastSourceVersionDebugInfo(Map<String, dynamic>? value) {
+    _lastSourceVersionDebugInfoStorage =
+        _softwareLogCaptureEnabled ? value : null;
+  }
+
   final LinkedHashMap<String, Uint8List> _imageBytesCache =
       LinkedHashMap<String, Uint8List>();
   final Map<String, Future<Uint8List>> _imageDownloadInFlight =
@@ -121,6 +136,8 @@ class HazukiSourceService {
   static const String _cacheLastAutoCleanAtKey =
       'image_cache_last_auto_clean_at';
   static const String _customEditedJmSourceKey = 'custom_edited_jm_source';
+  static const String _softwareLogCaptureEnabledKey =
+      'advanced_software_log_capture_enabled';
 
   static const int _defaultCacheMaxBytes = 400 * 1024 * 1024;
   static const String _defaultAutoCleanMode = 'size_overflow';
@@ -130,6 +147,36 @@ class HazukiSourceService {
   String get statusText => _statusText;
   SourceMeta? get sourceMeta => _sourceMeta;
   bool get isInitialized => _engine != null && _sourceMeta != null;
+  bool get softwareLogCaptureEnabled => _softwareLogCaptureEnabled;
+
+  Future<bool> loadSoftwareLogCaptureEnabled() async {
+    final prefs = _prefs ??= await SharedPreferences.getInstance();
+    _softwareLogCaptureEnabled =
+        prefs.getBool(_softwareLogCaptureEnabledKey) ?? false;
+    if (!_softwareLogCaptureEnabled) {
+      _clearCapturedLogs();
+    }
+    return _softwareLogCaptureEnabled;
+  }
+
+  Future<void> setSoftwareLogCaptureEnabled(bool enabled) async {
+    _softwareLogCaptureEnabled = enabled;
+    if (!enabled) {
+      _clearCapturedLogs();
+    }
+    final prefs = _prefs ??= await SharedPreferences.getInstance();
+    await prefs.setBool(_softwareLogCaptureEnabledKey, enabled);
+  }
+
+  void _clearCapturedLogs() {
+    _favoritesDebugCache = null;
+    _recentNetworkLogs.clear();
+    _recentApplicationLogs.clear();
+    _recentReaderLogs.clear();
+    _networkLogDedupedCount = 0;
+    _lastLoginDebugInfo = null;
+    _lastSourceVersionDebugInfo = null;
+  }
 
   Future<void> init({
     void Function(int received, int total)? onSourceDownloadProgress,
@@ -178,6 +225,8 @@ class HazukiSourceService {
   }) async {
     try {
       _prefs = await SharedPreferences.getInstance();
+      _softwareLogCaptureEnabled =
+          _prefs?.getBool(_softwareLogCaptureEnabledKey) ?? false;
       _configureDioCookieBridge();
       await _initImageCache();
       await _initDiscoverCache();

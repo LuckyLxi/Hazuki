@@ -1,5 +1,4 @@
-name: Android arm64-v8a Build
-
+name: Hazuki Release
 on:
   push:
     branches:
@@ -36,6 +35,20 @@ jobs:
 
       - name: Static analysis
         run: flutter analyze
+
+      # 把 jks 文件从 Base64 还原出来
+      - name: Decode keystore
+        run: echo "${{ secrets.HazukiNoa }}" | base64 --decode > android/app/keystore.jks
+
+      # 写入签名配置到 key.properties
+      - name: Write key.properties
+        run: |
+          cat > android/key.properties <<EOF
+          storePassword=${{ secrets.STORE_PASSWORD }}
+          keyPassword=${{ secrets.KEY_PASSWORD }}
+          keyAlias=${{ secrets.KEY_ALIAS }}
+          storeFile=keystore.jks
+          EOF
 
       - name: Build Android APK (arm64-v8a only)
         run: flutter build apk --release --target-platform android-arm64

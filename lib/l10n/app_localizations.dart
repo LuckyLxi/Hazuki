@@ -2639,6 +2639,18 @@ abstract class AppLocalizations {
   /// **'Network, application, and reader logs'**
   String get advancedDebugSubtitle;
 
+  /// No description provided for @advancedSoftwareLogCaptureTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Record software logs'**
+  String get advancedSoftwareLogCaptureTitle;
+
+  /// No description provided for @advancedSoftwareLogCaptureSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'When turned off, network, application, and reader logs will no longer be captured'**
+  String get advancedSoftwareLogCaptureSubtitle;
+
   /// No description provided for @advancedComicIdSearchTitle.
   ///
   /// In en, this message translates to:

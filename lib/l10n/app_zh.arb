@@ -784,6 +784,8 @@
   "advancedTitle": "高级",
   "advancedDebugTitle": "日志",
   "advancedDebugSubtitle": "网络日志、应用日志与阅读器日志",
+  "advancedSoftwareLogCaptureTitle": "记录软件日志",
+  "advancedSoftwareLogCaptureSubtitle": "关闭后将不再抓取网络日志、应用日志与阅读器日志",
   "advancedComicIdSearchTitle": "漫画 ID 搜索优化",
   "advancedComicIdSearchSubtitle": "提交搜索时自动过滤非数字字符，仅保留阿拉伯数字作为关键词",
   "advancedNoImageModeTitle": "无图模式",

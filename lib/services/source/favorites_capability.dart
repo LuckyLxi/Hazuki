@@ -252,6 +252,22 @@ extension HazukiSourceServiceFavoritesCapability on HazukiSourceService {
             }
           }
         }
+        favorited.removeWhere(
+          (id) => !folders.any((folder) => folder.id == id),
+        );
+
+        final normalizedComicId = comicId?.trim() ?? '';
+        if (normalizedComicId.isNotEmpty &&
+            favorited.isEmpty &&
+            folders.any((folder) => folder.id != '0')) {
+          favorited.addAll(
+            await _inferFavoritedFolderIds(
+              engine: engine,
+              comicId: normalizedComicId,
+              folders: folders,
+            ),
+          );
+        }
 
         return (folders, favorited);
       });
@@ -263,6 +279,101 @@ extension HazukiSourceServiceFavoritesCapability on HazukiSourceService {
     } catch (e) {
       return FavoriteFoldersResult.error(e.toString());
     }
+  }
+
+  Future<Set<String>> _inferFavoritedFolderIds({
+    required dynamic engine,
+    required String comicId,
+    required List<FavoriteFolder> folders,
+  }) async {
+    final normalizedComicId = comicId.trim();
+    if (normalizedComicId.isEmpty) {
+      return const <String>{};
+    }
+    final hasLoadComics = _asBool(
+      engine.evaluate('!!this.__hazuki_source.favorites?.loadComics'),
+    );
+    if (!hasLoadComics) {
+      return const <String>{};
+    }
+
+    final inferred = <String>{};
+    final singleFolderOnly = favoriteSingleFolderForSingleComic;
+    for (final folder in folders) {
+      final folderId = folder.id.trim();
+      if (folderId.isEmpty || folderId == '0') {
+        continue;
+      }
+      final containsComic = await _favoriteFolderContainsComic(
+        engine: engine,
+        comicId: normalizedComicId,
+        folderId: folderId,
+      );
+      if (!containsComic) {
+        continue;
+      }
+      inferred.add(folderId);
+      if (singleFolderOnly) {
+        break;
+      }
+    }
+    return inferred;
+  }
+
+  Future<bool> _favoriteFolderContainsComic({
+    required dynamic engine,
+    required String comicId,
+    required String folderId,
+  }) async {
+    final normalizedComicId = comicId.trim();
+    final normalizedFolderId = folderId.trim();
+    if (normalizedComicId.isEmpty ||
+        normalizedFolderId.isEmpty ||
+        normalizedFolderId == '0') {
+      return false;
+    }
+
+    final safeFolderId = normalizedFolderId.replaceAll(
+      RegExp(r'[^A-Za-z0-9_-]'),
+      '_',
+    );
+    var page = 1;
+    const maxProbePages = 120;
+
+    while (page <= maxProbePages) {
+      final dynamic raw = engine.evaluate(
+        'this.__hazuki_source.favorites.loadComics($page, ${jsonEncode(normalizedFolderId)})',
+        name: 'source_favorite_folder_probe_${safeFolderId}_$page.js',
+      );
+      final dynamic resolved = await _awaitJsResult(raw);
+      if (resolved is! Map) {
+        return false;
+      }
+
+      final map = Map<String, dynamic>.from(resolved);
+      final comicsRaw = map['comics'];
+      if (comicsRaw is! List || comicsRaw.isEmpty) {
+        return false;
+      }
+
+      final comics = _parseExploreComics(comicsRaw);
+      if (comics.any((comic) => comic.id == normalizedComicId)) {
+        return true;
+      }
+
+      final maxPageRaw = map['maxPage'];
+      final maxPage = switch (maxPageRaw) {
+        int value => value,
+        num value => value.toInt(),
+        _ => int.tryParse(maxPageRaw?.toString() ?? ''),
+      };
+      if (maxPage == null || page >= maxPage) {
+        return false;
+      }
+      page++;
+    }
+
+    return false;
   }
 
   Future<void> addFavoriteFolder(String name) async {

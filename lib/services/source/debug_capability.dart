@@ -2,7 +2,7 @@ part of '../hazuki_source_service.dart';
 
 extension HazukiSourceServiceDebugCapability on HazukiSourceService {
   Future<void> warmUpFavoritesDebugInfo() async {
-    if (!isLogged) {
+    if (!_softwareLogCaptureEnabled || !isLogged) {
       return;
     }
     if (_isWarmingUpFavoritesDebug) {
@@ -21,6 +21,9 @@ extension HazukiSourceServiceDebugCapability on HazukiSourceService {
   Future<Map<String, dynamic>> collectFavoritesDebugInfo({
     bool forceRefresh = true,
   }) async {
+    if (!_softwareLogCaptureEnabled) {
+      return _buildDisabledFavoritesDebugInfo();
+    }
     if (!forceRefresh && _favoritesDebugCache != null) {
       return _favoritesDebugCache!;
     }
@@ -28,6 +31,9 @@ extension HazukiSourceServiceDebugCapability on HazukiSourceService {
   }
 
   Future<Map<String, dynamic>> _collectFavoritesDebugInfoCore() async {
+    if (!_softwareLogCaptureEnabled) {
+      return _buildDisabledFavoritesDebugInfo();
+    }
     final engine = _engine;
     if (engine == null) {
       throw Exception('漫画源尚未初始化完成');
@@ -106,6 +112,27 @@ extension HazukiSourceServiceDebugCapability on HazukiSourceService {
     return info;
   }
 
+  Map<String, dynamic> _buildDisabledFavoritesDebugInfo() {
+    return <String, dynamic>{
+      'statusText': _statusText,
+      'platform': Platform.operatingSystem,
+      'sourceMeta': {
+        'name': _sourceMeta?.name,
+        'key': _sourceMeta?.key,
+        'version': _sourceMeta?.version,
+        'supportsAccount': _sourceMeta?.supportsAccount,
+      },
+      'isLogged': isLogged,
+      'currentAccount': currentAccount,
+      'generatedAt': DateTime.now().toIso8601String(),
+      'captureEnabled': false,
+      'disabledReason': 'software_log_capture_disabled',
+      'checks': <String, dynamic>{},
+      'calls': <String, dynamic>{},
+      'favoritePageLoadResult': <String, dynamic>{},
+    };
+  }
+
   Future<dynamic> _awaitJsResult(dynamic result) async {
     if (result is Future) {
       return await result;
@@ -119,6 +146,9 @@ extension HazukiSourceServiceDebugCapability on HazukiSourceService {
     Object? content,
     String source = 'app',
   }) {
+    if (!_softwareLogCaptureEnabled) {
+      return;
+    }
     _appendApplicationLog(
       level: level,
       title: title,
@@ -133,6 +163,9 @@ extension HazukiSourceServiceDebugCapability on HazukiSourceService {
     Object? content,
     String source = 'reader',
   }) {
+    if (!_softwareLogCaptureEnabled) {
+      return;
+    }
     _appendReaderLog(
       level: level,
       title: title,
@@ -252,6 +285,9 @@ extension HazukiSourceServiceDebugCapability on HazukiSourceService {
     Map<String, dynamic>? responseHeaders,
     Object? responseBody,
   }) {
+    if (!_softwareLogCaptureEnabled) {
+      return;
+    }
     final endedAt = DateTime.now();
     final durationMs = endedAt.difference(startedAt).inMilliseconds;
     final isImportant = _isImportantNetworkLogForStorage(
@@ -390,6 +426,7 @@ extension HazukiSourceServiceDebugCapability on HazukiSourceService {
       'isLogged': isLogged,
       'currentAccount': currentAccount,
       'generatedAt': DateTime.now().toIso8601String(),
+      'captureEnabled': _softwareLogCaptureEnabled,
       'networkLogStats': {
         'keptCount': _recentNetworkLogs.length,
         'dedupedCount': _networkLogDedupedCount,
@@ -417,6 +454,7 @@ extension HazukiSourceServiceDebugCapability on HazukiSourceService {
       'isLogged': isLogged,
       'currentAccount': currentAccount,
       'generatedAt': DateTime.now().toIso8601String(),
+      'captureEnabled': _softwareLogCaptureEnabled,
       'applicationLogStats': {
         'keptCount': _recentApplicationLogs.length,
       },
@@ -441,6 +479,7 @@ extension HazukiSourceServiceDebugCapability on HazukiSourceService {
       'isLogged': isLogged,
       'currentAccount': currentAccount,
       'generatedAt': DateTime.now().toIso8601String(),
+      'captureEnabled': _softwareLogCaptureEnabled,
       'readerLogStats': {
         'keptCount': _recentReaderLogs.length,
       },

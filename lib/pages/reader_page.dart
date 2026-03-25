@@ -1697,7 +1697,8 @@ class _ReaderPageState extends State<ReaderPage>
   Widget _buildReaderListItem(int index) {
     final url = _images[index];
     final cachedProvider = _providerCache[url];
-    final placeholderAspectRatio = _imageAspectRatioCache[url] ?? (3 / 4);
+    final resolvedAspectRatio = _imageAspectRatioCache[url];
+    final placeholderAspectRatio = resolvedAspectRatio ?? (3 / 4);
 
     if (_noImageModeEnabled) {
       return AspectRatio(
@@ -1708,31 +1709,41 @@ class _ReaderPageState extends State<ReaderPage>
     }
 
     Widget buildImage(ImageProvider provider) {
-      return _wrapImageWidget(
-        Image(
-          key: ValueKey(url),
-          image: provider,
-          fit: BoxFit.fitWidth,
-          width: double.infinity,
-          filterQuality: FilterQuality.medium,
-          gaplessPlayback: true,
-          frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-            if (wasSynchronouslyLoaded || frame != null) {
-              return child;
-            }
-            return const ColoredBox(color: Colors.black);
-          },
-          errorBuilder: (_, _, _) {
-            return Container(
-              height: 120,
-              color: Theme.of(context).colorScheme.surfaceContainerHighest,
-              alignment: Alignment.center,
-              child: const Icon(Icons.broken_image_outlined),
-            );
-          },
-        ),
-        url,
+      final image = Image(
+        key: ValueKey(url),
+        image: provider,
+        fit: resolvedAspectRatio != null ? BoxFit.fill : BoxFit.fitWidth,
+        width: double.infinity,
+        height: resolvedAspectRatio != null ? double.infinity : null,
+        filterQuality: FilterQuality.medium,
+        gaplessPlayback: true,
+        frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+          if (wasSynchronouslyLoaded || frame != null) {
+            return child;
+          }
+          return const ColoredBox(color: Colors.black);
+        },
+        errorBuilder: (_, _, _) {
+          return Container(
+            height: 120,
+            color: Theme.of(context).colorScheme.surfaceContainerHighest,
+            alignment: Alignment.center,
+            child: const Icon(Icons.broken_image_outlined),
+          );
+        },
       );
+      final stableImage = resolvedAspectRatio == null
+          ? image
+          : ColoredBox(
+              color: Colors.black,
+              child: AspectRatio(
+                // 为已解析宽高比的图片预留稳定高度，避免快速滑动时
+                // 已缓存图片短暂变成 0 高，导致列表 extent 收缩并回顶。
+                aspectRatio: resolvedAspectRatio,
+                child: image,
+              ),
+            );
+      return _wrapImageWidget(stableImage, url);
     }
 
     Widget content;
