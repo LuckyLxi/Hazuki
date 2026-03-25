@@ -45,6 +45,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get settingsCloudSyncSubtitle => '上传与恢复备份';
 
   @override
+  String get settingsOtherTitle => '其它';
+
+  @override
+  String get settingsOtherSubtitle => '签到与附加功能';
+
+  @override
   String get settingsAdvancedTitle => '高级';
 
   @override
@@ -236,10 +242,50 @@ class AppLocalizationsZh extends AppLocalizations {
   String get homeMenuLines => '线路';
 
   @override
+  String get homeCheckInAction => '签到';
+
+  @override
+  String get homeCheckInDone => '今日已签到';
+
+  @override
+  String get homeCheckInInProgress => '签到中...';
+
+  @override
+  String get homeCheckInSuccess => '签到成功';
+
+  @override
+  String get homeCheckInAlreadyDone => '今天已经签到过了';
+
+  @override
+  String homeCheckInFailed(Object error) {
+    return '签到失败：$error';
+  }
+
+  @override
   String get homeTabDiscover => '发现';
 
   @override
   String get homeTabFavorite => '收藏';
+
+  @override
+  String get otherTitle => '其它';
+
+  @override
+  String get otherAutoCheckInTitle => '自动签到';
+
+  @override
+  String get otherAutoCheckInSubtitle => '开启后，每天打开软件时会自动触发一次签到';
+
+  @override
+  String get sourceBootstrapDownloading => '正在下载漫画源';
+
+  @override
+  String get sourceBootstrapPreparing => '正在准备源文件...';
+
+  @override
+  String sourceBootstrapProgress(Object progress) {
+    return '已下载 $progress%';
+  }
 
   @override
   String get dialogBarrierLabel => '对话框';
@@ -675,8 +721,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get readingTapToTurnPageTitle => '点击翻页';
 
   @override
-  String get readingTapToTurnPageSubtitle =>
-      '仅在从右到左模式下生效，点击左侧回到上一页，点击右侧前往下一页';
+  String get readingTapToTurnPageSubtitle => '仅在从右到左模式下生效，点击左侧回到上一页，点击右侧前往下一页';
 
   @override
   String get readingImmersiveModeTitle => '沉浸模式';
@@ -700,13 +745,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String readingBrightnessLabel(Object value) {
     return '亮度 $value';
   }
- 
+
   @override
   String get readingPageIndicatorTitle => '页数指示器';
- 
+
   @override
   String get readingPageIndicatorSubtitle => '在阅读器左下角显示第几话与当前页数/总页数';
- 
+
   @override
   String get readingPinchToZoomTitle => '双指缩放';
 
@@ -1359,12 +1404,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get readerCurrentChapterNoImages => '当前章节无图片';
- 
+
   @override
   String readerPageIndicator(Object chapter, Object current, Object total) {
     return '第$chapter话 $current/$total';
   }
- 
+
   @override
   String get readerResetZoom => '还原大小';
 
@@ -1390,48 +1435,14 @@ class AppLocalizationsZh extends AppLocalizations {
   String get advancedNoImageModeSubtitle => '全局不显示图片（侧边栏登录头像除外）';
 
   @override
-  String get settingsOtherTitle => '其它';
+  String get advancedEditSourceTitle => '编辑漫画源';
 
   @override
-  String get settingsOtherSubtitle => '签到与附加功能';
+  String get advancedEditSourceSubtitle => '打开轻量编辑器，修改并保存 jm.js';
 
   @override
-  String get homeCheckInAction => '签到';
+  String get advancedRestoreSourceLabel => '还原漫画源';
 
   @override
-  String get homeCheckInDone => '今日已签到';
-
-  @override
-  String get homeCheckInInProgress => '签到中...';
-
-  @override
-  String get homeCheckInSuccess => '签到成功';
-
-  @override
-  String get homeCheckInAlreadyDone => '今天已经签到过了';
-
-  @override
-  String homeCheckInFailed(Object error) {
-    return '签到失败：$error';
-  }
-
-  @override
-  String get otherTitle => '其它';
-
-  @override
-  String get otherAutoCheckInTitle => '自动签到';
-
-  @override
-  String get otherAutoCheckInSubtitle => '开启后，每天打开软件时会自动触发一次签到';
-
-  @override
-  String get sourceBootstrapDownloading => '正在下载漫画源';
-
-  @override
-  String get sourceBootstrapPreparing => '正在准备源文件...';
-
-  @override
-  String sourceBootstrapProgress(Object progress) {
-    return '已下载 $progress%';
-  }
+  String get advancedRestoreSourceSuccess => '已还原漫画源，请重启应用后生效';
 }

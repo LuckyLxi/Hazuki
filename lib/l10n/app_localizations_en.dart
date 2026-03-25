@@ -45,6 +45,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsCloudSyncSubtitle => 'Upload and restore backups';
 
   @override
+  String get settingsOtherTitle => 'Other';
+
+  @override
+  String get settingsOtherSubtitle => 'Check-in and extra actions';
+
+  @override
   String get settingsAdvancedTitle => 'Advanced';
 
   @override
@@ -236,10 +242,50 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeMenuLines => 'Lines';
 
   @override
+  String get homeCheckInAction => 'Check in';
+
+  @override
+  String get homeCheckInDone => 'Checked in today';
+
+  @override
+  String get homeCheckInInProgress => 'Checking in...';
+
+  @override
+  String get homeCheckInSuccess => 'Check-in successful';
+
+  @override
+  String get homeCheckInAlreadyDone => 'Already checked in today';
+
+  @override
+  String homeCheckInFailed(Object error) {
+    return 'Check-in failed: $error';
+  }
+
+  @override
   String get homeTabDiscover => 'Discover';
 
   @override
   String get homeTabFavorite => 'Favorites';
+
+  @override
+  String get otherTitle => 'Other';
+
+  @override
+  String get otherAutoCheckInTitle => 'Auto daily check-in';
+
+  @override
+  String get otherAutoCheckInSubtitle => 'Automatically check in once when the app is opened each day';
+
+  @override
+  String get sourceBootstrapDownloading => 'Downloading comic source';
+
+  @override
+  String get sourceBootstrapPreparing => 'Preparing source files...';
+
+  @override
+  String sourceBootstrapProgress(Object progress) {
+    return 'Downloaded $progress%';
+  }
 
   @override
   String get dialogBarrierLabel => 'Dialog';
@@ -663,8 +709,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get readingModeTitle => 'Reading mode';
 
   @override
-  String get readingModeSubtitle =>
-      'Choose how pages are arranged in the reader';
+  String get readingModeSubtitle => 'Choose how pages are arranged in the reader';
 
   @override
   String get readingModeTopToBottom => 'Top to bottom';
@@ -676,8 +721,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get readingTapToTurnPageTitle => 'Tap to turn page';
 
   @override
-  String get readingTapToTurnPageSubtitle =>
-      'Only works in right-to-left mode. Tap the left side for the previous page and the right side for the next page';
+  String get readingTapToTurnPageSubtitle => 'Only works in right-to-left mode. Tap the left side for the previous page and the right side for the next page';
 
   @override
   String get readingImmersiveModeTitle => 'Immersive mode';
@@ -701,14 +745,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String readingBrightnessLabel(Object value) {
     return 'Brightness $value';
   }
- 
+
   @override
   String get readingPageIndicatorTitle => 'Page indicator';
- 
+
   @override
-  String get readingPageIndicatorSubtitle =>
-      'Show the chapter number and current page/total pages in the lower-left corner of the reader';
- 
+  String get readingPageIndicatorSubtitle => 'Show the chapter number and current page/total pages in the lower-left corner of the reader';
+
   @override
   String get readingPinchToZoomTitle => 'Pinch to zoom';
 
@@ -791,8 +834,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get downloadsDownloadChaptersTitle => 'Download chapters';
 
   @override
-  String get downloadsDownloadChaptersSubtitle =>
-      'Select the chapters you want to download';
+  String get downloadsDownloadChaptersSubtitle => 'Select the chapters you want to download';
 
   @override
   String get downloadsDownloadAction => 'Download';
@@ -1362,12 +1404,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get readerCurrentChapterNoImages => 'No images in the current chapter';
- 
+
   @override
   String readerPageIndicator(Object chapter, Object current, Object total) {
     return 'Chapter $chapter $current/$total';
   }
- 
+
   @override
   String get readerResetZoom => 'Reset zoom';
 
@@ -1393,48 +1435,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get advancedNoImageModeSubtitle => 'Hide images globally (except the login avatar in the sidebar)';
 
   @override
-  String get settingsOtherTitle => 'Other';
+  String get advancedEditSourceTitle => 'Edit comic source';
 
   @override
-  String get settingsOtherSubtitle => 'Check-in and extra actions';
+  String get advancedEditSourceSubtitle => 'Open a lightweight editor to edit and save jm.js';
 
   @override
-  String get homeCheckInAction => 'Check in';
+  String get advancedRestoreSourceLabel => 'Restore comic source';
 
   @override
-  String get homeCheckInDone => 'Checked in today';
-
-  @override
-  String get homeCheckInInProgress => 'Checking in...';
-
-  @override
-  String get homeCheckInSuccess => 'Check-in successful';
-
-  @override
-  String get homeCheckInAlreadyDone => 'Already checked in today';
-
-  @override
-  String homeCheckInFailed(Object error) {
-    return 'Check-in failed: $error';
-  }
-
-  @override
-  String get otherTitle => 'Other';
-
-  @override
-  String get otherAutoCheckInTitle => 'Auto daily check-in';
-
-  @override
-  String get otherAutoCheckInSubtitle => 'Automatically check in once when the app is opened each day';
-
-  @override
-  String get sourceBootstrapDownloading => 'Downloading comic source';
-
-  @override
-  String get sourceBootstrapPreparing => 'Preparing source files...';
-
-  @override
-  String sourceBootstrapProgress(Object progress) {
-    return 'Downloaded $progress%';
-  }
+  String get advancedRestoreSourceSuccess => 'Comic source restored. Restart the app to apply it.';
 }

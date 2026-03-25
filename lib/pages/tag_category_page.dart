@@ -15,7 +15,6 @@ class _TagCategoryPageState extends State<TagCategoryPage> {
   String? _errorMessage;
 
   bool _initialLoading = true;
-  bool _refreshing = false;
 
   @override
   void initState() {
@@ -31,15 +30,9 @@ class _TagCategoryPageState extends State<TagCategoryPage> {
     );
   }
 
-  Future<void> _loadInitial({bool forceRefresh = false}) async {
+  Future<void> _loadInitial() async {
     if (!mounted) {
       return;
-    }
-
-    if (forceRefresh) {
-      setState(() {
-        _refreshing = true;
-      });
     }
 
     try {
@@ -63,7 +56,6 @@ class _TagCategoryPageState extends State<TagCategoryPage> {
       if (mounted) {
         setState(() {
           _initialLoading = false;
-          _refreshing = false;
         });
       }
     }
@@ -84,107 +76,94 @@ class _TagCategoryPageState extends State<TagCategoryPage> {
         context: context,
         title: Text(strings.tagCategoryTitle),
       ),
-      body: RefreshIndicator(
-        onRefresh: () => _loadInitial(forceRefresh: true),
-        child: _initialLoading
-            ? ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                children: [
-                  const SizedBox(height: 160),
-                  Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const HazukiStickerLoadingIndicator(size: 112),
-                        const SizedBox(height: 10),
-                        Text(strings.commonLoading),
-                      ],
-                    ),
+      body: _initialLoading
+          ? ListView(
+              children: [
+                const SizedBox(height: 160),
+                Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const HazukiStickerLoadingIndicator(size: 112),
+                      const SizedBox(height: 10),
+                      Text(strings.commonLoading),
+                    ],
                   ),
-                ],
-              )
-            : (_errorMessage != null && _tagGroups.isEmpty)
-            ? ListView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.all(16),
-                children: [
-                  const SizedBox(height: 90),
-                  Text(_errorMessage!, textAlign: TextAlign.center),
-                  const SizedBox(height: 12),
-                  Center(
-                    child: FilledButton(
-                      onPressed: () {
-                        unawaited(_loadInitial(forceRefresh: true));
-                      },
-                      child: Text(strings.commonRetry),
-                    ),
-                  ),
-                ],
-              )
-            : ListView(
-                physics: const AlwaysScrollableScrollPhysics(
-                  parent: ClampingScrollPhysics(),
                 ),
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-                children: [
-                  if (_errorMessage != null)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 8),
-                      child: Text(
-                        _errorMessage!,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
+              ],
+            )
+          : (_errorMessage != null && _tagGroups.isEmpty)
+          ? ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                const SizedBox(height: 90),
+                Text(_errorMessage!, textAlign: TextAlign.center),
+                const SizedBox(height: 12),
+                Center(
+                  child: FilledButton(
+                    onPressed: () {
+                      unawaited(_loadInitial());
+                    },
+                    child: Text(strings.commonRetry),
+                  ),
+                ),
+              ],
+            )
+          : ListView(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+              children: [
+                if (_errorMessage != null)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      _errorMessage!,
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                    ),
+                  ),
+                if (_tagGroups.isNotEmpty)
+                  Text(
+                    strings.tagCategoryTitle,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                if (_tagGroups.isNotEmpty) const SizedBox(height: 10),
+                if (_tagGroups.isEmpty) Text(strings.tagCategoryEmpty),
+                for (final group in _tagGroups)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 14),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surfaceContainer,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              group.name,
+                              style: Theme.of(context).textTheme.titleSmall,
+                            ),
+                            const SizedBox(height: 8),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: group.tags.map((tag) {
+                                return ActionChip(
+                                  label: Text(tag),
+                                  onPressed: () => _openSearchByTag(tag),
+                                );
+                              }).toList(),
+                            ),
+                          ],
                         ),
                       ),
                     ),
-                  if (_tagGroups.isNotEmpty)
-                    Text(
-                      strings.tagCategoryTitle,
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                  if (_tagGroups.isNotEmpty) const SizedBox(height: 10),
-                  if (_tagGroups.isEmpty) Text(strings.tagCategoryEmpty),
-                  for (final group in _tagGroups)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 14),
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: Theme.of(context).colorScheme.surfaceContainer,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                group.name,
-                                style: Theme.of(context).textTheme.titleSmall,
-                              ),
-                              const SizedBox(height: 8),
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                children: group.tags.map((tag) {
-                                  return ActionChip(
-                                    label: Text(tag),
-                                    onPressed: () => _openSearchByTag(tag),
-                                  );
-                                }).toList(),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  if (_refreshing)
-                    const Padding(
-                      padding: EdgeInsets.only(top: 8),
-                      child: SizedBox.shrink(),
-                    ),
-                ],
-              ),
-      ),
+                  ),
+              ],
+            ),
     );
   }
 }

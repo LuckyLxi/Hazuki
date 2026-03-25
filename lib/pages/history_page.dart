@@ -210,10 +210,10 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 
   Future<void> _handleToggleFavoriteFromHistory(ExploreComic comic) async {
-    final isLogged = HazukiSourceService.instance.isLogged;
+    final service = HazukiSourceService.instance;
     final strings = l10n(context);
 
-    if (!isLogged) {
+    if (!service.isLogged) {
       unawaited(
         showHazukiPrompt(
           context,
@@ -223,22 +223,21 @@ class _HistoryPageState extends State<HistoryPage> {
       );
       return;
     }
-    unawaited(showHazukiPrompt(context, strings.historyFavoriteProcessing));
+
     try {
-      final details = await HazukiSourceService.instance.loadComicDetails(
-        comic.id,
-      );
+      final details = await service.loadComicDetails(comic.id);
       if (!mounted) {
         return;
       }
-      if (HazukiSourceService.instance.supportFavoriteFolderLoad &&
-          HazukiSourceService.instance.supportFavoriteToggle) {
-        unawaited(
-          showHazukiPrompt(context, strings.historyFavoriteFolderNotice),
-        );
+
+      if (service.supportFavoriteFolderLoad && service.supportFavoriteToggle) {
+        await _showFavoriteFoldersPanelFromHistory(details);
+        return;
       }
+
+      unawaited(showHazukiPrompt(context, strings.historyFavoriteProcessing));
       if (details.isFavorite) {
-        await HazukiSourceService.instance.toggleFavorite(
+        await service.toggleFavorite(
           comicId: details.id,
           isAdding: false,
           folderId: '0',
@@ -248,7 +247,7 @@ class _HistoryPageState extends State<HistoryPage> {
         }
         unawaited(showHazukiPrompt(context, strings.historyFavoriteRemoved));
       } else {
-        await HazukiSourceService.instance.toggleFavorite(
+        await service.toggleFavorite(
           comicId: details.id,
           isAdding: true,
           folderId: '0',
@@ -266,6 +265,135 @@ class _HistoryPageState extends State<HistoryPage> {
         showHazukiPrompt(
           context,
           strings.historyFavoriteFailed('$e'),
+          isError: true,
+        ),
+      );
+    }
+  }
+
+  Future<void> _showFavoriteFoldersPanelFromHistory(
+    ComicDetailsData details,
+  ) async {
+    final service = HazukiSourceService.instance;
+    final singleFolderOnly = service.favoriteSingleFolderForSingleComic;
+
+    final changed = await showGeneralDialog<Map<String, Set<String>>>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+      barrierColor: Colors.black.withValues(alpha: 0.46),
+      transitionDuration: const Duration(milliseconds: 420),
+      pageBuilder: (dialogContext, animation, secondaryAnimation) {
+        final themedData = Theme.of(context);
+        return Theme(
+          data: themedData,
+          child: _FavoriteFoldersMorphDialog(
+            details: details,
+            singleFolderOnly: singleFolderOnly,
+            favoriteOverride: null,
+            initialIsFavorite: details.isFavorite,
+          ),
+        );
+      },
+      transitionBuilder: (dialogContext, animation, secondaryAnimation, child) {
+        final scale = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutBack,
+          reverseCurve: Curves.easeInCubic,
+        );
+        final opacity = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        );
+        final slide = Tween<Offset>(
+          begin: const Offset(0, 0.04),
+          end: Offset.zero,
+        ).animate(
+          CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
+            reverseCurve: Curves.easeInCubic,
+          ),
+        );
+        return FadeTransition(
+          opacity: opacity,
+          child: SlideTransition(
+            position: slide,
+            child: ScaleTransition(
+              scale: Tween<double>(begin: 0.9, end: 1).animate(scale),
+              child: child,
+            ),
+          ),
+        );
+      },
+    );
+
+    if (changed == null || !mounted) {
+      return;
+    }
+
+    final selectedResult = Set<String>.from(changed['selected'] ?? <String>{});
+    final initialFavoritedResult = Set<String>.from(
+      changed['initial'] ?? <String>{},
+    );
+
+    final addTargets = selectedResult.difference(initialFavoritedResult);
+    final removeTargets = initialFavoritedResult.difference(selectedResult);
+
+    if (addTargets.isEmpty && removeTargets.isEmpty) {
+      return;
+    }
+
+    try {
+      if (singleFolderOnly) {
+        if (selectedResult.isEmpty) {
+          await service.toggleFavorite(
+            comicId: details.id,
+            isAdding: false,
+            folderId: initialFavoritedResult.firstOrNull ?? '0',
+          );
+        } else {
+          await service.toggleFavorite(
+            comicId: details.id,
+            isAdding: true,
+            folderId: selectedResult.first,
+          );
+        }
+      } else {
+        for (final folderId in addTargets) {
+          await service.toggleFavorite(
+            comicId: details.id,
+            isAdding: true,
+            folderId: folderId,
+          );
+        }
+        for (final folderId in removeTargets) {
+          await service.toggleFavorite(
+            comicId: details.id,
+            isAdding: false,
+            folderId: folderId,
+          );
+        }
+      }
+
+      if (!mounted) {
+        return;
+      }
+      unawaited(
+        showHazukiPrompt(
+          context,
+          l10n(context).comicDetailFavoriteSettingsUpdated,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      unawaited(
+        showHazukiPrompt(
+          context,
+          l10n(context).comicDetailFavoriteSettingsUpdateFailed('$e'),
           isError: true,
         ),
       );
@@ -664,7 +792,7 @@ class _HistoryPageState extends State<HistoryPage> {
                   curve: Curves.easeOutCubic,
                   child: IgnorePointer(
                     ignoring: !_showBackToTop,
-                    child: FloatingActionButton.small(
+                    child: FloatingActionButton(
                       heroTag: 'history_back_to_top',
                       onPressed: _scrollToTop,
                       child: const Icon(Icons.vertical_align_top_rounded),

@@ -373,473 +373,53 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
     final service = HazukiSourceService.instance;
     final singleFolderOnly = service.favoriteSingleFolderForSingleComic;
 
-    var hasRequestedInitialLoad = false;
-    var isLoading = true;
-    var loadedAnimationPlayed = false;
-    String? loadError;
-    List<FavoriteFolder> folders = <FavoriteFolder>[];
-    Set<String> selected = <String>{};
-    Set<String> initialFavorited = <String>{};
-
-    final changed = await showModalBottomSheet<Map<String, Set<String>>>(
+    final changed = await showGeneralDialog<Map<String, Set<String>>>(
       context: context,
-      showDragHandle: true,
-      isScrollControlled: true,
-      builder: (sheetContext) {
-        final themedData = _buildDetailTheme(Theme.of(sheetContext));
-
+      barrierDismissible: true,
+      barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+      barrierColor: Colors.black.withValues(alpha: 0.46),
+      transitionDuration: const Duration(milliseconds: 420),
+      pageBuilder: (dialogContext, animation, secondaryAnimation) {
+        final themedData = _buildDetailTheme(Theme.of(context));
         return Theme(
           data: themedData,
-          child: StatefulBuilder(
-            builder: (sheetContext, setSheetState) {
-              Future<void> loadFolders() async {
-                try {
-                  final result = await service.loadFavoriteFolders(
-                    comicId: details.id,
-                  );
-                  if (!sheetContext.mounted) {
-                    return;
-                  }
-                  setSheetState(() {
-                    isLoading = false;
-                    if (result.errorMessage != null) {
-                      loadError = result.errorMessage;
-                      return;
-                    }
-                    loadError = null;
-                    loadedAnimationPlayed = true;
-                    folders = List<FavoriteFolder>.from(result.folders);
-                    initialFavorited = Set<String>.from(
-                      result.favoritedFolderIds,
-                    );
-                    selected = Set<String>.from(initialFavorited);
-                    if (selected.isEmpty &&
-                        (_favoriteOverride ?? details.isFavorite)) {
-                      selected = <String>{'0'};
-                    }
-                  });
-                } catch (e) {
-                  if (!sheetContext.mounted) {
-                    return;
-                  }
-                  setSheetState(() {
-                    isLoading = false;
-                    loadError = e.toString();
-                  });
-                }
-              }
-
-              if (!hasRequestedInitialLoad) {
-                hasRequestedInitialLoad = true;
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (!sheetContext.mounted) {
-                    return;
-                  }
-                  unawaited(loadFolders());
-                });
-              }
-
-              Future<void> addFolder() async {
-                final controller = TextEditingController();
-                final strings = l10n(context);
-                final name = await showDialog<String>(
-                  context: sheetContext,
-                  builder: (dialogContext) {
-                    String? errorText;
-                    return Theme(
-                      data: themedData,
-                      child: StatefulBuilder(
-                        builder: (dialogContext, setDialogState) {
-                          return AlertDialog(
-                            title: Text(
-                              strings.comicDetailCreateFavoriteFolder,
-                            ),
-                            content: TextField(
-                              controller: controller,
-                              autofocus: true,
-                              decoration: InputDecoration(
-                                hintText:
-                                    strings.comicDetailFavoriteFolderNameHint,
-                                border: const OutlineInputBorder(),
-                                errorText: errorText,
-                              ),
-                              onChanged: (_) {
-                                if (errorText != null) {
-                                  setDialogState(() => errorText = null);
-                                }
-                              },
-                            ),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(dialogContext),
-                                child: Text(strings.commonCancel),
-                              ),
-                              FilledButton(
-                                onPressed: () {
-                                  final text = controller.text.trim();
-                                  if (text.isEmpty) {
-                                    setDialogState(
-                                      () => errorText = strings
-                                          .comicDetailFavoriteFolderNameRequired,
-                                    );
-                                    return;
-                                  }
-                                  Navigator.pop(dialogContext, text);
-                                },
-                                child: Text(strings.commonConfirm),
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-                    );
-                  },
-                );
-                controller.dispose();
-                if (name == null || name.isEmpty) {
-                  return;
-                }
-                try {
-                  setSheetState(() => isLoading = true);
-                  await service.addFavoriteFolder(name);
-                  final refreshed = await service.loadFavoriteFolders(
-                    comicId: details.id,
-                  );
-                  if (refreshed.errorMessage != null) {
-                    throw Exception(refreshed.errorMessage);
-                  }
-                  if (!sheetContext.mounted) {
-                    return;
-                  }
-                  setSheetState(() {
-                    folders = List<FavoriteFolder>.from(refreshed.folders);
-                    isLoading = false;
-                    loadError = null;
-                  });
-                } catch (e) {
-                  if (!sheetContext.mounted) {
-                    return;
-                  }
-                  setSheetState(() => isLoading = false);
-                  unawaited(
-                    showHazukiPrompt(
-                      sheetContext,
-                      strings.comicDetailCreateFavoriteFolderFailed('$e'),
-                      isError: true,
-                    ),
-                  );
-                }
-              }
-
-              Future<void> deleteFolder(String folderId) async {
-                final strings = l10n(context);
-                final ok = await showDialog<bool>(
-                  context: sheetContext,
-                  builder: (dialogContext) {
-                    return Theme(
-                      data: themedData,
-                      child: AlertDialog(
-                        title: Text(strings.comicDetailDeleteFavoriteFolder),
-                        content: Text(
-                          strings.comicDetailDeleteFavoriteFolderContent,
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () =>
-                                Navigator.pop(dialogContext, false),
-                            child: Text(strings.commonCancel),
-                          ),
-                          FilledButton(
-                            onPressed: () => Navigator.pop(dialogContext, true),
-                            child: Text(strings.comicDetailDelete),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                );
-                if (ok != true) {
-                  return;
-                }
-                try {
-                  setSheetState(() => isLoading = true);
-                  await service.deleteFavoriteFolder(folderId);
-                  if (!sheetContext.mounted) {
-                    return;
-                  }
-                  setSheetState(() {
-                    folders = folders.where((e) => e.id != folderId).toList();
-                    selected.remove(folderId);
-                    initialFavorited.remove(folderId);
-                    isLoading = false;
-                    loadError = null;
-                  });
-                } catch (e) {
-                  if (!sheetContext.mounted) {
-                    return;
-                  }
-                  setSheetState(() => isLoading = false);
-                  unawaited(
-                    showHazukiPrompt(
-                      sheetContext,
-                      strings.comicDetailDeleteFavoriteFolderFailed('$e'),
-                      isError: true,
-                    ),
-                  );
-                }
-              }
-
-              Widget buildLoadingBody() {
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 24),
-                  child: Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const HazukiStickerLoadingIndicator(size: 112),
-                        const SizedBox(height: 10),
-                        Text(l10n(context).commonLoading),
-                      ],
-                    ),
-                  ),
-                );
-              }
-
-              Widget buildLoadedBody() {
-                if (loadError != null) {
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 24),
-                    child: Center(
-                      child: Text(
-                        l10n(
-                          context,
-                        ).comicDetailFavoriteFoldersLoadFailed('$loadError'),
-                        style: TextStyle(
-                          color: Theme.of(sheetContext).colorScheme.error,
-                        ),
-                      ),
-                    ),
-                  );
-                }
-
-                if (folders.isEmpty) {
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    child: Text(l10n(context).comicDetailNoFavoriteFolders),
-                  );
-                }
-
-                return ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxHeight: MediaQuery.of(sheetContext).size.height * 0.48,
-                  ),
-                  child: ListView.separated(
-                    shrinkWrap: true,
-                    itemCount: folders.length,
-                    separatorBuilder: (_, _) => const Divider(height: 1),
-                    itemBuilder: (itemContext, index) {
-                      final folder = folders[index];
-                      final checked = selected.contains(folder.id);
-                      return ListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 4,
-                        ),
-                        title: Text(folder.name),
-                        trailing: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Checkbox(
-                              value: checked,
-                              onChanged: (value) {
-                                setSheetState(() {
-                                  final enabled = value == true;
-                                  if (enabled) {
-                                    if (singleFolderOnly) {
-                                      selected = <String>{folder.id};
-                                    } else {
-                                      selected.add(folder.id);
-                                    }
-                                  } else {
-                                    selected.remove(folder.id);
-                                  }
-                                });
-                              },
-                            ),
-                            if (folder.id != '0' &&
-                                service.supportFavoriteFolderDelete)
-                              IconButton(
-                                icon: const Icon(Icons.delete_outline),
-                                tooltip: l10n(
-                                  context,
-                                ).comicDetailDeleteFavoriteFolderTooltip,
-                                onPressed: () => deleteFolder(folder.id),
-                              ),
-                          ],
-                        ),
-                        onTap: () {
-                          setSheetState(() {
-                            if (singleFolderOnly) {
-                              selected = <String>{folder.id};
-                            } else if (checked) {
-                              selected.remove(folder.id);
-                            } else {
-                              selected.add(folder.id);
-                            }
-                          });
-                        },
-                      );
-                    },
-                  ),
-                );
-              }
-
-              Widget buildAnimatedBody() {
-                final showLoadingBody = isLoading && !loadedAnimationPlayed;
-                return TweenAnimationBuilder<double>(
-                  key: ValueKey(
-                    showLoadingBody
-                        ? 'favorite_loading_body'
-                        : 'favorite_loaded_body',
-                  ),
-                  tween: Tween<double>(begin: 0.94, end: 1),
-                  duration: Duration(milliseconds: showLoadingBody ? 160 : 320),
-                  curve: showLoadingBody
-                      ? Curves.easeOutCubic
-                      : Curves.easeOutBack,
-                  builder: (context, value, child) {
-                    final opacity = showLoadingBody
-                        ? 1.0
-                        : ((value - 0.94) / 0.06).clamp(0.0, 1.0);
-                    final translateY = (1 - value) * 28;
-                    return Opacity(
-                      opacity: opacity,
-                      child: Transform.translate(
-                        offset: Offset(0, translateY),
-                        child: Transform.scale(
-                          scale: value,
-                          alignment: Alignment.topCenter,
-                          child: child,
-                        ),
-                      ),
-                    );
-                  },
-                  child: showLoadingBody
-                      ? buildLoadingBody()
-                      : buildLoadedBody(),
-                );
-              }
-
-              final showLoadedState =
-                  !isLoading && loadError == null && loadedAnimationPlayed;
-
-              return SafeArea(
-                child: AnimatedScale(
-                  scale: showLoadedState ? 1 : 0.98,
-                  duration: const Duration(milliseconds: 340),
-                  curve: Curves.easeOutBack,
-                  child: AnimatedOpacity(
-                    opacity: showLoadedState ? 1 : 0.88,
-                    duration: const Duration(milliseconds: 220),
-                    curve: Curves.easeOut,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 280),
-                      curve: Curves.easeOutCubic,
-                      decoration: BoxDecoration(
-                        color: Theme.of(sheetContext).colorScheme.surface,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withAlpha(20),
-                            blurRadius: showLoadedState ? 24 : 10,
-                            spreadRadius: showLoadedState ? 0 : -2,
-                            offset: const Offset(0, -2),
-                          ),
-                        ],
-                      ),
-                      child: Padding(
-                        padding: EdgeInsets.only(
-                          left: 16,
-                          right: 16,
-                          top: 4,
-                          bottom:
-                              MediaQuery.of(sheetContext).viewInsets.bottom +
-                              16,
-                        ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: Text(
-                                    l10n(context).comicDetailManageFavorites,
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                ),
-                                if (service.supportFavoriteFolderAdd &&
-                                    !isLoading &&
-                                    loadError == null)
-                                  IconButton(
-                                    tooltip: l10n(
-                                      context,
-                                    ).comicDetailCreateFavoriteFolderTooltip,
-                                    onPressed: addFolder,
-                                    icon: const Icon(
-                                      Icons.create_new_folder_outlined,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                            Text(
-                              singleFolderOnly
-                                  ? l10n(context).comicDetailSingleFolderHint
-                                  : l10n(
-                                      context,
-                                    ).comicDetailMultipleFoldersHint,
-                              style: Theme.of(sheetContext).textTheme.bodySmall,
-                            ),
-                            const SizedBox(height: 10),
-                            buildAnimatedBody(),
-                            const SizedBox(height: 12),
-                            FilledButton(
-                              onPressed: (isLoading || loadError != null)
-                                  ? null
-                                  : () {
-                                      if (selected.isEmpty &&
-                                          initialFavorited.isEmpty) {
-                                        unawaited(
-                                          showHazukiPrompt(
-                                            sheetContext,
-                                            l10n(context)
-                                                .comicDetailSelectAtLeastOneFolder,
-                                            isError: true,
-                                          ),
-                                        );
-                                        return;
-                                      }
-                                      Navigator.of(
-                                        sheetContext,
-                                      ).pop(<String, Set<String>>{
-                                        'selected': Set<String>.from(selected),
-                                        'initial': Set<String>.from(
-                                          initialFavorited,
-                                        ),
-                                      });
-                                    },
-                              child: Text(l10n(context).commonSave),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            },
+          child: _FavoriteFoldersMorphDialog(
+            details: details,
+            singleFolderOnly: singleFolderOnly,
+            favoriteOverride: _favoriteOverride,
+            initialIsFavorite: details.isFavorite,
+          ),
+        );
+      },
+      transitionBuilder: (dialogContext, animation, secondaryAnimation, child) {
+        final scale = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutBack,
+          reverseCurve: Curves.easeInCubic,
+        );
+        final opacity = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        );
+        final slide = Tween<Offset>(
+          begin: const Offset(0, 0.04),
+          end: Offset.zero,
+        ).animate(
+          CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
+            reverseCurve: Curves.easeInCubic,
+          ),
+        );
+        return FadeTransition(
+          opacity: opacity,
+          child: SlideTransition(
+            position: slide,
+            child: ScaleTransition(
+              scale: Tween<double>(begin: 0.9, end: 1).animate(scale),
+              child: child,
+            ),
           ),
         );
       },
@@ -1339,5 +919,801 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
         ),
       ),
     );
+  }
+}
+
+enum _FavoriteDialogPhase { loading, result }
+
+class _FavoriteFoldersMorphDialog extends StatefulWidget {
+  const _FavoriteFoldersMorphDialog({
+    required this.details,
+    required this.singleFolderOnly,
+    required this.favoriteOverride,
+    required this.initialIsFavorite,
+  });
+
+  final ComicDetailsData details;
+  final bool singleFolderOnly;
+  final bool? favoriteOverride;
+  final bool initialIsFavorite;
+
+  @override
+  State<_FavoriteFoldersMorphDialog> createState() =>
+      _FavoriteFoldersMorphDialogState();
+}
+
+class _FavoriteFoldersMorphDialogState
+    extends State<_FavoriteFoldersMorphDialog> {
+  final HazukiSourceService _service = HazukiSourceService.instance;
+
+  _FavoriteDialogPhase _phase = _FavoriteDialogPhase.loading;
+  bool _busy = false;
+  String? _loadError;
+  List<FavoriteFolder> _folders = <FavoriteFolder>[];
+  Set<String> _selected = <String>{};
+  Set<String> _initialFavorited = <String>{};
+
+  bool get _showExpandedDialog => _phase == _FavoriteDialogPhase.result;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadFolders(initialLoad: true));
+  }
+
+  Future<void> _loadFolders({bool initialLoad = false}) async {
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      if (initialLoad) {
+        _phase = _FavoriteDialogPhase.loading;
+      } else {
+        _busy = true;
+      }
+      _loadError = null;
+    });
+
+    try {
+      final result = await _service.loadFavoriteFolders(
+        comicId: widget.details.id,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _phase = _FavoriteDialogPhase.result;
+        _busy = false;
+        if (result.errorMessage != null) {
+          _loadError = result.errorMessage;
+          return;
+        }
+        _loadError = null;
+        _folders = List<FavoriteFolder>.from(result.folders);
+        _initialFavorited = Set<String>.from(result.favoritedFolderIds);
+        _selected = Set<String>.from(_initialFavorited);
+        if (_selected.isEmpty &&
+            (widget.favoriteOverride ?? widget.initialIsFavorite)) {
+          _selected = <String>{'0'};
+        }
+      });
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _phase = _FavoriteDialogPhase.result;
+        _busy = false;
+        _loadError = e.toString();
+      });
+    }
+  }
+
+  Future<void> _addFolder() async {
+    final strings = l10n(context);
+    final controller = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        String? errorText;
+        return StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
+            return AlertDialog(
+              title: Text(strings.comicDetailCreateFavoriteFolder),
+              content: TextField(
+                controller: controller,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: strings.comicDetailFavoriteFolderNameHint,
+                  border: const OutlineInputBorder(),
+                  errorText: errorText,
+                ),
+                onChanged: (_) {
+                  if (errorText != null) {
+                    setDialogState(() => errorText = null);
+                  }
+                },
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: Text(strings.commonCancel),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    final text = controller.text.trim();
+                    if (text.isEmpty) {
+                      setDialogState(
+                        () => errorText = strings
+                            .comicDetailFavoriteFolderNameRequired,
+                      );
+                      return;
+                    }
+                    Navigator.pop(dialogContext, text);
+                  },
+                  child: Text(strings.commonConfirm),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    controller.dispose();
+    if (name == null || name.isEmpty || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _busy = true;
+    });
+    try {
+      await _service.addFavoriteFolder(name);
+      final refreshed = await _service.loadFavoriteFolders(
+        comicId: widget.details.id,
+      );
+      if (refreshed.errorMessage != null) {
+        throw Exception(refreshed.errorMessage);
+      }
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _folders = List<FavoriteFolder>.from(refreshed.folders);
+        _loadError = null;
+        _busy = false;
+      });
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _busy = false;
+      });
+      unawaited(
+        showHazukiPrompt(
+          context,
+          strings.comicDetailCreateFavoriteFolderFailed('$e'),
+          isError: true,
+        ),
+      );
+    }
+  }
+
+  Future<void> _deleteFolder(String folderId) async {
+    final strings = l10n(context);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(strings.comicDetailDeleteFavoriteFolder),
+          content: Text(strings.comicDetailDeleteFavoriteFolderContent),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: Text(strings.commonCancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: Text(strings.comicDetailDelete),
+            ),
+          ],
+        );
+      },
+    );
+    if (ok != true || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _busy = true;
+    });
+    try {
+      await _service.deleteFavoriteFolder(folderId);
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _folders = _folders.where((e) => e.id != folderId).toList();
+        _selected = Set<String>.from(_selected)..remove(folderId);
+        _initialFavorited = Set<String>.from(_initialFavorited)
+          ..remove(folderId);
+        _loadError = null;
+        _busy = false;
+      });
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _busy = false;
+      });
+      unawaited(
+        showHazukiPrompt(
+          context,
+          strings.comicDetailDeleteFavoriteFolderFailed('$e'),
+          isError: true,
+        ),
+      );
+    }
+  }
+
+  void _toggleFolder(String folderId, {bool? value}) {
+    if (_busy) {
+      return;
+    }
+    final checked = _selected.contains(folderId);
+    final enable = value ?? !checked;
+    setState(() {
+      if (enable) {
+        if (widget.singleFolderOnly) {
+          _selected = <String>{folderId};
+        } else {
+          _selected = Set<String>.from(_selected)..add(folderId);
+        }
+      } else {
+        _selected = Set<String>.from(_selected)..remove(folderId);
+      }
+    });
+  }
+
+  void _handleSave() {
+    if (_busy || _loadError != null) {
+      return;
+    }
+    if (_selected.isEmpty && _initialFavorited.isEmpty) {
+      unawaited(
+        showHazukiPrompt(
+          context,
+          l10n(context).comicDetailSelectAtLeastOneFolder,
+          isError: true,
+        ),
+      );
+      return;
+    }
+    Navigator.of(context).pop(<String, Set<String>>{
+      'selected': Set<String>.from(_selected),
+      'initial': Set<String>.from(_initialFavorited),
+    });
+  }
+
+  Widget _buildLoadingContent(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    return SizedBox(
+      key: const ValueKey('favorite_dialog_loading'),
+      width: double.infinity,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(height: 8),
+          const _ShapeMorphingLoader(size: 90),
+          const SizedBox(height: 18),
+          Text(
+            l10n(context).commonLoading,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.2,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            l10n(context).comicDetailManageFavorites,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: cs.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStateCard({
+    required Widget icon,
+    required String message,
+    required Color backgroundColor,
+  }) {
+    final theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 22),
+      decoration: BoxDecoration(
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(22),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          icon,
+          const SizedBox(height: 12),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyMedium,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFolderTile(BuildContext context, FavoriteFolder folder) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final checked = _selected.contains(folder.id);
+    final title = folder.id == '0'
+        ? l10n(context).favoriteAllFolder
+        : folder.name;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+      decoration: BoxDecoration(
+        color: checked
+            ? cs.primaryContainer.withValues(alpha: 0.88)
+            : cs.surface.withValues(alpha: 0.88),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: checked
+              ? cs.primary.withValues(alpha: 0.34)
+              : cs.outlineVariant.withValues(alpha: 0.28),
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: ListTile(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(18),
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 2,
+          ),
+          leading: AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            width: 30,
+            height: 30,
+            decoration: BoxDecoration(
+              color: checked ? cs.primary : cs.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(11),
+            ),
+            child: Icon(
+              checked ? Icons.check_rounded : Icons.add_rounded,
+              size: 18,
+              color: checked ? cs.onPrimary : cs.onSurfaceVariant,
+            ),
+          ),
+          title: Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          trailing: folder.id != '0' && _service.supportFavoriteFolderDelete
+              ? IconButton(
+                  tooltip:
+                      l10n(context).comicDetailDeleteFavoriteFolderTooltip,
+                  onPressed: _busy ? null : () => _deleteFolder(folder.id),
+                  icon: const Icon(Icons.delete_outline_rounded),
+                )
+              : null,
+          onTap: () => _toggleFolder(folder.id),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDialogBody(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    if (_loadError != null) {
+      return _buildStateCard(
+        icon: Icon(
+          Icons.error_outline_rounded,
+          size: 28,
+          color: cs.error,
+        ),
+        message:
+            l10n(context).comicDetailFavoriteFoldersLoadFailed('$_loadError'),
+        backgroundColor: cs.errorContainer.withValues(alpha: 0.32),
+      );
+    }
+
+    if (_folders.isEmpty) {
+      return _buildStateCard(
+        icon: Icon(
+          Icons.folder_off_outlined,
+          size: 28,
+          color: cs.onSurfaceVariant,
+        ),
+        message: l10n(context).comicDetailNoFavoriteFolders,
+        backgroundColor: cs.surfaceContainerLow.withValues(alpha: 0.72),
+      );
+    }
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerLowest.withValues(alpha: 0.9),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: cs.outlineVariant.withValues(alpha: 0.18),
+        ),
+      ),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: math.min(MediaQuery.sizeOf(context).height * 0.38, 320),
+        ),
+        child: ListView.separated(
+          shrinkWrap: true,
+          padding: const EdgeInsets.all(10),
+          itemCount: _folders.length,
+          separatorBuilder: (_, _) => const SizedBox(height: 8),
+          itemBuilder: (context, index) =>
+              _buildFolderTile(context, _folders[index]),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildExpandedContent(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    return SizedBox(
+      key: ValueKey<String>(
+        _loadError == null
+            ? 'favorite_dialog_loaded'
+            : 'favorite_dialog_error',
+      ),
+      width: double.infinity,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  l10n(context).comicDetailManageFavorites,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              if (_service.supportFavoriteFolderAdd && _loadError == null)
+                IconButton(
+                  tooltip: l10n(context).comicDetailCreateFavoriteFolderTooltip,
+                  onPressed: _busy ? null : _addFolder,
+                  icon: const Icon(Icons.create_new_folder_outlined),
+                ),
+              IconButton(
+                tooltip: l10n(context).commonClose,
+                onPressed: _busy ? null : () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.close_rounded),
+              ),
+            ],
+          ),
+          Text(
+            widget.singleFolderOnly
+                ? l10n(context).comicDetailSingleFolderHint
+                : l10n(context).comicDetailMultipleFoldersHint,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: cs.onSurfaceVariant,
+            ),
+          ),
+          const SizedBox(height: 16),
+          _buildDialogBody(context),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: _busy ? null : () => Navigator.of(context).pop(),
+                  child: Text(l10n(context).commonClose),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton(
+                  onPressed: _busy
+                      ? null
+                      : _loadError != null
+                      ? () => unawaited(_loadFolders())
+                      : _handleSave,
+                  child: Text(
+                    _loadError != null
+                        ? l10n(context).commonRetry
+                        : l10n(context).commonSave,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBusyOverlay(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    return Positioned.fill(
+      child: IgnorePointer(
+        child: ColoredBox(
+          color: cs.surface.withValues(alpha: 0.72),
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const _ShapeMorphingLoader(size: 54),
+                const SizedBox(height: 12),
+                Text(
+                  l10n(context).commonLoading,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final size = MediaQuery.sizeOf(context);
+    final expanded = _showExpandedDialog;
+    final dialogWidth = expanded
+        ? math.min(size.width * 0.9, 440.0)
+        : math.min(size.width * 0.78, 320.0);
+
+    return SafeArea(
+      child: Material(
+        type: MaterialType.transparency,
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 24),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 460),
+              curve: Curves.easeInOutCubicEmphasized,
+              width: dialogWidth,
+              constraints: BoxConstraints(
+                minHeight: expanded ? 340 : 196,
+                maxHeight: expanded ? size.height * 0.82 : 220,
+              ),
+              clipBehavior: Clip.antiAlias,
+              decoration: BoxDecoration(
+                color: cs.surface,
+                borderRadius: BorderRadius.circular(expanded ? 32 : 28),
+                border: Border.all(
+                  color: cs.outlineVariant.withValues(
+                    alpha: expanded ? 0.24 : 0.16,
+                  ),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.18),
+                    blurRadius: expanded ? 30 : 22,
+                    spreadRadius: -6,
+                    offset: const Offset(0, 18),
+                  ),
+                ],
+              ),
+              child: Stack(
+                children: [
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      24,
+                      expanded ? 20 : 24,
+                      24,
+                      expanded ? 20 : 24,
+                    ),
+                    child: AnimatedSize(
+                      duration: const Duration(milliseconds: 460),
+                      curve: Curves.easeInOutCubicEmphasized,
+                      alignment: Alignment.center,
+                      child: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 280),
+                        switchInCurve: Curves.easeOutCubic,
+                        switchOutCurve: Curves.easeInCubic,
+                        transitionBuilder: (child, animation) {
+                          final slide = Tween<Offset>(
+                            begin: const Offset(0, 0.08),
+                            end: Offset.zero,
+                          ).animate(animation);
+                          return FadeTransition(
+                            opacity: animation,
+                            child: SlideTransition(
+                              position: slide,
+                              child: child,
+                            ),
+                          );
+                        },
+                        child: expanded
+                            ? _buildExpandedContent(context)
+                            : _buildLoadingContent(context),
+                      ),
+                    ),
+                  ),
+                  if (_busy && expanded) _buildBusyOverlay(context),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ShapeMorphingLoader extends StatefulWidget {
+  const _ShapeMorphingLoader({this.size = 84});
+
+  final double size;
+
+  @override
+  State<_ShapeMorphingLoader> createState() => _ShapeMorphingLoaderState();
+}
+
+class _ShapeMorphingLoaderState extends State<_ShapeMorphingLoader>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1600),
+  )..repeat();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return RepaintBoundary(
+      child: SizedBox(
+        width: widget.size,
+        height: widget.size,
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, _) {
+            return CustomPaint(
+              painter: _ShapeMorphingLoaderPainter(
+                progress: _controller.value,
+                primary: cs.primary,
+                secondary: cs.tertiary,
+                highlight: cs.surfaceContainerHighest,
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _ShapeMorphingLoaderPainter extends CustomPainter {
+  const _ShapeMorphingLoaderPainter({
+    required this.progress,
+    required this.primary,
+    required this.secondary,
+    required this.highlight,
+  });
+
+  final double progress;
+  final Color primary;
+  final Color secondary;
+  final Color highlight;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = size.center(Offset.zero);
+    final base = size.shortestSide;
+    final phase = progress * math.pi * 2;
+    final waveA = (math.sin(phase) + 1) / 2;
+    final waveB = (math.sin(phase + math.pi / 2) + 1) / 2;
+    final waveC = (math.sin(phase - math.pi / 3) + 1) / 2;
+
+    final width = base * (0.44 + 0.22 * waveA);
+    final height = base * (0.44 + 0.22 * waveB);
+    final radius = base * (0.1 + 0.18 * waveC);
+    final rotation = math.sin(phase - 0.8) * 0.42;
+    final rect = Rect.fromCenter(
+      center: center,
+      width: width,
+      height: height,
+    );
+    final path = Path()
+      ..addRRect(
+        RRect.fromRectAndRadius(rect, Radius.circular(radius)),
+      );
+
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.rotate(rotation);
+    canvas.translate(-center.dx, -center.dy);
+
+    canvas.drawPath(
+      path.shift(const Offset(0, 8)),
+      Paint()
+        ..color = primary.withValues(alpha: 0.18)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 18),
+    );
+
+    canvas.drawPath(
+      path,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color.lerp(primary, secondary, 0.18)!,
+            Color.lerp(primary, secondary, 0.72)!,
+          ],
+        ).createShader(rect),
+    );
+
+    final highlightRect = Rect.fromCenter(
+      center: center.translate(-width * 0.12, -height * 0.16),
+      width: width * (0.34 + 0.08 * waveB),
+      height: height * (0.18 + 0.06 * waveA),
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        highlightRect,
+        Radius.circular(highlightRect.height),
+      ),
+      Paint()..color = highlight.withValues(alpha: 0.42),
+    );
+
+    final orbitDistance = base * 0.22;
+    final orbitRadius = base * (0.07 + 0.015 * waveC);
+    final orbitCenter = center.translate(
+      math.cos(phase * 1.4 - math.pi / 3) * orbitDistance,
+      math.sin(phase * 1.4 - math.pi / 3) * orbitDistance,
+    );
+    canvas.drawCircle(
+      orbitCenter,
+      orbitRadius,
+      Paint()..color = secondary.withValues(alpha: 0.86),
+    );
+
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _ShapeMorphingLoaderPainter oldDelegate) {
+    return oldDelegate.progress != progress ||
+        oldDelegate.primary != primary ||
+        oldDelegate.secondary != secondary ||
+        oldDelegate.highlight != highlight;
   }
 }

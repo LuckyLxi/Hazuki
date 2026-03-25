@@ -120,6 +120,7 @@ class HazukiSourceService {
   static const String _cacheAutoCleanModeKey = 'image_cache_auto_clean_mode';
   static const String _cacheLastAutoCleanAtKey =
       'image_cache_last_auto_clean_at';
+  static const String _customEditedJmSourceKey = 'custom_edited_jm_source';
 
   static const int _defaultCacheMaxBytes = 400 * 1024 * 1024;
   static const String _defaultAutoCleanMode = 'size_overflow';
@@ -334,6 +335,8 @@ class HazukiSourceService {
 
     final downloadedVersion = _extractSourceVersion(jmScript);
     await jmFile.writeAsString(jmScript);
+    final prefs = _prefs ??= await SharedPreferences.getInstance();
+    await prefs.setBool(_customEditedJmSourceKey, false);
 
     _lastSourceVersionDebugInfo = {
       'checkedAt': DateTime.now().toIso8601String(),
@@ -345,18 +348,39 @@ class HazukiSourceService {
     return true;
   }
 
+  Future<String> loadEditableJmSource() async {
+    final result = await _downloadOrLoadSourceFiles();
+    return result.jmFile.readAsString();
+  }
+
+  Future<void> saveEditedJmSource(String content) async {
+    final result = await _downloadOrLoadSourceFiles();
+    await result.jmFile.writeAsString(content, flush: true);
+    final prefs = _prefs ??= await SharedPreferences.getInstance();
+    await prefs.setBool(_customEditedJmSourceKey, true);
+    _lastSourceVersionDebugInfo = {
+      'checkedAt': DateTime.now().toIso8601String(),
+      'resolvedFrom': 'local_source_editor',
+      'outcome': 'edited_waiting_for_restart',
+    };
+    _statusText = 'source_edited_waiting_for_restart';
+  }
+
   Future<bool> hasLocalJmSourceFile() async {
     final sourceDir = await _getSourceStorageDirectory();
     final jmFile = File('${sourceDir.path}/jm.js');
     return jmFile.exists();
   }
 
+  Future<bool> hasCustomEditedJmSource() async {
+    final prefs = _prefs ??= await SharedPreferences.getInstance();
+    return prefs.getBool(_customEditedJmSourceKey) ?? false;
+  }
+
   Future<Directory> _getSourceStorageDirectory() async {
     if (Platform.isAndroid) {
-      final externalDir = await getExternalStorageDirectory();
-      if (externalDir != null) {
-        return Directory('${externalDir.path}/comic_source');
-      }
+      final supportDir = await getApplicationSupportDirectory();
+      return Directory('${supportDir.path}/comic_source');
     }
 
     if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {

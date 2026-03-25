@@ -787,5 +787,9 @@
   "advancedComicIdSearchTitle": "Comic ID search optimization",
   "advancedComicIdSearchSubtitle": "Automatically remove non-digit characters on search submission and keep only Arabic numerals as the keyword",
   "advancedNoImageModeTitle": "No-image mode",
-  "advancedNoImageModeSubtitle": "Hide images globally (except the login avatar in the sidebar)"
+  "advancedNoImageModeSubtitle": "Hide images globally (except the login avatar in the sidebar)",
+  "advancedEditSourceTitle": "Edit comic source",
+  "advancedEditSourceSubtitle": "Open a lightweight editor to edit and save jm.js",
+  "advancedRestoreSourceLabel": "Restore comic source",
+  "advancedRestoreSourceSuccess": "Comic source restored. Restart the app to apply it."
 }

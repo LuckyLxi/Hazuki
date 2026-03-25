@@ -65,6 +65,10 @@ class _ReaderPageState extends State<ReaderPage>
   static const int _prefetchAheadMemoryCount = 4;
   static const int _providerKeepWindow = 280;
   static const int _prefetchBatchSize = 4;
+  static const double _unexpectedTopOffsetThreshold = 240;
+  static const double _topEdgeOffsetEpsilon = 8;
+  final String _readerSessionId =
+      DateTime.now().microsecondsSinceEpoch.toString();
   int _activeUnscrambleTasks = 0;
   int _maxDiskPrefetchedIndex = -1;
   bool _prefetchAheadRunning = false;
@@ -102,9 +106,61 @@ class _ReaderPageState extends State<ReaderPage>
   // 还原动画控制器
   late final AnimationController _resetAnimController;
   int _lastLoggedVisiblePageIndex = -1;
+  double? _lastObservedListPixels;
+  bool _listUserScrollInProgress = false;
+  String? _activeProgrammaticListScrollReason;
+  int? _activeProgrammaticListTargetIndex;
+  int? _lastCompletedProgrammaticListTargetIndex;
+  DateTime? _lastCompletedProgrammaticListScrollAt;
+  int _readerDiagnosticSequence = 0;
+  DateTime? _lastUnexpectedListJumpLoggedAt;
+
+  double _normalizeLogDouble(num value) {
+    final normalized = value.toDouble();
+    if (!normalized.isFinite) {
+      return 0;
+    }
+    return double.parse(normalized.toStringAsFixed(2));
+  }
+
+  List<Map<String, dynamic>> _captureRenderedItemsAround(int anchorIndex) {
+    if (_images.isEmpty || _itemKeys.isEmpty) {
+      return const <Map<String, dynamic>>[];
+    }
+    final target = math.max(0, math.min(anchorIndex, _images.length - 1));
+    final start = math.max(0, target - 2);
+    final end = math.min(_images.length - 1, target + 2);
+    final items = <Map<String, dynamic>>[];
+    for (var i = start; i <= end; i++) {
+      if (i >= _itemKeys.length) {
+        continue;
+      }
+      final ctx = _itemKeys[i].currentContext;
+      if (ctx == null) {
+        items.add({'index': i, 'mounted': false});
+        continue;
+      }
+      final renderObject = ctx.findRenderObject();
+      if (renderObject is! RenderBox || !renderObject.hasSize) {
+        items.add({'index': i, 'mounted': true, 'hasSize': false});
+        continue;
+      }
+      final top = renderObject.localToGlobal(Offset.zero).dy;
+      final height = renderObject.size.height;
+      items.add({
+        'index': i,
+        'mounted': true,
+        'top': _normalizeLogDouble(top),
+        'height': _normalizeLogDouble(height),
+        'bottom': _normalizeLogDouble(top + height),
+      });
+    }
+    return items;
+  }
 
   Map<String, dynamic> _readerLogPayload([Map<String, dynamic>? extra]) {
     final payload = <String, dynamic>{
+      'sessionId': _readerSessionId,
       'comicId': widget.comicId,
       'epId': widget.epId,
       'chapterTitle': widget.chapterTitle,
@@ -114,6 +170,7 @@ class _ReaderPageState extends State<ReaderPage>
       'currentPage': _images.isEmpty
           ? 0
           : math.min(_currentPageIndex + 1, _images.length),
+      'pageIndicatorIndex': _pageIndexNotifier.value,
       'totalPages': _images.length,
       'controlsVisible': _controlsVisible,
       'tapToTurnPage': _tapToTurnPage,
@@ -124,11 +181,111 @@ class _ReaderPageState extends State<ReaderPage>
       'keepScreenOn': _keepScreenOn,
       'customBrightness': _customBrightness,
       'brightnessValue': _brightnessValue,
+      'loadingImages': _loadingImages,
+      'loadImagesError': _loadImagesError,
+      'noImageModeEnabled': _noImageModeEnabled,
+      'isZoomed': _isZoomed,
+      'zoomInteracting': _zoomInteracting,
+      'zoomScale': _normalizeLogDouble(_zoomController.value.getMaxScaleOnAxis()),
+      'activePointerCount': _activePointerCount,
+      'providerCacheSize': _providerCache.length,
+      'providerFutureCacheSize': _providerFutureCache.length,
+      'aspectRatioCacheSize': _imageAspectRatioCache.length,
+      'prefetchAheadRunning': _prefetchAheadRunning,
+      'activeUnscrambleTasks': _activeUnscrambleTasks,
+      'maxDiskPrefetchedIndex': _maxDiskPrefetchedIndex,
+      'listUserScrollInProgress': _listUserScrollInProgress,
+      'activeProgrammaticListScrollReason': _activeProgrammaticListScrollReason,
+      'activeProgrammaticListTargetIndex': _activeProgrammaticListTargetIndex,
+      'lastCompletedProgrammaticListTargetIndex':
+          _lastCompletedProgrammaticListTargetIndex,
+      if (_lastObservedListPixels != null)
+        'lastObservedListPixels': _normalizeLogDouble(_lastObservedListPixels!),
     };
+    if (_scrollController.hasClients) {
+      final position = _scrollController.position;
+      payload.addAll({
+        'listPixels': _normalizeLogDouble(position.pixels),
+        'listMaxScrollExtent': _normalizeLogDouble(position.maxScrollExtent),
+        'listMinScrollExtent': _normalizeLogDouble(position.minScrollExtent),
+        'listViewportDimension': _normalizeLogDouble(position.viewportDimension),
+        'listExtentBefore': _normalizeLogDouble(position.extentBefore),
+        'listExtentAfter': _normalizeLogDouble(position.extentAfter),
+        'listAtEdge': position.atEdge,
+        'listOutOfRange': position.outOfRange,
+        'listUserDirection': position.userScrollDirection.name,
+      });
+    }
+    if (_pageController.hasClients) {
+      payload['pageControllerPage'] = _normalizeLogDouble(
+        _pageController.page ?? _currentPageIndex.toDouble(),
+      );
+    }
     if (extra != null) {
       payload.addAll(extra);
     }
     return payload;
+  }
+
+  void _logListPositionSnapshot(
+    String title, {
+    required String trigger,
+    double? previousPixels,
+    int? normalizedIndex,
+    String level = 'info',
+    Map<String, dynamic>? extra,
+  }) {
+    final payload = <String, dynamic>{
+      'trigger': trigger,
+      'diagnosticSequence': ++_readerDiagnosticSequence,
+      if (previousPixels != null)
+        'previousListPixels': _normalizeLogDouble(previousPixels),
+    };
+    if (_scrollController.hasClients) {
+      final position = _scrollController.position;
+      payload.addAll({
+        'currentListPixels': _normalizeLogDouble(position.pixels),
+        if (previousPixels != null)
+          'listDeltaPixels': _normalizeLogDouble(position.pixels - previousPixels),
+        'listMaxScrollExtent': _normalizeLogDouble(position.maxScrollExtent),
+        'listViewportDimension': _normalizeLogDouble(position.viewportDimension),
+        'listExtentBefore': _normalizeLogDouble(position.extentBefore),
+        'listExtentAfter': _normalizeLogDouble(position.extentAfter),
+        'listAtEdge': position.atEdge,
+        'listOutOfRange': position.outOfRange,
+        'listUserDirection': position.userScrollDirection.name,
+        'nearbyRenderedItems': _captureRenderedItemsAround(
+          normalizedIndex ?? _currentPageIndex,
+        ),
+      });
+    } else {
+      payload['listHasClients'] = false;
+    }
+    if (extra != null) {
+      payload.addAll(extra);
+    }
+    _logReaderEvent(
+      title,
+      level: level,
+      source: 'reader_position',
+      content: _readerLogPayload(payload),
+    );
+  }
+
+  bool _shouldLogUnexpectedListJump() {
+    final now = DateTime.now();
+    final lastLoggedAt = _lastUnexpectedListJumpLoggedAt;
+    if (lastLoggedAt != null &&
+        now.difference(lastLoggedAt) < const Duration(milliseconds: 900)) {
+      return false;
+    }
+    _lastUnexpectedListJumpLoggedAt = now;
+    return true;
+  }
+
+  void _markProgrammaticListScrollCompleted(int target) {
+    _lastCompletedProgrammaticListTargetIndex = target;
+    _lastCompletedProgrammaticListScrollAt = DateTime.now();
   }
 
   void _logReaderEvent(
@@ -164,6 +321,8 @@ class _ReaderPageState extends State<ReaderPage>
         'trigger': trigger,
         'pageIndex': normalizedIndex,
         'page': normalizedIndex + 1,
+        if (_readerMode == _ReaderMode.topToBottom)
+          'nearbyRenderedItems': _captureRenderedItemsAround(normalizedIndex),
       }),
     );
   }
@@ -290,10 +449,68 @@ class _ReaderPageState extends State<ReaderPage>
   void _handleNoImageModeChanged() {
     _providerCache.clear();
     _providerFutureCache.clear();
+    _logReaderEvent(
+      'Reader no-image mode changed',
+      source: 'reader_data',
+      content: _readerLogPayload({
+        'enabled': _noImageModeEnabled,
+        'providerCachesCleared': true,
+      }),
+    );
     if (!mounted) {
       return;
     }
     setState(() {});
+  }
+
+  bool _handleReaderScrollNotification(ScrollNotification notification) {
+    if (_readerMode != _ReaderMode.topToBottom ||
+        notification.depth != 0 ||
+        _images.isEmpty) {
+      return false;
+    }
+    final previousPixels = _lastObservedListPixels;
+    if (notification is ScrollStartNotification) {
+      _listUserScrollInProgress = notification.dragDetails != null;
+      _logListPositionSnapshot(
+        'Reader list scroll started',
+        trigger: notification.dragDetails != null
+            ? 'scroll_start_drag'
+            : 'scroll_start_ballistic',
+        previousPixels: previousPixels,
+        extra: {
+          'notificationType': notification.runtimeType.toString(),
+          'depth': notification.depth,
+        },
+      );
+    } else if (notification is ScrollEndNotification) {
+      _listUserScrollInProgress = false;
+      _logListPositionSnapshot(
+        'Reader list scroll ended',
+        trigger: 'scroll_end',
+        previousPixels: previousPixels,
+        extra: {
+          'notificationType': notification.runtimeType.toString(),
+          'depth': notification.depth,
+        },
+      );
+    } else if (notification is OverscrollNotification) {
+      _logListPositionSnapshot(
+        'Reader list overscrolled',
+        trigger: notification.overscroll < 0
+            ? 'overscroll_top'
+            : 'overscroll_bottom',
+        previousPixels: previousPixels,
+        level: 'warning',
+        extra: {
+          'notificationType': notification.runtimeType.toString(),
+          'depth': notification.depth,
+          'overscroll': _normalizeLogDouble(notification.overscroll),
+          'velocity': _normalizeLogDouble(notification.velocity),
+        },
+      );
+    }
+    return false;
   }
 
   void _handleReaderPointerDown(PointerDownEvent _) {
@@ -376,6 +593,15 @@ class _ReaderPageState extends State<ReaderPage>
   /// 平滑动画将缩放矩阵还原为原始大小
   void _resetZoom() {
     final controller = _zoomController;
+    final startScale = controller.value.getMaxScaleOnAxis();
+    _logReaderEvent(
+      'Reader zoom reset animated',
+      source: 'reader_zoom',
+      content: _readerLogPayload({
+        'trigger': 'manual_reset_button',
+        'previousScale': _normalizeLogDouble(startScale),
+      }),
+    );
 
     // 从当前矩阵插值到单位矩阵（即原始 1:1 大小）
     final Matrix4 start = controller.value.clone();
@@ -412,12 +638,28 @@ class _ReaderPageState extends State<ReaderPage>
     });
   }
 
-  void _resetZoomImmediately() {
+  void _resetZoomImmediately({String reason = 'unspecified'}) {
+    final previousScale = _zoomController.value.getMaxScaleOnAxis();
+    final hadZoomState =
+        _isZoomed ||
+        _zoomInteracting ||
+        _activePointerCount > 0 ||
+        previousScale > 1.001;
     _resetAnimController.stop();
     _zoomController.value = Matrix4.identity();
     _zoomInteracting = false;
     _activePointerCount = 0;
     _isZoomed = false;
+    if (hadZoomState) {
+      _logReaderEvent(
+        'Reader zoom reset immediately',
+        source: 'reader_zoom',
+        content: _readerLogPayload({
+          'trigger': reason,
+          'previousScale': _normalizeLogDouble(previousScale),
+        }),
+      );
+    }
   }
 
   Widget _buildZoomableReader({
@@ -597,7 +839,7 @@ class _ReaderPageState extends State<ReaderPage>
       }),
     );
     if (changed) {
-      _resetZoomImmediately();
+      _resetZoomImmediately(reason: 'reading_mode_changed');
       _syncReaderPositionAfterModeChange();
     }
   }
@@ -691,7 +933,7 @@ class _ReaderPageState extends State<ReaderPage>
 
   Future<void> _togglePinchToZoomSetting(bool value) async {
     if (!value) {
-      _resetZoomImmediately();
+      _resetZoomImmediately(reason: 'pinch_to_zoom_disabled');
     }
     setState(() {
       _pinchToZoom = value;
@@ -868,6 +1110,9 @@ class _ReaderPageState extends State<ReaderPage>
         content: _readerLogPayload({
           'targetPageIndex': target,
           'targetPage': target + 1,
+          'syncPath': _readerMode == _ReaderMode.rightToLeft
+              ? 'page_controller_jump'
+              : 'list_scroll_alignment',
         }),
       );
       _logVisiblePageChange(index: target, trigger: 'mode_changed_sync');
@@ -876,7 +1121,13 @@ class _ReaderPageState extends State<ReaderPage>
           _pageController.jumpToPage(target);
         }
       } else {
-        unawaited(_scrollToListReaderPage(target, animate: false));
+        unawaited(
+          _scrollToListReaderPage(
+            target,
+            animate: false,
+            trigger: 'mode_changed_sync',
+          ),
+        );
       }
     });
   }
@@ -1162,6 +1413,8 @@ class _ReaderPageState extends State<ReaderPage>
       return;
     }
 
+    final currentPixels = position.pixels;
+    final previousPixels = _lastObservedListPixels;
     int normalizedIndex = _currentPageIndex;
 
     // 通过遍历已挂载的组件位置来精确寻找当前屏幕最顶端可见的漫画页
@@ -1188,6 +1441,44 @@ class _ReaderPageState extends State<ReaderPage>
       _logVisiblePageChange(index: normalizedIndex, trigger: 'scroll');
     }
     _setDisplayedPageIndex(normalizedIndex);
+
+    if (previousPixels != null) {
+      final hasRecentExpectedTopJump =
+          _activeProgrammaticListTargetIndex == 0 ||
+          (_lastCompletedProgrammaticListTargetIndex == 0 &&
+              _lastCompletedProgrammaticListScrollAt != null &&
+              DateTime.now().difference(
+                    _lastCompletedProgrammaticListScrollAt!,
+                  ) <
+                  const Duration(seconds: 1));
+      final jumpedToTop =
+          currentPixels <= _topEdgeOffsetEpsilon &&
+          previousPixels >= _unexpectedTopOffsetThreshold &&
+          !hasRecentExpectedTopJump;
+      final deltaPixels = currentPixels - previousPixels;
+      final largeJump =
+          deltaPixels.abs() >= math.max(viewport * 1.35, 1200.0);
+      if ((jumpedToTop || largeJump) && _shouldLogUnexpectedListJump()) {
+        _logListPositionSnapshot(
+          jumpedToTop
+              ? 'Reader suspicious return to top detected'
+              : 'Reader suspicious list offset jump detected',
+          trigger: jumpedToTop
+              ? 'scroll_return_to_top'
+              : 'scroll_large_offset_jump',
+          previousPixels: previousPixels,
+          normalizedIndex: normalizedIndex,
+          level: 'warning',
+          extra: {
+            'deltaPixels': _normalizeLogDouble(deltaPixels),
+            'jumpedToTop': jumpedToTop,
+            'largeJump': largeJump,
+          },
+        );
+      }
+    }
+
+    _lastObservedListPixels = currentPixels;
     if (!_noImageModeEnabled) {
       _prefetchAround(normalizedIndex);
       unawaited(_prefetchAheadFrom(normalizedIndex));
@@ -1352,7 +1643,25 @@ class _ReaderPageState extends State<ReaderPage>
       if (image.height <= 0) {
         return;
       }
-      _imageAspectRatioCache[url] = image.width / image.height;
+      final aspectRatio = image.width / image.height;
+      _imageAspectRatioCache[url] = aspectRatio;
+      final index = _imageIndexMap[url];
+      if (index != null &&
+          _readerMode == _ReaderMode.topToBottom &&
+          index < _currentPageIndex &&
+          index >= _currentPageIndex - 4) {
+        _logListPositionSnapshot(
+          'Reader upstream page aspect ratio resolved',
+          trigger: 'image_aspect_ratio_resolved',
+          normalizedIndex: _currentPageIndex,
+          extra: {
+            'resolvedPageIndex': index,
+            'resolvedPage': index + 1,
+            'aspectRatio': _normalizeLogDouble(aspectRatio),
+            'isBeforeCurrentPage': true,
+          },
+        );
+      }
     } catch (_) {}
   }
 
@@ -1464,15 +1773,18 @@ class _ReaderPageState extends State<ReaderPage>
   }
 
   Widget _buildReaderListView() {
-    return ListView.builder(
-      key: ValueKey('${widget.comicId}-${widget.epId}'),
-      padding: EdgeInsets.zero,
-      itemCount: _images.length,
-      controller: _scrollController,
-      physics: _zoomGestureActive
-          ? const NeverScrollableScrollPhysics()
-          : const _ReaderScrollPhysics(),
-      itemBuilder: (context, index) => _buildReaderListItem(index),
+    return NotificationListener<ScrollNotification>(
+      onNotification: _handleReaderScrollNotification,
+      child: ListView.builder(
+        key: ValueKey('${widget.comicId}-${widget.epId}'),
+        padding: EdgeInsets.zero,
+        itemCount: _images.length,
+        controller: _scrollController,
+        physics: _zoomGestureActive
+            ? const NeverScrollableScrollPhysics()
+            : const _ReaderScrollPhysics(),
+        itemBuilder: (context, index) => _buildReaderListItem(index),
+      ),
     );
   }
 
@@ -1500,7 +1812,7 @@ class _ReaderPageState extends State<ReaderPage>
         }
         final pageChanged = _currentPageIndex != index;
         final zoomWasActive = _isZoomed;
-        _resetZoomImmediately();
+        _resetZoomImmediately(reason: 'page_swipe');
         if (pageChanged || zoomWasActive) {
           setState(() {
             _currentPageIndex = index;
@@ -1591,57 +1903,160 @@ class _ReaderPageState extends State<ReaderPage>
   Future<void> _scrollToListReaderPage(
     int index, {
     bool animate = true,
+    String trigger = 'manual',
   }) async {
     if (!_scrollController.hasClients || _images.isEmpty) {
+      _logReaderEvent(
+        'Reader list scroll skipped',
+        level: 'warning',
+        source: 'reader_navigation',
+        content: _readerLogPayload({
+          'trigger': trigger,
+          'reason': !_scrollController.hasClients
+              ? 'scroll_controller_has_no_clients'
+              : 'images_empty',
+          'targetPageIndex': index,
+          'animate': animate,
+        }),
+      );
       return;
     }
     final target = math.max(0, math.min(index, _images.length - 1));
+    final previousPixels = _scrollController.position.pixels;
     final visibleContext =
         target < _itemKeys.length ? _itemKeys[target].currentContext : null;
-    if (visibleContext != null) {
-      await Scrollable.ensureVisible(
-        visibleContext,
-        duration: animate ? const Duration(milliseconds: 360) : Duration.zero,
-        curve: Curves.easeOutCubic,
-        alignment: 0,
-      );
-      return;
-    }
-
-    final maxScrollExtent = _scrollController.position.maxScrollExtent;
-    final ratio = _images.length <= 1 ? 0.0 : target / (_images.length - 1);
-    final estimatedOffset = math.max(
-      0.0,
-      math.min(maxScrollExtent * ratio, maxScrollExtent),
+    _activeProgrammaticListScrollReason = trigger;
+    _activeProgrammaticListTargetIndex = target;
+    _logListPositionSnapshot(
+      'Reader list programmatic scroll started',
+      trigger: trigger,
+      previousPixels: previousPixels,
+      normalizedIndex: target,
+      extra: {
+        'targetPageIndex': target,
+        'targetPage': target + 1,
+        'animate': animate,
+        'hasVisibleContext': visibleContext != null,
+      },
     );
-    if (animate) {
-      await _scrollController.animateTo(
-        estimatedOffset,
-        duration: const Duration(milliseconds: 320),
-        curve: Curves.easeOutCubic,
-      );
-    } else {
-      _scrollController.jumpTo(estimatedOffset);
-    }
-
-    if (!mounted) {
-      return;
-    }
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) {
-        return;
-      }
-      final exactContext =
-          target < _itemKeys.length ? _itemKeys[target].currentContext : null;
-      if (exactContext != null) {
-        Scrollable.ensureVisible(
-          exactContext,
-          duration: animate ? const Duration(milliseconds: 220) : Duration.zero,
+    try {
+      if (visibleContext != null) {
+        await Scrollable.ensureVisible(
+          visibleContext,
+          duration: animate ? const Duration(milliseconds: 360) : Duration.zero,
           curve: Curves.easeOutCubic,
           alignment: 0,
         );
+        if (!mounted) {
+          return;
+        }
+        _markProgrammaticListScrollCompleted(target);
+        _logListPositionSnapshot(
+          'Reader list programmatic scroll finished',
+          trigger: '${trigger}_ensure_visible',
+          previousPixels: previousPixels,
+          normalizedIndex: target,
+          extra: {
+            'targetPageIndex': target,
+            'targetPage': target + 1,
+            'path': 'ensure_visible',
+            'animate': animate,
+          },
+        );
+        return;
       }
-    });
+
+      final maxScrollExtent = _scrollController.position.maxScrollExtent;
+      final ratio = _images.length <= 1 ? 0.0 : target / (_images.length - 1);
+      final estimatedOffset = math.max(
+        0.0,
+        math.min(maxScrollExtent * ratio, maxScrollExtent),
+      );
+      if (animate) {
+        await _scrollController.animateTo(
+          estimatedOffset,
+          duration: const Duration(milliseconds: 320),
+          curve: Curves.easeOutCubic,
+        );
+      } else {
+        _scrollController.jumpTo(estimatedOffset);
+      }
+
+      if (!mounted) {
+        return;
+      }
+      _markProgrammaticListScrollCompleted(target);
+      _logListPositionSnapshot(
+        'Reader list approximate scroll applied',
+        trigger: '${trigger}_estimated_offset',
+        previousPixels: previousPixels,
+        normalizedIndex: target,
+        extra: {
+          'targetPageIndex': target,
+          'targetPage': target + 1,
+          'path': animate
+              ? 'animate_to_estimated_offset'
+              : 'jump_to_estimated_offset',
+          'estimatedOffset': _normalizeLogDouble(estimatedOffset),
+          'animate': animate,
+        },
+      );
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+        final exactContext =
+            target < _itemKeys.length ? _itemKeys[target].currentContext : null;
+        if (exactContext == null) {
+          _logReaderEvent(
+            'Reader list exact alignment skipped',
+            level: 'warning',
+            source: 'reader_navigation',
+            content: _readerLogPayload({
+              'trigger': '${trigger}_post_frame_exact_alignment',
+              'targetPageIndex': target,
+              'targetPage': target + 1,
+              'reason': 'target_context_not_available_after_estimated_scroll',
+              'animate': animate,
+            }),
+          );
+          return;
+        }
+        _activeProgrammaticListScrollReason = '${trigger}_post_frame_exact_alignment';
+        _activeProgrammaticListTargetIndex = target;
+        unawaited(
+          Scrollable.ensureVisible(
+            exactContext,
+            duration: animate ? const Duration(milliseconds: 220) : Duration.zero,
+            curve: Curves.easeOutCubic,
+            alignment: 0,
+          ).then((_) {
+            _activeProgrammaticListScrollReason = null;
+            _activeProgrammaticListTargetIndex = null;
+            _markProgrammaticListScrollCompleted(target);
+            if (!mounted) {
+              return;
+            }
+            _logListPositionSnapshot(
+              'Reader list exact alignment applied',
+              trigger: '${trigger}_post_frame_exact_alignment',
+              previousPixels: previousPixels,
+              normalizedIndex: target,
+              extra: {
+                'targetPageIndex': target,
+                'targetPage': target + 1,
+                'path': 'post_frame_ensure_visible',
+                'animate': animate,
+              },
+            );
+          }),
+        );
+      });
+    } finally {
+      _activeProgrammaticListScrollReason = null;
+      _activeProgrammaticListTargetIndex = null;
+    }
   }
 
   Future<void> _goToReaderPage(int index, {String trigger = 'manual'}) async {
@@ -1667,7 +2082,7 @@ class _ReaderPageState extends State<ReaderPage>
       if (!_pageController.hasClients || target == _currentPageIndex) {
         return;
       }
-      _resetZoomImmediately();
+      _resetZoomImmediately(reason: 'page_navigation_request');
       await _pageController.animateToPage(
         target,
         duration: const Duration(milliseconds: 220),
@@ -1675,7 +2090,7 @@ class _ReaderPageState extends State<ReaderPage>
       );
       return;
     }
-    await _scrollToListReaderPage(target);
+    await _scrollToListReaderPage(target, trigger: trigger);
   }
 
   Future<void> _goToPreviousPage() async {

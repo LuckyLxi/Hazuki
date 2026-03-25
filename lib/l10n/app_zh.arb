@@ -787,5 +787,9 @@
   "advancedComicIdSearchTitle": "漫画 ID 搜索优化",
   "advancedComicIdSearchSubtitle": "提交搜索时自动过滤非数字字符，仅保留阿拉伯数字作为关键词",
   "advancedNoImageModeTitle": "无图模式",
-  "advancedNoImageModeSubtitle": "全局不显示图片（侧边栏登录头像除外）"
+  "advancedNoImageModeSubtitle": "全局不显示图片（侧边栏登录头像除外）",
+  "advancedEditSourceTitle": "编辑漫画源",
+  "advancedEditSourceSubtitle": "打开轻量编辑器，修改并保存 jm.js",
+  "advancedRestoreSourceLabel": "还原漫画源",
+  "advancedRestoreSourceSuccess": "已还原漫画源，请重启应用后生效"
 }

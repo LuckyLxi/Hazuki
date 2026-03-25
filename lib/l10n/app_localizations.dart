@@ -167,6 +167,18 @@ abstract class AppLocalizations {
   /// **'Upload and restore backups'**
   String get settingsCloudSyncSubtitle;
 
+  /// No description provided for @settingsOtherTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get settingsOtherTitle;
+
+  /// No description provided for @settingsOtherSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Check-in and extra actions'**
+  String get settingsOtherSubtitle;
+
   /// No description provided for @settingsAdvancedTitle.
   ///
   /// In en, this message translates to:
@@ -533,6 +545,42 @@ abstract class AppLocalizations {
   /// **'Lines'**
   String get homeMenuLines;
 
+  /// No description provided for @homeCheckInAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Check in'**
+  String get homeCheckInAction;
+
+  /// No description provided for @homeCheckInDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Checked in today'**
+  String get homeCheckInDone;
+
+  /// No description provided for @homeCheckInInProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking in...'**
+  String get homeCheckInInProgress;
+
+  /// No description provided for @homeCheckInSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Check-in successful'**
+  String get homeCheckInSuccess;
+
+  /// No description provided for @homeCheckInAlreadyDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Already checked in today'**
+  String get homeCheckInAlreadyDone;
+
+  /// No description provided for @homeCheckInFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Check-in failed: {error}'**
+  String homeCheckInFailed(Object error);
+
   /// No description provided for @homeTabDiscover.
   ///
   /// In en, this message translates to:
@@ -544,6 +592,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Favorites'**
   String get homeTabFavorite;
+
+  /// No description provided for @otherTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get otherTitle;
+
+  /// No description provided for @otherAutoCheckInTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto daily check-in'**
+  String get otherAutoCheckInTitle;
+
+  /// No description provided for @otherAutoCheckInSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatically check in once when the app is opened each day'**
+  String get otherAutoCheckInSubtitle;
+
+  /// No description provided for @sourceBootstrapDownloading.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading comic source'**
+  String get sourceBootstrapDownloading;
+
+  /// No description provided for @sourceBootstrapPreparing.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing source files...'**
+  String get sourceBootstrapPreparing;
+
+  /// No description provided for @sourceBootstrapProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloaded {progress}%'**
+  String sourceBootstrapProgress(Object progress);
 
   /// No description provided for @dialogBarrierLabel.
   ///
@@ -1378,19 +1462,19 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Brightness {value}'**
   String readingBrightnessLabel(Object value);
- 
+
   /// No description provided for @readingPageIndicatorTitle.
   ///
   /// In en, this message translates to:
   /// **'Page indicator'**
   String get readingPageIndicatorTitle;
- 
+
   /// No description provided for @readingPageIndicatorSubtitle.
   ///
   /// In en, this message translates to:
   /// **'Show the chapter number and current page/total pages in the lower-left corner of the reader'**
   String get readingPageIndicatorSubtitle;
- 
+
   /// No description provided for @readingPinchToZoomTitle.
   ///
   /// In en, this message translates to:
@@ -2524,13 +2608,13 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No images in the current chapter'**
   String get readerCurrentChapterNoImages;
- 
+
   /// No description provided for @readerPageIndicator.
   ///
   /// In en, this message translates to:
   /// **'Chapter {chapter} {current}/{total}'**
   String readerPageIndicator(Object chapter, Object current, Object total);
- 
+
   /// No description provided for @readerResetZoom.
   ///
   /// In en, this message translates to:
@@ -2579,89 +2663,29 @@ abstract class AppLocalizations {
   /// **'Hide images globally (except the login avatar in the sidebar)'**
   String get advancedNoImageModeSubtitle;
 
-  /// No description provided for @settingsOtherTitle.
+  /// No description provided for @advancedEditSourceTitle.
   ///
   /// In en, this message translates to:
-  /// **'Other'**
-  String get settingsOtherTitle;
+  /// **'Edit comic source'**
+  String get advancedEditSourceTitle;
 
-  /// No description provided for @settingsOtherSubtitle.
+  /// No description provided for @advancedEditSourceSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Check-in and extra actions'**
-  String get settingsOtherSubtitle;
+  /// **'Open a lightweight editor to edit and save jm.js'**
+  String get advancedEditSourceSubtitle;
 
-  /// No description provided for @homeCheckInAction.
+  /// No description provided for @advancedRestoreSourceLabel.
   ///
   /// In en, this message translates to:
-  /// **'Check in'**
-  String get homeCheckInAction;
+  /// **'Restore comic source'**
+  String get advancedRestoreSourceLabel;
 
-  /// No description provided for @homeCheckInDone.
+  /// No description provided for @advancedRestoreSourceSuccess.
   ///
   /// In en, this message translates to:
-  /// **'Checked in today'**
-  String get homeCheckInDone;
-
-  /// No description provided for @homeCheckInInProgress.
-  ///
-  /// In en, this message translates to:
-  /// **'Checking in...'**
-  String get homeCheckInInProgress;
-
-  /// No description provided for @homeCheckInSuccess.
-  ///
-  /// In en, this message translates to:
-  /// **'Check-in successful'**
-  String get homeCheckInSuccess;
-
-  /// No description provided for @homeCheckInAlreadyDone.
-  ///
-  /// In en, this message translates to:
-  /// **'Already checked in today'**
-  String get homeCheckInAlreadyDone;
-
-  /// No description provided for @homeCheckInFailed.
-  ///
-  /// In en, this message translates to:
-  /// **'Check-in failed: {error}'**
-  String homeCheckInFailed(Object error);
-
-  /// No description provided for @otherTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Other'**
-  String get otherTitle;
-
-  /// No description provided for @otherAutoCheckInTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Auto daily check-in'**
-  String get otherAutoCheckInTitle;
-
-  /// No description provided for @otherAutoCheckInSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Automatically check in once when the app is opened each day'**
-  String get otherAutoCheckInSubtitle;
-
-  /// No description provided for @sourceBootstrapDownloading.
-  ///
-  /// In en, this message translates to:
-  /// **'Downloading comic source'**
-  String get sourceBootstrapDownloading;
-
-  /// No description provided for @sourceBootstrapPreparing.
-  ///
-  /// In en, this message translates to:
-  /// **'Preparing source files...'**
-  String get sourceBootstrapPreparing;
-
-  /// No description provided for @sourceBootstrapProgress.
-  ///
-  /// In en, this message translates to:
-  /// **'Downloaded {progress}%'**
-  String sourceBootstrapProgress(Object progress);
+  /// **'Comic source restored. Restart the app to apply it.'**
+  String get advancedRestoreSourceSuccess;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

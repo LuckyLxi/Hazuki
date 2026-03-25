@@ -1135,7 +1135,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
                     curve: Curves.easeOutCubic,
                     child: IgnorePointer(
                       ignoring: !_showBackToTop,
-                      child: FloatingActionButton.small(
+                      child: FloatingActionButton(
                         heroTag: 'search_back_to_top',
                         onPressed: () => unawaited(_scrollToTop()),
                         child: const Icon(Icons.vertical_align_top_rounded),

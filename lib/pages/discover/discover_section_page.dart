@@ -417,7 +417,7 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
                   curve: Curves.easeOutCubic,
                   child: IgnorePointer(
                     ignoring: !_showBackToTop,
-                    child: FloatingActionButton.small(
+                    child: FloatingActionButton(
                       heroTag: 'discover_section_back_to_top',
                       onPressed: _scrollToTop,
                       child: const Icon(Icons.vertical_align_top_rounded),

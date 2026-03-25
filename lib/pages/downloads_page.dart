@@ -209,7 +209,7 @@ class _DownloadsPageState extends State<DownloadsPage>
     final isZh = Localizations.localeOf(context).languageCode.toLowerCase().startsWith(
       'zh',
     );
-    return FloatingActionButton.small(
+    return FloatingActionButton(
       tooltip: isZh ? '扫描本地漫画' : 'Scan local comics',
       onPressed: _scanningDownloaded ? null : _scanDownloadedComics,
       child: AnimatedSwitcher(
@@ -219,10 +219,10 @@ class _DownloadsPageState extends State<DownloadsPage>
         child: _scanningDownloaded
             ? SizedBox(
                 key: const ValueKey<String>('scan_loading'),
-                width: 18,
-                height: 18,
+                width: 20,
+                height: 20,
                 child: CircularProgressIndicator(
-                  strokeWidth: 2.2,
+                  strokeWidth: 2.4,
                   valueColor: AlwaysStoppedAnimation<Color>(
                     Theme.of(context).colorScheme.onPrimaryContainer,
                   ),
@@ -236,13 +236,22 @@ class _DownloadsPageState extends State<DownloadsPage>
     );
   }
 
-  PreferredSizeWidget _buildAppBar(AppLocalizations strings) {
-    return hazukiFrostedAppBar(
-      context: context,
-      title: AnimatedSwitcher(
+  Widget _buildAnimatedAppBarTitle(AppLocalizations strings) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: AnimatedSwitcher(
         duration: const Duration(milliseconds: 220),
         switchInCurve: Curves.easeOutCubic,
         switchOutCurve: Curves.easeInCubic,
+        layoutBuilder: (currentChild, previousChildren) {
+          return Stack(
+            alignment: Alignment.centerLeft,
+            children: <Widget>[
+              ...previousChildren,
+              ?currentChild,
+            ],
+          );
+        },
         transitionBuilder: (child, animation) {
           return FadeTransition(
             opacity: animation,
@@ -266,6 +275,119 @@ class _DownloadsPageState extends State<DownloadsPage>
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildDownloadedActions(AppLocalizations strings) {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 220),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      layoutBuilder: (currentChild, previousChildren) {
+        return Stack(
+          alignment: Alignment.centerRight,
+          children: <Widget>[
+            ...previousChildren,
+            ?currentChild,
+          ],
+        );
+      },
+      transitionBuilder: (child, animation) {
+        return FadeTransition(
+          opacity: animation,
+          child: SizeTransition(
+            axis: Axis.horizontal,
+            axisAlignment: 1,
+            sizeFactor: animation,
+            child: child,
+          ),
+        );
+      },
+      child: _tabController.index == 1
+          ? Padding(
+              key: const ValueKey<String>('download_actions_visible'),
+              padding: const EdgeInsets.only(right: 4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox.square(
+                    dimension: kMinInteractiveDimension,
+                    child: IconButton(
+                      tooltip: _selectionMode
+                          ? strings.commonClose
+                          : strings.downloadsActionSelect,
+                      onPressed: () {
+                        setState(() {
+                          if (_selectionMode) {
+                            _selectionEnabled = false;
+                            _selectedComicIds.clear();
+                          } else {
+                            _selectionEnabled = true;
+                          }
+                        });
+                      },
+                      icon: AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 220),
+                        switchInCurve: Curves.easeOutCubic,
+                        switchOutCurve: Curves.easeInCubic,
+                        transitionBuilder: (child, animation) {
+                          return FadeTransition(
+                            opacity: animation,
+                            child: ScaleTransition(
+                              scale: Tween<double>(
+                                begin: 0.86,
+                                end: 1,
+                              ).animate(animation),
+                              child: child,
+                            ),
+                          );
+                        },
+                        child: Icon(
+                          _selectionMode ? Icons.close : Icons.checklist_rounded,
+                          key: ValueKey<String>(
+                            _selectionMode
+                                ? 'selection_close_icon'
+                                : 'selection_checklist_icon',
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  ClipRect(
+                    child: AnimatedAlign(
+                      duration: const Duration(milliseconds: 220),
+                      curve: Curves.easeInOutCubic,
+                      alignment: Alignment.centerRight,
+                      widthFactor: _selectionMode ? 1 : 0,
+                      child: AnimatedOpacity(
+                        duration: const Duration(milliseconds: 180),
+                        curve: Curves.easeInOutCubic,
+                        opacity: _selectionMode ? 1 : 0,
+                        child: IgnorePointer(
+                          ignoring: !_selectionMode,
+                          child: SizedBox.square(
+                            dimension: kMinInteractiveDimension,
+                            child: IconButton(
+                              tooltip: strings.comicDetailDelete,
+                              onPressed: _deleteSelected,
+                              icon: const Icon(Icons.delete_outline),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          : const SizedBox.shrink(key: ValueKey<String>('download_actions_hidden')),
+    );
+  }
+
+  PreferredSizeWidget _buildAppBar(AppLocalizations strings) {
+    return hazukiFrostedAppBar(
+      context: context,
+      title: _buildAnimatedAppBarTitle(strings),
       bottom: TabBar(
         controller: _tabController,
         tabs: [
@@ -273,68 +395,7 @@ class _DownloadsPageState extends State<DownloadsPage>
           Tab(text: strings.downloadsTabDownloaded),
         ],
       ),
-      actions: [
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 220),
-          switchInCurve: Curves.easeOutCubic,
-          switchOutCurve: Curves.easeInCubic,
-          transitionBuilder: (child, animation) {
-            return FadeTransition(
-              opacity: animation,
-              child: ScaleTransition(
-                scale: Tween<double>(begin: 0.86, end: 1).animate(animation),
-                child: child,
-              ),
-            );
-          },
-          child: _tabController.index == 1
-              ? IconButton(
-                  key: ValueKey<String>('select_${_selectionMode ? 'on' : 'off'}'),
-                  tooltip: _selectionMode
-                      ? strings.commonClose
-                      : strings.downloadsActionSelect,
-                  onPressed: () {
-                    setState(() {
-                      if (_selectionMode) {
-                        _selectionEnabled = false;
-                        _selectedComicIds.clear();
-                      } else {
-                        _selectionEnabled = true;
-                      }
-                    });
-                  },
-                  icon: Icon(
-                    _selectionMode ? Icons.close : Icons.checklist_rounded,
-                  ),
-                )
-              : const SizedBox.shrink(key: ValueKey<String>('select_hidden')),
-        ),
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 220),
-          switchInCurve: Curves.easeOutCubic,
-          switchOutCurve: Curves.easeInCubic,
-          transitionBuilder: (child, animation) {
-            return FadeTransition(
-              opacity: animation,
-              child: SlideTransition(
-                position: Tween<Offset>(
-                  begin: const Offset(0.2, 0),
-                  end: Offset.zero,
-                ).animate(animation),
-                child: child,
-              ),
-            );
-          },
-          child: _selectionMode
-              ? IconButton(
-                  key: const ValueKey<String>('delete_selection'),
-                  tooltip: strings.comicDetailDelete,
-                  onPressed: _deleteSelected,
-                  icon: const Icon(Icons.delete_outline),
-                )
-              : const SizedBox.shrink(key: ValueKey<String>('delete_hidden')),
-        ),
-      ],
+      actions: [_buildDownloadedActions(strings)],
     );
   }
 

@@ -10,7 +10,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'l10n/app_localizations.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -32,6 +31,7 @@ part 'pages/settings/reading_settings_page.dart';
 part 'pages/settings/favorites_debug_page.dart';
 part 'pages/settings/other_settings_page.dart';
 part 'pages/settings/advanced_settings_page.dart';
+part 'pages/settings/source_editor_page.dart';
 part 'pages/settings/line_settings_page.dart';
 part 'pages/settings/cloud_sync_page.dart';
 part 'pages/comic_detail_page.dart';
@@ -79,30 +79,7 @@ Future<void> _ensureAndroidNoMediaMarker() async {
     return;
   }
 
-  final markerDirs = <String>{};
-
-  try {
-    final externalDir = await getExternalStorageDirectory();
-    if (externalDir != null) {
-      markerDirs.add(externalDir.parent.path);
-      markerDirs.add(externalDir.path);
-      markerDirs.add('${externalDir.path}/comic_source');
-    }
-  } catch (_) {}
-
-  try {
-    final externalCacheDirs = await getExternalCacheDirectories();
-    if (externalCacheDirs != null) {
-      for (final dir in externalCacheDirs) {
-        markerDirs.add(dir.parent.path);
-        markerDirs.add(dir.path);
-      }
-    }
-  } catch (_) {}
-
-  for (final dirPath in markerDirs) {
-    await _ensureNoMediaFile(dirPath);
-  }
+  await _ensureNoMediaFile('/storage/emulated/0/Download/Hazuki_Manga');
 }
 
 Future<void> _ensureNoMediaFile(String dirPath) async {
@@ -644,24 +621,25 @@ class _HazukiAppState extends State<HazukiApp>
         Widget buildPage(bool canDismiss) {
           return PopScope(
             canPop: canDismiss,
-            child: SafeArea(
-              child: Stack(
-                children: [
-                  Positioned.fill(
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.opaque,
-                      onTap: canDismiss
-                          ? () => Navigator.of(buildContext).maybePop()
-                          : null,
-                      child: BackdropFilter(
-                        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                        child: ColoredBox(
-                          color: Colors.black.withValues(alpha: 0.45),
-                        ),
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: canDismiss
+                        ? () => Navigator.of(buildContext).maybePop()
+                        : null,
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                      child: ColoredBox(
+                        color: Colors.black.withValues(alpha: 0.45),
                       ),
                     ),
                   ),
-                  Center(
+                ),
+                SafeArea(
+                  minimum: const EdgeInsets.all(16),
+                  child: Center(
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTap: () {},
@@ -671,8 +649,8 @@ class _HazukiAppState extends State<HazukiApp>
                       ),
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           );
         }

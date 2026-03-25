@@ -950,7 +950,7 @@ class _FavoritePageState extends State<FavoritePage>
                 curve: Curves.easeOutCubic,
                 child: IgnorePointer(
                   ignoring: !_showBackToTop,
-                  child: FloatingActionButton.small(
+                  child: FloatingActionButton(
                     heroTag: 'favorite_back_to_top',
                     onPressed: _scrollToTop,
                     child: const Icon(Icons.vertical_align_top_rounded),

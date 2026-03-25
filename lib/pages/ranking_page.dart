@@ -504,7 +504,7 @@ class _RankingPageState extends State<RankingPage> {
                   curve: Curves.easeOutCubic,
                   child: IgnorePointer(
                     ignoring: !_showBackToTop,
-                    child: FloatingActionButton.small(
+                    child: FloatingActionButton(
                       heroTag: 'ranking_back_to_top',
                       onPressed: _scrollToTop,
                       child: const Icon(Icons.vertical_align_top_rounded),
