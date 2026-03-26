@@ -660,18 +660,56 @@ Future<bool> showComicSourceRestoreDialog(BuildContext context) async {
                     child: AnimatedBuilder(
                       animation: animation,
                       builder: (context, child) {
-                        final blurProgress = CurvedAnimation(
-                          parent: animation,
+                        final transitionProgress = Curves.easeOutCubic
+                            .transform(animation.value);
+                        final blurProgress = const Interval(
+                          0.0,
+                          0.82,
                           curve: Curves.easeOutCubic,
-                          reverseCurve: Curves.easeInCubic,
-                        ).value;
-                        final sigma = 14 * blurProgress;
-                        return BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
-                          child: child,
+                        ).transform(animation.value);
+                        final sigma = 6 + (16 * blurProgress);
+                        return Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            ColoredBox(
+                              color: Colors.black.withValues(
+                                alpha: 0.22 * transitionProgress,
+                              ),
+                            ),
+                            ClipRect(
+                              child: BackdropFilter(
+                                filter: ImageFilter.blur(
+                                  sigmaX: sigma,
+                                  sigmaY: sigma,
+                                ),
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter,
+                                      colors: [
+                                        colorScheme.surface.withValues(
+                                          alpha: 0.07 * transitionProgress,
+                                        ),
+                                        colorScheme.surface.withValues(
+                                          alpha: 0.14 * transitionProgress,
+                                        ),
+                                        colorScheme.surfaceContainerHighest
+                                            .withValues(
+                                              alpha:
+                                                  0.20 * transitionProgress,
+                                            ),
+                                      ],
+                                    ),
+                                  ),
+                                  child: child,
+                                ),
+                              ),
+                            ),
+                          ],
                         );
                       },
-                      child: const ColoredBox(color: Colors.transparent),
+                      child: const SizedBox.expand(),
                     ),
                   ),
                 ),

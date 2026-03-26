@@ -28,8 +28,7 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
   ColorScheme? _lightComicScheme;
   ColorScheme? _darkComicScheme;
   final Map<String, Uint8List> _dynamicColorImageCache = <String, Uint8List>{};
-  double _appBarSolidProgress = 0;
-  bool _showCollapsedComicTitle = false;
+  late final ValueNotifier<_ComicDetailScrollState> _appBarScrollNotifier;
   String _appBarComicTitle = '';
   String _appBarUpdateTime = '';
   Map<String, dynamic>? _lastReadProgress;
@@ -37,6 +36,10 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
   @override
   void initState() {
     super.initState();
+    _appBarScrollNotifier = ValueNotifier<_ComicDetailScrollState>(
+      const _ComicDetailScrollState(),
+    );
+    _appBarComicTitle = widget.comic.title;
     _future = HazukiSourceService.instance
         .loadComicDetails(widget.comic.id)
         .timeout(const Duration(seconds: 30));
@@ -114,6 +117,7 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
     _scrollController
       ..removeListener(_handleScroll)
       ..dispose();
+    _appBarScrollNotifier.dispose();
     super.dispose();
   }
 
@@ -134,19 +138,42 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
     final nextProgress = ((offset - fadeStart) / fadeDistance).clamp(0.0, 1.0);
     final titleCollapsed = offset >= titleCollapseOffset;
 
-    final progressChanged = (_appBarSolidProgress - nextProgress).abs() >= 0.02;
-    final titleChanged = titleCollapsed != _showCollapsedComicTitle;
+    final scrollState = _appBarScrollNotifier.value;
+    final progressChanged =
+        (scrollState.appBarSolidProgress - nextProgress).abs() >= 0.02;
+    final titleChanged =
+        titleCollapsed != scrollState.showCollapsedComicTitle;
 
     if (!progressChanged && !titleChanged) {
       return false;
     }
 
-    _appBarSolidProgress = nextProgress;
-    _showCollapsedComicTitle = titleCollapsed;
-    if (mounted) {
-      setState(() {});
-    }
+    _appBarScrollNotifier.value = scrollState.copyWith(
+      appBarSolidProgress: nextProgress,
+      showCollapsedComicTitle: titleCollapsed,
+    );
     return true;
+  }
+
+  void _updateAppBarMetadata({
+    required String title,
+    required String updateTime,
+  }) {
+    if (_appBarComicTitle == title && _appBarUpdateTime == updateTime) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      if (_appBarComicTitle == title && _appBarUpdateTime == updateTime) {
+        return;
+      }
+      setState(() {
+        _appBarComicTitle = title;
+        _appBarUpdateTime = updateTime;
+      });
+    });
   }
 
   Future<void> _warmupReaderImages() async {
@@ -919,34 +946,21 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
         child: Scaffold(
           backgroundColor: surface,
           extendBodyBehindAppBar: true,
-          appBar: AppBar(
-            titleSpacing: 0,
-            title: _ComicDetailAppBarTitle(
-              showCollapsedComicTitle: _showCollapsedComicTitle,
-              appBarComicTitle: _appBarComicTitle,
-              appBarUpdateTime: _appBarUpdateTime,
-              theme: theme,
-            ),
-            backgroundColor: Color.lerp(
-              Colors.transparent,
-              surface,
-              _appBarSolidProgress,
-            ),
-            surfaceTintColor: Colors.transparent,
-            elevation: 0,
-            scrolledUnderElevation: 0,
+          appBar: _ComicDetailScrollAwareAppBar(
+            scrollListenable: _appBarScrollNotifier,
+            appBarComicTitle: _appBarComicTitle,
+            appBarUpdateTime: _appBarUpdateTime,
+            theme: theme,
+            surface: surface,
           ),
           body: Stack(
             children: [
               _ComicDetailParallaxBackground(
                 coverUrl: widget.comic.cover.trim(),
               ),
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: ColoredBox(
-                    color: surface.withValues(alpha: _appBarSolidProgress),
-                  ),
-                ),
+              _ComicDetailTopSurfaceOverlay(
+                scrollListenable: _appBarScrollNotifier,
+                surface: surface,
               ),
               Padding(
                 padding: EdgeInsets.only(top: topInset),
@@ -970,13 +984,110 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
                   onShowChapters: _showChaptersPanel,
                   onOpenReader: _openReader,
                   onDetailsResolved: ({required title, required updateTime}) {
-                    _appBarComicTitle = title;
-                    _appBarUpdateTime = updateTime;
+                    _updateAppBarMetadata(
+                      title: title,
+                      updateTime: updateTime,
+                    );
                   },
                 ),
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ComicDetailScrollState {
+  const _ComicDetailScrollState({
+    this.appBarSolidProgress = 0,
+    this.showCollapsedComicTitle = false,
+  });
+
+  final double appBarSolidProgress;
+  final bool showCollapsedComicTitle;
+
+  _ComicDetailScrollState copyWith({
+    double? appBarSolidProgress,
+    bool? showCollapsedComicTitle,
+  }) {
+    return _ComicDetailScrollState(
+      appBarSolidProgress: appBarSolidProgress ?? this.appBarSolidProgress,
+      showCollapsedComicTitle:
+          showCollapsedComicTitle ?? this.showCollapsedComicTitle,
+    );
+  }
+}
+
+class _ComicDetailScrollAwareAppBar extends StatelessWidget
+    implements PreferredSizeWidget {
+  const _ComicDetailScrollAwareAppBar({
+    required this.scrollListenable,
+    required this.appBarComicTitle,
+    required this.appBarUpdateTime,
+    required this.theme,
+    required this.surface,
+  });
+
+  final ValueNotifier<_ComicDetailScrollState> scrollListenable;
+  final String appBarComicTitle;
+  final String appBarUpdateTime;
+  final ThemeData theme;
+  final Color surface;
+
+  @override
+  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<_ComicDetailScrollState>(
+      valueListenable: scrollListenable,
+      builder: (context, scrollState, _) {
+        return AppBar(
+          titleSpacing: 0,
+          title: _ComicDetailAppBarTitle(
+            showCollapsedComicTitle: scrollState.showCollapsedComicTitle,
+            appBarComicTitle: appBarComicTitle,
+            appBarUpdateTime: appBarUpdateTime,
+            theme: theme,
+          ),
+          backgroundColor: Color.lerp(
+            Colors.transparent,
+            surface,
+            scrollState.appBarSolidProgress,
+          ),
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+        );
+      },
+    );
+  }
+}
+
+class _ComicDetailTopSurfaceOverlay extends StatelessWidget {
+  const _ComicDetailTopSurfaceOverlay({
+    required this.scrollListenable,
+    required this.surface,
+  });
+
+  final ValueNotifier<_ComicDetailScrollState> scrollListenable;
+  final Color surface;
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned.fill(
+      child: IgnorePointer(
+        child: ValueListenableBuilder<_ComicDetailScrollState>(
+          valueListenable: scrollListenable,
+          builder: (context, scrollState, _) {
+            final alpha = scrollState.appBarSolidProgress;
+            if (alpha <= 0) {
+              return const SizedBox.expand();
+            }
+            return ColoredBox(color: surface.withValues(alpha: alpha));
+          },
         ),
       ),
     );

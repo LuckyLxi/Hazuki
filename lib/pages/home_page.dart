@@ -807,6 +807,91 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
     );
   }
 
+  Widget _buildFavoriteAppBarActionGroup() {
+    return Row(
+      key: const ValueKey<String>('favorite-appbar-actions'),
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (_favoriteAppBarActions.showSort)
+          PopupMenuButton<String>(
+            tooltip: l10n(context).homeSortTooltip,
+            initialValue: _favoriteAppBarActions.currentSortOrder,
+            onSelected: _onFavoriteSortSelected,
+            itemBuilder: (context) => [
+              CheckedPopupMenuItem<String>(
+                value: 'mr',
+                checked: _favoriteAppBarActions.currentSortOrder == 'mr',
+                child: Text(l10n(context).homeFavoriteSortByFavoriteTime),
+              ),
+              CheckedPopupMenuItem<String>(
+                value: 'mp',
+                checked: _favoriteAppBarActions.currentSortOrder == 'mp',
+                child: Text(l10n(context).homeFavoriteSortByUpdateTime),
+              ),
+            ],
+            icon: const Icon(Icons.sort_rounded),
+          ),
+        if (_favoriteAppBarActions.showCreateFolder)
+          IconButton(
+            tooltip: l10n(context).homeCreateFavoriteFolder,
+            onPressed: _onFavoriteCreateFolderPressed,
+            icon: const Icon(Icons.create_new_folder_outlined),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildHomeAppBarActions() {
+    final discoverActions = Row(
+      key: const ValueKey<String>('discover-appbar-actions'),
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _buildDiscoverAppBarSearchAction(),
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          width: _discoverSearchMorphProgress >= 0.96 ? 12 : 0,
+        ),
+      ],
+    );
+
+    final actionsChild = _currentIndex == 1
+        ? _buildFavoriteAppBarActionGroup()
+        : discoverActions;
+
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 260),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      layoutBuilder: (currentChild, previousChildren) {
+        return Stack(
+          alignment: Alignment.centerRight,
+          clipBehavior: Clip.none,
+          children: <Widget>[
+            ...previousChildren,
+            ?currentChild,
+          ],
+        );
+      },
+      transitionBuilder: (child, animation) {
+        final curved = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        );
+        final slide = Tween<Offset>(
+          begin: const Offset(0.24, 0),
+          end: Offset.zero,
+        ).animate(curved);
+        return FadeTransition(
+          opacity: curved,
+          child: SlideTransition(position: slide, child: child),
+        );
+      },
+      child: actionsChild,
+    );
+  }
+
   void _handleFavoriteAppBarActionsChanged(FavoriteAppBarActionsState state) {
     if (state == _favoriteAppBarActions || !mounted) {
       return;
@@ -847,44 +932,7 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
         appBar: hazukiFrostedAppBar(
           context: context,
           title: const Text('Hazuki'),
-          actions: [
-            if (_currentIndex == 1 && _favoriteAppBarActions.showSort)
-              PopupMenuButton<String>(
-                tooltip: l10n(context).homeSortTooltip,
-                initialValue: _favoriteAppBarActions.currentSortOrder,
-                onSelected: _onFavoriteSortSelected,
-                itemBuilder: (context) => [
-                  CheckedPopupMenuItem<String>(
-                    value: 'mr',
-                    checked: _favoriteAppBarActions.currentSortOrder == 'mr',
-                    child: Text(l10n(context).homeFavoriteSortByFavoriteTime),
-                  ),
-                  CheckedPopupMenuItem<String>(
-                    value: 'mp',
-                    checked: _favoriteAppBarActions.currentSortOrder == 'mp',
-                    child: Text(l10n(context).homeFavoriteSortByUpdateTime),
-                  ),
-                ],
-                icon: const Icon(Icons.sort_rounded),
-              ),
-            if (_currentIndex == 1 && _favoriteAppBarActions.showCreateFolder)
-              IconButton(
-                tooltip: l10n(context).homeCreateFavoriteFolder,
-                onPressed: _onFavoriteCreateFolderPressed,
-                icon: const Icon(Icons.create_new_folder_outlined),
-              ),
-            if (_currentIndex == 0) ...[
-              _buildDiscoverAppBarSearchAction(),
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 220),
-                curve: Curves.easeOutCubic,
-                width:
-                    _discoverSearchMorphProgress >= 0.96
-                    ? 12
-                    : 0,
-              ),
-            ],
-          ],
+          actions: [_buildHomeAppBarActions()],
         ),
         drawer: Drawer(
           child: SafeArea(

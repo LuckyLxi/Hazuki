@@ -33,6 +33,8 @@ class HazukiCachedImage extends StatefulWidget {
     this.error,
     this.keepInMemory = true,
     this.ignoreNoImageMode = false,
+    this.cacheWidth,
+    this.cacheHeight,
   });
 
   final String url;
@@ -44,6 +46,8 @@ class HazukiCachedImage extends StatefulWidget {
   final Widget? error;
   final bool keepInMemory;
   final bool ignoreNoImageMode;
+  final int? cacheWidth;
+  final int? cacheHeight;
 
   @override
   State<HazukiCachedImage> createState() => _HazukiCachedImageState();
@@ -232,6 +236,8 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
         height: widget.height,
         fit: widget.fit,
         alignment: widget.alignment,
+        cacheWidth: widget.cacheWidth,
+        cacheHeight: widget.cacheHeight,
         gaplessPlayback: true,
         filterQuality: FilterQuality.medium,
       );

@@ -4,7 +4,7 @@ part of '../../main.dart';
 
 const int _comicStaticBlurredCoverCacheLimit = 24;
 const int _comicStaticBlurDecodeWidth = 128;
-const int _comicStaticBlurRadius = 12;
+const int _comicStaticBlurRadius = 18;
 final Map<String, Uint8List> _comicStaticBlurredCoverCache =
     <String, Uint8List>{};
 
@@ -264,14 +264,25 @@ class _ComicBlurredCoverBackgroundState
             duration: const Duration(milliseconds: 220),
             switchInCurve: Curves.easeOutCubic,
             switchOutCurve: Curves.easeInCubic,
+            layoutBuilder: (currentChild, previousChildren) {
+              return Stack(
+                fit: StackFit.expand,
+                children: <Widget>[
+                  ...previousChildren,
+                  ?currentChild,
+                ],
+              );
+            },
             child: _blurredBytes == null
                 ? const SizedBox.expand(key: ValueKey('static-cover-blur-empty'))
-                : Image.memory(
-                    _blurredBytes!,
+                : SizedBox.expand(
                     key: ValueKey('static-cover-blur-$normalizedUrl'),
-                    fit: BoxFit.cover,
-                    gaplessPlayback: true,
-                    filterQuality: FilterQuality.medium,
+                    child: Image.memory(
+                      _blurredBytes!,
+                      fit: BoxFit.cover,
+                      gaplessPlayback: true,
+                      filterQuality: FilterQuality.medium,
+                    ),
                   ),
           ),
           ColoredBox(color: surface.withValues(alpha: 0.2)),

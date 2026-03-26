@@ -99,6 +99,20 @@ class _ComicDetailRelatedTab extends StatelessWidget {
       return Center(child: Text(l10n(context).comicDetailNoRelatedComics));
     }
 
+    const crossAxisCount = 3;
+    const gridPadding = 16.0;
+    const crossSpacing = 10.0;
+    final mediaQuery = MediaQuery.of(context);
+    final tileWidth =
+        (mediaQuery.size.width -
+            (gridPadding * 2) -
+            (crossSpacing * (crossAxisCount - 1))) /
+        crossAxisCount;
+    final thumbnailCacheWidth = (tileWidth * mediaQuery.devicePixelRatio)
+        .round()
+        .clamp(120, 480)
+        .toInt();
+
     return GridView.builder(
       key: const PageStorageKey<String>('comic-detail-related-tab'),
       physics: const ClampingScrollPhysics(),
@@ -143,6 +157,8 @@ class _ComicDetailRelatedTab extends StatelessWidget {
                             url: comic.cover,
                             fit: BoxFit.cover,
                             width: double.infinity,
+                            keepInMemory: false,
+                            cacheWidth: thumbnailCacheWidth,
                             loading: Container(
                               color: Theme.of(
                                 context,

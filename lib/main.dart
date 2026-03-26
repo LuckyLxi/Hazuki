@@ -633,18 +633,57 @@ class _HazukiAppState extends State<HazukiApp>
                     child: AnimatedBuilder(
                       animation: animation,
                       builder: (context, child) {
-                        final blurProgress = CurvedAnimation(
-                          parent: animation,
+                        final colorScheme = Theme.of(context).colorScheme;
+                        final transitionProgress = Curves.easeOutCubic
+                            .transform(animation.value);
+                        final blurProgress = const Interval(
+                          0.0,
+                          0.82,
                           curve: Curves.easeOutCubic,
-                          reverseCurve: Curves.easeInCubic,
-                        ).value;
-                        final sigma = 10 * blurProgress;
-                        return BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
-                          child: child,
+                        ).transform(animation.value);
+                        final sigma = 4 + (14 * blurProgress);
+                        return Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            ColoredBox(
+                              color: Colors.black.withValues(
+                                alpha: 0.20 * transitionProgress,
+                              ),
+                            ),
+                            ClipRect(
+                              child: BackdropFilter(
+                                filter: ImageFilter.blur(
+                                  sigmaX: sigma,
+                                  sigmaY: sigma,
+                                ),
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.topCenter,
+                                      end: Alignment.bottomCenter,
+                                      colors: [
+                                        colorScheme.surface.withValues(
+                                          alpha: 0.06 * transitionProgress,
+                                        ),
+                                        colorScheme.surface.withValues(
+                                          alpha: 0.12 * transitionProgress,
+                                        ),
+                                        colorScheme.surfaceContainerHighest
+                                            .withValues(
+                                              alpha:
+                                                  0.18 * transitionProgress,
+                                            ),
+                                      ],
+                                    ),
+                                  ),
+                                  child: child,
+                                ),
+                              ),
+                            ),
+                          ],
                         );
                       },
-                      child: const ColoredBox(color: Colors.transparent),
+                      child: const SizedBox.expand(),
                     ),
                   ),
                 ),
