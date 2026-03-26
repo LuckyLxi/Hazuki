@@ -167,32 +167,22 @@ class _DownloadsPageState extends State<DownloadsPage>
       if (!mounted) {
         return;
       }
-      final isZh = Localizations.localeOf(context).languageCode.toLowerCase().startsWith(
-        'zh',
-      );
+      final strings = l10n(context);
       final message = !result.permissionGranted
-          ? (isZh
-                ? '未获得文件访问权限，无法扫描本地漫画'
-                : 'File access permission was not granted. Unable to scan local comics.')
+          ? strings.downloadsScanPermissionDenied
           : result.recoveredComics > 0
-          ? (isZh
-                ? '扫描完成，已扫描 ${result.scannedDirectories} 个目录，恢复 ${result.recoveredComics} 部漫画'
-                : 'Scan complete. Scanned ${result.scannedDirectories} folders and recovered ${result.recoveredComics} comics.')
-          : (isZh
-                ? '扫描完成，未发现可恢复的已下载漫画'
-                : 'Scan complete. No recoverable downloaded comics were found.');
+          ? strings.downloadsScanCompleted(
+              result.scannedDirectories,
+              result.recoveredComics,
+            )
+          : strings.downloadsScanNoRecoverable;
       await showHazukiPrompt(context, message);
     } catch (e) {
       if (!mounted) {
         return;
       }
-      final isZh = Localizations.localeOf(context).languageCode.toLowerCase().startsWith(
-        'zh',
-      );
-      await showHazukiPrompt(
-        context,
-        isZh ? '扫描失败：$e' : 'Scan failed: $e',
-      );
+      final strings = l10n(context);
+      await showHazukiPrompt(context, strings.downloadsScanFailed('$e'));
     } finally {
       if (mounted) {
         setState(() {
@@ -206,11 +196,9 @@ class _DownloadsPageState extends State<DownloadsPage>
     if (!ready || _tabController.index != 1 || _selectionMode) {
       return null;
     }
-    final isZh = Localizations.localeOf(context).languageCode.toLowerCase().startsWith(
-      'zh',
-    );
+    final strings = l10n(context);
     return FloatingActionButton(
-      tooltip: isZh ? '扫描本地漫画' : 'Scan local comics',
+      tooltip: strings.downloadsScanTooltip,
       onPressed: _scanningDownloaded ? null : _scanDownloadedComics,
       child: AnimatedSwitcher(
         duration: const Duration(milliseconds: 180),

@@ -594,23 +594,20 @@ class _DisplayModeSettingsPageState extends State<DisplayModeSettingsPage> {
   Widget _buildContent(BuildContext context) {
     return Stack(
       children: [
-        RefreshIndicator(
-          onRefresh: () => _loadModes(showLoader: false),
-          child: ListView(
-            key: const ValueKey('display-mode-content'),
-            physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-            children: [
-              _buildOverviewCard(context),
-              const SizedBox(height: 16),
-              ..._modes.map((mode) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: _buildModeCard(context, mode),
-                );
-              }),
-            ],
-          ),
+        ListView(
+          key: const ValueKey('display-mode-content'),
+          physics: const ClampingScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+          children: [
+            _buildOverviewCard(context),
+            const SizedBox(height: 16),
+            ..._modes.map((mode) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _buildModeCard(context, mode),
+              );
+            }),
+          ],
         ),
         if (_applying)
           const Positioned(

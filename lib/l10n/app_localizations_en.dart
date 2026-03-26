@@ -199,9 +199,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeSaveAvatarContent => 'Save the current avatar to your gallery?';
 
   @override
-  String homeAvatarSaved(Object path) {
-    return 'Avatar saved to $path';
-  }
+  String get homeAvatarSaved => 'Avatar saved';
 
   @override
   String homeAvatarSaveFailed(Object error) {
@@ -318,25 +316,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aboutOpenFeedbackFailed => 'Unable to open the feedback link';
 
   @override
-  String get aboutLicenseTitle => 'License';
+  String get aboutDisclaimerTitle => 'Disclaimer';
 
   @override
-  String get aboutLicenseSubtitle => 'GPL-3.0 License';
+  String get aboutDisclaimerSubtitle => 'Please read before use';
 
   @override
-  String get aboutLicenseSnackbar => 'This project is licensed under GPL-3.0';
-
-  @override
-  String get aboutThanksTitle => 'Acknowledgements';
-
-  @override
-  String get aboutThanksSubtitle => 'Outstanding projects that inspired this app';
-
-  @override
-  String get aboutThanksDialogTitle => 'Acknowledgements';
-
-  @override
-  String get aboutThanksDialogContent => 'This project was developed with reference to and thanks to the following open-source projects:\n\n• Venera: reference for login flow implementation\n• Animeko: reference for interface layout design';
+  String get aboutDisclaimerContent => 'This app is provided only for learning, interface research, and personal technical exchange. It does not provide any comic resources, nor does it directly store, upload, or distribute comic content.\n\nOn first launch or when updating the comic source, the app automatically downloads a comic-source script from a third-party GitHub repository. Both that script and any content parsed through it originate from third parties, and the related copyrights and liabilities belong to the original authors or rights holders.\n\nPlease use this app in compliance with local laws, regulations, and copyright requirements. Any disputes, losses, or legal liabilities arising from downloading, using third-party comic sources, or accessing related content shall be borne solely by the user.';
 
   @override
   String get commonConfirm => 'OK';
@@ -596,9 +582,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String comicDetailSavedToPath(Object path) {
-    return 'Saved to $path';
-  }
+  String get comicDetailSavedToPath => 'Saved';
 
   @override
   String comicDetailSaveFailed(Object error) {
@@ -1450,5 +1434,83 @@ class AppLocalizationsEn extends AppLocalizations {
   String get advancedRestoreSourceLabel => 'Restore comic source';
 
   @override
-  String get advancedRestoreSourceSuccess => 'Comic source restored. Restart the app to apply it.';
+  String get advancedRestoreSourceSuccess => 'Comic source restored';
+
+  @override
+  String get sourceEditorLoading => 'Loading comic source…';
+
+  @override
+  String get sourceEditorHint => 'Restart the app after saving to apply the updated source.';
+
+  @override
+  String get sourceEditorSaved => 'Comic source saved';
+
+  @override
+  String sourceEditorLoadFailed(Object error) {
+    return 'Load failed: $error';
+  }
+
+  @override
+  String sourceEditorSaveFailed(Object error) {
+    return 'Save failed: $error';
+  }
+
+  @override
+  String sourceEditorLineCount(Object count) {
+    return '$count lines';
+  }
+
+  @override
+  String get sourceEditorRestoreConfirmContent => 'Restore the official comic source? Your saved edits will be overwritten.';
+
+  @override
+  String get sourceEditorRestoreFailed => 'Restore failed. Please try again later.';
+
+  @override
+  String sourceEditorRestoreDownloadingProgress(Object progress) {
+    return 'Downloading $progress%';
+  }
+
+  @override
+  String get sourceEditorRestoringTitle => 'Restoring comic source';
+
+  @override
+  String get downloadsScanPermissionDenied => 'File access permission was not granted. Unable to scan local comics.';
+
+  @override
+  String downloadsScanCompleted(Object scannedDirectories, Object recoveredComics) {
+    return 'Scan complete. Scanned $scannedDirectories folders and recovered $recoveredComics comics.';
+  }
+
+  @override
+  String get downloadsScanNoRecoverable => 'Scan complete. No recoverable downloaded comics were found.';
+
+  @override
+  String downloadsScanFailed(Object error) {
+    return 'Scan failed: $error';
+  }
+
+  @override
+  String get downloadsScanTooltip => 'Scan local comics';
+
+  @override
+  String get sourceUpdateRestartTitle => 'Please restart the app';
+
+  @override
+  String get sourceUpdateRestartMessage => 'The source update has finished downloading. Please restart the app to apply the update.';
+
+  @override
+  String get sourceUpdateLocalLabel => 'Local';
+
+  @override
+  String get sourceUpdateCloudLabel => 'Cloud';
+
+  @override
+  String get sourceUpdateAvailableMessage => 'A new source version is available. Download it now and restart the app to apply it.';
+
+  @override
+  String get sourceUpdateDownloadingMessage => 'Downloading and replacing the source package. Please keep the network connected.';
+
+  @override
+  String get sourceUpdateRestartHint => 'Close and reopen the app to finish applying the update.';
 }

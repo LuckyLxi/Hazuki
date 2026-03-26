@@ -602,7 +602,7 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
       if (!mounted) {
         return;
       }
-      unawaited(showHazukiPrompt(context, strings.homeAvatarSaved(file.path)));
+      unawaited(showHazukiPrompt(context, strings.homeAvatarSaved));
     } catch (e) {
       if (!mounted) {
         return;
@@ -873,14 +873,17 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
                 onPressed: _onFavoriteCreateFolderPressed,
                 icon: const Icon(Icons.create_new_folder_outlined),
               ),
-            _buildDiscoverAppBarSearchAction(),
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 220),
-              curve: Curves.easeOutCubic,
-              width: _currentIndex == 0 && _discoverSearchMorphProgress >= 0.96
-                  ? 12
-                  : 0,
-            ),
+            if (_currentIndex == 0) ...[
+              _buildDiscoverAppBarSearchAction(),
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+                width:
+                    _discoverSearchMorphProgress >= 0.96
+                    ? 12
+                    : 0,
+              ),
+            ],
           ],
         ),
         drawer: Drawer(

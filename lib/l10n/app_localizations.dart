@@ -470,8 +470,8 @@ abstract class AppLocalizations {
   /// No description provided for @homeAvatarSaved.
   ///
   /// In en, this message translates to:
-  /// **'Avatar saved to {path}'**
-  String homeAvatarSaved(Object path);
+  /// **'Avatar saved'**
+  String get homeAvatarSaved;
 
   /// No description provided for @homeAvatarSaveFailed.
   ///
@@ -689,47 +689,23 @@ abstract class AppLocalizations {
   /// **'Unable to open the feedback link'**
   String get aboutOpenFeedbackFailed;
 
-  /// No description provided for @aboutLicenseTitle.
+  /// No description provided for @aboutDisclaimerTitle.
   ///
   /// In en, this message translates to:
-  /// **'License'**
-  String get aboutLicenseTitle;
+  /// **'Disclaimer'**
+  String get aboutDisclaimerTitle;
 
-  /// No description provided for @aboutLicenseSubtitle.
+  /// No description provided for @aboutDisclaimerSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'GPL-3.0 License'**
-  String get aboutLicenseSubtitle;
+  /// **'Please read before use'**
+  String get aboutDisclaimerSubtitle;
 
-  /// No description provided for @aboutLicenseSnackbar.
+  /// No description provided for @aboutDisclaimerContent.
   ///
   /// In en, this message translates to:
-  /// **'This project is licensed under GPL-3.0'**
-  String get aboutLicenseSnackbar;
-
-  /// No description provided for @aboutThanksTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Acknowledgements'**
-  String get aboutThanksTitle;
-
-  /// No description provided for @aboutThanksSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Outstanding projects that inspired this app'**
-  String get aboutThanksSubtitle;
-
-  /// No description provided for @aboutThanksDialogTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Acknowledgements'**
-  String get aboutThanksDialogTitle;
-
-  /// No description provided for @aboutThanksDialogContent.
-  ///
-  /// In en, this message translates to:
-  /// **'This project was developed with reference to and thanks to the following open-source projects:\n\n• Venera: reference for login flow implementation\n• Animeko: reference for interface layout design'**
-  String get aboutThanksDialogContent;
+  /// **'This app is provided only for learning, interface research, and personal technical exchange. It does not provide any comic resources, nor does it directly store, upload, or distribute comic content.\n\nOn first launch or when updating the comic source, the app automatically downloads a comic-source script from a third-party GitHub repository. Both that script and any content parsed through it originate from third parties, and the related copyrights and liabilities belong to the original authors or rights holders.\n\nPlease use this app in compliance with local laws, regulations, and copyright requirements. Any disputes, losses, or legal liabilities arising from downloading, using third-party comic sources, or accessing related content shall be borne solely by the user.'**
+  String get aboutDisclaimerContent;
 
   /// No description provided for @commonConfirm.
   ///
@@ -1208,8 +1184,8 @@ abstract class AppLocalizations {
   /// No description provided for @comicDetailSavedToPath.
   ///
   /// In en, this message translates to:
-  /// **'Saved to {path}'**
-  String comicDetailSavedToPath(Object path);
+  /// **'Saved'**
+  String get comicDetailSavedToPath;
 
   /// No description provided for @comicDetailSaveFailed.
   ///
@@ -2696,8 +2672,140 @@ abstract class AppLocalizations {
   /// No description provided for @advancedRestoreSourceSuccess.
   ///
   /// In en, this message translates to:
-  /// **'Comic source restored. Restart the app to apply it.'**
+  /// **'Comic source restored'**
   String get advancedRestoreSourceSuccess;
+
+  /// No description provided for @sourceEditorLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading comic source…'**
+  String get sourceEditorLoading;
+
+  /// No description provided for @sourceEditorHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Restart the app after saving to apply the updated source.'**
+  String get sourceEditorHint;
+
+  /// No description provided for @sourceEditorSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Comic source saved'**
+  String get sourceEditorSaved;
+
+  /// No description provided for @sourceEditorLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Load failed: {error}'**
+  String sourceEditorLoadFailed(Object error);
+
+  /// No description provided for @sourceEditorSaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Save failed: {error}'**
+  String sourceEditorSaveFailed(Object error);
+
+  /// No description provided for @sourceEditorLineCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} lines'**
+  String sourceEditorLineCount(Object count);
+
+  /// No description provided for @sourceEditorRestoreConfirmContent.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore the official comic source? Your saved edits will be overwritten.'**
+  String get sourceEditorRestoreConfirmContent;
+
+  /// No description provided for @sourceEditorRestoreFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore failed. Please try again later.'**
+  String get sourceEditorRestoreFailed;
+
+  /// No description provided for @sourceEditorRestoreDownloadingProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading {progress}%'**
+  String sourceEditorRestoreDownloadingProgress(Object progress);
+
+  /// No description provided for @sourceEditorRestoringTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Restoring comic source'**
+  String get sourceEditorRestoringTitle;
+
+  /// No description provided for @downloadsScanPermissionDenied.
+  ///
+  /// In en, this message translates to:
+  /// **'File access permission was not granted. Unable to scan local comics.'**
+  String get downloadsScanPermissionDenied;
+
+  /// No description provided for @downloadsScanCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan complete. Scanned {scannedDirectories} folders and recovered {recoveredComics} comics.'**
+  String downloadsScanCompleted(Object scannedDirectories, Object recoveredComics);
+
+  /// No description provided for @downloadsScanNoRecoverable.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan complete. No recoverable downloaded comics were found.'**
+  String get downloadsScanNoRecoverable;
+
+  /// No description provided for @downloadsScanFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan failed: {error}'**
+  String downloadsScanFailed(Object error);
+
+  /// No description provided for @downloadsScanTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan local comics'**
+  String get downloadsScanTooltip;
+
+  /// No description provided for @sourceUpdateRestartTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Please restart the app'**
+  String get sourceUpdateRestartTitle;
+
+  /// No description provided for @sourceUpdateRestartMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'The source update has finished downloading. Please restart the app to apply the update.'**
+  String get sourceUpdateRestartMessage;
+
+  /// No description provided for @sourceUpdateLocalLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Local'**
+  String get sourceUpdateLocalLabel;
+
+  /// No description provided for @sourceUpdateCloudLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cloud'**
+  String get sourceUpdateCloudLabel;
+
+  /// No description provided for @sourceUpdateAvailableMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'A new source version is available. Download it now and restart the app to apply it.'**
+  String get sourceUpdateAvailableMessage;
+
+  /// No description provided for @sourceUpdateDownloadingMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading and replacing the source package. Please keep the network connected.'**
+  String get sourceUpdateDownloadingMessage;
+
+  /// No description provided for @sourceUpdateRestartHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Close and reopen the app to finish applying the update.'**
+  String get sourceUpdateRestartHint;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

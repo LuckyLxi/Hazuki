@@ -18,20 +18,18 @@ class _ComicSourceEditorPageState extends State<ComicSourceEditorPage> {
   bool _loading = true;
   bool _saving = false;
 
-  bool get _isZh => Localizations.localeOf(context).languageCode == 'zh';
+  AppLocalizations get _strings => l10n(context);
   bool get _hasChanges => _controller.text != _initialContent;
 
-  String get _pageTitle => _isZh ? '编辑漫画源' : 'Edit comic source';
-  String get _saveLabel => _isZh ? '保存' : 'Save';
-  String get _loadingText => _isZh ? '正在读取漫画源…' : 'Loading comic source…';
-  String get _retryLabel => _isZh ? '重试' : 'Retry';
+  String get _pageTitle => _strings.advancedEditSourceTitle;
+  String get _saveLabel => _strings.commonSave;
+  String get _loadingText => _strings.sourceEditorLoading;
+  String get _retryLabel => _strings.commonRetry;
   String get _fileBadge => 'jm.js';
-  String get _hintText =>
-      _isZh ? '保存后需要重启应用，新的漫画源才会生效。' : 'Restart the app after saving to apply the updated source.';
-  String get _saveSuccessText =>
-      _isZh ? '已保存漫画源，请重启应用后生效' : 'Comic source saved. Restart the app to apply it.';
-  String get _loadFailedPrefix => _isZh ? '读取失败：' : 'Load failed: ';
-  String get _saveFailedPrefix => _isZh ? '保存失败：' : 'Save failed: ';
+  String get _hintText => _strings.sourceEditorHint;
+  String get _saveSuccessText => _strings.sourceEditorSaved;
+  String _loadFailedText(Object error) => _strings.sourceEditorLoadFailed(error);
+  String _saveFailedText(Object error) => _strings.sourceEditorSaveFailed(error);
 
   @override
   void initState() {
@@ -77,7 +75,7 @@ class _ComicSourceEditorPageState extends State<ComicSourceEditorPage> {
       }
       setState(() {
         _loading = false;
-        _loadErrorText = '$_loadFailedPrefix$e';
+        _loadErrorText = _loadFailedText('$e');
       });
     }
   }
@@ -106,7 +104,7 @@ class _ComicSourceEditorPageState extends State<ComicSourceEditorPage> {
       if (!mounted) {
         return;
       }
-      final message = '$_saveFailedPrefix$e';
+      final message = _saveFailedText('$e');
       setState(() {
         _saving = false;
         _inlineErrorText = message;
@@ -293,7 +291,7 @@ class _ComicSourceEditorPageState extends State<ComicSourceEditorPage> {
               _buildFileBadge(context),
               const Spacer(),
               Text(
-                '${lineCount.toString()} ${_isZh ? '行' : 'lines'}',
+                _strings.sourceEditorLineCount(lineCount),
                 style: theme.textTheme.labelMedium?.copyWith(
                   color: colorScheme.onSurfaceVariant,
                   fontWeight: FontWeight.w700,
@@ -475,7 +473,7 @@ class _ComicSourceEditorPageState extends State<ComicSourceEditorPage> {
 }
 
 Future<bool> showComicSourceRestoreDialog(BuildContext context) async {
-  final isZh = Localizations.localeOf(context).languageCode == 'zh';
+  final strings = l10n(context);
   var phase = _ComicSourceRestoreDialogPhase.confirm;
   var progress = 0.0;
   var indeterminate = true;
@@ -483,7 +481,7 @@ Future<bool> showComicSourceRestoreDialog(BuildContext context) async {
   final result = await showGeneralDialog<bool>(
     context: context,
     barrierDismissible: false,
-    barrierLabel: 'comic-source-restore-dialog',
+    barrierLabel: strings.dialogBarrierLabel,
     barrierColor: Colors.transparent,
     transitionDuration: const Duration(milliseconds: 260),
     pageBuilder: (dialogContext, animation, secondaryAnimation) {
@@ -520,16 +518,14 @@ Future<bool> showComicSourceRestoreDialog(BuildContext context) async {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            isZh ? '还原漫画源' : 'Restore comic source',
+                            strings.advancedRestoreSourceLabel,
                             style: textTheme.titleLarge?.copyWith(
                               fontWeight: FontWeight.w800,
                             ),
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            isZh
-                                ? '确定要还原为官方漫画源吗？你自己保存的修改会被覆盖。'
-                                : 'Restore the official comic source? Your saved edits will be overwritten.',
+                            strings.sourceEditorRestoreConfirmContent,
                             style: textTheme.bodyMedium?.copyWith(
                               color: colorScheme.onSurfaceVariant,
                               height: 1.45,
@@ -547,7 +543,7 @@ Future<bool> showComicSourceRestoreDialog(BuildContext context) async {
                   children: [
                     TextButton(
                       onPressed: () => Navigator.of(dialogContext).pop(false),
-                      child: Text(isZh ? '取消' : 'Cancel'),
+                      child: Text(strings.commonCancel),
                     ),
                     FilledButton(
                       onPressed: () async {
@@ -583,15 +579,13 @@ Future<bool> showComicSourceRestoreDialog(BuildContext context) async {
                           unawaited(
                             showHazukiPrompt(
                               context,
-                              isZh
-                                  ? '还原失败，请稍后再试'
-                                  : 'Restore failed. Please try again later.',
+                              strings.sourceEditorRestoreFailed,
                               isError: true,
                             ),
                           );
                         }
                       },
-                      child: Text(isZh ? '是' : 'Yes'),
+                      child: Text(strings.commonConfirm),
                     ),
                   ],
                 ),
@@ -601,10 +595,10 @@ Future<bool> showComicSourceRestoreDialog(BuildContext context) async {
 
           Widget buildDownloadingContent() {
             final progressText = indeterminate
-                ? (isZh ? '下载中…' : 'Downloading…')
-                : (isZh
-                    ? '正在下载 ${ (progress * 100).toStringAsFixed(0) }%'
-                    : 'Downloading ${ (progress * 100).toStringAsFixed(0) }%');
+                ? strings.sourceUpdateDownloading
+                : strings.sourceEditorRestoreDownloadingProgress(
+                    (progress * 100).toStringAsFixed(0),
+                  );
             return Column(
               key: const ValueKey<String>('restore-downloading'),
               mainAxisSize: MainAxisSize.min,
@@ -623,7 +617,7 @@ Future<bool> showComicSourceRestoreDialog(BuildContext context) async {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        isZh ? '正在还原漫画源' : 'Restoring comic source',
+                        strings.sourceEditorRestoringTitle,
                         style: textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w800,
                         ),
@@ -663,11 +657,21 @@ Future<bool> showComicSourceRestoreDialog(BuildContext context) async {
                     onTap: canDismiss
                         ? () => Navigator.of(dialogContext).pop(false)
                         : null,
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                      child: ColoredBox(
-                        color: Colors.black.withValues(alpha: 0.42),
-                      ),
+                    child: AnimatedBuilder(
+                      animation: animation,
+                      builder: (context, child) {
+                        final blurProgress = CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOutCubic,
+                          reverseCurve: Curves.easeInCubic,
+                        ).value;
+                        final sigma = 14 * blurProgress;
+                        return BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
+                          child: child,
+                        );
+                      },
+                      child: const ColoredBox(color: Colors.transparent),
                     ),
                   ),
                 ),

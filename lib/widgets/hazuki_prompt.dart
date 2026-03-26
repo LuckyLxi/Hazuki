@@ -62,6 +62,30 @@ Future<void> showHazukiPrompt(
       final foregroundColor = isError
           ? colorScheme.onErrorContainer
           : colorScheme.onInverseSurface;
+      final textStyle = Theme.of(overlayContext).textTheme.labelMedium?.copyWith(
+            color: foregroundColor,
+            fontWeight: FontWeight.w600,
+          ) ??
+          TextStyle(
+            color: foregroundColor,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          );
+      final mediaQuery = MediaQuery.of(overlayContext);
+      final safeHorizontalInsets =
+          mediaQuery.padding.left + mediaQuery.padding.right;
+      final maxPromptWidth = mediaQuery.size.width - safeHorizontalInsets - 24;
+      final textPainter = TextPainter(
+        text: TextSpan(text: message, style: textStyle),
+        maxLines: 1,
+        textDirection: Directionality.of(overlayContext),
+        textScaler: mediaQuery.textScaler,
+      )..layout();
+      final desiredExpandedWidth =
+          24.0 + 18.0 + 8.0 + textPainter.width + 2.0;
+      final expandedWidth = desiredExpandedWidth > maxPromptWidth
+          ? maxPromptWidth
+          : desiredExpandedWidth;
 
       return IgnorePointer(
         ignoring: true,
@@ -89,7 +113,9 @@ Future<void> showHazukiPrompt(
                       curve: expanded
                           ? Curves.easeOutBack
                           : const Cubic(0.4, 0.0, 0.2, 1.0),
-                      width: expanded ? 248 : 44,
+                      width: expanded
+                          ? (expandedWidth < 44 ? 44 : expandedWidth)
+                          : 44,
                       height: 44,
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       decoration: BoxDecoration(
@@ -132,13 +158,7 @@ Future<void> showHazukiPrompt(
                                     maxLines: 1,
                                     overflow: TextOverflow.fade,
                                     softWrap: false,
-                                    style: Theme.of(overlayContext)
-                                        .textTheme
-                                        .labelMedium
-                                        ?.copyWith(
-                                          color: foregroundColor,
-                                          fontWeight: FontWeight.w600,
-                                        ),
+                                    style: textStyle,
                                   ),
                                 ),
                               ),

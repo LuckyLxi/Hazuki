@@ -615,7 +615,7 @@ class _HazukiAppState extends State<HazukiApp>
     return showGeneralDialog<T>(
       context: dialogContext,
       barrierDismissible: false,
-      barrierLabel: 'source-update-dialog',
+      barrierLabel: l10n(dialogContext).dialogBarrierLabel,
       barrierColor: Colors.transparent,
       transitionDuration: const Duration(milliseconds: 280),
       pageBuilder: (buildContext, animation, secondaryAnimation) {
@@ -630,11 +630,21 @@ class _HazukiAppState extends State<HazukiApp>
                     onTap: canDismiss
                         ? () => Navigator.of(buildContext).maybePop()
                         : null,
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                      child: ColoredBox(
-                        color: Colors.black.withValues(alpha: 0.45),
-                      ),
+                    child: AnimatedBuilder(
+                      animation: animation,
+                      builder: (context, child) {
+                        final blurProgress = CurvedAnimation(
+                          parent: animation,
+                          curve: Curves.easeOutCubic,
+                          reverseCurve: Curves.easeInCubic,
+                        ).value;
+                        final sigma = 10 * blurProgress;
+                        return BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: sigma, sigmaY: sigma),
+                          child: child,
+                        );
+                      },
+                      child: const ColoredBox(color: Colors.transparent),
                     ),
                   ),
                 ),
@@ -726,30 +736,15 @@ class _HazukiAppState extends State<HazukiApp>
           final theme = Theme.of(dialogContext);
           final colorScheme = theme.colorScheme;
           final textTheme = theme.textTheme;
-          final isZh =
-              Localizations.localeOf(dialogContext).languageCode == 'zh';
-          final restartTitle =
-              isZh ? '请重新启动软件' : 'Please restart the app';
-          final restartMessage =
-              isZh
-                  ? '漫画源已下载完成，请重新启动软件以应用更新。'
-                  : 'The source update has finished downloading. Please restart the app to apply the update.';
-          final localVersionLabel = isZh ? '本地版本' : 'Local';
-          final remoteVersionLabel = isZh ? '云端版本' : 'Cloud';
+          final restartTitle = strings.sourceUpdateRestartTitle;
+          final restartMessage = strings.sourceUpdateRestartMessage;
+          final localVersionLabel = strings.sourceUpdateLocalLabel;
+          final remoteVersionLabel = strings.sourceUpdateCloudLabel;
 
           const dialogMaxWidth = 360.0;
-          final availableMessage =
-              isZh
-                  ? '检测到新的漫画源版本，下载完成后重启软件即可生效。'
-                  : 'A new source version is available. Download it now and restart the app to apply it.';
-          final downloadingMessage =
-              isZh
-                  ? '正在下载并替换漫画源文件，请保持网络连接。'
-                  : 'Downloading and replacing the source package. Please keep the network connected.';
-          final restartHint =
-              isZh
-                  ? '关闭并重新打开软件后即可完成更新。'
-                  : 'Close and reopen the app to finish applying the update.';
+          final availableMessage = strings.sourceUpdateAvailableMessage;
+          final downloadingMessage = strings.sourceUpdateDownloadingMessage;
+          final restartHint = strings.sourceUpdateRestartHint;
 
           double resolveDialogRadius() {
             switch (phase) {

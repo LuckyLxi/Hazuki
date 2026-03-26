@@ -88,21 +88,35 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
     super.dispose();
   }
 
-  void _onScroll() {
+  double _calculateSearchRevealProgress() {
     if (!_scrollController.hasClients) {
+      return 0;
+    }
+    return (_scrollController.position.pixels / _searchAppBarRevealOffset)
+        .clamp(0.0, 1.0);
+  }
+
+  void _syncSearchRevealProgress({bool force = false}) {
+    if (!mounted) {
       return;
     }
-    final nextReveal =
-        (_scrollController.position.pixels / _searchAppBarRevealOffset).clamp(
-          0.0,
-          1.0,
-        );
-    if ((nextReveal - _searchRevealProgress).abs() < 0.01) {
+    final nextReveal = _calculateSearchRevealProgress();
+    if (!force && (nextReveal - _searchRevealProgress).abs() < 0.01) {
       return;
     }
     setState(() {
       _searchRevealProgress = nextReveal;
     });
+  }
+
+  void _scheduleSearchRevealSync({bool force = false}) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _syncSearchRevealProgress(force: force);
+    });
+  }
+
+  void _onScroll() {
+    _syncSearchRevealProgress();
   }
 
   void _parkSearchFocus() {
@@ -137,6 +151,7 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
         _historyEditMode = false;
       }
     });
+    _scheduleSearchRevealSync();
   }
 
   Future<void> _removeHistory(String keyword) async {
@@ -152,6 +167,7 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
         _historyEditMode = false;
       }
     });
+    _scheduleSearchRevealSync();
   }
 
   Future<void> _clearHistory() async {
@@ -165,6 +181,7 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
       _historyEditMode = false;
       _historyExpanded = false;
     });
+    _scheduleSearchRevealSync();
   }
 
   double _estimateHistoryChipWidth(String keyword, BuildContext context) {
@@ -357,20 +374,23 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
     final hideProgress = Curves.easeOutCubic.transform(_searchRevealProgress);
     return Padding(
       padding: const EdgeInsets.fromLTRB(0, 14, 0, 10),
-      child: Opacity(
-        opacity: 1 - hideProgress,
-        child: Transform.translate(
-          offset: Offset(0, -10 * hideProgress),
-          child: Transform.scale(
-            scale: 1 - 0.04 * hideProgress,
-            alignment: Alignment.topCenter,
-            child: HeroMode(
-              enabled: !_showCollapsedSearch,
-              child: Hero(
-                tag: _discoverSearchHeroTag,
-                child: _buildSearchBar(
-                  clearKey: 'entry-clear',
-                  submitKey: 'entry-submit',
+      child: IgnorePointer(
+        ignoring: _showCollapsedSearch,
+        child: Opacity(
+          opacity: 1 - hideProgress,
+          child: Transform.translate(
+            offset: Offset(0, -10 * hideProgress),
+            child: Transform.scale(
+              scale: 1 - 0.04 * hideProgress,
+              alignment: Alignment.topCenter,
+              child: HeroMode(
+                enabled: !_showCollapsedSearch,
+                child: Hero(
+                  tag: _discoverSearchHeroTag,
+                  child: _buildSearchBar(
+                    clearKey: 'entry-clear',
+                    submitKey: 'entry-submit',
+                  ),
                 ),
               ),
             ),
@@ -461,6 +481,7 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
               duration: const Duration(milliseconds: 320),
               curve: Curves.easeOutCubic,
               alignment: Alignment.topCenter,
+              onEnd: _scheduleSearchRevealSync,
               child: Wrap(
                 spacing: _searchHistoryChipSpacing,
                 runSpacing: 8,
@@ -494,6 +515,7 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
                     setState(() {
                       _historyExpanded = !_historyExpanded;
                     });
+                    _scheduleSearchRevealSync();
                   },
                 ),
               ),
@@ -518,6 +540,7 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
                     setState(() {
                       _historyEditMode = !_historyEditMode;
                     });
+                    _scheduleSearchRevealSync();
                   },
                   child: Icon(
                     _historyEditMode ? Icons.done : Icons.delete_outline,

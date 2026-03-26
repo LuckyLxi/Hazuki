@@ -72,12 +72,7 @@
   "homeLoggedOut": "已退出登录",
   "homeSaveAvatarTitle": "保存头像",
   "homeSaveAvatarContent": "将当前头像保存到相册吗？",
-  "homeAvatarSaved": "头像已保存到 {path}",
-  "@homeAvatarSaved": {
-    "placeholders": {
-      "path": {}
-    }
-  },
+  "homeAvatarSaved": "头像已保存",
   "homeAvatarSaveFailed": "头像保存失败：{error}",
   "@homeAvatarSaveFailed": {
     "placeholders": {
@@ -129,13 +124,9 @@
   "aboutFeedbackSubtitle": "如果在阅读中遇到任何问题，欢迎反馈",
   "aboutOpenLinkFailed": "无法打开链接",
   "aboutOpenFeedbackFailed": "无法打开反馈链接",
-  "aboutLicenseTitle": "开源协议",
-  "aboutLicenseSubtitle": "GPL-3.0 License",
-  "aboutLicenseSnackbar": "本项目采用 GPL-3.0 开源协议",
-  "aboutThanksTitle": "鸣谢",
-  "aboutThanksSubtitle": "启发本项目开发的优秀作品",
-  "aboutThanksDialogTitle": "致谢",
-  "aboutThanksDialogContent": "本项目的开发参考并感谢以下开源项目：\n\n• Venera: 登录逻辑实现参考\n• Animeko: 界面布局设计参考",
+  "aboutDisclaimerTitle": "免责声明",
+  "aboutDisclaimerSubtitle": "使用前请先阅读相关说明",
+  "aboutDisclaimerContent": "本应用仅供学习、界面研究与个人交流使用，不提供漫画资源，也不直接存储、上传或分发漫画内容。\n\n软件首次启动或更新漫画源时，会自动从第三方 GitHub 仓库下载漫画源脚本；该脚本及其后续解析出的内容均来自第三方，相关版权归原作者或权利人所有。\n\n请在遵守当地法律法规及版权要求的前提下使用本应用；因下载、使用第三方漫画源或访问相关内容产生的任何纠纷、损失或法律责任，均由使用者自行承担。",
   "commonConfirm": "确定",
   "commonCancel": "取消",
   "commonClose": "关闭",
@@ -265,12 +256,7 @@
       "value": {}
     }
   },
-  "comicDetailSavedToPath": "已保存到 {path}",
-  "@comicDetailSavedToPath": {
-    "placeholders": {
-      "path": {}
-    }
-  },
+  "comicDetailSavedToPath": "已保存",
   "comicDetailSaveFailed": "保存失败：{error}",
   "@comicDetailSaveFailed": {
     "placeholders": {
@@ -793,5 +779,58 @@
   "advancedEditSourceTitle": "编辑漫画源",
   "advancedEditSourceSubtitle": "打开轻量编辑器，修改并保存 jm.js",
   "advancedRestoreSourceLabel": "还原漫画源",
-  "advancedRestoreSourceSuccess": "已还原漫画源，请重启应用后生效"
+  "advancedRestoreSourceSuccess": "漫画源已还原",
+  "sourceEditorLoading": "正在读取漫画源…",
+  "sourceEditorHint": "保存后需要重启应用，新的漫画源才会生效。",
+  "sourceEditorSaved": "漫画源已保存",
+  "sourceEditorLoadFailed": "读取失败：{error}",
+  "@sourceEditorLoadFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "sourceEditorSaveFailed": "保存失败：{error}",
+  "@sourceEditorSaveFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "sourceEditorLineCount": "{count} 行",
+  "@sourceEditorLineCount": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "sourceEditorRestoreConfirmContent": "确定要还原为官方漫画源吗？你自己保存的修改会被覆盖。",
+  "sourceEditorRestoreFailed": "还原失败，请稍后再试",
+  "sourceEditorRestoreDownloadingProgress": "正在下载 {progress}%",
+  "@sourceEditorRestoreDownloadingProgress": {
+    "placeholders": {
+      "progress": {}
+    }
+  },
+  "sourceEditorRestoringTitle": "正在还原漫画源",
+  "downloadsScanPermissionDenied": "未获得文件访问权限，无法扫描本地漫画",
+  "downloadsScanCompleted": "扫描完成，已扫描 {scannedDirectories} 个目录，恢复 {recoveredComics} 部漫画",
+  "@downloadsScanCompleted": {
+    "placeholders": {
+      "scannedDirectories": {},
+      "recoveredComics": {}
+    }
+  },
+  "downloadsScanNoRecoverable": "扫描完成，未发现可恢复的已下载漫画",
+  "downloadsScanFailed": "扫描失败：{error}",
+  "@downloadsScanFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "downloadsScanTooltip": "扫描本地漫画",
+  "sourceUpdateRestartTitle": "请重新启动软件",
+  "sourceUpdateRestartMessage": "漫画源已下载完成，请重新启动软件以应用更新。",
+  "sourceUpdateLocalLabel": "本地版本",
+  "sourceUpdateCloudLabel": "云端版本",
+  "sourceUpdateAvailableMessage": "检测到新的漫画源版本，下载完成后重启软件即可生效。",
+  "sourceUpdateDownloadingMessage": "正在下载并替换漫画源文件，请保持网络连接。",
+  "sourceUpdateRestartHint": "关闭并重新打开软件后即可完成更新。"
 }

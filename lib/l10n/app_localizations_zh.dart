@@ -199,9 +199,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get homeSaveAvatarContent => '将当前头像保存到相册吗？';
 
   @override
-  String homeAvatarSaved(Object path) {
-    return '头像已保存到 $path';
-  }
+  String get homeAvatarSaved => '头像已保存';
 
   @override
   String homeAvatarSaveFailed(Object error) {
@@ -318,25 +316,13 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutOpenFeedbackFailed => '无法打开反馈链接';
 
   @override
-  String get aboutLicenseTitle => '开源协议';
+  String get aboutDisclaimerTitle => '免责声明';
 
   @override
-  String get aboutLicenseSubtitle => 'GPL-3.0 License';
+  String get aboutDisclaimerSubtitle => '使用前请先阅读相关说明';
 
   @override
-  String get aboutLicenseSnackbar => '本项目采用 GPL-3.0 开源协议';
-
-  @override
-  String get aboutThanksTitle => '鸣谢';
-
-  @override
-  String get aboutThanksSubtitle => '启发本项目开发的优秀作品';
-
-  @override
-  String get aboutThanksDialogTitle => '致谢';
-
-  @override
-  String get aboutThanksDialogContent => '本项目的开发参考并感谢以下开源项目：\n\n• Venera: 登录逻辑实现参考\n• Animeko: 界面布局设计参考';
+  String get aboutDisclaimerContent => '本应用仅供学习、界面研究与个人交流使用，不提供漫画资源，也不直接存储、上传或分发漫画内容。\n\n软件首次启动或更新漫画源时，会自动从第三方 GitHub 仓库下载漫画源脚本；该脚本及其后续解析出的内容均来自第三方，相关版权归原作者或权利人所有。\n\n请在遵守当地法律法规及版权要求的前提下使用本应用；因下载、使用第三方漫画源或访问相关内容产生的任何纠纷、损失或法律责任，均由使用者自行承担。';
 
   @override
   String get commonConfirm => '确定';
@@ -596,9 +582,7 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
-  String comicDetailSavedToPath(Object path) {
-    return '已保存到 $path';
-  }
+  String get comicDetailSavedToPath => '已保存';
 
   @override
   String comicDetailSaveFailed(Object error) {
@@ -1450,5 +1434,83 @@ class AppLocalizationsZh extends AppLocalizations {
   String get advancedRestoreSourceLabel => '还原漫画源';
 
   @override
-  String get advancedRestoreSourceSuccess => '已还原漫画源，请重启应用后生效';
+  String get advancedRestoreSourceSuccess => '漫画源已还原';
+
+  @override
+  String get sourceEditorLoading => '正在读取漫画源…';
+
+  @override
+  String get sourceEditorHint => '保存后需要重启应用，新的漫画源才会生效。';
+
+  @override
+  String get sourceEditorSaved => '漫画源已保存';
+
+  @override
+  String sourceEditorLoadFailed(Object error) {
+    return '读取失败：$error';
+  }
+
+  @override
+  String sourceEditorSaveFailed(Object error) {
+    return '保存失败：$error';
+  }
+
+  @override
+  String sourceEditorLineCount(Object count) {
+    return '$count 行';
+  }
+
+  @override
+  String get sourceEditorRestoreConfirmContent => '确定要还原为官方漫画源吗？你自己保存的修改会被覆盖。';
+
+  @override
+  String get sourceEditorRestoreFailed => '还原失败，请稍后再试';
+
+  @override
+  String sourceEditorRestoreDownloadingProgress(Object progress) {
+    return '正在下载 $progress%';
+  }
+
+  @override
+  String get sourceEditorRestoringTitle => '正在还原漫画源';
+
+  @override
+  String get downloadsScanPermissionDenied => '未获得文件访问权限，无法扫描本地漫画';
+
+  @override
+  String downloadsScanCompleted(Object scannedDirectories, Object recoveredComics) {
+    return '扫描完成，已扫描 $scannedDirectories 个目录，恢复 $recoveredComics 部漫画';
+  }
+
+  @override
+  String get downloadsScanNoRecoverable => '扫描完成，未发现可恢复的已下载漫画';
+
+  @override
+  String downloadsScanFailed(Object error) {
+    return '扫描失败：$error';
+  }
+
+  @override
+  String get downloadsScanTooltip => '扫描本地漫画';
+
+  @override
+  String get sourceUpdateRestartTitle => '请重新启动软件';
+
+  @override
+  String get sourceUpdateRestartMessage => '漫画源已下载完成，请重新启动软件以应用更新。';
+
+  @override
+  String get sourceUpdateLocalLabel => '本地版本';
+
+  @override
+  String get sourceUpdateCloudLabel => '云端版本';
+
+  @override
+  String get sourceUpdateAvailableMessage => '检测到新的漫画源版本，下载完成后重启软件即可生效。';
+
+  @override
+  String get sourceUpdateDownloadingMessage => '正在下载并替换漫画源文件，请保持网络连接。';
+
+  @override
+  String get sourceUpdateRestartHint => '关闭并重新打开软件后即可完成更新。';
 }

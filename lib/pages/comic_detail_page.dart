@@ -216,6 +216,61 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
     return widget.comic.cover.trim();
   }
 
+  Future<Color> _buildNeutralComicSeed(Uint8List bytes) async {
+    final averageLuminance = await _estimateCoverAverageLuminance(bytes);
+    if (averageLuminance == null) {
+      return const Color(0xff7a7a7a);
+    }
+    final tone = (92 + (averageLuminance * 72)).round().clamp(92, 164).toInt();
+    return Color.fromARGB(255, tone, tone, tone);
+  }
+
+  Future<double?> _estimateCoverAverageLuminance(Uint8List bytes) async {
+    try {
+      final codec = await instantiateImageCodec(
+        bytes,
+        targetWidth: 36,
+        targetHeight: 36,
+      );
+      final frame = await codec.getNextFrame();
+      final rgbaData = await frame.image.toByteData(
+        format: ImageByteFormat.rawRgba,
+      );
+      final rgbaBytes = rgbaData?.buffer.asUint8List();
+      if (rgbaBytes == null) {
+        return null;
+      }
+
+      double totalLuminance = 0;
+      var sampleCount = 0;
+      for (var index = 0; index <= rgbaBytes.length - 4; index += 16) {
+        final alpha = rgbaBytes[index + 3];
+        if (alpha < 24) {
+          continue;
+        }
+        final red = rgbaBytes[index] / 255;
+        final green = rgbaBytes[index + 1] / 255;
+        final blue = rgbaBytes[index + 2] / 255;
+        totalLuminance += 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+        sampleCount++;
+      }
+      if (sampleCount == 0) {
+        return null;
+      }
+      return totalLuminance / sampleCount;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<ColorScheme> _buildNeutralComicScheme({
+    required Uint8List bytes,
+    required Brightness brightness,
+  }) async {
+    final seed = await _buildNeutralComicSeed(bytes);
+    return ColorScheme.fromSeed(seedColor: seed, brightness: brightness);
+  }
+
   Future<void> _extractColorScheme(String url) async {
     try {
       final cachedBytes = _dynamicColorImageCache[url];
@@ -237,25 +292,37 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
         brightness: Brightness.light,
       );
 
-      // 避免黑白封面取色退回到默认蓝色时错误覆盖应用主题。
       final fallbackLight = ColorScheme.fromSeed(
         seedColor: const Color(0xff4285F4),
         brightness: Brightness.light,
       );
+
+      late final ColorScheme resolvedLight;
+      late final ColorScheme resolvedDark;
       if (light.primary == fallbackLight.primary) {
-        return;
+        // 黑白或低饱和封面退回默认蓝色时，改走中性色动态主题。
+        resolvedLight = await _buildNeutralComicScheme(
+          bytes: bytes,
+          brightness: Brightness.light,
+        );
+        resolvedDark = await _buildNeutralComicScheme(
+          bytes: bytes,
+          brightness: Brightness.dark,
+        );
+      } else {
+        resolvedLight = light;
+        resolvedDark = await ColorScheme.fromImageProvider(
+          provider: imgProvider,
+          brightness: Brightness.dark,
+        );
       }
 
-      final dark = await ColorScheme.fromImageProvider(
-        provider: imgProvider,
-        brightness: Brightness.dark,
-      );
       if (!mounted) {
         return;
       }
       setState(() {
-        _lightComicScheme = light;
-        _darkComicScheme = dark;
+        _lightComicScheme = resolvedLight;
+        _darkComicScheme = resolvedDark;
       });
     } catch (_) {}
   }
@@ -775,12 +842,7 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
       if (!mounted) {
         return;
       }
-      unawaited(
-        showHazukiPrompt(
-          context,
-          l10n(context).comicDetailSavedToPath(file.path),
-        ),
-      );
+      unawaited(showHazukiPrompt(context, l10n(context).comicDetailSavedToPath));
     } catch (e) {
       if (!mounted) {
         return;
@@ -877,7 +939,6 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
           body: Stack(
             children: [
               _ComicDetailParallaxBackground(
-                scrollController: _scrollController,
                 coverUrl: widget.comic.cover.trim(),
               ),
               Positioned.fill(
@@ -1381,7 +1442,7 @@ class _FavoriteFoldersMorphDialogState
       ),
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxHeight: math.min(MediaQuery.sizeOf(context).height * 0.38, 320),
+          maxHeight: math.min(MediaQuery.sizeOf(context).height * 0.28, 240),
         ),
         child: ListView.separated(
           shrinkWrap: true,
@@ -1398,94 +1459,78 @@ class _FavoriteFoldersMorphDialogState
   Widget _buildExpandedContent(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final hasBoundedHeight = constraints.maxHeight.isFinite;
-        return SizedBox(
-          key: ValueKey<String>(
-            _loadError == null
-                ? 'favorite_dialog_loaded'
-                : 'favorite_dialog_error',
-          ),
-          width: double.infinity,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              minHeight: hasBoundedHeight ? constraints.maxHeight : 0,
-            ),
-            child: Column(
-              mainAxisSize:
-                  hasBoundedHeight ? MainAxisSize.max : MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        l10n(context).comicDetailManageFavorites,
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    if (_service.supportFavoriteFolderAdd && _loadError == null)
-                      IconButton(
-                        tooltip:
-                            l10n(context).comicDetailCreateFavoriteFolderTooltip,
-                        onPressed: _busy ? null : _addFolder,
-                        icon: const Icon(Icons.create_new_folder_outlined),
-                      ),
-                    IconButton(
-                      tooltip: l10n(context).commonClose,
-                      onPressed: _busy ? null : () => Navigator.of(context).pop(),
-                      icon: const Icon(Icons.close_rounded),
-                    ),
-                  ],
-                ),
-                Text(
-                  widget.singleFolderOnly
-                      ? l10n(context).comicDetailSingleFolderHint
-                      : l10n(context).comicDetailMultipleFoldersHint,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: cs.onSurfaceVariant,
+    return SizedBox(
+      key: ValueKey<String>(
+        _loadError == null
+            ? 'favorite_dialog_loaded'
+            : 'favorite_dialog_error',
+      ),
+      width: double.infinity,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  l10n(context).comicDetailManageFavorites,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 16),
-                _buildDialogBody(context),
-                if (hasBoundedHeight)
-                  const Spacer()
-                else
-                  const SizedBox(height: 18),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed:
-                            _busy ? null : () => Navigator.of(context).pop(),
-                        child: Text(l10n(context).commonClose),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: FilledButton(
-                        onPressed: _busy
-                            ? null
-                            : _loadError != null
-                            ? () => unawaited(_loadFolders())
-                            : _handleSave,
-                        child: Text(
-                          _loadError != null
-                              ? l10n(context).commonRetry
-                              : l10n(context).commonSave,
-                        ),
-                      ),
-                    ),
-                  ],
+              ),
+              if (_service.supportFavoriteFolderAdd && _loadError == null)
+                IconButton(
+                  tooltip: l10n(context).comicDetailCreateFavoriteFolderTooltip,
+                  onPressed: _busy ? null : _addFolder,
+                  icon: const Icon(Icons.create_new_folder_outlined),
                 ),
-              ],
+              IconButton(
+                tooltip: l10n(context).commonClose,
+                onPressed: _busy ? null : () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.close_rounded),
+              ),
+            ],
+          ),
+          Text(
+            widget.singleFolderOnly
+                ? l10n(context).comicDetailSingleFolderHint
+                : l10n(context).comicDetailMultipleFoldersHint,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: cs.onSurfaceVariant,
             ),
           ),
-        );
-      },
+          const SizedBox(height: 16),
+          _buildDialogBody(context),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: _busy ? null : () => Navigator.of(context).pop(),
+                  child: Text(l10n(context).commonClose),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton(
+                  onPressed: _busy
+                      ? null
+                      : _loadError != null
+                      ? () => unawaited(_loadFolders())
+                      : _handleSave,
+                  child: Text(
+                    _loadError != null
+                        ? l10n(context).commonRetry
+                        : l10n(context).commonSave,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -1537,8 +1582,8 @@ class _FavoriteFoldersMorphDialogState
               curve: Curves.easeInOutCubicEmphasized,
               width: dialogWidth,
               constraints: BoxConstraints(
-                minHeight: expanded ? 340 : 196,
-                maxHeight: expanded ? size.height * 0.82 : 220,
+                minHeight: expanded ? 0 : 196,
+                maxHeight: expanded ? math.min(size.height * 0.68, 420) : 220,
               ),
               clipBehavior: Clip.antiAlias,
               decoration: BoxDecoration(

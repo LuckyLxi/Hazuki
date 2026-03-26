@@ -87,6 +87,7 @@ extension HazukiSourceServiceImageCacheCapability on HazukiSourceService {
     String? comicId,
     String? epId,
     bool keepInMemory = true,
+    bool useDiskCache = true,
   }) async {
     final normalizedUrl = url.trim();
     if (normalizedUrl.isEmpty) {
@@ -100,12 +101,14 @@ extension HazukiSourceServiceImageCacheCapability on HazukiSourceService {
       return cached;
     }
 
-    final diskCached = await _readImageBytesFromDisk(normalizedUrl);
-    if (diskCached != null) {
-      if (keepInMemory) {
-        _putInMemoryCache(normalizedUrl, diskCached);
+    if (useDiskCache) {
+      final diskCached = await _readImageBytesFromDisk(normalizedUrl);
+      if (diskCached != null) {
+        if (keepInMemory) {
+          _putInMemoryCache(normalizedUrl, diskCached);
+        }
+        return diskCached;
       }
-      return diskCached;
     }
 
     final inFlight = _imageDownloadInFlight[normalizedUrl];
@@ -126,7 +129,9 @@ extension HazukiSourceServiceImageCacheCapability on HazukiSourceService {
 
     try {
       final bytes = await future;
-      await _saveImageBytesToDisk(normalizedUrl, bytes);
+      if (useDiskCache) {
+        await _saveImageBytesToDisk(normalizedUrl, bytes);
+      }
       if (keepInMemory) {
         _putInMemoryCache(normalizedUrl, bytes);
       }
@@ -244,6 +249,16 @@ extension HazukiSourceServiceImageCacheCapability on HazukiSourceService {
       await file.writeAsBytes(bytes, flush: false);
       await _enforceImageCachePolicy();
     } catch (_) {}
+  }
+
+  void evictImageBytesFromMemory(Iterable<String> urls) {
+    for (final url in urls) {
+      final normalizedUrl = url.trim();
+      if (normalizedUrl.isEmpty) {
+        continue;
+      }
+      _imageBytesCache.remove(normalizedUrl);
+    }
   }
 
   void _putInMemoryCache(String url, Uint8List bytes) {

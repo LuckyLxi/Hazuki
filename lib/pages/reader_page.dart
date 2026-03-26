@@ -60,17 +60,15 @@ class _ReaderPageState extends State<ReaderPage>
   static const bool _defaultCustomBrightness = false;
   static const bool _defaultPageIndicator = false;
   static const double _defaultBrightnessValue = 0.5;
-  static const int _prefetchAroundCount = 14;
-  static const int _prefetchAheadCount = 12;
-  static const int _prefetchAheadMemoryCount = 4;
-  static const int _providerKeepWindow = 280;
-  static const int _prefetchBatchSize = 4;
+  static const int _prefetchAroundCount = 6;
+  static const int _prefetchAheadMemoryCount = 2;
+  static const int _providerKeepBehindCount = 8;
+  static const int _providerKeepAheadCount = 16;
   static const double _unexpectedTopOffsetThreshold = 240;
   static const double _topEdgeOffsetEpsilon = 8;
   final String _readerSessionId =
       DateTime.now().microsecondsSinceEpoch.toString();
   int _activeUnscrambleTasks = 0;
-  int _maxDiskPrefetchedIndex = -1;
   bool _prefetchAheadRunning = false;
   int _currentPageIndex = 0;
   final Map<String, int> _imageIndexMap = <String, int>{};
@@ -193,7 +191,6 @@ class _ReaderPageState extends State<ReaderPage>
       'aspectRatioCacheSize': _imageAspectRatioCache.length,
       'prefetchAheadRunning': _prefetchAheadRunning,
       'activeUnscrambleTasks': _activeUnscrambleTasks,
-      'maxDiskPrefetchedIndex': _maxDiskPrefetchedIndex,
       'listUserScrollInProgress': _listUserScrollInProgress,
       'activeProgrammaticListScrollReason': _activeProgrammaticListScrollReason,
       'activeProgrammaticListTargetIndex': _activeProgrammaticListTargetIndex,
@@ -1277,9 +1274,7 @@ class _ReaderPageState extends State<ReaderPage>
           'savedPath': file.path,
         }),
       );
-      unawaited(
-        showHazukiPrompt(context, strings.comicDetailSavedToPath(file.path)),
-      );
+      unawaited(showHazukiPrompt(context, strings.comicDetailSavedToPath));
     } catch (e) {
       _logReaderEvent(
         'Reader image save failed',
@@ -1312,8 +1307,8 @@ class _ReaderPageState extends State<ReaderPage>
   }
 
   void _trimProviderCachesAround(int centerIndex) {
-    final keepStart = centerIndex - 120;
-    final keepEnd = centerIndex + _providerKeepWindow;
+    final keepStart = centerIndex - _providerKeepBehindCount;
+    final keepEnd = centerIndex + _providerKeepAheadCount;
 
     final staleProviderKeys = <String>[];
     _providerCache.forEach((key, _) {
@@ -1335,6 +1330,16 @@ class _ReaderPageState extends State<ReaderPage>
     });
     for (final key in staleFutureKeys) {
       _providerFutureCache.remove(key);
+    }
+
+    final staleByteUrls = <String>[];
+    for (var i = 0; i < _images.length; i++) {
+      if (i < keepStart || i > keepEnd) {
+        staleByteUrls.add(_images[i]);
+      }
+    }
+    if (staleByteUrls.isNotEmpty) {
+      HazukiSourceService.instance.evictImageBytesFromMemory(staleByteUrls);
     }
   }
 
@@ -1505,7 +1510,7 @@ class _ReaderPageState extends State<ReaderPage>
       unawaited(_getOrCreateImageProviderFuture(url));
     }
 
-    _trimProviderCachesAround(start);
+    _trimProviderCachesAround(currentIndex);
   }
 
   Future<void> _prefetchAheadFrom(int currentIndex) async {
@@ -1522,61 +1527,39 @@ class _ReaderPageState extends State<ReaderPage>
 
     _prefetchAheadRunning = true;
     try {
-      final endExclusive = (start + _prefetchAheadCount) < _images.length
-          ? (start + _prefetchAheadCount)
+      final endExclusive = (start + _prefetchAheadMemoryCount) < _images.length
+          ? (start + _prefetchAheadMemoryCount)
           : _images.length;
+      final futures = <Future<void>>[];
 
-      for (var batchStart = start; batchStart < endExclusive;) {
-        final batchEnd = (batchStart + _prefetchBatchSize) < endExclusive
-            ? (batchStart + _prefetchBatchSize)
-            : endExclusive;
-
-        final futures = <Future<void>>[];
-        for (var i = batchStart; i < batchEnd; i++) {
-          final shouldKeepInMemory = i < start + _prefetchAheadMemoryCount;
-          final shouldDownloadForDisk = i > _maxDiskPrefetchedIndex;
-          if (!shouldKeepInMemory && !shouldDownloadForDisk) {
-            continue;
-          }
-
-          final url = _images[i];
-          if (url.trim().isEmpty) {
-            continue;
-          }
-
-          if (HazukiSourceService.instance.isLocalImagePath(url)) {
-            if (shouldKeepInMemory) {
-              unawaited(_getOrCreateImageProviderFuture(url));
-            }
-            continue;
-          }
-
-          futures.add(
-            HazukiSourceService.instance
-                .downloadImageBytes(
-                  url,
-                  comicId: widget.comicId,
-                  epId: widget.epId,
-                  keepInMemory: shouldKeepInMemory,
-                )
-                .then((_) {})
-                .catchError((_) {}),
-          );
-
-          if (shouldKeepInMemory) {
-            unawaited(_getOrCreateImageProviderFuture(url));
-          }
+      for (var i = start; i < endExclusive; i++) {
+        final url = _images[i];
+        if (url.trim().isEmpty) {
+          continue;
         }
 
-        if (futures.isNotEmpty) {
-          await Future.wait(futures);
+        if (HazukiSourceService.instance.isLocalImagePath(url)) {
+          unawaited(_getOrCreateImageProviderFuture(url));
+          continue;
         }
 
-        batchStart = batchEnd;
+        futures.add(
+          HazukiSourceService.instance
+              .downloadImageBytes(
+                url,
+                comicId: widget.comicId,
+                epId: widget.epId,
+                keepInMemory: true,
+                useDiskCache: false,
+              )
+              .then((_) {})
+              .catchError((_) {}),
+        );
+        unawaited(_getOrCreateImageProviderFuture(url));
       }
 
-      if (endExclusive - 1 > _maxDiskPrefetchedIndex) {
-        _maxDiskPrefetchedIndex = endExclusive - 1;
+      if (futures.isNotEmpty) {
+        await Future.wait(futures);
       }
     } finally {
       _prefetchAheadRunning = false;
@@ -1686,6 +1669,7 @@ class _ReaderPageState extends State<ReaderPage>
         url,
         comicId: widget.comicId,
         epId: widget.epId,
+        useDiskCache: false,
       );
       await _rememberAspectRatioFromBytes(url, prepared.bytes);
       return MemoryImage(prepared.bytes);
@@ -1699,6 +1683,7 @@ class _ReaderPageState extends State<ReaderPage>
     final cachedProvider = _providerCache[url];
     final resolvedAspectRatio = _imageAspectRatioCache[url];
     final placeholderAspectRatio = resolvedAspectRatio ?? (3 / 4);
+    final readerPlaceholderColor = Theme.of(context).scaffoldBackgroundColor;
 
     if (_noImageModeEnabled) {
       return AspectRatio(
@@ -1721,7 +1706,7 @@ class _ReaderPageState extends State<ReaderPage>
           if (wasSynchronouslyLoaded || frame != null) {
             return child;
           }
-          return const ColoredBox(color: Colors.black);
+          return ColoredBox(color: readerPlaceholderColor);
         },
         errorBuilder: (_, _, _) {
           return Container(
@@ -1735,7 +1720,7 @@ class _ReaderPageState extends State<ReaderPage>
       final stableImage = resolvedAspectRatio == null
           ? image
           : ColoredBox(
-              color: Colors.black,
+              color: readerPlaceholderColor,
               child: AspectRatio(
                 // 为已解析宽高比的图片预留稳定高度，避免快速滑动时
                 // 已缓存图片短暂变成 0 高，导致列表 extent 收缩并回顶。

@@ -72,12 +72,7 @@
   "homeLoggedOut": "Signed out",
   "homeSaveAvatarTitle": "Save avatar",
   "homeSaveAvatarContent": "Save the current avatar to your gallery?",
-  "homeAvatarSaved": "Avatar saved to {path}",
-  "@homeAvatarSaved": {
-    "placeholders": {
-      "path": {}
-    }
-  },
+  "homeAvatarSaved": "Avatar saved",
   "homeAvatarSaveFailed": "Failed to save avatar: {error}",
   "@homeAvatarSaveFailed": {
     "placeholders": {
@@ -129,13 +124,9 @@
   "aboutFeedbackSubtitle": "Report any issues you encounter while reading",
   "aboutOpenLinkFailed": "Unable to open the link",
   "aboutOpenFeedbackFailed": "Unable to open the feedback link",
-  "aboutLicenseTitle": "License",
-  "aboutLicenseSubtitle": "GPL-3.0 License",
-  "aboutLicenseSnackbar": "This project is licensed under GPL-3.0",
-  "aboutThanksTitle": "Acknowledgements",
-  "aboutThanksSubtitle": "Outstanding projects that inspired this app",
-  "aboutThanksDialogTitle": "Acknowledgements",
-  "aboutThanksDialogContent": "This project was developed with reference to and thanks to the following open-source projects:\n\n• Venera: reference for login flow implementation\n• Animeko: reference for interface layout design",
+  "aboutDisclaimerTitle": "Disclaimer",
+  "aboutDisclaimerSubtitle": "Please read before use",
+  "aboutDisclaimerContent": "This app is provided only for learning, interface research, and personal technical exchange. It does not provide any comic resources, nor does it directly store, upload, or distribute comic content.\n\nOn first launch or when updating the comic source, the app automatically downloads a comic-source script from a third-party GitHub repository. Both that script and any content parsed through it originate from third parties, and the related copyrights and liabilities belong to the original authors or rights holders.\n\nPlease use this app in compliance with local laws, regulations, and copyright requirements. Any disputes, losses, or legal liabilities arising from downloading, using third-party comic sources, or accessing related content shall be borne solely by the user.",
   "commonConfirm": "OK",
   "commonCancel": "Cancel",
   "commonClose": "Close",
@@ -265,12 +256,7 @@
       "value": {}
     }
   },
-  "comicDetailSavedToPath": "Saved to {path}",
-  "@comicDetailSavedToPath": {
-    "placeholders": {
-      "path": {}
-    }
-  },
+  "comicDetailSavedToPath": "Saved",
   "comicDetailSaveFailed": "Failed to save: {error}",
   "@comicDetailSaveFailed": {
     "placeholders": {
@@ -793,5 +779,58 @@
   "advancedEditSourceTitle": "Edit comic source",
   "advancedEditSourceSubtitle": "Open a lightweight editor to edit and save jm.js",
   "advancedRestoreSourceLabel": "Restore comic source",
-  "advancedRestoreSourceSuccess": "Comic source restored. Restart the app to apply it."
+  "advancedRestoreSourceSuccess": "Comic source restored",
+  "sourceEditorLoading": "Loading comic source…",
+  "sourceEditorHint": "Restart the app after saving to apply the updated source.",
+  "sourceEditorSaved": "Comic source saved",
+  "sourceEditorLoadFailed": "Load failed: {error}",
+  "@sourceEditorLoadFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "sourceEditorSaveFailed": "Save failed: {error}",
+  "@sourceEditorSaveFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "sourceEditorLineCount": "{count} lines",
+  "@sourceEditorLineCount": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "sourceEditorRestoreConfirmContent": "Restore the official comic source? Your saved edits will be overwritten.",
+  "sourceEditorRestoreFailed": "Restore failed. Please try again later.",
+  "sourceEditorRestoreDownloadingProgress": "Downloading {progress}%",
+  "@sourceEditorRestoreDownloadingProgress": {
+    "placeholders": {
+      "progress": {}
+    }
+  },
+  "sourceEditorRestoringTitle": "Restoring comic source",
+  "downloadsScanPermissionDenied": "File access permission was not granted. Unable to scan local comics.",
+  "downloadsScanCompleted": "Scan complete. Scanned {scannedDirectories} folders and recovered {recoveredComics} comics.",
+  "@downloadsScanCompleted": {
+    "placeholders": {
+      "scannedDirectories": {},
+      "recoveredComics": {}
+    }
+  },
+  "downloadsScanNoRecoverable": "Scan complete. No recoverable downloaded comics were found.",
+  "downloadsScanFailed": "Scan failed: {error}",
+  "@downloadsScanFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "downloadsScanTooltip": "Scan local comics",
+  "sourceUpdateRestartTitle": "Please restart the app",
+  "sourceUpdateRestartMessage": "The source update has finished downloading. Please restart the app to apply the update.",
+  "sourceUpdateLocalLabel": "Local",
+  "sourceUpdateCloudLabel": "Cloud",
+  "sourceUpdateAvailableMessage": "A new source version is available. Download it now and restart the app to apply it.",
+  "sourceUpdateDownloadingMessage": "Downloading and replacing the source package. Please keep the network connected.",
+  "sourceUpdateRestartHint": "Close and reopen the app to finish applying the update."
 }

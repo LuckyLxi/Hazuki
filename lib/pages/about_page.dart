@@ -3,6 +3,53 @@ part of '../main.dart';
 class AboutPage extends StatelessWidget {
   const AboutPage({super.key});
 
+  Future<void> _showDisclaimerDialog(BuildContext context) {
+    final strings = l10n(context);
+    final textTheme = Theme.of(context).textTheme;
+    return showGeneralDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: strings.dialogBarrierLabel,
+      transitionDuration: const Duration(milliseconds: 260),
+      pageBuilder: (context, animation, secondaryAnimation) {
+        return AlertDialog(
+          title: Text(strings.aboutDisclaimerTitle),
+          content: SingleChildScrollView(
+            child: Text(
+              strings.aboutDisclaimerContent,
+              style: textTheme.bodyMedium,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(strings.commonClose),
+            ),
+          ],
+        );
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        final scaleAnimation = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutBack,
+          reverseCurve: Curves.easeInBack,
+        );
+        final fadeAnimation = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        );
+        return FadeTransition(
+          opacity: fadeAnimation,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.94, end: 1).animate(scaleAnimation),
+            child: child,
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final strings = l10n(context);
@@ -89,32 +136,10 @@ class AboutPage extends StatelessWidget {
             },
           ),
           ListTile(
-            leading: const Icon(Icons.gavel_outlined),
-            title: Text(strings.aboutLicenseTitle),
-            subtitle: Text(strings.aboutLicenseSubtitle),
-            onTap: () {
-              unawaited(showHazukiPrompt(context, strings.aboutLicenseSnackbar));
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.favorite_outline),
-            title: Text(strings.aboutThanksTitle),
-            subtitle: Text(strings.aboutThanksSubtitle),
-            onTap: () {
-              showDialog(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: Text(strings.aboutThanksDialogTitle),
-                  content: Text(strings.aboutThanksDialogContent),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: Text(strings.commonConfirm),
-                    ),
-                  ],
-                ),
-              );
-            },
+            leading: const Icon(Icons.warning_amber_rounded),
+            title: Text(strings.aboutDisclaimerTitle),
+            subtitle: Text(strings.aboutDisclaimerSubtitle),
+            onTap: () => unawaited(_showDisclaimerDialog(context)),
           ),
           ListTile(
             leading: const Icon(Icons.description_outlined),

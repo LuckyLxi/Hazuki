@@ -61,12 +61,8 @@ class _ComicDetailAppBarTitle extends StatelessWidget {
 }
 
 class _ComicDetailParallaxBackground extends StatelessWidget {
-  const _ComicDetailParallaxBackground({
-    required this.scrollController,
-    required this.coverUrl,
-  });
+  const _ComicDetailParallaxBackground({required this.coverUrl});
 
-  final ScrollController scrollController;
   final String coverUrl;
 
   @override
@@ -76,20 +72,8 @@ class _ComicDetailParallaxBackground extends StatelessWidget {
       right: 0,
       top: 0,
       height: MediaQuery.of(context).size.height,
-      child: AnimatedBuilder(
-        animation: scrollController,
-        builder: (context, child) {
-          final offset = scrollController.hasClients
-              ? scrollController.offset.clamp(0.0, double.infinity)
-              : 0.0;
-          return Transform.translate(
-            offset: Offset(0, -offset * 0.51),
-            child: child,
-          );
-        },
-        child: RepaintBoundary(
-          child: _ComicBlurredCoverBackground(coverUrl: coverUrl),
-        ),
+      child: RepaintBoundary(
+        child: _ComicBlurredCoverBackground(coverUrl: coverUrl),
       ),
     );
   }

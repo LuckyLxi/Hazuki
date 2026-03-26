@@ -103,12 +103,14 @@ extension HazukiSourceServiceImagePrepareCapability on HazukiSourceService {
     String imageUrl, {
     required String comicId,
     required String epId,
+    bool useDiskCache = true,
   }) async {
     final rawBytes = await downloadImageBytes(
       imageUrl,
       comicId: comicId,
       epId: epId,
       keepInMemory: false,
+      useDiskCache: useDiskCache,
     );
     final declaredSegments = await _resolveSourceDeclaredImageSegments(
       imageUrl,
