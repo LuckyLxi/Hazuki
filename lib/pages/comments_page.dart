@@ -285,72 +285,106 @@ class _CommentsPageState extends State<CommentsPage>
   }
 
   Widget _buildCommentTile(ComicCommentData comment) {
+    final theme = Theme.of(context);
     final hasReply = (comment.replyCount ?? 0) > 0;
-    final bodyStyle = Theme.of(context).textTheme.bodyMedium;
-    return ListTile(
+    final bodyStyle = theme.textTheme.bodyMedium;
+    final metaStyle = theme.textTheme.bodySmall;
+    final displayName = comment.userName.isEmpty
+        ? l10n(context).commentsAnonymousUser
+        : comment.userName;
+
+    return InkWell(
       onTap: comment.id == null ? null : () => _setReplyTarget(comment),
-      leading: HazukiCachedCircleAvatar(
-        url: comment.avatar,
-        fallbackIcon: const Icon(Icons.person_outline),
-      ),
-      title: Row(
-        children: [
-          Expanded(
-            child: Text(
-              comment.userName.isEmpty
-                  ? l10n(context).commentsAnonymousUser
-                  : comment.userName,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: HazukiCachedCircleAvatar(
+                url: comment.avatar,
+                fallbackIcon: const Icon(Icons.person_outline),
+              ),
             ),
-          ),
-          if (hasReply)
-            Text(
-              l10n(context).commentsReplyCount('${comment.replyCount}'),
-              style: Theme.of(context).textTheme.bodySmall,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          displayName,
+                          style: theme.textTheme.titleSmall,
+                        ),
+                      ),
+                      if (comment.id != null)
+                        IconButton(
+                          tooltip: l10n(context).commentsReplyTooltip,
+                          onPressed: () => _setReplyTarget(comment),
+                          padding: EdgeInsets.zero,
+                          visualDensity: VisualDensity.compact,
+                          constraints: const BoxConstraints(
+                            minWidth: 32,
+                            minHeight: 32,
+                          ),
+                          icon: const Icon(Icons.reply_outlined, size: 20),
+                        ),
+                    ],
+                  ),
+                  if (comment.time.isNotEmpty || hasReply) ...[
+                    const SizedBox(height: 2),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 2,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        if (comment.time.isNotEmpty)
+                          Text(comment.time, style: metaStyle),
+                        if (hasReply)
+                          Text(
+                            l10n(
+                              context,
+                            ).commentsReplyCount('${comment.replyCount}'),
+                            style: metaStyle,
+                          ),
+                      ],
+                    ),
+                  ],
+                  const SizedBox(height: 6),
+                  _buildSelectableCommentContent(
+                    comment.content,
+                    bodyStyle,
+                    expansionKey:
+                        comment.id ??
+                        '${comment.userName}|${comment.time}|${comment.content}',
+                  ),
+                ],
+              ),
             ),
-        ],
+          ],
+        ),
       ),
-      subtitle: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (comment.time.isNotEmpty) Text(comment.time),
-          const SizedBox(height: 4),
-          _buildSelectableCommentContent(comment.content, bodyStyle),
-        ],
-      ),
-      trailing: comment.id == null
-          ? null
-          : IconButton(
-              tooltip: l10n(context).commentsReplyTooltip,
-              onPressed: () => _setReplyTarget(comment),
-              icon: const Icon(Icons.reply_outlined),
-            ),
     );
   }
 
-  Widget _buildSelectableCommentContent(String content, TextStyle? style) {
-    return SelectionArea(
-      child: Builder(
-        builder: (context) {
-          final selectionColor =
-              Theme.of(context).textSelectionTheme.selectionColor ??
-              Theme.of(context).colorScheme.primary.withAlpha(56);
-          return RichText(
-            text: TextSpan(
-              style: style,
-              children: _buildCommentContentSpans(content, style),
-            ),
-            selectionRegistrar: SelectionContainer.maybeOf(context),
-            selectionColor: selectionColor,
-          );
-        },
-      ),
-    );
-  }
-
-  List<InlineSpan> _buildCommentContentSpans(
+  Widget _buildSelectableCommentContent(
     String content,
-    TextStyle? style,
-  ) {
+    TextStyle? style, {
+    required String expansionKey,
+  }) {
+    return _ExpandableCommentContent(
+      key: ValueKey<String>(expansionKey),
+      spans: _buildCommentContentSpans(content, style),
+      plainText: _commentPreviewText(content),
+      style: style,
+    );
+  }
+
+  List<InlineSpan> _buildCommentContentSpans(String content, TextStyle? style) {
     if (content.isEmpty) {
       return const <InlineSpan>[];
     }
@@ -422,7 +456,9 @@ class _CommentsPageState extends State<CommentsPage>
     }
 
     final baseFontSize =
-        style?.fontSize ?? Theme.of(context).textTheme.bodyMedium?.fontSize ?? 14;
+        style?.fontSize ??
+        Theme.of(context).textTheme.bodyMedium?.fontSize ??
+        14;
     final imageSize = (baseFontSize * 1.25).clamp(16.0, 24.0).toDouble();
     final fallbackStyle = (style ?? const TextStyle()).copyWith(
       fontSize: baseFontSize * 0.85,
@@ -468,7 +504,9 @@ class _CommentsPageState extends State<CommentsPage>
     var start = 0;
     for (final match in _commentInlineImagePattern.allMatches(content)) {
       if (match.start > start) {
-        buffer.write(_normalizeCommentText(content.substring(start, match.start)));
+        buffer.write(
+          _normalizeCommentText(content.substring(start, match.start)),
+        );
       }
 
       final tag = match.group(0);
@@ -790,6 +828,117 @@ class _CommentsPageState extends State<CommentsPage>
       // 独立页面模式：bottomNavigationBar + Scaffold 的 resizeToAvoidBottomInset 配合，
       // 无需再手动添加 viewInsets.bottom 偏移
       bottomNavigationBar: _buildBottomComposer(),
+    );
+  }
+}
+
+class _ExpandableCommentContent extends StatefulWidget {
+  const _ExpandableCommentContent({
+    super.key,
+    required this.spans,
+    required this.plainText,
+    required this.style,
+  });
+
+  static const int collapsedMaxLines = 4;
+  final List<InlineSpan> spans;
+  final String plainText;
+  final TextStyle? style;
+
+  @override
+  State<_ExpandableCommentContent> createState() =>
+      _ExpandableCommentContentState();
+}
+
+class _ExpandableCommentContentState extends State<_ExpandableCommentContent> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final textStyle = widget.style ?? DefaultTextStyle.of(context).style;
+    final textScaler = MediaQuery.textScalerOf(context);
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final textPainter = TextPainter(
+          text: TextSpan(text: widget.plainText, style: textStyle),
+          maxLines: _ExpandableCommentContent.collapsedMaxLines,
+          textDirection: Directionality.of(context),
+          textScaler: textScaler,
+        )..layout(maxWidth: constraints.maxWidth);
+
+        final isOverflowing = textPainter.didExceedMaxLines;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AnimatedSize(
+              duration: const Duration(milliseconds: 280),
+              curve: Curves.easeOutCubic,
+              alignment: Alignment.topLeft,
+              clipBehavior: Clip.hardEdge,
+              child: SelectionArea(
+                child: Builder(
+                  builder: (context) {
+                    final selectionColor =
+                        theme.textSelectionTheme.selectionColor ??
+                        theme.colorScheme.primary.withAlpha(56);
+                    return RichText(
+                      text: TextSpan(style: textStyle, children: widget.spans),
+                      maxLines: _expanded || !isOverflowing
+                          ? null
+                          : _ExpandableCommentContent.collapsedMaxLines,
+                      overflow: TextOverflow.clip,
+                      selectionRegistrar: SelectionContainer.maybeOf(context),
+                      selectionColor: selectionColor,
+                    );
+                  },
+                ),
+              ),
+            ),
+            if (isOverflowing)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(8),
+                  onTap: () {
+                    setState(() {
+                      _expanded = !_expanded;
+                    });
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 2),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _expanded
+                              ? l10n(context).comicDetailCollapse
+                              : l10n(context).comicDetailExpand,
+                          style: theme.textTheme.labelMedium?.copyWith(
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
+                        const SizedBox(width: 2),
+                        AnimatedRotation(
+                          duration: const Duration(milliseconds: 220),
+                          curve: Curves.easeOutCubic,
+                          turns: _expanded ? 0.5 : 0,
+                          child: Icon(
+                            Icons.keyboard_arrow_down,
+                            size: 16,
+                            color: theme.colorScheme.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
     );
   }
 }

@@ -227,7 +227,7 @@ class _ExpandableDescriptionState extends State<_ExpandableDescription> {
         final textPainter = TextPainter(
           text: TextSpan(text: widget.text, style: textStyle),
           maxLines: 6,
-          textDirection: TextDirection.ltr,
+          textDirection: Directionality.of(context),
           textScaler: textScaler,
         )..layout(maxWidth: constraints.maxWidth);
 
@@ -239,27 +239,19 @@ class _ExpandableDescriptionState extends State<_ExpandableDescription> {
             AnimatedSize(
               duration: const Duration(milliseconds: 320),
               curve: Curves.easeOutCubic,
-              alignment: Alignment.topCenter,
+              alignment: Alignment.topLeft,
               clipBehavior: Clip.hardEdge,
-              child: _expanded
-                  ? SelectionArea(
-                      child: SelectableText(
-                        widget.text,
-                        style: textStyle,
-                      ),
-                    )
-                  : Text(
-                      widget.text,
-                      style: textStyle,
-                      maxLines: isOverflowing ? 6 : null,
-                      overflow: TextOverflow.clip,
-                    ),
+              child: SelectableText(
+                widget.text,
+                style: textStyle,
+                maxLines: _expanded || !isOverflowing ? null : 6,
+              ),
             ),
             if (isOverflowing)
               Padding(
                 padding: const EdgeInsets.only(top: 6),
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(8),
                   onTap: () {
                     setState(() {
                       _expanded = !_expanded;
@@ -276,12 +268,15 @@ class _ExpandableDescriptionState extends State<_ExpandableDescription> {
                           color: theme.colorScheme.primary,
                         ),
                       ),
-                      Icon(
-                        _expanded
-                            ? Icons.keyboard_arrow_up
-                            : Icons.keyboard_arrow_down,
-                        size: 16,
-                        color: theme.colorScheme.primary,
+                      AnimatedRotation(
+                        duration: const Duration(milliseconds: 220),
+                        curve: Curves.easeOutCubic,
+                        turns: _expanded ? 0.5 : 0,
+                        child: Icon(
+                          Icons.keyboard_arrow_down,
+                          size: 16,
+                          color: theme.colorScheme.primary,
+                        ),
                       ),
                     ],
                   ),
