@@ -241,10 +241,15 @@ class _ExpandableDescriptionState extends State<_ExpandableDescription> {
               curve: Curves.easeOutCubic,
               alignment: Alignment.topLeft,
               clipBehavior: Clip.hardEdge,
-              child: SelectableText(
-                widget.text,
-                style: textStyle,
-                maxLines: _expanded || !isOverflowing ? null : 6,
+              child: SelectionArea(
+                child: Text(
+                  widget.text,
+                  style: textStyle,
+                  maxLines: _expanded ? null : (isOverflowing ? 6 : null),
+                  overflow: _expanded
+                      ? TextOverflow.visible
+                      : TextOverflow.clip,
+                ),
               ),
             ),
             if (isOverflowing)

@@ -13,6 +13,8 @@ class DiscoverSectionPage extends StatefulWidget {
 }
 
 class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
+  static const double _mainLoadingIndicatorSize = 112;
+
   final ScrollController _scrollController = ScrollController();
 
   /// 展示的漫画列表（初始包含发现页预加载数据）
@@ -240,7 +242,9 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  const HazukiStickerLoadingIndicator(size: 72),
+                                  const HazukiStickerLoadingIndicator(
+                                    size: _mainLoadingIndicatorSize,
+                                  ),
                                   const SizedBox(height: 10),
                                   Text(strings.commonLoading),
                                 ],

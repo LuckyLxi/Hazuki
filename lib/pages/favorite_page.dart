@@ -1,4 +1,4 @@
-part of '../main.dart';
+﻿part of '../main.dart';
 
 class FavoritePage extends StatefulWidget {
   const FavoritePage({
@@ -333,11 +333,7 @@ class _FavoritePageState extends State<FavoritePage>
 
       if (result.errorMessage != null) {
         unawaited(
-          showHazukiPrompt(
-            context,
-            result.errorMessage!,
-            isError: true,
-          ),
+          showHazukiPrompt(context, result.errorMessage!, isError: true),
         );
         setState(() {
           _loadingMore = false;
@@ -650,12 +646,19 @@ class _FavoritePageState extends State<FavoritePage>
                 style: Theme.of(context).textTheme.titleSmall,
               ),
               const Spacer(),
-              if (service.supportFavoriteFolderDelete &&
-                  _selectedFolderId != '0')
-                IconButton(
-                  tooltip: l10n(context).favoriteDeleteCurrentFolderTooltip,
-                  onPressed: _deleteCurrentFolder,
-                  icon: const Icon(Icons.delete_outline),
+              if (service.supportFavoriteFolderDelete)
+                Visibility(
+                  visible: _selectedFolderId != '0',
+                  maintainState: true,
+                  maintainAnimation: true,
+                  maintainSize: true,
+                  child: IconButton(
+                    tooltip: l10n(context).favoriteDeleteCurrentFolderTooltip,
+                    onPressed: _selectedFolderId == '0'
+                        ? null
+                        : _deleteCurrentFolder,
+                    icon: const Icon(Icons.delete_outline),
+                  ),
                 ),
             ],
           ),
@@ -820,9 +823,9 @@ class _FavoritePageState extends State<FavoritePage>
               const SizedBox(height: 18),
               Text(
                 strings.favoriteLoginRequired,
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),

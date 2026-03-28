@@ -14,7 +14,8 @@ class ComicDetailPage extends StatefulWidget {
   State<ComicDetailPage> createState() => _ComicDetailPageState();
 }
 
-class _ComicDetailPageState extends State<ComicDetailPage> {
+class _ComicDetailPageState extends State<ComicDetailPage>
+    with SingleTickerProviderStateMixin {
   static const _mediaChannel = MethodChannel('hazuki.comics/media');
 
   late Future<ComicDetailsData> _future;
@@ -29,9 +30,11 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
   ColorScheme? _darkComicScheme;
   final Map<String, Uint8List> _dynamicColorImageCache = <String, Uint8List>{};
   late final ValueNotifier<_ComicDetailScrollState> _appBarScrollNotifier;
+  late final TabController _tabController;
   String _appBarComicTitle = '';
   String _appBarUpdateTime = '';
   Map<String, dynamic>? _lastReadProgress;
+  int _lastTabIndex = 0;
 
   @override
   void initState() {
@@ -39,6 +42,8 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
     _appBarScrollNotifier = ValueNotifier<_ComicDetailScrollState>(
       const _ComicDetailScrollState(),
     );
+    _tabController = TabController(length: 3, vsync: this)
+      ..addListener(_handleTabChanged);
     _appBarComicTitle = widget.comic.title;
     _future = HazukiSourceService.instance
         .loadComicDetails(widget.comic.id)
@@ -114,11 +119,23 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
 
   @override
   void dispose() {
+    _tabController
+      ..removeListener(_handleTabChanged)
+      ..dispose();
     _scrollController
       ..removeListener(_handleScroll)
       ..dispose();
     _appBarScrollNotifier.dispose();
     super.dispose();
+  }
+
+  void _handleTabChanged() {
+    final nextIndex = _tabController.index;
+    if (_lastTabIndex == nextIndex) {
+      return;
+    }
+    _lastTabIndex = nextIndex;
+    FocusManager.instance.primaryFocus?.unfocus();
   }
 
   void _handleScroll() {
@@ -141,8 +158,7 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
     final scrollState = _appBarScrollNotifier.value;
     final progressChanged =
         (scrollState.appBarSolidProgress - nextProgress).abs() >= 0.02;
-    final titleChanged =
-        titleCollapsed != scrollState.showCollapsedComicTitle;
+    final titleChanged = titleCollapsed != scrollState.showCollapsedComicTitle;
 
     if (!progressChanged && !titleChanged) {
       return false;
@@ -496,16 +512,17 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
           curve: Curves.easeOutCubic,
           reverseCurve: Curves.easeInCubic,
         );
-        final slide = Tween<Offset>(
-          begin: const Offset(0, 0.04),
-          end: Offset.zero,
-        ).animate(
-          CurvedAnimation(
-            parent: animation,
-            curve: Curves.easeOutCubic,
-            reverseCurve: Curves.easeInCubic,
-          ),
-        );
+        final slide =
+            Tween<Offset>(
+              begin: const Offset(0, 0.04),
+              end: Offset.zero,
+            ).animate(
+              CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeOutCubic,
+                reverseCurve: Curves.easeInCubic,
+              ),
+            );
         return FadeTransition(
           opacity: opacity,
           child: SlideTransition(
@@ -869,7 +886,9 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
       if (!mounted) {
         return;
       }
-      unawaited(showHazukiPrompt(context, l10n(context).comicDetailSavedToPath));
+      unawaited(
+        showHazukiPrompt(context, l10n(context).comicDetailSavedToPath),
+      );
     } catch (e) {
       if (!mounted) {
         return;
@@ -941,59 +960,54 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
       data: theme,
       duration: const Duration(milliseconds: 360),
       curve: Curves.easeOutCubic,
-      child: DefaultTabController(
-        length: 3,
-        child: Scaffold(
-          backgroundColor: surface,
-          extendBodyBehindAppBar: true,
-          appBar: _ComicDetailScrollAwareAppBar(
-            scrollListenable: _appBarScrollNotifier,
-            appBarComicTitle: _appBarComicTitle,
-            appBarUpdateTime: _appBarUpdateTime,
-            theme: theme,
-            surface: surface,
-          ),
-          body: Stack(
-            children: [
-              _ComicDetailParallaxBackground(
-                coverUrl: widget.comic.cover.trim(),
+      child: Scaffold(
+        backgroundColor: surface,
+        extendBodyBehindAppBar: true,
+        appBar: _ComicDetailScrollAwareAppBar(
+          scrollListenable: _appBarScrollNotifier,
+          appBarComicTitle: _appBarComicTitle,
+          appBarUpdateTime: _appBarUpdateTime,
+          theme: theme,
+          surface: surface,
+        ),
+        body: Stack(
+          children: [
+            _ComicDetailParallaxBackground(
+              coverUrl: widget.comic.cover.trim(),
+              scrollController: _scrollController,
+            ),
+            _ComicDetailTopSurfaceOverlay(
+              scrollListenable: _appBarScrollNotifier,
+              surface: surface,
+            ),
+            Padding(
+              padding: EdgeInsets.only(top: topInset),
+              child: _ComicDetailBody(
+                tabController: _tabController,
+                future: _future,
                 scrollController: _scrollController,
-              ),
-              _ComicDetailTopSurfaceOverlay(
-                scrollListenable: _appBarScrollNotifier,
                 surface: surface,
+                heroTag: widget.heroTag,
+                comic: widget.comic,
+                headerTitleKey: _headerTitleKey,
+                favoriteRowKey: _favoriteRowKey,
+                actionButtonsKey: _actionButtonsKey,
+                favoriteBusy: _favoriteBusy,
+                favoriteOverride: _favoriteOverride,
+                lastReadProgress: _lastReadProgress,
+                buildViewsText: _extractComicViewsText,
+                buildMetaSection: _buildDetailMetaSection,
+                onShowCoverPreview: (imageUrl) =>
+                    unawaited(_showCoverPreview(imageUrl)),
+                onFavoriteTap: _toggleFavorite,
+                onShowChapters: _showChaptersPanel,
+                onOpenReader: _openReader,
+                onDetailsResolved: ({required title, required updateTime}) {
+                  _updateAppBarMetadata(title: title, updateTime: updateTime);
+                },
               ),
-              Padding(
-                padding: EdgeInsets.only(top: topInset),
-                child: _ComicDetailBody(
-                  future: _future,
-                  scrollController: _scrollController,
-                  surface: surface,
-                  heroTag: widget.heroTag,
-                  comic: widget.comic,
-                  headerTitleKey: _headerTitleKey,
-                  favoriteRowKey: _favoriteRowKey,
-                  actionButtonsKey: _actionButtonsKey,
-                  favoriteBusy: _favoriteBusy,
-                  favoriteOverride: _favoriteOverride,
-                  lastReadProgress: _lastReadProgress,
-                  buildViewsText: _extractComicViewsText,
-                  buildMetaSection: _buildDetailMetaSection,
-                  onShowCoverPreview: (imageUrl) =>
-                      unawaited(_showCoverPreview(imageUrl)),
-                  onFavoriteTap: _toggleFavorite,
-                  onShowChapters: _showChaptersPanel,
-                  onOpenReader: _openReader,
-                  onDetailsResolved: ({required title, required updateTime}) {
-                    _updateAppBarMetadata(
-                      title: title,
-                      updateTime: updateTime,
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -1219,8 +1233,8 @@ class _FavoriteFoldersMorphDialogState
                     final text = controller.text.trim();
                     if (text.isEmpty) {
                       setDialogState(
-                        () => errorText = strings
-                            .comicDetailFavoriteFolderNameRequired,
+                        () => errorText =
+                            strings.comicDetailFavoriteFolderNameRequired,
                       );
                       return;
                     }
@@ -1310,7 +1324,8 @@ class _FavoriteFoldersMorphDialogState
       }
       setState(() {
         final deletedASelectedFolder =
-            _selected.contains(folderId) || _initialFavorited.contains(folderId);
+            _selected.contains(folderId) ||
+            _initialFavorited.contains(folderId);
         final nextSelected = Set<String>.from(_selected)..remove(folderId);
         final nextInitialFavorited = Set<String>.from(_initialFavorited)
           ..remove(folderId);
@@ -1505,8 +1520,7 @@ class _FavoriteFoldersMorphDialogState
           ),
           trailing: folder.id != '0' && _service.supportFavoriteFolderDelete
               ? IconButton(
-                  tooltip:
-                      l10n(context).comicDetailDeleteFavoriteFolderTooltip,
+                  tooltip: l10n(context).comicDetailDeleteFavoriteFolderTooltip,
                   onPressed: _busy ? null : () => _deleteFolder(folder.id),
                   icon: const Icon(Icons.delete_outline_rounded),
                 )
@@ -1521,13 +1535,10 @@ class _FavoriteFoldersMorphDialogState
     final cs = Theme.of(context).colorScheme;
     if (_loadError != null) {
       return _buildStateCard(
-        icon: Icon(
-          Icons.error_outline_rounded,
-          size: 28,
-          color: cs.error,
-        ),
-        message:
-            l10n(context).comicDetailFavoriteFoldersLoadFailed('$_loadError'),
+        icon: Icon(Icons.error_outline_rounded, size: 28, color: cs.error),
+        message: l10n(
+          context,
+        ).comicDetailFavoriteFoldersLoadFailed('$_loadError'),
         backgroundColor: cs.errorContainer.withValues(alpha: 0.32),
       );
     }
@@ -1548,9 +1559,7 @@ class _FavoriteFoldersMorphDialogState
       decoration: BoxDecoration(
         color: cs.surfaceContainerLowest.withValues(alpha: 0.9),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: cs.outlineVariant.withValues(alpha: 0.18),
-        ),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.18)),
       ),
       child: ConstrainedBox(
         constraints: BoxConstraints(
@@ -1573,9 +1582,7 @@ class _FavoriteFoldersMorphDialogState
     final cs = theme.colorScheme;
     return SizedBox(
       key: ValueKey<String>(
-        _loadError == null
-            ? 'favorite_dialog_loaded'
-            : 'favorite_dialog_error',
+        _loadError == null ? 'favorite_dialog_loaded' : 'favorite_dialog_error',
       ),
       width: double.infinity,
       child: Column(
@@ -1835,15 +1842,9 @@ class _ShapeMorphingLoaderPainter extends CustomPainter {
     final height = base * (0.44 + 0.22 * waveB);
     final radius = base * (0.1 + 0.18 * waveC);
     final rotation = math.sin(phase - 0.8) * 0.42;
-    final rect = Rect.fromCenter(
-      center: center,
-      width: width,
-      height: height,
-    );
+    final rect = Rect.fromCenter(center: center, width: width, height: height);
     final path = Path()
-      ..addRRect(
-        RRect.fromRectAndRadius(rect, Radius.circular(radius)),
-      );
+      ..addRRect(RRect.fromRectAndRadius(rect, Radius.circular(radius)));
 
     canvas.save();
     canvas.translate(center.dx, center.dy);

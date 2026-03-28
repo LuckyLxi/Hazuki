@@ -22,10 +22,7 @@ class _ComicDetailAppBarTitle extends StatelessWidget {
       layoutBuilder: (currentChild, previousChildren) {
         return Stack(
           alignment: Alignment.centerLeft,
-          children: <Widget>[
-            ...previousChildren,
-            ?currentChild,
-          ],
+          children: <Widget>[...previousChildren, ?currentChild],
         );
       },
       transitionBuilder: (child, animation) {
@@ -97,6 +94,7 @@ class _ComicDetailParallaxBackground extends StatelessWidget {
 
 class _ComicDetailBody extends StatelessWidget {
   const _ComicDetailBody({
+    required this.tabController,
     required this.future,
     required this.scrollController,
     required this.surface,
@@ -117,6 +115,7 @@ class _ComicDetailBody extends StatelessWidget {
     required this.onDetailsResolved,
   });
 
+  final TabController tabController;
   final Future<ComicDetailsData> future;
   final ScrollController scrollController;
   final Color surface;
@@ -201,6 +200,8 @@ class _ComicDetailBody extends StatelessWidget {
                 pinned: true,
                 delegate: _HazukiTabBarDelegate(
                   TabBar(
+                    controller: tabController,
+                    onTap: (_) => FocusManager.instance.primaryFocus?.unfocus(),
                     tabs: [
                       Tab(text: l10n(context).comicDetailTabInfo),
                       Tab(text: l10n(context).comicDetailTabComments),
@@ -215,6 +216,7 @@ class _ComicDetailBody extends StatelessWidget {
           body: ColoredBox(
             color: surface,
             child: TabBarView(
+              controller: tabController,
               children: [
                 _ComicDetailInfoTab(
                   details: details,

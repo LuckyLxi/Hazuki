@@ -351,6 +351,22 @@ class _RankingPageState extends State<RankingPage> {
     );
   }
 
+  Widget _buildCenteredRankingLoading(String text) {
+    return SizedBox(
+      height: 360,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const HazukiStickerLoadingIndicator(size: 112),
+            const SizedBox(height: 10),
+            Text(text),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final strings = l10n(context);
@@ -368,17 +384,7 @@ class _RankingPageState extends State<RankingPage> {
                 ? ListView(
                     physics: const AlwaysScrollableScrollPhysics(),
                     children: [
-                      const SizedBox(height: 160),
-                      Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const HazukiStickerLoadingIndicator(size: 112),
-                            const SizedBox(height: 10),
-                            Text(strings.commonLoading),
-                          ],
-                        ),
-                      ),
+                      _buildCenteredRankingLoading(strings.commonLoading),
                     ],
                   )
                 : (_errorMessage != null &&
@@ -435,19 +441,7 @@ class _RankingPageState extends State<RankingPage> {
                         ),
                       const SizedBox(height: 10),
                       if (_rankingLoading && _rankingComics.isEmpty)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 26),
-                          child: Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const HazukiStickerLoadingIndicator(size: 96),
-                                const SizedBox(height: 10),
-                                Text(strings.commonLoading),
-                              ],
-                            ),
-                          ),
-                        )
+                        _buildCenteredRankingLoading(strings.commonLoading)
                       else if (_rankingComics.isEmpty)
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 20),
