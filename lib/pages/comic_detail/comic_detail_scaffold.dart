@@ -61,17 +61,33 @@ class _ComicDetailAppBarTitle extends StatelessWidget {
 }
 
 class _ComicDetailParallaxBackground extends StatelessWidget {
-  const _ComicDetailParallaxBackground({required this.coverUrl});
+  const _ComicDetailParallaxBackground({
+    required this.coverUrl,
+    required this.scrollController,
+  });
 
   final String coverUrl;
+  final ScrollController scrollController;
 
   @override
   Widget build(BuildContext context) {
-    return Positioned(
-      left: 0,
-      right: 0,
-      top: 0,
-      height: MediaQuery.of(context).size.height,
+    final screenHeight = MediaQuery.of(context).size.height;
+    final backgroundHeight = math.min(screenHeight * 0.58, 520.0);
+
+    return AnimatedBuilder(
+      animation: scrollController,
+      builder: (context, child) {
+        final offset = scrollController.hasClients
+            ? scrollController.offset.clamp(0.0, backgroundHeight)
+            : 0.0;
+        return Positioned(
+          left: 0,
+          right: 0,
+          top: -offset,
+          height: backgroundHeight,
+          child: child!,
+        );
+      },
       child: RepaintBoundary(
         child: _ComicBlurredCoverBackground(coverUrl: coverUrl),
       ),
@@ -156,42 +172,28 @@ class _ComicDetailBody extends StatelessWidget {
           headerSliverBuilder: (context, _) {
             return [
               SliverToBoxAdapter(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        surface.withValues(alpha: 0.0),
-                        surface.withValues(alpha: 0.9),
-                        surface,
-                      ],
-                      stops: const [0.75, 0.95, 1.0],
-                    ),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                    child: _ComicDetailHeaderSection(
-                      heroTag: heroTag,
-                      details: details,
-                      skeletonColor: skeletonColor,
-                      displayTitle: displayTitle,
-                      displaySubTitle: displaySubTitle,
-                      displayCoverUrl: displayCoverUrl,
-                      viewsText: details != null ? buildViewsText(details) : '',
-                      headerTitleKey: headerTitleKey,
-                      favoriteRowKey: favoriteRowKey,
-                      actionButtonsKey: actionButtonsKey,
-                      favoriteBusy: favoriteBusy,
-                      favoriteOverride: favoriteOverride,
-                      lastReadProgress: lastReadProgress,
-                      onCoverTap: displayCoverUrl.isEmpty
-                          ? null
-                          : () => onShowCoverPreview(displayCoverUrl),
-                      onFavoriteTap: onFavoriteTap,
-                      onShowChapters: onShowChapters,
-                      onOpenReader: onOpenReader,
-                    ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  child: _ComicDetailHeaderSection(
+                    heroTag: heroTag,
+                    details: details,
+                    skeletonColor: skeletonColor,
+                    displayTitle: displayTitle,
+                    displaySubTitle: displaySubTitle,
+                    displayCoverUrl: displayCoverUrl,
+                    viewsText: details != null ? buildViewsText(details) : '',
+                    headerTitleKey: headerTitleKey,
+                    favoriteRowKey: favoriteRowKey,
+                    actionButtonsKey: actionButtonsKey,
+                    favoriteBusy: favoriteBusy,
+                    favoriteOverride: favoriteOverride,
+                    lastReadProgress: lastReadProgress,
+                    onCoverTap: displayCoverUrl.isEmpty
+                        ? null
+                        : () => onShowCoverPreview(displayCoverUrl),
+                    onFavoriteTap: onFavoriteTap,
+                    onShowChapters: onShowChapters,
+                    onOpenReader: onOpenReader,
                   ),
                 ),
               ),

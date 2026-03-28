@@ -34,3 +34,18 @@ doc/api/
 
 # OS files
 .DS_Store
+
+# Android-specific
+**/*.cxx/
+**/build/
+android/local.properties
+android/key.properties
+android/bundle/
+android/app/build/
+android/app/.cxx/
+*.keystore
+!android/app/debug.keystore
+
+# third_party build artifacts
+third_party/**/.cxx/
+third_party/**/build/

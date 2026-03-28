@@ -957,6 +957,7 @@ class _ComicDetailPageState extends State<ComicDetailPage> {
             children: [
               _ComicDetailParallaxBackground(
                 coverUrl: widget.comic.cover.trim(),
+                scrollController: _scrollController,
               ),
               _ComicDetailTopSurfaceOverlay(
                 scrollListenable: _appBarScrollNotifier,

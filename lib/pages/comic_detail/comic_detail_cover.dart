@@ -35,6 +35,15 @@ void _putComicStaticBlurredCover(String url, Uint8List bytes) {
   }
 }
 
+Uint8List? _takeBackgroundCoverBytes(String url) {
+  final normalizedUrl = url.trim();
+  if (normalizedUrl.isEmpty) {
+    return null;
+  }
+  return _takeComicStaticBlurredCover(normalizedUrl) ??
+      _takeWidgetImageMemory(normalizedUrl);
+}
+
 class _ComicCoverActionsSheet extends StatelessWidget {
   const _ComicCoverActionsSheet({required this.onSavePressed});
 
@@ -84,7 +93,7 @@ class _ComicBlurredCoverBackgroundState
   @override
   void initState() {
     super.initState();
-    final cached = _takeComicStaticBlurredCover(widget.coverUrl);
+    final cached = _takeBackgroundCoverBytes(widget.coverUrl);
     if (cached != null) {
       _coverBytes = cached;
       _queueBackgroundReveal();
@@ -102,7 +111,7 @@ class _ComicBlurredCoverBackgroundState
     if (oldWidget.coverUrl == widget.coverUrl) {
       return;
     }
-    final cached = _takeComicStaticBlurredCover(widget.coverUrl);
+    final cached = _takeBackgroundCoverBytes(widget.coverUrl);
     if (cached != null) {
       setState(() {
         _coverBytes = cached;
@@ -125,8 +134,9 @@ class _ComicBlurredCoverBackgroundState
     try {
       final bytes = await HazukiSourceService.instance.downloadImageBytes(
         normalizedUrl,
-        keepInMemory: false,
+        keepInMemory: true,
       );
+      _putWidgetImageMemory(normalizedUrl, bytes);
       _putComicStaticBlurredCover(normalizedUrl, bytes);
       if (!mounted || widget.coverUrl.trim() != normalizedUrl) {
         return;
@@ -171,38 +181,20 @@ class _ComicBlurredCoverBackgroundState
         children: [
           ColoredBox(color: surface),
           if (hasCover)
-            TweenAnimationBuilder<double>(
+            AnimatedOpacity(
               key: ValueKey('static-cover-blur-$normalizedUrl'),
-              tween: Tween<double>(
-                begin: 0,
-                end: _showBackground ? 1 : 0,
-              ),
-              duration: const Duration(milliseconds: 520),
+              opacity: _showBackground ? 1 : 0,
+              duration: const Duration(milliseconds: 320),
               curve: Curves.easeOutCubic,
-              builder: (context, value, child) {
-                final blurSigma = lerpDouble(22, 16, value) ?? 16;
-                final scale = lerpDouble(1.06, 1.0, value) ?? 1.0;
-                return Opacity(
-                  opacity: value,
-                  child: Transform.scale(
-                    scale: scale,
-                    alignment: Alignment.topCenter,
-                    child: ImageFiltered(
-                      imageFilter: ImageFilter.blur(
-                        sigmaX: blurSigma,
-                        sigmaY: blurSigma,
-                      ),
-                      child: child,
-                    ),
-                  ),
-                );
-              },
-              child: Image.memory(
-                _coverBytes!,
-                fit: BoxFit.cover,
-                alignment: Alignment.topCenter,
-                gaplessPlayback: true,
-                filterQuality: FilterQuality.medium,
+              child: ImageFiltered(
+                imageFilter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                child: Image.memory(
+                  _coverBytes!,
+                  fit: BoxFit.cover,
+                  alignment: Alignment.topCenter,
+                  gaplessPlayback: true,
+                  filterQuality: FilterQuality.medium,
+                ),
               ),
             ),
           ColoredBox(color: darkModeDim),
@@ -213,11 +205,11 @@ class _ComicBlurredCoverBackgroundState
                 end: Alignment.bottomCenter,
                 colors: [
                   topScrim,
-                  topScrim,
-                  bottomScrim.withValues(alpha: isDark ? 0.9 : 0.78),
+                  topScrim.withValues(alpha: isDark ? 0.58 : 0.52),
+                  bottomScrim.withValues(alpha: isDark ? 0.96 : 0.88),
                   bottomScrim,
                 ],
-                stops: const [0.0, 0.4, 0.74, 1.0],
+                stops: const [0.0, 0.32, 0.68, 0.88],
               ),
             ),
           ),
