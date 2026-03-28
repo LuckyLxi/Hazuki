@@ -202,10 +202,23 @@ class _ComicDetailBody extends StatelessWidget {
                   TabBar(
                     controller: tabController,
                     onTap: (_) => FocusManager.instance.primaryFocus?.unfocus(),
+                    isScrollable: true,
+                    tabAlignment: TabAlignment.center,
+                    padding: EdgeInsets.zero,
+                    labelPadding: const EdgeInsets.symmetric(horizontal: 18),
+                    indicatorSize: TabBarIndicatorSize.label,
+                    indicatorWeight: 3,
+                    dividerColor: Colors.transparent,
                     tabs: [
-                      Tab(text: l10n(context).comicDetailTabInfo),
-                      Tab(text: l10n(context).comicDetailTabComments),
-                      Tab(text: l10n(context).comicDetailTabRelated),
+                      Tab(height: 44, text: l10n(context).comicDetailTabInfo),
+                      Tab(
+                        height: 44,
+                        text: l10n(context).comicDetailTabComments,
+                      ),
+                      Tab(
+                        height: 44,
+                        text: l10n(context).comicDetailTabRelated,
+                      ),
                     ],
                   ),
                   surface,
@@ -218,21 +231,27 @@ class _ComicDetailBody extends StatelessWidget {
             child: TabBarView(
               controller: tabController,
               children: [
-                _ComicDetailInfoTab(
-                  details: details,
-                  skeletonColor: skeletonColor,
-                  metaSectionBuilder: buildMetaSection,
+                RepaintBoundary(
+                  child: _ComicDetailInfoTab(
+                    details: details,
+                    skeletonColor: skeletonColor,
+                    metaSectionBuilder: buildMetaSection,
+                  ),
                 ),
                 details != null
-                    ? CommentsPage(
-                        comicId: details.id,
-                        subId: details.subId.isEmpty ? null : details.subId,
-                        isTabView: true,
+                    ? RepaintBoundary(
+                        child: CommentsPage(
+                          comicId: details.id,
+                          subId: details.subId.isEmpty ? null : details.subId,
+                          isTabView: true,
+                        ),
                       )
                     : const _ComicDetailLoadingView(),
-                _ComicDetailRelatedTab(
-                  details: details,
-                  heroTagPrefix: heroTag,
+                RepaintBoundary(
+                  child: _ComicDetailRelatedTab(
+                    details: details,
+                    heroTagPrefix: heroTag,
+                  ),
                 ),
               ],
             ),

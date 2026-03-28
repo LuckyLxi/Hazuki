@@ -775,36 +775,63 @@ class _CommentsPageState extends State<CommentsPage>
           )
         : const SizedBox(height: 8);
 
+    final listBottomPadding = EdgeInsets.only(
+      bottom: MediaQuery.of(context).viewInsets.bottom > 0 ? 8 : 16,
+    );
+
     final bodyList = NotificationListener<ScrollNotification>(
       onNotification: (notification) {
         _onScrollNotification(notification);
         return false;
       },
-      child: ListView(
-        controller: widget.isTabView ? null : _scrollController,
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom > 0 ? 8 : 16,
-        ),
-        children: [
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 320),
-            switchInCurve: Curves.easeOutCubic,
-            switchOutCurve: Curves.easeOutCubic,
-            layoutBuilder: (currentChild, previousChildren) {
-              return Stack(
-                alignment: Alignment.topCenter,
-                children: <Widget>[
-                  ...previousChildren,
-                  ...<Widget?>[currentChild].whereType<Widget>(),
-                ],
-              );
-            },
-            child: content,
-          ),
-          loadMoreFooter,
-        ],
-      ),
+      child: _comments.isNotEmpty
+          ? CustomScrollView(
+              controller: widget.isTabView ? null : _scrollController,
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
+                SliverPadding(
+                  padding: listBottomPadding,
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate((context, index) {
+                      if (index == _comments.length) {
+                        return loadMoreFooter;
+                      }
+                      final isLastComment = index == _comments.length - 1;
+                      return Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _buildCommentTile(_comments[index]),
+                          if (!isLastComment) const Divider(height: 1),
+                        ],
+                      );
+                    }, childCount: _comments.length + 1),
+                  ),
+                ),
+              ],
+            )
+          : ListView(
+              controller: widget.isTabView ? null : _scrollController,
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: listBottomPadding,
+              children: [
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 320),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeOutCubic,
+                  layoutBuilder: (currentChild, previousChildren) {
+                    return Stack(
+                      alignment: Alignment.topCenter,
+                      children: <Widget>[
+                        ...previousChildren,
+                        ...<Widget?>[currentChild].whereType<Widget>(),
+                      ],
+                    );
+                  },
+                  child: content,
+                ),
+                loadMoreFooter,
+              ],
+            ),
     );
 
     if (widget.isTabView) {
