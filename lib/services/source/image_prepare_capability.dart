@@ -5,11 +5,13 @@ class PreparedChapterImageData {
     required this.bytes,
     required this.extension,
     required this.wasProcessed,
+    this.aspectRatio,
   });
 
   final Uint8List bytes;
   final String extension;
   final bool wasProcessed;
+  final double? aspectRatio;
 }
 
 extension HazukiSourceServiceImagePrepareCapability on HazukiSourceService {
@@ -117,18 +119,25 @@ extension HazukiSourceServiceImagePrepareCapability on HazukiSourceService {
       comicId: comicId,
       epId: epId,
     );
-    final segments = declaredSegments ?? calculateJmImageSegments(epId, imageUrl);
-    if (segments > 1 && _imageExtensionFromUrl(imageUrl) != 'gif') {
-      final fixed = await _unscrambleJmImageBytes(rawBytes, segments);
+    final sourceExtension = _imageExtensionFromUrl(imageUrl);
+    final segments =
+        declaredSegments ?? calculateJmImageSegments(epId, imageUrl);
+    if (segments > 1 && sourceExtension != 'gif') {
+      final fixed = await _unscrambleJmImageBytes(
+        rawBytes,
+        segments,
+        fallbackExtension: sourceExtension,
+      );
       return PreparedChapterImageData(
-        bytes: fixed,
-        extension: 'png',
+        bytes: fixed.bytes,
+        extension: fixed.extension,
         wasProcessed: true,
+        aspectRatio: fixed.aspectRatio,
       );
     }
     return PreparedChapterImageData(
       bytes: rawBytes,
-      extension: _imageExtensionFromUrl(imageUrl),
+      extension: sourceExtension,
       wasProcessed: false,
     );
   }
@@ -149,18 +158,25 @@ extension HazukiSourceServiceImagePrepareCapability on HazukiSourceService {
     return ext;
   }
 
-  Future<Uint8List> _unscrambleJmImageBytes(
+  Future<({Uint8List bytes, String extension, double? aspectRatio})>
+  _unscrambleJmImageBytes(
     Uint8List data,
-    int segments,
-  ) async {
+    int segments, {
+    required String fallbackExtension,
+  }) async {
     final codec = await instantiateImageCodec(data);
     final frame = await codec.getNextFrame();
     final image = frame.image;
     final width = image.width;
     final height = image.height;
+    final aspectRatio = height > 0 ? width / height : null;
     final src = await image.toByteData(format: ImageByteFormat.rawRgba);
     if (src == null) {
-      return data;
+      return (
+        bytes: data,
+        extension: fallbackExtension,
+        aspectRatio: aspectRatio,
+      );
     }
 
     final blockSize = height ~/ segments;
@@ -176,12 +192,7 @@ extension HazukiSourceServiceImagePrepareCapability on HazukiSourceService {
       for (var y = 0; y < currentHeight; y++) {
         final srcOffset = ((startY + y) * width) * 4;
         final dstOffset = ((destY + y) * width) * 4;
-        dstBytes.setRange(
-          dstOffset,
-          dstOffset + rowBytes,
-          srcBytes,
-          srcOffset,
-        );
+        dstBytes.setRange(dstOffset, dstOffset + rowBytes, srcBytes, srcOffset);
       }
       destY += currentHeight;
     }
@@ -198,8 +209,16 @@ extension HazukiSourceServiceImagePrepareCapability on HazukiSourceService {
     final outFrame = await outCodec.getNextFrame();
     final png = await outFrame.image.toByteData(format: ImageByteFormat.png);
     if (png == null) {
-      return data;
+      return (
+        bytes: data,
+        extension: fallbackExtension,
+        aspectRatio: aspectRatio,
+      );
     }
-    return png.buffer.asUint8List();
+    return (
+      bytes: png.buffer.asUint8List(),
+      extension: 'png',
+      aspectRatio: aspectRatio,
+    );
   }
 }

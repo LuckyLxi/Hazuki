@@ -60,16 +60,21 @@ class _ReaderPageState extends State<ReaderPage>
   static const bool _defaultCustomBrightness = false;
   static const bool _defaultPageIndicator = false;
   static const double _defaultBrightnessValue = 0.5;
-  static const int _prefetchAroundCount = 6;
-  static const int _prefetchAheadMemoryCount = 2;
-  static const int _providerKeepBehindCount = 8;
-  static const int _providerKeepAheadCount = 16;
+  static const int _prefetchAroundCount = 10;
+  static const int _prefetchAheadMemoryCount = 6;
+  static const int _providerKeepBehindCount = 12;
+  static const int _providerKeepAheadCount = 24;
+  static const double _defaultPlaceholderAspectRatio = 0.72;
+  static const double _readerListCacheExtentViewportMultiplier = 3.0;
+  static const double _readerListCacheExtentMin = 1600;
+  static const double _readerListCacheExtentMax = 5200;
   static const double _unexpectedTopOffsetThreshold = 240;
   static const double _topEdgeOffsetEpsilon = 8;
   final String _readerSessionId =
       DateTime.now().microsecondsSinceEpoch.toString();
   int _activeUnscrambleTasks = 0;
   bool _prefetchAheadRunning = false;
+  int? _queuedPrefetchAheadIndex;
   int _currentPageIndex = 0;
   final Map<String, int> _imageIndexMap = <String, int>{};
   final ValueNotifier<int> _pageIndexNotifier = ValueNotifier<int>(0);
@@ -393,7 +398,7 @@ class _ReaderPageState extends State<ReaderPage>
       _logVisiblePageChange(index: 0, trigger: 'constructor_images');
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _prefetchAround(0);
-        unawaited(_prefetchAheadFrom(0));
+        _requestPrefetchAhead(0);
       });
     } else {
       unawaited(_loadChapterImages(trigger: 'initial_load'));
@@ -1386,7 +1391,7 @@ class _ReaderPageState extends State<ReaderPage>
       _logVisiblePageChange(index: 0, trigger: 'chapter_images_loaded');
       if (!_noImageModeEnabled) {
         _prefetchAround(0);
-        unawaited(_prefetchAheadFrom(0));
+        _requestPrefetchAhead(0);
       }
     } catch (e) {
       _logReaderEvent(
@@ -1486,7 +1491,40 @@ class _ReaderPageState extends State<ReaderPage>
     _lastObservedListPixels = currentPixels;
     if (!_noImageModeEnabled) {
       _prefetchAround(normalizedIndex);
-      unawaited(_prefetchAheadFrom(normalizedIndex));
+      _requestPrefetchAhead(normalizedIndex);
+    }
+  }
+
+  void _requestPrefetchAhead(int currentIndex) {
+    if (_images.isEmpty) {
+      return;
+    }
+    _queuedPrefetchAheadIndex = currentIndex;
+    if (_prefetchAheadRunning) {
+      return;
+    }
+    unawaited(_drainPrefetchAheadQueue());
+  }
+
+  Future<void> _drainPrefetchAheadQueue() async {
+    if (_prefetchAheadRunning) {
+      return;
+    }
+    _prefetchAheadRunning = true;
+    try {
+      while (true) {
+        final currentIndex = _queuedPrefetchAheadIndex;
+        _queuedPrefetchAheadIndex = null;
+        if (currentIndex == null || _images.isEmpty) {
+          break;
+        }
+        await _prefetchAheadFrom(currentIndex);
+      }
+    } finally {
+      _prefetchAheadRunning = false;
+      if (_queuedPrefetchAheadIndex != null) {
+        unawaited(_drainPrefetchAheadQueue());
+      }
     }
   }
 
@@ -1514,7 +1552,7 @@ class _ReaderPageState extends State<ReaderPage>
   }
 
   Future<void> _prefetchAheadFrom(int currentIndex) async {
-    if (_prefetchAheadRunning || _images.isEmpty) {
+    if (_images.isEmpty) {
       return;
     }
     var start = currentIndex + 1;
@@ -1524,45 +1562,44 @@ class _ReaderPageState extends State<ReaderPage>
     if (start >= _images.length) {
       return;
     }
+    final endExclusive = (start + _prefetchAheadMemoryCount) < _images.length
+        ? (start + _prefetchAheadMemoryCount)
+        : _images.length;
+    final futures = <Future<void>>[];
 
-    _prefetchAheadRunning = true;
-    try {
-      final endExclusive = (start + _prefetchAheadMemoryCount) < _images.length
-          ? (start + _prefetchAheadMemoryCount)
-          : _images.length;
-      final futures = <Future<void>>[];
+    for (var i = start; i < endExclusive; i++) {
+      if (_queuedPrefetchAheadIndex != null &&
+          _queuedPrefetchAheadIndex != currentIndex) {
+        break;
+      }
 
-      for (var i = start; i < endExclusive; i++) {
-        final url = _images[i];
-        if (url.trim().isEmpty) {
-          continue;
-        }
+      final url = _images[i];
+      if (url.trim().isEmpty) {
+        continue;
+      }
 
-        if (HazukiSourceService.instance.isLocalImagePath(url)) {
-          unawaited(_getOrCreateImageProviderFuture(url));
-          continue;
-        }
-
-        futures.add(
-          HazukiSourceService.instance
-              .downloadImageBytes(
-                url,
-                comicId: widget.comicId,
-                epId: widget.epId,
-                keepInMemory: true,
-                useDiskCache: false,
-              )
-              .then((_) {})
-              .catchError((_) {}),
-        );
+      if (HazukiSourceService.instance.isLocalImagePath(url)) {
         unawaited(_getOrCreateImageProviderFuture(url));
+        continue;
       }
 
-      if (futures.isNotEmpty) {
-        await Future.wait(futures);
-      }
-    } finally {
-      _prefetchAheadRunning = false;
+      futures.add(
+        HazukiSourceService.instance
+            .downloadImageBytes(
+              url,
+              comicId: widget.comicId,
+              epId: widget.epId,
+              keepInMemory: true,
+              useDiskCache: true,
+            )
+            .then((_) {})
+            .catchError((_) {}),
+      );
+      unawaited(_getOrCreateImageProviderFuture(url));
+    }
+
+    if (futures.isNotEmpty) {
+      await Future.wait(futures);
     }
   }
 
@@ -1648,6 +1685,71 @@ class _ReaderPageState extends State<ReaderPage>
     } catch (_) {}
   }
 
+  void _rememberAspectRatio(String url, double? aspectRatio) {
+    if (aspectRatio == null || !aspectRatio.isFinite || aspectRatio <= 0) {
+      return;
+    }
+    _imageAspectRatioCache[url] = aspectRatio;
+  }
+
+  double _resolvePlaceholderAspectRatio(int index) {
+    if (index >= 0 && index < _images.length) {
+      final exact = _imageAspectRatioCache[_images[index]];
+      if (exact != null && exact.isFinite && exact > 0) {
+        return exact;
+      }
+    }
+
+    for (var distance = 1; distance <= 3; distance++) {
+      final before = index - distance;
+      if (before >= 0) {
+        final ratio = _imageAspectRatioCache[_images[before]];
+        if (ratio != null && ratio.isFinite && ratio > 0) {
+          return ratio;
+        }
+      }
+
+      final after = index + distance;
+      if (after < _images.length) {
+        final ratio = _imageAspectRatioCache[_images[after]];
+        if (ratio != null && ratio.isFinite && ratio > 0) {
+          return ratio;
+        }
+      }
+    }
+
+    if (_imageAspectRatioCache.isNotEmpty) {
+      var total = 0.0;
+      var count = 0;
+      for (final ratio in _imageAspectRatioCache.values) {
+        if (!ratio.isFinite || ratio <= 0) {
+          continue;
+        }
+        total += ratio;
+        count++;
+        if (count >= 8) {
+          break;
+        }
+      }
+      if (count > 0) {
+        final average = total / count;
+        return average.clamp(0.45, 1.2).toDouble();
+      }
+    }
+
+    return _defaultPlaceholderAspectRatio;
+  }
+
+  double _readerListCacheExtent(BuildContext context) {
+    final viewport = MediaQuery.sizeOf(context).height;
+    if (!viewport.isFinite || viewport <= 0) {
+      return _readerListCacheExtentMin;
+    }
+    return (viewport * _readerListCacheExtentViewportMultiplier)
+        .clamp(_readerListCacheExtentMin, _readerListCacheExtentMax)
+        .toDouble();
+  }
+
   Future<ImageProvider> _buildImageProvider(String url) async {
     final sourceService = HazukiSourceService.instance;
     if (_noImageModeEnabled) {
@@ -1669,9 +1771,12 @@ class _ReaderPageState extends State<ReaderPage>
         url,
         comicId: widget.comicId,
         epId: widget.epId,
-        useDiskCache: false,
+        useDiskCache: true,
       );
-      await _rememberAspectRatioFromBytes(url, prepared.bytes);
+      _rememberAspectRatio(url, prepared.aspectRatio);
+      if (!_imageAspectRatioCache.containsKey(url)) {
+        await _rememberAspectRatioFromBytes(url, prepared.bytes);
+      }
       return MemoryImage(prepared.bytes);
     } finally {
       _releaseUnscramblePermit();
@@ -1682,7 +1787,8 @@ class _ReaderPageState extends State<ReaderPage>
     final url = _images[index];
     final cachedProvider = _providerCache[url];
     final resolvedAspectRatio = _imageAspectRatioCache[url];
-    final placeholderAspectRatio = resolvedAspectRatio ?? (3 / 4);
+    final placeholderAspectRatio =
+        resolvedAspectRatio ?? _resolvePlaceholderAspectRatio(index);
     final readerPlaceholderColor = Theme.of(context).scaffoldBackgroundColor;
 
     if (_noImageModeEnabled) {
@@ -1774,6 +1880,7 @@ class _ReaderPageState extends State<ReaderPage>
       child: ListView.builder(
         key: ValueKey('${widget.comicId}-${widget.epId}'),
         padding: EdgeInsets.zero,
+        cacheExtent: _readerListCacheExtent(context),
         itemCount: _images.length,
         controller: _scrollController,
         physics: _zoomGestureActive
@@ -1818,7 +1925,7 @@ class _ReaderPageState extends State<ReaderPage>
         _logVisiblePageChange(index: index, trigger: 'page_swipe');
         if (!_noImageModeEnabled) {
           _prefetchAround(index);
-          unawaited(_prefetchAheadFrom(index));
+          _requestPrefetchAhead(index);
         }
       },
       itemBuilder: (context, index) {

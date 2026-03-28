@@ -264,8 +264,7 @@ PreferredSizeWidget hazukiFrostedAppBar({
   );
 }
 
-class _HazukiAppState extends State<HazukiApp>
-    with WidgetsBindingObserver {
+class _HazukiAppState extends State<HazukiApp> with WidgetsBindingObserver {
   static const _themeModeKey = 'appearance_theme_mode';
   static const _oledPureBlackKey = 'appearance_oled_pure_black';
   static const _dynamicColorKey = 'appearance_dynamic_color';
@@ -433,8 +432,8 @@ class _HazukiAppState extends State<HazukiApp>
   }
 
   Future<void> _bootstrapSourceRuntime() async {
-    final hasLocalSource =
-        await HazukiSourceService.instance.hasLocalJmSourceFile();
+    final hasLocalSource = await HazukiSourceService.instance
+        .hasLocalJmSourceFile();
     if (!mounted) {
       return;
     }
@@ -601,6 +600,40 @@ class _HazukiAppState extends State<HazukiApp>
     return '$y-$m-$d';
   }
 
+  bool _shouldSkipSourceUpdateDialog({
+    required String? skipPayload,
+    required SourceVersionCheckResult check,
+  }) {
+    if (skipPayload == null || skipPayload.isEmpty) {
+      return false;
+    }
+
+    try {
+      final decoded = jsonDecode(skipPayload);
+      if (decoded is! Map) {
+        return false;
+      }
+      final map = Map<String, dynamic>.from(decoded);
+      final date = map['date']?.toString();
+      final localVersion = map['localVersion']?.toString();
+      final remoteVersion = map['remoteVersion']?.toString();
+      return date == _formatTodayKey() &&
+          localVersion == check.localVersion &&
+          remoteVersion == check.remoteVersion;
+    } catch (_) {
+      // 兼容旧版仅记录日期的跳过逻辑；当本地或云端版本变化时，不再整天静默跳过。
+      return false;
+    }
+  }
+
+  String _buildSourceUpdateSkipPayload(SourceVersionCheckResult check) {
+    return jsonEncode({
+      'date': _formatTodayKey(),
+      'localVersion': check.localVersion,
+      'remoteVersion': check.remoteVersion,
+    });
+  }
+
   Future<T?> _showAnimatedDialog<T>({
     required Widget child,
     bool barrierDismissible = true,
@@ -636,12 +669,6 @@ class _HazukiAppState extends State<HazukiApp>
                         final colorScheme = Theme.of(context).colorScheme;
                         final transitionProgress = Curves.easeOutCubic
                             .transform(animation.value);
-                        final blurProgress = const Interval(
-                          0.0,
-                          0.82,
-                          curve: Curves.easeOutCubic,
-                        ).transform(animation.value);
-                        final sigma = 4 + (14 * blurProgress);
                         return Stack(
                           fit: StackFit.expand,
                           children: [
@@ -650,35 +677,26 @@ class _HazukiAppState extends State<HazukiApp>
                                 alpha: 0.20 * transitionProgress,
                               ),
                             ),
-                            ClipRect(
-                              child: BackdropFilter(
-                                filter: ImageFilter.blur(
-                                  sigmaX: sigma,
-                                  sigmaY: sigma,
-                                ),
-                                child: DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      begin: Alignment.topCenter,
-                                      end: Alignment.bottomCenter,
-                                      colors: [
-                                        colorScheme.surface.withValues(
-                                          alpha: 0.06 * transitionProgress,
-                                        ),
-                                        colorScheme.surface.withValues(
-                                          alpha: 0.12 * transitionProgress,
-                                        ),
-                                        colorScheme.surfaceContainerHighest
-                                            .withValues(
-                                              alpha:
-                                                  0.18 * transitionProgress,
-                                            ),
-                                      ],
+                            DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    colorScheme.surface.withValues(
+                                      alpha: 0.06 * transitionProgress,
                                     ),
-                                  ),
-                                  child: child,
+                                    colorScheme.surface.withValues(
+                                      alpha: 0.12 * transitionProgress,
+                                    ),
+                                    colorScheme.surfaceContainerHighest
+                                        .withValues(
+                                          alpha: 0.18 * transitionProgress,
+                                        ),
+                                  ],
                                 ),
                               ),
+                              child: child,
                             ),
                           ],
                         );
@@ -752,8 +770,8 @@ class _HazukiAppState extends State<HazukiApp>
     }
 
     final prefs = await SharedPreferences.getInstance();
-    final skipDate = prefs.getString(_sourceUpdateSkipDateKey);
-    if (skipDate == _formatTodayKey()) {
+    final skipPayload = prefs.getString(_sourceUpdateSkipDateKey);
+    if (_shouldSkipSourceUpdateDialog(skipPayload: skipPayload, check: check)) {
       return null;
     }
 
@@ -785,17 +803,6 @@ class _HazukiAppState extends State<HazukiApp>
           final downloadingMessage = strings.sourceUpdateDownloadingMessage;
           final restartHint = strings.sourceUpdateRestartHint;
 
-          double resolveDialogRadius() {
-            switch (phase) {
-              case _SourceUpdateDialogPhase.available:
-                return 28;
-              case _SourceUpdateDialogPhase.downloading:
-                return 24;
-              case _SourceUpdateDialogPhase.restartRequired:
-                return 26;
-            }
-          }
-
           EdgeInsets resolveDialogPadding() {
             switch (phase) {
               case _SourceUpdateDialogPhase.available:
@@ -804,17 +811,6 @@ class _HazukiAppState extends State<HazukiApp>
                 return const EdgeInsets.fromLTRB(20, 18, 20, 18);
               case _SourceUpdateDialogPhase.restartRequired:
                 return const EdgeInsets.fromLTRB(20, 20, 20, 20);
-            }
-          }
-
-          Color resolveAccentColor() {
-            switch (phase) {
-              case _SourceUpdateDialogPhase.available:
-                return colorScheme.primary;
-              case _SourceUpdateDialogPhase.downloading:
-                return colorScheme.primary;
-              case _SourceUpdateDialogPhase.restartRequired:
-                return colorScheme.tertiary;
             }
           }
 
@@ -1065,7 +1061,10 @@ class _HazukiAppState extends State<HazukiApp>
                                 setDialogState(() {
                                   if (total > 0) {
                                     indeterminate = false;
-                                    progress = (received / total).clamp(0.0, 1.0);
+                                    progress = (received / total).clamp(
+                                      0.0,
+                                      1.0,
+                                    );
                                   } else {
                                     indeterminate = true;
                                   }
@@ -1125,7 +1124,9 @@ class _HazukiAppState extends State<HazukiApp>
                       );
                 final percentLabel = '${(progress * 100).toStringAsFixed(0)}%';
                 return Column(
-                  key: const ValueKey<String>('source-update-phase-downloading'),
+                  key: const ValueKey<String>(
+                    'source-update-phase-downloading',
+                  ),
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
@@ -1174,9 +1175,7 @@ class _HazukiAppState extends State<HazukiApp>
                           ),
                           const SizedBox(height: 12),
                           Text(
-                            indeterminate
-                                ? downloadingMessage
-                                : restartHint,
+                            indeterminate ? downloadingMessage : restartHint,
                             style: textTheme.bodySmall?.copyWith(
                               color: colorScheme.onSurfaceVariant,
                               height: 1.4,
@@ -1232,9 +1231,9 @@ class _HazukiAppState extends State<HazukiApp>
                           borderRadius: BorderRadius.circular(16),
                         ),
                       ),
-                      onPressed: () => Navigator.of(dialogContext).pop(
-                        _SourceUpdateDialogAction.downloaded,
-                      ),
+                      onPressed: () => Navigator.of(
+                        dialogContext,
+                      ).pop(_SourceUpdateDialogAction.downloaded),
                       child: Text(strings.commonConfirm),
                     ),
                   ],
@@ -1243,8 +1242,10 @@ class _HazukiAppState extends State<HazukiApp>
           }
 
           return Dialog(
-            backgroundColor: Colors.transparent,
-            elevation: 0,
+            clipBehavior: Clip.antiAlias,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(28),
+            ),
             insetPadding: const EdgeInsets.symmetric(horizontal: 24),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 320),
@@ -1252,21 +1253,6 @@ class _HazukiAppState extends State<HazukiApp>
               width: double.infinity,
               constraints: const BoxConstraints(maxWidth: dialogMaxWidth),
               padding: resolveDialogPadding(),
-              clipBehavior: Clip.antiAlias,
-              decoration: BoxDecoration(
-                color: colorScheme.surface,
-                borderRadius: BorderRadius.circular(resolveDialogRadius()),
-                border: Border.all(
-                  color: resolveAccentColor().withValues(alpha: 0.14),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.12),
-                    blurRadius: 24,
-                    offset: const Offset(0, 14),
-                  ),
-                ],
-              ),
               child: AnimatedSize(
                 duration: const Duration(milliseconds: 320),
                 curve: Curves.easeInOutCubic,
@@ -1278,10 +1264,7 @@ class _HazukiAppState extends State<HazukiApp>
                   layoutBuilder: (currentChild, previousChildren) {
                     return Stack(
                       alignment: Alignment.center,
-                      children: [
-                        ...previousChildren,
-                        ?currentChild,
-                      ],
+                      children: [...previousChildren, ?currentChild],
                     );
                   },
                   transitionBuilder: (child, animation) {
@@ -1318,7 +1301,10 @@ class _HazukiAppState extends State<HazukiApp>
         : result;
 
     if (effectiveResult == _SourceUpdateDialogAction.skipToday) {
-      await prefs.setString(_sourceUpdateSkipDateKey, _formatTodayKey());
+      await prefs.setString(
+        _sourceUpdateSkipDateKey,
+        _buildSourceUpdateSkipPayload(check),
+      );
     }
 
     if (!mounted) {
@@ -1430,96 +1416,96 @@ class _HazukiAppState extends State<HazukiApp>
                       },
                       child:
                           _showInitialSourceBootstrapOverlay ||
-                                  _showInitialSourceBootstrapIntro
-                              ? ColoredBox(
-                                  key: ValueKey(
-                                    _showInitialSourceBootstrapOverlay
-                                        ? 'initial-source-bootstrap-overlay'
-                                        : 'initial-source-bootstrap-intro',
+                              _showInitialSourceBootstrapIntro
+                          ? ColoredBox(
+                              key: ValueKey(
+                                _showInitialSourceBootstrapOverlay
+                                    ? 'initial-source-bootstrap-overlay'
+                                    : 'initial-source-bootstrap-intro',
+                              ),
+                              color: Colors.transparent,
+                              child: Center(
+                                child: Container(
+                                  width: 332,
+                                  padding: const EdgeInsets.fromLTRB(
+                                    20,
+                                    18,
+                                    20,
+                                    18,
                                   ),
-                                  color: Colors.transparent,
-                                  child: Center(
-                                    child: Container(
-                                      width: 332,
-                                      padding: const EdgeInsets.fromLTRB(
-                                        20,
-                                        18,
-                                        20,
-                                        18,
+                                  decoration: BoxDecoration(
+                                    color: scheme.surface,
+                                    borderRadius: BorderRadius.circular(28),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(
+                                          alpha: 0.14,
+                                        ),
+                                        blurRadius: 24,
+                                        offset: const Offset(0, 10),
                                       ),
-                                      decoration: BoxDecoration(
-                                        color: scheme.surface,
-                                        borderRadius: BorderRadius.circular(28),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withValues(
-                                              alpha: 0.14,
+                                    ],
+                                  ),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        l10n(
+                                          context,
+                                        ).sourceBootstrapDownloading,
+                                        style: Theme.of(
+                                          context,
+                                        ).textTheme.titleMedium,
+                                      ),
+                                      const SizedBox(height: 14),
+                                      if (_showInitialSourceBootstrapOverlay) ...[
+                                        LinearProgressIndicator(
+                                          value: _sourceBootstrapIndeterminate
+                                              ? null
+                                              : _sourceBootstrapProgress,
+                                          borderRadius: BorderRadius.circular(
+                                            999,
+                                          ),
+                                          minHeight: 8,
+                                        ),
+                                        const SizedBox(height: 10),
+                                      ],
+                                      Text(
+                                        _sourceBootstrapErrorText ??
+                                            (_showInitialSourceBootstrapIntro
+                                                ? l10n(
+                                                    context,
+                                                  ).sourceBootstrapPreparing
+                                                : _sourceBootstrapIndeterminate
+                                                ? l10n(
+                                                    context,
+                                                  ).sourceBootstrapPreparing
+                                                : l10n(
+                                                    context,
+                                                  ).sourceBootstrapProgress(
+                                                    (_sourceBootstrapProgress *
+                                                            100)
+                                                        .toStringAsFixed(0),
+                                                  )),
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.copyWith(
+                                              color: scheme.onSurfaceVariant,
                                             ),
-                                            blurRadius: 24,
-                                            offset: const Offset(0, 10),
-                                          ),
-                                        ],
                                       ),
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            l10n(context)
-                                                .sourceBootstrapDownloading,
-                                            style: Theme.of(
-                                              context,
-                                            ).textTheme.titleMedium,
-                                          ),
-                                          const SizedBox(height: 14),
-                                          if (_showInitialSourceBootstrapOverlay)
-                                            ...[
-                                              LinearProgressIndicator(
-                                                value:
-                                                    _sourceBootstrapIndeterminate
-                                                        ? null
-                                                        : _sourceBootstrapProgress,
-                                                borderRadius:
-                                                    BorderRadius.circular(999),
-                                                minHeight: 8,
-                                              ),
-                                              const SizedBox(height: 10),
-                                            ],
-                                          Text(
-                                            _sourceBootstrapErrorText ??
-                                                (_showInitialSourceBootstrapIntro
-                                                    ? l10n(context)
-                                                          .sourceBootstrapPreparing
-                                                    : _sourceBootstrapIndeterminate
-                                                    ? l10n(context)
-                                                          .sourceBootstrapPreparing
-                                                    : l10n(context)
-                                                          .sourceBootstrapProgress(
-                                                            (_sourceBootstrapProgress *
-                                                                    100)
-                                                                .toStringAsFixed(
-                                                                  0,
-                                                                ),
-                                                          )),
-                                            style: Theme.of(context)
-                                                .textTheme
-                                                .bodySmall
-                                                ?.copyWith(
-                                                  color:
-                                                      scheme.onSurfaceVariant,
-                                                ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                )
-                              : const SizedBox.shrink(
-                                  key: ValueKey(
-                                    'initial-source-bootstrap-overlay-empty',
+                                    ],
                                   ),
                                 ),
+                              ),
+                            )
+                          : const SizedBox.shrink(
+                              key: ValueKey(
+                                'initial-source-bootstrap-overlay-empty',
+                              ),
+                            ),
                     ),
                   ),
                 ),

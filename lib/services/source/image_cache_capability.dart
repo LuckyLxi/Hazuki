@@ -175,7 +175,11 @@ extension HazukiSourceServiceImageCacheCapability on HazukiSourceService {
 
     final response = await _dio.get<List<int>>(
       url,
-      options: Options(responseType: ResponseType.bytes, headers: headers),
+      options: Options(
+        responseType: ResponseType.bytes,
+        headers: headers,
+        extra: {'hazukiLogCategory': 'image_download'},
+      ),
     );
 
     final data = response.data;

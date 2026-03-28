@@ -57,6 +57,7 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
     skipTraversal: true,
   );
   final ScrollController _scrollController = ScrollController();
+  final List<Timer> _searchRevealSyncTimers = <Timer>[];
 
   List<String> _historyList = [];
   bool _historyEditMode = false;
@@ -80,6 +81,7 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
 
   @override
   void dispose() {
+    _cancelSearchRevealSyncTimers();
     _scrollController.removeListener(_onScroll);
     _searchController.dispose();
     _searchFocusNode.dispose();
@@ -113,6 +115,33 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _syncSearchRevealProgress(force: force);
     });
+  }
+
+  void _cancelSearchRevealSyncTimers() {
+    for (final timer in _searchRevealSyncTimers) {
+      timer.cancel();
+    }
+    _searchRevealSyncTimers.clear();
+  }
+
+  void _scheduleSearchRevealSyncBurst({bool force = false}) {
+    _cancelSearchRevealSyncTimers();
+    const delays = <Duration>[
+      Duration.zero,
+      Duration(milliseconds: 50),
+      Duration(milliseconds: 120),
+      Duration(milliseconds: 220),
+      Duration(milliseconds: 340),
+    ];
+    for (final delay in delays) {
+      final timer = Timer(delay, () {
+        if (!mounted) {
+          return;
+        }
+        _scheduleSearchRevealSync(force: force);
+      });
+      _searchRevealSyncTimers.add(timer);
+    }
   }
 
   void _onScroll() {
@@ -151,7 +180,7 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
         _historyEditMode = false;
       }
     });
-    _scheduleSearchRevealSync();
+    _scheduleSearchRevealSyncBurst();
   }
 
   Future<void> _removeHistory(String keyword) async {
@@ -167,7 +196,7 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
         _historyEditMode = false;
       }
     });
-    _scheduleSearchRevealSync();
+    _scheduleSearchRevealSyncBurst();
   }
 
   Future<void> _clearHistory() async {
@@ -181,7 +210,7 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
       _historyEditMode = false;
       _historyExpanded = false;
     });
-    _scheduleSearchRevealSync();
+    _scheduleSearchRevealSyncBurst();
   }
 
   double _estimateHistoryChipWidth(String keyword, BuildContext context) {
@@ -480,25 +509,28 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
             AnimatedSize(
               duration: const Duration(milliseconds: 320),
               curve: Curves.easeOutCubic,
-              alignment: Alignment.topCenter,
-              onEnd: _scheduleSearchRevealSync,
-              child: Wrap(
-                spacing: _searchHistoryChipSpacing,
-                runSpacing: 8,
-                children: displayList.map((keyword) {
-                  if (_historyEditMode) {
-                    return InputChip(
+              alignment: Alignment.topLeft,
+              onEnd: () => _scheduleSearchRevealSync(force: true),
+              child: SizedBox(
+                width: double.infinity,
+                child: Wrap(
+                  spacing: _searchHistoryChipSpacing,
+                  runSpacing: 8,
+                  children: displayList.map((keyword) {
+                    if (_historyEditMode) {
+                      return InputChip(
+                        label: Text(keyword),
+                        deleteIcon: const Icon(Icons.cancel, size: 18),
+                        onDeleted: () => _removeHistory(keyword),
+                        onPressed: () => _removeHistory(keyword),
+                      );
+                    }
+                    return ActionChip(
                       label: Text(keyword),
-                      deleteIcon: const Icon(Icons.cancel, size: 18),
-                      onDeleted: () => _removeHistory(keyword),
-                      onPressed: () => _removeHistory(keyword),
+                      onPressed: () => unawaited(_openResults(keyword)),
                     );
-                  }
-                  return ActionChip(
-                    label: Text(keyword),
-                    onPressed: () => unawaited(_openResults(keyword)),
-                  );
-                }).toList(),
+                  }).toList(),
+                ),
               ),
             ),
             if (isTooLong)
@@ -515,7 +547,7 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
                     setState(() {
                       _historyExpanded = !_historyExpanded;
                     });
-                    _scheduleSearchRevealSync();
+                    _scheduleSearchRevealSyncBurst(force: true);
                   },
                 ),
               ),
@@ -540,7 +572,7 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
                     setState(() {
                       _historyEditMode = !_historyEditMode;
                     });
-                    _scheduleSearchRevealSync();
+                    _scheduleSearchRevealSyncBurst(force: true);
                   },
                   child: Icon(
                     _historyEditMode ? Icons.done : Icons.delete_outline,

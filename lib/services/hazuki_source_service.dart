@@ -633,7 +633,10 @@ class HazukiSourceService {
           method: method,
           responseType: bytes ? ResponseType.bytes : ResponseType.plain,
           headers: headers,
-          extra: {'skipNetworkDebugLog': true},
+          extra: {
+            'skipNetworkDebugLog': true,
+            if (bytes) 'hazukiLogCategory': 'image_download',
+          },
         ),
       );
     } catch (e) {
@@ -650,6 +653,7 @@ class HazukiSourceService {
         error: error,
         startedAt: startedAt,
         source: 'js_http',
+        category: bytes ? 'image_download' : 'js_http',
         requestHeaders: Map<String, dynamic>.from(headers),
         requestData: data,
         responseHeaders: responseHeadersForLog,
@@ -708,6 +712,8 @@ class HazukiSourceService {
               error: null,
               startedAt: startedAt,
               source: 'dio_direct',
+              category: response.requestOptions.extra['hazukiLogCategory']
+                  ?.toString(),
               requestHeaders: Map<String, dynamic>.from(
                 response.requestOptions.headers,
               ),
@@ -737,6 +743,7 @@ class HazukiSourceService {
               error: error.toString(),
               startedAt: startedAt,
               source: 'dio_direct',
+              category: options.extra['hazukiLogCategory']?.toString(),
               requestHeaders: Map<String, dynamic>.from(options.headers),
               requestData: options.data,
               responseHeaders: responseHeadersForLog,
@@ -893,6 +900,7 @@ class HazukiSourceService {
           options: Options(
             responseType: ResponseType.plain,
             headers: {'cache-control': 'no-cache'},
+            extra: {'skipNetworkDebugLog': true, 'hazukiLogCategory': source},
           ),
         );
         _appendNetworkLog(
@@ -902,6 +910,7 @@ class HazukiSourceService {
           statusCode: response.statusCode,
           error: null,
           startedAt: startedAt,
+          category: source,
           responseHeaders: response.headers.map,
           responseBody: response.data,
         );
@@ -917,6 +926,7 @@ class HazukiSourceService {
           statusCode: null,
           error: e.toString(),
           startedAt: startedAt,
+          category: source,
         );
       }
       return null;
@@ -963,6 +973,7 @@ class HazukiSourceService {
           options: Options(
             responseType: ResponseType.plain,
             headers: {'cache-control': 'no-cache'},
+            extra: {'skipNetworkDebugLog': true, 'hazukiLogCategory': source},
           ),
           onReceiveProgress: onProgress,
         );
@@ -973,6 +984,7 @@ class HazukiSourceService {
           statusCode: response.statusCode,
           error: null,
           startedAt: startedAt,
+          category: source,
           responseHeaders: response.headers.map,
           responseBody: response.data,
         );
@@ -988,6 +1000,7 @@ class HazukiSourceService {
           statusCode: null,
           error: e.toString(),
           startedAt: startedAt,
+          category: source,
         );
       }
     }

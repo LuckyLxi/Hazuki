@@ -3,8 +3,6 @@ part of '../../main.dart';
 // ignore_for_file: unused_element
 
 const int _comicStaticBlurredCoverCacheLimit = 24;
-const int _comicStaticBlurDecodeWidth = 128;
-const int _comicStaticBlurRadius = 18;
 final Map<String, Uint8List> _comicStaticBlurredCoverCache =
     <String, Uint8List>{};
 
@@ -35,113 +33,6 @@ void _putComicStaticBlurredCover(String url, Uint8List bytes) {
       _comicStaticBlurredCoverCache.keys.first,
     );
   }
-}
-
-Uint8List _applyComicStaticBoxBlur(
-  Uint8List source,
-  int width,
-  int height, {
-  required int radius,
-}) {
-  if (radius <= 0 || source.isEmpty || width <= 0 || height <= 0) {
-    return Uint8List.fromList(source);
-  }
-
-  final horizontal = Uint8List(source.length);
-  final output = Uint8List(source.length);
-
-  for (var y = 0; y < height; y++) {
-    for (var x = 0; x < width; x++) {
-      final startX = math.max(0, x - radius);
-      final endX = math.min(width - 1, x + radius);
-      var red = 0;
-      var green = 0;
-      var blue = 0;
-      var alpha = 0;
-      var count = 0;
-      for (var sampleX = startX; sampleX <= endX; sampleX++) {
-        final offset = (y * width + sampleX) * 4;
-        red += source[offset];
-        green += source[offset + 1];
-        blue += source[offset + 2];
-        alpha += source[offset + 3];
-        count++;
-      }
-      final outOffset = (y * width + x) * 4;
-      horizontal[outOffset] = red ~/ count;
-      horizontal[outOffset + 1] = green ~/ count;
-      horizontal[outOffset + 2] = blue ~/ count;
-      horizontal[outOffset + 3] = alpha ~/ count;
-    }
-  }
-
-  for (var y = 0; y < height; y++) {
-    for (var x = 0; x < width; x++) {
-      final startY = math.max(0, y - radius);
-      final endY = math.min(height - 1, y + radius);
-      var red = 0;
-      var green = 0;
-      var blue = 0;
-      var alpha = 0;
-      var count = 0;
-      for (var sampleY = startY; sampleY <= endY; sampleY++) {
-        final offset = (sampleY * width + x) * 4;
-        red += horizontal[offset];
-        green += horizontal[offset + 1];
-        blue += horizontal[offset + 2];
-        alpha += horizontal[offset + 3];
-        count++;
-      }
-      final outOffset = (y * width + x) * 4;
-      output[outOffset] = red ~/ count;
-      output[outOffset + 1] = green ~/ count;
-      output[outOffset + 2] = blue ~/ count;
-      output[outOffset + 3] = alpha ~/ count;
-    }
-  }
-
-  return output;
-}
-
-Future<Uint8List> _createComicStaticBlurredCover(Uint8List bytes) async {
-  final codec = await instantiateImageCodec(
-    bytes,
-    targetWidth: _comicStaticBlurDecodeWidth,
-  );
-  final frame = await codec.getNextFrame();
-  final image = frame.image;
-  final raw = await image.toByteData(format: ImageByteFormat.rawRgba);
-  if (raw == null) {
-    return bytes;
-  }
-
-  final width = image.width;
-  final height = image.height;
-  if (width <= 0 || height <= 0) {
-    return bytes;
-  }
-
-  final blurredBytes = _applyComicStaticBoxBlur(
-    raw.buffer.asUint8List(),
-    width,
-    height,
-    radius: _comicStaticBlurRadius,
-  );
-  final buffer = await ImmutableBuffer.fromUint8List(blurredBytes);
-  final descriptor = ImageDescriptor.raw(
-    buffer,
-    width: width,
-    height: height,
-    pixelFormat: PixelFormat.rgba8888,
-    rowBytes: width * 4,
-  );
-  final outCodec = await descriptor.instantiateCodec();
-  final outFrame = await outCodec.getNextFrame();
-  final png = await outFrame.image.toByteData(format: ImageByteFormat.png);
-  if (png == null) {
-    return bytes;
-  }
-  return png.buffer.asUint8List();
 }
 
 class _ComicCoverActionsSheet extends StatelessWidget {
@@ -187,14 +78,16 @@ class _ComicBlurredCoverBackground extends StatefulWidget {
 
 class _ComicBlurredCoverBackgroundState
     extends State<_ComicBlurredCoverBackground> {
-  Uint8List? _blurredBytes;
+  Uint8List? _coverBytes;
+  bool _showBackground = false;
 
   @override
   void initState() {
     super.initState();
     final cached = _takeComicStaticBlurredCover(widget.coverUrl);
     if (cached != null) {
-      _blurredBytes = cached;
+      _coverBytes = cached;
+      _queueBackgroundReveal();
       return;
     }
     final normalizedUrl = widget.coverUrl.trim();
@@ -212,12 +105,15 @@ class _ComicBlurredCoverBackgroundState
     final cached = _takeComicStaticBlurredCover(widget.coverUrl);
     if (cached != null) {
       setState(() {
-        _blurredBytes = cached;
+        _coverBytes = cached;
+        _showBackground = false;
       });
+      _queueBackgroundReveal();
       return;
     }
     setState(() {
-      _blurredBytes = null;
+      _coverBytes = null;
+      _showBackground = false;
     });
     final normalizedUrl = widget.coverUrl.trim();
     if (normalizedUrl.isNotEmpty) {
@@ -231,71 +127,97 @@ class _ComicBlurredCoverBackgroundState
         normalizedUrl,
         keepInMemory: false,
       );
-      final blurred = await _createComicStaticBlurredCover(bytes);
-      _putComicStaticBlurredCover(normalizedUrl, blurred);
+      _putComicStaticBlurredCover(normalizedUrl, bytes);
       if (!mounted || widget.coverUrl.trim() != normalizedUrl) {
         return;
       }
       setState(() {
-        _blurredBytes = blurred;
+        _coverBytes = bytes;
+        _showBackground = false;
       });
+      _queueBackgroundReveal();
     } catch (_) {}
+  }
+
+  void _queueBackgroundReveal() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _coverBytes == null || _showBackground) {
+        return;
+      }
+      setState(() {
+        _showBackground = true;
+      });
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final surface = Theme.of(context).colorScheme.surface;
+    final theme = Theme.of(context);
+    final surface = theme.colorScheme.surface;
+    final isDark = theme.brightness == Brightness.dark;
+    final hasCover = _coverBytes != null;
     final normalizedUrl = widget.coverUrl.trim();
+    final topScrim = isDark
+        ? surface.withValues(alpha: 0.64)
+        : const Color(0xA2FAFAFA);
+    final bottomScrim = surface;
+    final darkModeDim = isDark
+        ? Colors.black.withValues(alpha: hasCover ? 0.18 : 0.12)
+        : Colors.transparent;
 
     return ClipRect(
       child: Stack(
         fit: StackFit.expand,
         children: [
-          if (normalizedUrl.isNotEmpty)
-            HazukiCachedImage(
-              key: ValueKey('cover-base-$normalizedUrl'),
-              url: normalizedUrl,
-              fit: BoxFit.cover,
-              keepInMemory: false,
-            )
-          else
-            ColoredBox(color: surface),
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 220),
-            switchInCurve: Curves.easeOutCubic,
-            switchOutCurve: Curves.easeInCubic,
-            layoutBuilder: (currentChild, previousChildren) {
-              return Stack(
-                fit: StackFit.expand,
-                children: <Widget>[
-                  ...previousChildren,
-                  ?currentChild,
-                ],
-              );
-            },
-            child: _blurredBytes == null
-                ? const SizedBox.expand(key: ValueKey('static-cover-blur-empty'))
-                : SizedBox.expand(
-                    key: ValueKey('static-cover-blur-$normalizedUrl'),
-                    child: Image.memory(
-                      _blurredBytes!,
-                      fit: BoxFit.cover,
-                      gaplessPlayback: true,
-                      filterQuality: FilterQuality.medium,
+          ColoredBox(color: surface),
+          if (hasCover)
+            TweenAnimationBuilder<double>(
+              key: ValueKey('static-cover-blur-$normalizedUrl'),
+              tween: Tween<double>(
+                begin: 0,
+                end: _showBackground ? 1 : 0,
+              ),
+              duration: const Duration(milliseconds: 520),
+              curve: Curves.easeOutCubic,
+              builder: (context, value, child) {
+                final blurSigma = lerpDouble(22, 16, value) ?? 16;
+                final scale = lerpDouble(1.06, 1.0, value) ?? 1.0;
+                return Opacity(
+                  opacity: value,
+                  child: Transform.scale(
+                    scale: scale,
+                    alignment: Alignment.topCenter,
+                    child: ImageFiltered(
+                      imageFilter: ImageFilter.blur(
+                        sigmaX: blurSigma,
+                        sigmaY: blurSigma,
+                      ),
+                      child: child,
                     ),
                   ),
-          ),
-          ColoredBox(color: surface.withValues(alpha: 0.2)),
+                );
+              },
+              child: Image.memory(
+                _coverBytes!,
+                fit: BoxFit.cover,
+                alignment: Alignment.topCenter,
+                gaplessPlayback: true,
+                filterQuality: FilterQuality.medium,
+              ),
+            ),
+          ColoredBox(color: darkModeDim),
           DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  Colors.black.withValues(alpha: 0.4),
-                  Colors.transparent,
+                  topScrim,
+                  topScrim,
+                  bottomScrim.withValues(alpha: isDark ? 0.9 : 0.78),
+                  bottomScrim,
                 ],
-                stops: const [0.0, 0.25],
+                stops: const [0.0, 0.4, 0.74, 1.0],
               ),
             ),
           ),

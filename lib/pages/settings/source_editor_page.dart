@@ -28,8 +28,10 @@ class _ComicSourceEditorPageState extends State<ComicSourceEditorPage> {
   String get _fileBadge => 'jm.js';
   String get _hintText => _strings.sourceEditorHint;
   String get _saveSuccessText => _strings.sourceEditorSaved;
-  String _loadFailedText(Object error) => _strings.sourceEditorLoadFailed(error);
-  String _saveFailedText(Object error) => _strings.sourceEditorSaveFailed(error);
+  String _loadFailedText(Object error) =>
+      _strings.sourceEditorLoadFailed(error);
+  String _saveFailedText(Object error) =>
+      _strings.sourceEditorSaveFailed(error);
 
   @override
   void initState() {
@@ -58,6 +60,7 @@ class _ComicSourceEditorPageState extends State<ComicSourceEditorPage> {
       if (!mounted) {
         return;
       }
+      _controller.setSyntaxHighlightEnabled(false);
       _controller.value = TextEditingValue(
         text: content,
         selection: TextSelection.collapsed(offset: content.length),
@@ -67,6 +70,7 @@ class _ComicSourceEditorPageState extends State<ComicSourceEditorPage> {
         _loading = false;
       });
       WidgetsBinding.instance.addPostFrameCallback((_) {
+        _controller.scheduleSyntaxHighlightEnable();
         _syncLineNumberScrollOffset();
       });
     } catch (e) {
@@ -126,20 +130,12 @@ class _ComicSourceEditorPageState extends State<ComicSourceEditorPage> {
     _lineNumberScrollController.jumpTo(target);
   }
 
-  String _buildLineNumberText() {
-    final lineCount = '\n'.allMatches(_controller.text).length + 1;
-    return List<String>.generate(lineCount, (index) => '${index + 1}').join('\n');
-  }
-
-  double _measureEditorWidth(TextStyle style) {
-    final lines = _controller.text.split('\n');
-    final longestLine = lines.isEmpty
-        ? ''
-        : lines.reduce(
-            (value, element) => element.length > value.length ? element : value,
-          );
+  double _measureEditorWidth(String longestLine, TextStyle style) {
     final painter = TextPainter(
-      text: TextSpan(text: longestLine.isEmpty ? ' ' : longestLine, style: style),
+      text: TextSpan(
+        text: longestLine.isEmpty ? ' ' : longestLine,
+        style: style,
+      ),
       textDirection: TextDirection.ltr,
       maxLines: 1,
     )..layout();
@@ -236,11 +232,7 @@ class _ComicSourceEditorPageState extends State<ComicSourceEditorPage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                Icons.code_off_rounded,
-                size: 34,
-                color: colorScheme.error,
-              ),
+              Icon(Icons.code_off_rounded, size: 34, color: colorScheme.error),
               const SizedBox(height: 14),
               Text(
                 message,
@@ -263,41 +255,41 @@ class _ComicSourceEditorPageState extends State<ComicSourceEditorPage> {
   Widget _buildEditorBody(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final editorStyle = theme.textTheme.bodyMedium?.copyWith(
+    final editorStyle =
+        theme.textTheme.bodyMedium?.copyWith(
           fontFamily: 'monospace',
           fontSize: 13.5,
           height: 1.5,
           letterSpacing: 0.1,
         ) ??
-        const TextStyle(
-          fontFamily: 'monospace',
-          fontSize: 13.5,
-          height: 1.5,
-        );
+        const TextStyle(fontFamily: 'monospace', fontSize: 13.5, height: 1.5);
     final lineNumberStyle = editorStyle.copyWith(
       color: colorScheme.onSurfaceVariant,
       fontFeatures: const [FontFeature.tabularFigures()],
     );
-    final lineCount = '\n'.allMatches(_controller.text).length + 1;
-    final gutterWidth = 22 + (lineCount.toString().length * 10.0);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            children: [
-              _buildFileBadge(context),
-              const Spacer(),
-              Text(
-                _strings.sourceEditorLineCount(lineCount),
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
+          ValueListenableBuilder<_SourceEditorMetrics>(
+            valueListenable: _controller.metrics,
+            builder: (context, metrics, _) {
+              return Row(
+                children: [
+                  _buildFileBadge(context),
+                  const Spacer(),
+                  Text(
+                    _strings.sourceEditorLineCount(metrics.lineCount),
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 12),
           _buildNoticeCard(context),
@@ -309,7 +301,9 @@ class _ComicSourceEditorPageState extends State<ComicSourceEditorPage> {
           Expanded(
             child: DecoratedBox(
               decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.32),
+                color: colorScheme.surfaceContainerHighest.withValues(
+                  alpha: 0.32,
+                ),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color: colorScheme.outlineVariant.withValues(alpha: 0.52),
@@ -317,83 +311,102 @@ class _ComicSourceEditorPageState extends State<ComicSourceEditorPage> {
               ),
               child: LayoutBuilder(
                 builder: (context, constraints) {
-                  final editorWidth = math.max(
-                    constraints.maxWidth - gutterWidth,
-                    _measureEditorWidth(editorStyle),
-                  );
-                  return ClipRRect(
-                    borderRadius: BorderRadius.circular(20),
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: SizedBox(
-                        width: gutterWidth + editorWidth,
-                        height: constraints.maxHeight,
-                        child: Row(
-                          children: [
-                            Container(
-                              width: gutterWidth,
-                              height: constraints.maxHeight,
-                              padding: const EdgeInsets.fromLTRB(0, 14, 8, 14),
-                              color: colorScheme.surfaceContainerHigh.withValues(
-                                alpha: 0.72,
-                              ),
-                              alignment: Alignment.topRight,
-                              child: SingleChildScrollView(
-                                controller: _lineNumberScrollController,
-                                physics: const NeverScrollableScrollPhysics(),
-                                child: Text(
-                                  _buildLineNumberText(),
-                                  textAlign: TextAlign.right,
-                                  style: lineNumberStyle,
-                                ),
-                              ),
-                            ),
-                            Container(
-                              width: editorWidth,
-                              height: constraints.maxHeight,
-                              padding: const EdgeInsets.fromLTRB(0, 6, 0, 6),
-                              child: Scrollbar(
-                                controller: _editorScrollController,
-                                thumbVisibility: true,
-                                child: TextField(
-                                  controller: _controller,
-                                  scrollController: _editorScrollController,
-                                  enabled: !_saving,
-                                  expands: true,
-                                  minLines: null,
-                                  maxLines: null,
-                                  keyboardType: TextInputType.multiline,
-                                  textCapitalization: TextCapitalization.none,
-                                  autocorrect: false,
-                                  enableSuggestions: false,
-                                  smartDashesType: SmartDashesType.disabled,
-                                  smartQuotesType: SmartQuotesType.disabled,
-                                  style: editorStyle.copyWith(
-                                    fontFeatures: const [FontFeature.tabularFigures()],
+                  return ValueListenableBuilder<_SourceEditorMetrics>(
+                    valueListenable: _controller.metrics,
+                    builder: (context, metrics, _) {
+                      final gutterWidth =
+                          22 + (metrics.lineCount.toString().length * 10.0);
+                      final editorWidth = math.max(
+                        constraints.maxWidth - gutterWidth,
+                        _measureEditorWidth(metrics.longestLine, editorStyle),
+                      );
+                      return ClipRRect(
+                        borderRadius: BorderRadius.circular(20),
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: SizedBox(
+                            width: gutterWidth + editorWidth,
+                            height: constraints.maxHeight,
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: gutterWidth,
+                                  height: constraints.maxHeight,
+                                  padding: const EdgeInsets.fromLTRB(
+                                    0,
+                                    14,
+                                    8,
+                                    14,
                                   ),
-                                  cursorColor: colorScheme.primary,
-                                  decoration: InputDecoration(
-                                    isCollapsed: true,
-                                    border: InputBorder.none,
-                                    contentPadding: const EdgeInsets.fromLTRB(
-                                      14,
-                                      8,
-                                      18,
-                                      8,
+                                  color: colorScheme.surfaceContainerHigh
+                                      .withValues(alpha: 0.72),
+                                  alignment: Alignment.topRight,
+                                  child: SingleChildScrollView(
+                                    controller: _lineNumberScrollController,
+                                    physics:
+                                        const NeverScrollableScrollPhysics(),
+                                    child: Text(
+                                      metrics.lineNumberText,
+                                      textAlign: TextAlign.right,
+                                      style: lineNumberStyle,
                                     ),
                                   ),
-                                  onChanged: (_) {
-                                    if (mounted) {
-                                      setState(() {});
-                                    }
-                                  },
                                 ),
-                              ),
+                                Container(
+                                  width: editorWidth,
+                                  height: constraints.maxHeight,
+                                  padding: const EdgeInsets.fromLTRB(
+                                    0,
+                                    6,
+                                    0,
+                                    6,
+                                  ),
+                                  child: Scrollbar(
+                                    controller: _editorScrollController,
+                                    thumbVisibility: true,
+                                    child: TextField(
+                                      controller: _controller,
+                                      scrollController:
+                                          _editorScrollController,
+                                      enabled: !_saving,
+                                      expands: true,
+                                      minLines: null,
+                                      maxLines: null,
+                                      keyboardType: TextInputType.multiline,
+                                      textCapitalization:
+                                          TextCapitalization.none,
+                                      autocorrect: false,
+                                      enableSuggestions: false,
+                                      smartDashesType:
+                                          SmartDashesType.disabled,
+                                      smartQuotesType:
+                                          SmartQuotesType.disabled,
+                                      style: editorStyle.copyWith(
+                                        fontFeatures: const [
+                                          FontFeature.tabularFigures(),
+                                        ],
+                                      ),
+                                      cursorColor: colorScheme.primary,
+                                      decoration: InputDecoration(
+                                        isCollapsed: true,
+                                        border: InputBorder.none,
+                                        contentPadding:
+                                            const EdgeInsets.fromLTRB(
+                                              14,
+                                              8,
+                                              18,
+                                              8,
+                                            ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
+                          ),
                         ),
-                      ),
-                    ),
+                      );
+                    },
                   );
                 },
               ),
@@ -433,7 +446,6 @@ class _ComicSourceEditorPageState extends State<ComicSourceEditorPage> {
 
   @override
   Widget build(BuildContext context) {
-    final saveEnabled = !_loading && !_saving && _hasChanges;
     return PopScope(
       canPop: !_saving,
       child: Scaffold(
@@ -441,18 +453,24 @@ class _ComicSourceEditorPageState extends State<ComicSourceEditorPage> {
           context: context,
           title: Text(_pageTitle),
           actions: [
-            TextButton(
-              onPressed: saveEnabled ? _saveSource : null,
-              child: _saving
-                  ? SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2.2,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    )
-                  : Text(_saveLabel),
+            ListenableBuilder(
+              listenable: _controller,
+              builder: (context, _) {
+                final saveEnabled = !_loading && !_saving && _hasChanges;
+                return TextButton(
+                  onPressed: saveEnabled ? _saveSource : null,
+                  child: _saving
+                      ? SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2.2,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                        )
+                      : Text(_saveLabel),
+                );
+              },
             ),
             const SizedBox(width: 4),
           ],
@@ -562,7 +580,10 @@ Future<bool> showComicSourceRestoreDialog(BuildContext context) async {
                                 setDialogState(() {
                                   if (total > 0) {
                                     indeterminate = false;
-                                    progress = (received / total).clamp(0.0, 1.0);
+                                    progress = (received / total).clamp(
+                                      0.0,
+                                      1.0,
+                                    );
                                   } else {
                                     indeterminate = true;
                                   }
@@ -662,12 +683,6 @@ Future<bool> showComicSourceRestoreDialog(BuildContext context) async {
                       builder: (context, child) {
                         final transitionProgress = Curves.easeOutCubic
                             .transform(animation.value);
-                        final blurProgress = const Interval(
-                          0.0,
-                          0.82,
-                          curve: Curves.easeOutCubic,
-                        ).transform(animation.value);
-                        final sigma = 6 + (16 * blurProgress);
                         return Stack(
                           fit: StackFit.expand,
                           children: [
@@ -676,35 +691,26 @@ Future<bool> showComicSourceRestoreDialog(BuildContext context) async {
                                 alpha: 0.22 * transitionProgress,
                               ),
                             ),
-                            ClipRect(
-                              child: BackdropFilter(
-                                filter: ImageFilter.blur(
-                                  sigmaX: sigma,
-                                  sigmaY: sigma,
-                                ),
-                                child: DecoratedBox(
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      begin: Alignment.topCenter,
-                                      end: Alignment.bottomCenter,
-                                      colors: [
-                                        colorScheme.surface.withValues(
-                                          alpha: 0.07 * transitionProgress,
-                                        ),
-                                        colorScheme.surface.withValues(
-                                          alpha: 0.14 * transitionProgress,
-                                        ),
-                                        colorScheme.surfaceContainerHighest
-                                            .withValues(
-                                              alpha:
-                                                  0.20 * transitionProgress,
-                                            ),
-                                      ],
+                            DecoratedBox(
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  begin: Alignment.topCenter,
+                                  end: Alignment.bottomCenter,
+                                  colors: [
+                                    colorScheme.surface.withValues(
+                                      alpha: 0.07 * transitionProgress,
                                     ),
-                                  ),
-                                  child: child,
+                                    colorScheme.surface.withValues(
+                                      alpha: 0.14 * transitionProgress,
+                                    ),
+                                    colorScheme.surfaceContainerHighest
+                                        .withValues(
+                                          alpha: 0.20 * transitionProgress,
+                                        ),
+                                  ],
                                 ),
                               ),
+                              child: child,
                             ),
                           ],
                         );
@@ -719,32 +725,22 @@ Future<bool> showComicSourceRestoreDialog(BuildContext context) async {
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTap: () {},
-                      child: Material(
-                        type: MaterialType.transparency,
+                      child: Dialog(
+                        clipBehavior: Clip.antiAlias,
+                        insetPadding: EdgeInsets.zero,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(28),
+                        ),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 280),
                           curve: Curves.easeInOutCubic,
                           width: phase == _ComicSourceRestoreDialogPhase.confirm
                               ? 360
                               : 320,
-                          padding: phase == _ComicSourceRestoreDialogPhase.confirm
+                          padding:
+                              phase == _ComicSourceRestoreDialogPhase.confirm
                               ? const EdgeInsets.fromLTRB(20, 20, 20, 18)
                               : const EdgeInsets.fromLTRB(20, 16, 20, 16),
-                          decoration: BoxDecoration(
-                            color: colorScheme.surface.withValues(alpha: 0.96),
-                            borderRadius: BorderRadius.circular(
-                              phase == _ComicSourceRestoreDialogPhase.confirm
-                                  ? 30
-                                  : 22,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.18),
-                                blurRadius: 26,
-                                offset: const Offset(0, 12),
-                              ),
-                            ],
-                          ),
                           child: AnimatedSwitcher(
                             duration: const Duration(milliseconds: 220),
                             switchInCurve: Curves.easeOutCubic,
@@ -759,7 +755,8 @@ Future<bool> showComicSourceRestoreDialog(BuildContext context) async {
                                 ),
                               );
                             },
-                            child: phase == _ComicSourceRestoreDialogPhase.confirm
+                            child:
+                                phase == _ComicSourceRestoreDialogPhase.confirm
                                 ? buildConfirmContent()
                                 : buildDownloadingContent(),
                           ),
@@ -774,33 +771,49 @@ Future<bool> showComicSourceRestoreDialog(BuildContext context) async {
         },
       );
     },
-    transitionBuilder:
-        (dialogContext, animation, secondaryAnimation, child) {
-          final curved = CurvedAnimation(
-            parent: animation,
-            curve: Curves.easeOutCubic,
-            reverseCurve: Curves.easeInCubic,
-          );
-          return FadeTransition(
-            opacity: curved,
-            child: SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0, 0.03),
-                end: Offset.zero,
-              ).animate(curved),
-              child: ScaleTransition(
-                scale: Tween<double>(begin: 0.98, end: 1).animate(curved),
-                child: child,
-              ),
-            ),
-          );
-        },
+    transitionBuilder: (dialogContext, animation, secondaryAnimation, child) {
+      final curved = CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutCubic,
+        reverseCurve: Curves.easeInCubic,
+      );
+      return FadeTransition(
+        opacity: curved,
+        child: SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0, 0.03),
+            end: Offset.zero,
+          ).animate(curved),
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.98, end: 1).animate(curved),
+            child: child,
+          ),
+        ),
+      );
+    },
   );
 
   return result == true;
 }
 
 enum _ComicSourceRestoreDialogPhase { confirm, downloading }
+
+class _SourceEditorMetrics {
+  const _SourceEditorMetrics({
+    required this.lineCount,
+    required this.lineNumberText,
+    required this.longestLine,
+  });
+
+  const _SourceEditorMetrics.initial()
+    : lineCount = 1,
+      lineNumberText = '1',
+      longestLine = '';
+
+  final int lineCount;
+  final String lineNumberText;
+  final String longestLine;
+}
 
 class _SourceCodeEditingController extends TextEditingController {
   static const Set<String> _keywords = {
@@ -849,6 +862,105 @@ class _SourceCodeEditingController extends TextEditingController {
     r"""//.*?$|/\*[\s\S]*?\*/|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|`(?:\\.|[\s\S])*?`|\b(?:async|await|break|case|catch|class|const|continue|default|delete|else|export|extends|false|finally|for|from|function|if|import|in|instanceof|let|new|null|of|return|static|super|switch|this|throw|true|try|typeof|undefined|var|while|yield)\b|\b\d+(?:\.\d+)?\b""",
     multiLine: true,
   );
+  static const int _syntaxHighlightCharLimit = 30000;
+  static const Duration _metricsDebounceDuration = Duration(milliseconds: 40);
+
+  _SourceCodeEditingController() {
+    addListener(_handleTextChanged);
+    _recomputeMetricsNow();
+  }
+
+  final ValueNotifier<_SourceEditorMetrics> metrics =
+      ValueNotifier<_SourceEditorMetrics>(const _SourceEditorMetrics.initial());
+  Timer? _metricsDebounceTimer;
+  Timer? _syntaxHighlightEnableTimer;
+  bool _syntaxHighlightEnabled = true;
+
+  void _handleTextChanged() {
+    _metricsDebounceTimer?.cancel();
+    _metricsDebounceTimer = Timer(
+      _metricsDebounceDuration,
+      _recomputeMetricsNow,
+    );
+  }
+
+  void setSyntaxHighlightEnabled(bool enabled) {
+    if (_syntaxHighlightEnabled == enabled) {
+      return;
+    }
+    _syntaxHighlightEnabled = enabled;
+    notifyListeners();
+  }
+
+  void scheduleSyntaxHighlightEnable() {
+    _syntaxHighlightEnableTimer?.cancel();
+    _syntaxHighlightEnableTimer = Timer(const Duration(milliseconds: 140), () {
+      setSyntaxHighlightEnabled(true);
+    });
+  }
+
+  void _recomputeMetricsNow() {
+    final source = text;
+    var lineCount = 1;
+    var currentLineStart = 0;
+    var longestLineStart = 0;
+    var longestLineLength = 0;
+
+    for (var i = 0; i < source.length; i++) {
+      if (source.codeUnitAt(i) != 10) {
+        continue;
+      }
+      final lineLength = i - currentLineStart;
+      if (lineLength > longestLineLength) {
+        longestLineLength = lineLength;
+        longestLineStart = currentLineStart;
+      }
+      lineCount++;
+      currentLineStart = i + 1;
+    }
+
+    final trailingLineLength = source.length - currentLineStart;
+    if (trailingLineLength > longestLineLength) {
+      longestLineLength = trailingLineLength;
+      longestLineStart = currentLineStart;
+    }
+
+    final buffer = StringBuffer();
+    for (var i = 1; i <= lineCount; i++) {
+      if (i > 1) {
+        buffer.writeln();
+      }
+      buffer.write(i);
+    }
+
+    final longestLine = longestLineLength <= 0
+        ? ''
+        : source.substring(
+            longestLineStart,
+            longestLineStart + longestLineLength,
+          );
+    final nextMetrics = _SourceEditorMetrics(
+      lineCount: lineCount,
+      lineNumberText: buffer.toString(),
+      longestLine: longestLine,
+    );
+    final currentMetrics = metrics.value;
+    if (currentMetrics.lineCount == nextMetrics.lineCount &&
+        currentMetrics.lineNumberText == nextMetrics.lineNumberText &&
+        currentMetrics.longestLine == nextMetrics.longestLine) {
+      return;
+    }
+    metrics.value = nextMetrics;
+  }
+
+  @override
+  void dispose() {
+    removeListener(_handleTextChanged);
+    _metricsDebounceTimer?.cancel();
+    _syntaxHighlightEnableTimer?.cancel();
+    metrics.dispose();
+    super.dispose();
+  }
 
   @override
   TextSpan buildTextSpan({
@@ -856,7 +968,23 @@ class _SourceCodeEditingController extends TextEditingController {
     TextStyle? style,
     required bool withComposing,
   }) {
+    final text = value.text;
     final baseStyle = style ?? const TextStyle();
+    final composingRange = value.composing;
+    final hasActiveComposingRange =
+        withComposing &&
+        composingRange.isValid &&
+        !composingRange.isCollapsed &&
+        composingRange.end <= text.length;
+    if (hasActiveComposingRange ||
+        !_syntaxHighlightEnabled ||
+        text.length > _syntaxHighlightCharLimit) {
+      return super.buildTextSpan(
+        context: context,
+        style: baseStyle,
+        withComposing: withComposing,
+      );
+    }
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final stringStyle = baseStyle.copyWith(
@@ -884,10 +1012,7 @@ class _SourceCodeEditingController extends TextEditingController {
     for (final match in _tokenPattern.allMatches(text)) {
       if (match.start > start) {
         children.add(
-          TextSpan(
-            text: text.substring(start, match.start),
-            style: baseStyle,
-          ),
+          TextSpan(text: text.substring(start, match.start), style: baseStyle),
         );
       }
       final token = match.group(0) ?? '';
@@ -923,7 +1048,9 @@ class _SourceCodeEditingController extends TextEditingController {
     if (token.startsWith('//') || token.startsWith('/*')) {
       return commentStyle;
     }
-    if (token.startsWith('"') || token.startsWith("'") || token.startsWith('`')) {
+    if (token.startsWith('"') ||
+        token.startsWith("'") ||
+        token.startsWith('`')) {
       return stringStyle;
     }
     if (_keywords.contains(token)) {
