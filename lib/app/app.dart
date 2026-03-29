@@ -1,5 +1,8 @@
 export 'app_preferences.dart';
 export 'appearance_settings.dart';
+export 'chapter_title_resolver.dart';
 export 'display_mode.dart';
+export 'hazuki_theme_controller.dart';
+export 'hazuki_theme_factory.dart';
 export 'navigation_tags.dart';
 export 'ui_flags.dart';

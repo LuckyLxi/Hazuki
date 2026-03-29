@@ -131,19 +131,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get displayPureBlackTitle => 'Pure black mode';
 
   @override
-  String get displayPureBlackSubtitle => 'Use a pure black background in dark mode';
+  String get displayPureBlackSubtitle =>
+      'Use a pure black background in dark mode';
 
   @override
   String get displayDynamicColorTitle => 'Dynamic color';
 
   @override
-  String get displayDynamicColorSubtitle => 'Extract theme colors from the system wallpaper automatically (Android 12+)';
+  String get displayDynamicColorSubtitle =>
+      'Extract theme colors from the system wallpaper automatically (Android 12+)';
 
   @override
   String get displayComicDynamicColorTitle => 'Comic detail dynamic color';
 
   @override
-  String get displayComicDynamicColorSubtitle => 'Generate a dynamic theme for the comic detail page from the cover image';
+  String get displayComicDynamicColorSubtitle =>
+      'Generate a dynamic theme for the comic detail page from the cover image';
 
   @override
   String get displayColorSchemeTitle => 'Color scheme';
@@ -196,7 +199,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get homeSaveAvatarTitle => 'Save avatar';
 
   @override
-  String get homeSaveAvatarContent => 'Save the current avatar to your gallery?';
+  String get homeSaveAvatarContent =>
+      'Save the current avatar to your gallery?';
 
   @override
   String get homeAvatarSaved => 'Avatar saved';
@@ -272,7 +276,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get otherAutoCheckInTitle => 'Auto daily check-in';
 
   @override
-  String get otherAutoCheckInSubtitle => 'Automatically check in once when the app is opened each day';
+  String get otherAutoCheckInSubtitle =>
+      'Automatically check in once when the app is opened each day';
 
   @override
   String get sourceBootstrapDownloading => 'Downloading comic source';
@@ -301,13 +306,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aboutProjectTitle => 'Project';
 
   @override
-  String get aboutProjectSubtitle => 'GitHub (https://github.com/LuckyLxi/Hazuki)';
+  String get aboutProjectSubtitle =>
+      'GitHub (https://github.com/LuckyLxi/Hazuki)';
 
   @override
   String get aboutFeedbackTitle => 'Feedback';
 
   @override
-  String get aboutFeedbackSubtitle => 'Report any issues you encounter while reading';
+  String get aboutFeedbackSubtitle =>
+      'Report any issues you encounter while reading';
 
   @override
   String get aboutOpenLinkFailed => 'Unable to open the link';
@@ -322,7 +329,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aboutDisclaimerSubtitle => 'Please read before use';
 
   @override
-  String get aboutDisclaimerContent => 'This app is provided only for learning, interface research, and personal technical exchange. It does not provide any comic resources, nor does it directly store, upload, or distribute comic content.\n\nOn first launch or when updating the comic source, the app automatically downloads a comic-source script from a third-party GitHub repository. Both that script and any content parsed through it originate from third parties, and the related copyrights and liabilities belong to the original authors or rights holders.\n\nPlease use this app in compliance with local laws, regulations, and copyright requirements. Any disputes, losses, or legal liabilities arising from downloading, using third-party comic sources, or accessing related content shall be borne solely by the user.';
+  String get aboutDisclaimerContent =>
+      'This app is provided only for learning, interface research, and personal technical exchange. It does not provide any comic resources, nor does it directly store, upload, or distribute comic content.\n\nOn first launch or when updating the comic source, the app automatically downloads a comic-source script from a third-party GitHub repository. Both that script and any content parsed through it originate from third parties, and the related copyrights and liabilities belong to the original authors or rights holders.\n\nPlease use this app in compliance with local laws, regulations, and copyright requirements. Any disputes, losses, or legal liabilities arising from downloading, using third-party comic sources, or accessing related content shall be borne solely by the user.';
 
   @override
   String get commonConfirm => 'OK';
@@ -361,7 +369,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get searchClearHistoryTitle => 'Clear history';
 
   @override
-  String get searchClearHistoryContent => 'Are you sure you want to clear all search history?';
+  String get searchClearHistoryContent =>
+      'Are you sure you want to clear all search history?';
 
   @override
   String get historyTitle => 'History';
@@ -393,7 +402,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get historyClearAllTitle => 'Clear history';
 
   @override
-  String get historyClearAllContent => 'Are you sure you want to clear all history? This action cannot be undone.';
+  String get historyClearAllContent =>
+      'Are you sure you want to clear all history? This action cannot be undone.';
 
   @override
   String get historyCopiedComicId => 'Comic ID copied';
@@ -405,7 +415,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get historyFavoriteProcessing => 'Processing favorite...';
 
   @override
-  String get historyFavoriteFolderNotice => 'For multiple favorite folders, please use the comic detail page. Performing the default action...';
+  String get historyFavoriteFolderNotice =>
+      'For multiple favorite folders, please use the comic detail page. Performing the default action...';
 
   @override
   String get historyFavoriteRemoved => 'Removed from favorites';
@@ -428,7 +439,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get historyMenuDeleteItem => 'Delete this record';
 
   @override
-  String get discoverLoadTimeout => 'Discover page loading timed out. Pull down to retry.';
+  String get discoverLoadTimeout =>
+      'Discover page loading timed out. Pull down to retry.';
 
   @override
   String discoverLoadFailed(Object error) {
@@ -436,7 +448,8 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get discoverEmpty => 'No discover content is available for the current source';
+  String get discoverEmpty =>
+      'No discover content is available for the current source';
 
   @override
   String get discoverMore => 'See more';
@@ -445,7 +458,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aboutThirdPartyLicensesTitle => 'Third-party licenses';
 
   @override
-  String get aboutThirdPartyLicensesSubtitle => 'View the open-source libraries used by this app';
+  String get aboutThirdPartyLicensesSubtitle =>
+      'View the open-source libraries used by this app';
 
   @override
   String get searchOrderLatest => 'Latest';
@@ -509,7 +523,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get comicDetailFavoriteFolderNameHint => 'Enter a folder name';
 
   @override
-  String get comicDetailFavoriteFolderNameRequired => 'Folder name cannot be empty';
+  String get comicDetailFavoriteFolderNameRequired =>
+      'Folder name cannot be empty';
 
   @override
   String comicDetailCreateFavoriteFolderFailed(Object error) {
@@ -520,7 +535,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get comicDetailDeleteFavoriteFolder => 'Delete favorite folder';
 
   @override
-  String get comicDetailDeleteFavoriteFolderContent => 'Delete this folder? Comics in this folder will lose their grouping.';
+  String get comicDetailDeleteFavoriteFolderContent =>
+      'Delete this folder? Comics in this folder will lose their grouping.';
 
   @override
   String get comicDetailDelete => 'Delete';
@@ -545,13 +561,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get comicDetailCreateFavoriteFolderTooltip => 'New folder';
 
   @override
-  String get comicDetailSingleFolderHint => 'The current source only supports adding this comic to one favorite folder';
+  String get comicDetailSingleFolderHint =>
+      'The current source only supports adding this comic to one favorite folder';
 
   @override
-  String get comicDetailMultipleFoldersHint => 'You can select multiple favorite folders for this comic';
+  String get comicDetailMultipleFoldersHint =>
+      'You can select multiple favorite folders for this comic';
 
   @override
-  String get comicDetailSelectAtLeastOneFolder => 'Please select at least one favorite folder';
+  String get comicDetailSelectAtLeastOneFolder =>
+      'Please select at least one favorite folder';
 
   @override
   String get comicDetailFavoriteSettingsUpdated => 'Favorite settings updated';
@@ -625,6 +644,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get comicDetailChapters => 'Chapters';
 
   @override
+  String get comicDetailDefaultChapterTitle => 'Chapter 1';
+
+  @override
   String comicDetailChapterCount(Object count) {
     return '$count chapters';
   }
@@ -681,7 +703,8 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get sourceUpdateDownloadFailed => 'Download failed. Please try again later.';
+  String get sourceUpdateDownloadFailed =>
+      'Download failed. Please try again later.';
 
   @override
   String get sourceUpdateDownload => 'Download';
@@ -693,7 +716,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get readingModeTitle => 'Reading mode';
 
   @override
-  String get readingModeSubtitle => 'Choose how pages are arranged in the reader';
+  String get readingModeSubtitle =>
+      'Choose how pages are arranged in the reader';
 
   @override
   String get readingModeTopToBottom => 'Top to bottom';
@@ -705,25 +729,29 @@ class AppLocalizationsEn extends AppLocalizations {
   String get readingTapToTurnPageTitle => 'Tap to turn page';
 
   @override
-  String get readingTapToTurnPageSubtitle => 'Only works in right-to-left mode. Tap the left side for the previous page and the right side for the next page';
+  String get readingTapToTurnPageSubtitle =>
+      'Only works in right-to-left mode. Tap the left side for the previous page and the right side for the next page';
 
   @override
   String get readingImmersiveModeTitle => 'Immersive mode';
 
   @override
-  String get readingImmersiveModeSubtitle => 'Hide the status bar and bottom navigation bar automatically when entering the reader';
+  String get readingImmersiveModeSubtitle =>
+      'Hide the status bar and bottom navigation bar automatically when entering the reader';
 
   @override
   String get readingKeepScreenOnTitle => 'Keep screen on';
 
   @override
-  String get readingKeepScreenOnSubtitle => 'Keep the screen awake while reading to prevent auto lock';
+  String get readingKeepScreenOnSubtitle =>
+      'Keep the screen awake while reading to prevent auto lock';
 
   @override
   String get readingCustomBrightnessTitle => 'Custom brightness';
 
   @override
-  String get readingCustomBrightnessSubtitle => 'Override the system brightness inside the reader when enabled';
+  String get readingCustomBrightnessSubtitle =>
+      'Override the system brightness inside the reader when enabled';
 
   @override
   String readingBrightnessLabel(Object value) {
@@ -734,19 +762,22 @@ class AppLocalizationsEn extends AppLocalizations {
   String get readingPageIndicatorTitle => 'Page indicator';
 
   @override
-  String get readingPageIndicatorSubtitle => 'Show the chapter number and current page/total pages in the lower-left corner of the reader';
+  String get readingPageIndicatorSubtitle =>
+      'Show the chapter number and current page/total pages in the lower-left corner of the reader';
 
   @override
   String get readingPinchToZoomTitle => 'Pinch to zoom';
 
   @override
-  String get readingPinchToZoomSubtitle => 'Allow two-finger pinch gestures to zoom comic images';
+  String get readingPinchToZoomSubtitle =>
+      'Allow two-finger pinch gestures to zoom comic images';
 
   @override
   String get readingLongPressSaveTitle => 'Long press to save images';
 
   @override
-  String get readingLongPressSaveSubtitle => 'Allow saving the current comic image by long pressing it';
+  String get readingLongPressSaveSubtitle =>
+      'Allow saving the current comic image by long pressing it';
 
   @override
   String get downloadsTitle => 'Downloads';
@@ -818,7 +849,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get downloadsDownloadChaptersTitle => 'Download chapters';
 
   @override
-  String get downloadsDownloadChaptersSubtitle => 'Select the chapters you want to download';
+  String get downloadsDownloadChaptersSubtitle =>
+      'Select the chapters you want to download';
 
   @override
   String get downloadsDownloadAction => 'Download';
@@ -830,19 +862,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get privacyBlurTaskTitle => 'Blur app in recent tasks';
 
   @override
-  String get privacyBlurTaskSubtitle => 'Show a pure black task card when switching to recent apps';
+  String get privacyBlurTaskSubtitle =>
+      'Show a pure black task card when switching to recent apps';
 
   @override
   String get privacyBiometricUnlockTitle => 'Biometric unlock';
 
   @override
-  String get privacyBiometricUnlockSubtitle => 'Require fingerprint verification each time the app is opened';
+  String get privacyBiometricUnlockSubtitle =>
+      'Require fingerprint verification each time the app is opened';
 
   @override
-  String get privacyAuthOnResumeTitle => 'Require verification after leaving app';
+  String get privacyAuthOnResumeTitle =>
+      'Require verification after leaving app';
 
   @override
-  String get privacyAuthOnResumeSubtitle => 'Require authentication again whenever the app returns to foreground';
+  String get privacyAuthOnResumeSubtitle =>
+      'Require authentication again whenever the app returns to foreground';
 
   @override
   String get lineSettingsTitle => 'Lines';
@@ -883,7 +919,8 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get lineRefreshOnStartUpdated => 'Startup auto-refresh setting updated';
+  String get lineRefreshOnStartUpdated =>
+      'Startup auto-refresh setting updated';
 
   @override
   String lineSaveFailed(Object error) {
@@ -891,13 +928,15 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get lineIntro => 'You can switch API and image streams separately, and changes will apply automatically to subsequent requests.';
+  String get lineIntro =>
+      'You can switch API and image streams separately, and changes will apply automatically to subsequent requests.';
 
   @override
   String get lineApiTitle => 'API domain stream';
 
   @override
-  String get lineApiSubtitle => 'Used for API requests. Switch it if the network is unstable.';
+  String get lineApiSubtitle =>
+      'Used for API requests. Switch it if the network is unstable.';
 
   @override
   String get lineSelectApiLabel => 'Select API line';
@@ -920,13 +959,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get lineRefreshOnStartTitle => 'Refresh domain list on startup';
 
   @override
-  String get lineRefreshOnStartSubtitle => 'Automatically update the API domain pool each time the app opens';
+  String get lineRefreshOnStartSubtitle =>
+      'Automatically update the API domain pool each time the app opens';
 
   @override
   String get lineRefreshStatusButton => 'Refresh line status';
 
   @override
-  String get displayModeAndroidOnly => 'Only Android supports refresh rate settings';
+  String get displayModeAndroidOnly =>
+      'Only Android supports refresh rate settings';
 
   @override
   String displayModeReadFailed(Object error) {
@@ -934,10 +975,12 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get displayModeSystemRejected => 'The system rejected this display mode';
+  String get displayModeSystemRejected =>
+      'The system rejected this display mode';
 
   @override
-  String get displayModeApplied => 'Refresh rate applied. Restart the app if it does not take effect.';
+  String get displayModeApplied =>
+      'Refresh rate applied. Restart the app if it does not take effect.';
 
   @override
   String displayModeSetFailed(Object error) {
@@ -962,7 +1005,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get displayModeSelectedSubtitle => 'Selected';
 
   @override
-  String get displayModeHint => 'Note: some devices may be affected by system power saving or app whitelist policies.';
+  String get displayModeHint =>
+      'Note: some devices may be affected by system power saving or app whitelist policies.';
 
   @override
   String get cachePresetDefault => 'Default 400MB';
@@ -980,7 +1024,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cacheMaxSizeTitle => 'Set maximum cache size';
 
   @override
-  String get cacheMaxSizeHint => 'Minimum 400MB. Choose a preset or enter a custom value.';
+  String get cacheMaxSizeHint =>
+      'Minimum 400MB. Choose a preset or enter a custom value.';
 
   @override
   String get cacheCustomMbLabel => 'Custom (MB)';
@@ -997,22 +1042,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cacheAutoCleanTitle => 'Cache auto-clean';
 
   @override
-  String get cacheAutoCleanOverflowTitle => 'Clean automatically when limit is exceeded';
+  String get cacheAutoCleanOverflowTitle =>
+      'Clean automatically when limit is exceeded';
 
   @override
-  String get cacheAutoCleanOverflowSubtitle => 'Delete the oldest cache first until usage drops below the limit';
+  String get cacheAutoCleanOverflowSubtitle =>
+      'Delete the oldest cache first until usage drops below the limit';
 
   @override
   String get cacheAutoCleanSevenDaysTitle => 'Clean every seven days';
 
   @override
-  String get cacheAutoCleanSevenDaysSubtitle => 'Delete cache files older than 7 days';
+  String get cacheAutoCleanSevenDaysSubtitle =>
+      'Delete cache files older than 7 days';
 
   @override
   String get cacheAutoCleanSevenDaysApplied => 'Set to clean every seven days';
 
   @override
-  String get cacheAutoCleanOverflowApplied => 'Set to clean automatically when limit is exceeded';
+  String get cacheAutoCleanOverflowApplied =>
+      'Set to clean automatically when limit is exceeded';
 
   @override
   String get cacheClearBarrierLabel => 'Close';
@@ -1021,7 +1070,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cacheClearTitle => 'Clear cache';
 
   @override
-  String get cacheClearContent => 'Are you sure you want to clear all image cache? This action cannot be undone.';
+  String get cacheClearContent =>
+      'Are you sure you want to clear all image cache? This action cannot be undone.';
 
   @override
   String get cacheClearConfirm => 'Clear now';
@@ -1049,19 +1099,23 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cacheAutoCleanModeSummary => 'Clean every seven days';
 
   @override
-  String get cacheAutoCleanModeOverflowSummary => 'Clean automatically when limit is exceeded';
+  String get cacheAutoCleanModeOverflowSummary =>
+      'Clean automatically when limit is exceeded';
 
   @override
   String get cacheClearNowTitle => 'Clear cache now';
 
   @override
-  String get cacheClearNowSubtitle => 'Remove all locally downloaded image cache to free up storage space';
+  String get cacheClearNowSubtitle =>
+      'Remove all locally downloaded image cache to free up storage space';
 
   @override
-  String get cloudSyncIncompleteConfig => 'Please fill in the complete URL, Username, and Password';
+  String get cloudSyncIncompleteConfig =>
+      'Please fill in the complete URL, Username, and Password';
 
   @override
-  String get cloudSyncInvalidUrl => 'Invalid URL format. Please include http/https';
+  String get cloudSyncInvalidUrl =>
+      'Invalid URL format. Please include http/https';
 
   @override
   String get cloudSyncStatusIncomplete => 'Configuration incomplete';
@@ -1078,7 +1132,8 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get cloudSyncNeedCompleteConfig => 'Please enable cloud sync and save a complete configuration first';
+  String get cloudSyncNeedCompleteConfig =>
+      'Please enable cloud sync and save a complete configuration first';
 
   @override
   String get cloudSyncUploadCompleted => 'Backup upload completed';
@@ -1092,13 +1147,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cloudSyncRestoreTitle => 'Restore backup';
 
   @override
-  String get cloudSyncRestoreContent => 'Overwrite local files and restore the latest cloud backup?';
+  String get cloudSyncRestoreContent =>
+      'Overwrite local files and restore the latest cloud backup?';
 
   @override
   String get cloudSyncRestoreConfirm => 'Overwrite and restore';
 
   @override
-  String get cloudSyncRestoreCompleted => 'Backup restored and local data overwritten';
+  String get cloudSyncRestoreCompleted =>
+      'Backup restored and local data overwritten';
 
   @override
   String cloudSyncRestoreFailed(Object error) {
@@ -1121,10 +1178,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get cloudSyncEnabledTitle => 'Cloud sync';
 
   @override
-  String get cloudSyncEnabledSubtitle => 'Enable uploading and restoring cloud backups';
+  String get cloudSyncEnabledSubtitle =>
+      'Enable uploading and restoring cloud backups';
 
   @override
-  String get cloudSyncUrlHelper => 'The app will append /HazukiSync automatically, so you do not need to enter it manually';
+  String get cloudSyncUrlHelper =>
+      'The app will append /HazukiSync automatically, so you do not need to enter it manually';
 
   @override
   String get cloudSyncUsernameLabel => 'Username';
@@ -1145,7 +1204,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get favoritesDebugCopied => 'Network logs copied';
 
   @override
-  String get favoritesDebugFilterReason => 'Show only important logs (error logs, HTTP>=400, login-related entries, and entries containing critical error keywords)';
+  String get favoritesDebugFilterReason =>
+      'Show only important logs (error logs, HTTP>=400, login-related entries, and entries containing critical error keywords)';
 
   @override
   String get favoritesDebugFilterImportantTooltip => 'Filter important logs';
@@ -1162,7 +1222,8 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get favoritesDebugFullFetchButton => 'Run full network fetch manually (slow)';
+  String get favoritesDebugFullFetchButton =>
+      'Run full network fetch manually (slow)';
 
   @override
   String get logsNetworkTitle => 'Network logs';
@@ -1213,7 +1274,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get logsReaderEmpty => 'No reader logs yet';
 
   @override
-  String get tagCategoryLoadTimeout => 'Tag categories timed out while loading. Please try again later.';
+  String get tagCategoryLoadTimeout =>
+      'Tag categories timed out while loading. Please try again later.';
 
   @override
   String tagCategoryLoadFailed(Object error) {
@@ -1224,13 +1286,16 @@ class AppLocalizationsEn extends AppLocalizations {
   String get tagCategoryTitle => 'Tag categories';
 
   @override
-  String get tagCategoryEmpty => 'No tag categories are available for the current source';
+  String get tagCategoryEmpty =>
+      'No tag categories are available for the current source';
 
   @override
-  String get rankingLoadOptionsTimeout => 'Ranking categories timed out while loading. Please try again later.';
+  String get rankingLoadOptionsTimeout =>
+      'Ranking categories timed out while loading. Please try again later.';
 
   @override
-  String get rankingLoadTimeout => 'Rankings timed out while loading. Please try again later.';
+  String get rankingLoadTimeout =>
+      'Rankings timed out while loading. Please try again later.';
 
   @override
   String rankingLoadFailed(Object error) {
@@ -1241,7 +1306,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get rankingTitle => 'Rankings';
 
   @override
-  String get rankingEmptyOptions => 'No ranking categories are available for the current source';
+  String get rankingEmptyOptions =>
+      'No ranking categories are available for the current source';
 
   @override
   String get rankingEmptyComics => 'No ranking content available';
@@ -1253,7 +1319,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get favoriteAllFolder => 'All';
 
   @override
-  String get favoriteLoadTimeout => 'Favorites timed out while loading. Pull down to retry.';
+  String get favoriteLoadTimeout =>
+      'Favorites timed out while loading. Pull down to retry.';
 
   @override
   String favoriteFoldersLoadFailed(Object error) {
@@ -1284,7 +1351,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get favoriteFolderHeader => 'Favorite folders';
 
   @override
-  String get favoriteDeleteCurrentFolderTooltip => 'Delete current favorite folder';
+  String get favoriteDeleteCurrentFolderTooltip =>
+      'Delete current favorite folder';
 
   @override
   String get favoriteLoginRequired => 'Please sign in';
@@ -1329,7 +1397,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get commentsLoginRequiredToSend => 'Please sign in before commenting';
 
   @override
-  String get commentsSourceNotSupported => 'The current source does not support sending comments';
+  String get commentsSourceNotSupported =>
+      'The current source does not support sending comments';
 
   @override
   String get commentsSendSuccess => 'Comment sent successfully';
@@ -1410,25 +1479,29 @@ class AppLocalizationsEn extends AppLocalizations {
   String get advancedSoftwareLogCaptureTitle => 'Record software logs';
 
   @override
-  String get advancedSoftwareLogCaptureSubtitle => 'When turned off, network, application, and reader logs will no longer be captured';
+  String get advancedSoftwareLogCaptureSubtitle =>
+      'When turned off, network, application, and reader logs will no longer be captured';
 
   @override
   String get advancedComicIdSearchTitle => 'Comic ID search optimization';
 
   @override
-  String get advancedComicIdSearchSubtitle => 'Automatically remove non-digit characters on search submission and keep only Arabic numerals as the keyword';
+  String get advancedComicIdSearchSubtitle =>
+      'Automatically remove non-digit characters on search submission and keep only Arabic numerals as the keyword';
 
   @override
   String get advancedNoImageModeTitle => 'No-image mode';
 
   @override
-  String get advancedNoImageModeSubtitle => 'Hide images globally (except the login avatar in the sidebar)';
+  String get advancedNoImageModeSubtitle =>
+      'Hide images globally (except the login avatar in the sidebar)';
 
   @override
   String get advancedEditSourceTitle => 'Edit comic source';
 
   @override
-  String get advancedEditSourceSubtitle => 'Open a lightweight editor to edit and save jm.js';
+  String get advancedEditSourceSubtitle =>
+      'Open a lightweight editor to edit and save jm.js';
 
   @override
   String get advancedRestoreSourceLabel => 'Restore comic source';
@@ -1440,7 +1513,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sourceEditorLoading => 'Loading comic source…';
 
   @override
-  String get sourceEditorHint => 'Restart the app after saving to apply the updated source.';
+  String get sourceEditorHint =>
+      'Restart the app after saving to apply the updated source.';
 
   @override
   String get sourceEditorSaved => 'Comic source saved';
@@ -1461,10 +1535,12 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get sourceEditorRestoreConfirmContent => 'Restore the official comic source? Your saved edits will be overwritten.';
+  String get sourceEditorRestoreConfirmContent =>
+      'Restore the official comic source? Your saved edits will be overwritten.';
 
   @override
-  String get sourceEditorRestoreFailed => 'Restore failed. Please try again later.';
+  String get sourceEditorRestoreFailed =>
+      'Restore failed. Please try again later.';
 
   @override
   String sourceEditorRestoreDownloadingProgress(Object progress) {
@@ -1475,15 +1551,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sourceEditorRestoringTitle => 'Restoring comic source';
 
   @override
-  String get downloadsScanPermissionDenied => 'File access permission was not granted. Unable to scan local comics.';
+  String get downloadsScanPermissionDenied =>
+      'File access permission was not granted. Unable to scan local comics.';
 
   @override
-  String downloadsScanCompleted(Object scannedDirectories, Object recoveredComics) {
+  String downloadsScanCompleted(
+    Object scannedDirectories,
+    Object recoveredComics,
+  ) {
     return 'Scan complete. Scanned $scannedDirectories folders and recovered $recoveredComics comics.';
   }
 
   @override
-  String get downloadsScanNoRecoverable => 'Scan complete. No recoverable downloaded comics were found.';
+  String get downloadsScanNoRecoverable =>
+      'Scan complete. No recoverable downloaded comics were found.';
 
   @override
   String downloadsScanFailed(Object error) {
@@ -1497,7 +1578,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sourceUpdateRestartTitle => 'Please restart the app';
 
   @override
-  String get sourceUpdateRestartMessage => 'The source update has finished downloading. Please restart the app to apply the update.';
+  String get sourceUpdateRestartMessage =>
+      'The source update has finished downloading. Please restart the app to apply the update.';
 
   @override
   String get sourceUpdateLocalLabel => 'Local';
@@ -1506,11 +1588,14 @@ class AppLocalizationsEn extends AppLocalizations {
   String get sourceUpdateCloudLabel => 'Cloud';
 
   @override
-  String get sourceUpdateAvailableMessage => 'A new source version is available. Download it now and restart the app to apply it.';
+  String get sourceUpdateAvailableMessage =>
+      'A new source version is available. Download it now and restart the app to apply it.';
 
   @override
-  String get sourceUpdateDownloadingMessage => 'Downloading and replacing the source package. Please keep the network connected.';
+  String get sourceUpdateDownloadingMessage =>
+      'Downloading and replacing the source package. Please keep the network connected.';
 
   @override
-  String get sourceUpdateRestartHint => 'Close and reopen the app to finish applying the update.';
+  String get sourceUpdateRestartHint =>
+      'Close and reopen the app to finish applying the update.';
 }

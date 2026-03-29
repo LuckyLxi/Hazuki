@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/hazuki_models.dart';
@@ -25,6 +25,7 @@ class MangaDownloadService extends ChangeNotifier {
       writeMetadataFile: _writeMetadataFile,
     );
     _queueExecutor = MangaDownloadQueueExecutor(
+      logDownload: _logScan,
       tasks: _tasks,
       replaceTask: _replaceTask,
       removeTaskByComicId: _removeTaskByComicId,
@@ -39,6 +40,8 @@ class MangaDownloadService extends ChangeNotifier {
       downloadCoverIfNeeded: _downloadCoverIfNeeded,
       writeMetadataFile: _writeMetadataFile,
       chapterDirForTarget: _chapterDirForTarget,
+      shouldSuspendDownloads: _shouldSuspendDownloads,
+      shouldRecoverTransientNetworkError: _shouldRecoverTransientDownloadError,
     );
   }
 
@@ -55,6 +58,9 @@ class MangaDownloadService extends ChangeNotifier {
   late final MangaDownloadAccess _access;
   late final MangaDownloadRecoveryScanner _recoveryScanner;
   late final MangaDownloadQueueExecutor _queueExecutor;
+  bool _downloadsSuspended = false;
+  DateTime? _downloadResumeGraceDeadline;
+  Timer? _downloadResumeTimer;
 
   List<MangaDownloadTask> get tasks =>
       List<MangaDownloadTask>.unmodifiable(_tasks);
@@ -68,6 +74,42 @@ class MangaDownloadService extends ChangeNotifier {
       content: content,
       source: 'download_scan',
     );
+  }
+
+  void handleAppLifecycleState(AppLifecycleState state) {
+    final suspendDownloads = state != AppLifecycleState.resumed;
+    if (suspendDownloads == _downloadsSuspended &&
+        state != AppLifecycleState.resumed) {
+      return;
+    }
+
+    _downloadsSuspended = suspendDownloads;
+    _downloadResumeTimer?.cancel();
+    _downloadResumeTimer = null;
+
+    if (suspendDownloads) {
+      _downloadResumeGraceDeadline = null;
+      _logScan(
+        'Downloads suspended for app lifecycle',
+        level: 'warning',
+        content: {'state': state.name},
+      );
+      return;
+    }
+
+    _downloadResumeGraceDeadline = DateTime.now().add(
+      const Duration(seconds: 4),
+    );
+    _logScan(
+      'Downloads resume recovery scheduled',
+      content: {'state': state.name},
+    );
+    _downloadResumeTimer = Timer(const Duration(milliseconds: 1200), () {
+      if (_downloadsSuspended) {
+        return;
+      }
+      unawaited(_queueExecutor.processQueue());
+    });
   }
 
   Future<void> ensureInitialized() async {
@@ -324,6 +366,19 @@ class MangaDownloadService extends ChangeNotifier {
   Future<void> _flushState() async {
     await _persistState();
     notifyListeners();
+  }
+
+  bool _shouldSuspendDownloads() => _downloadsSuspended;
+
+  bool _shouldRecoverTransientDownloadError() {
+    if (_downloadsSuspended) {
+      return true;
+    }
+    final deadline = _downloadResumeGraceDeadline;
+    if (deadline == null) {
+      return false;
+    }
+    return DateTime.now().isBefore(deadline);
   }
 
   void _sanitizeRestoredDownloadedState() {

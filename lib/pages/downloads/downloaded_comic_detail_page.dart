@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../app/chapter_title_resolver.dart';
 import '../../l10n/l10n.dart';
 import '../../services/manga_download_service.dart';
 import '../../widgets/widgets.dart';
@@ -103,10 +104,14 @@ class DownloadedComicDetailPage extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           ...comic.chapters.map((chapter) {
+            final displayTitle = resolveHazukiChapterTitle(
+              context,
+              chapter.title,
+            );
             return Card(
               margin: const EdgeInsets.only(bottom: 10),
               child: ListTile(
-                title: Text(chapter.title),
+                title: Text(displayTitle),
                 subtitle: Text(
                   l10n(context).downloadsCurrentProgress(
                     '${chapter.imagePaths.length}',

@@ -4,10 +4,14 @@ extension _ReaderListItemBuilderExtension on _ReaderPageState {
   Widget _buildReaderListItem(int index) {
     final url = _images[index];
     final cachedProvider = _providerCache[url];
-    final resolvedAspectRatio = _imageAspectRatioCache[url];
-    final placeholderAspectRatio =
-        resolvedAspectRatio ?? _resolvePlaceholderAspectRatio(index);
     final readerPlaceholderColor = Theme.of(context).scaffoldBackgroundColor;
+
+    double? currentResolvedAspectRatio() => _imageAspectRatioCache[url];
+
+    double currentPlaceholderAspectRatio() {
+      return currentResolvedAspectRatio() ??
+          _resolvePlaceholderAspectRatio(index);
+    }
 
     if (_noImageModeEnabled) {
       return AspectRatio(
@@ -18,6 +22,7 @@ extension _ReaderListItemBuilderExtension on _ReaderPageState {
     }
 
     Widget buildImage(ImageProvider provider) {
+      final resolvedAspectRatio = currentResolvedAspectRatio();
       final image = Image(
         key: ValueKey(url),
         image: provider,
@@ -66,7 +71,7 @@ extension _ReaderListItemBuilderExtension on _ReaderPageState {
           }
           if (snapshot.hasError) {
             return AspectRatio(
-              aspectRatio: placeholderAspectRatio,
+              aspectRatio: currentPlaceholderAspectRatio(),
               child: Container(
                 color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 alignment: Alignment.center,
@@ -75,7 +80,7 @@ extension _ReaderListItemBuilderExtension on _ReaderPageState {
             );
           }
           return AspectRatio(
-            aspectRatio: placeholderAspectRatio,
+            aspectRatio: currentPlaceholderAspectRatio(),
             child: const Center(
               child: CircularProgressIndicator(strokeWidth: 2),
             ),

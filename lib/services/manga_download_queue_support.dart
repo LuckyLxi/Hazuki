@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:dio/dio.dart';
+
 import 'hazuki_source_service.dart';
 import 'manga_download_models.dart';
 import 'manga_download_storage_support.dart';
@@ -26,9 +28,12 @@ typedef MangaDownloadWriteMetadata =
     Future<void> Function(Directory comicDir, DownloadedMangaComic comic);
 typedef MangaDownloadChapterDirBuilder =
     Directory Function(Directory comicDir, MangaChapterDownloadTarget target);
+typedef MangaDownloadSuspendCheck = bool Function();
+typedef MangaDownloadTransientRecoveryCheck = bool Function();
 
 class MangaDownloadQueueExecutor {
   MangaDownloadQueueExecutor({
+    required MangaDownloadLogCallback logDownload,
     required List<MangaDownloadTask> tasks,
     required MangaDownloadReplaceTask replaceTask,
     required MangaDownloadRemoveTask removeTaskByComicId,
@@ -43,7 +48,11 @@ class MangaDownloadQueueExecutor {
     required MangaDownloadCoverDownload downloadCoverIfNeeded,
     required MangaDownloadWriteMetadata writeMetadataFile,
     required MangaDownloadChapterDirBuilder chapterDirForTarget,
+    required MangaDownloadSuspendCheck shouldSuspendDownloads,
+    required MangaDownloadTransientRecoveryCheck
+    shouldRecoverTransientNetworkError,
   }) : _tasks = tasks,
+       _logDownload = logDownload,
        _replaceTask = replaceTask,
        _removeTaskByComicId = removeTaskByComicId,
        _latestTask = latestTask,
@@ -56,9 +65,12 @@ class MangaDownloadQueueExecutor {
        _findExistingImagePath = findExistingImagePath,
        _downloadCoverIfNeeded = downloadCoverIfNeeded,
        _writeMetadataFile = writeMetadataFile,
-       _chapterDirForTarget = chapterDirForTarget;
+       _chapterDirForTarget = chapterDirForTarget,
+       _shouldSuspendDownloads = shouldSuspendDownloads,
+       _shouldRecoverTransientNetworkError = shouldRecoverTransientNetworkError;
 
   final List<MangaDownloadTask> _tasks;
+  final MangaDownloadLogCallback _logDownload;
   final MangaDownloadReplaceTask _replaceTask;
   final MangaDownloadRemoveTask _removeTaskByComicId;
   final MangaDownloadLatestTask _latestTask;
@@ -72,6 +84,8 @@ class MangaDownloadQueueExecutor {
   final MangaDownloadCoverDownload _downloadCoverIfNeeded;
   final MangaDownloadWriteMetadata _writeMetadataFile;
   final MangaDownloadChapterDirBuilder _chapterDirForTarget;
+  final MangaDownloadSuspendCheck _shouldSuspendDownloads;
+  final MangaDownloadTransientRecoveryCheck _shouldRecoverTransientNetworkError;
 
   bool _processing = false;
 
@@ -82,6 +96,9 @@ class MangaDownloadQueueExecutor {
     _processing = true;
     try {
       while (true) {
+        if (_shouldSuspendDownloads()) {
+          break;
+        }
         final taskIndex = _tasks.indexWhere(
           (task) => task.status == MangaDownloadTaskStatus.queued,
         );
@@ -107,6 +124,14 @@ class MangaDownloadQueueExecutor {
       return;
     }
     await _flushState();
+
+    if (_shouldSuspendDownloads()) {
+      await _requeueTaskForRetry(
+        task,
+        reason: 'downloads_suspended_before_run',
+      );
+      return;
+    }
 
     try {
       if (!await _ensureAndroidDownloadsAccess()) {
@@ -152,6 +177,13 @@ class MangaDownloadQueueExecutor {
         if (await _shouldAbortTask(task.comicId)) {
           return;
         }
+        if (_shouldSuspendDownloads()) {
+          await _requeueTaskForRetry(
+            task,
+            reason: 'downloads_suspended_before_chapter',
+          );
+          return;
+        }
         if (existingChapterIds.contains(target.epId)) {
           task = task.copyWith(
             completedEpIds: {...task.completedEpIds, target.epId},
@@ -194,6 +226,13 @@ class MangaDownloadQueueExecutor {
 
         for (var i = savedPaths.length; i < imageUrls.length; i++) {
           if (await _shouldAbortTask(task.comicId)) {
+            return;
+          }
+          if (_shouldSuspendDownloads()) {
+            await _requeueTaskForRetry(
+              task,
+              reason: 'downloads_suspended_before_image',
+            );
             return;
           }
           final imageUrl = imageUrls[i];
@@ -257,6 +296,15 @@ class MangaDownloadQueueExecutor {
       await _writeMetadataFile(comicDir, downloadedComic);
       await _flushState();
     } catch (e) {
+      if (_isTransientDownloadError(e) &&
+          _shouldRecoverTransientNetworkError()) {
+        await _requeueTaskForRetry(
+          task,
+          reason: 'transient_network_error',
+          error: e,
+        );
+        return;
+      }
       final latest = _latestTask(task.comicId);
       if (latest == null) {
         return;
@@ -274,5 +322,59 @@ class MangaDownloadQueueExecutor {
       );
       await _flushState();
     }
+  }
+
+  Future<void> _requeueTaskForRetry(
+    MangaDownloadTask task, {
+    required String reason,
+    Object? error,
+  }) async {
+    final latest = _latestTask(task.comicId);
+    if (latest == null) {
+      return;
+    }
+    _logDownload(
+      'Deferred manga download task',
+      level: 'warning',
+      content: {
+        'comicId': task.comicId,
+        'title': task.title,
+        'reason': reason,
+        if (error != null) 'error': error.toString(),
+      },
+    );
+    _replaceTask(
+      task.comicId,
+      latest.copyWith(
+        status: MangaDownloadTaskStatus.queued,
+        clearErrorMessage: true,
+      ),
+    );
+    await _flushState();
+  }
+
+  bool _isTransientDownloadError(Object error) {
+    if (error is SocketException) {
+      return true;
+    }
+    if (error is DioException) {
+      if (error.type == DioExceptionType.connectionError ||
+          error.type == DioExceptionType.connectionTimeout) {
+        return true;
+      }
+      if (error.error is SocketException) {
+        return true;
+      }
+      final message = error.message?.toLowerCase() ?? '';
+      if (message.contains('failed host lookup') ||
+          message.contains('connection error')) {
+        return true;
+      }
+    }
+
+    final text = error.toString().toLowerCase();
+    return text.contains('failed host lookup') ||
+        text.contains('socketexception') ||
+        text.contains('connection error');
   }
 }

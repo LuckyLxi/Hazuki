@@ -90,7 +90,7 @@ class HomeNavigationActions {
         builder: (_) => DownloadsPage(
           readerPageBuilder: (comic, chapter) => ReaderPage(
             title: comic.title,
-            chapterTitle: chapter.title,
+            chapterTitle: resolveHazukiChapterTitle(context, chapter.title),
             comicId: comic.comicId,
             epId: chapter.epId,
             chapterIndex: chapter.index,

@@ -22,6 +22,22 @@ class AppearanceSettingsData {
   final String displayModeRaw;
   final bool comicDetailDynamicColor;
 
+  static ThemeMode decodeThemeMode(String? raw) {
+    return switch (raw) {
+      'light' => ThemeMode.light,
+      'dark' => ThemeMode.dark,
+      _ => ThemeMode.system,
+    };
+  }
+
+  static String encodeThemeMode(ThemeMode mode) {
+    return switch (mode) {
+      ThemeMode.light => 'light',
+      ThemeMode.dark => 'dark',
+      _ => 'system',
+    };
+  }
+
   AppearanceSettingsData copyWith({
     ThemeMode? themeMode,
     bool? oledPureBlack,
@@ -40,6 +56,30 @@ class AppearanceSettingsData {
           comicDetailDynamicColor ?? this.comicDetailDynamicColor,
     );
   }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) {
+      return true;
+    }
+    return other is AppearanceSettingsData &&
+        other.themeMode == themeMode &&
+        other.oledPureBlack == oledPureBlack &&
+        other.dynamicColor == dynamicColor &&
+        other.presetIndex == presetIndex &&
+        other.displayModeRaw == displayModeRaw &&
+        other.comicDetailDynamicColor == comicDetailDynamicColor;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    themeMode,
+    oledPureBlack,
+    dynamicColor,
+    presetIndex,
+    displayModeRaw,
+    comicDetailDynamicColor,
+  );
 }
 
 class HazukiColorPreset {

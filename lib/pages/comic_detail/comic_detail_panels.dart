@@ -153,7 +153,9 @@ class _ChaptersPanelSheetState extends State<ChaptersPanelSheet> {
             constraints: BoxConstraints(maxHeight: screenH * 0.65),
             decoration: BoxDecoration(
               color: cs.surface,
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(20),
+              ),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -231,7 +233,9 @@ class _ChaptersPanelSheetState extends State<ChaptersPanelSheet> {
                                 ? l10n(context).downloadsDownloadChaptersTitle
                                 : l10n(context).comicDetailChapters,
                             key: ValueKey<String>(
-                              _showDownloadSelection ? 'download_title' : 'chapter_title',
+                              _showDownloadSelection
+                                  ? 'download_title'
+                                  : 'chapter_title',
                             ),
                             style: theme.textTheme.titleMedium?.copyWith(
                               fontWeight: FontWeight.w600,
@@ -242,14 +246,17 @@ class _ChaptersPanelSheetState extends State<ChaptersPanelSheet> {
                         AnimatedSwitcher(
                           duration: const Duration(milliseconds: 220),
                           transitionBuilder: (child, animation) {
-                            return FadeTransition(opacity: animation, child: child);
+                            return FadeTransition(
+                              opacity: animation,
+                              child: child,
+                            );
                           },
                           child: Text(
                             _showDownloadSelection
                                 ? '${_selectedEpIds.length}/${chapters.length}'
-                                : l10n(
-                                    context,
-                                  ).comicDetailChapterCount('${chapters.length}'),
+                                : l10n(context).comicDetailChapterCount(
+                                    '${chapters.length}',
+                                  ),
                             key: ValueKey<String>(
                               _showDownloadSelection
                                   ? 'download_count_${_selectedEpIds.length}'
@@ -267,7 +274,10 @@ class _ChaptersPanelSheetState extends State<ChaptersPanelSheet> {
                             return FadeTransition(
                               opacity: animation,
                               child: ScaleTransition(
-                                scale: Tween<double>(begin: 0.9, end: 1).animate(animation),
+                                scale: Tween<double>(
+                                  begin: 0.9,
+                                  end: 1,
+                                ).animate(animation),
                                 child: child,
                               ),
                             );
@@ -275,7 +285,9 @@ class _ChaptersPanelSheetState extends State<ChaptersPanelSheet> {
                           child: !_showDownloadSelection
                               ? IconButton(
                                   key: const ValueKey('download_enter'),
-                                  tooltip: l10n(context).downloadsDownloadAction,
+                                  tooltip: l10n(
+                                    context,
+                                  ).downloadsDownloadAction,
                                   onPressed: () {
                                     setState(() {
                                       _showDownloadSelection = true;
@@ -378,9 +390,10 @@ class _ChaptersPanelSheetState extends State<ChaptersPanelSheet> {
       itemCount: chapters.length,
       itemBuilder: (context, index) {
         final entry = chapters.entries.elementAt(index);
+        final displayTitle = resolveHazukiChapterTitle(context, entry.value);
         return _ChapterChip(
-          label: entry.value,
-          onTap: () => widget.onChapterTap(entry.key, entry.value, index),
+          label: displayTitle,
+          onTap: () => widget.onChapterTap(entry.key, displayTitle, index),
         );
       },
     );
@@ -419,8 +432,12 @@ class _ChaptersPanelSheetState extends State<ChaptersPanelSheet> {
             itemBuilder: (context, index) {
               final entry = chapterEntries[index];
               final selected = _selectedEpIds.contains(entry.key);
+              final displayTitle = resolveHazukiChapterTitle(
+                context,
+                entry.value,
+              );
               return _SelectableChapterChip(
-                label: entry.value,
+                label: displayTitle,
                 selected: selected,
                 onTap: () {
                   setState(() {

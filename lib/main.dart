@@ -7,6 +7,8 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 
 import 'app/app_settings_store.dart';
 import 'app/appearance_settings.dart';
+import 'app/hazuki_theme_controller.dart';
+import 'app/hazuki_theme_factory.dart';
 import 'app/source_runtime_coordinator.dart';
 import 'app/source_runtime_widgets.dart';
 import 'app/source_update_dialog_support.dart';
@@ -48,11 +50,29 @@ Future<void> main() async {
   await HazukiSourceService.instance.loadSoftwareLogCaptureEnabled();
   await _ensureAndroidNoMediaMarker();
   await MangaDownloadService.instance.ensureInitialized();
-  runApp(const HazukiApp());
+  const settingsStore = HazukiAppSettingsStore();
+  final initialAppearance = await settingsStore.loadAppearance();
+  final initialLocale = await settingsStore.loadLocalePreference();
+  runApp(
+    HazukiApp(
+      settingsStore: settingsStore,
+      initialAppearance: initialAppearance,
+      initialLocale: initialLocale,
+    ),
+  );
 }
 
 class HazukiApp extends StatefulWidget {
-  const HazukiApp({super.key});
+  const HazukiApp({
+    super.key,
+    required this.settingsStore,
+    required this.initialAppearance,
+    required this.initialLocale,
+  });
+
+  final HazukiAppSettingsStore settingsStore;
+  final AppearanceSettingsData initialAppearance;
+  final Locale? initialLocale;
 
   @override
   State<HazukiApp> createState() => _HazukiAppState();
@@ -62,32 +82,26 @@ class _HazukiAppState extends State<HazukiApp> with WidgetsBindingObserver {
   static const _sourceUpdateSkipDateKey = 'source_update_skip_date';
 
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
-  final HazukiAppSettingsStore _settingsStore = const HazukiAppSettingsStore();
   final SourceRuntimeCoordinator _sourceRuntimeCoordinator =
       SourceRuntimeCoordinator();
   final SourceUpdateDialogSupport _sourceUpdateDialogSupport =
       const SourceUpdateDialogSupport();
 
+  late final HazukiThemeController _themeController;
   int _homeRefreshTick = 0;
   bool _allowDiscoverInitialLoad = false;
   SourceBootstrapState _bootstrapState = const SourceBootstrapState.idle();
-
-  AppearanceSettingsData _appearance = const AppearanceSettingsData(
-    themeMode: ThemeMode.system,
-    oledPureBlack: false,
-    dynamicColor: hazukiDefaultDynamicColorEnabled,
-    presetIndex: hazukiDefaultAppearancePresetIndex,
-    displayModeRaw: 'native:auto',
-    comicDetailDynamicColor: false,
-  );
-  Locale? _locale;
+  late Locale? _locale;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    unawaited(_loadAppearance());
-    unawaited(_loadLocalePreference());
+    _themeController = HazukiThemeController(
+      settingsStore: widget.settingsStore,
+      initialSettings: widget.initialAppearance,
+    );
+    _locale = widget.initialLocale;
     unawaited(
       _sourceRuntimeCoordinator.initConnectivityWatcher(
         scheduleSourceRecovery: _scheduleSourceRecovery,
@@ -112,6 +126,7 @@ class _HazukiAppState extends State<HazukiApp> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
+    MangaDownloadService.instance.handleAppLifecycleState(state);
     if (state == AppLifecycleState.resumed) {
       _scheduleSourceUpdateDialogCheck();
     }
@@ -120,42 +135,19 @@ class _HazukiAppState extends State<HazukiApp> with WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _themeController.dispose();
     unawaited(_sourceRuntimeCoordinator.dispose());
     super.dispose();
   }
 
-  Future<void> _loadAppearance() async {
-    final appearance = await _settingsStore.loadAppearance();
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _appearance = appearance;
-    });
-  }
-
   Future<void> _updateAppearance(AppearanceSettingsData next) async {
-    await _settingsStore.saveAppearance(next);
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _appearance = next;
-    });
-  }
-
-  Future<void> _loadLocalePreference() async {
-    final locale = await _settingsStore.loadLocalePreference();
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _locale = locale;
-    });
+    await _themeController.update(next);
   }
 
   Future<void> _updateLocalePreference(Locale? locale) async {
-    final effectiveLocale = await _settingsStore.saveLocalePreference(locale);
+    final effectiveLocale = await widget.settingsStore.saveLocalePreference(
+      locale,
+    );
     if (!mounted) {
       return;
     }
@@ -187,126 +179,85 @@ class _HazukiAppState extends State<HazukiApp> with WidgetsBindingObserver {
     );
   }
 
-  ThemeData _buildLightTheme([ColorScheme? dynamicColorScheme]) {
-    final preset = kHazukiColorPresets[_appearance.presetIndex];
-    final colorScheme = _appearance.dynamicColor && dynamicColorScheme != null
-        ? dynamicColorScheme.harmonized()
-        : ColorScheme.fromSeed(
-            seedColor: preset.seedColor,
-            brightness: Brightness.light,
-            dynamicSchemeVariant: DynamicSchemeVariant.tonalSpot,
-          );
-
-    return ThemeData(colorScheme: colorScheme, useMaterial3: true);
-  }
-
-  ThemeData _buildDarkTheme([ColorScheme? dynamicColorScheme]) {
-    final preset = kHazukiColorPresets[_appearance.presetIndex];
-    final baseColorScheme =
-        _appearance.dynamicColor && dynamicColorScheme != null
-        ? dynamicColorScheme.harmonized()
-        : ColorScheme.fromSeed(
-            seedColor: preset.seedColor,
-            brightness: Brightness.dark,
-            dynamicSchemeVariant: DynamicSchemeVariant.tonalSpot,
-          );
-
-    final base = ThemeData(colorScheme: baseColorScheme, useMaterial3: true);
-
-    if (!_appearance.oledPureBlack) {
-      return base;
-    }
-
-    final pureBlackScheme = base.colorScheme.copyWith(
-      surface: Colors.black,
-      surfaceContainer: Colors.black,
-      surfaceContainerLow: Colors.black,
-      surfaceContainerLowest: Colors.black,
-      surfaceContainerHigh: Colors.black,
-      surfaceContainerHighest: Colors.black,
-    );
-
-    return base.copyWith(
-      scaffoldBackgroundColor: Colors.black,
-      canvasColor: Colors.black,
-      colorScheme: pureBlackScheme,
-      cardColor: Colors.black,
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    return DynamicColorBuilder(
-      builder: (lightDynamic, darkDynamic) {
-        return MaterialApp(
-          navigatorKey: _navigatorKey,
-          debugShowCheckedModeBanner: false,
-          onGenerateTitle: (context) => l10n(context).appTitle,
-          locale: _locale,
-          localizationsDelegates: const [
-            AppLocalizations.delegate,
-            GlobalMaterialLocalizations.delegate,
-            GlobalWidgetsLocalizations.delegate,
-            GlobalCupertinoLocalizations.delegate,
-          ],
-          supportedLocales: AppLocalizations.supportedLocales,
-          themeMode: _appearance.themeMode,
-          theme: _buildLightTheme(lightDynamic),
-          darkTheme: _buildDarkTheme(darkDynamic),
-          builder: (context, child) {
-            return Stack(
-              children: [
-                // ignore: use_null_aware_elements
-                if (child != null) child,
-                Positioned.fill(
-                  child: IgnorePointer(
-                    ignoring:
-                        !_bootstrapState.showOverlay &&
-                        !_bootstrapState.showIntro,
-                    child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 280),
-                      switchInCurve: Curves.easeOutCubic,
-                      switchOutCurve: Curves.easeInCubic,
-                      transitionBuilder: (widget, animation) {
-                        final curved = CurvedAnimation(
-                          parent: animation,
-                          curve: Curves.easeOutCubic,
-                          reverseCurve: Curves.easeInCubic,
-                        );
-                        return FadeTransition(
-                          opacity: curved,
-                          child: ScaleTransition(
-                            scale: Tween<double>(
-                              begin: 0.94,
-                              end: 1,
-                            ).animate(curved),
-                            child: widget,
+    return ListenableBuilder(
+      listenable: _themeController,
+      builder: (context, _) {
+        final appearance = _themeController.settings;
+        return DynamicColorBuilder(
+          builder: (lightDynamic, darkDynamic) {
+            return MaterialApp(
+              navigatorKey: _navigatorKey,
+              debugShowCheckedModeBanner: false,
+              onGenerateTitle: (context) => l10n(context).appTitle,
+              locale: _locale,
+              localizationsDelegates: const [
+                AppLocalizations.delegate,
+                GlobalMaterialLocalizations.delegate,
+                GlobalWidgetsLocalizations.delegate,
+                GlobalCupertinoLocalizations.delegate,
+              ],
+              supportedLocales: AppLocalizations.supportedLocales,
+              themeMode: _themeController.themeMode,
+              theme: HazukiThemeFactory.buildLight(appearance, lightDynamic),
+              darkTheme: HazukiThemeFactory.buildDark(appearance, darkDynamic),
+              builder: (context, child) {
+                return Stack(
+                  children: [
+                    // ignore: use_null_aware_elements
+                    if (child != null) child,
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        ignoring:
+                            !_bootstrapState.showOverlay &&
+                            !_bootstrapState.showIntro,
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 280),
+                          switchInCurve: Curves.easeOutCubic,
+                          switchOutCurve: Curves.easeInCubic,
+                          transitionBuilder: (widget, animation) {
+                            final curved = CurvedAnimation(
+                              parent: animation,
+                              curve: Curves.easeOutCubic,
+                              reverseCurve: Curves.easeInCubic,
+                            );
+                            return FadeTransition(
+                              opacity: curved,
+                              child: ScaleTransition(
+                                scale: Tween<double>(
+                                  begin: 0.94,
+                                  end: 1,
+                                ).animate(curved),
+                                child: widget,
+                              ),
+                            );
+                          },
+                          child: InitialSourceBootstrapOverlay(
+                            showOverlay: _bootstrapState.showOverlay,
+                            showIntro: _bootstrapState.showIntro,
+                            indeterminate: _bootstrapState.indeterminate,
+                            progress: _bootstrapState.progress,
+                            errorText: _bootstrapState.errorText,
                           ),
-                        );
-                      },
-                      child: InitialSourceBootstrapOverlay(
-                        showOverlay: _bootstrapState.showOverlay,
-                        showIntro: _bootstrapState.showIntro,
-                        indeterminate: _bootstrapState.indeterminate,
-                        progress: _bootstrapState.progress,
-                        errorText: _bootstrapState.errorText,
+                        ),
                       ),
                     ),
-                  ),
-                ),
-              ],
+                  ],
+                );
+              },
+              home: HazukiHomePage(
+                appearanceSettings: appearance,
+                onAppearanceChanged: _updateAppearance,
+                locale: _locale,
+                onLocaleChanged: _updateLocalePreference,
+                allowDiscoverInitialLoad: _allowDiscoverInitialLoad,
+                hideDiscoverLoadingUntilAllowed:
+                    _bootstrapState.showOverlay || _bootstrapState.showIntro,
+                refreshTick: _homeRefreshTick,
+              ),
             );
           },
-          home: HazukiHomePage(
-            appearanceSettings: _appearance,
-            onAppearanceChanged: _updateAppearance,
-            locale: _locale,
-            onLocaleChanged: _updateLocalePreference,
-            allowDiscoverInitialLoad: _allowDiscoverInitialLoad,
-            hideDiscoverLoadingUntilAllowed:
-                _bootstrapState.showOverlay || _bootstrapState.showIntro,
-            refreshTick: _homeRefreshTick,
-          ),
         );
       },
     );

@@ -71,7 +71,7 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
   }) async {
     final engine = _engine;
     if (engine == null) {
-      throw Exception('漫画源尚未初始化完成');
+      throw Exception('source_not_initialized');
     }
 
     final dynamic result = engine.evaluate(
@@ -157,7 +157,7 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
     }
 
     if (chapters.isEmpty && fallbackComicId.isNotEmpty) {
-      chapters[fallbackComicId] = '__default_chapter_1__';
+      chapters[fallbackComicId] = hazukiDefaultChapterTitleToken;
     }
     return chapters;
   }

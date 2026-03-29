@@ -18,12 +18,9 @@ class HazukiAppSettingsStore {
 
   Future<AppearanceSettingsData> loadAppearance() async {
     final prefs = await SharedPreferences.getInstance();
-    final modeRaw = prefs.getString(_themeModeKey) ?? 'system';
-    final mode = switch (modeRaw) {
-      'light' => ThemeMode.light,
-      'dark' => ThemeMode.dark,
-      _ => ThemeMode.system,
-    };
+    final mode = AppearanceSettingsData.decodeThemeMode(
+      prefs.getString(_themeModeKey),
+    );
     var presetIndex =
         prefs.getInt(_presetIndexKey) ?? hazukiDefaultAppearancePresetIndex;
     if (presetIndex < 0 || presetIndex >= kHazukiColorPresets.length) {
@@ -46,11 +43,7 @@ class HazukiAppSettingsStore {
 
   Future<void> saveAppearance(AppearanceSettingsData next) async {
     final prefs = await SharedPreferences.getInstance();
-    final modeRaw = switch (next.themeMode) {
-      ThemeMode.light => 'light',
-      ThemeMode.dark => 'dark',
-      _ => 'system',
-    };
+    final modeRaw = AppearanceSettingsData.encodeThemeMode(next.themeMode);
     await prefs.setString(_themeModeKey, modeRaw);
     await prefs.setBool(_oledPureBlackKey, next.oledPureBlack);
     await prefs.setBool(_dynamicColorKey, next.dynamicColor);

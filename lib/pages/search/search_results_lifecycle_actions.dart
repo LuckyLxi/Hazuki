@@ -190,15 +190,34 @@ extension _SearchResultsLifecycleActionsExtension on _SearchResultsPageState {
     }
   }
 
-  void _onSearchOrderSelected(String order) {
+  Future<void> _onSearchOrderSelected(String order) async {
     final orderLabels = searchOrderLabels(context);
     if (!orderLabels.containsKey(order) || order == _searchOrder) {
       return;
     }
+
+    if (_collapsedSearchExpanded) {
+      _collapsedSearchFocusNode.unfocus();
+      _updateSearchResultsState(() {
+        _collapsedSearchExpanded = false;
+        _awaitingCollapsedSearchFocus = false;
+      });
+    }
+
+    if (_scrollController.hasClients && _scrollController.offset > 0) {
+      await _scrollToTop();
+    }
+
+    if (!mounted) {
+      return;
+    }
+
     _resultsController.setSearchOrder(order);
     if (_searchKeyword.isNotEmpty) {
-      unawaited(
-        _resultsController.search(context, keyword: _searchKeyword, page: 1),
+      await _resultsController.search(
+        context,
+        keyword: _searchKeyword,
+        page: 1,
       );
     }
   }

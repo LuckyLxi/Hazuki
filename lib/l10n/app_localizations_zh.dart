@@ -301,7 +301,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutProjectTitle => '项目地址';
 
   @override
-  String get aboutProjectSubtitle => 'GitHub (https://github.com/LuckyLxi/Hazuki)';
+  String get aboutProjectSubtitle =>
+      'GitHub (https://github.com/LuckyLxi/Hazuki)';
 
   @override
   String get aboutFeedbackTitle => '反馈问题';
@@ -322,7 +323,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutDisclaimerSubtitle => '使用前请先阅读相关说明';
 
   @override
-  String get aboutDisclaimerContent => '本应用仅供学习、界面研究与个人交流使用，不提供漫画资源，也不直接存储、上传或分发漫画内容。\n\n软件首次启动或更新漫画源时，会自动从第三方 GitHub 仓库下载漫画源脚本；该脚本及其后续解析出的内容均来自第三方，相关版权归原作者或权利人所有。\n\n请在遵守当地法律法规及版权要求的前提下使用本应用；因下载、使用第三方漫画源或访问相关内容产生的任何纠纷、损失或法律责任，均由使用者自行承担。';
+  String get aboutDisclaimerContent =>
+      '本应用仅供学习、界面研究与个人交流使用，不提供漫画资源，也不直接存储、上传或分发漫画内容。\n\n软件首次启动或更新漫画源时，会自动从第三方 GitHub 仓库下载漫画源脚本；该脚本及其后续解析出的内容均来自第三方，相关版权归原作者或权利人所有。\n\n请在遵守当地法律法规及版权要求的前提下使用本应用；因下载、使用第三方漫画源或访问相关内容产生的任何纠纷、损失或法律责任，均由使用者自行承担。';
 
   @override
   String get commonConfirm => '确定';
@@ -520,7 +522,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get comicDetailDeleteFavoriteFolder => '删除收藏夹';
 
   @override
-  String get comicDetailDeleteFavoriteFolderContent => '删除这个收藏夹吗？位于该收藏夹中的漫画将失去分组。';
+  String get comicDetailDeleteFavoriteFolderContent =>
+      '删除这个收藏夹吗？位于该收藏夹中的漫画将失去分组。';
 
   @override
   String get comicDetailDelete => '删除';
@@ -623,6 +626,9 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get comicDetailChapters => '章节';
+
+  @override
+  String get comicDetailDefaultChapterTitle => '\u7b2c1\u8bdd';
 
   @override
   String comicDetailChapterCount(Object count) {
@@ -1145,7 +1151,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get favoritesDebugCopied => '已复制网络日志';
 
   @override
-  String get favoritesDebugFilterReason => '仅显示重要日志（错误日志、HTTP>=400、登录相关、含关键错误关键词）';
+  String get favoritesDebugFilterReason =>
+      '仅显示重要日志（错误日志、HTTP>=400、登录相关、含关键错误关键词）';
 
   @override
   String get favoritesDebugFilterImportantTooltip => '筛查重要日志';
@@ -1478,7 +1485,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get downloadsScanPermissionDenied => '未获得文件访问权限，无法扫描本地漫画';
 
   @override
-  String downloadsScanCompleted(Object scannedDirectories, Object recoveredComics) {
+  String downloadsScanCompleted(
+    Object scannedDirectories,
+    Object recoveredComics,
+  ) {
     return '扫描完成，已扫描 $scannedDirectories 个目录，恢复 $recoveredComics 部漫画';
   }
 

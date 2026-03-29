@@ -15,6 +15,7 @@ import 'package:pointycastle/block/aes.dart';
 import 'package:pointycastle/block/modes/ecb.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../app/chapter_title_resolver.dart';
 import '../models/hazuki_models.dart';
 
 part 'source/account_session_capability.dart';

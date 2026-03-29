@@ -62,7 +62,7 @@ extension _ComicDetailReaderActionsExtension on _ComicDetailPageState {
         targets.add(
           MangaChapterDownloadTarget(
             epId: entry.key,
-            title: entry.value,
+            title: resolveHazukiChapterTitle(context, entry.value),
             index: i,
           ),
         );
@@ -132,10 +132,12 @@ extension _ComicDetailReaderActionsExtension on _ComicDetailPageState {
       finalIndex = 0;
     }
 
-    final initialChapterTitle =
-        (chapterTitle != null && chapterTitle.isNotEmpty)
-        ? chapterTitle
-        : initialEntry.value;
+    final initialChapterTitle = resolveHazukiChapterTitle(
+      context,
+      (chapterTitle != null && chapterTitle.isNotEmpty)
+          ? chapterTitle
+          : initialEntry.value,
+    );
 
     await Navigator.of(context)
         .push(

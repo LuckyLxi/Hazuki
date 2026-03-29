@@ -148,34 +148,43 @@ extension _SearchResultsShellWidgetsExtension on _SearchResultsPageState {
     );
   }
 
-  Widget _buildCollapsedSearchBox() {
+  Widget _buildCollapsedSearchBox({
+    required double collapsedWidth,
+    required double expandedWidth,
+  }) {
     final visible = _showCollapsedSearch && !_flyingSearchToTop;
-    final width = _collapsedSearchExpanded ? 220.0 : 180.0;
+    final currentWidth = _collapsedSearchExpanded
+        ? expandedWidth
+        : collapsedWidth;
     return HeroMode(
       enabled: visible,
       child: Hero(
         tag: discoverSearchHeroTag,
-        child: ClipRect(
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOutCubic,
-            width: visible ? width : 0,
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: AnimatedSlide(
-                offset: visible ? Offset.zero : const Offset(-0.08, 0),
-                duration: const Duration(milliseconds: 220),
-                curve: Curves.easeOutCubic,
-                child: AnimatedScale(
-                  scale: visible ? 1 : 0.94,
-                  duration: const Duration(milliseconds: 240),
-                  curve: Curves.easeOutBack,
-                  child: AnimatedOpacity(
-                    opacity: visible ? 1 : 0,
-                    duration: const Duration(milliseconds: 180),
-                    curve: Curves.easeOutCubic,
-                    child: IgnorePointer(
-                      ignoring: !visible,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          width: visible ? currentWidth : 0,
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: AnimatedSlide(
+              offset: visible ? Offset.zero : const Offset(-0.08, 0),
+              duration: const Duration(milliseconds: 220),
+              curve: Curves.easeOutCubic,
+              child: AnimatedScale(
+                scale: visible ? 1 : 0.94,
+                duration: const Duration(milliseconds: 240),
+                curve: Curves.easeOutBack,
+                child: AnimatedOpacity(
+                  opacity: visible ? 1 : 0,
+                  duration: const Duration(milliseconds: 180),
+                  curve: Curves.easeOutCubic,
+                  child: IgnorePointer(
+                    ignoring: !visible,
+                    child: AnimatedContainer(
+                      key: _collapsedSearchKey,
+                      duration: const Duration(milliseconds: 220),
+                      curve: Curves.easeOutCubic,
+                      width: currentWidth,
                       child: _collapsedSearchExpanded
                           ? _buildSearchBar(
                               controller: _collapsedSearchController,
@@ -201,6 +210,51 @@ extension _SearchResultsShellWidgetsExtension on _SearchResultsPageState {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildSearchResultsAppBarTitle() {
+    final strings = AppLocalizations.of(context)!;
+    return SizedBox(
+      height: 40,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final maxWidth = constraints.maxWidth;
+          final collapsedWidth = maxWidth >= 188 ? 188.0 : maxWidth;
+          final expandedWidth = maxWidth;
+          final reserveForCollapsedPreview =
+              _showCollapsedSearch &&
+                  !_collapsedSearchExpanded &&
+                  !_flyingSearchToTop
+              ? collapsedWidth + 12
+              : 0.0;
+          return Stack(
+            alignment: Alignment.centerLeft,
+            children: [
+              AnimatedOpacity(
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOutCubic,
+                opacity: _collapsedSearchExpanded ? 0 : 1,
+                child: Padding(
+                  padding: EdgeInsets.only(right: reserveForCollapsedPreview),
+                  child: Text(
+                    strings.searchTitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
+              Align(
+                alignment: Alignment.centerRight,
+                child: _buildCollapsedSearchBox(
+                  collapsedWidth: collapsedWidth,
+                  expandedWidth: expandedWidth,
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -235,21 +289,16 @@ extension _SearchResultsShellWidgetsExtension on _SearchResultsPageState {
   }
 
   PreferredSizeWidget _buildSearchResultsAppBar() {
-    final strings = AppLocalizations.of(context)!;
     final orderLabels = searchOrderLabels(context);
     return hazukiFrostedAppBar(
       context: context,
-      title: Text(strings.searchTitle),
+      title: _buildSearchResultsAppBarTitle(),
       actions: [
-        _buildCollapsedSearchBox(),
-        AnimatedContainer(
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.easeOutCubic,
-          width: _showCollapsedSearch && !_flyingSearchToTop ? 8 : 0,
-        ),
         PopupMenuButton<String>(
           tooltip: _currentSearchOrderLabel,
-          onSelected: _onSearchOrderSelected,
+          onSelected: (order) {
+            unawaited(_onSearchOrderSelected(order));
+          },
           itemBuilder: (context) => [
             for (final entry in orderLabels.entries)
               PopupMenuItem<String>(
@@ -409,7 +458,7 @@ extension _SearchResultsShellWidgetsExtension on _SearchResultsPageState {
             opacity: _showBackToTop ? 1 : 0,
             duration: const Duration(milliseconds: 180),
             curve: Curves.easeOutCubic,
-            child: FloatingActionButton.small(
+            child: FloatingActionButton(
               onPressed: () => unawaited(_scrollToTop()),
               child: const Icon(Icons.keyboard_arrow_up),
             ),

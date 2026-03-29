@@ -69,37 +69,6 @@ class _DownloadsPageState extends State<DownloadsPage>
                 tabController: _tabController,
                 selectionMode: _selectionMode,
                 selectedCount: _controller.selectedCount,
-                onToggleSelectionMode: () {
-                  _controller.toggleSelectionMode(_tabController.index);
-                },
-                onDeleteSelected: () {
-                  unawaited(_controller.deleteSelected(context));
-                },
-              ),
-              floatingActionButton: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 220),
-                switchInCurve: Curves.easeOutCubic,
-                switchOutCurve: Curves.easeInCubic,
-                transitionBuilder: (child, animation) {
-                  return FadeTransition(
-                    opacity: animation,
-                    child: ScaleTransition(
-                      scale: Tween<double>(
-                        begin: 0.86,
-                        end: 1,
-                      ).animate(animation),
-                      child: child,
-                    ),
-                  );
-                },
-                child: DownloadsScanButton(
-                  ready: ready,
-                  visible: _tabController.index == 1 && !_selectionMode,
-                  scanning: _controller.scanningDownloaded,
-                  onPressed: () {
-                    unawaited(_controller.scanDownloadedComics(context));
-                  },
-                ),
               ),
               body: !ready
                   ? const Center(child: CircularProgressIndicator())
@@ -121,8 +90,23 @@ class _DownloadsPageState extends State<DownloadsPage>
                         DownloadsCompletedTab(
                           comics: comics,
                           selectionMode: _selectionMode,
+                          scanning: _controller.scanningDownloaded,
+                          selectedCount: _controller.selectedCount,
                           selectedComicIds: _controller.selectedComicIds,
                           onToggleSelection: _controller.toggleSelection,
+                          onToggleSelectionMode: () {
+                            _controller.toggleSelectionMode(
+                              _tabController.index,
+                            );
+                          },
+                          onDeleteSelected: () {
+                            unawaited(_controller.deleteSelected(context));
+                          },
+                          onScanDownloaded: () {
+                            unawaited(
+                              _controller.scanDownloadedComics(context),
+                            );
+                          },
                           onOpenComic: (comic) {
                             Navigator.of(context).push(
                               MaterialPageRoute<void>(
