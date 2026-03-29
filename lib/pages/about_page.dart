@@ -1,10 +1,16 @@
-part of '../main.dart';
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../l10n/app_localizations.dart';
+import '../widgets/widgets.dart';
 
 class AboutPage extends StatelessWidget {
   const AboutPage({super.key});
 
   Future<void> _showDisclaimerDialog(BuildContext context) {
-    final strings = l10n(context);
+    final strings = AppLocalizations.of(context)!;
     final textTheme = Theme.of(context).textTheme;
     return showGeneralDialog<void>(
       context: context,
@@ -52,7 +58,7 @@ class AboutPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final strings = l10n(context);
+    final strings = AppLocalizations.of(context)!;
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 

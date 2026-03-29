@@ -1,4 +1,4 @@
-part of '../../main.dart';
+part of '../comic_detail_page.dart';
 
 class _ComicDetailLoadingView extends StatelessWidget {
   const _ComicDetailLoadingView();

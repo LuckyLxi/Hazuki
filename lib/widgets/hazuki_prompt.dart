@@ -1,4 +1,6 @@
-part of '../main.dart';
+import 'dart:async';
+
+import 'package:flutter/material.dart';
 
 int _hazukiPromptTicket = 0;
 _HazukiPromptHandle? _activeHazukiPrompt;

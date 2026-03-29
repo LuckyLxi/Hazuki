@@ -1,18 +1,32 @@
-part of '../../main.dart';
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+
+import '../../app/app.dart';
+import '../../l10n/app_localizations.dart';
+import '../../models/hazuki_models.dart';
+import '../../services/hazuki_source_service.dart';
+import '../../widgets/widgets.dart';
+import '../search/search.dart';
+import 'discover_section_page.dart';
 
 class DiscoverPage extends StatefulWidget {
   const DiscoverPage({
     super.key,
+    required this.comicDetailPageBuilder,
     this.onSearchMorphProgressChanged,
     this.onSearchTap,
     this.allowInitialLoad = true,
     this.hideLoadingUntilInitialLoadAllowed = false,
+    this.comicCoverHeroTagBuilder = comicCoverHeroTag,
   });
 
+  final ComicDetailPageBuilder comicDetailPageBuilder;
   final ValueChanged<double>? onSearchMorphProgressChanged;
   final VoidCallback? onSearchTap;
   final bool allowInitialLoad;
   final bool hideLoadingUntilInitialLoadAllowed;
+  final ComicHeroTagBuilder comicCoverHeroTagBuilder;
 
   @override
   State<DiscoverPage> createState() => _DiscoverPageState();
@@ -52,7 +66,9 @@ class _DiscoverPageState extends State<DiscoverPage> {
         widget.onSearchMorphProgressChanged) {
       widget.onSearchMorphProgressChanged?.call(_searchMorphProgress);
     }
-    if (!oldWidget.allowInitialLoad && widget.allowInitialLoad && _initialLoading) {
+    if (!oldWidget.allowInitialLoad &&
+        widget.allowInitialLoad &&
+        _initialLoading) {
       unawaited(_loadInitial());
     }
   }
@@ -95,7 +111,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
   }
 
   Future<void> _loadInitial() async {
-    final strings = l10n(context);
+    final strings = AppLocalizations.of(context)!;
     try {
       final sections = await _loadSections();
       if (!mounted) {
@@ -133,7 +149,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
       _refreshing = true;
     });
 
-    final strings = l10n(context);
+    final strings = AppLocalizations.of(context)!;
     try {
       final sections = await _loadSections(forceRefresh: true);
       if (!mounted) {
@@ -167,9 +183,16 @@ class _DiscoverPageState extends State<DiscoverPage> {
       widget.onSearchTap!.call();
       return;
     }
-    Navigator.of(
-      context,
-    ).push(MaterialPageRoute<void>(builder: (_) => const SearchPage()));
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => SearchPage(
+          initialKeyword: null,
+          comicDetailPageBuilder: (comic, heroTag) =>
+              widget.comicDetailPageBuilder(comic, heroTag),
+          comicCoverHeroTagBuilder: widget.comicCoverHeroTagBuilder,
+        ),
+      ),
+    );
   }
 
   Widget _buildSearchBox({
@@ -185,7 +208,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
       child: HeroMode(
         enabled: heroEnabled,
         child: Hero(
-          tag: _discoverSearchHeroTag,
+          tag: discoverSearchHeroTag,
           child: InkWell(
             borderRadius: BorderRadius.circular(borderRadius),
             onTap: onTap,
@@ -193,7 +216,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
               child: SizedBox(
                 height: height,
                 child: SearchBar(
-                  hintText: l10n(context).searchHint,
+                  hintText: AppLocalizations.of(context)!.searchHint,
                   elevation: const WidgetStatePropertyAll(0),
                   backgroundColor: WidgetStatePropertyAll(
                     Theme.of(context).colorScheme.surfaceContainerHigh,
@@ -242,7 +265,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
   }
 
   Widget _buildDiscoverView() {
-    final strings = l10n(context);
+    final strings = AppLocalizations.of(context)!;
     if (_initialLoading) {
       if (!widget.allowInitialLoad &&
           widget.hideLoadingUntilInitialLoadAllowed) {
@@ -308,7 +331,12 @@ class _DiscoverPageState extends State<DiscoverPage> {
                   onPressed: () {
                     Navigator.of(context).push(
                       MaterialPageRoute<void>(
-                        builder: (_) => DiscoverSectionPage(section: section),
+                        builder: (_) => DiscoverSectionPage(
+                          section: section,
+                          comicDetailPageBuilder: widget.comicDetailPageBuilder,
+                          comicCoverHeroTagBuilder:
+                              widget.comicCoverHeroTagBuilder,
+                        ),
                       ),
                     );
                   },
@@ -330,14 +358,14 @@ class _DiscoverPageState extends State<DiscoverPage> {
                   child: InkWell(
                     borderRadius: BorderRadius.circular(8),
                     onTap: () {
-                      final heroTag = _comicCoverHeroTag(
+                      final heroTag = widget.comicCoverHeroTagBuilder(
                         comic,
                         salt: 'discover-${section.title}-$index',
                       );
                       Navigator.of(context).push(
                         MaterialPageRoute<void>(
                           builder: (_) =>
-                              ComicDetailPage(comic: comic, heroTag: heroTag),
+                              widget.comicDetailPageBuilder(comic, heroTag),
                         ),
                       );
                     },
@@ -346,7 +374,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
                       children: [
                         Expanded(
                           child: Hero(
-                            tag: _comicCoverHeroTag(
+                            tag: widget.comicCoverHeroTagBuilder(
                               comic,
                               salt: 'discover-${section.title}-$index',
                             ),

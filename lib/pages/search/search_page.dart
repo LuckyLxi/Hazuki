@@ -1,49 +1,51 @@
-part of '../../main.dart';
+import 'dart:async';
+import 'dart:math' as math;
 
-const Duration _searchLoadTimeout = Duration(seconds: 25);
-const double _searchAppBarRevealOffset = 68;
-const int _searchHistoryCollapsedMaxRows = 4;
-const double _searchHistoryChipSpacing = 8;
-const Set<String> _searchOrderKeys = {
-  'mr',
-  'mv',
-  'mv_m',
-  'mv_w',
-  'mv_t',
-  'mp',
-  'tf',
-};
-
-Map<String, String> searchOrderLabels(BuildContext context) {
-  final strings = l10n(context);
-  return {
-    'mr': strings.searchOrderLatest,
-    'mv': strings.searchOrderTotalRanking,
-    'mv_m': strings.searchOrderMonthlyRanking,
-    'mv_w': strings.searchOrderWeeklyRanking,
-    'mv_t': strings.searchOrderDailyRanking,
-    'mp': strings.searchOrderMostImages,
-    'tf': strings.searchOrderMostLikes,
-  };
-}
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../app/app.dart';
+import '../../l10n/app_localizations.dart';
+import '../../widgets/widgets.dart';
+import 'search_results_page.dart';
+import 'search_shared.dart';
 
 class SearchPage extends StatelessWidget {
-  const SearchPage({super.key, this.initialKeyword});
+  const SearchPage({
+    super.key,
+    this.initialKeyword,
+    required this.comicDetailPageBuilder,
+    this.comicCoverHeroTagBuilder = comicCoverHeroTag,
+  });
 
   final String? initialKeyword;
+  final ComicDetailPageBuilder comicDetailPageBuilder;
+  final ComicHeroTagBuilder comicCoverHeroTagBuilder;
 
   @override
   Widget build(BuildContext context) {
     final keyword = initialKeyword?.trim() ?? '';
     if (keyword.isNotEmpty) {
-      return SearchResultsPage(initialKeyword: keyword);
+      return SearchResultsPage(
+        initialKeyword: keyword,
+        comicDetailPageBuilder: comicDetailPageBuilder,
+        comicCoverHeroTagBuilder: comicCoverHeroTagBuilder,
+      );
     }
-    return const _SearchEntryPage();
+    return _SearchEntryPage(
+      comicDetailPageBuilder: comicDetailPageBuilder,
+      comicCoverHeroTagBuilder: comicCoverHeroTagBuilder,
+    );
   }
 }
 
 class _SearchEntryPage extends StatefulWidget {
-  const _SearchEntryPage();
+  const _SearchEntryPage({
+    required this.comicDetailPageBuilder,
+    required this.comicCoverHeroTagBuilder,
+  });
+
+  final ComicDetailPageBuilder comicDetailPageBuilder;
+  final ComicHeroTagBuilder comicCoverHeroTagBuilder;
 
   @override
   State<_SearchEntryPage> createState() => _SearchEntryPageState();
@@ -94,8 +96,10 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
     if (!_scrollController.hasClients) {
       return 0;
     }
-    return (_scrollController.position.pixels / _searchAppBarRevealOffset)
-        .clamp(0.0, 1.0);
+    return (_scrollController.position.pixels / searchAppBarRevealOffset).clamp(
+      0.0,
+      1.0,
+    );
   }
 
   void _syncSearchRevealProgress({bool force = false}) {
@@ -245,10 +249,10 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
       );
       final nextWidth = rowWidth == 0
           ? chipWidth
-          : rowWidth + _searchHistoryChipSpacing + chipWidth;
+          : rowWidth + searchHistoryChipSpacing + chipWidth;
       if (rowWidth > 0 && nextWidth > maxWidth) {
         rowCount += 1;
-        if (rowCount > _searchHistoryCollapsedMaxRows) {
+        if (rowCount > searchHistoryCollapsedMaxRows) {
           break;
         }
         rowWidth = chipWidth;
@@ -262,7 +266,7 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
   }
 
   Future<void> _openResults(String rawKeyword) async {
-    final keyword = await _normalizeSubmittedKeyword(
+    final keyword = await normalizeSubmittedKeyword(
       rawKeyword,
       controller: _searchController,
     );
@@ -273,7 +277,11 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
     _parkSearchFocus();
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => SearchResultsPage(initialKeyword: keyword),
+        builder: (_) => SearchResultsPage(
+          initialKeyword: keyword,
+          comicDetailPageBuilder: widget.comicDetailPageBuilder,
+          comicCoverHeroTagBuilder: widget.comicCoverHeroTagBuilder,
+        ),
       ),
     );
     if (!mounted) {
@@ -288,7 +296,7 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
     if (!mounted) {
       return;
     }
-    final strings = l10n(context);
+    final strings = AppLocalizations.of(context)!;
     final confirm = await showGeneralDialog<bool>(
       context: context,
       barrierDismissible: true,
@@ -348,7 +356,7 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
       child: SearchBar(
         focusNode: _searchFocusNode,
         controller: _searchController,
-        hintText: l10n(context).searchHint,
+        hintText: AppLocalizations.of(context)!.searchHint,
         elevation: const WidgetStatePropertyAll(0),
         backgroundColor: WidgetStatePropertyAll(
           Theme.of(context).colorScheme.surfaceContainerHigh,
@@ -376,7 +384,7 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
             child: _searchController.text.isNotEmpty
                 ? IconButton(
                     key: ValueKey(clearKey),
-                    tooltip: l10n(context).searchClearTooltip,
+                    tooltip: AppLocalizations.of(context)!.searchClearTooltip,
                     onPressed: () {
                       _searchController.clear();
                       setState(() {});
@@ -386,7 +394,7 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
                   )
                 : IconButton(
                     key: ValueKey(submitKey),
-                    tooltip: l10n(context).searchSubmitTooltip,
+                    tooltip: AppLocalizations.of(context)!.searchSubmitTooltip,
                     onPressed: () =>
                         unawaited(_openResults(_searchController.text)),
                     icon: const Icon(Icons.arrow_forward),
@@ -415,7 +423,7 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
               child: HeroMode(
                 enabled: !_showCollapsedSearch,
                 child: Hero(
-                  tag: _discoverSearchHeroTag,
+                  tag: discoverSearchHeroTag,
                   child: _buildSearchBar(
                     clearKey: 'entry-clear',
                     submitKey: 'entry-submit',
@@ -433,7 +441,7 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
     return HeroMode(
       enabled: _showCollapsedSearch,
       child: Hero(
-        tag: _discoverSearchHeroTag,
+        tag: discoverSearchHeroTag,
         child: ClipRect(
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 220),
@@ -500,7 +508,7 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
             Padding(
               padding: const EdgeInsets.only(bottom: 12, left: 4),
               child: Text(
-                l10n(context).searchHistoryTitle,
+                AppLocalizations.of(context)!.searchHistoryTitle,
                 style: Theme.of(context).textTheme.titleSmall?.copyWith(
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
@@ -514,7 +522,7 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
               child: SizedBox(
                 width: double.infinity,
                 child: Wrap(
-                  spacing: _searchHistoryChipSpacing,
+                  spacing: searchHistoryChipSpacing,
                   runSpacing: 8,
                   children: displayList.map((keyword) {
                     if (_historyEditMode) {
@@ -582,7 +590,7 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
             : null,
         appBar: hazukiFrostedAppBar(
           context: context,
-          title: Text(l10n(context).searchTitle),
+          title: Text(AppLocalizations.of(context)!.searchTitle),
           actions: [
             _buildCollapsedSearchBox(),
             AnimatedContainer(
@@ -607,40 +615,4 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
       ),
     );
   }
-}
-
-Future<String> _normalizeSubmittedKeyword(
-  String rawKeyword, {
-  TextEditingController? controller,
-}) async {
-  var keyword = rawKeyword.trim();
-  if (keyword.isEmpty) {
-    return '';
-  }
-
-  final prefs = await SharedPreferences.getInstance();
-  if (prefs.getBool('advanced_comic_id_search_enhance') == true) {
-    final digitsOnly = keyword.replaceAll(RegExp(r'[^\d]'), '');
-    if (digitsOnly.length > 2 && digitsOnly != keyword) {
-      keyword = digitsOnly;
-      controller?.value = TextEditingValue(
-        text: keyword,
-        selection: TextSelection.collapsed(offset: keyword.length),
-      );
-    }
-  }
-  return keyword;
-}
-
-Future<void> _addSearchHistory(String keyword) async {
-  if (keyword.isEmpty) {
-    return;
-  }
-  final prefs = await SharedPreferences.getInstance();
-  final history = prefs.getStringList('search_history') ?? const <String>[];
-  final newHistory = [keyword, ...history.where((e) => e != keyword)];
-  if (newHistory.length > 50) {
-    newHistory.removeRange(50, newHistory.length);
-  }
-  await prefs.setStringList('search_history', newHistory);
 }

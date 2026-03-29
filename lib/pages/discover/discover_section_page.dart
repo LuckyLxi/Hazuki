@@ -1,12 +1,27 @@
-part of '../../main.dart';
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+
+import '../../app/app.dart';
+import '../../l10n/app_localizations.dart';
+import '../../models/hazuki_models.dart';
+import '../../services/hazuki_source_service.dart';
+import '../../widgets/widgets.dart';
 
 /// 专栏漫画列表页
 /// 初始数据来自发现页预加载的 [section.comics]，
 /// 若 [section.viewMoreUrl] 不为空则支持上滑分页继续加载
 class DiscoverSectionPage extends StatefulWidget {
-  const DiscoverSectionPage({super.key, required this.section});
+  const DiscoverSectionPage({
+    super.key,
+    required this.section,
+    required this.comicDetailPageBuilder,
+    this.comicCoverHeroTagBuilder = comicCoverHeroTag,
+  });
 
   final ExploreSection section;
+  final ComicDetailPageBuilder comicDetailPageBuilder;
+  final ComicHeroTagBuilder comicCoverHeroTagBuilder;
 
   @override
   State<DiscoverSectionPage> createState() => _DiscoverSectionPageState();
@@ -120,7 +135,9 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = l10n(context).discoverSectionLoadFailed('$e');
+        _errorMessage = AppLocalizations.of(
+          context,
+        )!.discoverSectionLoadFailed('$e');
       });
     } finally {
       if (mounted) {
@@ -186,7 +203,7 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
 
   @override
   Widget build(BuildContext context) {
-    final strings = l10n(context);
+    final strings = AppLocalizations.of(context)!;
 
     return Scaffold(
       appBar: hazukiFrostedAppBar(
@@ -264,7 +281,7 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
                             ),
                         itemBuilder: (context, index) {
                           final comic = _comics[index];
-                          final heroTag = _comicCoverHeroTag(
+                          final heroTag = widget.comicCoverHeroTagBuilder(
                             comic,
                             salt:
                                 'discover-more-${widget.section.title}-$index',
@@ -274,9 +291,9 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
                             onTap: () async {
                               await Navigator.of(context).push(
                                 MaterialPageRoute<void>(
-                                  builder: (_) => ComicDetailPage(
-                                    comic: comic,
-                                    heroTag: heroTag,
+                                  builder: (_) => widget.comicDetailPageBuilder(
+                                    comic,
+                                    heroTag,
                                   ),
                                 ),
                               );

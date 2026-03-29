@@ -1,9 +1,15 @@
-part of '../main.dart';
+import 'dart:async';
+import 'dart:typed_data';
+
+import 'package:flutter/material.dart';
+
+import '../app/ui_flags.dart';
+import '../services/hazuki_source_service.dart';
 
 const int _hazukiWidgetImageMemoryLimit = 300;
 final Map<String, Uint8List> _hazukiWidgetImageMemory = <String, Uint8List>{};
 
-Uint8List? _takeWidgetImageMemory(String url) {
+Uint8List? takeHazukiWidgetImageMemory(String url) {
   final bytes = _hazukiWidgetImageMemory[url];
   if (bytes == null) {
     return null;
@@ -13,7 +19,7 @@ Uint8List? _takeWidgetImageMemory(String url) {
   return bytes;
 }
 
-void _putWidgetImageMemory(String url, Uint8List bytes) {
+void putHazukiWidgetImageMemory(String url, Uint8List bytes) {
   _hazukiWidgetImageMemory.remove(url);
   _hazukiWidgetImageMemory[url] = bytes;
   while (_hazukiWidgetImageMemory.length > _hazukiWidgetImageMemoryLimit) {
@@ -133,7 +139,7 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
       _loading = false;
       return false;
     }
-    final cached = _takeWidgetImageMemory(normalized);
+    final cached = takeHazukiWidgetImageMemory(normalized);
     if (cached == null) {
       return false;
     }
@@ -165,7 +171,7 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
       return;
     }
 
-    final cached = _takeWidgetImageMemory(normalized);
+    final cached = takeHazukiWidgetImageMemory(normalized);
     if (cached != null) {
       if (!mounted) {
         _bytes = cached;
@@ -201,7 +207,7 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
         keepInMemory: widget.keepInMemory,
       );
       if (widget.keepInMemory) {
-        _putWidgetImageMemory(normalized, bytes);
+        putHazukiWidgetImageMemory(normalized, bytes);
       }
       if (!mounted || widget.url.trim() != normalized) {
         return;
@@ -375,7 +381,7 @@ class _HazukiCachedCircleAvatarState extends State<HazukiCachedCircleAvatar> {
       return;
     }
 
-    final cached = _takeWidgetImageMemory(normalized);
+    final cached = takeHazukiWidgetImageMemory(normalized);
     if (cached != null) {
       if (!mounted) {
         _bytes = cached;
@@ -403,7 +409,7 @@ class _HazukiCachedCircleAvatarState extends State<HazukiCachedCircleAvatar> {
       final bytes = await HazukiSourceService.instance.downloadImageBytes(
         normalized,
       );
-      _putWidgetImageMemory(normalized, bytes);
+      putHazukiWidgetImageMemory(normalized, bytes);
       if (!mounted || widget.url.trim() != normalized) {
         return;
       }

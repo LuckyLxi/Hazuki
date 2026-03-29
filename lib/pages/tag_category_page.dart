@@ -1,7 +1,16 @@
-part of '../main.dart';
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+
+import '../l10n/app_localizations.dart';
+import '../models/hazuki_models.dart';
+import '../services/hazuki_source_service.dart';
+import '../widgets/widgets.dart';
 
 class TagCategoryPage extends StatefulWidget {
-  const TagCategoryPage({super.key});
+  const TagCategoryPage({super.key, required this.searchPageBuilder});
+
+  final Widget Function(String tag) searchPageBuilder;
 
   @override
   State<TagCategoryPage> createState() => _TagCategoryPageState();
@@ -23,7 +32,7 @@ class _TagCategoryPageState extends State<TagCategoryPage> {
   }
 
   Future<List<CategoryTagGroup>> _loadTagGroups() {
-    final timeoutMessage = l10n(context).tagCategoryLoadTimeout;
+    final timeoutMessage = AppLocalizations.of(context)!.tagCategoryLoadTimeout;
     return HazukiSourceService.instance.loadCategoryTagGroups().timeout(
       _loadTimeout,
       onTimeout: () => throw Exception(timeoutMessage),
@@ -50,7 +59,9 @@ class _TagCategoryPageState extends State<TagCategoryPage> {
         return;
       }
       setState(() {
-        _errorMessage = l10n(context).tagCategoryLoadFailed('$e');
+        _errorMessage = AppLocalizations.of(
+          context,
+        )!.tagCategoryLoadFailed('$e');
       });
     } finally {
       if (mounted) {
@@ -63,13 +74,13 @@ class _TagCategoryPageState extends State<TagCategoryPage> {
 
   void _openSearchByTag(String tag) {
     Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => SearchPage(initialKeyword: tag)),
+      MaterialPageRoute<void>(builder: (_) => widget.searchPageBuilder(tag)),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final strings = l10n(context);
+    final strings = AppLocalizations.of(context)!;
 
     return Scaffold(
       appBar: hazukiFrostedAppBar(

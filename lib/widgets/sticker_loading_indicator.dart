@@ -1,4 +1,4 @@
-part of '../main.dart';
+import 'package:flutter/material.dart';
 
 class HazukiStickerLoadingIndicator extends StatefulWidget {
   const HazukiStickerLoadingIndicator({super.key, this.size = 56});

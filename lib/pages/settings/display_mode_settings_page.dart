@@ -1,4 +1,11 @@
-part of '../../main.dart';
+import 'dart:async';
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+
+import '../../app/app.dart';
+import '../../l10n/app_localizations.dart';
+import '../../widgets/widgets.dart';
 
 class DisplayModeSettingsPage extends StatefulWidget {
   const DisplayModeSettingsPage({
@@ -45,7 +52,7 @@ class _DisplayModeSettingsPageState extends State<DisplayModeSettingsPage> {
       if (!mounted) {
         return;
       }
-      final strings = l10n(context);
+      final strings = AppLocalizations.of(context)!;
       setState(() {
         _loading = false;
         _error = strings.displayModeAndroidOnly;
@@ -54,13 +61,7 @@ class _DisplayModeSettingsPageState extends State<DisplayModeSettingsPage> {
     }
 
     try {
-      final list = await _displayModeChannel.invokeMethod<List<dynamic>>(
-        'getDisplayModes',
-      );
-      final modes = (list ?? const <dynamic>[])
-          .whereType<Map>()
-          .map((item) => Map<String, dynamic>.from(item))
-          .toList();
+      final modes = await fetchHazukiDisplayModes();
       final preferredRaw = _applyingRaw ?? _selectedRaw;
       final hasPreferred = modes.any(
         (mode) => mode['raw']?.toString() == preferredRaw,
@@ -84,7 +85,7 @@ class _DisplayModeSettingsPageState extends State<DisplayModeSettingsPage> {
       if (!mounted) {
         return;
       }
-      final strings = l10n(context);
+      final strings = AppLocalizations.of(context)!;
       setState(() {
         _loading = false;
         _error = strings.displayModeReadFailed('$e');
@@ -97,7 +98,7 @@ class _DisplayModeSettingsPageState extends State<DisplayModeSettingsPage> {
       return;
     }
 
-    final strings = l10n(context);
+    final strings = AppLocalizations.of(context)!;
     final previousRaw = _selectedRaw;
     setState(() {
       _selectedRaw = raw;
@@ -108,15 +109,10 @@ class _DisplayModeSettingsPageState extends State<DisplayModeSettingsPage> {
     try {
       bool applied;
       if (raw == 'native:auto') {
-        await _displayModeChannel.invokeMethod<void>('applyAutoDisplayMode');
+        await applyHazukiAutoDisplayMode();
         applied = true;
       } else {
-        applied =
-            await _displayModeChannel.invokeMethod<bool>(
-              'applyDisplayModeRaw',
-              {'raw': raw},
-            ) ??
-            false;
+        applied = await applyHazukiDisplayModeRaw(raw);
       }
       if (!applied) {
         throw Exception(strings.displayModeSystemRejected);
@@ -154,7 +150,7 @@ class _DisplayModeSettingsPageState extends State<DisplayModeSettingsPage> {
   String _modeLabel(BuildContext context, Map<String, dynamic> mode) {
     return mode['label']?.toString() ??
         mode['raw']?.toString() ??
-        l10n(context).displayModeUnknownMode;
+        AppLocalizations.of(context)!.displayModeUnknownMode;
   }
 
   Map<String, dynamic>? _findModeByRaw(String? raw) {
@@ -174,7 +170,7 @@ class _DisplayModeSettingsPageState extends State<DisplayModeSettingsPage> {
     if (active != null) {
       return _modeLabel(context, active);
     }
-    return _activeRaw ?? l10n(context).displayModeUnknown;
+    return _activeRaw ?? AppLocalizations.of(context)!.displayModeUnknown;
   }
 
   String _selectedModeLabel(BuildContext context) {
@@ -290,7 +286,7 @@ class _DisplayModeSettingsPageState extends State<DisplayModeSettingsPage> {
   Widget _buildOverviewCard(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final strings = l10n(context);
+    final strings = AppLocalizations.of(context)!;
 
     return _buildSectionCard(
       context,
@@ -431,7 +427,7 @@ class _DisplayModeSettingsPageState extends State<DisplayModeSettingsPage> {
   }
 
   Widget _buildModeCard(BuildContext context, Map<String, dynamic> mode) {
-    final strings = l10n(context);
+    final strings = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final raw = mode['raw']?.toString() ?? 'native:auto';
@@ -540,7 +536,7 @@ class _DisplayModeSettingsPageState extends State<DisplayModeSettingsPage> {
   }
 
   Widget _buildErrorState(BuildContext context) {
-    final strings = l10n(context);
+    final strings = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     return ListView(
@@ -625,7 +621,7 @@ class _DisplayModeSettingsPageState extends State<DisplayModeSettingsPage> {
     return Scaffold(
       appBar: hazukiFrostedAppBar(
         context: context,
-        title: Text(l10n(context).displayRefreshRateTitle),
+        title: Text(AppLocalizations.of(context)!.displayRefreshRateTitle),
       ),
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 220),

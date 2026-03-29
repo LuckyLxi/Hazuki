@@ -1,4 +1,8 @@
-part of '../../main.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import '../../l10n/app_localizations.dart';
+import '../../widgets/widgets.dart';
 
 class PrivacySettingsPage extends StatefulWidget {
   const PrivacySettingsPage({super.key});
@@ -80,9 +84,28 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
     } catch (_) {}
   }
 
+  Widget _buildGroup(BuildContext context, {required List<Widget> children}) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: children,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final strings = l10n(context);
+    final strings = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: hazukiFrostedAppBar(
         context: context,
@@ -91,28 +114,38 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
+              padding: const EdgeInsets.symmetric(vertical: 8),
               children: [
-                SwitchListTile(
-                  secondary: const Icon(Icons.blur_on_outlined),
-                  title: Text(strings.privacyBlurTaskTitle),
-                  subtitle: Text(strings.privacyBlurTaskSubtitle),
-                  value: _blurBackground,
-                  onChanged: _toggleBlurBackground,
+                _buildGroup(
+                  context,
+                  children: [
+                    SwitchListTile(
+                      secondary: const Icon(Icons.blur_on_outlined),
+                      title: Text(strings.privacyBlurTaskTitle),
+                      subtitle: Text(strings.privacyBlurTaskSubtitle),
+                      value: _blurBackground,
+                      onChanged: _toggleBlurBackground,
+                    ),
+                  ],
                 ),
-                const Divider(height: 1),
-                SwitchListTile(
-                  secondary: const Icon(Icons.fingerprint_outlined),
-                  title: Text(strings.privacyBiometricUnlockTitle),
-                  subtitle: Text(strings.privacyBiometricUnlockSubtitle),
-                  value: _biometricAuth,
-                  onChanged: _toggleBiometricAuth,
-                ),
-                SwitchListTile(
-                  secondary: const Icon(Icons.lock_clock_outlined),
-                  title: Text(strings.privacyAuthOnResumeTitle),
-                  subtitle: Text(strings.privacyAuthOnResumeSubtitle),
-                  value: _authOnResume,
-                  onChanged: _biometricAuth ? _toggleAuthOnResume : null,
+                _buildGroup(
+                  context,
+                  children: [
+                    SwitchListTile(
+                      secondary: const Icon(Icons.fingerprint_outlined),
+                      title: Text(strings.privacyBiometricUnlockTitle),
+                      subtitle: Text(strings.privacyBiometricUnlockSubtitle),
+                      value: _biometricAuth,
+                      onChanged: _toggleBiometricAuth,
+                    ),
+                    SwitchListTile(
+                      secondary: const Icon(Icons.lock_clock_outlined),
+                      title: Text(strings.privacyAuthOnResumeTitle),
+                      subtitle: Text(strings.privacyAuthOnResumeSubtitle),
+                      value: _authOnResume,
+                      onChanged: _biometricAuth ? _toggleAuthOnResume : null,
+                    ),
+                  ],
                 ),
               ],
             ),

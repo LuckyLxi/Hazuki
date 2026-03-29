@@ -1,7 +1,22 @@
-part of '../main.dart';
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+
+import '../app/app.dart';
+import '../l10n/app_localizations.dart';
+import '../models/hazuki_models.dart';
+import '../services/hazuki_source_service.dart';
+import '../widgets/widgets.dart';
 
 class RankingPage extends StatefulWidget {
-  const RankingPage({super.key});
+  const RankingPage({
+    super.key,
+    required this.comicDetailPageBuilder,
+    this.comicCoverHeroTagBuilder = comicCoverHeroTag,
+  });
+
+  final ComicDetailPageBuilder comicDetailPageBuilder;
+  final ComicHeroTagBuilder comicCoverHeroTagBuilder;
 
   @override
   State<RankingPage> createState() => _RankingPageState();
@@ -84,7 +99,9 @@ class _RankingPageState extends State<RankingPage> {
   }
 
   Future<List<CategoryRankingOption>> _loadRankingOptions() {
-    final timeoutMessage = l10n(context).rankingLoadOptionsTimeout;
+    final timeoutMessage = AppLocalizations.of(
+      context,
+    )!.rankingLoadOptionsTimeout;
     return HazukiSourceService.instance.loadCategoryRankingOptions().timeout(
       _loadTimeout,
       onTimeout: () => throw Exception(timeoutMessage),
@@ -95,7 +112,7 @@ class _RankingPageState extends State<RankingPage> {
     required String rankingOption,
     required int page,
   }) {
-    final timeoutMessage = l10n(context).rankingLoadTimeout;
+    final timeoutMessage = AppLocalizations.of(context)!.rankingLoadTimeout;
     return HazukiSourceService.instance
         .loadCategoryRankingComics(rankingOption: rankingOption, page: page)
         .timeout(
@@ -145,7 +162,7 @@ class _RankingPageState extends State<RankingPage> {
         return;
       }
       setState(() {
-        _errorMessage = l10n(context).rankingLoadFailed('$e');
+        _errorMessage = AppLocalizations.of(context)!.rankingLoadFailed('$e');
       });
     } finally {
       if (mounted) {
@@ -230,7 +247,7 @@ class _RankingPageState extends State<RankingPage> {
         return;
       }
       setState(() {
-        _errorMessage = l10n(context).rankingLoadFailed('$e');
+        _errorMessage = AppLocalizations.of(context)!.rankingLoadFailed('$e');
       });
     } finally {
       if (mounted && requestToken == _rankingRequestToken) {
@@ -257,7 +274,7 @@ class _RankingPageState extends State<RankingPage> {
   }
 
   Widget _buildRankingComicItem(ExploreComic comic, int index) {
-    final heroTag = _comicCoverHeroTag(
+    final heroTag = widget.comicCoverHeroTagBuilder(
       comic,
       salt: 'ranking-page-${_selectedRankingValue ?? 'none'}-$index',
     );
@@ -269,7 +286,7 @@ class _RankingPageState extends State<RankingPage> {
         onTap: () {
           Navigator.of(context).push(
             MaterialPageRoute<void>(
-              builder: (_) => ComicDetailPage(comic: comic, heroTag: heroTag),
+              builder: (_) => widget.comicDetailPageBuilder(comic, heroTag),
             ),
           );
         },
@@ -369,7 +386,7 @@ class _RankingPageState extends State<RankingPage> {
 
   @override
   Widget build(BuildContext context) {
-    final strings = l10n(context);
+    final strings = AppLocalizations.of(context)!;
 
     return Scaffold(
       appBar: hazukiFrostedAppBar(

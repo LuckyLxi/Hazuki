@@ -1,4 +1,4 @@
-part of '../../main.dart';
+part of '../comic_detail_page.dart';
 
 class _ComicDetailHeaderSection extends StatelessWidget {
   const _ComicDetailHeaderSection({

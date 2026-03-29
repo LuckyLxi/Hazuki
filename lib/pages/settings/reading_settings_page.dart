@@ -1,4 +1,9 @@
-part of '../../main.dart';
+import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../../l10n/app_localizations.dart';
+import '../../pages/reader/reader.dart';
+import '../../widgets/widgets.dart';
 
 class ReadingSettingsPage extends StatefulWidget {
   const ReadingSettingsPage({super.key});
@@ -8,7 +13,7 @@ class ReadingSettingsPage extends StatefulWidget {
 }
 
 class _ReadingSettingsPageState extends State<ReadingSettingsPage> {
-  _ReaderMode _readerMode = _ReaderMode.topToBottom;
+  ReaderMode _readerMode = ReaderMode.topToBottom;
   bool _tapToTurnPage = false;
   bool _immersiveMode = true;
   bool _keepScreenOn = true;
@@ -28,7 +33,7 @@ class _ReadingSettingsPageState extends State<ReadingSettingsPage> {
     final prefs = await SharedPreferences.getInstance();
     if (!mounted) return;
     setState(() {
-      _readerMode = _readerModeFromRaw(prefs.getString('reader_reading_mode'));
+      _readerMode = readerModeFromRaw(prefs.getString('reader_reading_mode'));
       _tapToTurnPage = prefs.getBool('reader_tap_to_turn_page') ?? false;
       _immersiveMode = prefs.getBool('reader_immersive_mode') ?? true;
       _keepScreenOn = prefs.getBool('reader_keep_screen_on') ?? true;
@@ -40,7 +45,7 @@ class _ReadingSettingsPageState extends State<ReadingSettingsPage> {
     });
   }
 
-  Future<void> _updateReaderMode(_ReaderMode? value) async {
+  Future<void> _updateReaderMode(ReaderMode? value) async {
     if (value == null) {
       return;
     }
@@ -99,9 +104,28 @@ class _ReadingSettingsPageState extends State<ReadingSettingsPage> {
     await prefs.setBool('reader_long_press_save', value);
   }
 
+  Widget _buildGroup(BuildContext context, {required List<Widget> children}) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: children,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final strings = l10n(context);
+    final strings = AppLocalizations.of(context)!;
     final brightnessText = (_brightnessValue * 100).round().toString();
     final sliderActiveColor = Theme.of(context).colorScheme.primary;
     final sliderInactiveColor = Theme.of(
@@ -114,109 +138,121 @@ class _ReadingSettingsPageState extends State<ReadingSettingsPage> {
         title: Text(strings.readingSettingsTitle),
       ),
       body: ListView(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        physics: const AlwaysScrollableScrollPhysics(),
         children: [
-          ListTile(
-            leading: const Icon(Icons.chrome_reader_mode_outlined),
-            title: Text(strings.readingModeTitle),
-            subtitle: Text(strings.readingModeSubtitle),
-            trailing: DropdownButtonHideUnderline(
-              child: DropdownButton<_ReaderMode>(
-                value: _readerMode,
-                borderRadius: BorderRadius.circular(18),
-                onChanged: _updateReaderMode,
-                items: [
-                  DropdownMenuItem(
-                    value: _ReaderMode.topToBottom,
-                    child: Text(strings.readingModeTopToBottom),
+          _buildGroup(
+            context,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.chrome_reader_mode_outlined),
+                title: Text(strings.readingModeTitle),
+                subtitle: Text(strings.readingModeSubtitle),
+                trailing: DropdownButtonHideUnderline(
+                  child: DropdownButton<ReaderMode>(
+                    value: _readerMode,
+                    borderRadius: BorderRadius.circular(18),
+                    onChanged: _updateReaderMode,
+                    items: [
+                      DropdownMenuItem(
+                        value: ReaderMode.topToBottom,
+                        child: Text(strings.readingModeTopToBottom),
+                      ),
+                      DropdownMenuItem(
+                        value: ReaderMode.rightToLeft,
+                        child: Text(strings.readingModeRightToLeft),
+                      ),
+                    ],
                   ),
-                  DropdownMenuItem(
-                    value: _ReaderMode.rightToLeft,
-                    child: Text(strings.readingModeRightToLeft),
+                ),
+              ),
+              SwitchListTile(
+                secondary: const Icon(Icons.touch_app_outlined),
+                title: Text(strings.readingTapToTurnPageTitle),
+                subtitle: Text(strings.readingTapToTurnPageSubtitle),
+                value: _tapToTurnPage,
+                onChanged: _readerMode == ReaderMode.rightToLeft
+                    ? _toggleTapToTurnPage
+                    : null,
+              ),
+              SwitchListTile(
+                secondary: const Icon(Icons.zoom_in_outlined),
+                title: Text(strings.readingPinchToZoomTitle),
+                subtitle: Text(strings.readingPinchToZoomSubtitle),
+                value: _pinchToZoom,
+                onChanged: _togglePinchToZoom,
+              ),
+              SwitchListTile(
+                secondary: const Icon(Icons.save_alt_outlined),
+                title: Text(strings.readingLongPressSaveTitle),
+                subtitle: Text(strings.readingLongPressSaveSubtitle),
+                value: _longPressToSave,
+                onChanged: _toggleLongPressToSave,
+              ),
+            ],
+          ),
+          _buildGroup(
+            context,
+            children: [
+              SwitchListTile(
+                secondary: const Icon(Icons.fullscreen_outlined),
+                title: Text(strings.readingImmersiveModeTitle),
+                subtitle: Text(strings.readingImmersiveModeSubtitle),
+                value: _immersiveMode,
+                onChanged: _toggleImmersiveMode,
+              ),
+              SwitchListTile(
+                secondary: const Icon(Icons.screen_lock_portrait_outlined),
+                title: Text(strings.readingKeepScreenOnTitle),
+                subtitle: Text(strings.readingKeepScreenOnSubtitle),
+                value: _keepScreenOn,
+                onChanged: _toggleKeepScreenOn,
+              ),
+              SwitchListTile(
+                secondary: const Icon(Icons.format_list_numbered_outlined),
+                title: Text(strings.readingPageIndicatorTitle),
+                subtitle: Text(strings.readingPageIndicatorSubtitle),
+                value: _pageIndicator,
+                onChanged: _togglePageIndicator,
+              ),
+              const Divider(height: 1, indent: 16, endIndent: 16),
+              SwitchListTile(
+                secondary: const Icon(Icons.brightness_medium_outlined),
+                title: Text(strings.readingCustomBrightnessTitle),
+                subtitle: Text(strings.readingCustomBrightnessSubtitle),
+                value: _customBrightness,
+                onChanged: _toggleCustomBrightness,
+              ),
+              ListTile(
+                leading: Icon(
+                  Icons.wb_sunny_outlined,
+                  color: _customBrightness
+                      ? Theme.of(context).colorScheme.onSurface
+                      : Theme.of(
+                          context,
+                        ).colorScheme.onSurface.withValues(alpha: 0.38),
+                ),
+                title: Text(
+                  strings.readingBrightnessLabel(brightnessText),
+                  style: TextStyle(
+                    color: _customBrightness
+                        ? Theme.of(context).colorScheme.onSurface
+                        : Theme.of(
+                            context,
+                          ).colorScheme.onSurface.withValues(alpha: 0.38),
                   ),
-                ],
+                ),
+                subtitle: Slider(
+                  value: _brightnessValue,
+                  min: 0,
+                  max: 1,
+                  divisions: 100,
+                  onChanged: _customBrightness ? _updateBrightness : null,
+                  activeColor: sliderActiveColor,
+                  inactiveColor: sliderInactiveColor,
+                ),
               ),
-            ),
-          ),
-          SwitchListTile(
-            secondary: const Icon(Icons.touch_app_outlined),
-            title: Text(strings.readingTapToTurnPageTitle),
-            subtitle: Text(strings.readingTapToTurnPageSubtitle),
-            value: _tapToTurnPage,
-            onChanged: _readerMode == _ReaderMode.rightToLeft
-                ? _toggleTapToTurnPage
-                : null,
-          ),
-          SwitchListTile(
-            secondary: const Icon(Icons.fullscreen_outlined),
-            title: Text(strings.readingImmersiveModeTitle),
-            subtitle: Text(strings.readingImmersiveModeSubtitle),
-            value: _immersiveMode,
-            onChanged: _toggleImmersiveMode,
-          ),
-          SwitchListTile(
-            secondary: const Icon(Icons.screen_lock_portrait_outlined),
-            title: Text(strings.readingKeepScreenOnTitle),
-            subtitle: Text(strings.readingKeepScreenOnSubtitle),
-            value: _keepScreenOn,
-            onChanged: _toggleKeepScreenOn,
-          ),
-          SwitchListTile(
-            secondary: const Icon(Icons.brightness_medium_outlined),
-            title: Text(strings.readingCustomBrightnessTitle),
-            subtitle: Text(strings.readingCustomBrightnessSubtitle),
-            value: _customBrightness,
-            onChanged: _toggleCustomBrightness,
-          ),
-          ListTile(
-            leading: Icon(
-              Icons.wb_sunny_outlined,
-              color: _customBrightness
-                  ? Theme.of(context).colorScheme.onSurface
-                  : Theme.of(
-                      context,
-                    ).colorScheme.onSurface.withValues(alpha: 0.38),
-            ),
-            title: Text(
-              strings.readingBrightnessLabel(brightnessText),
-              style: TextStyle(
-                color: _customBrightness
-                    ? Theme.of(context).colorScheme.onSurface
-                    : Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(alpha: 0.38),
-              ),
-            ),
-            subtitle: Slider(
-              value: _brightnessValue,
-              min: 0,
-              max: 1,
-              divisions: 100,
-              onChanged: _customBrightness ? _updateBrightness : null,
-              activeColor: sliderActiveColor,
-              inactiveColor: sliderInactiveColor,
-            ),
-          ),
-          const Divider(height: 1),
-          SwitchListTile(
-            secondary: const Icon(Icons.format_list_numbered_outlined),
-            title: Text(strings.readingPageIndicatorTitle),
-            subtitle: Text(strings.readingPageIndicatorSubtitle),
-            value: _pageIndicator,
-            onChanged: _togglePageIndicator,
-          ),
-          SwitchListTile(
-            secondary: const Icon(Icons.zoom_in_outlined),
-            title: Text(strings.readingPinchToZoomTitle),
-            subtitle: Text(strings.readingPinchToZoomSubtitle),
-            value: _pinchToZoom,
-            onChanged: _togglePinchToZoom,
-          ),
-          SwitchListTile(
-            secondary: const Icon(Icons.save_alt_outlined),
-            title: Text(strings.readingLongPressSaveTitle),
-            subtitle: Text(strings.readingLongPressSaveSubtitle),
-            value: _longPressToSave,
-            onChanged: _toggleLongPressToSave,
+            ],
           ),
         ],
       ),

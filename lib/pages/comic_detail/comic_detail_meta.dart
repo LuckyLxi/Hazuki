@@ -1,4 +1,4 @@
-part of '../../main.dart';
+part of '../comic_detail_page.dart';
 
 List<String> _normalizeComicMetaValues(
   List<String> rawValues, {

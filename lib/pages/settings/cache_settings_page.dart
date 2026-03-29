@@ -1,4 +1,10 @@
-part of '../../main.dart';
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+
+import '../../l10n/app_localizations.dart';
+import '../../services/hazuki_source_service.dart';
+import '../../widgets/widgets.dart';
 
 class CacheSettingsPage extends StatefulWidget {
   const CacheSettingsPage({super.key});
@@ -61,7 +67,7 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
   }
 
   Future<void> _chooseCacheMaxSize() async {
-    final strings = l10n(context);
+    final strings = AppLocalizations.of(context)!;
     final presets = <(String label, int mb)>[
       (strings.cachePresetDefault, 400),
       (strings.cachePresetLite, 600),
@@ -163,11 +169,13 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
     if (!mounted) {
       return;
     }
-    unawaited(showHazukiPrompt(context, strings.cacheLimitUpdated('$normalizedMb')));
+    unawaited(
+      showHazukiPrompt(context, strings.cacheLimitUpdated('$normalizedMb')),
+    );
   }
 
   Future<void> _chooseAutoCleanMode() async {
-    final strings = l10n(context);
+    final strings = AppLocalizations.of(context)!;
     final result = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
@@ -252,7 +260,7 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
   }
 
   Future<void> _clearCacheNow() async {
-    final strings = l10n(context);
+    final strings = AppLocalizations.of(context)!;
     final confirm = await showGeneralDialog<bool>(
       context: context,
       barrierDismissible: true,
@@ -326,7 +334,15 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final strings = l10n(context);
+    final strings = AppLocalizations.of(context)!;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    final double usageRatio = _maxBytes > 0
+        ? (_usedBytes / _maxBytes).clamp(0.0, 1.0)
+        : 0.0;
+    final isUsageHigh = usageRatio > 0.9;
+    final usageColor = isUsageHigh ? colorScheme.error : colorScheme.primary;
+
     return Scaffold(
       appBar: hazukiFrostedAppBar(
         context: context,
@@ -335,16 +351,96 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : ListView(
+              padding: const EdgeInsets.only(bottom: 32),
               children: [
-                ListTile(
-                  leading: const Icon(Icons.sd_storage_outlined),
-                  title: Text(strings.cacheSizeTitle),
-                  subtitle: Text(
-                    strings.cacheSizeSummary(
-                      _formatBytes(_usedBytes),
-                      _formatBytes(_maxBytes),
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Container(
+                    padding: const EdgeInsets.all(24.0),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainerHighest
+                          .withValues(alpha: 0.45),
+                      borderRadius: BorderRadius.circular(24.0),
+                      border: Border.all(
+                        color: colorScheme.outlineVariant
+                            .withValues(alpha: 0.5),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.sd_storage_rounded,
+                                color: usageColor, size: 24),
+                            const SizedBox(width: 8),
+                            Text(
+                              strings.cacheSizeTitle,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              _formatBytes(_usedBytes).split(' ').first,
+                              style: TextStyle(
+                                fontSize: 36,
+                                fontWeight: FontWeight.w700,
+                                color: colorScheme.onSurface,
+                                height: 1.0,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 4.0),
+                              child: Text(
+                                _formatBytes(_usedBytes).split(' ').last,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                            const Spacer(),
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 4.0),
+                              child: Text(
+                                '/ ${_formatBytes(_maxBytes)}',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8.0),
+                          child: LinearProgressIndicator(
+                            value: usageRatio,
+                            minHeight: 8,
+                            backgroundColor: colorScheme.surfaceContainerHighest,
+                            valueColor: AlwaysStoppedAnimation<Color>(usageColor),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.settings_overscan_outlined),
+                  title: Text(strings.cacheMaxSizeTitle),
+                  subtitle: Text(strings.cacheMaxSizeHint),
                   onTap: _chooseCacheMaxSize,
                 ),
                 ListTile(
@@ -357,16 +453,26 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
                   ),
                   onTap: _chooseAutoCleanMode,
                 ),
-                const Divider(height: 1),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16.0,
+                    vertical: 8.0,
+                  ),
+                  child: Divider(
+                    height: 1,
+                    color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+                  ),
+                ),
                 ListTile(
                   leading: Icon(
-                    Icons.delete_outline,
-                    color: Theme.of(context).colorScheme.error,
+                    Icons.delete_sweep_outlined,
+                    color: colorScheme.error,
                   ),
                   title: Text(
                     strings.cacheClearNowTitle,
                     style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
+                      color: colorScheme.error,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
                   subtitle: Text(strings.cacheClearNowSubtitle),

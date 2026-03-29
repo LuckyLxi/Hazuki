@@ -1,4 +1,4 @@
-part of '../../main.dart';
+part of '../comic_detail_page.dart';
 
 class _HazukiTabBarDelegate extends SliverPersistentHeaderDelegate {
   const _HazukiTabBarDelegate(this.tabBar, this.surfaceColor);
@@ -27,8 +27,8 @@ class _HazukiTabBarDelegate extends SliverPersistentHeaderDelegate {
   }
 }
 
-class _SpringBottomSheetRoute<T> extends PageRoute<T> {
-  _SpringBottomSheetRoute({required this.builder});
+class SpringBottomSheetRoute<T> extends PageRoute<T> {
+  SpringBottomSheetRoute({required this.builder});
 
   final WidgetBuilder builder;
 
@@ -103,8 +103,9 @@ class _SpringBottomSheetRoute<T> extends PageRoute<T> {
   }
 }
 
-class _ChaptersPanelSheet extends StatefulWidget {
-  const _ChaptersPanelSheet({
+class ChaptersPanelSheet extends StatefulWidget {
+  const ChaptersPanelSheet({
+    super.key,
     required this.details,
     required this.onChapterTap,
     required this.onDownloadConfirm,
@@ -115,10 +116,10 @@ class _ChaptersPanelSheet extends StatefulWidget {
   final ValueChanged<Set<String>> onDownloadConfirm;
 
   @override
-  State<_ChaptersPanelSheet> createState() => _ChaptersPanelSheetState();
+  State<ChaptersPanelSheet> createState() => _ChaptersPanelSheetState();
 }
 
-class _ChaptersPanelSheetState extends State<_ChaptersPanelSheet> {
+class _ChaptersPanelSheetState extends State<ChaptersPanelSheet> {
   bool _showDownloadSelection = false;
   final Set<String> _selectedEpIds = <String>{};
 

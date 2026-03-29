@@ -1,7 +1,27 @@
-part of '../../main.dart';
+import 'dart:async';
+import 'dart:convert';
+import 'dart:math' as math;
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../app/app.dart';
+import '../l10n/app_localizations.dart';
+import '../models/hazuki_models.dart';
+import '../services/hazuki_source_service.dart';
+import '../widgets/widgets.dart';
+import 'comic_detail/comic_detail.dart';
 
 class HistoryPage extends StatefulWidget {
-  const HistoryPage({super.key});
+  const HistoryPage({
+    super.key,
+    required this.comicDetailPageBuilder,
+    this.comicCoverHeroTagBuilder = comicCoverHeroTag,
+  });
+
+  final ComicDetailPageBuilder comicDetailPageBuilder;
+  final ComicHeroTagBuilder comicCoverHeroTagBuilder;
 
   @override
   State<HistoryPage> createState() => _HistoryPageState();
@@ -106,7 +126,7 @@ class _HistoryPageState extends State<HistoryPage> {
   Future<void> _deleteSelected() async {
     if (_selectedIds.isEmpty) return;
 
-    final strings = l10n(context);
+    final strings = AppLocalizations.of(context)!;
     final confirm = await showGeneralDialog<bool>(
       context: context,
       barrierDismissible: true,
@@ -156,7 +176,7 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 
   Future<void> _clearAll() async {
-    final strings = l10n(context);
+    final strings = AppLocalizations.of(context)!;
     final confirm = await showGeneralDialog<bool>(
       context: context,
       barrierDismissible: true,
@@ -201,7 +221,7 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 
   Future<void> _handleCopyComicId(ExploreComic comic) async {
-    final strings = l10n(context);
+    final strings = AppLocalizations.of(context)!;
     await Clipboard.setData(ClipboardData(text: comic.id));
     if (!mounted) {
       return;
@@ -211,15 +231,11 @@ class _HistoryPageState extends State<HistoryPage> {
 
   Future<void> _handleToggleFavoriteFromHistory(ExploreComic comic) async {
     final service = HazukiSourceService.instance;
-    final strings = l10n(context);
+    final strings = AppLocalizations.of(context)!;
 
     if (!service.isLogged) {
       unawaited(
-        showHazukiPrompt(
-          context,
-          strings.historyLoginRequired,
-          isError: true,
-        ),
+        showHazukiPrompt(context, strings.historyLoginRequired, isError: true),
       );
       return;
     }
@@ -287,7 +303,7 @@ class _HistoryPageState extends State<HistoryPage> {
         final themedData = Theme.of(context);
         return Theme(
           data: themedData,
-          child: _FavoriteFoldersMorphDialog(
+          child: FavoriteFoldersMorphDialog(
             details: details,
             singleFolderOnly: singleFolderOnly,
             favoriteOverride: null,
@@ -306,16 +322,17 @@ class _HistoryPageState extends State<HistoryPage> {
           curve: Curves.easeOutCubic,
           reverseCurve: Curves.easeInCubic,
         );
-        final slide = Tween<Offset>(
-          begin: const Offset(0, 0.04),
-          end: Offset.zero,
-        ).animate(
-          CurvedAnimation(
-            parent: animation,
-            curve: Curves.easeOutCubic,
-            reverseCurve: Curves.easeInCubic,
-          ),
-        );
+        final slide =
+            Tween<Offset>(
+              begin: const Offset(0, 0.04),
+              end: Offset.zero,
+            ).animate(
+              CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeOutCubic,
+                reverseCurve: Curves.easeInCubic,
+              ),
+            );
         return FadeTransition(
           opacity: opacity,
           child: SlideTransition(
@@ -383,7 +400,7 @@ class _HistoryPageState extends State<HistoryPage> {
       unawaited(
         showHazukiPrompt(
           context,
-          l10n(context).comicDetailFavoriteSettingsUpdated,
+          AppLocalizations.of(context)!.comicDetailFavoriteSettingsUpdated,
         ),
       );
     } catch (e) {
@@ -393,7 +410,9 @@ class _HistoryPageState extends State<HistoryPage> {
       unawaited(
         showHazukiPrompt(
           context,
-          l10n(context).comicDetailFavoriteSettingsUpdateFailed('$e'),
+          AppLocalizations.of(
+            context,
+          )!.comicDetailFavoriteSettingsUpdateFailed('$e'),
           isError: true,
         ),
       );
@@ -478,7 +497,7 @@ class _HistoryPageState extends State<HistoryPage> {
     final originX = fingerOffset.dx < dx + menuWidth / 2 ? 0.0 : 1.0;
     final originY = showBelow ? -1.0 : 1.0;
 
-    final strings = l10n(context);
+    final strings = AppLocalizations.of(context)!;
     final action = await showGeneralDialog<String>(
       context: context,
       barrierDismissible: true,
@@ -604,12 +623,15 @@ class _HistoryPageState extends State<HistoryPage> {
                 });
                 return;
               }
-              final heroTag = _comicCoverHeroTag(comic, salt: 'history');
+              final heroTag = widget.comicCoverHeroTagBuilder(
+                comic,
+                salt: 'history',
+              );
               Navigator.of(context)
                   .push(
                     MaterialPageRoute<void>(
                       builder: (_) =>
-                          ComicDetailPage(comic: comic, heroTag: heroTag),
+                          widget.comicDetailPageBuilder(comic, heroTag),
                     ),
                   )
                   .then((_) {
@@ -662,7 +684,10 @@ class _HistoryPageState extends State<HistoryPage> {
                         : const SizedBox.shrink(key: ValueKey('no_selection')),
                   ),
                   Hero(
-                    tag: _comicCoverHeroTag(comic, salt: 'history'),
+                    tag: widget.comicCoverHeroTagBuilder(
+                      comic,
+                      salt: 'history',
+                    ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(8),
                       child: comic.cover.isEmpty
@@ -717,7 +742,7 @@ class _HistoryPageState extends State<HistoryPage> {
 
   @override
   Widget build(BuildContext context) {
-    final strings = l10n(context);
+    final strings = AppLocalizations.of(context)!;
     final bodyContent = _loading
         ? Center(
             child: Column(

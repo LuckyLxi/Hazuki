@@ -1,4 +1,10 @@
-part of '../../main.dart';
+import 'dart:async';
+
+import 'package:flutter/material.dart';
+
+import '../../l10n/l10n.dart';
+import '../../services/hazuki_source_service.dart';
+import '../../widgets/widgets.dart';
 
 class LineSettingsPage extends StatefulWidget {
   const LineSettingsPage({super.key});
@@ -87,11 +93,7 @@ class _LineSettingsPageState extends State<LineSettingsPage> {
       }
       final strings = l10n(context);
       unawaited(
-        showHazukiPrompt(
-          context,
-          strings.lineLoadFailed('$e'),
-          isError: true,
-        ),
+        showHazukiPrompt(context, strings.lineLoadFailed('$e'), isError: true),
       );
     } finally {
       if (mounted) {
@@ -231,11 +233,7 @@ class _LineSettingsPageState extends State<LineSettingsPage> {
       }
       final strings = l10n(context);
       unawaited(
-        showHazukiPrompt(
-          context,
-          strings.lineSaveFailed('$e'),
-          isError: true,
-        ),
+        showHazukiPrompt(context, strings.lineSaveFailed('$e'), isError: true),
       );
     }
   }

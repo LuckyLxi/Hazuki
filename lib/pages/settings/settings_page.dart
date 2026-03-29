@@ -1,22 +1,72 @@
-part of '../../main.dart';
+import 'package:flutter/material.dart';
 
-class SettingsPage extends StatelessWidget {
+import '../../app/app.dart';
+import '../../l10n/app_localizations.dart';
+import '../../widgets/widgets.dart';
+import '../about_page.dart';
+import 'settings.dart';
+
+class SettingsPage extends StatefulWidget {
   const SettingsPage({
     super.key,
     required this.appearanceSettings,
     required this.onAppearanceChanged,
     required this.locale,
     required this.onLocaleChanged,
+    required this.cloudSyncPageBuilder,
+    required this.advancedSettingsPageBuilder,
   });
 
   final AppearanceSettingsData appearanceSettings;
   final Future<void> Function(AppearanceSettingsData next) onAppearanceChanged;
   final Locale? locale;
   final Future<void> Function(Locale? locale) onLocaleChanged;
+  final WidgetBuilder cloudSyncPageBuilder;
+  final WidgetBuilder advancedSettingsPageBuilder;
+
+  @override
+  State<SettingsPage> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends State<SettingsPage> {
+  late AppearanceSettingsData _appearanceSettings;
+  late Locale? _locale;
+
+  @override
+  void initState() {
+    super.initState();
+    _appearanceSettings = widget.appearanceSettings;
+    _locale = widget.locale;
+  }
+
+  @override
+  void didUpdateWidget(covariant SettingsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.appearanceSettings != widget.appearanceSettings) {
+      _appearanceSettings = widget.appearanceSettings;
+    }
+    if (oldWidget.locale != widget.locale) {
+      _locale = widget.locale;
+    }
+  }
+
+  Future<void> _handleAppearanceChanged(AppearanceSettingsData next) async {
+    setState(() {
+      _appearanceSettings = next;
+    });
+    await widget.onAppearanceChanged(next);
+  }
+
+  Future<void> _handleLocaleChanged(Locale? locale) async {
+    setState(() {
+      _locale = locale;
+    });
+    await widget.onLocaleChanged(locale);
+  }
 
   @override
   Widget build(BuildContext context) {
-    final strings = l10n(context);
+    final strings = AppLocalizations.of(context)!;
     return Scaffold(
       appBar: hazukiFrostedAppBar(
         context: context,
@@ -44,10 +94,10 @@ class SettingsPage extends StatelessWidget {
               Navigator.of(context).push(
                 MaterialPageRoute<void>(
                   builder: (_) => AppearanceSettingsPage(
-                    appearanceSettings: appearanceSettings,
-                    onAppearanceChanged: onAppearanceChanged,
-                    locale: locale,
-                    onLocaleChanged: onLocaleChanged,
+                    appearanceSettings: _appearanceSettings,
+                    onAppearanceChanged: _handleAppearanceChanged,
+                    locale: _locale,
+                    onLocaleChanged: _handleLocaleChanged,
                   ),
                 ),
               );
@@ -82,8 +132,12 @@ class SettingsPage extends StatelessWidget {
             title: Text(strings.settingsCloudSyncTitle),
             subtitle: Text(strings.settingsCloudSyncSubtitle),
             onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(builder: (_) => const CloudSyncPage()),
+              Navigator.of(
+                context,
+              ).push(
+                MaterialPageRoute<void>(
+                  builder: widget.cloudSyncPageBuilder,
+                ),
               );
             },
           ),
@@ -106,12 +160,11 @@ class SettingsPage extends StatelessWidget {
             onTap: () {
               Navigator.of(context).push(
                 MaterialPageRoute<void>(
-                  builder: (_) => const AdvancedSettingsPage(),
+                  builder: widget.advancedSettingsPageBuilder,
                 ),
               );
             },
           ),
-
           ListTile(
             leading: const Icon(Icons.info_outline),
             title: Text(strings.settingsAboutTitle),

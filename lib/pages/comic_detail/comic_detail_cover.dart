@@ -1,4 +1,4 @@
-part of '../../main.dart';
+part of '../comic_detail_page.dart';
 
 // ignore_for_file: unused_element
 
@@ -41,7 +41,7 @@ Uint8List? _takeBackgroundCoverBytes(String url) {
     return null;
   }
   return _takeComicStaticBlurredCover(normalizedUrl) ??
-      _takeWidgetImageMemory(normalizedUrl);
+      takeHazukiWidgetImageMemory(normalizedUrl);
 }
 
 class _ComicCoverActionsSheet extends StatelessWidget {
@@ -136,7 +136,7 @@ class _ComicBlurredCoverBackgroundState
         normalizedUrl,
         keepInMemory: true,
       );
-      _putWidgetImageMemory(normalizedUrl, bytes);
+      putHazukiWidgetImageMemory(normalizedUrl, bytes);
       _putComicStaticBlurredCover(normalizedUrl, bytes);
       if (!mounted || widget.coverUrl.trim() != normalizedUrl) {
         return;
