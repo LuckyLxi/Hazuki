@@ -22,10 +22,7 @@ class _FavoriteContentSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
-      children: [
-        _buildMainContent(context),
-        _buildLoadMoreFooter(),
-      ],
+      children: [_buildMainContent(context), _buildLoadMoreFooter()],
     );
   }
 
@@ -37,7 +34,7 @@ class _FavoriteContentSection extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const HazukiStickerLoadingIndicator(size: 120),
+              const HazukiSandyLoadingIndicator(size: 144),
               const SizedBox(height: 10),
               Text(strings.commonLoading),
             ],
@@ -93,21 +90,9 @@ class _FavoriteContentSection extends StatelessWidget {
 
   Widget _buildLoadMoreFooter() {
     if (!loadingMore) {
-      return const SizedBox(height: 8);
+      return const SizedBox(height: 4);
     }
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const HazukiStickerLoadingIndicator(size: 72),
-            const SizedBox(height: 8),
-            Text(strings.commonLoading),
-          ],
-        ),
-      ),
-    );
+    return const HazukiLoadMoreFooter();
   }
 }

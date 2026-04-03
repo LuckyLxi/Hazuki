@@ -368,19 +368,23 @@ class _RankingPageState extends State<RankingPage> {
     );
   }
 
-  Widget _buildCenteredRankingLoading(String text) {
-    return SizedBox(
-      height: 360,
-      child: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const HazukiStickerLoadingIndicator(size: 112),
-            const SizedBox(height: 10),
-            Text(text),
-          ],
+  Widget _buildCenteredRankingLoading({String? text}) {
+    return CustomScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      slivers: [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const HazukiSandyLoadingIndicator(size: 136),
+                if (text != null) ...[const SizedBox(height: 10), Text(text)],
+              ],
+            ),
+          ),
         ),
-      ),
+      ],
     );
   }
 
@@ -398,12 +402,7 @@ class _RankingPageState extends State<RankingPage> {
           RefreshIndicator(
             onRefresh: () => _loadInitial(forceRefresh: true),
             child: _initialLoading
-                ? ListView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    children: [
-                      _buildCenteredRankingLoading(strings.commonLoading),
-                    ],
-                  )
+                ? _buildCenteredRankingLoading(text: strings.commonLoading)
                 : (_errorMessage != null &&
                       _rankingOptions.isEmpty &&
                       _rankingComics.isEmpty)
@@ -424,6 +423,8 @@ class _RankingPageState extends State<RankingPage> {
                       ),
                     ],
                   )
+                : (_rankingLoading && _rankingComics.isEmpty)
+                ? _buildCenteredRankingLoading()
                 : ListView(
                     controller: _scrollController,
                     physics: const AlwaysScrollableScrollPhysics(
@@ -457,9 +458,7 @@ class _RankingPageState extends State<RankingPage> {
                           }).toList(),
                         ),
                       const SizedBox(height: 10),
-                      if (_rankingLoading && _rankingComics.isEmpty)
-                        _buildCenteredRankingLoading(strings.commonLoading)
-                      else if (_rankingComics.isEmpty)
+                      if (_rankingComics.isEmpty)
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 20),
                           child: Center(
@@ -470,19 +469,7 @@ class _RankingPageState extends State<RankingPage> {
                         for (int i = 0; i < _rankingComics.length; i++)
                           _buildRankingComicItem(_rankingComics[i], i),
                       if (_rankingLoadingMore)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          child: Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const HazukiStickerLoadingIndicator(size: 72),
-                                const SizedBox(height: 8),
-                                Text(strings.commonLoading),
-                              ],
-                            ),
-                          ),
-                        ),
+                        const HazukiLoadMoreFooter(verticalPadding: 8),
                       if (!_rankingLoading &&
                           !_rankingLoadingMore &&
                           !_rankingHasMore)

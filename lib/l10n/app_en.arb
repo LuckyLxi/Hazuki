@@ -279,6 +279,7 @@
   "comicDetailTabComments": "Comments",
   "comicDetailTabRelated": "Related",
   "comicDetailChapters": "Chapters",
+  "comicDetailDefaultChapterTitle": "Chapter 1",
   "comicDetailChapterCount": "{count} chapters",
   "@comicDetailChapterCount": {
     "placeholders": {

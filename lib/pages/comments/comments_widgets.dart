@@ -195,23 +195,11 @@ extension _CommentsWidgetsExtension on _CommentsPageState {
   Widget _buildCommentsBodyList() {
     final content = _buildCommentsContent();
     final loadMoreFooter = _loadingMore
-        ? Padding(
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const HazukiStickerLoadingIndicator(size: 72),
-                  const SizedBox(height: 8),
-                  Text(l10n(context).commonLoading),
-                ],
-              ),
-            ),
-          )
-        : const SizedBox(height: 8);
+        ? const HazukiLoadMoreFooter()
+        : const SizedBox(height: 4);
 
     final listBottomPadding = EdgeInsets.only(
-      bottom: MediaQuery.of(context).viewInsets.bottom > 0 ? 8 : 16,
+      bottom: MediaQuery.of(context).viewInsets.bottom > 0 ? 8 : 10,
     );
 
     return NotificationListener<ScrollNotification>(
@@ -279,7 +267,7 @@ extension _CommentsWidgetsExtension on _CommentsPageState {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const HazukiStickerLoadingIndicator(size: 120),
+            const HazukiSandyLoadingIndicator(size: 144),
             const SizedBox(height: 10),
             Text(l10n(context).commonLoading),
           ],

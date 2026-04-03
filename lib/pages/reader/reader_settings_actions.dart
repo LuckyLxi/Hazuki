@@ -224,6 +224,13 @@ extension _ReaderSettingsActionsExtension on _ReaderPageState {
   }
 
   Future<void> _togglePinchToZoomSetting(bool value) async {
+    final previousValue = _pinchToZoom;
+    final targetPageIndex = _images.isEmpty
+        ? 0
+        : math.max(
+            0,
+            math.min(_pageIndexNotifier.value, _images.length - 1),
+          );
     if (!value) {
       _resetZoomImmediately(reason: 'pinch_to_zoom_disabled');
     }
@@ -236,6 +243,9 @@ extension _ReaderSettingsActionsExtension on _ReaderPageState {
       source: 'reader_settings',
       content: _readerLogPayload({'setting': 'pinch_to_zoom', 'value': value}),
     );
+    if (previousValue != value) {
+      unawaited(_syncReaderPositionAfterPinchToggle(targetPageIndex));
+    }
   }
 
   Future<void> _toggleLongPressToSaveSetting(bool value) async {
@@ -422,5 +432,83 @@ extension _ReaderSettingsActionsExtension on _ReaderPageState {
         );
       }
     });
+  }
+
+  Future<void> _syncReaderPositionAfterPinchToggle(int targetPageIndex) async {
+    const maxAttempts = 6;
+    for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted || _images.isEmpty) {
+        return;
+      }
+      final target = math.max(
+        0,
+        math.min(targetPageIndex, _images.length - 1),
+      );
+      _currentPageIndex = target;
+      _setDisplayedPageIndex(target);
+
+      if (_readerMode == ReaderMode.rightToLeft) {
+        if (!_pageController.hasClients) {
+          continue;
+        }
+        _pageController.jumpToPage(target);
+        _logReaderEvent(
+          'Reader position synced after pinch toggle',
+          source: 'reader_navigation',
+          content: _readerLogPayload({
+            'targetPageIndex': target,
+            'targetPage': target + 1,
+            'syncPath': 'page_controller_jump',
+            'attempt': attempt,
+          }),
+        );
+        _logVisiblePageChange(
+          index: target,
+          trigger: 'pinch_to_zoom_toggle_sync',
+        );
+        return;
+      }
+
+      if (!_scrollController.hasClients) {
+        continue;
+      }
+      await _scrollToListReaderPage(
+        target,
+        animate: false,
+        trigger: 'pinch_to_zoom_toggle_sync_attempt_$attempt',
+      );
+      if (!mounted) {
+        return;
+      }
+      _logReaderEvent(
+        'Reader position synced after pinch toggle',
+        source: 'reader_navigation',
+        content: _readerLogPayload({
+          'targetPageIndex': target,
+          'targetPage': target + 1,
+          'syncPath': 'list_scroll_alignment',
+          'attempt': attempt,
+        }),
+      );
+      _logVisiblePageChange(
+        index: target,
+        trigger: 'pinch_to_zoom_toggle_sync',
+      );
+      return;
+    }
+
+    _logReaderEvent(
+      'Reader position sync after pinch toggle skipped',
+      level: 'warning',
+      source: 'reader_navigation',
+      content: _readerLogPayload({
+        'targetPageIndex': targetPageIndex,
+        'targetPage': _images.isEmpty ? 0 : targetPageIndex + 1,
+        'reason': _readerMode == ReaderMode.rightToLeft
+            ? 'page_controller_unavailable'
+            : 'scroll_controller_unavailable',
+      }),
+    );
   }
 }

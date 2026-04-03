@@ -5,7 +5,7 @@ extension _ReaderNavigationActionsExtension on _ReaderPageState {
     return NotificationListener<ScrollNotification>(
       onNotification: _handleReaderScrollNotification,
       child: ListView.builder(
-        key: ValueKey('${widget.comicId}-${widget.epId}'),
+        key: PageStorageKey<String>('reader-list-${widget.comicId}-${widget.epId}'),
         padding: EdgeInsets.zero,
         cacheExtent: _readerListCacheExtent(context),
         itemCount: _images.length,
@@ -20,7 +20,7 @@ extension _ReaderNavigationActionsExtension on _ReaderPageState {
 
   Widget _buildReaderPageView() {
     return PageView.builder(
-      key: ValueKey('${widget.comicId}-${widget.epId}-rtl'),
+      key: PageStorageKey<String>('reader-page-${widget.comicId}-${widget.epId}-rtl'),
       controller: _pageController,
       reverse: false,
       allowImplicitScrolling: true,

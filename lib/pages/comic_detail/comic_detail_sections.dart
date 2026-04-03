@@ -9,7 +9,7 @@ class _ComicDetailLoadingView extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const HazukiStickerLoadingIndicator(size: 112),
+          const HazukiSandyLoadingIndicator(size: 136),
           const SizedBox(height: 10),
           Text(l10n(context).comicDetailLoading),
         ],

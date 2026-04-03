@@ -47,6 +47,7 @@ dependencies:
   flutter_displaymode: ^0.7.0
   connectivity_plus: ^6.1.1
   url_launcher: ^6.3.2
+  lottie: ^3.3.0
 
 dev_dependencies:
   flutter_test:

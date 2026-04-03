@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:lottie/lottie.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../models/hazuki_models.dart';
@@ -39,7 +40,7 @@ class SearchResultsStateView extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const HazukiStickerLoadingIndicator(size: 120),
+              const HazukiSearchingAnimationIndicator(size: 156),
               const SizedBox(height: 12),
               Text(strings.searchLoading),
             ],
@@ -72,12 +73,44 @@ class SearchResultsStateView extends StatelessWidget {
 
     if (searchComics.isEmpty) {
       return SizedBox(
-        height: 220,
-        child: Center(child: Text(strings.searchEmpty)),
+        height: 320,
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const _SearchEmptyAnimation(size: 200),
+              const SizedBox(height: 12),
+              Text(strings.searchEmpty),
+            ],
+          ),
+        ),
       );
     }
 
     return const SizedBox.shrink();
+  }
+}
+
+class _SearchEmptyAnimation extends StatelessWidget {
+  const _SearchEmptyAnimation({required this.size});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return RepaintBoundary(
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: Lottie.asset(
+          'assets/stickers/loading/search_empty_no_history.json',
+          width: size,
+          height: size,
+          fit: BoxFit.contain,
+          repeat: false,
+        ),
+      ),
+    );
   }
 }
 

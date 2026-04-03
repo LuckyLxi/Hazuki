@@ -279,6 +279,7 @@
   "comicDetailTabComments": "评论",
   "comicDetailTabRelated": "相关",
   "comicDetailChapters": "章节",
+  "comicDetailDefaultChapterTitle": "第1话",
   "comicDetailChapterCount": "共 {count} 话",
   "@comicDetailChapterCount": {
     "placeholders": {

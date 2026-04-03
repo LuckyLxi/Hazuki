@@ -56,7 +56,7 @@ extension _SearchResultsShellWidgetsExtension on _SearchResultsPageState {
                 ),
         ),
       ],
-      onSubmitted: (_) => unawaited(_submitSearch()),
+      onSubmitted: (value) => unawaited(_submitSearch(submittedText: value)),
       onChanged: onChanged,
     );
 
@@ -221,13 +221,27 @@ extension _SearchResultsShellWidgetsExtension on _SearchResultsPageState {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final maxWidth = constraints.maxWidth;
-          final collapsedWidth = maxWidth >= 188 ? 188.0 : maxWidth;
+          const preferredCollapsedWidth = 188.0;
+          const collapsedGap = 12.0;
+          final titlePainter = TextPainter(
+            text: TextSpan(
+              text: strings.searchTitle,
+              style: DefaultTextStyle.of(context).style,
+            ),
+            maxLines: 1,
+            textDirection: Directionality.of(context),
+          )..layout(maxWidth: maxWidth);
+          final reservedTitleWidth = titlePainter.width.ceilToDouble();
+          final collapsedWidth = math.min(
+            preferredCollapsedWidth,
+            math.max(0.0, maxWidth - reservedTitleWidth - collapsedGap),
+          );
           final expandedWidth = maxWidth;
           final reserveForCollapsedPreview =
               _showCollapsedSearch &&
                   !_collapsedSearchExpanded &&
                   !_flyingSearchToTop
-              ? collapsedWidth + 12
+              ? collapsedWidth + collapsedGap
               : 0.0;
           return Stack(
             alignment: Alignment.centerLeft,
@@ -387,24 +401,7 @@ extension _SearchResultsShellWidgetsExtension on _SearchResultsPageState {
           if (_searchComics.isNotEmpty) ...[
             for (final comic in _searchComics) _buildSearchComicItem(comic),
           ],
-          if (_searchLoadingMore)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(strokeWidth: 2.4),
-                    ),
-                    const SizedBox(height: 10),
-                    Text(strings.searchLoading),
-                  ],
-                ),
-              ),
-            ),
+          if (_searchLoadingMore) const HazukiLoadMoreFooter(),
           if (_searchErrorMessage != null && _searchComics.isNotEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 8),
@@ -438,7 +435,7 @@ extension _SearchResultsShellWidgetsExtension on _SearchResultsPageState {
                 ),
               ),
             ),
-          const SizedBox(height: 80),
+          SizedBox(height: _searchLoadingMore ? 16 : 80),
         ],
       ),
     );

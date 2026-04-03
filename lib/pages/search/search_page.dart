@@ -265,7 +265,19 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
     return visibleCount.clamp(1, _historyList.length);
   }
 
+  void _syncSearchText(String value) {
+    if (_searchController.text == value) {
+      return;
+    }
+    _searchController.value = _searchController.value.copyWith(
+      text: value,
+      selection: TextSelection.collapsed(offset: value.length),
+      composing: TextRange.empty,
+    );
+  }
+
   Future<void> _openResults(String rawKeyword) async {
+    _syncSearchText(rawKeyword);
     final keyword = await normalizeSubmittedKeyword(
       rawKeyword,
       controller: _searchController,
@@ -401,7 +413,7 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
                   ),
           ),
         ],
-        onSubmitted: (_) => unawaited(_openResults(_searchController.text)),
+        onSubmitted: (value) => unawaited(_openResults(value)),
         onChanged: (_) => setState(() {}),
       ),
     );

@@ -48,12 +48,14 @@ extension _SearchResultsSearchActionsExtension on _SearchResultsPageState {
     }
   }
 
-  Future<void> _submitSearch() async {
+  Future<void> _submitSearch({String? submittedText}) async {
     final activeController = _collapsedSearchFocusNode.hasFocus
         ? _collapsedSearchController
         : _searchController;
+    final rawKeyword = submittedText ?? activeController.text;
+    _syncSearchText(rawKeyword);
     final keyword = await normalizeSubmittedKeyword(
-      activeController.text,
+      rawKeyword,
       controller: activeController,
     );
 

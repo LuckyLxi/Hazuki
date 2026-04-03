@@ -51,7 +51,7 @@ class HomeDrawer extends StatelessWidget {
                   ? const CircleAvatar(
                       radius: 36,
                       backgroundImage: AssetImage(
-                        'assets/avatars/20260307_220809.jpg',
+                        'assets/avatars/guest_avatar.png',
                       ),
                     )
                   : HazukiCachedCircleAvatar(

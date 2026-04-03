@@ -277,7 +277,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const HazukiStickerLoadingIndicator(size: 112),
+              const HazukiSandyLoadingIndicator(size: 136),
               const SizedBox(height: 10),
               Text(strings.commonLoading),
             ],
