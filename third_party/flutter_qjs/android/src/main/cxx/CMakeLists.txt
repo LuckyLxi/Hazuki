@@ -4,6 +4,7 @@
 # Sets the minimum version of CMake required to build the native library.
 
 cmake_minimum_required(VERSION 3.4.1)
+project(qjs_android LANGUAGES C CXX)
 set(JNI_LIB_NAME qjs)
 
 # Creates and names a library, sets it as either STATIC
@@ -21,6 +22,10 @@ add_library( # Sets the name of the library.
 
              # Provides a relative path to your source file(s).
              ${CXX_LIB_DIR}/ffi.cpp )
+
+if(ANDROID)
+    target_link_options(${JNI_LIB_NAME} PRIVATE "-Wl,-z,max-page-size=16384")
+endif()
 
 # Searches for a specified prebuilt library and stores the path as a
 # variable. Because CMake includes system libraries in the search path by
