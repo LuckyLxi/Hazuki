@@ -38,6 +38,7 @@ class ReaderSettingsDrawerContent extends StatelessWidget {
   const ReaderSettingsDrawerContent({
     super.key,
     required this.readerMode,
+    required this.doublePageMode,
     required this.tapToTurnPage,
     required this.volumeButtonTurnPage,
     required this.pinchToZoom,
@@ -48,6 +49,7 @@ class ReaderSettingsDrawerContent extends StatelessWidget {
     required this.customBrightness,
     required this.brightnessValue,
     required this.onReaderModeChanged,
+    required this.onDoublePageModeChanged,
     required this.onTapToTurnPageChanged,
     required this.onVolumeButtonTurnPageChanged,
     required this.onPinchToZoomChanged,
@@ -62,6 +64,7 @@ class ReaderSettingsDrawerContent extends StatelessWidget {
   });
 
   final ReaderMode readerMode;
+  final bool doublePageMode;
   final bool tapToTurnPage;
   final bool volumeButtonTurnPage;
   final bool pinchToZoom;
@@ -72,6 +75,7 @@ class ReaderSettingsDrawerContent extends StatelessWidget {
   final bool customBrightness;
   final double brightnessValue;
   final ValueChanged<ReaderMode?> onReaderModeChanged;
+  final ValueChanged<bool> onDoublePageModeChanged;
   final ValueChanged<bool>? onTapToTurnPageChanged;
   final ValueChanged<bool> onVolumeButtonTurnPageChanged;
   final ValueChanged<bool> onPinchToZoomChanged;
@@ -145,6 +149,13 @@ class ReaderSettingsDrawerContent extends StatelessWidget {
                     ],
                   ),
                 ),
+              ),
+              SwitchListTile(
+                secondary: const Icon(Icons.auto_stories_outlined),
+                title: Text(strings.readingDoublePageModeTitle),
+                subtitle: Text(strings.readingDoublePageModeSubtitle),
+                value: doublePageMode,
+                onChanged: onDoublePageModeChanged,
               ),
               SwitchListTile(
                 secondary: const Icon(Icons.touch_app_outlined),

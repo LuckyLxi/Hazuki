@@ -62,7 +62,8 @@ import 'app_localizations_zh.dart';
 /// be consistent with the languages listed in the AppLocalizations.supportedLocales
 /// property.
 abstract class AppLocalizations {
-  AppLocalizations(String locale) : localeName = intl.Intl.canonicalizedLocale(locale.toString());
+  AppLocalizations(String locale)
+    : localeName = intl.Intl.canonicalizedLocale(locale.toString());
 
   final String localeName;
 
@@ -70,7 +71,8 @@ abstract class AppLocalizations {
     return Localizations.of<AppLocalizations>(context, AppLocalizations);
   }
 
-  static const LocalizationsDelegate<AppLocalizations> delegate = _AppLocalizationsDelegate();
+  static const LocalizationsDelegate<AppLocalizations> delegate =
+      _AppLocalizationsDelegate();
 
   /// A list of this localizations delegate along with the default localizations
   /// delegates.
@@ -82,17 +84,18 @@ abstract class AppLocalizations {
   /// Additional delegates can be added by appending to this list in
   /// MaterialApp. This list does not have to be used at all if a custom list
   /// of delegates is preferred or required.
-  static const List<LocalizationsDelegate<dynamic>> localizationsDelegates = <LocalizationsDelegate<dynamic>>[
-    delegate,
-    GlobalMaterialLocalizations.delegate,
-    GlobalCupertinoLocalizations.delegate,
-    GlobalWidgetsLocalizations.delegate,
-  ];
+  static const List<LocalizationsDelegate<dynamic>> localizationsDelegates =
+      <LocalizationsDelegate<dynamic>>[
+        delegate,
+        GlobalMaterialLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+      ];
 
   /// A list of this localizations delegate's supported locales.
   static const List<Locale> supportedLocales = <Locale>[
     Locale('en'),
-    Locale('zh')
+    Locale('zh'),
   ];
 
   /// No description provided for @appTitle.
@@ -1388,20 +1391,32 @@ abstract class AppLocalizations {
   /// No description provided for @readingModeSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Choose how pages are arranged in the reader'**
+  /// **'Choose how to browse pages in the reader'**
   String get readingModeSubtitle;
 
   /// No description provided for @readingModeTopToBottom.
   ///
   /// In en, this message translates to:
-  /// **'Top to bottom'**
+  /// **'Vertical scroll'**
   String get readingModeTopToBottom;
 
   /// No description provided for @readingModeRightToLeft.
   ///
   /// In en, this message translates to:
-  /// **'Right to left'**
+  /// **'Horizontal paging'**
   String get readingModeRightToLeft;
+
+  /// No description provided for @readingDoublePageModeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Double-page mode'**
+  String get readingDoublePageModeTitle;
+
+  /// No description provided for @readingDoublePageModeSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Show two images at once in both vertical scroll and horizontal paging modes'**
+  String get readingDoublePageModeSubtitle;
 
   /// No description provided for @readingTapToTurnPageTitle.
   ///
@@ -1412,7 +1427,7 @@ abstract class AppLocalizations {
   /// No description provided for @readingTapToTurnPageSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Only works in right-to-left mode. Tap the left side for the previous page and the right side for the next page'**
+  /// **'Only works in horizontal paging mode. Tap the left side for the previous page and the right side for the next page'**
   String get readingTapToTurnPageSubtitle;
 
   /// No description provided for @readingVolumeButtonTurnPageTitle.
@@ -2909,6 +2924,24 @@ abstract class AppLocalizations {
   /// **'{count} lines'**
   String sourceEditorLineCount(Object count);
 
+  /// No description provided for @sourceEditorSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search keywords or code'**
+  String get sourceEditorSearchHint;
+
+  /// No description provided for @sourceEditorSearchNoResult.
+  ///
+  /// In en, this message translates to:
+  /// **'No matching content found'**
+  String get sourceEditorSearchNoResult;
+
+  /// No description provided for @sourceEditorSearchResultCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Found {count} results'**
+  String sourceEditorSearchResultCount(Object count);
+
   /// No description provided for @sourceEditorRestoreConfirmContent.
   ///
   /// In en, this message translates to:
@@ -2943,7 +2976,10 @@ abstract class AppLocalizations {
   ///
   /// In en, this message translates to:
   /// **'Scan complete. Scanned {scannedDirectories} folders and recovered {recoveredComics} comics.'**
-  String downloadsScanCompleted(Object scannedDirectories, Object recoveredComics);
+  String downloadsScanCompleted(
+    Object scannedDirectories,
+    Object recoveredComics,
+  );
 
   /// No description provided for @downloadsScanNoRecoverable.
   ///
@@ -3006,7 +3042,8 @@ abstract class AppLocalizations {
   String get sourceUpdateRestartHint;
 }
 
-class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
+class _AppLocalizationsDelegate
+    extends LocalizationsDelegate<AppLocalizations> {
   const _AppLocalizationsDelegate();
 
   @override
@@ -3015,25 +3052,26 @@ class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> 
   }
 
   @override
-  bool isSupported(Locale locale) => <String>['en', 'zh'].contains(locale.languageCode);
+  bool isSupported(Locale locale) =>
+      <String>['en', 'zh'].contains(locale.languageCode);
 
   @override
   bool shouldReload(_AppLocalizationsDelegate old) => false;
 }
 
 AppLocalizations lookupAppLocalizations(Locale locale) {
-
-
   // Lookup logic when only language code is specified.
   switch (locale.languageCode) {
-    case 'en': return AppLocalizationsEn();
-    case 'zh': return AppLocalizationsZh();
+    case 'en':
+      return AppLocalizationsEn();
+    case 'zh':
+      return AppLocalizationsZh();
   }
 
   throw FlutterError(
     'AppLocalizations.delegate failed to load unsupported locale "$locale". This is likely '
     'an issue with the localizations generation tool. Please file an issue '
     'on GitHub with a reproducible sample app and the gen-l10n configuration '
-    'that was used.'
+    'that was used.',
   );
 }

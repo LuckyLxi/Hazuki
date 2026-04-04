@@ -335,11 +335,13 @@
   "sourceUpdateDownload": "下载",
   "readingSettingsTitle": "阅读设置",
   "readingModeTitle": "阅读模式",
-  "readingModeSubtitle": "选择阅读器中的页面排列方式",
-  "readingModeTopToBottom": "从上往下",
-  "readingModeRightToLeft": "从右到左",
+  "readingModeSubtitle": "选择阅读器中的浏览方式",
+  "readingModeTopToBottom": "纵向滚动",
+  "readingModeRightToLeft": "横向翻页",
+  "readingDoublePageModeTitle": "双页模式",
+  "readingDoublePageModeSubtitle": "开启后每次同时显示两张图片，纵向滚动与横向翻页都生效",
   "readingTapToTurnPageTitle": "点击翻页",
-  "readingTapToTurnPageSubtitle": "仅在从右到左模式下生效，点击左侧回到上一页，点击右侧前往下一页",
+  "readingTapToTurnPageSubtitle": "仅在横向翻页模式下生效，点击左侧回到上一页，点击右侧前往下一页",
   "readingVolumeButtonTurnPageTitle": "音量键翻页",
   "readingVolumeButtonTurnPageSubtitle": "开启后，上音量键为上一页，下音量键为下一页，两种阅读模式都生效",
   "readingImmersiveModeTitle": "沉浸模式",
@@ -845,6 +847,14 @@
   },
   "sourceEditorLineCount": "{count} 行",
   "@sourceEditorLineCount": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "sourceEditorSearchHint": "搜索关键词或代码",
+  "sourceEditorSearchNoResult": "没搜到内容",
+  "sourceEditorSearchResultCount": "搜到 {count} 个结果",
+  "@sourceEditorSearchResultCount": {
     "placeholders": {
       "count": {}
     }

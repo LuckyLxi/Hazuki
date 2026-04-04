@@ -5,7 +5,7 @@ extension _ReaderDiagnosticsActionsExtension on _ReaderPageState {
 
   List<Map<String, dynamic>> _captureRenderedItemsAround(int anchorIndex) {
     return captureReaderRenderedItemsAround(
-      images: _images,
+      itemCount: _readerSpreadCount,
       itemKeys: _itemKeys,
       anchorIndex: anchorIndex,
     );
@@ -47,12 +47,13 @@ extension _ReaderDiagnosticsActionsExtension on _ReaderPageState {
       chapterTitle: widget.chapterTitle,
       chapterIndex: widget.chapterIndex,
       readerMode: _readerMode.prefsValue,
+      doublePageMode: _doublePageMode,
       currentPageIndex: _currentPageIndex,
       currentPage: _images.isEmpty
           ? 0
-          : math.min(_currentPageIndex + 1, _images.length),
+          : math.min(_currentPageIndex + 1, _readerSpreadCount),
       pageIndicatorIndex: _pageIndexNotifier.value,
-      totalPages: _images.length,
+      totalPages: _readerSpreadCount,
       controlsVisible: _controlsVisible,
       tapToTurnPage: _tapToTurnPage,
       pageIndicator: _pageIndicator,
@@ -170,20 +171,22 @@ extension _ReaderDiagnosticsActionsExtension on _ReaderPageState {
     if (_images.isEmpty) {
       return;
     }
-    final normalizedIndex = math.max(0, math.min(index, _images.length - 1));
-    if (_diagnosticsState.lastLoggedVisiblePageIndex == normalizedIndex) {
+    final normalizedIndex = math.max(0, math.min(index, _readerSpreadCount - 1));
+    final safeIndex = _normalizeSpreadIndex(normalizedIndex);
+    if (_diagnosticsState.lastLoggedVisiblePageIndex == safeIndex) {
       return;
     }
-    _diagnosticsState.lastLoggedVisiblePageIndex = normalizedIndex;
+    _diagnosticsState.lastLoggedVisiblePageIndex = safeIndex;
     _logReaderEvent(
       'Reader visible page changed',
       source: 'reader_position',
       content: _readerLogPayload({
         'trigger': trigger,
-        'pageIndex': normalizedIndex,
-        'page': normalizedIndex + 1,
+        'pageIndex': safeIndex,
+        'page': safeIndex + 1,
+        'visibleImageIndices': _spreadImageIndices(safeIndex),
         if (_readerMode == ReaderMode.topToBottom)
-          'nearbyRenderedItems': _captureRenderedItemsAround(normalizedIndex),
+          'nearbyRenderedItems': _captureRenderedItemsAround(safeIndex),
       }),
     );
   }

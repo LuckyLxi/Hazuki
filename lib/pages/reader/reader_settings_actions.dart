@@ -15,6 +15,9 @@ extension _ReaderSettingsActionsExtension on _ReaderPageState {
     final pageIndicator =
         prefs.getBool('reader_page_indicator') ??
         _ReaderPageState._defaultPageIndicator;
+    final doublePageMode =
+        prefs.getBool('reader_double_page_mode') ??
+        _ReaderPageState._defaultDoublePageMode;
     final brightnessValue =
         prefs.getDouble('reader_brightness_value') ??
         _ReaderPageState._defaultBrightnessValue;
@@ -31,6 +34,8 @@ extension _ReaderSettingsActionsExtension on _ReaderPageState {
       _pageIndicator = pageIndicator;
       _brightnessValue = math.max(0.0, math.min(brightnessValue, 1.0));
       _readerMode = readerMode;
+      _doublePageMode = doublePageMode;
+      _rebuildSpreadItemKeys();
       _tapToTurnPage = prefs.getBool('reader_tap_to_turn_page') ?? false;
       _volumeButtonTurnPage =
           prefs.getBool('reader_volume_button_turn_page') ?? false;
@@ -137,6 +142,7 @@ extension _ReaderSettingsActionsExtension on _ReaderPageState {
     if (value == null) {
       return;
     }
+    final targetImageIndex = _spreadStartIndex(_currentPageIndex);
     final previousMode = _readerMode.prefsValue;
     final changed = _readerMode != value;
     _updateReaderState(() {
@@ -154,7 +160,38 @@ extension _ReaderSettingsActionsExtension on _ReaderPageState {
     );
     if (changed) {
       _resetZoomImmediately(reason: 'reading_mode_changed');
-      _syncReaderPositionAfterModeChange();
+      _syncReaderPositionToImageIndex(
+        targetImageIndex,
+        trigger: 'mode_changed_sync',
+      );
+    }
+  }
+
+  Future<void> _toggleDoublePageModeSetting(bool value) async {
+    final targetImageIndex = _spreadStartIndex(_currentPageIndex);
+    final previousValue = _doublePageMode;
+    _updateReaderState(() {
+      _doublePageMode = value;
+      _rebuildSpreadItemKeys();
+    });
+    await _persistReaderBool('reader_double_page_mode', value);
+    _logReaderEvent(
+      previousValue != value
+          ? 'Reader double page mode toggled'
+          : 'Reader double page mode reselected',
+      source: 'reader_settings',
+      content: _readerLogPayload({
+        'setting': 'double_page_mode',
+        'previousValue': previousValue,
+        'nextValue': value,
+      }),
+    );
+    if (previousValue != value) {
+      _resetZoomImmediately(reason: 'double_page_mode_changed');
+      _syncReaderPositionToImageIndex(
+        targetImageIndex,
+        trigger: 'double_page_mode_changed_sync',
+      );
     }
   }
 
@@ -254,9 +291,9 @@ extension _ReaderSettingsActionsExtension on _ReaderPageState {
 
   Future<void> _togglePinchToZoomSetting(bool value) async {
     final previousValue = _pinchToZoom;
-    final targetPageIndex = _images.isEmpty
+    final targetImageIndex = _images.isEmpty
         ? 0
-        : math.max(0, math.min(_pageIndexNotifier.value, _images.length - 1));
+        : _spreadStartIndex(_pageIndexNotifier.value);
     if (!value) {
       _resetZoomImmediately(reason: 'pinch_to_zoom_disabled');
     }
@@ -270,7 +307,7 @@ extension _ReaderSettingsActionsExtension on _ReaderPageState {
       content: _readerLogPayload({'setting': 'pinch_to_zoom', 'value': value}),
     );
     if (previousValue != value) {
-      unawaited(_syncReaderPositionAfterPinchToggle(targetPageIndex));
+      unawaited(_syncReaderPositionAfterPinchToggle(targetImageIndex));
     }
   }
 
@@ -511,20 +548,28 @@ extension _ReaderSettingsActionsExtension on _ReaderPageState {
     }
   }
 
-  void _syncReaderPositionAfterModeChange() {
+  void _syncReaderPositionToImageIndex(
+    int targetImageIndex, {
+    required String trigger,
+  }) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _images.isEmpty) {
         return;
       }
-      final target = math.max(
+      final safeImageIndex = math.max(
         0,
-        math.min(_currentPageIndex, _images.length - 1),
+        math.min(targetImageIndex, _images.length - 1),
       );
+      final target = _normalizeSpreadIndex(safeImageIndex ~/ _readerSpreadSize);
+      _currentPageIndex = target;
       _setDisplayedPageIndex(target);
       _logReaderEvent(
-        'Reader position synced after mode change',
+        'Reader position synced after layout change',
         source: 'reader_navigation',
         content: _readerLogPayload({
+          'trigger': trigger,
+          'targetImageIndex': safeImageIndex,
+          'targetImage': safeImageIndex + 1,
           'targetPageIndex': target,
           'targetPage': target + 1,
           'syncPath': _readerMode == ReaderMode.rightToLeft
@@ -532,7 +577,7 @@ extension _ReaderSettingsActionsExtension on _ReaderPageState {
               : 'list_scroll_alignment',
         }),
       );
-      _logVisiblePageChange(index: target, trigger: 'mode_changed_sync');
+      _logVisiblePageChange(index: target, trigger: trigger);
       if (_readerMode == ReaderMode.rightToLeft) {
         if (_pageController.hasClients) {
           _pageController.jumpToPage(target);
@@ -549,14 +594,18 @@ extension _ReaderSettingsActionsExtension on _ReaderPageState {
     });
   }
 
-  Future<void> _syncReaderPositionAfterPinchToggle(int targetPageIndex) async {
+  Future<void> _syncReaderPositionAfterPinchToggle(int targetImageIndex) async {
     const maxAttempts = 6;
     for (var attempt = 1; attempt <= maxAttempts; attempt++) {
       await WidgetsBinding.instance.endOfFrame;
       if (!mounted || _images.isEmpty) {
         return;
       }
-      final target = math.max(0, math.min(targetPageIndex, _images.length - 1));
+      final safeImageIndex = math.max(
+        0,
+        math.min(targetImageIndex, _images.length - 1),
+      );
+      final target = _normalizeSpreadIndex(safeImageIndex ~/ _readerSpreadSize);
       _currentPageIndex = target;
       _setDisplayedPageIndex(target);
 
@@ -615,8 +664,8 @@ extension _ReaderSettingsActionsExtension on _ReaderPageState {
       level: 'warning',
       source: 'reader_navigation',
       content: _readerLogPayload({
-        'targetPageIndex': targetPageIndex,
-        'targetPage': _images.isEmpty ? 0 : targetPageIndex + 1,
+        'targetImageIndex': targetImageIndex,
+        'targetImage': _images.isEmpty ? 0 : targetImageIndex + 1,
         'reason': _readerMode == ReaderMode.rightToLeft
             ? 'page_controller_unavailable'
             : 'scroll_controller_unavailable',

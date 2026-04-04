@@ -589,36 +589,34 @@ class _PasswordDigitButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(borderRadius),
             border: Border.all(color: borderColor),
           ),
-          child: Stack(
-            children: [
-              Center(
-                child: Text(
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
                   digit,
                   style: TextStyle(
                     color: digitColor,
                     fontSize: digitFontSize,
                     fontWeight: FontWeight.w500,
+                    height: 1,
                   ),
                 ),
-              ),
-              if (letters.isNotEmpty)
-                Positioned(
-                  right: 22,
-                  top: 0,
-                  bottom: 0,
-                  child: Center(
-                    child: Text(
-                      letters,
-                      style: TextStyle(
-                        color: lettersColor,
-                        fontSize: letterFontSize,
-                        fontWeight: FontWeight.w500,
-                        letterSpacing: 1.2,
-                      ),
+                if (letters.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    letters,
+                    style: TextStyle(
+                      color: lettersColor,
+                      fontSize: letterFontSize,
+                      fontWeight: FontWeight.w500,
+                      letterSpacing: 1.2,
+                      height: 1,
                     ),
                   ),
-                ),
-            ],
+                ],
+              ],
+            ),
           ),
         ),
       ),

@@ -112,32 +112,29 @@ class _DiscoverPageState extends State<DiscoverPage> {
 
   Future<void> _loadInitial() async {
     final strings = AppLocalizations.of(context)!;
+    List<ExploreSection>? loadedSections;
+    String? errorMessage;
     try {
-      final sections = await _loadSections();
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _sections = sections;
-        _errorMessage = null;
-      });
+      loadedSections = await _loadSections();
     } catch (e) {
-      if (!mounted) {
-        return;
-      }
-      final errorMessage = e.toString().contains('discover_load_timeout')
+      errorMessage = e.toString().contains('discover_load_timeout')
           ? strings.discoverLoadTimeout
           : strings.discoverLoadFailed('$e');
-      setState(() {
-        _errorMessage = errorMessage;
-      });
-    } finally {
-      if (mounted) {
-        setState(() {
-          _initialLoading = false;
-        });
-      }
     }
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      if (loadedSections != null) {
+        _sections = loadedSections;
+        _errorMessage = null;
+      } else {
+        _errorMessage = errorMessage;
+      }
+      _initialLoading = false;
+    });
   }
 
   Future<void> _refreshDiscover() async {
@@ -150,32 +147,29 @@ class _DiscoverPageState extends State<DiscoverPage> {
     });
 
     final strings = AppLocalizations.of(context)!;
+    List<ExploreSection>? refreshedSections;
+    String? errorMessage;
     try {
-      final sections = await _loadSections(forceRefresh: true);
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _sections = sections;
-        _errorMessage = null;
-      });
+      refreshedSections = await _loadSections(forceRefresh: true);
     } catch (e) {
-      if (!mounted) {
-        return;
-      }
-      final errorMessage = e.toString().contains('discover_load_timeout')
+      errorMessage = e.toString().contains('discover_load_timeout')
           ? strings.discoverLoadTimeout
           : strings.discoverLoadFailed('$e');
-      setState(() {
-        _errorMessage = errorMessage;
-      });
-    } finally {
-      if (mounted) {
-        setState(() {
-          _refreshing = false;
-        });
-      }
     }
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      if (refreshedSections != null) {
+        _sections = refreshedSections;
+        _errorMessage = null;
+      } else {
+        _errorMessage = errorMessage;
+      }
+      _refreshing = false;
+    });
   }
 
   void _openSearch() {
@@ -264,7 +258,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
     );
   }
 
-  Widget _buildDiscoverView() {
+  Widget _buildDiscoverStateView() {
     final strings = AppLocalizations.of(context)!;
     if (_initialLoading) {
       if (!widget.allowInitialLoad &&
@@ -315,16 +309,25 @@ class _DiscoverPageState extends State<DiscoverPage> {
       );
     }
 
-    return Column(
-      children: [
-        for (final section in _sections) ...[
+    return const SizedBox.shrink();
+  }
+
+  Widget _buildDiscoverSection(ExploreSection section, int sectionIndex) {
+    final strings = AppLocalizations.of(context)!;
+    final theme = Theme.of(context);
+    final placeholderColor = theme.colorScheme.surfaceContainerHighest;
+    final coverCacheWidth = (130 * MediaQuery.devicePixelRatioOf(context))
+        .round();
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
           Row(
             children: [
               Expanded(
-                child: Text(
-                  section.title,
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
+                child: Text(section.title, style: theme.textTheme.titleMedium),
               ),
               if (section.comics.isNotEmpty)
                 TextButton(
@@ -348,20 +351,23 @@ class _DiscoverPageState extends State<DiscoverPage> {
           SizedBox(
             height: 228,
             child: ListView.separated(
+              key: PageStorageKey<String>(
+                'discover-section-$sectionIndex-${section.title}',
+              ),
               scrollDirection: Axis.horizontal,
               itemCount: section.comics.length,
               separatorBuilder: (_, _) => const SizedBox(width: 12),
               itemBuilder: (context, index) {
                 final comic = section.comics[index];
+                final heroTag = widget.comicCoverHeroTagBuilder(
+                  comic,
+                  salt: 'discover-$sectionIndex-${section.title}-$index',
+                );
                 return SizedBox(
                   width: 130,
                   child: InkWell(
                     borderRadius: BorderRadius.circular(8),
                     onTap: () {
-                      final heroTag = widget.comicCoverHeroTagBuilder(
-                        comic,
-                        salt: 'discover-${section.title}-$index',
-                      );
                       Navigator.of(context).push(
                         MaterialPageRoute<void>(
                           builder: (_) =>
@@ -374,17 +380,12 @@ class _DiscoverPageState extends State<DiscoverPage> {
                       children: [
                         Expanded(
                           child: Hero(
-                            tag: widget.comicCoverHeroTagBuilder(
-                              comic,
-                              salt: 'discover-${section.title}-$index',
-                            ),
+                            tag: heroTag,
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(8),
                               child: comic.cover.isEmpty
-                                  ? Container(
-                                      color: Theme.of(
-                                        context,
-                                      ).colorScheme.surfaceContainerHighest,
+                                  ? ColoredBox(
+                                      color: placeholderColor,
                                       child: const Center(
                                         child: Icon(
                                           Icons.image_not_supported_outlined,
@@ -395,10 +396,9 @@ class _DiscoverPageState extends State<DiscoverPage> {
                                       url: comic.cover,
                                       fit: BoxFit.cover,
                                       width: 130,
-                                      loading: Container(
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.surfaceContainerHighest,
+                                      cacheWidth: coverCacheWidth,
+                                      loading: ColoredBox(
+                                        color: placeholderColor,
                                         child: const Center(
                                           child: SizedBox(
                                             width: 18,
@@ -409,10 +409,8 @@ class _DiscoverPageState extends State<DiscoverPage> {
                                           ),
                                         ),
                                       ),
-                                      error: Container(
-                                        color: Theme.of(
-                                          context,
-                                        ).colorScheme.surfaceContainerHighest,
+                                      error: ColoredBox(
+                                        color: placeholderColor,
                                         child: const Center(
                                           child: Icon(
                                             Icons.broken_image_outlined,
@@ -428,14 +426,14 @@ class _DiscoverPageState extends State<DiscoverPage> {
                           comic.title,
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.bodyMedium,
+                          style: theme.textTheme.bodyMedium,
                         ),
                         if (comic.subTitle.isNotEmpty)
                           Text(
                             comic.subTitle,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: Theme.of(context).textTheme.bodySmall,
+                            style: theme.textTheme.bodySmall,
                           ),
                       ],
                     ),
@@ -444,24 +442,34 @@ class _DiscoverPageState extends State<DiscoverPage> {
               },
             ),
           ),
-          const SizedBox(height: 20),
         ],
-      ],
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final hasSections = _sections.isNotEmpty;
+
     return RefreshIndicator(
       onRefresh: _refreshDiscover,
       edgeOffset: 56,
-      child: ListView(
+      child: ListView.builder(
         controller: _scrollController,
         physics: const AlwaysScrollableScrollPhysics(
           parent: ClampingScrollPhysics(),
         ),
         padding: const EdgeInsets.all(16),
-        children: [_buildTopSearchBox(), _buildDiscoverView()],
+        itemCount: hasSections ? _sections.length + 1 : 2,
+        itemBuilder: (context, index) {
+          if (index == 0) {
+            return _buildTopSearchBox();
+          }
+          if (!hasSections) {
+            return _buildDiscoverStateView();
+          }
+          return _buildDiscoverSection(_sections[index - 1], index - 1);
+        },
       ),
     );
   }

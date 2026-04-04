@@ -22,11 +22,11 @@ extension _ReaderNavigationActionsExtension on _ReaderPageState {
       onNotification: _handleReaderScrollNotification,
       child: ListView.builder(
         key: PageStorageKey<String>(
-          'reader-list-${widget.comicId}-${widget.epId}',
+          'reader-list-${widget.comicId}-${widget.epId}-$_readerSpreadSize',
         ),
         padding: EdgeInsets.zero,
         cacheExtent: _readerListCacheExtent(context),
-        itemCount: _images.length,
+        itemCount: _readerSpreadCount,
         controller: _scrollController,
         physics: _zoomGestureActive
             ? const NeverScrollableScrollPhysics()
@@ -36,15 +36,104 @@ extension _ReaderNavigationActionsExtension on _ReaderPageState {
     );
   }
 
+  Widget _buildReaderPageImage(int imageIndex) {
+    final url = _images[imageIndex];
+    final cachedProvider = _providerCache[url];
+    final readerSurfaceColor = _resolveReaderSurfaceColor(context);
+    final readerPlaceholderColor = _resolveReaderPlaceholderColor(context);
+
+    if (_noImageModeEnabled) {
+      return const SizedBox.expand();
+    }
+
+    Widget buildImage(ImageProvider provider) {
+      return _wrapImageWidget(
+        ColoredBox(
+          color: readerSurfaceColor,
+          child: Center(
+            child: Image(
+              key: ValueKey('reader-page-$url'),
+              image: provider,
+              fit: BoxFit.contain,
+              width: double.infinity,
+              height: double.infinity,
+              filterQuality: FilterQuality.medium,
+              gaplessPlayback: true,
+              frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+                if (wasSynchronouslyLoaded || frame != null) {
+                  return child;
+                }
+                return ColoredBox(color: readerSurfaceColor);
+              },
+              errorBuilder: (_, _, _) {
+                return ColoredBox(
+                  color: readerPlaceholderColor,
+                  child: const Center(
+                    child: Icon(Icons.broken_image_outlined),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+        url,
+      );
+    }
+
+    if (cachedProvider != null) {
+      return buildImage(cachedProvider);
+    }
+
+    return FutureBuilder<ImageProvider>(
+      key: ValueKey('reader-page-future-$url'),
+      future: _getOrCreateImageProviderFuture(url),
+      builder: (context, snapshot) {
+        if (snapshot.hasData) {
+          return buildImage(snapshot.data!);
+        }
+        if (snapshot.hasError) {
+          return ColoredBox(
+            color: readerPlaceholderColor,
+            child: const Center(child: Icon(Icons.broken_image_outlined)),
+          );
+        }
+        return ColoredBox(
+          color: readerSurfaceColor,
+          child: const Center(
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildReaderPageSpread(int spreadIndex) {
+    final imageIndices = _spreadImageIndices(spreadIndex);
+    if (imageIndices.isEmpty) {
+      return const SizedBox.expand();
+    }
+
+    final spreadContent = imageIndices.length == 1
+        ? _buildReaderPageImage(imageIndices.first)
+        : Row(
+            children: [
+              Expanded(child: _buildReaderPageImage(imageIndices[0])),
+              Expanded(child: _buildReaderPageImage(imageIndices[1])),
+            ],
+          );
+
+    return _wrapPageWithPinchZoom(index: spreadIndex, child: spreadContent);
+  }
+
   Widget _buildReaderPageView() {
     return PageView.builder(
       key: PageStorageKey<String>(
-        'reader-page-${widget.comicId}-${widget.epId}-rtl',
+        'reader-page-${widget.comicId}-${widget.epId}-rtl-$_readerSpreadSize',
       ),
       controller: _pageController,
       reverse: false,
       allowImplicitScrolling: true,
-      itemCount: _images.length,
+      itemCount: _readerSpreadCount,
       physics: _pageNavigationLocked
           ? const NeverScrollableScrollPhysics()
           : const PageScrollPhysics(),
@@ -76,78 +165,7 @@ extension _ReaderNavigationActionsExtension on _ReaderPageState {
         }
       },
       itemBuilder: (context, index) {
-        final url = _images[index];
-        final cachedProvider = _providerCache[url];
-        final readerSurfaceColor = _resolveReaderSurfaceColor(context);
-        final readerPlaceholderColor = _resolveReaderPlaceholderColor(context);
-
-        if (_noImageModeEnabled) {
-          return const SizedBox.expand();
-        }
-
-        Widget buildImage(ImageProvider provider) {
-          return _wrapImageWidget(
-            _wrapPageWithPinchZoom(
-              index: index,
-              child: ColoredBox(
-                color: readerSurfaceColor,
-                child: Center(
-                  child: Image(
-                    key: ValueKey('reader-page-$url'),
-                    image: provider,
-                    fit: BoxFit.contain,
-                    width: double.infinity,
-                    height: double.infinity,
-                    filterQuality: FilterQuality.medium,
-                    gaplessPlayback: true,
-                    frameBuilder:
-                        (context, child, frame, wasSynchronouslyLoaded) {
-                          if (wasSynchronouslyLoaded || frame != null) {
-                            return child;
-                          }
-                          return ColoredBox(color: readerSurfaceColor);
-                        },
-                    errorBuilder: (_, _, _) {
-                      return ColoredBox(
-                        color: readerPlaceholderColor,
-                        child: const Center(
-                          child: Icon(Icons.broken_image_outlined),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-              ),
-            ),
-            url,
-          );
-        }
-
-        if (cachedProvider != null) {
-          return buildImage(cachedProvider);
-        }
-
-        return FutureBuilder<ImageProvider>(
-          key: ValueKey('reader-page-future-$url'),
-          future: _getOrCreateImageProviderFuture(url),
-          builder: (context, snapshot) {
-            if (snapshot.hasData) {
-              return buildImage(snapshot.data!);
-            }
-            if (snapshot.hasError) {
-              return ColoredBox(
-                color: readerPlaceholderColor,
-                child: const Center(child: Icon(Icons.broken_image_outlined)),
-              );
-            }
-            return ColoredBox(
-              color: readerSurfaceColor,
-              child: const Center(
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            );
-          },
-        );
+        return _buildReaderPageSpread(index);
       },
     );
   }
@@ -157,7 +175,7 @@ extension _ReaderNavigationActionsExtension on _ReaderPageState {
     bool animate = true,
     String trigger = 'manual',
   }) async {
-    if (!_scrollController.hasClients || _images.isEmpty) {
+    if (!_scrollController.hasClients || _readerSpreadCount <= 0) {
       _logReaderEvent(
         'Reader list scroll skipped',
         level: 'warning',
@@ -173,7 +191,7 @@ extension _ReaderNavigationActionsExtension on _ReaderPageState {
       );
       return;
     }
-    final target = math.max(0, math.min(index, _images.length - 1));
+    final target = _normalizeSpreadIndex(index);
     final previousPixels = _scrollController.position.pixels;
     final visibleContext = target < _itemKeys.length
         ? _itemKeys[target].currentContext
@@ -220,7 +238,9 @@ extension _ReaderNavigationActionsExtension on _ReaderPageState {
       }
 
       final maxScrollExtent = _scrollController.position.maxScrollExtent;
-      final ratio = _images.length <= 1 ? 0.0 : target / (_images.length - 1);
+      final ratio = _readerSpreadCount <= 1
+          ? 0.0
+          : target / (_readerSpreadCount - 1);
       final estimatedOffset = math.max(
         0.0,
         math.min(maxScrollExtent * ratio, maxScrollExtent),
@@ -317,19 +337,19 @@ extension _ReaderNavigationActionsExtension on _ReaderPageState {
   }
 
   Future<void> _goToReaderPage(int index, {String trigger = 'manual'}) async {
-    if (_images.isEmpty) {
+    if (_readerSpreadCount <= 0) {
       return;
     }
-    final target = math.max(0, math.min(index, _images.length - 1));
+    final target = _normalizeSpreadIndex(index);
     _logReaderEvent(
       'Reader page navigation requested',
       source: 'reader_navigation',
       content: _readerLogPayload({
         'trigger': trigger,
         'fromPageIndex': _currentPageIndex,
-        'fromPage': _images.isEmpty
+        'fromPage': _readerSpreadCount <= 0
             ? 0
-            : math.min(_currentPageIndex + 1, _images.length),
+            : math.min(_currentPageIndex + 1, _readerSpreadCount),
         'targetPageIndex': target,
         'targetPage': target + 1,
       }),
@@ -358,7 +378,7 @@ extension _ReaderNavigationActionsExtension on _ReaderPageState {
   }
 
   Future<void> _goToNextPage({String trigger = 'tap_next_zone'}) async {
-    if (_currentPageIndex >= _images.length - 1) {
+    if (_currentPageIndex >= _readerSpreadCount - 1) {
       return;
     }
     await _goToReaderPage(_currentPageIndex + 1, trigger: trigger);

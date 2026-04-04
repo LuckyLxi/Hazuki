@@ -66,6 +66,7 @@ class _ReaderPageState extends State<ReaderPage>
   static const bool _defaultImmersiveMode = true;
   static const bool _defaultKeepScreenOn = true;
   static const bool _defaultCustomBrightness = false;
+  static const bool _defaultDoublePageMode = false;
   static const bool _defaultPageIndicator = false;
   static const double _defaultBrightnessValue = 0.5;
   static const int _prefetchAroundCount = 10;
@@ -114,6 +115,7 @@ class _ReaderPageState extends State<ReaderPage>
   bool _customBrightness = _defaultCustomBrightness;
   double _brightnessValue = _defaultBrightnessValue;
   ReaderMode _readerMode = ReaderMode.topToBottom;
+  bool _doublePageMode = _defaultDoublePageMode;
   bool _tapToTurnPage = false;
   bool _pageIndicator = _defaultPageIndicator;
   bool _pinchToZoom = false;
@@ -133,6 +135,44 @@ class _ReaderPageState extends State<ReaderPage>
   bool get _pageNavigationLocked =>
       _pinchToZoom &&
       (_zoomInteracting || _isZoomed || _activePointerCount > 1);
+
+  int get _readerSpreadSize => _doublePageMode ? 2 : 1;
+
+  int get _readerSpreadCount {
+    if (_images.isEmpty) {
+      return 0;
+    }
+    return (_images.length + _readerSpreadSize - 1) ~/ _readerSpreadSize;
+  }
+
+  int _normalizeSpreadIndex(int index) {
+    if (_readerSpreadCount <= 0) {
+      return 0;
+    }
+    return math.max(0, math.min(index, _readerSpreadCount - 1));
+  }
+
+  int _spreadStartIndex(int spreadIndex) {
+    if (_images.isEmpty) {
+      return 0;
+    }
+    return _normalizeSpreadIndex(spreadIndex) * _readerSpreadSize;
+  }
+
+  List<int> _spreadImageIndices(int spreadIndex) {
+    if (_images.isEmpty) {
+      return const <int>[];
+    }
+    final start = _spreadStartIndex(spreadIndex);
+    final end = math.min(start + _readerSpreadSize, _images.length);
+    return List<int>.generate(end - start, (offset) => start + offset);
+  }
+
+  void _rebuildSpreadItemKeys() {
+    _itemKeys
+      ..clear()
+      ..addAll(List.generate(_readerSpreadCount, (_) => GlobalKey()));
+  }
 
   void _updateReaderState(VoidCallback update) {
     if (!mounted) {
@@ -159,7 +199,7 @@ class _ReaderPageState extends State<ReaderPage>
   void _maybeTriggerSliderHaptic(double value) {
     final targetIndex = math.max(
       0,
-      math.min(value.round(), _images.length - 1),
+      math.min(value.round(), _readerSpreadCount - 1),
     );
     if (_lastSliderHapticPageIndex == targetIndex) {
       return;
@@ -281,13 +321,13 @@ class _ReaderPageState extends State<ReaderPage>
   }
 
   void _setDisplayedPageIndex(int index) {
-    if (_images.isEmpty) {
+    if (_readerSpreadCount <= 0) {
       if (_pageIndexNotifier.value != 0) {
         _pageIndexNotifier.value = 0;
       }
       return;
     }
-    final normalized = math.max(0, math.min(index, _images.length - 1));
+    final normalized = _normalizeSpreadIndex(index);
     if (_pageIndexNotifier.value != normalized) {
       _pageIndexNotifier.value = normalized;
     }

@@ -335,11 +335,13 @@
   "sourceUpdateDownload": "Download",
   "readingSettingsTitle": "Reading settings",
   "readingModeTitle": "Reading mode",
-  "readingModeSubtitle": "Choose how pages are arranged in the reader",
-  "readingModeTopToBottom": "Top to bottom",
-  "readingModeRightToLeft": "Right to left",
+  "readingModeSubtitle": "Choose how to browse pages in the reader",
+  "readingModeTopToBottom": "Vertical scroll",
+  "readingModeRightToLeft": "Horizontal paging",
+  "readingDoublePageModeTitle": "Double-page mode",
+  "readingDoublePageModeSubtitle": "Show two images at once in both vertical scroll and horizontal paging modes",
   "readingTapToTurnPageTitle": "Tap to turn page",
-  "readingTapToTurnPageSubtitle": "Only works in right-to-left mode. Tap the left side for the previous page and the right side for the next page",
+  "readingTapToTurnPageSubtitle": "Only works in horizontal paging mode. Tap the left side for the previous page and the right side for the next page",
   "readingVolumeButtonTurnPageTitle": "Volume buttons turn pages",
   "readingVolumeButtonTurnPageSubtitle": "When enabled, volume up goes to the previous page and volume down goes to the next page in both reading modes",
   "readingImmersiveModeTitle": "Immersive mode",
@@ -845,6 +847,14 @@
   },
   "sourceEditorLineCount": "{count} lines",
   "@sourceEditorLineCount": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "sourceEditorSearchHint": "Search keywords or code",
+  "sourceEditorSearchNoResult": "No matching content found",
+  "sourceEditorSearchResultCount": "Found {count} results",
+  "@sourceEditorSearchResultCount": {
     "placeholders": {
       "count": {}
     }

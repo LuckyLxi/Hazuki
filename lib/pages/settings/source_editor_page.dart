@@ -17,8 +17,6 @@ class ComicSourceEditorPage extends StatefulWidget {
 
 class _ComicSourceEditorPageState extends State<ComicSourceEditorPage> {
   final _controller = SourceCodeEditingController();
-  final _editorScrollController = ScrollController();
-  final _lineNumberScrollController = ScrollController();
 
   String _initialContent = '';
   String? _loadErrorText;
@@ -42,16 +40,12 @@ class _ComicSourceEditorPageState extends State<ComicSourceEditorPage> {
   @override
   void initState() {
     super.initState();
-    _editorScrollController.addListener(_syncLineNumberScrollOffset);
     _loadSource();
   }
 
   @override
   void dispose() {
-    _editorScrollController.removeListener(_syncLineNumberScrollOffset);
     _controller.dispose();
-    _editorScrollController.dispose();
-    _lineNumberScrollController.dispose();
     super.dispose();
   }
 
@@ -66,18 +60,10 @@ class _ComicSourceEditorPageState extends State<ComicSourceEditorPage> {
       if (!mounted) {
         return;
       }
-      _controller.setSyntaxHighlightEnabled(false);
-      _controller.value = TextEditingValue(
-        text: content,
-        selection: TextSelection.collapsed(offset: content.length),
-      );
+      _controller.loadText(content);
       setState(() {
         _initialContent = content;
         _loading = false;
-      });
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _controller.scheduleSyntaxHighlightEnable();
-        _syncLineNumberScrollOffset();
       });
     } catch (e) {
       if (!mounted) {
@@ -121,19 +107,6 @@ class _ComicSourceEditorPageState extends State<ComicSourceEditorPage> {
       });
       await showHazukiPrompt(context, message, isError: true);
     }
-  }
-
-  void _syncLineNumberScrollOffset() {
-    if (!_editorScrollController.hasClients ||
-        !_lineNumberScrollController.hasClients) {
-      return;
-    }
-    final maxOffset = _lineNumberScrollController.position.maxScrollExtent;
-    final target = _editorScrollController.offset.clamp(0.0, maxOffset);
-    if ((_lineNumberScrollController.offset - target).abs() < 0.5) {
-      return;
-    }
-    _lineNumberScrollController.jumpTo(target);
   }
 
   Widget _buildLoadingState(BuildContext context) {
@@ -222,10 +195,9 @@ class _ComicSourceEditorPageState extends State<ComicSourceEditorPage> {
               : SourceEditorContent(
                   strings: _strings,
                   controller: _controller,
-                  editorScrollController: _editorScrollController,
-                  lineNumberScrollController: _lineNumberScrollController,
                   saving: _saving,
                   inlineErrorText: _inlineErrorText,
+                  onSaveRequested: _saveSource,
                 ),
         ),
       ),

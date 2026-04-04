@@ -32,6 +32,7 @@ class ReaderDiagnosticsSnapshot {
     required this.chapterTitle,
     required this.chapterIndex,
     required this.readerMode,
+    required this.doublePageMode,
     required this.currentPageIndex,
     required this.currentPage,
     required this.pageIndicatorIndex,
@@ -72,6 +73,7 @@ class ReaderDiagnosticsSnapshot {
   final String chapterTitle;
   final int chapterIndex;
   final String readerMode;
+  final bool doublePageMode;
   final int currentPageIndex;
   final int currentPage;
   final int pageIndicatorIndex;
@@ -145,16 +147,16 @@ double normalizeReaderLogDouble(num value) {
 }
 
 List<Map<String, dynamic>> captureReaderRenderedItemsAround({
-  required List<String> images,
+  required int itemCount,
   required List<GlobalKey> itemKeys,
   required int anchorIndex,
 }) {
-  if (images.isEmpty || itemKeys.isEmpty) {
+  if (itemCount <= 0 || itemKeys.isEmpty) {
     return const <Map<String, dynamic>>[];
   }
-  final target = anchorIndex.clamp(0, images.length - 1);
-  final start = (target - 2).clamp(0, images.length - 1);
-  final end = (target + 2).clamp(0, images.length - 1);
+  final target = anchorIndex.clamp(0, itemCount - 1);
+  final start = (target - 2).clamp(0, itemCount - 1);
+  final end = (target + 2).clamp(0, itemCount - 1);
   final items = <Map<String, dynamic>>[];
   for (var i = start; i <= end; i++) {
     if (i >= itemKeys.length) {
@@ -194,6 +196,7 @@ Map<String, dynamic> buildReaderLogPayload({
     'chapterTitle': snapshot.chapterTitle,
     'chapterIndex': snapshot.chapterIndex,
     'readerMode': snapshot.readerMode,
+    'doublePageMode': snapshot.doublePageMode,
     'currentPageIndex': snapshot.currentPageIndex,
     'currentPage': snapshot.currentPage,
     'pageIndicatorIndex': snapshot.pageIndicatorIndex,

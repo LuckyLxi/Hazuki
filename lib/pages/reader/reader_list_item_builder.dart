@@ -1,8 +1,27 @@
 part of '../reader_page.dart';
 
 extension _ReaderListItemBuilderExtension on _ReaderPageState {
-  Widget _buildReaderListItem(int index) {
-    final url = _images[index];
+  Widget _buildReaderListItem(int spreadIndex) {
+    final imageIndices = _spreadImageIndices(spreadIndex);
+    if (imageIndices.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Container(
+      key: spreadIndex < _itemKeys.length ? _itemKeys[spreadIndex] : null,
+      child: imageIndices.length == 1
+          ? _buildReaderListImage(imageIndices.first)
+          : Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(child: _buildReaderListImage(imageIndices[0])),
+                Expanded(child: _buildReaderListImage(imageIndices[1])),
+              ],
+            ),
+    );
+  }
+
+  Widget _buildReaderListImage(int imageIndex) {
+    final url = _images[imageIndex];
     final cachedProvider = _providerCache[url];
     final readerSurfaceColor = _resolveReaderSurfaceColor(context);
     final readerPlaceholderColor = _resolveReaderPlaceholderColor(context);
@@ -11,13 +30,12 @@ extension _ReaderListItemBuilderExtension on _ReaderPageState {
 
     double currentPlaceholderAspectRatio() {
       return currentResolvedAspectRatio() ??
-          _resolvePlaceholderAspectRatio(index);
+          _resolvePlaceholderAspectRatio(imageIndex);
     }
 
     if (_noImageModeEnabled) {
       return AspectRatio(
-        key: index < _itemKeys.length ? _itemKeys[index] : null,
-        aspectRatio: 3 / 4,
+        aspectRatio: currentPlaceholderAspectRatio(),
         child: const SizedBox.expand(),
       );
     }
@@ -60,42 +78,36 @@ extension _ReaderListItemBuilderExtension on _ReaderPageState {
       return _wrapImageWidget(stableImage, url);
     }
 
-    Widget content;
     if (cachedProvider != null) {
-      content = buildImage(cachedProvider);
-    } else {
-      content = FutureBuilder<ImageProvider>(
-        key: ValueKey(url),
-        future: _getOrCreateImageProviderFuture(url),
-        builder: (context, snapshot) {
-          if (snapshot.hasData) {
-            return buildImage(snapshot.data!);
-          }
-          if (snapshot.hasError) {
-            return AspectRatio(
-              aspectRatio: currentPlaceholderAspectRatio(),
-              child: ColoredBox(
-                color: readerPlaceholderColor,
-                child: const Center(child: Icon(Icons.broken_image_outlined)),
-              ),
-            );
-          }
-          return AspectRatio(
-            aspectRatio: currentPlaceholderAspectRatio(),
-            child: DecoratedBox(
-              decoration: BoxDecoration(color: readerSurfaceColor),
-              child: const Center(
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            ),
-          );
-        },
-      );
+      return buildImage(cachedProvider);
     }
 
-    return Container(
-      key: index < _itemKeys.length ? _itemKeys[index] : null,
-      child: content,
+    return FutureBuilder<ImageProvider>(
+      key: ValueKey(url),
+      future: _getOrCreateImageProviderFuture(url),
+      builder: (context, snapshot) {
+        if (snapshot.hasData) {
+          return buildImage(snapshot.data!);
+        }
+        if (snapshot.hasError) {
+          return AspectRatio(
+            aspectRatio: currentPlaceholderAspectRatio(),
+            child: ColoredBox(
+              color: readerPlaceholderColor,
+              child: const Center(child: Icon(Icons.broken_image_outlined)),
+            ),
+          );
+        }
+        return AspectRatio(
+          aspectRatio: currentPlaceholderAspectRatio(),
+          child: DecoratedBox(
+            decoration: BoxDecoration(color: readerSurfaceColor),
+            child: const Center(
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ),
+        );
+      },
     );
   }
 }

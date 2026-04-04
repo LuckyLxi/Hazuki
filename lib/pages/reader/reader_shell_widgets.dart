@@ -15,6 +15,7 @@ extension _ReaderShellWidgetsExtension on _ReaderPageState {
             width: drawerWidth,
             child: ReaderSettingsDrawerContent(
               readerMode: _readerMode,
+              doublePageMode: _doublePageMode,
               tapToTurnPage: _tapToTurnPage,
               volumeButtonTurnPage: _volumeButtonTurnPage,
               pinchToZoom: _pinchToZoom,
@@ -25,6 +26,7 @@ extension _ReaderShellWidgetsExtension on _ReaderPageState {
               customBrightness: _customBrightness,
               brightnessValue: _brightnessValue,
               onReaderModeChanged: _updateReaderModeSetting,
+              onDoublePageModeChanged: _toggleDoublePageModeSetting,
               onTapToTurnPageChanged: _readerMode == ReaderMode.rightToLeft
                   ? _toggleTapToTurnPageSetting
                   : null,
@@ -66,21 +68,21 @@ extension _ReaderShellWidgetsExtension on _ReaderPageState {
       readerTheme: readerTheme,
       pageIndexNotifier: _pageIndexNotifier,
       chapterIndex: widget.chapterIndex,
-      imageCount: _images.length,
+      imageCount: _readerSpreadCount,
     );
   }
 
   Widget _buildReaderBottomControls(ThemeData readerTheme) {
-    final maxIndex = math.max(_images.length - 1, 0);
+    final maxIndex = math.max(_readerSpreadCount - 1, 0);
     return ReaderBottomControls(
       controlsVisible: _controlsVisible,
       readerTheme: readerTheme,
       pageIndexNotifier: _pageIndexNotifier,
       sliderDragging: _sliderDragging,
       sliderDragValue: _sliderDragValue,
-      imageCount: _images.length,
+      imageCount: _readerSpreadCount,
       chapterPanelLoading: _chapterPanelLoading,
-      onSliderChangeStart: _images.length > 1
+      onSliderChangeStart: _readerSpreadCount > 1
           ? (value) {
               _lastSliderHapticPageIndex = null;
               _maybeTriggerSliderHaptic(value);
@@ -90,7 +92,7 @@ extension _ReaderShellWidgetsExtension on _ReaderPageState {
               });
             }
           : null,
-      onSliderChanged: _images.length > 1
+      onSliderChanged: _readerSpreadCount > 1
           ? (value) {
               _maybeTriggerSliderHaptic(value);
               _updateReaderState(() {
@@ -99,7 +101,7 @@ extension _ReaderShellWidgetsExtension on _ReaderPageState {
               });
             }
           : null,
-      onSliderChangeEnd: _images.length > 1
+      onSliderChangeEnd: _readerSpreadCount > 1
           ? (value) {
               final target = math.max(0, math.min(value.round(), maxIndex));
               _lastSliderHapticPageIndex = null;

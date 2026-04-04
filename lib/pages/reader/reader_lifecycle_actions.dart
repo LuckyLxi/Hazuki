@@ -59,9 +59,9 @@ extension _ReaderLifecycleActionsExtension on _ReaderPageState {
       source: 'reader_lifecycle',
       content: _readerLogPayload({
         'lastVisiblePageIndex': _pageIndexNotifier.value,
-        'lastVisiblePage': _images.isEmpty
+        'lastVisiblePage': _readerSpreadCount <= 0
             ? 0
-            : math.min(_pageIndexNotifier.value + 1, _images.length),
+            : math.min(_pageIndexNotifier.value + 1, _readerSpreadCount),
       }),
     );
     unawaited(_restoreReaderDisplay());
@@ -71,8 +71,7 @@ extension _ReaderLifecycleActionsExtension on _ReaderPageState {
     _zoomController.value = Matrix4.identity();
     _imageAspectRatioCache.clear();
     _images = images;
-    _itemKeys.clear();
-    _itemKeys.addAll(List.generate(_images.length, (_) => GlobalKey()));
+    _rebuildSpreadItemKeys();
     _rebuildImageIndexMap();
     _loadingImages = false;
     _loadImagesError = null;

@@ -301,7 +301,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutProjectTitle => '项目地址';
 
   @override
-  String get aboutProjectSubtitle => 'GitHub (https://github.com/LuckyLxi/Hazuki)';
+  String get aboutProjectSubtitle =>
+      'GitHub (https://github.com/LuckyLxi/Hazuki)';
 
   @override
   String get aboutFeedbackTitle => '反馈问题';
@@ -322,7 +323,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutDisclaimerSubtitle => '使用前请先阅读相关说明';
 
   @override
-  String get aboutDisclaimerContent => '本软件免费开源，仅供个人学习与交流使用。\n\nHazuki 本身不提供、存储或分发任何漫画内容，所有内容均来自第三方漫画源脚本，版权归各自权利人所有。账号密码仅用于与源站直接通信，本软件不作任何存储或上传。\n\n首次启动时软件会自动下载漫画源脚本，该脚本来自第三方仓库，与本项目无关。\n\n请在遵守当地法律法规的前提下使用本软件，由此产生的任何责任由使用者自行承担。';
+  String get aboutDisclaimerContent =>
+      '本软件免费开源，仅供个人学习与交流使用。\n\nHazuki 本身不提供、存储或分发任何漫画内容，所有内容均来自第三方漫画源脚本，版权归各自权利人所有。账号密码仅用于与源站直接通信，本软件不作任何存储或上传。\n\n首次启动时软件会自动下载漫画源脚本，该脚本来自第三方仓库，与本项目无关。\n\n请在遵守当地法律法规的前提下使用本软件，由此产生的任何责任由使用者自行承担。';
 
   @override
   String get commonConfirm => '确定';
@@ -526,7 +528,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get comicDetailDeleteFavoriteFolder => '删除收藏夹';
 
   @override
-  String get comicDetailDeleteFavoriteFolderContent => '删除这个收藏夹吗？位于该收藏夹中的漫画将失去分组。';
+  String get comicDetailDeleteFavoriteFolderContent =>
+      '删除这个收藏夹吗？位于该收藏夹中的漫画将失去分组。';
 
   @override
   String get comicDetailDelete => '删除';
@@ -702,25 +705,32 @@ class AppLocalizationsZh extends AppLocalizations {
   String get readingModeTitle => '阅读模式';
 
   @override
-  String get readingModeSubtitle => '选择阅读器中的页面排列方式';
+  String get readingModeSubtitle => '选择阅读器中的浏览方式';
 
   @override
-  String get readingModeTopToBottom => '从上往下';
+  String get readingModeTopToBottom => '纵向滚动';
 
   @override
-  String get readingModeRightToLeft => '从右到左';
+  String get readingModeRightToLeft => '横向翻页';
+
+  @override
+  String get readingDoublePageModeTitle => '双页模式';
+
+  @override
+  String get readingDoublePageModeSubtitle => '开启后每次同时显示两张图片，纵向滚动与横向翻页都生效';
 
   @override
   String get readingTapToTurnPageTitle => '点击翻页';
 
   @override
-  String get readingTapToTurnPageSubtitle => '仅在从右到左模式下生效，点击左侧回到上一页，点击右侧前往下一页';
+  String get readingTapToTurnPageSubtitle => '仅在横向翻页模式下生效，点击左侧回到上一页，点击右侧前往下一页';
 
   @override
   String get readingVolumeButtonTurnPageTitle => '音量键翻页';
 
   @override
-  String get readingVolumeButtonTurnPageSubtitle => '开启后，上音量键为上一页，下音量键为下一页，两种阅读模式都生效';
+  String get readingVolumeButtonTurnPageSubtitle =>
+      '开启后，上音量键为上一页，下音量键为下一页，两种阅读模式都生效';
 
   @override
   String get readingImmersiveModeTitle => '沉浸模式';
@@ -872,7 +882,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get privacyPasswordLockIntroTitle => '为软件添加四位数字密码';
 
   @override
-  String get privacyPasswordLockIntroSubtitle => '启用后，进入软件前需要先输入密码；如果开启了生物认证，也可以在密码键盘页使用指纹解锁。';
+  String get privacyPasswordLockIntroSubtitle =>
+      '启用后，进入软件前需要先输入密码；如果开启了生物认证，也可以在密码键盘页使用指纹解锁。';
 
   @override
   String get privacyPasswordLockEnableAction => '启用密码锁';
@@ -1214,7 +1225,8 @@ class AppLocalizationsZh extends AppLocalizations {
   String get favoritesDebugCopied => '已复制网络日志';
 
   @override
-  String get favoritesDebugFilterReason => '仅显示重要日志（错误日志、HTTP>=400、登录相关、含关键错误关键词）';
+  String get favoritesDebugFilterReason =>
+      '仅显示重要日志（错误日志、HTTP>=400、登录相关、含关键错误关键词）';
 
   @override
   String get favoritesDebugFilterImportantTooltip => '筛查重要日志';
@@ -1566,6 +1578,17 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get sourceEditorSearchHint => '搜索关键词或代码';
+
+  @override
+  String get sourceEditorSearchNoResult => '没搜到内容';
+
+  @override
+  String sourceEditorSearchResultCount(Object count) {
+    return '搜到 $count 个结果';
+  }
+
+  @override
   String get sourceEditorRestoreConfirmContent => '确定要还原为官方漫画源吗？你自己保存的修改会被覆盖。';
 
   @override
@@ -1583,7 +1606,10 @@ class AppLocalizationsZh extends AppLocalizations {
   String get downloadsScanPermissionDenied => '未获得文件访问权限，无法扫描本地漫画';
 
   @override
-  String downloadsScanCompleted(Object scannedDirectories, Object recoveredComics) {
+  String downloadsScanCompleted(
+    Object scannedDirectories,
+    Object recoveredComics,
+  ) {
     return '扫描完成，已扫描 $scannedDirectories 个目录，恢复 $recoveredComics 部漫画';
   }
 

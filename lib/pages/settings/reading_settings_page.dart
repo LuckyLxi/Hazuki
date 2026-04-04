@@ -14,6 +14,7 @@ class ReadingSettingsPage extends StatefulWidget {
 
 class _ReadingSettingsPageState extends State<ReadingSettingsPage> {
   ReaderMode _readerMode = ReaderMode.topToBottom;
+  bool _doublePageMode = false;
   bool _tapToTurnPage = false;
   bool _volumeButtonTurnPage = false;
   bool _immersiveMode = true;
@@ -35,6 +36,7 @@ class _ReadingSettingsPageState extends State<ReadingSettingsPage> {
     if (!mounted) return;
     setState(() {
       _readerMode = readerModeFromRaw(prefs.getString('reader_reading_mode'));
+      _doublePageMode = prefs.getBool('reader_double_page_mode') ?? false;
       _tapToTurnPage = prefs.getBool('reader_tap_to_turn_page') ?? false;
       _volumeButtonTurnPage =
           prefs.getBool('reader_volume_button_turn_page') ?? false;
@@ -63,6 +65,12 @@ class _ReadingSettingsPageState extends State<ReadingSettingsPage> {
     setState(() => _tapToTurnPage = value);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('reader_tap_to_turn_page', value);
+  }
+
+  Future<void> _toggleDoublePageMode(bool value) async {
+    setState(() => _doublePageMode = value);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('reader_double_page_mode', value);
   }
 
   Future<void> _toggleVolumeButtonTurnPage(bool value) async {
@@ -174,6 +182,13 @@ class _ReadingSettingsPageState extends State<ReadingSettingsPage> {
                     ],
                   ),
                 ),
+              ),
+              SwitchListTile(
+                secondary: const Icon(Icons.auto_stories_outlined),
+                title: Text(strings.readingDoublePageModeTitle),
+                subtitle: Text(strings.readingDoublePageModeSubtitle),
+                value: _doublePageMode,
+                onChanged: _toggleDoublePageMode,
               ),
               SwitchListTile(
                 secondary: const Icon(Icons.touch_app_outlined),

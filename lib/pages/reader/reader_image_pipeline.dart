@@ -66,8 +66,7 @@ extension _ReaderImagePipelineExtension on _ReaderPageState {
         _zoomController.value = Matrix4.identity();
         _imageAspectRatioCache.clear();
         _images = images.where((e) => e.trim().isNotEmpty).toList();
-        _itemKeys.clear();
-        _itemKeys.addAll(List.generate(_images.length, (_) => GlobalKey()));
+        _rebuildSpreadItemKeys();
         _rebuildImageIndexMap();
         _loadingImages = false;
         _loadImagesError = null;
@@ -109,7 +108,7 @@ extension _ReaderImagePipelineExtension on _ReaderPageState {
   }
 
   void _onScrollPrefetch() {
-    if (!_scrollController.hasClients || _images.isEmpty) {
+    if (!_scrollController.hasClients || _images.isEmpty || _itemKeys.isEmpty) {
       return;
     }
     final position = _scrollController.position;
@@ -122,7 +121,7 @@ extension _ReaderImagePipelineExtension on _ReaderPageState {
     final previousPixels = _diagnosticsState.lastObservedListPixels;
     int normalizedIndex = _currentPageIndex;
 
-    for (var i = 0; i < _images.length; i++) {
+    for (var i = 0; i < _itemKeys.length; i++) {
       if (i >= _itemKeys.length) {
         break;
       }
@@ -140,6 +139,7 @@ extension _ReaderImagePipelineExtension on _ReaderPageState {
       }
     }
 
+    normalizedIndex = _normalizeSpreadIndex(normalizedIndex);
     if (_currentPageIndex != normalizedIndex) {
       _currentPageIndex = normalizedIndex;
       _logVisiblePageChange(index: normalizedIndex, trigger: 'scroll');
@@ -221,13 +221,14 @@ extension _ReaderImagePipelineExtension on _ReaderPageState {
     }
   }
 
-  void _prefetchAround(int currentIndex) {
-    var start = currentIndex - _ReaderPageState._prefetchAroundCount;
+  void _prefetchAround(int currentSpreadIndex) {
+    final anchorImageIndex = _spreadStartIndex(currentSpreadIndex);
+    var start = anchorImageIndex - _ReaderPageState._prefetchAroundCount;
     if (start < 0) {
       start = 0;
     }
     final max = _images.length;
-    var end = currentIndex + _ReaderPageState._prefetchAroundCount;
+    var end = anchorImageIndex + _ReaderPageState._prefetchAroundCount;
     if (end > max) {
       end = max;
     }
@@ -241,14 +242,14 @@ extension _ReaderImagePipelineExtension on _ReaderPageState {
       unawaited(_getOrCreateImageProviderFuture(url));
     }
 
-    _trimProviderCachesAround(currentIndex);
+    _trimProviderCachesAround(anchorImageIndex);
   }
 
-  Future<void> _prefetchAheadFrom(int currentIndex) async {
+  Future<void> _prefetchAheadFrom(int currentSpreadIndex) async {
     if (_images.isEmpty) {
       return;
     }
-    var start = currentIndex + 1;
+    var start = _spreadStartIndex(currentSpreadIndex) + _readerSpreadSize;
     if (start < 0) {
       start = 0;
     }
@@ -263,7 +264,7 @@ extension _ReaderImagePipelineExtension on _ReaderPageState {
 
     for (var i = start; i < endExclusive; i++) {
       if (_queuedPrefetchAheadIndex != null &&
-          _queuedPrefetchAheadIndex != currentIndex) {
+          _queuedPrefetchAheadIndex != currentSpreadIndex) {
         break;
       }
 
@@ -365,8 +366,8 @@ extension _ReaderImagePipelineExtension on _ReaderPageState {
       final index = _imageIndexMap[url];
       if (index != null &&
           _readerMode == ReaderMode.topToBottom &&
-          index < _currentPageIndex &&
-          index >= _currentPageIndex - 4) {
+          index < _spreadStartIndex(_currentPageIndex) &&
+          index >= _spreadStartIndex(_currentPageIndex) - 4) {
         _logListPositionSnapshot(
           'Reader upstream page aspect ratio resolved',
           trigger: 'image_aspect_ratio_resolved',
