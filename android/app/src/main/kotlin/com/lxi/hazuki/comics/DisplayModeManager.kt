@@ -18,9 +18,6 @@ class DisplayModeManager(
     }
 
     private fun applyMode(mode: Display.Mode): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
-            return false
-        }
         activity.window.attributes = activity.window.attributes.apply {
             preferredDisplayModeId = mode.modeId
         }
@@ -50,11 +47,7 @@ class DisplayModeManager(
                 .thenByDescending { it.physicalWidth },
         )
         val activeId = display.mode.modeId
-        val preferredId = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            activity.window.attributes.preferredDisplayModeId
-        } else {
-            0
-        }
+        val preferredId = activity.window.attributes.preferredDisplayModeId
 
         val result = mutableListOf<Map<String, Any>>()
         result.add(
@@ -88,10 +81,8 @@ class DisplayModeManager(
     }
 
     fun applyAutoDisplayMode() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            activity.window.attributes = activity.window.attributes.apply {
-                preferredDisplayModeId = 0
-            }
+        activity.window.attributes = activity.window.attributes.apply {
+            preferredDisplayModeId = 0
         }
     }
 

@@ -10,8 +10,10 @@ import android.os.Environment
 import android.provider.Settings
 import android.util.Log
 import android.view.KeyEvent
+import androidx.annotation.RequiresApi
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
@@ -233,10 +235,11 @@ class MainActivityChannels(
         }
     }
 
+    @RequiresApi(Build.VERSION_CODES.R)
     private fun launchManageStorageAccessSettings() {
         val intent =
                 Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
-                    data = Uri.parse("package:${activity.packageName}")
+                    data = "package:${activity.packageName}".toUri()
                 }
         try {
             manageStorageAccessLauncher.launch(intent)

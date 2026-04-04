@@ -34,11 +34,18 @@ class MainActivity : FlutterFragmentActivity() {
         privacyManager.onActivityCreated()
     }
 
-    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         if (::flutterChannels.isInitialized && flutterChannels.handleReaderVolumeButtonKeyEvent(event)) {
             return true
         }
-        return super.dispatchKeyEvent(event)
+        return super.onKeyDown(keyCode, event)
+    }
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean {
+        if (::flutterChannels.isInitialized && flutterChannels.handleReaderVolumeButtonKeyEvent(event)) {
+            return true
+        }
+        return super.onKeyUp(keyCode, event)
     }
 
     override fun onUserLeaveHint() {

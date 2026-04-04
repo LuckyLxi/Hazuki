@@ -9,12 +9,14 @@ import android.view.WindowManager
 import android.widget.FrameLayout
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
+import androidx.core.content.edit
+import androidx.core.graphics.drawable.toDrawable
 import kotlin.system.exitProcess
 
 class PrivacyManager(
     private val activity: MainActivity,
 ) {
-    private val blackBackgroundDrawable = ColorDrawable(Color.BLACK)
+    private val blackBackgroundDrawable = Color.BLACK.toDrawable()
     private var blurView: View? = null
     private var temporarySecureAppliedForRecents = false
     private var isAuthenticating = false
@@ -32,7 +34,7 @@ class PrivacyManager(
 
     fun setBlurBackground(enabled: Boolean) {
         val prefs = activity.getSharedPreferences("hazuki_privacy", Context.MODE_PRIVATE)
-        prefs.edit().putBoolean("blurBackground", enabled).apply()
+        prefs.edit { putBoolean("blurBackground", enabled) }
         applyRecentsScreenshotPolicy()
         applySecureFlag()
         if (!enabled) {
@@ -44,17 +46,17 @@ class PrivacyManager(
 
     fun setBiometricAuth(enabled: Boolean) {
         val prefs = activity.getSharedPreferences("hazuki_privacy", Context.MODE_PRIVATE)
-        prefs.edit().putBoolean("biometricAuth", enabled).apply()
+        prefs.edit { putBoolean("biometricAuth", enabled) }
     }
 
     fun setAuthOnResume(enabled: Boolean) {
         val prefs = activity.getSharedPreferences("hazuki_privacy", Context.MODE_PRIVATE)
-        prefs.edit().putBoolean("authOnResume", enabled).apply()
+        prefs.edit { putBoolean("authOnResume", enabled) }
     }
 
     fun setPasswordLockEnabled(enabled: Boolean) {
         val prefs = activity.getSharedPreferences("hazuki_privacy", Context.MODE_PRIVATE)
-        prefs.edit().putBoolean("passwordLockEnabled", enabled).apply()
+        prefs.edit { putBoolean("passwordLockEnabled", enabled) }
     }
 
     fun requireAuthCheck(): Boolean {
