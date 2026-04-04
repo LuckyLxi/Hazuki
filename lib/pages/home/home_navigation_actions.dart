@@ -63,8 +63,12 @@ class HomeNavigationActions {
   }
 
   Future<void> openCategories() async {
+    final navigator = Navigator.of(context);
     Navigator.pop(context);
-    await Navigator.of(context).push(
+    if (!navigator.mounted) {
+      return;
+    }
+    await navigator.push(
       MaterialPageRoute<void>(
         builder: (_) => TagCategoryPage(
           searchPageBuilder: (tag) => buildSearchPage(initialKeyword: tag),

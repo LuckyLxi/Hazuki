@@ -167,6 +167,8 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
       _favoritesDebugCache = null;
       _exploreSectionsMemoryCache = null;
       _exploreSectionsMemoryCachedAt = null;
+      _categoryTagGroupsMemoryCache = null;
+      _categoryTagGroupsMemoryCachedAt = null;
       _sourceMeta = null;
       final result = await _downloadOrLoadSourceFiles();
       final meta = await _loadSourceMetadata(result.initFile, result.jmFile);

@@ -15,6 +15,7 @@ class LineSettingsPage extends StatefulWidget {
 
 class _LineSettingsPageState extends State<LineSettingsPage> {
   bool _loading = true;
+  bool _refreshingStatus = false;
 
   String _selectedApiDomain = '1';
   String _selectedImageStream = '1';
@@ -30,10 +31,12 @@ class _LineSettingsPageState extends State<LineSettingsPage> {
     unawaited(_loadSnapshot());
   }
 
-  Future<void> _loadSnapshot() async {
-    setState(() {
-      _loading = true;
-    });
+  Future<void> _loadSnapshot({bool showLoading = true}) async {
+    if (showLoading) {
+      setState(() {
+        _loading = true;
+      });
+    }
 
     try {
       final snapshot = await HazukiSourceService.instance
@@ -96,9 +99,38 @@ class _LineSettingsPageState extends State<LineSettingsPage> {
         showHazukiPrompt(context, strings.lineLoadFailed('$e'), isError: true),
       );
     } finally {
-      if (mounted) {
+      if (mounted && showLoading) {
         setState(() {
           _loading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _refreshLineStatus() async {
+    if (_refreshingStatus) {
+      return;
+    }
+
+    setState(() {
+      _refreshingStatus = true;
+    });
+
+    try {
+      await HazukiSourceService.instance.refreshLines();
+      await _loadSnapshot(showLoading: false);
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      final strings = l10n(context);
+      unawaited(
+        showHazukiPrompt(context, strings.lineLoadFailed('$e'), isError: true),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _refreshingStatus = false;
         });
       }
     }
@@ -374,9 +406,19 @@ class _LineSettingsPageState extends State<LineSettingsPage> {
                   child: SizedBox(
                     width: double.infinity,
                     child: FilledButton.tonalIcon(
-                      onPressed: _loadSnapshot,
-                      icon: const Icon(Icons.refresh),
-                      label: Text(strings.lineRefreshStatusButton),
+                      onPressed: _refreshingStatus ? null : _refreshLineStatus,
+                      icon: _refreshingStatus
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.refresh),
+                      label: Text(
+                        _refreshingStatus
+                            ? strings.commonLoading
+                            : strings.lineRefreshStatusButton,
+                      ),
                     ),
                   ),
                 ),

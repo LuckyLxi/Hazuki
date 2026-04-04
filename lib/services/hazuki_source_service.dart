@@ -142,6 +142,8 @@ class HazukiSourceService {
       LinkedHashMap<String, ComicDetailsData>();
   List<ExploreSection>? _exploreSectionsMemoryCache;
   DateTime? _exploreSectionsMemoryCachedAt;
+  List<CategoryTagGroup>? _categoryTagGroupsMemoryCache;
+  DateTime? _categoryTagGroupsMemoryCachedAt;
   Directory? _imageCacheDir;
   Directory? _comicDetailsCacheDir;
   Directory? _discoverCacheDir;

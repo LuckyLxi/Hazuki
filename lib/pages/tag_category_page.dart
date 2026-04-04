@@ -28,7 +28,12 @@ class _TagCategoryPageState extends State<TagCategoryPage> {
   @override
   void initState() {
     super.initState();
-    unawaited(_loadInitial());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      unawaited(_loadInitial());
+    });
   }
 
   Future<List<CategoryTagGroup>> _loadTagGroups() {

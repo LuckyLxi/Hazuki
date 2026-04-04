@@ -35,6 +35,11 @@ doc/api/
 # OS files
 .DS_Store
 
+# Local diagnostics
+analyze_out.txt
+android/clean.log
+android/gradle_error.txt
+
 # Android-specific
 **/*.cxx/
 **/build/

@@ -98,6 +98,8 @@ extension HazukiSourceServiceExploreCapability on HazukiSourceService {
   Future<void> _initDiscoverCache() async {
     _exploreSectionsMemoryCache = null;
     _exploreSectionsMemoryCachedAt = null;
+    _categoryTagGroupsMemoryCache = null;
+    _categoryTagGroupsMemoryCachedAt = null;
     final dir = _discoverCacheDir;
     _discoverCacheDir = null;
     try {

@@ -1,8 +1,20 @@
 part of '../hazuki_source_service.dart';
 
 extension HazukiSourceServiceCategoryCapability on HazukiSourceService {
-  Future<List<CategoryTagGroup>> loadCategoryTagGroups() async {
+  Future<List<CategoryTagGroup>> loadCategoryTagGroups({
+    bool forceRefresh = false,
+  }) async {
     await ensureInitialized();
+
+    if (!forceRefresh) {
+      final memoryCached = _getCategoryTagGroupsFromMemoryCache();
+      if (memoryCached != null) {
+        return memoryCached;
+      }
+    } else {
+      _categoryTagGroupsMemoryCache = null;
+      _categoryTagGroupsMemoryCachedAt = null;
+    }
 
     final engine = _engine;
     if (engine == null) {
@@ -64,7 +76,36 @@ extension HazukiSourceServiceCategoryCapability on HazukiSourceService {
       groups.add(CategoryTagGroup(name: name, tags: tags));
     }
 
+    final cached = List<CategoryTagGroup>.unmodifiable(
+      groups.map(
+        (group) => CategoryTagGroup(
+          name: group.name,
+          tags: List<String>.unmodifiable(group.tags),
+        ),
+      ),
+    );
+    _putCategoryTagGroupsInMemoryCache(cached);
+    return cached;
+  }
+
+  List<CategoryTagGroup>? _getCategoryTagGroupsFromMemoryCache() {
+    final groups = _categoryTagGroupsMemoryCache;
+    final cachedAt = _categoryTagGroupsMemoryCachedAt;
+    if (groups == null || cachedAt == null) {
+      return null;
+    }
+    if (DateTime.now().difference(cachedAt) >
+        HazukiSourceService._discoverCacheTtl) {
+      _categoryTagGroupsMemoryCache = null;
+      _categoryTagGroupsMemoryCachedAt = null;
+      return null;
+    }
     return groups;
+  }
+
+  void _putCategoryTagGroupsInMemoryCache(List<CategoryTagGroup> groups) {
+    _categoryTagGroupsMemoryCache = groups;
+    _categoryTagGroupsMemoryCachedAt = DateTime.now();
   }
 
   ({String category, String? param}) _parseCategoryViewMoreUrl(String rawUrl) {
