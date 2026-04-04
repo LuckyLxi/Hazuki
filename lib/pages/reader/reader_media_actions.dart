@@ -15,12 +15,11 @@ extension _ReaderMediaActionsExtension on _ReaderPageState {
   Future<void> _showSaveImageDialog(String imageUrl) async {
     unawaited(HapticFeedback.heavyImpact());
     final strings = l10n(context);
+    final dialogTheme = _resolveReaderTheme(context);
     _logReaderEvent(
       'Reader save image dialog opened',
       source: 'reader_media',
-      content: _readerLogPayload({
-        'imageUrl': imageUrl,
-      }),
+      content: _readerLogPayload({'imageUrl': imageUrl}),
     );
     final shouldSave = await showGeneralDialog<bool>(
       context: context,
@@ -38,19 +37,23 @@ extension _ReaderMediaActionsExtension on _ReaderPageState {
         );
       },
       pageBuilder: (dialogContext, anim1, anim2) {
-        return AlertDialog(
-          title: Text(strings.readerSaveImageTitle),
-          content: Text(strings.readerSaveImageContent),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext, false),
-              child: Text(strings.commonCancel),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(dialogContext, true),
-              child: Text(strings.commonSave),
-            ),
-          ],
+        return Theme(
+          data: dialogTheme,
+          child: AlertDialog(
+            backgroundColor: dialogTheme.colorScheme.surfaceContainerHigh,
+            title: Text(strings.readerSaveImageTitle),
+            content: Text(strings.readerSaveImageContent),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: Text(strings.commonCancel),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: Text(strings.commonSave),
+              ),
+            ],
+          ),
         );
       },
     );
@@ -58,18 +61,14 @@ extension _ReaderMediaActionsExtension on _ReaderPageState {
       _logReaderEvent(
         'Reader save image cancelled',
         source: 'reader_media',
-        content: _readerLogPayload({
-          'imageUrl': imageUrl,
-        }),
+        content: _readerLogPayload({'imageUrl': imageUrl}),
       );
       return;
     }
     _logReaderEvent(
       'Reader save image confirmed',
       source: 'reader_media',
-      content: _readerLogPayload({
-        'imageUrl': imageUrl,
-      }),
+      content: _readerLogPayload({'imageUrl': imageUrl}),
     );
     try {
       final sourceService = HazukiSourceService.instance;
@@ -135,10 +134,7 @@ extension _ReaderMediaActionsExtension on _ReaderPageState {
         'Reader image save failed',
         level: 'error',
         source: 'reader_media',
-        content: _readerLogPayload({
-          'imageUrl': imageUrl,
-          'error': '$e',
-        }),
+        content: _readerLogPayload({'imageUrl': imageUrl, 'error': '$e'}),
       );
       if (!mounted) {
         return;
@@ -153,4 +149,3 @@ extension _ReaderMediaActionsExtension on _ReaderPageState {
     }
   }
 }
-

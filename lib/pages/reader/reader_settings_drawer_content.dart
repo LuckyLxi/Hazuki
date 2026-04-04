@@ -39,6 +39,7 @@ class ReaderSettingsDrawerContent extends StatelessWidget {
     super.key,
     required this.readerMode,
     required this.tapToTurnPage,
+    required this.volumeButtonTurnPage,
     required this.pinchToZoom,
     required this.longPressToSave,
     required this.immersiveMode,
@@ -48,6 +49,7 @@ class ReaderSettingsDrawerContent extends StatelessWidget {
     required this.brightnessValue,
     required this.onReaderModeChanged,
     required this.onTapToTurnPageChanged,
+    required this.onVolumeButtonTurnPageChanged,
     required this.onPinchToZoomChanged,
     required this.onLongPressToSaveChanged,
     required this.onImmersiveModeChanged,
@@ -61,6 +63,7 @@ class ReaderSettingsDrawerContent extends StatelessWidget {
 
   final ReaderMode readerMode;
   final bool tapToTurnPage;
+  final bool volumeButtonTurnPage;
   final bool pinchToZoom;
   final bool longPressToSave;
   final bool immersiveMode;
@@ -70,6 +73,7 @@ class ReaderSettingsDrawerContent extends StatelessWidget {
   final double brightnessValue;
   final ValueChanged<ReaderMode?> onReaderModeChanged;
   final ValueChanged<bool>? onTapToTurnPageChanged;
+  final ValueChanged<bool> onVolumeButtonTurnPageChanged;
   final ValueChanged<bool> onPinchToZoomChanged;
   final ValueChanged<bool> onLongPressToSaveChanged;
   final ValueChanged<bool> onImmersiveModeChanged;
@@ -148,6 +152,13 @@ class ReaderSettingsDrawerContent extends StatelessWidget {
                 subtitle: Text(strings.readingTapToTurnPageSubtitle),
                 value: tapToTurnPage,
                 onChanged: onTapToTurnPageChanged,
+              ),
+              SwitchListTile(
+                secondary: const Icon(Icons.volume_up_outlined),
+                title: Text(strings.readingVolumeButtonTurnPageTitle),
+                subtitle: Text(strings.readingVolumeButtonTurnPageSubtitle),
+                value: volumeButtonTurnPage,
+                onChanged: onVolumeButtonTurnPageChanged,
               ),
               SwitchListTile(
                 secondary: const Icon(Icons.zoom_in_outlined),

@@ -27,82 +27,6 @@ class _HazukiTabBarDelegate extends SliverPersistentHeaderDelegate {
   }
 }
 
-class SpringBottomSheetRoute<T> extends PageRoute<T> {
-  SpringBottomSheetRoute({required this.builder});
-
-  final WidgetBuilder builder;
-
-  @override
-  bool get opaque => false;
-
-  @override
-  bool get barrierDismissible => true;
-
-  @override
-  Color get barrierColor => Colors.black54;
-
-  @override
-  String? get barrierLabel => null;
-
-  @override
-  bool get maintainState => true;
-
-  @override
-  Duration get transitionDuration => const Duration(milliseconds: 380);
-
-  @override
-  Duration get reverseTransitionDuration => const Duration(milliseconds: 280);
-
-  @override
-  Widget buildPage(
-    BuildContext context,
-    Animation<double> animation,
-    Animation<double> secondaryAnimation,
-  ) {
-    return builder(context);
-  }
-
-  @override
-  Widget buildTransitions(
-    BuildContext context,
-    Animation<double> animation,
-    Animation<double> secondaryAnimation,
-    Widget child,
-  ) {
-    final isReversing = animation.status == AnimationStatus.reverse;
-    final slideIn = Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero)
-        .animate(
-          CurvedAnimation(
-            parent: animation,
-            curve: isReversing ? Curves.easeInCubic : Curves.easeOutBack,
-          ),
-        );
-
-    final fade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: animation,
-        curve: const Interval(0.0, 0.5, curve: Curves.easeOutCubic),
-        reverseCurve: Curves.easeInCubic,
-      ),
-    );
-
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () => Navigator.of(context).pop(),
-      child: FadeTransition(
-        opacity: fade,
-        child: Align(
-          alignment: Alignment.bottomCenter,
-          child: GestureDetector(
-            onTap: () {},
-            child: SlideTransition(position: slideIn, child: child),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class ChaptersPanelSheet extends StatefulWidget {
   const ChaptersPanelSheet({
     super.key,
@@ -122,6 +46,22 @@ class ChaptersPanelSheet extends StatefulWidget {
 class _ChaptersPanelSheetState extends State<ChaptersPanelSheet> {
   bool _showDownloadSelection = false;
   final Set<String> _selectedEpIds = <String>{};
+
+  bool _areAllChaptersSelected(Map<String, String> chapters) {
+    return chapters.isNotEmpty && _selectedEpIds.length == chapters.length;
+  }
+
+  void _toggleSelectAllChapters(Map<String, String> chapters) {
+    setState(() {
+      if (_areAllChaptersSelected(chapters)) {
+        _selectedEpIds.clear();
+        return;
+      }
+      _selectedEpIds
+        ..clear()
+        ..addAll(chapters.keys);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -282,8 +222,35 @@ class _ChaptersPanelSheetState extends State<ChaptersPanelSheet> {
                               ),
                             );
                           },
-                          child: !_showDownloadSelection
-                              ? IconButton(
+                          child: _showDownloadSelection
+                              ? TextButton.icon(
+                                  key: ValueKey<bool>(
+                                    _areAllChaptersSelected(chapters),
+                                  ),
+                                  onPressed: () =>
+                                      _toggleSelectAllChapters(chapters),
+                                  icon: Icon(
+                                    _areAllChaptersSelected(chapters)
+                                        ? Icons.remove_done_outlined
+                                        : Icons.done_all_rounded,
+                                    size: 18,
+                                  ),
+                                  label: Text(
+                                    _areAllChaptersSelected(chapters)
+                                        ? l10n(context).commonDeselectAll
+                                        : l10n(context).commonSelectAll,
+                                  ),
+                                  style: TextButton.styleFrom(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 8,
+                                    ),
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                    visualDensity: VisualDensity.compact,
+                                  ),
+                                )
+                              : IconButton(
                                   key: const ValueKey('download_enter'),
                                   tooltip: l10n(
                                     context,
@@ -294,11 +261,6 @@ class _ChaptersPanelSheetState extends State<ChaptersPanelSheet> {
                                     });
                                   },
                                   icon: const Icon(Icons.download_outlined),
-                                )
-                              : const SizedBox(
-                                  key: ValueKey('download_enter_hidden'),
-                                  width: 0,
-                                  height: 0,
                                 ),
                         ),
                       ],

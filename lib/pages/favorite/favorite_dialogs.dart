@@ -2,11 +2,46 @@ import 'package:flutter/material.dart';
 
 import '../../l10n/app_localizations.dart';
 
-AppLocalizations _strings(BuildContext context) => AppLocalizations.of(context)!;
+AppLocalizations _strings(BuildContext context) =>
+    AppLocalizations.of(context)!;
+
+Future<T?> _showAnimatedFolderDialog<T>({
+  required BuildContext context,
+  required WidgetBuilder builder,
+}) {
+  return showGeneralDialog<T>(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+    barrierColor: Colors.black.withValues(alpha: 0.32),
+    transitionDuration: const Duration(milliseconds: 240),
+    pageBuilder: (dialogContext, animation, secondaryAnimation) {
+      return builder(dialogContext);
+    },
+    transitionBuilder: (dialogContext, animation, secondaryAnimation, child) {
+      final curved = CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutCubic,
+        reverseCurve: Curves.easeInCubic,
+      );
+      final scale = Tween<double>(begin: 0.92, end: 1).animate(
+        CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutBack,
+          reverseCurve: Curves.easeInCubic,
+        ),
+      );
+      return FadeTransition(
+        opacity: curved,
+        child: ScaleTransition(scale: scale, child: child),
+      );
+    },
+  );
+}
 
 Future<String?> showFavoriteCreateFolderDialog(BuildContext context) {
   final controller = TextEditingController();
-  return showDialog<String>(
+  return _showAnimatedFolderDialog<String>(
     context: context,
     builder: (dialogContext) {
       String? errorText;
@@ -39,7 +74,8 @@ Future<String?> showFavoriteCreateFolderDialog(BuildContext context) {
                   final text = controller.text.trim();
                   if (text.isEmpty) {
                     setDialogState(
-                      () => errorText = strings.favoriteCreateFolderNameRequired,
+                      () =>
+                          errorText = strings.favoriteCreateFolderNameRequired,
                     );
                     return;
                   }
@@ -59,7 +95,7 @@ Future<bool> showFavoriteDeleteFolderDialog(
   BuildContext context, {
   required String folderName,
 }) async {
-  final confirmed = await showDialog<bool>(
+  final confirmed = await _showAnimatedFolderDialog<bool>(
     context: context,
     builder: (dialogContext) {
       final strings = _strings(dialogContext);

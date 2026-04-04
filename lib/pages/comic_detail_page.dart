@@ -12,6 +12,7 @@ import '../app/app.dart';
 import '../l10n/l10n.dart';
 import '../models/hazuki_models.dart';
 import '../services/hazuki_source_service.dart';
+import '../services/local_favorites_service.dart';
 import '../services/manga_download_service.dart';
 import '../widgets/widgets.dart';
 import 'comments_page.dart';

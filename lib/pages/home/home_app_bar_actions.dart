@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/app.dart';
 import '../../l10n/l10n.dart';
+import '../../models/hazuki_models.dart';
 import '../favorite/favorite.dart';
 
 class HomeAppBarActions extends StatelessWidget {
@@ -13,6 +14,7 @@ class HomeAppBarActions extends StatelessWidget {
     required this.onOpenSearch,
     required this.onFavoriteSortSelected,
     required this.onFavoriteCreateFolderPressed,
+    required this.onFavoriteModeTogglePressed,
   });
 
   final int currentIndex;
@@ -21,6 +23,7 @@ class HomeAppBarActions extends StatelessWidget {
   final VoidCallback onOpenSearch;
   final ValueChanged<String> onFavoriteSortSelected;
   final VoidCallback onFavoriteCreateFolderPressed;
+  final VoidCallback onFavoriteModeTogglePressed;
 
   Widget _buildDiscoverSearchAction(BuildContext context) {
     final showCollapsedSearch =
@@ -103,10 +106,55 @@ class HomeAppBarActions extends StatelessWidget {
   }
 
   Widget _buildFavoriteActionGroup(BuildContext context) {
+    final isLocalMode =
+        favoriteAppBarActions.currentMode == FavoritePageMode.local;
     return Row(
       key: const ValueKey<String>('favorite-appbar-actions'),
       mainAxisSize: MainAxisSize.min,
       children: [
+        if (favoriteAppBarActions.showModeToggle)
+          Padding(
+            padding: const EdgeInsets.only(right: 4),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 220),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              transitionBuilder: (child, animation) {
+                return FadeTransition(
+                  opacity: animation,
+                  child: SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(0.08, 0),
+                      end: Offset.zero,
+                    ).animate(animation),
+                    child: child,
+                  ),
+                );
+              },
+              child: TextButton.icon(
+                key: ValueKey<FavoritePageMode>(
+                  favoriteAppBarActions.currentMode,
+                ),
+                onPressed: onFavoriteModeTogglePressed,
+                icon: Icon(
+                  isLocalMode
+                      ? Icons.folder_copy_outlined
+                      : Icons.cloud_outlined,
+                  size: 18,
+                ),
+                label: Text(
+                  isLocalMode
+                      ? l10n(context).favoriteModeLocal
+                      : l10n(context).favoriteModeCloud,
+                ),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+            ),
+          ),
         if (favoriteAppBarActions.showSort)
           PopupMenuButton<String>(
             tooltip: l10n(context).homeSortTooltip,

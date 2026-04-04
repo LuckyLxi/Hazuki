@@ -15,6 +15,7 @@ class ReadingSettingsPage extends StatefulWidget {
 class _ReadingSettingsPageState extends State<ReadingSettingsPage> {
   ReaderMode _readerMode = ReaderMode.topToBottom;
   bool _tapToTurnPage = false;
+  bool _volumeButtonTurnPage = false;
   bool _immersiveMode = true;
   bool _keepScreenOn = true;
   bool _customBrightness = false;
@@ -35,6 +36,8 @@ class _ReadingSettingsPageState extends State<ReadingSettingsPage> {
     setState(() {
       _readerMode = readerModeFromRaw(prefs.getString('reader_reading_mode'));
       _tapToTurnPage = prefs.getBool('reader_tap_to_turn_page') ?? false;
+      _volumeButtonTurnPage =
+          prefs.getBool('reader_volume_button_turn_page') ?? false;
       _immersiveMode = prefs.getBool('reader_immersive_mode') ?? true;
       _keepScreenOn = prefs.getBool('reader_keep_screen_on') ?? true;
       _customBrightness = prefs.getBool('reader_custom_brightness') ?? false;
@@ -60,6 +63,12 @@ class _ReadingSettingsPageState extends State<ReadingSettingsPage> {
     setState(() => _tapToTurnPage = value);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('reader_tap_to_turn_page', value);
+  }
+
+  Future<void> _toggleVolumeButtonTurnPage(bool value) async {
+    setState(() => _volumeButtonTurnPage = value);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('reader_volume_button_turn_page', value);
   }
 
   Future<void> _toggleImmersiveMode(bool value) async {
@@ -174,6 +183,13 @@ class _ReadingSettingsPageState extends State<ReadingSettingsPage> {
                 onChanged: _readerMode == ReaderMode.rightToLeft
                     ? _toggleTapToTurnPage
                     : null,
+              ),
+              SwitchListTile(
+                secondary: const Icon(Icons.volume_up_outlined),
+                title: Text(strings.readingVolumeButtonTurnPageTitle),
+                subtitle: Text(strings.readingVolumeButtonTurnPageSubtitle),
+                value: _volumeButtonTurnPage,
+                onChanged: _toggleVolumeButtonTurnPage,
               ),
               SwitchListTile(
                 secondary: const Icon(Icons.zoom_in_outlined),

@@ -322,7 +322,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aboutDisclaimerSubtitle => 'Please read before use';
 
   @override
-  String get aboutDisclaimerContent => 'This app is provided only for learning, interface research, and personal technical exchange. It does not provide any comic resources, nor does it directly store, upload, or distribute comic content.\n\nOn first launch or when updating the comic source, the app automatically downloads a comic-source script from a third-party GitHub repository. Both that script and any content parsed through it originate from third parties, and the related copyrights and liabilities belong to the original authors or rights holders.\n\nPlease use this app in compliance with local laws, regulations, and copyright requirements. Any disputes, losses, or legal liabilities arising from downloading, using third-party comic sources, or accessing related content shall be borne solely by the user.';
+  String get aboutDisclaimerContent => 'This software is free and open source, and is intended only for personal learning and communication.\n\nHazuki itself does not provide, store, or distribute any comic content. All content comes from third-party comic source scripts, and the copyright belongs to the respective rights holders. Account credentials are used only for direct communication with the source site; this software does not store or upload them.\n\nOn first launch, the software automatically downloads comic source scripts. Those scripts come from a third-party repository and are unrelated to this project.\n\nPlease use this software in compliance with local laws and regulations. Any responsibilities arising from its use shall be borne solely by the user.';
 
   @override
   String get commonConfirm => 'OK';
@@ -335,6 +335,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get commonSave => 'Save';
+
+  @override
+  String get commonSelectAll => 'Select all';
+
+  @override
+  String get commonDeselectAll => 'Clear all';
 
   @override
   String get commonLoading => 'Loading...';
@@ -711,6 +717,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get readingTapToTurnPageSubtitle => 'Only works in right-to-left mode. Tap the left side for the previous page and the right side for the next page';
 
   @override
+  String get readingVolumeButtonTurnPageTitle => 'Volume buttons turn pages';
+
+  @override
+  String get readingVolumeButtonTurnPageSubtitle => 'When enabled, volume up goes to the previous page and volume down goes to the next page in both reading modes';
+
+  @override
   String get readingImmersiveModeTitle => 'Immersive mode';
 
   @override
@@ -846,6 +858,60 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get privacyAuthOnResumeSubtitle => 'Require authentication again whenever the app returns to foreground';
+
+  @override
+  String get privacyPasswordLockTitle => 'Password lock';
+
+  @override
+  String get privacyPasswordLockEnabledSubtitle => 'Configured. Tap to turn it off';
+
+  @override
+  String get privacyPasswordLockDisabledSubtitle => 'Protect the app with a 4-digit passcode';
+
+  @override
+  String get privacyPasswordLockIntroTitle => 'Add a 4-digit password lock';
+
+  @override
+  String get privacyPasswordLockIntroSubtitle => 'When enabled, the app will ask for your passcode before access. If biometric unlock is enabled, you can also unlock with fingerprint from the keypad screen.';
+
+  @override
+  String get privacyPasswordLockEnableAction => 'Enable password lock';
+
+  @override
+  String get privacyPasswordLockSetupInstruction => 'Enter four digits as the app passcode';
+
+  @override
+  String privacyPasswordLockEnableFailed(Object error) {
+    return 'Failed to enable password lock: $error';
+  }
+
+  @override
+  String get privacyPasswordLockDisableTitle => 'Turn off password lock?';
+
+  @override
+  String get privacyPasswordLockDisableContent => 'After turning it off, the app will no longer require the 4-digit passcode on launch.';
+
+  @override
+  String get passwordLockUnlockTitle => 'Enter passcode';
+
+  @override
+  String get passwordLockUnlockSubtitle => 'Enter the 4-digit app password to continue';
+
+  @override
+  String passwordLockWrongPin(Object remaining) {
+    return 'Wrong password. $remaining attempts left';
+  }
+
+  @override
+  String get passwordLockLockedForMinutes => 'Too many wrong attempts. Try again in 5 minutes';
+
+  @override
+  String passwordLockCountdown(Object time) {
+    return 'Locked. Try again in $time';
+  }
+
+  @override
+  String get passwordLockBiometricFailed => 'Biometric unlock failed';
 
   @override
   String get lineSettingsTitle => 'Lines';
@@ -1256,6 +1322,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get favoriteAllFolder => 'All';
 
   @override
+  String get favoriteModeCloud => 'Cloud';
+
+  @override
+  String get favoriteModeLocal => 'Local';
+
+  @override
+  String get favoriteFolderGroupCloud => 'Cloud folders';
+
+  @override
+  String get favoriteFolderGroupLocal => 'Local folders';
+
+  @override
   String get favoriteLoadTimeout => 'Favorites timed out while loading. Pull down to retry.';
 
   @override
@@ -1305,12 +1383,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get favoriteCreateFolderNameRequired => 'Folder name cannot be empty';
 
   @override
+  String get favoriteCreateLocalFolderAction => 'Create local favorite folder';
+
+  @override
   String get favoriteDeleteFolderTitle => 'Delete favorite folder';
 
   @override
   String favoriteDeleteFolderContent(Object name) {
     return 'Delete \"$name\"?';
   }
+
+  @override
+  String get favoriteCreateFolderTargetTitle => 'Where should the folder be created?';
+
+  @override
+  String get favoriteCreateFolderTargetCloud => 'Cloud';
+
+  @override
+  String get favoriteCreateFolderTargetLocal => 'Local';
 
   @override
   String discoverSectionLoadFailed(Object error) {
@@ -1383,6 +1473,18 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get readerSaveImageContent => 'Save this comic image locally?';
+
+  @override
+  String get readerPreviousChapter => 'Previous chapter';
+
+  @override
+  String get readerNextChapter => 'Next chapter';
+
+  @override
+  String get readerNoPreviousChapter => 'No previous chapter';
+
+  @override
+  String get readerAlreadyLastChapter => 'This is the last chapter';
 
   @override
   String readerChapterLoadFailed(Object error) {

@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../services/password_lock_service.dart';
 import '../../widgets/widgets.dart';
+import 'password_lock_pages.dart';
 
 class PrivacySettingsPage extends StatefulWidget {
   const PrivacySettingsPage({super.key});
@@ -29,6 +31,10 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
     try {
       final dynamic result = await _channel.invokeMethod('getPrivacySettings');
       if (result is Map) {
+        await PasswordLockService.instance.refreshPrivacySettings();
+        if (!mounted) {
+          return;
+        }
         setState(() {
           _blurBackground = result['blurBackground'] == true;
           _biometricAuth = result['biometricAuth'] == true;
@@ -74,6 +80,7 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
         await _channel.invokeMethod('setAuthOnResume', {'enabled': false});
       }
     } catch (_) {}
+    await PasswordLockService.instance.refreshPrivacySettings();
   }
 
   Future<void> _toggleAuthOnResume(bool value) async {
@@ -82,6 +89,53 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
     try {
       await _channel.invokeMethod('setAuthOnResume', {'enabled': value});
     } catch (_) {}
+    await PasswordLockService.instance.refreshPrivacySettings();
+  }
+
+  Future<void> _handlePasswordLockTap() async {
+    await PasswordLockService.instance.ensureInitialized();
+    if (!mounted) {
+      return;
+    }
+    final service = PasswordLockService.instance;
+    if (!service.isEnabled) {
+      await Navigator.of(context).push<bool>(
+        MaterialPageRoute<bool>(builder: (_) => const PasswordLockIntroPage()),
+      );
+      if (mounted) {
+        setState(() {});
+      }
+      return;
+    }
+
+    final strings = AppLocalizations.of(context)!;
+    final shouldDisable = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(strings.privacyPasswordLockDisableTitle),
+          content: Text(strings.privacyPasswordLockDisableContent),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: Text(strings.commonCancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: Text(strings.commonConfirm),
+            ),
+          ],
+        );
+      },
+    );
+    if (shouldDisable != true) {
+      return;
+    }
+    await service.disable();
+    if (!mounted) {
+      return;
+    }
+    setState(() {});
   }
 
   Widget _buildGroup(BuildContext context, {required List<Widget> children}) {
@@ -144,6 +198,17 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
                       subtitle: Text(strings.privacyAuthOnResumeSubtitle),
                       value: _authOnResume,
                       onChanged: _biometricAuth ? _toggleAuthOnResume : null,
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.password_rounded),
+                      title: Text(strings.privacyPasswordLockTitle),
+                      subtitle: Text(
+                        PasswordLockService.instance.isEnabled
+                            ? strings.privacyPasswordLockEnabledSubtitle
+                            : strings.privacyPasswordLockDisabledSubtitle,
+                      ),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: _handlePasswordLockTap,
                     ),
                   ],
                 ),

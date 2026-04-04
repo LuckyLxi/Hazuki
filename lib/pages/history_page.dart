@@ -10,6 +10,7 @@ import '../app/app.dart';
 import '../l10n/app_localizations.dart';
 import '../models/hazuki_models.dart';
 import '../services/hazuki_source_service.dart';
+import '../services/local_favorites_service.dart';
 import '../widgets/widgets.dart';
 import 'comic_detail/comic_detail.dart';
 
@@ -233,46 +234,13 @@ class _HistoryPageState extends State<HistoryPage> {
     final service = HazukiSourceService.instance;
     final strings = AppLocalizations.of(context)!;
 
-    if (!service.isLogged) {
-      unawaited(
-        showHazukiPrompt(context, strings.historyLoginRequired, isError: true),
-      );
-      return;
-    }
-
     try {
       final details = await service.loadComicDetails(comic.id);
       if (!mounted) {
         return;
       }
 
-      if (service.supportFavoriteFolderLoad && service.supportFavoriteToggle) {
-        await _showFavoriteFoldersPanelFromHistory(details);
-        return;
-      }
-
-      unawaited(showHazukiPrompt(context, strings.historyFavoriteProcessing));
-      if (details.isFavorite) {
-        await service.toggleFavorite(
-          comicId: details.id,
-          isAdding: false,
-          folderId: '0',
-        );
-        if (!mounted) {
-          return;
-        }
-        unawaited(showHazukiPrompt(context, strings.historyFavoriteRemoved));
-      } else {
-        await service.toggleFavorite(
-          comicId: details.id,
-          isAdding: true,
-          folderId: '0',
-        );
-        if (!mounted) {
-          return;
-        }
-        unawaited(showHazukiPrompt(context, strings.historyFavoriteAdded));
-      }
+      await _showFavoriteFoldersPanelFromHistory(details);
     } catch (e) {
       if (!mounted) {
         return;
@@ -363,36 +331,12 @@ class _HistoryPageState extends State<HistoryPage> {
     }
 
     try {
-      if (singleFolderOnly) {
-        if (selectedResult.isEmpty) {
-          await service.toggleFavorite(
-            comicId: details.id,
-            isAdding: false,
-            folderId: initialFavoritedResult.firstOrNull ?? '0',
-          );
-        } else {
-          await service.toggleFavorite(
-            comicId: details.id,
-            isAdding: true,
-            folderId: selectedResult.first,
-          );
-        }
-      } else {
-        for (final folderId in addTargets) {
-          await service.toggleFavorite(
-            comicId: details.id,
-            isAdding: true,
-            folderId: folderId,
-          );
-        }
-        for (final folderId in removeTargets) {
-          await service.toggleFavorite(
-            comicId: details.id,
-            isAdding: false,
-            folderId: folderId,
-          );
-        }
-      }
+      await _applyFavoriteSelectionChangesFromHistory(
+        details: details,
+        selectedResult: selectedResult,
+        initialFavoritedResult: initialFavoritedResult,
+        singleFolderOnly: singleFolderOnly,
+      );
 
       if (!mounted) {
         return;
@@ -417,6 +361,113 @@ class _HistoryPageState extends State<HistoryPage> {
         ),
       );
     }
+  }
+
+  Future<void> _applyFavoriteSelectionChangesFromHistory({
+    required ComicDetailsData details,
+    required Set<String> selectedResult,
+    required Set<String> initialFavoritedResult,
+    required bool singleFolderOnly,
+  }) async {
+    final service = HazukiSourceService.instance;
+    final localService = LocalFavoritesService.instance;
+    final selectedHandles = _favoriteHandlesFromStorageKeys(selectedResult);
+    final initialHandles = _favoriteHandlesFromStorageKeys(
+      initialFavoritedResult,
+    );
+
+    final selectedCloudIds = _folderIdsForSource(
+      selectedHandles,
+      FavoriteFolderSource.cloud,
+    );
+    final initialCloudIds = _folderIdsForSource(
+      initialHandles,
+      FavoriteFolderSource.cloud,
+    );
+    final selectedLocalIds = _folderIdsForSource(
+      selectedHandles,
+      FavoriteFolderSource.local,
+    );
+    final initialLocalIds = _folderIdsForSource(
+      initialHandles,
+      FavoriteFolderSource.local,
+    );
+
+    if (singleFolderOnly && service.isLogged && service.supportFavoriteToggle) {
+      if (selectedCloudIds.isEmpty && initialCloudIds.isNotEmpty) {
+        await service.toggleFavorite(
+          comicId: details.id,
+          isAdding: false,
+          folderId: initialCloudIds.first,
+        );
+      } else if (selectedCloudIds.isNotEmpty &&
+          !_setContentsEqual(selectedCloudIds, initialCloudIds)) {
+        await service.toggleFavorite(
+          comicId: details.id,
+          isAdding: true,
+          folderId: selectedCloudIds.first,
+        );
+      }
+    } else if (service.isLogged && service.supportFavoriteToggle) {
+      final addCloudIds = selectedCloudIds.difference(initialCloudIds);
+      final removeCloudIds = initialCloudIds.difference(selectedCloudIds);
+      for (final folderId in addCloudIds) {
+        await service.toggleFavorite(
+          comicId: details.id,
+          isAdding: true,
+          folderId: folderId,
+        );
+      }
+      for (final folderId in removeCloudIds) {
+        await service.toggleFavorite(
+          comicId: details.id,
+          isAdding: false,
+          folderId: folderId,
+        );
+      }
+    }
+
+    final addLocalIds = selectedLocalIds.difference(initialLocalIds);
+    final removeLocalIds = initialLocalIds.difference(selectedLocalIds);
+    for (final folderId in addLocalIds) {
+      await localService.toggleFavorite(
+        details: details,
+        isAdding: true,
+        folderId: folderId,
+      );
+    }
+    for (final folderId in removeLocalIds) {
+      await localService.toggleFavorite(
+        details: details,
+        isAdding: false,
+        folderId: folderId,
+      );
+    }
+  }
+
+  Set<FavoriteFolderHandle> _favoriteHandlesFromStorageKeys(Set<String> keys) {
+    final handles = <FavoriteFolderHandle>{};
+    for (final key in keys) {
+      final handle = favoriteFolderHandleFromStorageKey(key);
+      if (handle != null) {
+        handles.add(handle);
+      }
+    }
+    return handles;
+  }
+
+  Set<String> _folderIdsForSource(
+    Set<FavoriteFolderHandle> handles,
+    FavoriteFolderSource source,
+  ) {
+    return handles
+        .where((handle) => handle.source == source)
+        .map((handle) => handle.id)
+        .toSet();
+  }
+
+  bool _setContentsEqual(Set<String> left, Set<String> right) {
+    return left.length == right.length && left.containsAll(right);
   }
 
   Future<void> _handleDeleteHistoryItem(ExploreComic comic) async {

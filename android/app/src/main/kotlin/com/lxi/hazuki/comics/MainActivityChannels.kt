@@ -9,6 +9,7 @@ import android.os.Build
 import android.os.Environment
 import android.provider.Settings
 import android.util.Log
+import android.view.KeyEvent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import io.flutter.embedding.engine.FlutterEngine
@@ -27,6 +28,8 @@ class MainActivityChannels(
     private var pendingSaveTextResult: MethodChannel.Result? = null
     private var pendingSaveTextContent: String? = null
     private var pendingStorageAccessResult: MethodChannel.Result? = null
+    private var readerDisplayChannel: MethodChannel? = null
+    private var volumeButtonPagingSessionId: String? = null
 
     private val createJsonDocumentLauncher =
             activity.registerForActivityResult(
@@ -45,6 +48,31 @@ class MainActivityChannels(
         registerDisplayModeChannel(flutterEngine)
         registerMediaChannel(flutterEngine)
         registerReaderDisplayChannel(flutterEngine)
+    }
+
+    fun handleReaderVolumeButtonKeyEvent(event: KeyEvent): Boolean {
+        val channel = readerDisplayChannel ?: return false
+        val sessionId = volumeButtonPagingSessionId ?: return false
+        val keyCode = event.keyCode
+        if (keyCode != KeyEvent.KEYCODE_VOLUME_UP && keyCode != KeyEvent.KEYCODE_VOLUME_DOWN) {
+            return false
+        }
+        when (event.action) {
+            KeyEvent.ACTION_DOWN -> {
+                channel.invokeMethod(
+                        "onVolumeButtonPressed",
+                        mapOf(
+                                "direction" to
+                                        if (keyCode == KeyEvent.KEYCODE_VOLUME_UP) "up" else "down",
+                                "sessionId" to sessionId,
+                        ),
+                )
+                return true
+            }
+
+            KeyEvent.ACTION_UP -> return true
+            else -> return true
+        }
     }
 
     private fun registerPrivacyChannel(flutterEngine: FlutterEngine) {
@@ -67,6 +95,12 @@ class MainActivityChannels(
                         "setAuthOnResume" -> {
                             privacyManager.setAuthOnResume(
                                     call.argument<Boolean>("enabled") ?: false
+                            )
+                            result.success(null)
+                        }
+                        "setPasswordLockEnabled" -> {
+                            privacyManager.setPasswordLockEnabled(
+                                call.argument<Boolean>("enabled") ?: false,
                             )
                             result.success(null)
                         }
@@ -219,6 +253,21 @@ class MainActivityChannels(
         result.success(granted)
     }
 
+    private fun setVolumeButtonPaging(enabled: Boolean, sessionId: String?): Boolean {
+        if (enabled) {
+            if (sessionId.isNullOrBlank()) {
+                return volumeButtonPagingSessionId != null
+            }
+            volumeButtonPagingSessionId = sessionId
+            return true
+        }
+        if (sessionId.isNullOrBlank() || sessionId == volumeButtonPagingSessionId) {
+            volumeButtonPagingSessionId = null
+            return false
+        }
+        return volumeButtonPagingSessionId != null
+    }
+
     private fun handleCreateJsonDocumentResult(uri: Uri?) {
         val result = pendingSaveTextResult ?: return
         val content = pendingSaveTextContent
@@ -253,8 +302,9 @@ class MainActivityChannels(
     }
 
     private fun registerReaderDisplayChannel(flutterEngine: FlutterEngine) {
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, READER_DISPLAY_CHANNEL)
-                .setMethodCallHandler { call, result ->
+        readerDisplayChannel =
+                MethodChannel(flutterEngine.dartExecutor.binaryMessenger, READER_DISPLAY_CHANNEL)
+        readerDisplayChannel?.setMethodCallHandler { call, result ->
                     when (call.method) {
                         "setKeepScreenOn" -> {
                             displayModeManager.setKeepScreenOnFlag(
@@ -266,6 +316,14 @@ class MainActivityChannels(
                             result.success(
                                     displayModeManager.setReaderBrightness(
                                             call.argument<Double>("value")
+                                    ),
+                            )
+                        }
+                        "setVolumeButtonPaging" -> {
+                            result.success(
+                                    setVolumeButtonPaging(
+                                            call.argument<Boolean>("enabled") ?: false,
+                                            call.argument<String>("sessionId"),
                                     ),
                             )
                         }

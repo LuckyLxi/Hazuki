@@ -15,6 +15,7 @@ extension _ComicDetailLifecycleActionsExtension on _ComicDetailPageState {
     unawaited(_warmupReaderImages());
     unawaited(_loadDynamicColorSetting());
     unawaited(_loadReadingProgress());
+    unawaited(_loadFavoriteOverrideState());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
         return;

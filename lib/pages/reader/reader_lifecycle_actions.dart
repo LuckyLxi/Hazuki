@@ -2,6 +2,7 @@ part of '../reader_page.dart';
 
 extension _ReaderLifecycleActionsExtension on _ReaderPageState {
   void _initializeReaderSession() {
+    _attachReaderDisplayChannelHandler();
     hazukiNoImageModeNotifier.addListener(_handleNoImageModeChanged);
     _scrollController.addListener(_onScrollPrefetch);
     _zoomController.addListener(_onZoomChanged);
@@ -11,6 +12,12 @@ extension _ReaderLifecycleActionsExtension on _ReaderPageState {
     );
     unawaited(_loadReadingSettings());
     unawaited(_recordReadingProgress());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      _readerKeyFocusNode.requestFocus();
+    });
 
     final initialImages = widget.images
         .where((e) => e.trim().isNotEmpty)
@@ -31,10 +38,12 @@ extension _ReaderLifecycleActionsExtension on _ReaderPageState {
   }
 
   void _disposeReaderSession() {
+    _detachReaderDisplayChannelHandler();
     hazukiNoImageModeNotifier.removeListener(_handleNoImageModeChanged);
     _scrollController.removeListener(_onScrollPrefetch);
     _scrollController.dispose();
     _pageController.dispose();
+    _readerKeyFocusNode.dispose();
     _zoomController.removeListener(_onZoomChanged);
     _zoomController.dispose();
     _resetAnimController.dispose();

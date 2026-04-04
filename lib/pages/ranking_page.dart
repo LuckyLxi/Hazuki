@@ -265,6 +265,8 @@ class _RankingPageState extends State<RankingPage> {
     }
     setState(() {
       _selectedRankingValue = value;
+      _rankingLoading = true;
+      _rankingLoadingMore = false;
       _rankingComics = const <ExploreComic>[];
       _rankingPage = 1;
       _rankingHasMore = true;
@@ -388,6 +390,22 @@ class _RankingPageState extends State<RankingPage> {
     );
   }
 
+  Widget _buildRankingLoadingSection(String text) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 28),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const HazukiSandyLoadingIndicator(size: 136),
+            const SizedBox(height: 10),
+            Text(text),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final strings = AppLocalizations.of(context)!;
@@ -423,8 +441,6 @@ class _RankingPageState extends State<RankingPage> {
                       ),
                     ],
                   )
-                : (_rankingLoading && _rankingComics.isEmpty)
-                ? _buildCenteredRankingLoading()
                 : ListView(
                     controller: _scrollController,
                     physics: const AlwaysScrollableScrollPhysics(
@@ -458,7 +474,9 @@ class _RankingPageState extends State<RankingPage> {
                           }).toList(),
                         ),
                       const SizedBox(height: 10),
-                      if (_rankingComics.isEmpty)
+                      if (_rankingLoading && _rankingComics.isEmpty)
+                        _buildRankingLoadingSection(strings.commonLoading)
+                      else if (_rankingComics.isEmpty)
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 20),
                           child: Center(

@@ -44,12 +44,17 @@ extension _ComicDetailCoverActionsExtension on _ComicDetailPageState {
   }
 
   Future<void> _showCoverActions(String imageUrl) async {
+    final themedData = _buildDetailTheme(Theme.of(context));
     await showModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
+      backgroundColor: themedData.colorScheme.surface,
       builder: (sheetContext) {
-        return _ComicCoverActionsSheet(
-          onSavePressed: () => unawaited(_saveImageToDownloads(imageUrl)),
+        return Theme(
+          data: themedData,
+          child: _ComicCoverActionsSheet(
+            onSavePressed: () => unawaited(_saveImageToDownloads(imageUrl)),
+          ),
         );
       },
     );

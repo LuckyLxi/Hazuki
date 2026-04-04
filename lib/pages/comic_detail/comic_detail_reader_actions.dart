@@ -13,38 +13,42 @@ extension _ComicDetailReaderActionsExtension on _ComicDetailPageState {
       return;
     }
 
-    Navigator.of(context).push(
-      SpringBottomSheetRoute(
-        builder: (routeContext) {
-          final themedData = _buildDetailTheme(Theme.of(routeContext));
-          return Theme(
-            data: themedData,
-            child: ChaptersPanelSheet(
-              details: details,
-              onDownloadConfirm: (selectedEpIds) {
-                Navigator.of(routeContext).pop();
-                unawaited(
-                  _enqueueChapterDownloads(
-                    details,
-                    selectedEpIds: selectedEpIds,
-                  ),
-                );
-              },
-              onChapterTap: (epId, chapterTitle, index) {
-                Navigator.of(routeContext).pop();
-                unawaited(
-                  _openReader(
-                    details,
-                    epId: epId,
-                    chapterTitle: chapterTitle,
-                    chapterIndex: index,
-                  ),
-                );
-              },
-            ),
-          );
-        },
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      isDismissible: true,
+      enableDrag: true,
+      useSafeArea: false,
+      sheetAnimationStyle: const AnimationStyle(
+        duration: Duration(milliseconds: 380),
+        reverseDuration: Duration(milliseconds: 280),
       ),
+      builder: (routeContext) {
+        final themedData = _buildDetailTheme(Theme.of(routeContext));
+        return Theme(
+          data: themedData,
+          child: ChaptersPanelSheet(
+            details: details,
+            onDownloadConfirm: (selectedEpIds) {
+              Navigator.of(routeContext).pop();
+              unawaited(
+                _enqueueChapterDownloads(details, selectedEpIds: selectedEpIds),
+              );
+            },
+            onChapterTap: (epId, chapterTitle, index) {
+              Navigator.of(routeContext).pop();
+              unawaited(
+                _openReader(
+                  details,
+                  epId: epId,
+                  chapterTitle: chapterTitle,
+                  chapterIndex: index,
+                ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 

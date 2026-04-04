@@ -704,7 +704,7 @@ abstract class AppLocalizations {
   /// No description provided for @aboutDisclaimerContent.
   ///
   /// In en, this message translates to:
-  /// **'This app is provided only for learning, interface research, and personal technical exchange. It does not provide any comic resources, nor does it directly store, upload, or distribute comic content.\n\nOn first launch or when updating the comic source, the app automatically downloads a comic-source script from a third-party GitHub repository. Both that script and any content parsed through it originate from third parties, and the related copyrights and liabilities belong to the original authors or rights holders.\n\nPlease use this app in compliance with local laws, regulations, and copyright requirements. Any disputes, losses, or legal liabilities arising from downloading, using third-party comic sources, or accessing related content shall be borne solely by the user.'**
+  /// **'This software is free and open source, and is intended only for personal learning and communication.\n\nHazuki itself does not provide, store, or distribute any comic content. All content comes from third-party comic source scripts, and the copyright belongs to the respective rights holders. Account credentials are used only for direct communication with the source site; this software does not store or upload them.\n\nOn first launch, the software automatically downloads comic source scripts. Those scripts come from a third-party repository and are unrelated to this project.\n\nPlease use this software in compliance with local laws and regulations. Any responsibilities arising from its use shall be borne solely by the user.'**
   String get aboutDisclaimerContent;
 
   /// No description provided for @commonConfirm.
@@ -730,6 +730,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Save'**
   String get commonSave;
+
+  /// No description provided for @commonSelectAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Select all'**
+  String get commonSelectAll;
+
+  /// No description provided for @commonDeselectAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear all'**
+  String get commonDeselectAll;
 
   /// No description provided for @commonLoading.
   ///
@@ -1403,6 +1415,18 @@ abstract class AppLocalizations {
   /// **'Only works in right-to-left mode. Tap the left side for the previous page and the right side for the next page'**
   String get readingTapToTurnPageSubtitle;
 
+  /// No description provided for @readingVolumeButtonTurnPageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Volume buttons turn pages'**
+  String get readingVolumeButtonTurnPageTitle;
+
+  /// No description provided for @readingVolumeButtonTurnPageSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'When enabled, volume up goes to the previous page and volume down goes to the next page in both reading modes'**
+  String get readingVolumeButtonTurnPageSubtitle;
+
   /// No description provided for @readingImmersiveModeTitle.
   ///
   /// In en, this message translates to:
@@ -1648,6 +1672,102 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Require authentication again whenever the app returns to foreground'**
   String get privacyAuthOnResumeSubtitle;
+
+  /// No description provided for @privacyPasswordLockTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Password lock'**
+  String get privacyPasswordLockTitle;
+
+  /// No description provided for @privacyPasswordLockEnabledSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Configured. Tap to turn it off'**
+  String get privacyPasswordLockEnabledSubtitle;
+
+  /// No description provided for @privacyPasswordLockDisabledSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Protect the app with a 4-digit passcode'**
+  String get privacyPasswordLockDisabledSubtitle;
+
+  /// No description provided for @privacyPasswordLockIntroTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Add a 4-digit password lock'**
+  String get privacyPasswordLockIntroTitle;
+
+  /// No description provided for @privacyPasswordLockIntroSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'When enabled, the app will ask for your passcode before access. If biometric unlock is enabled, you can also unlock with fingerprint from the keypad screen.'**
+  String get privacyPasswordLockIntroSubtitle;
+
+  /// No description provided for @privacyPasswordLockEnableAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable password lock'**
+  String get privacyPasswordLockEnableAction;
+
+  /// No description provided for @privacyPasswordLockSetupInstruction.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter four digits as the app passcode'**
+  String get privacyPasswordLockSetupInstruction;
+
+  /// No description provided for @privacyPasswordLockEnableFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to enable password lock: {error}'**
+  String privacyPasswordLockEnableFailed(Object error);
+
+  /// No description provided for @privacyPasswordLockDisableTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Turn off password lock?'**
+  String get privacyPasswordLockDisableTitle;
+
+  /// No description provided for @privacyPasswordLockDisableContent.
+  ///
+  /// In en, this message translates to:
+  /// **'After turning it off, the app will no longer require the 4-digit passcode on launch.'**
+  String get privacyPasswordLockDisableContent;
+
+  /// No description provided for @passwordLockUnlockTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter passcode'**
+  String get passwordLockUnlockTitle;
+
+  /// No description provided for @passwordLockUnlockSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the 4-digit app password to continue'**
+  String get passwordLockUnlockSubtitle;
+
+  /// No description provided for @passwordLockWrongPin.
+  ///
+  /// In en, this message translates to:
+  /// **'Wrong password. {remaining} attempts left'**
+  String passwordLockWrongPin(Object remaining);
+
+  /// No description provided for @passwordLockLockedForMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'Too many wrong attempts. Try again in 5 minutes'**
+  String get passwordLockLockedForMinutes;
+
+  /// No description provided for @passwordLockCountdown.
+  ///
+  /// In en, this message translates to:
+  /// **'Locked. Try again in {time}'**
+  String passwordLockCountdown(Object time);
+
+  /// No description provided for @passwordLockBiometricFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Biometric unlock failed'**
+  String get passwordLockBiometricFailed;
 
   /// No description provided for @lineSettingsTitle.
   ///
@@ -2369,6 +2489,30 @@ abstract class AppLocalizations {
   /// **'All'**
   String get favoriteAllFolder;
 
+  /// No description provided for @favoriteModeCloud.
+  ///
+  /// In en, this message translates to:
+  /// **'Cloud'**
+  String get favoriteModeCloud;
+
+  /// No description provided for @favoriteModeLocal.
+  ///
+  /// In en, this message translates to:
+  /// **'Local'**
+  String get favoriteModeLocal;
+
+  /// No description provided for @favoriteFolderGroupCloud.
+  ///
+  /// In en, this message translates to:
+  /// **'Cloud folders'**
+  String get favoriteFolderGroupCloud;
+
+  /// No description provided for @favoriteFolderGroupLocal.
+  ///
+  /// In en, this message translates to:
+  /// **'Local folders'**
+  String get favoriteFolderGroupLocal;
+
   /// No description provided for @favoriteLoadTimeout.
   ///
   /// In en, this message translates to:
@@ -2447,6 +2591,12 @@ abstract class AppLocalizations {
   /// **'Folder name cannot be empty'**
   String get favoriteCreateFolderNameRequired;
 
+  /// No description provided for @favoriteCreateLocalFolderAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Create local favorite folder'**
+  String get favoriteCreateLocalFolderAction;
+
   /// No description provided for @favoriteDeleteFolderTitle.
   ///
   /// In en, this message translates to:
@@ -2458,6 +2608,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Delete \"{name}\"?'**
   String favoriteDeleteFolderContent(Object name);
+
+  /// No description provided for @favoriteCreateFolderTargetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Where should the folder be created?'**
+  String get favoriteCreateFolderTargetTitle;
+
+  /// No description provided for @favoriteCreateFolderTargetCloud.
+  ///
+  /// In en, this message translates to:
+  /// **'Cloud'**
+  String get favoriteCreateFolderTargetCloud;
+
+  /// No description provided for @favoriteCreateFolderTargetLocal.
+  ///
+  /// In en, this message translates to:
+  /// **'Local'**
+  String get favoriteCreateFolderTargetLocal;
 
   /// No description provided for @discoverSectionLoadFailed.
   ///
@@ -2578,6 +2746,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Save this comic image locally?'**
   String get readerSaveImageContent;
+
+  /// No description provided for @readerPreviousChapter.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous chapter'**
+  String get readerPreviousChapter;
+
+  /// No description provided for @readerNextChapter.
+  ///
+  /// In en, this message translates to:
+  /// **'Next chapter'**
+  String get readerNextChapter;
+
+  /// No description provided for @readerNoPreviousChapter.
+  ///
+  /// In en, this message translates to:
+  /// **'No previous chapter'**
+  String get readerNoPreviousChapter;
+
+  /// No description provided for @readerAlreadyLastChapter.
+  ///
+  /// In en, this message translates to:
+  /// **'This is the last chapter'**
+  String get readerAlreadyLastChapter;
 
   /// No description provided for @readerChapterLoadFailed.
   ///

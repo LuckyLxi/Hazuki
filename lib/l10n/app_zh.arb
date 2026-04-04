@@ -126,11 +126,13 @@
   "aboutOpenFeedbackFailed": "无法打开反馈链接",
   "aboutDisclaimerTitle": "免责声明",
   "aboutDisclaimerSubtitle": "使用前请先阅读相关说明",
-  "aboutDisclaimerContent": "本应用仅供学习、界面研究与个人交流使用，不提供漫画资源，也不直接存储、上传或分发漫画内容。\n\n软件首次启动或更新漫画源时，会自动从第三方 GitHub 仓库下载漫画源脚本；该脚本及其后续解析出的内容均来自第三方，相关版权归原作者或权利人所有。\n\n请在遵守当地法律法规及版权要求的前提下使用本应用；因下载、使用第三方漫画源或访问相关内容产生的任何纠纷、损失或法律责任，均由使用者自行承担。",
+  "aboutDisclaimerContent": "本软件免费开源，仅供个人学习与交流使用。\n\nHazuki 本身不提供、存储或分发任何漫画内容，所有内容均来自第三方漫画源脚本，版权归各自权利人所有。账号密码仅用于与源站直接通信，本软件不作任何存储或上传。\n\n首次启动时软件会自动下载漫画源脚本，该脚本来自第三方仓库，与本项目无关。\n\n请在遵守当地法律法规的前提下使用本软件，由此产生的任何责任由使用者自行承担。",
   "commonConfirm": "确定",
   "commonCancel": "取消",
   "commonClose": "关闭",
   "commonSave": "保存",
+  "commonSelectAll": "全选",
+  "commonDeselectAll": "取消全选",
   "commonLoading": "加载中...",
   "commonRetry": "重试",
   "searchTitle": "搜索",
@@ -338,6 +340,8 @@
   "readingModeRightToLeft": "从右到左",
   "readingTapToTurnPageTitle": "点击翻页",
   "readingTapToTurnPageSubtitle": "仅在从右到左模式下生效，点击左侧回到上一页，点击右侧前往下一页",
+  "readingVolumeButtonTurnPageTitle": "音量键翻页",
+  "readingVolumeButtonTurnPageSubtitle": "开启后，上音量键为上一页，下音量键为下一页，两种阅读模式都生效",
   "readingImmersiveModeTitle": "沉浸模式",
   "readingImmersiveModeSubtitle": "开启后进入阅读器自动隐藏状态栏和底部导航栏",
   "readingKeepScreenOnTitle": "屏幕常亮",
@@ -415,6 +419,37 @@
   "privacyBiometricUnlockSubtitle": "每次进入软件需验证指纹",
   "privacyAuthOnResumeTitle": "退出软件需重新验证",
   "privacyAuthOnResumeSubtitle": "即使应用在后台，只要不在前台，再次打开便需要重新认证",
+  "privacyPasswordLockTitle": "密码锁",
+  "privacyPasswordLockEnabledSubtitle": "已设置，点击可关闭密码锁",
+  "privacyPasswordLockDisabledSubtitle": "使用四位数字密码保护软件",
+  "privacyPasswordLockIntroTitle": "为软件添加四位数字密码",
+  "privacyPasswordLockIntroSubtitle": "启用后，进入软件前需要先输入密码；如果开启了生物认证，也可以在密码键盘页使用指纹解锁。",
+  "privacyPasswordLockEnableAction": "启用密码锁",
+  "privacyPasswordLockSetupInstruction": "输入四位数字作为软件密码",
+  "privacyPasswordLockEnableFailed": "启用密码锁失败：{error}",
+  "@privacyPasswordLockEnableFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "privacyPasswordLockDisableTitle": "关闭密码锁？",
+  "privacyPasswordLockDisableContent": "关闭后，下次启动软件将不再需要输入四位数字密码。",
+  "passwordLockUnlockTitle": "输入密码",
+  "passwordLockUnlockSubtitle": "请输入四位软件密码后继续",
+  "passwordLockWrongPin": "密码错误，还剩 {remaining} 次机会",
+  "@passwordLockWrongPin": {
+    "placeholders": {
+      "remaining": {}
+    }
+  },
+  "passwordLockLockedForMinutes": "输错次数过多，请 5 分钟后再试",
+  "passwordLockCountdown": "已锁定，请在 {time} 后重试",
+  "@passwordLockCountdown": {
+    "placeholders": {
+      "time": {}
+    }
+  },
+  "passwordLockBiometricFailed": "生物认证失败",
   "lineSettingsTitle": "线路",
   "lineLoadFailed": "线路信息加载失败: {error}",
   "@lineLoadFailed": {
@@ -657,6 +692,10 @@
   "rankingEmptyComics": "暂无排行榜内容",
   "rankingReachedEnd": "已经到底了",
   "favoriteAllFolder": "全部",
+  "favoriteModeCloud": "云端",
+  "favoriteModeLocal": "本地",
+  "favoriteFolderGroupCloud": "云端收藏夹",
+  "favoriteFolderGroupLocal": "本地收藏夹",
   "favoriteLoadTimeout": "收藏加载超时，请下拉重试",
   "favoriteFoldersLoadFailed": "读取收藏夹失败：{error}",
   "@favoriteFoldersLoadFailed": {
@@ -695,6 +734,7 @@
   "favoriteCreateFolderTitle": "新建收藏夹",
   "favoriteCreateFolderHint": "请输入收藏夹名称",
   "favoriteCreateFolderNameRequired": "收藏夹名称不能为空",
+  "favoriteCreateLocalFolderAction": "新建本地收藏夹",
   "favoriteDeleteFolderTitle": "删除收藏夹",
   "favoriteDeleteFolderContent": "确定删除「{name}」吗？",
   "@favoriteDeleteFolderContent": {
@@ -702,6 +742,9 @@
       "name": {}
     }
   },
+  "favoriteCreateFolderTargetTitle": "创建到哪里",
+  "favoriteCreateFolderTargetCloud": "云端",
+  "favoriteCreateFolderTargetLocal": "本地",
   "discoverSectionLoadFailed": "加载失败：{error}",
   "@discoverSectionLoadFailed": {
     "placeholders": {
@@ -752,6 +795,10 @@
   "commentsEmpty": "暂无评论",
   "readerSaveImageTitle": "保存图片",
   "readerSaveImageContent": "是否将该漫画图片保存到本地？",
+  "readerPreviousChapter": "上一话",
+  "readerNextChapter": "下一话",
+  "readerNoPreviousChapter": "没有上一话",
+  "readerAlreadyLastChapter": "这是最后一话",
   "readerChapterLoadFailed": "加载章节失败：{error}",
   "@readerChapterLoadFailed": {
     "placeholders": {

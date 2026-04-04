@@ -35,6 +35,7 @@ class HomeScaffoldShell extends StatelessWidget {
     required this.onOpenSearch,
     required this.onFavoriteSortSelected,
     required this.onFavoriteCreateFolderPressed,
+    required this.onFavoriteModeTogglePressed,
     required this.onProfileTap,
     required this.onCheckInPressed,
     required this.onOpenHistory,
@@ -69,6 +70,7 @@ class HomeScaffoldShell extends StatelessWidget {
   final VoidCallback onOpenSearch;
   final ValueChanged<String> onFavoriteSortSelected;
   final VoidCallback onFavoriteCreateFolderPressed;
+  final VoidCallback onFavoriteModeTogglePressed;
   final VoidCallback? onProfileTap;
   final VoidCallback? onCheckInPressed;
   final VoidCallback onOpenHistory;
@@ -113,6 +115,7 @@ class HomeScaffoldShell extends StatelessWidget {
               onOpenSearch: onOpenSearch,
               onFavoriteSortSelected: onFavoriteSortSelected,
               onFavoriteCreateFolderPressed: onFavoriteCreateFolderPressed,
+              onFavoriteModeTogglePressed: onFavoriteModeTogglePressed,
             ),
           ],
         ),

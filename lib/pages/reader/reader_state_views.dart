@@ -16,10 +16,7 @@ class ReaderStateScaffold extends StatelessWidget {
       data: theme,
       duration: const Duration(milliseconds: 320),
       curve: Curves.easeOutCubic,
-      child: Scaffold(
-        backgroundColor: theme.scaffoldBackgroundColor,
-        body: child,
-      ),
+      child: Scaffold(backgroundColor: theme.colorScheme.surface, body: child),
     );
   }
 }

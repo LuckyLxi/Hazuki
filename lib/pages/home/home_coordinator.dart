@@ -113,6 +113,10 @@ class HomeCoordinator extends ChangeNotifier {
     return _shellController.createFavoriteFolder(favoritePageKey);
   }
 
+  Future<void> toggleFavoriteMode() {
+    return _shellController.toggleFavoriteMode(favoritePageKey);
+  }
+
   void handleDiscoverSearchMorphProgressChanged(double progress) {
     _shellController.handleDiscoverSearchMorphProgressChanged(progress);
   }

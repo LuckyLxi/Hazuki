@@ -26,6 +26,7 @@ class PrivacyManager(
             "blurBackground" to prefs.getBoolean("blurBackground", false),
             "biometricAuth" to prefs.getBoolean("biometricAuth", false),
             "authOnResume" to prefs.getBoolean("authOnResume", false),
+            "passwordLockEnabled" to prefs.getBoolean("passwordLockEnabled", false),
         )
     }
 
@@ -51,6 +52,11 @@ class PrivacyManager(
         prefs.edit().putBoolean("authOnResume", enabled).apply()
     }
 
+    fun setPasswordLockEnabled(enabled: Boolean) {
+        val prefs = activity.getSharedPreferences("hazuki_privacy", Context.MODE_PRIVATE)
+        prefs.edit().putBoolean("passwordLockEnabled", enabled).apply()
+    }
+
     fun requireAuthCheck(): Boolean {
         val prefs = activity.getSharedPreferences("hazuki_privacy", Context.MODE_PRIVATE)
         return prefs.getBoolean("biometricAuth", false)
@@ -62,7 +68,9 @@ class PrivacyManager(
         initBlurView()
 
         val prefs = activity.getSharedPreferences("hazuki_privacy", Context.MODE_PRIVATE)
-        if (prefs.getBoolean("biometricAuth", false)) {
+        if (prefs.getBoolean("biometricAuth", false) &&
+            !prefs.getBoolean("passwordLockEnabled", false)
+        ) {
             blurView?.visibility = View.VISIBLE
         }
     }
@@ -92,7 +100,11 @@ class PrivacyManager(
         val prefs = activity.getSharedPreferences("hazuki_privacy", Context.MODE_PRIVATE)
         val biometricAuth = prefs.getBoolean("biometricAuth", false)
         val authOnResume = prefs.getBoolean("authOnResume", false)
-        val needsAuth = biometricAuth && (isFirstLaunch || (authOnResume && wasInBackground))
+        val passwordLockEnabled = prefs.getBoolean("passwordLockEnabled", false)
+        val needsAuth =
+            biometricAuth &&
+                !passwordLockEnabled &&
+                (isFirstLaunch || (authOnResume && wasInBackground))
 
         if (needsAuth) {
             blurView?.visibility = View.VISIBLE
@@ -178,6 +190,7 @@ class PrivacyManager(
                 val prefs =
                     activity.getSharedPreferences("hazuki_privacy", Context.MODE_PRIVATE)
                 if (prefs.getBoolean("biometricAuth", false) &&
+                    !prefs.getBoolean("passwordLockEnabled", false) &&
                     !isAuthenticated &&
                     !isAuthenticating
                 ) {

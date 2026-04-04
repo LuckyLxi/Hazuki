@@ -322,7 +322,7 @@ class AppLocalizationsZh extends AppLocalizations {
   String get aboutDisclaimerSubtitle => '使用前请先阅读相关说明';
 
   @override
-  String get aboutDisclaimerContent => '本应用仅供学习、界面研究与个人交流使用，不提供漫画资源，也不直接存储、上传或分发漫画内容。\n\n软件首次启动或更新漫画源时，会自动从第三方 GitHub 仓库下载漫画源脚本；该脚本及其后续解析出的内容均来自第三方，相关版权归原作者或权利人所有。\n\n请在遵守当地法律法规及版权要求的前提下使用本应用；因下载、使用第三方漫画源或访问相关内容产生的任何纠纷、损失或法律责任，均由使用者自行承担。';
+  String get aboutDisclaimerContent => '本软件免费开源，仅供个人学习与交流使用。\n\nHazuki 本身不提供、存储或分发任何漫画内容，所有内容均来自第三方漫画源脚本，版权归各自权利人所有。账号密码仅用于与源站直接通信，本软件不作任何存储或上传。\n\n首次启动时软件会自动下载漫画源脚本，该脚本来自第三方仓库，与本项目无关。\n\n请在遵守当地法律法规的前提下使用本软件，由此产生的任何责任由使用者自行承担。';
 
   @override
   String get commonConfirm => '确定';
@@ -335,6 +335,12 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get commonSave => '保存';
+
+  @override
+  String get commonSelectAll => '全选';
+
+  @override
+  String get commonDeselectAll => '取消全选';
 
   @override
   String get commonLoading => '加载中...';
@@ -711,6 +717,12 @@ class AppLocalizationsZh extends AppLocalizations {
   String get readingTapToTurnPageSubtitle => '仅在从右到左模式下生效，点击左侧回到上一页，点击右侧前往下一页';
 
   @override
+  String get readingVolumeButtonTurnPageTitle => '音量键翻页';
+
+  @override
+  String get readingVolumeButtonTurnPageSubtitle => '开启后，上音量键为上一页，下音量键为下一页，两种阅读模式都生效';
+
+  @override
   String get readingImmersiveModeTitle => '沉浸模式';
 
   @override
@@ -846,6 +858,60 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get privacyAuthOnResumeSubtitle => '即使应用在后台，只要不在前台，再次打开便需要重新认证';
+
+  @override
+  String get privacyPasswordLockTitle => '密码锁';
+
+  @override
+  String get privacyPasswordLockEnabledSubtitle => '已设置，点击可关闭密码锁';
+
+  @override
+  String get privacyPasswordLockDisabledSubtitle => '使用四位数字密码保护软件';
+
+  @override
+  String get privacyPasswordLockIntroTitle => '为软件添加四位数字密码';
+
+  @override
+  String get privacyPasswordLockIntroSubtitle => '启用后，进入软件前需要先输入密码；如果开启了生物认证，也可以在密码键盘页使用指纹解锁。';
+
+  @override
+  String get privacyPasswordLockEnableAction => '启用密码锁';
+
+  @override
+  String get privacyPasswordLockSetupInstruction => '输入四位数字作为软件密码';
+
+  @override
+  String privacyPasswordLockEnableFailed(Object error) {
+    return '启用密码锁失败：$error';
+  }
+
+  @override
+  String get privacyPasswordLockDisableTitle => '关闭密码锁？';
+
+  @override
+  String get privacyPasswordLockDisableContent => '关闭后，下次启动软件将不再需要输入四位数字密码。';
+
+  @override
+  String get passwordLockUnlockTitle => '输入密码';
+
+  @override
+  String get passwordLockUnlockSubtitle => '请输入四位软件密码后继续';
+
+  @override
+  String passwordLockWrongPin(Object remaining) {
+    return '密码错误，还剩 $remaining 次机会';
+  }
+
+  @override
+  String get passwordLockLockedForMinutes => '输错次数过多，请 5 分钟后再试';
+
+  @override
+  String passwordLockCountdown(Object time) {
+    return '已锁定，请在 $time 后重试';
+  }
+
+  @override
+  String get passwordLockBiometricFailed => '生物认证失败';
 
   @override
   String get lineSettingsTitle => '线路';
@@ -1256,6 +1322,18 @@ class AppLocalizationsZh extends AppLocalizations {
   String get favoriteAllFolder => '全部';
 
   @override
+  String get favoriteModeCloud => '云端';
+
+  @override
+  String get favoriteModeLocal => '本地';
+
+  @override
+  String get favoriteFolderGroupCloud => '云端收藏夹';
+
+  @override
+  String get favoriteFolderGroupLocal => '本地收藏夹';
+
+  @override
   String get favoriteLoadTimeout => '收藏加载超时，请下拉重试';
 
   @override
@@ -1305,12 +1383,24 @@ class AppLocalizationsZh extends AppLocalizations {
   String get favoriteCreateFolderNameRequired => '收藏夹名称不能为空';
 
   @override
+  String get favoriteCreateLocalFolderAction => '新建本地收藏夹';
+
+  @override
   String get favoriteDeleteFolderTitle => '删除收藏夹';
 
   @override
   String favoriteDeleteFolderContent(Object name) {
     return '确定删除「$name」吗？';
   }
+
+  @override
+  String get favoriteCreateFolderTargetTitle => '创建到哪里';
+
+  @override
+  String get favoriteCreateFolderTargetCloud => '云端';
+
+  @override
+  String get favoriteCreateFolderTargetLocal => '本地';
 
   @override
   String discoverSectionLoadFailed(Object error) {
@@ -1383,6 +1473,18 @@ class AppLocalizationsZh extends AppLocalizations {
 
   @override
   String get readerSaveImageContent => '是否将该漫画图片保存到本地？';
+
+  @override
+  String get readerPreviousChapter => '上一话';
+
+  @override
+  String get readerNextChapter => '下一话';
+
+  @override
+  String get readerNoPreviousChapter => '没有上一话';
+
+  @override
+  String get readerAlreadyLastChapter => '这是最后一话';
 
   @override
   String readerChapterLoadFailed(Object error) {

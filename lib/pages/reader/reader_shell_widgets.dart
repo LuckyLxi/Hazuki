@@ -16,6 +16,7 @@ extension _ReaderShellWidgetsExtension on _ReaderPageState {
             child: ReaderSettingsDrawerContent(
               readerMode: _readerMode,
               tapToTurnPage: _tapToTurnPage,
+              volumeButtonTurnPage: _volumeButtonTurnPage,
               pinchToZoom: _pinchToZoom,
               longPressToSave: _longPressToSave,
               immersiveMode: _immersiveMode,
@@ -27,6 +28,7 @@ extension _ReaderShellWidgetsExtension on _ReaderPageState {
               onTapToTurnPageChanged: _readerMode == ReaderMode.rightToLeft
                   ? _toggleTapToTurnPageSetting
                   : null,
+              onVolumeButtonTurnPageChanged: _toggleVolumeButtonTurnPageSetting,
               onPinchToZoomChanged: _togglePinchToZoomSetting,
               onLongPressToSaveChanged: _toggleLongPressToSaveSetting,
               onImmersiveModeChanged: _toggleImmersiveModeSetting,
@@ -80,6 +82,8 @@ extension _ReaderShellWidgetsExtension on _ReaderPageState {
       chapterPanelLoading: _chapterPanelLoading,
       onSliderChangeStart: _images.length > 1
           ? (value) {
+              _lastSliderHapticPageIndex = null;
+              _maybeTriggerSliderHaptic(value);
               _updateReaderState(() {
                 _sliderDragging = true;
                 _sliderDragValue = value;
@@ -88,6 +92,7 @@ extension _ReaderShellWidgetsExtension on _ReaderPageState {
           : null,
       onSliderChanged: _images.length > 1
           ? (value) {
+              _maybeTriggerSliderHaptic(value);
               _updateReaderState(() {
                 _sliderDragging = true;
                 _sliderDragValue = value;
@@ -97,6 +102,7 @@ extension _ReaderShellWidgetsExtension on _ReaderPageState {
       onSliderChangeEnd: _images.length > 1
           ? (value) {
               final target = math.max(0, math.min(value.round(), maxIndex));
+              _lastSliderHapticPageIndex = null;
               _updateReaderState(() {
                 _sliderDragging = false;
                 _sliderDragValue = target.toDouble();
@@ -105,6 +111,20 @@ extension _ReaderShellWidgetsExtension on _ReaderPageState {
             }
           : null,
       onOpenChaptersPanel: _openChaptersPanel,
+    );
+  }
+
+  Widget _buildReaderChapterJumpOverlay() {
+    return ReaderChapterJumpOverlay(
+      controlsVisible: _controlsVisible,
+      onPreviousChapter: () {
+        unawaited(_jumpToAdjacentChapter(-1));
+      },
+      onNextChapter: () {
+        unawaited(_jumpToAdjacentChapter(1));
+      },
+      previousTooltip: l10n(context).readerPreviousChapter,
+      nextTooltip: l10n(context).readerNextChapter,
     );
   }
 

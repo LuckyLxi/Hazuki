@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../l10n/l10n.dart';
+import '../../models/hazuki_models.dart';
 import '../../widgets/widgets.dart';
 import '../favorite/favorite.dart';
 import '../favorite_page.dart';
@@ -18,6 +19,8 @@ class HomeShellController extends ChangeNotifier {
         showSort: false,
         showCreateFolder: false,
         currentSortOrder: 'mr',
+        showModeToggle: true,
+        currentMode: FavoritePageMode.cloud,
       );
 
   int get currentIndex => _currentIndex;
@@ -84,5 +87,11 @@ class HomeShellController extends ChangeNotifier {
     GlobalKey<FavoritePageState> favoritePageKey,
   ) async {
     await favoritePageKey.currentState?.createFolder();
+  }
+
+  Future<void> toggleFavoriteMode(
+    GlobalKey<FavoritePageState> favoritePageKey,
+  ) async {
+    await favoritePageKey.currentState?.toggleMode();
   }
 }

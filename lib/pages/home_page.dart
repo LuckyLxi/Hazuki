@@ -104,6 +104,9 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
           onFavoriteCreateFolderPressed: () {
             unawaited(_coordinator.createFavoriteFolder());
           },
+          onFavoriteModeTogglePressed: () {
+            unawaited(_coordinator.toggleFavoriteMode());
+          },
           onProfileTap: () {
             if (isLogged) {
               unawaited(profileFlow.showAvatarCard());

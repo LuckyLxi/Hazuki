@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/hazuki_models.dart';
 
-AppLocalizations _strings(BuildContext context) => AppLocalizations.of(context)!;
+AppLocalizations _strings(BuildContext context) =>
+    AppLocalizations.of(context)!;
 
 class FavoriteFolderHeader extends StatelessWidget {
   const FavoriteFolderHeader({
@@ -11,17 +12,23 @@ class FavoriteFolderHeader extends StatelessWidget {
     required this.folders,
     required this.selectedFolderId,
     required this.loadingFolders,
-    required this.showDeleteAction,
+    required this.showDeleteActionSlot,
+    required this.enableDeleteAction,
+    required this.showCreateLocalFolderButton,
     required this.onDeleteCurrentFolder,
     required this.onSelectFolder,
+    this.onCreateLocalFolder,
   });
 
   final List<FavoriteFolder> folders;
   final String selectedFolderId;
   final bool loadingFolders;
-  final bool showDeleteAction;
+  final bool showDeleteActionSlot;
+  final bool enableDeleteAction;
+  final bool showCreateLocalFolderButton;
   final VoidCallback? onDeleteCurrentFolder;
   final ValueChanged<String> onSelectFolder;
+  final VoidCallback? onCreateLocalFolder;
 
   @override
   Widget build(BuildContext context) {
@@ -38,18 +45,24 @@ class FavoriteFolderHeader extends StatelessWidget {
                 style: Theme.of(context).textTheme.titleSmall,
               ),
               const Spacer(),
-              if (showDeleteAction)
-                Visibility(
-                  visible: selectedFolderId != '0',
-                  maintainState: true,
-                  maintainAnimation: true,
-                  maintainSize: true,
-                  child: IconButton(
-                    tooltip: strings.favoriteDeleteCurrentFolderTooltip,
-                    onPressed: selectedFolderId == '0'
-                        ? null
-                        : onDeleteCurrentFolder,
-                    icon: const Icon(Icons.delete_outline),
+              if (showDeleteActionSlot)
+                SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: AnimatedOpacity(
+                    opacity: enableDeleteAction ? 1 : 0,
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOutCubic,
+                    child: IgnorePointer(
+                      ignoring: !enableDeleteAction,
+                      child: IconButton(
+                        tooltip: strings.favoriteDeleteCurrentFolderTooltip,
+                        onPressed: enableDeleteAction
+                            ? onDeleteCurrentFolder
+                            : null,
+                        icon: const Icon(Icons.delete_outline),
+                      ),
+                    ),
                   ),
                 ),
             ],
@@ -61,6 +74,15 @@ class FavoriteFolderHeader extends StatelessWidget {
                 width: 16,
                 height: 16,
                 child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            )
+          else if (showCreateLocalFolderButton)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: OutlinedButton.icon(
+                onPressed: onCreateLocalFolder,
+                icon: const Icon(Icons.create_new_folder_outlined),
+                label: Text(strings.favoriteCreateLocalFolderAction),
               ),
             )
           else

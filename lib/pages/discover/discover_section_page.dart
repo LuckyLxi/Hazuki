@@ -28,6 +28,9 @@ class DiscoverSectionPage extends StatefulWidget {
 }
 
 class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
+  static const int _gridCrossAxisCount = 3;
+  static const double _gridSpacing = 10;
+
   final ScrollController _scrollController = ScrollController();
 
   /// 展示的漫画列表（初始包含发现页预加载数据）
@@ -202,6 +205,7 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
   @override
   Widget build(BuildContext context) {
     final strings = AppLocalizations.of(context)!;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       appBar: hazukiFrostedAppBar(
@@ -264,105 +268,61 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
                               ),
                             )
                           : Center(child: Text(strings.discoverSectionEmpty))
-                    : GridView.builder(
-                        controller: _scrollController,
-                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-                        itemCount: _comics.length,
-                        gridDelegate:
-                            const SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: 3,
-                              mainAxisSpacing: 10,
-                              crossAxisSpacing: 10,
-                              childAspectRatio: 0.57,
-                            ),
-                        itemBuilder: (context, index) {
-                          final comic = _comics[index];
-                          final heroTag = widget.comicCoverHeroTagBuilder(
-                            comic,
-                            salt:
-                                'discover-more-${widget.section.title}-$index',
-                          );
-                          return InkWell(
-                            borderRadius: BorderRadius.circular(8),
-                            onTap: () async {
-                              await Navigator.of(context).push(
-                                MaterialPageRoute<void>(
-                                  builder: (_) => widget.comicDetailPageBuilder(
-                                    comic,
-                                    heroTag,
-                                  ),
+                    : LayoutBuilder(
+                        builder: (context, constraints) {
+                          final contentWidth = constraints.maxWidth - 32;
+                          final coverWidth =
+                              (contentWidth -
+                                  (_gridCrossAxisCount - 1) * _gridSpacing) /
+                              _gridCrossAxisCount;
+                          final coverCacheWidth =
+                              (coverWidth *
+                                      MediaQuery.devicePixelRatioOf(context))
+                                  .round();
+
+                          return GridView.builder(
+                            controller: _scrollController,
+                            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                            itemCount: _comics.length,
+                            gridDelegate:
+                                const SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: _gridCrossAxisCount,
+                                  mainAxisSpacing: _gridSpacing,
+                                  crossAxisSpacing: _gridSpacing,
+                                  childAspectRatio: 0.57,
                                 ),
+                            itemBuilder: (context, index) {
+                              final comic = _comics[index];
+                              final heroTag = widget.comicCoverHeroTagBuilder(
+                                comic,
+                                salt:
+                                    'discover-more-${widget.section.title}-$index',
+                              );
+                              return _DiscoverSectionComicTile(
+                                comic: comic,
+                                heroTag: heroTag,
+                                coverCacheWidth: coverCacheWidth,
+                                placeholderColor:
+                                    colorScheme.surfaceContainerHighest,
+                                titleStyle: Theme.of(
+                                  context,
+                                ).textTheme.bodyMedium,
+                                subtitleStyle: Theme.of(
+                                  context,
+                                ).textTheme.bodySmall,
+                                onTap: () async {
+                                  await Navigator.of(context).push(
+                                    MaterialPageRoute<void>(
+                                      builder: (_) =>
+                                          widget.comicDetailPageBuilder(
+                                            comic,
+                                            heroTag,
+                                          ),
+                                    ),
+                                  );
+                                },
                               );
                             },
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  child: Hero(
-                                    tag: heroTag,
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: comic.cover.isEmpty
-                                          ? Container(
-                                              color: Theme.of(context)
-                                                  .colorScheme
-                                                  .surfaceContainerHighest,
-                                              child: const Center(
-                                                child: Icon(
-                                                  Icons
-                                                      .image_not_supported_outlined,
-                                                ),
-                                              ),
-                                            )
-                                          : HazukiCachedImage(
-                                              url: comic.cover,
-                                              fit: BoxFit.cover,
-                                              width: double.infinity,
-                                              loading: Container(
-                                                color: Theme.of(context)
-                                                    .colorScheme
-                                                    .surfaceContainerHighest,
-                                                alignment: Alignment.center,
-                                                child: const SizedBox(
-                                                  width: 18,
-                                                  height: 18,
-                                                  child:
-                                                      CircularProgressIndicator(
-                                                        strokeWidth: 2,
-                                                      ),
-                                                ),
-                                              ),
-                                              error: Container(
-                                                color: Theme.of(context)
-                                                    .colorScheme
-                                                    .surfaceContainerHighest,
-                                                alignment: Alignment.center,
-                                                child: const Icon(
-                                                  Icons.broken_image_outlined,
-                                                ),
-                                              ),
-                                            ),
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  comic.title,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: Theme.of(context).textTheme.bodyMedium,
-                                ),
-                                if (comic.subTitle.isNotEmpty)
-                                  Text(
-                                    comic.subTitle,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: Theme.of(
-                                      context,
-                                    ).textTheme.bodySmall,
-                                  ),
-                              ],
-                            ),
                           );
                         },
                       ),
@@ -434,6 +394,83 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DiscoverSectionComicTile extends StatelessWidget {
+  const _DiscoverSectionComicTile({
+    required this.comic,
+    required this.heroTag,
+    required this.coverCacheWidth,
+    required this.placeholderColor,
+    required this.titleStyle,
+    required this.subtitleStyle,
+    required this.onTap,
+  });
+
+  final ExploreComic comic;
+  final String heroTag;
+  final int coverCacheWidth;
+  final Color placeholderColor;
+  final TextStyle? titleStyle;
+  final TextStyle? subtitleStyle;
+  final Future<void> Function() onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(8),
+      onTap: () {
+        unawaited(onTap());
+      },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Hero(
+              tag: heroTag,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: comic.cover.isEmpty
+                    ? ColoredBox(
+                        color: placeholderColor,
+                        child: const Center(
+                          child: Icon(Icons.image_not_supported_outlined),
+                        ),
+                      )
+                    : HazukiCachedImage(
+                        url: comic.cover,
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        cacheWidth: coverCacheWidth,
+                        loading: ColoredBox(color: placeholderColor),
+                        error: ColoredBox(
+                          color: placeholderColor,
+                          child: const Center(
+                            child: Icon(Icons.broken_image_outlined),
+                          ),
+                        ),
+                      ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            comic.title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: titleStyle,
+          ),
+          if (comic.subTitle.isNotEmpty)
+            Text(
+              comic.subTitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: subtitleStyle,
+            ),
         ],
       ),
     );

@@ -77,6 +77,9 @@ class FavoritePageState extends State<FavoritePage>
   void didUpdateWidget(covariant FavoritePage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.authVersion != widget.authVersion) {
+      if (_controller.mode == FavoritePageMode.local) {
+        return;
+      }
       if (HazukiSourceService.instance.isLogged) {
         _controller.resetForReload();
         _notifyAppBarActions();
@@ -100,6 +103,8 @@ class FavoritePageState extends State<FavoritePage>
         showSort: false,
         showCreateFolder: false,
         currentSortOrder: 'mr',
+        showModeToggle: true,
+        currentMode: FavoritePageMode.cloud,
       ),
     );
     _controller.removeListener(_handleControllerChanged);
@@ -152,6 +157,13 @@ class FavoritePageState extends State<FavoritePage>
         _strings(context).favoriteSortChangeFailed(error),
         isError: true,
       ),
+    );
+  }
+
+  Future<void> toggleMode() {
+    return _controller.toggleMode(
+      timeoutMessage: _strings(context).favoriteLoadTimeout,
+      onFolderLoadError: _showFolderLoadError,
     );
   }
 
@@ -284,7 +296,7 @@ class FavoritePageState extends State<FavoritePage>
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, _) {
-        if (!_controller.isLogged) {
+        if (_controller.showLoginRequired) {
           return FavoriteLoginRequiredView(
             onLoginPressed: _buildLoginHandler(),
           );
@@ -303,9 +315,14 @@ class FavoritePageState extends State<FavoritePage>
                     folders: _controller.folders,
                     selectedFolderId: _controller.selectedFolderId,
                     loadingFolders: _controller.loadingFolders,
-                    showDeleteAction: _controller.supportsFolderDelete,
+                    showDeleteActionSlot: _controller.supportsFolderDelete,
+                    enableDeleteAction: _controller.canDeleteSelectedFolder,
+                    showCreateLocalFolderButton:
+                        _controller.mode == FavoritePageMode.local &&
+                        _controller.folders.isEmpty,
                     onDeleteCurrentFolder: _deleteCurrentFolder,
                     onSelectFolder: _handleSelectFolder,
+                    onCreateLocalFolder: createFolder,
                   ),
                 _FavoriteContentSection(
                   comics: _controller.comics,

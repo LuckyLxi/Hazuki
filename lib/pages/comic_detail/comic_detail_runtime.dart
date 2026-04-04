@@ -1,6 +1,22 @@
 part of '../comic_detail_page.dart';
 
 extension _ComicDetailRuntimeExtension on _ComicDetailPageState {
+  Future<void> _loadFavoriteOverrideState() async {
+    try {
+      final details = await _future;
+      final localFavorite = await LocalFavoritesService.instance
+          .isComicFavorited(
+            details.id.trim().isNotEmpty ? details.id : widget.comic.id,
+          );
+      if (!mounted) {
+        return;
+      }
+      _updateComicDetailState(() {
+        _favoriteOverride = details.isFavorite || localFavorite;
+      });
+    } catch (_) {}
+  }
+
   Future<void> _loadReadingProgress() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -238,4 +254,3 @@ extension _ComicDetailRuntimeExtension on _ComicDetailPageState {
     } catch (_) {}
   }
 }
-

@@ -32,6 +32,8 @@ extension _ReaderSettingsActionsExtension on _ReaderPageState {
       _brightnessValue = math.max(0.0, math.min(brightnessValue, 1.0));
       _readerMode = readerMode;
       _tapToTurnPage = prefs.getBool('reader_tap_to_turn_page') ?? false;
+      _volumeButtonTurnPage =
+          prefs.getBool('reader_volume_button_turn_page') ?? false;
       _pinchToZoom = prefs.getBool('reader_pinch_to_zoom') ?? false;
       _longPressToSave = prefs.getBool('reader_long_press_save') ?? false;
     });
@@ -41,6 +43,7 @@ extension _ReaderSettingsActionsExtension on _ReaderPageState {
       content: _readerLogPayload({'settingsLoaded': true}),
     );
     await _applyReaderDisplaySettings();
+    await _syncReaderVolumeButtonPagingPlatformState();
   }
 
   Future<void> _applyReaderDisplaySettings() async {
@@ -54,35 +57,45 @@ extension _ReaderSettingsActionsExtension on _ReaderPageState {
       try {
         await _ReaderPageState._readerDisplayChannel.invokeMethod<void>(
           'setKeepScreenOn',
-          {
-          'enabled': _keepScreenOn,
-          },
+          {'enabled': _keepScreenOn},
         );
         await _ReaderPageState._readerDisplayChannel.invokeMethod<bool>(
           'setReaderBrightness',
-          {
-          'value': _customBrightness ? _brightnessValue : null,
-          },
+          {'value': _customBrightness ? _brightnessValue : null},
         );
       } catch (_) {}
     }
   }
 
+  Future<void> _syncReaderVolumeButtonPagingPlatformState({
+    bool? enabled,
+  }) async {
+    if (!Platform.isAndroid) {
+      return;
+    }
+    try {
+      await _ReaderPageState._readerDisplayChannel.invokeMethod<bool>(
+        'setVolumeButtonPaging',
+        {
+          'enabled': enabled ?? _volumeButtonTurnPage,
+          'sessionId': _readerSessionId,
+        },
+      );
+    } catch (_) {}
+  }
+
   Future<void> _restoreReaderDisplay() async {
     await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    await _syncReaderVolumeButtonPagingPlatformState(enabled: false);
     if (Platform.isAndroid) {
       try {
         await _ReaderPageState._readerDisplayChannel.invokeMethod<void>(
           'setKeepScreenOn',
-          {
-          'enabled': false,
-          },
+          {'enabled': false},
         );
         await _ReaderPageState._readerDisplayChannel.invokeMethod<bool>(
           'setReaderBrightness',
-          {
-          'value': null,
-          },
+          {'value': null},
         );
       } catch (_) {}
     }
@@ -160,6 +173,22 @@ extension _ReaderSettingsActionsExtension on _ReaderPageState {
     );
   }
 
+  Future<void> _toggleVolumeButtonTurnPageSetting(bool value) async {
+    _updateReaderState(() {
+      _volumeButtonTurnPage = value;
+    });
+    await _persistReaderBool('reader_volume_button_turn_page', value);
+    _logReaderEvent(
+      'Reader volume button turn page toggled',
+      source: 'reader_settings',
+      content: _readerLogPayload({
+        'setting': 'volume_button_turn_page',
+        'value': value,
+      }),
+    );
+    await _syncReaderVolumeButtonPagingPlatformState();
+  }
+
   Future<void> _toggleImmersiveModeSetting(bool value) async {
     _updateReaderState(() {
       _immersiveMode = value;
@@ -227,10 +256,7 @@ extension _ReaderSettingsActionsExtension on _ReaderPageState {
     final previousValue = _pinchToZoom;
     final targetPageIndex = _images.isEmpty
         ? 0
-        : math.max(
-            0,
-            math.min(_pageIndexNotifier.value, _images.length - 1),
-          );
+        : math.max(0, math.min(_pageIndexNotifier.value, _images.length - 1));
     if (!value) {
       _resetZoomImmediately(reason: 'pinch_to_zoom_disabled');
     }
@@ -293,31 +319,38 @@ extension _ReaderSettingsActionsExtension on _ReaderPageState {
           'hadCachedChapterDetails': hadCachedChapterDetails,
         }),
       );
-      Navigator.of(context).push(
-        SpringBottomSheetRoute(
-          builder: (routeContext) {
-            final themedData = widget.comicTheme ?? Theme.of(routeContext);
-            return Theme(
-              data: themedData,
-              child: ChaptersPanelSheet(
-                details: details,
-                onDownloadConfirm: (_) {
-                  Navigator.of(routeContext).pop();
-                },
-                onChapterTap: (epId, chapterTitle, index) {
-                  unawaited(
-                    _handleChapterSelectedFromPanel(
-                      routeContext,
-                      epId,
-                      chapterTitle,
-                      index,
-                    ),
-                  );
-                },
-              ),
-            );
-          },
+      showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        isDismissible: true,
+        enableDrag: true,
+        useSafeArea: false,
+        sheetAnimationStyle: const AnimationStyle(
+          duration: Duration(milliseconds: 380),
+          reverseDuration: Duration(milliseconds: 280),
         ),
+        builder: (routeContext) {
+          final themedData = widget.comicTheme ?? Theme.of(routeContext);
+          return Theme(
+            data: themedData,
+            child: ChaptersPanelSheet(
+              details: details,
+              onDownloadConfirm: (_) {
+                Navigator.of(routeContext).pop();
+              },
+              onChapterTap: (epId, chapterTitle, index) {
+                unawaited(
+                  _handleChapterSelectedFromPanel(
+                    routeContext,
+                    epId,
+                    chapterTitle,
+                    index,
+                  ),
+                );
+              },
+            ),
+          );
+        },
       );
     } catch (e) {
       _logReaderEvent(
@@ -396,6 +429,88 @@ extension _ReaderSettingsActionsExtension on _ReaderPageState {
     );
   }
 
+  Future<void> _jumpToAdjacentChapter(int offset) async {
+    final navigator = Navigator.of(context);
+    final strings = l10n(context);
+    try {
+      final details =
+          _chapterDetailsCache ??
+          await HazukiSourceService.instance.loadComicDetails(widget.comicId);
+      _chapterDetailsCache ??= details;
+      final chapterEntries = details.chapters.entries.toList(growable: false);
+      if (chapterEntries.isEmpty) {
+        return;
+      }
+
+      var currentChapterIndex = chapterEntries.indexWhere(
+        (entry) => entry.key == widget.epId,
+      );
+      if (currentChapterIndex < 0) {
+        currentChapterIndex = widget.chapterIndex.clamp(
+          0,
+          chapterEntries.length - 1,
+        );
+      }
+      final targetIndex = currentChapterIndex + offset;
+
+      if (targetIndex < 0) {
+        if (mounted) {
+          unawaited(showHazukiPrompt(context, strings.readerNoPreviousChapter));
+        }
+        return;
+      }
+      if (targetIndex >= chapterEntries.length) {
+        if (mounted) {
+          unawaited(
+            showHazukiPrompt(context, strings.readerAlreadyLastChapter),
+          );
+        }
+        return;
+      }
+
+      final targetChapter = chapterEntries[targetIndex];
+      _logReaderEvent(
+        'Reader adjacent chapter navigation requested',
+        source: 'reader_navigation',
+        content: _readerLogPayload({
+          'offset': offset,
+          'fromChapterIndex': currentChapterIndex,
+          'targetChapterIndex': targetIndex,
+          'targetEpId': targetChapter.key,
+          'targetChapterTitle': targetChapter.value,
+        }),
+      );
+
+      if (!mounted) {
+        return;
+      }
+      await navigator.pushReplacement(
+        MaterialPageRoute<void>(
+          builder: (_) => ReaderPage(
+            title: widget.title,
+            chapterTitle: targetChapter.value,
+            comicId: widget.comicId,
+            epId: targetChapter.key,
+            chapterIndex: targetIndex,
+            images: const [],
+            comicTheme: widget.comicTheme,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      unawaited(
+        showHazukiPrompt(
+          context,
+          strings.readerChapterLoadFailed('$e'),
+          isError: true,
+        ),
+      );
+    }
+  }
+
   void _syncReaderPositionAfterModeChange() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || _images.isEmpty) {
@@ -441,10 +556,7 @@ extension _ReaderSettingsActionsExtension on _ReaderPageState {
       if (!mounted || _images.isEmpty) {
         return;
       }
-      final target = math.max(
-        0,
-        math.min(targetPageIndex, _images.length - 1),
-      );
+      final target = math.max(0, math.min(targetPageIndex, _images.length - 1));
       _currentPageIndex = target;
       _setDisplayedPageIndex(target);
 

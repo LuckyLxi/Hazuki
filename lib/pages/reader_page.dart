@@ -59,6 +59,8 @@ class _ReaderPageState extends State<ReaderPage>
   static const _readerDisplayChannel = MethodChannel(
     'hazuki.comics/reader_display',
   );
+  static bool _readerDisplayMethodHandlerRegistered = false;
+  static _ReaderPageState? _activeReaderPageState;
 
   static const int _maxUnscrambleConcurrency = 5;
   static const bool _defaultImmersiveMode = true;
@@ -92,6 +94,7 @@ class _ReaderPageState extends State<ReaderPage>
       .toString();
   final TransformationController _zoomController = TransformationController();
   final ReaderDiagnosticsState _diagnosticsState = ReaderDiagnosticsState();
+  final FocusNode _readerKeyFocusNode = FocusNode();
 
   int _activeUnscrambleTasks = 0;
   bool _prefetchAheadRunning = false;
@@ -100,6 +103,7 @@ class _ReaderPageState extends State<ReaderPage>
   bool _controlsVisible = false;
   bool _sliderDragging = false;
   double _sliderDragValue = 0;
+  int? _lastSliderHapticPageIndex;
   List<String> _images = const [];
   bool _loadingImages = true;
   String? _loadImagesError;
@@ -114,6 +118,7 @@ class _ReaderPageState extends State<ReaderPage>
   bool _pageIndicator = _defaultPageIndicator;
   bool _pinchToZoom = false;
   bool _longPressToSave = false;
+  bool _volumeButtonTurnPage = false;
   bool _isZoomed = false;
   bool _zoomInteracting = false;
   int _activePointerCount = 0;
@@ -134,6 +139,82 @@ class _ReaderPageState extends State<ReaderPage>
       return;
     }
     setState(update);
+  }
+
+  ThemeData _resolveReaderTheme([BuildContext? buildContext]) {
+    final targetContext = buildContext ?? context;
+    return widget.comicTheme ?? Theme.of(targetContext);
+  }
+
+  Color _resolveReaderSurfaceColor([BuildContext? buildContext]) {
+    return _resolveReaderTheme(buildContext).colorScheme.surface;
+  }
+
+  Color _resolveReaderPlaceholderColor([BuildContext? buildContext]) {
+    return _resolveReaderTheme(
+      buildContext,
+    ).colorScheme.surfaceContainerHighest;
+  }
+
+  void _maybeTriggerSliderHaptic(double value) {
+    final targetIndex = math.max(
+      0,
+      math.min(value.round(), _images.length - 1),
+    );
+    if (_lastSliderHapticPageIndex == targetIndex) {
+      return;
+    }
+    _lastSliderHapticPageIndex = targetIndex;
+    unawaited(HapticFeedback.selectionClick());
+  }
+
+  void _attachReaderDisplayChannelHandler() {
+    _activeReaderPageState = this;
+    if (_readerDisplayMethodHandlerRegistered) {
+      return;
+    }
+    _readerDisplayChannel.setMethodCallHandler(_handleReaderDisplayMethodCall);
+    _readerDisplayMethodHandlerRegistered = true;
+  }
+
+  void _detachReaderDisplayChannelHandler() {
+    if (identical(_activeReaderPageState, this)) {
+      _activeReaderPageState = null;
+    }
+  }
+
+  static Future<dynamic> _handleReaderDisplayMethodCall(MethodCall call) async {
+    if (call.method != 'onVolumeButtonPressed') {
+      return null;
+    }
+    final arguments = call.arguments;
+    final direction = arguments is Map<Object?, Object?>
+        ? arguments['direction'] as String?
+        : null;
+    final sessionId = arguments is Map<Object?, Object?>
+        ? arguments['sessionId'] as String?
+        : null;
+    final activeReaderPageState = _activeReaderPageState;
+    if (activeReaderPageState == null ||
+        !activeReaderPageState.mounted ||
+        sessionId != activeReaderPageState._readerSessionId) {
+      return null;
+    }
+    await activeReaderPageState._handlePlatformVolumeButtonPressed(direction);
+    return null;
+  }
+
+  Future<void> _handlePlatformVolumeButtonPressed(String? direction) async {
+    if (!_volumeButtonTurnPage) {
+      return;
+    }
+    if (direction == 'up') {
+      await _goToPreviousPage(trigger: 'hardware_volume_up');
+      return;
+    }
+    if (direction == 'down') {
+      await _goToNextPage(trigger: 'hardware_volume_down');
+    }
   }
 
   @override
@@ -214,8 +295,7 @@ class _ReaderPageState extends State<ReaderPage>
 
   @override
   Widget build(BuildContext context) {
-    final inheritedTheme = Theme.of(context);
-    final readerTheme = widget.comicTheme ?? inheritedTheme;
+    final readerTheme = _resolveReaderTheme(context);
 
     if (_loadingImages) {
       return ReaderLoadingStateView(theme: readerTheme);
@@ -249,46 +329,57 @@ class _ReaderPageState extends State<ReaderPage>
       curve: Curves.easeOutCubic,
       child: Scaffold(
         key: _scaffoldKey,
-        backgroundColor: readerTheme.scaffoldBackgroundColor,
+        backgroundColor: readerTheme.colorScheme.surface,
         endDrawerEnableOpenDragGesture: false,
         endDrawer: _buildReaderSettingsDrawer(readerTheme),
-        body: SafeArea(
-          top: false,
-          bottom: false,
-          child: Stack(
-            children: [
-              Listener(
-                behavior: HitTestBehavior.translucent,
-                onPointerDown: _handleReaderPointerDown,
-                onPointerUp: _handleReaderPointerEnd,
-                onPointerCancel: _handleReaderPointerEnd,
-                child: _wrapReaderTapPaging(
-                  _readerMode == ReaderMode.rightToLeft
-                      ? _buildReaderPageView()
-                      : _buildTopToBottomReaderView(),
+        body: Focus(
+          autofocus: true,
+          focusNode: _readerKeyFocusNode,
+          onKeyEvent: _handleReaderKeyEvent,
+          child: SafeArea(
+            top: false,
+            bottom: false,
+            child: Stack(
+              children: [
+                Listener(
+                  behavior: HitTestBehavior.translucent,
+                  onPointerDown: _handleReaderPointerDown,
+                  onPointerUp: _handleReaderPointerEnd,
+                  onPointerCancel: _handleReaderPointerEnd,
+                  child: _wrapReaderTapPaging(
+                    _readerMode == ReaderMode.rightToLeft
+                        ? _buildReaderPageView()
+                        : _buildTopToBottomReaderView(),
+                  ),
                 ),
-              ),
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: _buildReaderTopControls(readerTheme),
-              ),
-              if (_pageIndicator)
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: _buildReaderTopControls(readerTheme),
+                ),
+                if (_pageIndicator)
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    child: _buildReaderPageIndicator(readerTheme),
+                  ),
                 Positioned(
                   left: 0,
                   right: 0,
                   bottom: 0,
-                  child: _buildReaderPageIndicator(readerTheme),
+                  child: _buildReaderBottomControls(readerTheme),
                 ),
-              Positioned(
-                left: 0,
-                right: 0,
-                bottom: 0,
-                child: _buildReaderBottomControls(readerTheme),
-              ),
-              if (_pinchToZoom) _buildReaderZoomResetOverlay(),
-            ],
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  child: _buildReaderChapterJumpOverlay(),
+                ),
+                if (_pinchToZoom) _buildReaderZoomResetOverlay(),
+              ],
+            ),
           ),
         ),
       ),

@@ -19,6 +19,8 @@ import 'pages/home_page.dart';
 import 'services/cloud_sync_service.dart';
 import 'services/hazuki_source_service.dart';
 import 'services/manga_download_service.dart';
+import 'services/password_lock_service.dart';
+import 'widgets/password_lock_widgets.dart';
 
 Future<void> _ensureAndroidNoMediaMarker() async {
   if (!Platform.isAndroid) {
@@ -46,10 +48,12 @@ Future<void> _ensureNoMediaFile(String dirPath) async {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  unawaited(PasswordLockAnimationCache.ensureLoaded());
   await loadHazukiUiFlags();
   await HazukiSourceService.instance.loadSoftwareLogCaptureEnabled();
   await _ensureAndroidNoMediaMarker();
   await MangaDownloadService.instance.ensureInitialized();
+  await PasswordLockService.instance.ensureInitialized();
   const settingsStore = HazukiAppSettingsStore();
   final initialAppearance = await settingsStore.loadAppearance();
   final initialLocale = await settingsStore.loadLocalePreference();
@@ -127,6 +131,7 @@ class _HazukiAppState extends State<HazukiApp> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
     MangaDownloadService.instance.handleAppLifecycleState(state);
+    unawaited(PasswordLockService.instance.handleAppLifecycleState(state));
     if (state == AppLifecycleState.resumed) {
       _scheduleSourceUpdateDialogCheck();
     }
@@ -242,6 +247,17 @@ class _HazukiAppState extends State<HazukiApp> with WidgetsBindingObserver {
                           ),
                         ),
                       ),
+                    ),
+                    ListenableBuilder(
+                      listenable: PasswordLockService.instance,
+                      builder: (context, _) {
+                        if (!PasswordLockService.instance.shouldBlockApp) {
+                          return const SizedBox.shrink();
+                        }
+                        return PasswordLockGateOverlay(
+                          controller: PasswordLockService.instance,
+                        );
+                      },
                     ),
                   ],
                 );

@@ -1,6 +1,7 @@
 package com.lxi.hazuki.comics
 
 import android.os.Bundle
+import android.view.KeyEvent
 import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 
@@ -31,6 +32,13 @@ class MainActivity : FlutterFragmentActivity() {
 
         displayModeManager.applyHighRefreshRateMode()
         privacyManager.onActivityCreated()
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (::flutterChannels.isInitialized && flutterChannels.handleReaderVolumeButtonKeyEvent(event)) {
+            return true
+        }
+        return super.dispatchKeyEvent(event)
     }
 
     override fun onUserLeaveHint() {

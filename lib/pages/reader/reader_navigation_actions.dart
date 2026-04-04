@@ -1,11 +1,29 @@
 part of '../reader_page.dart';
 
 extension _ReaderNavigationActionsExtension on _ReaderPageState {
+  KeyEventResult _handleReaderKeyEvent(FocusNode node, KeyEvent event) {
+    if (!_volumeButtonTurnPage || event is! KeyDownEvent) {
+      return KeyEventResult.ignored;
+    }
+
+    if (event.logicalKey == LogicalKeyboardKey.audioVolumeUp) {
+      unawaited(_goToPreviousPage(trigger: 'keyboard_volume_up'));
+      return KeyEventResult.handled;
+    }
+    if (event.logicalKey == LogicalKeyboardKey.audioVolumeDown) {
+      unawaited(_goToNextPage(trigger: 'keyboard_volume_down'));
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
   Widget _buildReaderListView() {
     return NotificationListener<ScrollNotification>(
       onNotification: _handleReaderScrollNotification,
       child: ListView.builder(
-        key: PageStorageKey<String>('reader-list-${widget.comicId}-${widget.epId}'),
+        key: PageStorageKey<String>(
+          'reader-list-${widget.comicId}-${widget.epId}',
+        ),
         padding: EdgeInsets.zero,
         cacheExtent: _readerListCacheExtent(context),
         itemCount: _images.length,
@@ -20,7 +38,9 @@ extension _ReaderNavigationActionsExtension on _ReaderPageState {
 
   Widget _buildReaderPageView() {
     return PageView.builder(
-      key: PageStorageKey<String>('reader-page-${widget.comicId}-${widget.epId}-rtl'),
+      key: PageStorageKey<String>(
+        'reader-page-${widget.comicId}-${widget.epId}-rtl',
+      ),
       controller: _pageController,
       reverse: false,
       allowImplicitScrolling: true,
@@ -58,6 +78,8 @@ extension _ReaderNavigationActionsExtension on _ReaderPageState {
       itemBuilder: (context, index) {
         final url = _images[index];
         final cachedProvider = _providerCache[url];
+        final readerSurfaceColor = _resolveReaderSurfaceColor(context);
+        final readerPlaceholderColor = _resolveReaderPlaceholderColor(context);
 
         if (_noImageModeEnabled) {
           return const SizedBox.expand();
@@ -68,7 +90,7 @@ extension _ReaderNavigationActionsExtension on _ReaderPageState {
             _wrapPageWithPinchZoom(
               index: index,
               child: ColoredBox(
-                color: Colors.black,
+                color: readerSurfaceColor,
                 child: Center(
                   child: Image(
                     key: ValueKey('reader-page-$url'),
@@ -83,15 +105,14 @@ extension _ReaderNavigationActionsExtension on _ReaderPageState {
                           if (wasSynchronouslyLoaded || frame != null) {
                             return child;
                           }
-                          return const ColoredBox(color: Colors.black);
+                          return ColoredBox(color: readerSurfaceColor);
                         },
                     errorBuilder: (_, _, _) {
-                      return Container(
-                        color: Theme.of(
-                          context,
-                        ).colorScheme.surfaceContainerHighest,
-                        alignment: Alignment.center,
-                        child: const Icon(Icons.broken_image_outlined),
+                      return ColoredBox(
+                        color: readerPlaceholderColor,
+                        child: const Center(
+                          child: Icon(Icons.broken_image_outlined),
+                        ),
                       );
                     },
                   ),
@@ -114,15 +135,16 @@ extension _ReaderNavigationActionsExtension on _ReaderPageState {
               return buildImage(snapshot.data!);
             }
             if (snapshot.hasError) {
-              return Container(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                alignment: Alignment.center,
-                child: const Icon(Icons.broken_image_outlined),
+              return ColoredBox(
+                color: readerPlaceholderColor,
+                child: const Center(child: Icon(Icons.broken_image_outlined)),
               );
             }
-            return const ColoredBox(
-              color: Colors.black,
-              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+            return ColoredBox(
+              color: readerSurfaceColor,
+              child: const Center(
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
             );
           },
         );
@@ -328,18 +350,18 @@ extension _ReaderNavigationActionsExtension on _ReaderPageState {
     await _scrollToListReaderPage(target, trigger: trigger);
   }
 
-  Future<void> _goToPreviousPage() async {
+  Future<void> _goToPreviousPage({String trigger = 'tap_previous_zone'}) async {
     if (_currentPageIndex <= 0) {
       return;
     }
-    await _goToReaderPage(_currentPageIndex - 1, trigger: 'tap_previous_zone');
+    await _goToReaderPage(_currentPageIndex - 1, trigger: trigger);
   }
 
-  Future<void> _goToNextPage() async {
+  Future<void> _goToNextPage({String trigger = 'tap_next_zone'}) async {
     if (_currentPageIndex >= _images.length - 1) {
       return;
     }
-    await _goToReaderPage(_currentPageIndex + 1, trigger: 'tap_next_zone');
+    await _goToReaderPage(_currentPageIndex + 1, trigger: trigger);
   }
 
   Widget _wrapReaderTapPaging(Widget child) {

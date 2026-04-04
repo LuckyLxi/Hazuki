@@ -4,7 +4,8 @@ extension _ReaderListItemBuilderExtension on _ReaderPageState {
   Widget _buildReaderListItem(int index) {
     final url = _images[index];
     final cachedProvider = _providerCache[url];
-    final readerPlaceholderColor = Theme.of(context).scaffoldBackgroundColor;
+    final readerSurfaceColor = _resolveReaderSurfaceColor(context);
+    final readerPlaceholderColor = _resolveReaderPlaceholderColor(context);
 
     double? currentResolvedAspectRatio() => _imageAspectRatioCache[url];
 
@@ -35,21 +36,22 @@ extension _ReaderListItemBuilderExtension on _ReaderPageState {
           if (wasSynchronouslyLoaded || frame != null) {
             return child;
           }
-          return ColoredBox(color: readerPlaceholderColor);
+          return ColoredBox(color: readerSurfaceColor);
         },
         errorBuilder: (_, _, _) {
-          return Container(
-            height: 120,
-            color: Theme.of(context).colorScheme.surfaceContainerHighest,
-            alignment: Alignment.center,
-            child: const Icon(Icons.broken_image_outlined),
+          return ColoredBox(
+            color: readerPlaceholderColor,
+            child: const SizedBox(
+              height: 120,
+              child: Center(child: Icon(Icons.broken_image_outlined)),
+            ),
           );
         },
       );
       final stableImage = resolvedAspectRatio == null
           ? image
           : ColoredBox(
-              color: readerPlaceholderColor,
+              color: readerSurfaceColor,
               child: AspectRatio(
                 aspectRatio: resolvedAspectRatio,
                 child: image,
@@ -72,17 +74,19 @@ extension _ReaderListItemBuilderExtension on _ReaderPageState {
           if (snapshot.hasError) {
             return AspectRatio(
               aspectRatio: currentPlaceholderAspectRatio(),
-              child: Container(
-                color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                alignment: Alignment.center,
-                child: const Icon(Icons.broken_image_outlined),
+              child: ColoredBox(
+                color: readerPlaceholderColor,
+                child: const Center(child: Icon(Icons.broken_image_outlined)),
               ),
             );
           }
           return AspectRatio(
             aspectRatio: currentPlaceholderAspectRatio(),
-            child: const Center(
-              child: CircularProgressIndicator(strokeWidth: 2),
+            child: DecoratedBox(
+              decoration: BoxDecoration(color: readerSurfaceColor),
+              child: const Center(
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
             ),
           );
         },

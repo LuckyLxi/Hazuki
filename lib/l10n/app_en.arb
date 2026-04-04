@@ -126,11 +126,13 @@
   "aboutOpenFeedbackFailed": "Unable to open the feedback link",
   "aboutDisclaimerTitle": "Disclaimer",
   "aboutDisclaimerSubtitle": "Please read before use",
-  "aboutDisclaimerContent": "This app is provided only for learning, interface research, and personal technical exchange. It does not provide any comic resources, nor does it directly store, upload, or distribute comic content.\n\nOn first launch or when updating the comic source, the app automatically downloads a comic-source script from a third-party GitHub repository. Both that script and any content parsed through it originate from third parties, and the related copyrights and liabilities belong to the original authors or rights holders.\n\nPlease use this app in compliance with local laws, regulations, and copyright requirements. Any disputes, losses, or legal liabilities arising from downloading, using third-party comic sources, or accessing related content shall be borne solely by the user.",
+  "aboutDisclaimerContent": "This software is free and open source, and is intended only for personal learning and communication.\n\nHazuki itself does not provide, store, or distribute any comic content. All content comes from third-party comic source scripts, and the copyright belongs to the respective rights holders. Account credentials are used only for direct communication with the source site; this software does not store or upload them.\n\nOn first launch, the software automatically downloads comic source scripts. Those scripts come from a third-party repository and are unrelated to this project.\n\nPlease use this software in compliance with local laws and regulations. Any responsibilities arising from its use shall be borne solely by the user.",
   "commonConfirm": "OK",
   "commonCancel": "Cancel",
   "commonClose": "Close",
   "commonSave": "Save",
+  "commonSelectAll": "Select all",
+  "commonDeselectAll": "Clear all",
   "commonLoading": "Loading...",
   "commonRetry": "Retry",
   "searchTitle": "Search",
@@ -338,6 +340,8 @@
   "readingModeRightToLeft": "Right to left",
   "readingTapToTurnPageTitle": "Tap to turn page",
   "readingTapToTurnPageSubtitle": "Only works in right-to-left mode. Tap the left side for the previous page and the right side for the next page",
+  "readingVolumeButtonTurnPageTitle": "Volume buttons turn pages",
+  "readingVolumeButtonTurnPageSubtitle": "When enabled, volume up goes to the previous page and volume down goes to the next page in both reading modes",
   "readingImmersiveModeTitle": "Immersive mode",
   "readingImmersiveModeSubtitle": "Hide the status bar and bottom navigation bar automatically when entering the reader",
   "readingKeepScreenOnTitle": "Keep screen on",
@@ -415,6 +419,37 @@
   "privacyBiometricUnlockSubtitle": "Require fingerprint verification each time the app is opened",
   "privacyAuthOnResumeTitle": "Require verification after leaving app",
   "privacyAuthOnResumeSubtitle": "Require authentication again whenever the app returns to foreground",
+  "privacyPasswordLockTitle": "Password lock",
+  "privacyPasswordLockEnabledSubtitle": "Configured. Tap to turn it off",
+  "privacyPasswordLockDisabledSubtitle": "Protect the app with a 4-digit passcode",
+  "privacyPasswordLockIntroTitle": "Add a 4-digit password lock",
+  "privacyPasswordLockIntroSubtitle": "When enabled, the app will ask for your passcode before access. If biometric unlock is enabled, you can also unlock with fingerprint from the keypad screen.",
+  "privacyPasswordLockEnableAction": "Enable password lock",
+  "privacyPasswordLockSetupInstruction": "Enter four digits as the app passcode",
+  "privacyPasswordLockEnableFailed": "Failed to enable password lock: {error}",
+  "@privacyPasswordLockEnableFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "privacyPasswordLockDisableTitle": "Turn off password lock?",
+  "privacyPasswordLockDisableContent": "After turning it off, the app will no longer require the 4-digit passcode on launch.",
+  "passwordLockUnlockTitle": "Enter passcode",
+  "passwordLockUnlockSubtitle": "Enter the 4-digit app password to continue",
+  "passwordLockWrongPin": "Wrong password. {remaining} attempts left",
+  "@passwordLockWrongPin": {
+    "placeholders": {
+      "remaining": {}
+    }
+  },
+  "passwordLockLockedForMinutes": "Too many wrong attempts. Try again in 5 minutes",
+  "passwordLockCountdown": "Locked. Try again in {time}",
+  "@passwordLockCountdown": {
+    "placeholders": {
+      "time": {}
+    }
+  },
+  "passwordLockBiometricFailed": "Biometric unlock failed",
   "lineSettingsTitle": "Lines",
   "lineLoadFailed": "Failed to load line information: {error}",
   "@lineLoadFailed": {
@@ -657,6 +692,10 @@
   "rankingEmptyComics": "No ranking content available",
   "rankingReachedEnd": "You've reached the end",
   "favoriteAllFolder": "All",
+  "favoriteModeCloud": "Cloud",
+  "favoriteModeLocal": "Local",
+  "favoriteFolderGroupCloud": "Cloud folders",
+  "favoriteFolderGroupLocal": "Local folders",
   "favoriteLoadTimeout": "Favorites timed out while loading. Pull down to retry.",
   "favoriteFoldersLoadFailed": "Failed to load favorite folders: {error}",
   "@favoriteFoldersLoadFailed": {
@@ -695,6 +734,7 @@
   "favoriteCreateFolderTitle": "New favorite folder",
   "favoriteCreateFolderHint": "Enter a folder name",
   "favoriteCreateFolderNameRequired": "Folder name cannot be empty",
+  "favoriteCreateLocalFolderAction": "Create local favorite folder",
   "favoriteDeleteFolderTitle": "Delete favorite folder",
   "favoriteDeleteFolderContent": "Delete \"{name}\"?",
   "@favoriteDeleteFolderContent": {
@@ -702,6 +742,9 @@
       "name": {}
     }
   },
+  "favoriteCreateFolderTargetTitle": "Where should the folder be created?",
+  "favoriteCreateFolderTargetCloud": "Cloud",
+  "favoriteCreateFolderTargetLocal": "Local",
   "discoverSectionLoadFailed": "Load failed: {error}",
   "@discoverSectionLoadFailed": {
     "placeholders": {
@@ -752,6 +795,10 @@
   "commentsEmpty": "No comments yet",
   "readerSaveImageTitle": "Save image",
   "readerSaveImageContent": "Save this comic image locally?",
+  "readerPreviousChapter": "Previous chapter",
+  "readerNextChapter": "Next chapter",
+  "readerNoPreviousChapter": "No previous chapter",
+  "readerAlreadyLastChapter": "This is the last chapter",
   "readerChapterLoadFailed": "Failed to load chapter: {error}",
   "@readerChapterLoadFailed": {
     "placeholders": {
