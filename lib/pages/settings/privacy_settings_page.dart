@@ -109,22 +109,52 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
     }
 
     final strings = AppLocalizations.of(context)!;
-    final shouldDisable = await showDialog<bool>(
+    final shouldDisable = await showGeneralDialog<bool>(
       context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: Text(strings.privacyPasswordLockDisableTitle),
-          content: Text(strings.privacyPasswordLockDisableContent),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: Text(strings.commonCancel),
+      barrierDismissible: true,
+      barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+      barrierColor: Colors.black54,
+      transitionDuration: const Duration(milliseconds: 220),
+      pageBuilder: (dialogContext, animation, secondaryAnimation) {
+        return SafeArea(
+          child: Center(
+            child: AlertDialog(
+              title: Text(strings.privacyPasswordLockDisableTitle),
+              content: Text(strings.privacyPasswordLockDisableContent),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(false),
+                  child: Text(strings.commonCancel),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(true),
+                  child: Text(strings.commonConfirm),
+                ),
+              ],
             ),
-            FilledButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: Text(strings.commonConfirm),
-            ),
-          ],
+          ),
+        );
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        final curvedAnimation = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        );
+        final scaleAnimation = Tween<double>(
+          begin: 0.94,
+          end: 1,
+        ).animate(curvedAnimation);
+        final slideAnimation = Tween<Offset>(
+          begin: const Offset(0, 0.03),
+          end: Offset.zero,
+        ).animate(curvedAnimation);
+        return FadeTransition(
+          opacity: curvedAnimation,
+          child: SlideTransition(
+            position: slideAnimation,
+            child: ScaleTransition(scale: scaleAnimation, child: child),
+          ),
         );
       },
     );

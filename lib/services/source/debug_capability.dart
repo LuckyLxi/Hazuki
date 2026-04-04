@@ -3,9 +3,9 @@ part of '../hazuki_source_service.dart';
 const int _debugMaxApplicationLogsKept = 180;
 const int _debugMaxReaderLogsKept = 180;
 const int _debugMaxNetworkLogsKept = 120;
-const int _debugNetworkPreviewKeep = 320;
-const int _debugNetworkFullBodyKeep = 1600;
-const int _debugReaderStringKeep = 220;
+const int _debugNetworkPreviewKeep = 240;
+const int _debugNetworkFullBodyKeep = 960;
+const int _debugReaderStringKeep = 180;
 const int _debugApplicationStringKeep = 320;
 const int _debugNetworkHeadersKeep = 12;
 

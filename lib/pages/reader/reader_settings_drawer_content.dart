@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../l10n/l10n.dart';
 import 'reader.dart';
 
+// 阅读器设置组，采用卡片样式呈现
 class ReaderSettingsGroup extends StatelessWidget {
   const ReaderSettingsGroup({
     super.key,
@@ -19,10 +20,10 @@ class ReaderSettingsGroup extends StatelessWidget {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(20),
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
         ),
       ),
       clipBehavior: Clip.antiAlias,
@@ -105,51 +106,92 @@ class ReaderSettingsDrawerContent extends StatelessWidget {
       child: ListView(
         padding: const EdgeInsets.only(bottom: 24),
         children: [
+          // 顶部标题和关闭按钮
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 4, 8),
+            padding: const EdgeInsets.fromLTRB(24, 16, 12, 8),
             child: Row(
               children: [
                 Expanded(
                   child: Text(
                     strings.readingSettingsTitle,
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
                 IconButton(
                   tooltip: strings.commonClose,
                   onPressed: onClose,
+                  style: IconButton.styleFrom(
+                    backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                  ),
                   icon: const Icon(Icons.close_rounded),
                 ),
               ],
             ),
           ),
+          
+          // 分组 1: 阅读模式与排版
           ReaderSettingsGroup(
             theme: theme,
             children: [
-              ListTile(
-                leading: const Icon(Icons.chrome_reader_mode_outlined),
-                title: Text(strings.readingModeTitle),
-                subtitle: Text(strings.readingModeSubtitle),
-                trailing: DropdownButtonHideUnderline(
-                  child: DropdownButton<ReaderMode>(
-                    value: readerMode,
-                    borderRadius: BorderRadius.circular(18),
-                    onChanged: onReaderModeChanged,
-                    items: [
-                      DropdownMenuItem(
-                        value: ReaderMode.topToBottom,
-                        child: Text(strings.readingModeTopToBottom),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.chrome_reader_mode_outlined,
+                          color: theme.colorScheme.primary,
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                strings.readingModeTitle,
+                                style: theme.textTheme.titleMedium,
+                              ),
+                              Text(
+                                strings.readingModeSubtitle,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: SegmentedButton<ReaderMode>(
+                        segments: [
+                          ButtonSegment(
+                            value: ReaderMode.topToBottom,
+                            label: Text(strings.readingModeTopToBottom),
+                            icon: const Icon(Icons.swap_vert_rounded),
+                          ),
+                          ButtonSegment(
+                            value: ReaderMode.rightToLeft,
+                            label: Text(strings.readingModeRightToLeft),
+                            icon: const Icon(Icons.swap_horiz_rounded),
+                          ),
+                        ],
+                        selected: {readerMode},
+                        onSelectionChanged: (set) {
+                          onReaderModeChanged(set.first);
+                        },
                       ),
-                      DropdownMenuItem(
-                        value: ReaderMode.rightToLeft,
-                        child: Text(strings.readingModeRightToLeft),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
+              const Divider(height: 1),
               SwitchListTile(
                 secondary: const Icon(Icons.auto_stories_outlined),
                 title: Text(strings.readingDoublePageModeTitle),
@@ -157,6 +199,21 @@ class ReaderSettingsDrawerContent extends StatelessWidget {
                 value: doublePageMode,
                 onChanged: onDoublePageModeChanged,
               ),
+              const Divider(height: 1),
+              SwitchListTile(
+                secondary: const Icon(Icons.format_list_numbered_outlined),
+                title: Text(strings.readingPageIndicatorTitle),
+                subtitle: Text(strings.readingPageIndicatorSubtitle),
+                value: pageIndicator,
+                onChanged: onPageIndicatorChanged,
+              ),
+            ],
+          ),
+
+          // 分组 2: 交互与手势
+          ReaderSettingsGroup(
+            theme: theme,
+            children: [
               SwitchListTile(
                 secondary: const Icon(Icons.touch_app_outlined),
                 title: Text(strings.readingTapToTurnPageTitle),
@@ -164,6 +221,7 @@ class ReaderSettingsDrawerContent extends StatelessWidget {
                 value: tapToTurnPage,
                 onChanged: onTapToTurnPageChanged,
               ),
+              const Divider(height: 1),
               SwitchListTile(
                 secondary: const Icon(Icons.volume_up_outlined),
                 title: Text(strings.readingVolumeButtonTurnPageTitle),
@@ -171,6 +229,7 @@ class ReaderSettingsDrawerContent extends StatelessWidget {
                 value: volumeButtonTurnPage,
                 onChanged: onVolumeButtonTurnPageChanged,
               ),
+              const Divider(height: 1),
               SwitchListTile(
                 secondary: const Icon(Icons.zoom_in_outlined),
                 title: Text(strings.readingPinchToZoomTitle),
@@ -178,6 +237,7 @@ class ReaderSettingsDrawerContent extends StatelessWidget {
                 value: pinchToZoom,
                 onChanged: onPinchToZoomChanged,
               ),
+              const Divider(height: 1),
               SwitchListTile(
                 secondary: const Icon(Icons.save_alt_outlined),
                 title: Text(strings.readingLongPressSaveTitle),
@@ -187,6 +247,8 @@ class ReaderSettingsDrawerContent extends StatelessWidget {
               ),
             ],
           ),
+
+          // 分组 3: 显示与亮度
           ReaderSettingsGroup(
             theme: theme,
             children: [
@@ -197,6 +259,7 @@ class ReaderSettingsDrawerContent extends StatelessWidget {
                 value: immersiveMode,
                 onChanged: onImmersiveModeChanged,
               ),
+              const Divider(height: 1),
               SwitchListTile(
                 secondary: const Icon(Icons.screen_lock_portrait_outlined),
                 title: Text(strings.readingKeepScreenOnTitle),
@@ -204,14 +267,7 @@ class ReaderSettingsDrawerContent extends StatelessWidget {
                 value: keepScreenOn,
                 onChanged: onKeepScreenOnChanged,
               ),
-              SwitchListTile(
-                secondary: const Icon(Icons.format_list_numbered_outlined),
-                title: Text(strings.readingPageIndicatorTitle),
-                subtitle: Text(strings.readingPageIndicatorSubtitle),
-                value: pageIndicator,
-                onChanged: onPageIndicatorChanged,
-              ),
-              const Divider(height: 1, indent: 16, endIndent: 16),
+              const Divider(height: 1),
               SwitchListTile(
                 secondary: const Icon(Icons.brightness_medium_outlined),
                 title: Text(strings.readingCustomBrightnessTitle),
@@ -220,6 +276,7 @@ class ReaderSettingsDrawerContent extends StatelessWidget {
                 onChanged: onCustomBrightnessChanged,
               ),
               ListTile(
+                contentPadding: const EdgeInsets.only(left: 16, right: 8),
                 leading: Icon(
                   Icons.wb_sunny_outlined,
                   color: customBrightness
@@ -234,15 +291,20 @@ class ReaderSettingsDrawerContent extends StatelessWidget {
                         : disabledContentColor,
                   ),
                 ),
-                subtitle: Slider(
-                  value: brightnessValue,
-                  min: 0,
-                  max: 1,
-                  divisions: 100,
-                  onChanged: onBrightnessChanged,
-                  onChangeEnd: onBrightnessChangeEnd,
-                  activeColor: sliderActiveColor,
-                  inactiveColor: sliderInactiveColor,
+                subtitle: SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
+                  ),
+                  child: Slider(
+                    value: brightnessValue,
+                    min: 0,
+                    max: 1,
+                    divisions: 100,
+                    onChanged: customBrightness ? onBrightnessChanged : null,
+                    onChangeEnd: customBrightness ? onBrightnessChangeEnd : null,
+                    activeColor: customBrightness ? sliderActiveColor : sliderInactiveColor,
+                    inactiveColor: sliderInactiveColor,
+                  ),
                 ),
               ),
             ],

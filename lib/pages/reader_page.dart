@@ -275,33 +275,13 @@ class _ReaderPageState extends State<ReaderPage>
         _images.isEmpty) {
       return false;
     }
-    final previousPixels = _diagnosticsState.lastObservedListPixels;
     if (notification is ScrollStartNotification) {
       _diagnosticsState.listUserScrollInProgress =
           notification.dragDetails != null;
-      _logListPositionSnapshot(
-        'Reader list scroll started',
-        trigger: notification.dragDetails != null
-            ? 'scroll_start_drag'
-            : 'scroll_start_ballistic',
-        previousPixels: previousPixels,
-        extra: {
-          'notificationType': notification.runtimeType.toString(),
-          'depth': notification.depth,
-        },
-      );
     } else if (notification is ScrollEndNotification) {
       _diagnosticsState.listUserScrollInProgress = false;
-      _logListPositionSnapshot(
-        'Reader list scroll ended',
-        trigger: 'scroll_end',
-        previousPixels: previousPixels,
-        extra: {
-          'notificationType': notification.runtimeType.toString(),
-          'depth': notification.depth,
-        },
-      );
     } else if (notification is OverscrollNotification) {
+      final previousPixels = _diagnosticsState.lastObservedListPixels;
       _logListPositionSnapshot(
         'Reader list overscrolled',
         trigger: notification.overscroll < 0

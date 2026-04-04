@@ -181,23 +181,44 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
       error: error,
       durationMs: durationMs,
     );
-    final requestHeadersSafe = isImportant
+    final keepRequestDetails = _shouldKeepDetailedNetworkRequest(
+      statusCode: statusCode,
+      error: error,
+    );
+    final keepResponseDetails = _shouldKeepDetailedNetworkResponse(
+      source: source,
+      category: category,
+      url: url,
+      statusCode: statusCode,
+      error: error,
+      durationMs: durationMs,
+    );
+    final requestHeadersSafe = keepRequestDetails
         ? _compactNetworkHeaders(_jsonSafe(requestHeaders))
         : null;
-    final requestDataSafe = isImportant
+    final requestDataSafe = keepRequestDetails
         ? _compactNetworkPayload(_jsonSafe(requestData), keep: 420)
         : null;
-    final responseHeadersSafe = isImportant
+    final responseHeadersSafe = keepResponseDetails
         ? _compactNetworkHeaders(_jsonSafe(responseHeaders))
         : null;
-    final responseBodyFull = isImportant
+    final responseBodyFull = keepResponseDetails
         ? _truncateBody(
             _toBodyFull(responseBody),
             keep: _debugNetworkFullBodyKeep,
           )
         : null;
+    final responseBodyPreviewSource = keepResponseDetails
+        ? responseBodyFull
+        : _truncateBody(
+            _toBodyFull(responseBody),
+            keep: _debugNetworkPreviewKeep,
+          );
     final responseBodyPreview = isImportant
-        ? _toBodyPreview(responseBodyFull, keep: _debugNetworkPreviewKeep)
+        ? _toBodyPreview(
+            responseBodyPreviewSource,
+            keep: _debugNetworkPreviewKeep,
+          )
         : _toBodyPreview(_toBodyFull(responseBody), keep: 160);
 
     final dedupKey = [
@@ -328,6 +349,57 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
     return false;
   }
 
+  bool _shouldKeepDetailedNetworkRequest({
+    required int? statusCode,
+    required String? error,
+  }) {
+    final normalizedError = (error ?? '').trim().toLowerCase();
+    if (normalizedError.isNotEmpty && normalizedError != 'null') {
+      return true;
+    }
+    if (statusCode != null && statusCode >= 400) {
+      return true;
+    }
+    return false;
+  }
+
+  bool _shouldKeepDetailedNetworkResponse({
+    required String source,
+    required String? category,
+    required String url,
+    required int? statusCode,
+    required String? error,
+    required int durationMs,
+  }) {
+    if (_shouldKeepDetailedNetworkRequest(
+      statusCode: statusCode,
+      error: error,
+    )) {
+      return true;
+    }
+
+    final normalizedSource = source.toLowerCase();
+    final normalizedCategory = (category ?? '').toLowerCase();
+    final normalizedUrl = url.toLowerCase();
+
+    if (normalizedCategory == 'image_download') {
+      return false;
+    }
+    if (durationMs >= 4000) {
+      return true;
+    }
+    if (normalizedSource.contains('login')) {
+      return true;
+    }
+    if (normalizedUrl.contains('/login') ||
+        normalizedUrl.contains('source://account.login') ||
+        normalizedUrl.contains('signin') ||
+        normalizedUrl.contains('auth')) {
+      return true;
+    }
+    return false;
+  }
+
   dynamic _compactNetworkHeaders(dynamic value) {
     if (value is! Map) {
       return _compactGenericLogValue(
@@ -391,38 +463,62 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
     final compacted = _compactGenericLogValue(
       value,
       maxStringLength: _debugReaderStringKeep,
-      maxItems: 80,
-      maxDepth: 5,
+      maxItems: 40,
+      maxDepth: 4,
     );
     if (compacted is! Map) {
       return compacted;
     }
 
-    final normalizedSource = source.toLowerCase();
     final normalizedLevel = level.toLowerCase();
-    final keepCoreKeys = <String>{
+    final keepBaseKeys = <String>{
       'sessionId',
-      'comicId',
       'epId',
-      'chapterTitle',
-      'chapterIndex',
       'readerMode',
-      'currentPageIndex',
       'currentPage',
-      'pageIndicatorIndex',
       'totalPages',
+    };
+
+    final keepEventKeys = <String>{
       'trigger',
       'pageIndex',
       'page',
+      'fromPageIndex',
+      'fromPage',
+      'targetPageIndex',
+      'targetPage',
+      'targetImageIndex',
+      'targetImage',
+      'targetEpId',
+      'targetChapterIndex',
+      'targetChapterTitle',
       'setting',
       'value',
+      'previousValue',
+      'nextValue',
       'brightnessPercent',
       'error',
       'imageCount',
+      'incomingImageCount',
+      'hasInitialImages',
       'imageUrl',
       'savedPath',
       'enabled',
+      'controlsVisible',
+      'settingsLoaded',
+      'providerCachesCleared',
+      'hadCachedChapterDetails',
+      'hasVisibleContext',
+      'listHasClients',
+      'reason',
+      'offset',
+      'attempt',
+      'animate',
+      'path',
+      'syncPath',
       'notificationType',
+      'overscroll',
+      'velocity',
       'depth',
       'diagnosticSequence',
       'previousListPixels',
@@ -432,11 +528,16 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
       'largeJump',
       'resolvedPageIndex',
       'resolvedPage',
-      'aspectRatio',
-      'isBeforeCurrentPage',
+      'visibleImageIndices',
     };
 
     final keepVerboseKeys = <String>{
+      'comicId',
+      'chapterTitle',
+      'chapterIndex',
+      'doublePageMode',
+      'currentPageIndex',
+      'pageIndicatorIndex',
       'loadImagesError',
       'listViewportDimension',
       'listExtentBefore',
@@ -477,20 +578,19 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
     };
 
     final shouldKeepVerbose =
-        normalizedLevel == 'warning' ||
-        normalizedLevel == 'error' ||
-        normalizedSource == 'reader_position';
+        normalizedLevel == 'warning' || normalizedLevel == 'error';
 
     final filtered = <String, dynamic>{};
     for (final entry in compacted.entries) {
       final key = entry.key.toString();
-      if (keepCoreKeys.contains(key) ||
+      if (keepBaseKeys.contains(key) ||
+          keepEventKeys.contains(key) ||
           (shouldKeepVerbose && keepVerboseKeys.contains(key))) {
         filtered[key] = entry.value;
       }
     }
 
-    if (filtered['nearbyRenderedItems'] is List && normalizedLevel == 'info') {
+    if (filtered['nearbyRenderedItems'] is List && !shouldKeepVerbose) {
       filtered.remove('nearbyRenderedItems');
     }
 

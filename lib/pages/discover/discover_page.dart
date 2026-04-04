@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
@@ -35,6 +36,8 @@ class DiscoverPage extends StatefulWidget {
 class _DiscoverPageState extends State<DiscoverPage> {
   static const _discoverLoadTimeout = Duration(seconds: 20);
   static const _searchMorphDistance = kToolbarHeight;
+  static const _initialVisibleSectionCount = 1;
+  static const _sectionRevealBatchSize = 1;
 
   final ScrollController _scrollController = ScrollController();
 
@@ -43,6 +46,8 @@ class _DiscoverPageState extends State<DiscoverPage> {
   bool _initialLoading = true;
   bool _refreshing = false;
   double _searchMorphProgress = 0;
+  int _visibleSectionCount = 0;
+  int _sectionRevealGeneration = 0;
 
   @override
   void initState() {
@@ -75,10 +80,33 @@ class _DiscoverPageState extends State<DiscoverPage> {
 
   @override
   void dispose() {
+    _sectionRevealGeneration++;
     _scrollController
       ..removeListener(_handleScroll)
       ..dispose();
     super.dispose();
+  }
+
+  void _scheduleRemainingSectionReveal(int generation) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || generation != _sectionRevealGeneration) {
+        return;
+      }
+      if (_visibleSectionCount >= _sections.length) {
+        return;
+      }
+
+      setState(() {
+        _visibleSectionCount = math.min(
+          _visibleSectionCount + _sectionRevealBatchSize,
+          _sections.length,
+        );
+      });
+
+      if (_visibleSectionCount < _sections.length) {
+        _scheduleRemainingSectionReveal(generation);
+      }
+    });
   }
 
   void _handleScroll() {
@@ -126,15 +154,30 @@ class _DiscoverPageState extends State<DiscoverPage> {
       return;
     }
 
+    int? revealGeneration;
     setState(() {
+      _sectionRevealGeneration++;
       if (loadedSections != null) {
         _sections = loadedSections;
         _errorMessage = null;
+        _visibleSectionCount = math.min(
+          _initialVisibleSectionCount,
+          loadedSections.length,
+        );
+        if (_visibleSectionCount < loadedSections.length) {
+          revealGeneration = _sectionRevealGeneration;
+        }
       } else {
+        _sections = const [];
         _errorMessage = errorMessage;
+        _visibleSectionCount = 0;
       }
       _initialLoading = false;
     });
+
+    if (revealGeneration != null) {
+      _scheduleRemainingSectionReveal(revealGeneration!);
+    }
   }
 
   Future<void> _refreshDiscover() async {
@@ -161,15 +204,28 @@ class _DiscoverPageState extends State<DiscoverPage> {
       return;
     }
 
+    final revealProgressively = _sections.isEmpty;
+    int? revealGeneration;
     setState(() {
+      _sectionRevealGeneration++;
       if (refreshedSections != null) {
         _sections = refreshedSections;
         _errorMessage = null;
+        _visibleSectionCount = revealProgressively
+            ? math.min(_initialVisibleSectionCount, refreshedSections.length)
+            : refreshedSections.length;
+        if (_visibleSectionCount < refreshedSections.length) {
+          revealGeneration = _sectionRevealGeneration;
+        }
       } else {
         _errorMessage = errorMessage;
       }
       _refreshing = false;
     });
+
+    if (revealGeneration != null) {
+      _scheduleRemainingSectionReveal(revealGeneration!);
+    }
   }
 
   void _openSearch() {
@@ -449,7 +505,11 @@ class _DiscoverPageState extends State<DiscoverPage> {
 
   @override
   Widget build(BuildContext context) {
-    final hasSections = _sections.isNotEmpty;
+    final visibleSectionCount = math.min(
+      _visibleSectionCount,
+      _sections.length,
+    );
+    final hasSections = visibleSectionCount > 0;
 
     return RefreshIndicator(
       onRefresh: _refreshDiscover,
@@ -460,7 +520,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
           parent: ClampingScrollPhysics(),
         ),
         padding: const EdgeInsets.all(16),
-        itemCount: hasSections ? _sections.length + 1 : 2,
+        itemCount: hasSections ? visibleSectionCount + 1 : 2,
         itemBuilder: (context, index) {
           if (index == 0) {
             return _buildTopSearchBox();

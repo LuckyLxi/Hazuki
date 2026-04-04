@@ -68,9 +68,7 @@ extension _ReaderNavigationActionsExtension on _ReaderPageState {
               errorBuilder: (_, _, _) {
                 return ColoredBox(
                   color: readerPlaceholderColor,
-                  child: const Center(
-                    child: Icon(Icons.broken_image_outlined),
-                  ),
+                  child: const Center(child: Icon(Icons.broken_image_outlined)),
                 );
               },
             ),
@@ -99,9 +97,7 @@ extension _ReaderNavigationActionsExtension on _ReaderPageState {
         }
         return ColoredBox(
           color: readerSurfaceColor,
-          child: const Center(
-            child: CircularProgressIndicator(strokeWidth: 2),
-          ),
+          child: const Center(child: CircularProgressIndicator(strokeWidth: 2)),
         );
       },
     );
@@ -192,24 +188,11 @@ extension _ReaderNavigationActionsExtension on _ReaderPageState {
       return;
     }
     final target = _normalizeSpreadIndex(index);
-    final previousPixels = _scrollController.position.pixels;
     final visibleContext = target < _itemKeys.length
         ? _itemKeys[target].currentContext
         : null;
     _diagnosticsState.activeProgrammaticListScrollReason = trigger;
     _diagnosticsState.activeProgrammaticListTargetIndex = target;
-    _logListPositionSnapshot(
-      'Reader list programmatic scroll started',
-      trigger: trigger,
-      previousPixels: previousPixels,
-      normalizedIndex: target,
-      extra: {
-        'targetPageIndex': target,
-        'targetPage': target + 1,
-        'animate': animate,
-        'hasVisibleContext': visibleContext != null,
-      },
-    );
     try {
       if (visibleContext != null) {
         await Scrollable.ensureVisible(
@@ -222,18 +205,6 @@ extension _ReaderNavigationActionsExtension on _ReaderPageState {
           return;
         }
         _markProgrammaticListScrollCompleted(target);
-        _logListPositionSnapshot(
-          'Reader list programmatic scroll finished',
-          trigger: '${trigger}_ensure_visible',
-          previousPixels: previousPixels,
-          normalizedIndex: target,
-          extra: {
-            'targetPageIndex': target,
-            'targetPage': target + 1,
-            'path': 'ensure_visible',
-            'animate': animate,
-          },
-        );
         return;
       }
 
@@ -259,21 +230,6 @@ extension _ReaderNavigationActionsExtension on _ReaderPageState {
         return;
       }
       _markProgrammaticListScrollCompleted(target);
-      _logListPositionSnapshot(
-        'Reader list approximate scroll applied',
-        trigger: '${trigger}_estimated_offset',
-        previousPixels: previousPixels,
-        normalizedIndex: target,
-        extra: {
-          'targetPageIndex': target,
-          'targetPage': target + 1,
-          'path': animate
-              ? 'animate_to_estimated_offset'
-              : 'jump_to_estimated_offset',
-          'estimatedOffset': _normalizeLogDouble(estimatedOffset),
-          'animate': animate,
-        },
-      );
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) {
@@ -312,21 +268,6 @@ extension _ReaderNavigationActionsExtension on _ReaderPageState {
             _diagnosticsState.activeProgrammaticListScrollReason = null;
             _diagnosticsState.activeProgrammaticListTargetIndex = null;
             _markProgrammaticListScrollCompleted(target);
-            if (!mounted) {
-              return;
-            }
-            _logListPositionSnapshot(
-              'Reader list exact alignment applied',
-              trigger: '${trigger}_post_frame_exact_alignment',
-              previousPixels: previousPixels,
-              normalizedIndex: target,
-              extra: {
-                'targetPageIndex': target,
-                'targetPage': target + 1,
-                'path': 'post_frame_ensure_visible',
-                'animate': animate,
-              },
-            );
           }),
         );
       });
