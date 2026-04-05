@@ -28,6 +28,7 @@ class FavoriteComicTile extends StatelessWidget {
           children: [
             Hero(
               tag: heroTag,
+              flightShuttleBuilder: buildComicCoverHeroFlightShuttle,
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(8),
                 child: comic.cover.isEmpty

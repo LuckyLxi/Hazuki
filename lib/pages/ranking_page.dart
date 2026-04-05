@@ -281,7 +281,7 @@ class _RankingPageState extends State<RankingPage> {
       salt: 'ranking-page-${_selectedRankingValue ?? 'none'}-$index',
     );
 
-    return Padding(
+    final item = Padding(
       padding: const EdgeInsets.only(top: 10),
       child: InkWell(
         borderRadius: BorderRadius.circular(10),
@@ -322,6 +322,7 @@ class _RankingPageState extends State<RankingPage> {
               ),
               Hero(
                 tag: heroTag,
+                flightShuttleBuilder: buildComicCoverHeroFlightShuttle,
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(8),
                   child: comic.cover.isEmpty
@@ -367,6 +368,27 @@ class _RankingPageState extends State<RankingPage> {
           ),
         ),
       ),
+    );
+
+    return TweenAnimationBuilder<double>(
+      // 首次加载或滑入视野时的从下方放出放大动画
+      tween: Tween<double>(begin: 0.0, end: 1.0),
+      duration: Duration(milliseconds: 350 + (index.clamp(0, 10)) * 60),
+      curve: Curves.easeOutBack,
+      builder: (context, value, child) {
+        return Transform.scale(
+          scale: 0.85 + 0.15 * value,
+          alignment: Alignment.bottomCenter,
+          child: Transform.translate(
+            offset: Offset(0, 50 * (1 - value)),
+            child: Opacity(
+              opacity: value.clamp(0.0, 1.0),
+              child: child,
+            ),
+          ),
+        );
+      },
+      child: item,
     );
   }
 
@@ -466,12 +488,32 @@ class _RankingPageState extends State<RankingPage> {
                         Wrap(
                           spacing: 8,
                           runSpacing: 8,
-                          children: _rankingOptions.map((option) {
-                            return ChoiceChip(
-                              label: Text(option.label),
-                              selected: _selectedRankingValue == option.value,
-                              onSelected: (_) =>
-                                  _onSelectRankingOption(option.value),
+                          children: _rankingOptions.asMap().entries.map((entry) {
+                            final index = entry.key;
+                            final option = entry.value;
+                            // 为每个分类按钮添加从左向右滑入并渐显的交错动画
+                            return TweenAnimationBuilder<double>(
+                              tween: Tween<double>(begin: 0.0, end: 1.0),
+                              duration: Duration(milliseconds: 300 + (index * 50)),
+                              curve: Curves.easeOutCubic,
+                              builder: (context, value, child) {
+                                return Transform.translate(
+                                  offset: Offset(
+                                    -MediaQuery.of(context).size.width * (1 - value),
+                                    0,
+                                  ),
+                                  child: Opacity(
+                                    opacity: value,
+                                    child: child,
+                                  ),
+                                );
+                              },
+                              child: ChoiceChip(
+                                label: Text(option.label),
+                                selected: _selectedRankingValue == option.value,
+                                onSelected: (_) =>
+                                    _onSelectRankingOption(option.value),
+                              ),
                             );
                           }).toList(),
                         ),

@@ -353,9 +353,25 @@ class _ChaptersPanelSheetState extends State<ChaptersPanelSheet> {
       itemBuilder: (context, index) {
         final entry = chapters.entries.elementAt(index);
         final displayTitle = resolveHazukiChapterTitle(context, entry.value);
-        return _ChapterChip(
+        final chip = _ChapterChip(
           label: displayTitle,
           onTap: () => widget.onChapterTap(entry.key, displayTitle, index),
+        );
+
+        return TweenAnimationBuilder<double>(
+          tween: Tween<double>(begin: 0.0, end: 1.0),
+          duration: Duration(milliseconds: 200 + (index.clamp(0, 15)) * 25),
+          curve: Curves.easeOutBack,
+          builder: (context, value, child) {
+            return Transform.scale(
+              scale: 0.9 + 0.1 * value,
+              child: Opacity(
+                opacity: value.clamp(0.0, 1.0),
+                child: child,
+              ),
+            );
+          },
+          child: chip,
         );
       },
     );

@@ -127,7 +127,7 @@ class _ComicDetailRelatedTab extends StatelessWidget {
       itemBuilder: (context, index) {
         final comic = details!.recommend[index];
         final heroTag = '${heroTagPrefix}_related_$index';
-        return InkWell(
+        final child = InkWell(
           borderRadius: BorderRadius.circular(8),
           onTap: () {
             Navigator.of(context).push(
@@ -164,13 +164,6 @@ class _ComicDetailRelatedTab extends StatelessWidget {
                                 context,
                               ).colorScheme.surfaceContainerHighest,
                               alignment: Alignment.center,
-                              child: const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              ),
                             ),
                             error: Container(
                               color: Theme.of(
@@ -199,6 +192,26 @@ class _ComicDetailRelatedTab extends StatelessWidget {
                 ),
             ],
           ),
+        );
+
+        return TweenAnimationBuilder<double>(
+          tween: Tween<double>(begin: 0.0, end: 1.0),
+          duration: Duration(milliseconds: 350 + (index.clamp(0, 10)) * 60),
+          curve: Curves.easeOutBack,
+          builder: (context, value, animationChild) {
+            return Transform.scale(
+              scale: 0.85 + 0.15 * value,
+              alignment: Alignment.bottomCenter,
+              child: Transform.translate(
+                offset: Offset(0, 50 * (1 - value)),
+                child: Opacity(
+                  opacity: value.clamp(0.0, 1.0),
+                  child: animationChild,
+                ),
+              ),
+            );
+          },
+          child: child,
         );
       },
     );

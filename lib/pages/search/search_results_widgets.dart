@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 
+import '../../app/navigation_tags.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/hazuki_models.dart';
 import '../../widgets/widgets.dart';
@@ -119,16 +120,18 @@ class SearchComicListItem extends StatelessWidget {
     super.key,
     required this.comic,
     required this.heroTag,
+    required this.index,
     required this.onTap,
   });
 
   final ExploreComic comic;
   final String heroTag;
+  final int index;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    final item = Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: InkWell(
         borderRadius: BorderRadius.circular(10),
@@ -143,6 +146,7 @@ class SearchComicListItem extends StatelessWidget {
             children: [
               Hero(
                 tag: heroTag,
+                flightShuttleBuilder: buildComicCoverHeroFlightShuttle,
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(8),
                   child: comic.cover.isEmpty
@@ -203,6 +207,27 @@ class SearchComicListItem extends StatelessWidget {
           ),
         ),
       ),
+    );
+
+    return TweenAnimationBuilder<double>(
+      // 首次加载或滑入视野时的从下方放出放大动画
+      tween: Tween<double>(begin: 0.0, end: 1.0),
+      duration: Duration(milliseconds: 350 + (index.clamp(0, 10)) * 60),
+      curve: Curves.easeOutBack,
+      builder: (context, value, child) {
+        return Transform.scale(
+          scale: 0.85 + 0.15 * value,
+          alignment: Alignment.bottomCenter,
+          child: Transform.translate(
+            offset: Offset(0, 50 * (1 - value)),
+            child: Opacity(
+              opacity: value.clamp(0.0, 1.0),
+              child: child,
+            ),
+          ),
+        );
+      },
+      child: item,
     );
   }
 }

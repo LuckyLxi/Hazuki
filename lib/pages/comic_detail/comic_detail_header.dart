@@ -47,11 +47,12 @@ class _ComicDetailHeaderSection extends StatelessWidget {
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Hero(
-              tag: heroTag,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(10),
-                onTap: displayCoverUrl.isEmpty ? null : onCoverTap,
+            InkWell(
+              borderRadius: BorderRadius.circular(10),
+              onTap: displayCoverUrl.isEmpty ? null : onCoverTap,
+              child: Hero(
+                tag: heroTag,
+                flightShuttleBuilder: buildComicCoverHeroFlightShuttle,
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(10),
                   child: displayCoverUrl.isNotEmpty

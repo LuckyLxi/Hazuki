@@ -231,13 +231,18 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
 
   @override
   Widget build(BuildContext context) {
-    if (_noImageModeEnabled) {
-      return SizedBox(width: widget.width, height: widget.height);
-    }
+    Widget currentWidget;
 
-    if (_bytes != null) {
-      return Image.memory(
+    if (_noImageModeEnabled) {
+      currentWidget = SizedBox(
+        key: const ValueKey('no-image'),
+        width: widget.width,
+        height: widget.height,
+      );
+    } else if (_bytes != null) {
+      currentWidget = Image.memory(
         _bytes!,
+        key: ValueKey('loaded-image-'),
         width: widget.width,
         height: widget.height,
         fit: widget.fit,
@@ -247,38 +252,50 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
         gaplessPlayback: true,
         filterQuality: FilterQuality.medium,
       );
-    }
-
-    if (_loading) {
-      return widget.loading ??
-          SizedBox(
-            width: widget.width,
-            height: widget.height,
-            child: const Center(
-              child: SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2),
+    } else if (_loading) {
+      if (widget.loading != null) {
+        currentWidget = Stack(
+          key: const ValueKey('loading-stack'),
+          fit: StackFit.passthrough,
+          children: [
+            Opacity(opacity: 0.0, child: widget.loading!),
+            Positioned.fill(
+              child: _HazukiShimmerLoading(
+                width: widget.width,
+                height: widget.height,
               ),
             ),
-          );
-    }
-
-    if (_error != null) {
-      return widget.error ??
+          ],
+        );
+      } else {
+        currentWidget = _HazukiShimmerLoading(
+          key: const ValueKey('loading-shimmer'),
+          width: widget.width,
+          height: widget.height,
+        );
+      }
+    } else if (_error != null) {
+      currentWidget = widget.error ??
           SizedBox(
+            key: const ValueKey('error-image'),
             width: widget.width,
             height: widget.height,
             child: const Icon(Icons.broken_image_outlined),
           );
+    } else {
+      currentWidget = widget.error ??
+          SizedBox(
+            key: const ValueKey('no-supported'),
+            width: widget.width,
+            height: widget.height,
+            child: const Icon(Icons.image_not_supported_outlined),
+          );
     }
 
-    return widget.error ??
-        SizedBox(
-          width: widget.width,
-          height: widget.height,
-          child: const Icon(Icons.image_not_supported_outlined),
-        );
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 300),
+      child: currentWidget,
+    );
   }
 }
 
@@ -431,29 +448,94 @@ class _HazukiCachedCircleAvatarState extends State<HazukiCachedCircleAvatar> {
   @override
   Widget build(BuildContext context) {
     final fallback = widget.fallbackIcon ?? const Icon(Icons.person_outline);
+    Widget currentWidget;
 
     if (_noImageModeEnabled) {
-      return CircleAvatar(radius: widget.radius, child: fallback);
-    }
-
-    if (_bytes != null) {
-      return CircleAvatar(
+      currentWidget = CircleAvatar(
+        key: const ValueKey('no-image'),
+        radius: widget.radius,
+        child: fallback,
+      );
+    } else if (_bytes != null) {
+      currentWidget = CircleAvatar(
+        key: ValueKey('loaded-avatar-'),
         radius: widget.radius,
         backgroundImage: MemoryImage(_bytes!),
       );
-    }
-
-    if (_loading) {
-      return CircleAvatar(
-        radius: widget.radius,
-        child: const SizedBox(
-          width: 14,
-          height: 14,
-          child: CircularProgressIndicator(strokeWidth: 2),
+    } else if (_loading) {
+      currentWidget = ClipOval(
+        key: const ValueKey('loading-avatar'),
+        child: _HazukiShimmerLoading(
+          width: widget.radius != null ? widget.radius! * 2 : 40,
+          height: widget.radius != null ? widget.radius! * 2 : 40,
         ),
+      );
+    } else {
+      currentWidget = CircleAvatar(
+        key: const ValueKey('fallback-avatar'),
+        radius: widget.radius,
+        child: fallback,
       );
     }
 
-    return CircleAvatar(radius: widget.radius, child: fallback);
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 300),
+      child: currentWidget,
+    );
+  }
+}
+
+class _HazukiShimmerLoading extends StatefulWidget {
+  const _HazukiShimmerLoading({super.key, this.width, this.height});
+  final double? width;
+  final double? height;
+
+  @override
+  State<_HazukiShimmerLoading> createState() => _HazukiShimmerLoadingState();
+}
+
+class _HazukiShimmerLoadingState extends State<_HazukiShimmerLoading>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final baseColor = theme.colorScheme.surfaceContainerHighest;
+    final highlightColor = theme.colorScheme.surface.withAlpha(128);
+
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        final x = -1.5 + _controller.value * 3.0;
+        return Container(
+          width: widget.width,
+          height: widget.height,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [baseColor, highlightColor, baseColor],
+              stops: const [0.1, 0.5, 0.9],
+              begin: Alignment(x - 1.2, -0.2),
+              end: Alignment(x + 1.2, 0.2),
+            ),
+          ),
+        );
+      },
+    );
   }
 }

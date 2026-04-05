@@ -16,3 +16,31 @@ String comicCoverHeroTag(ExploreComic comic, {String? salt}) {
   }
   return 'comic-cover-$key-$salt';
 }
+
+/// 漫画封面 Hero 飞行动画构建器（cross-fade 淡入淡出）
+///
+/// 必须在 source 和 destination 两端的 Hero 上都设置此 builder，
+/// 否则返回时仍会出现突然缩回原始尺寸的闪烁 bug。
+Widget buildComicCoverHeroFlightShuttle(
+  BuildContext flightContext,
+  Animation<double> animation,
+  HeroFlightDirection flightDirection,
+  BuildContext fromHeroContext,
+  BuildContext toHeroContext,
+) {
+  final fromHero = fromHeroContext.widget as Hero;
+  final toHero = toHeroContext.widget as Hero;
+  return Stack(
+    fit: StackFit.expand,
+    children: [
+      FadeTransition(
+        opacity: ReverseAnimation(animation),
+        child: fromHero.child,
+      ),
+      FadeTransition(
+        opacity: animation,
+        child: toHero.child,
+      ),
+    ],
+  );
+}

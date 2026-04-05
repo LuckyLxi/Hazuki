@@ -284,7 +284,7 @@ extension _SearchResultsShellWidgetsExtension on _SearchResultsPageState {
     );
   }
 
-  Widget _buildSearchComicItem(ExploreComic comic) {
+  Widget _buildSearchComicItem(ExploreComic comic, int index) {
     final heroTag = widget.comicCoverHeroTagBuilder(
       comic,
       salt: 'search-results',
@@ -292,6 +292,7 @@ extension _SearchResultsShellWidgetsExtension on _SearchResultsPageState {
     return SearchComicListItem(
       comic: comic,
       heroTag: heroTag,
+      index: index,
       onTap: () {
         Navigator.of(context).push(
           MaterialPageRoute<void>(
@@ -399,7 +400,8 @@ extension _SearchResultsShellWidgetsExtension on _SearchResultsPageState {
           ],
           _buildSearchResultState(),
           if (_searchComics.isNotEmpty) ...[
-            for (final comic in _searchComics) _buildSearchComicItem(comic),
+            for (int i = 0; i < _searchComics.length; i++)
+              _buildSearchComicItem(_searchComics[i], i),
           ],
           if (_searchLoadingMore) const HazukiLoadMoreFooter(),
           if (_searchErrorMessage != null && _searchComics.isNotEmpty)

@@ -298,7 +298,7 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
                                 salt:
                                     'discover-more-${widget.section.title}-$index',
                               );
-                              return _DiscoverSectionComicTile(
+                              final tile = _DiscoverSectionComicTile(
                                 comic: comic,
                                 heroTag: heroTag,
                                 coverCacheWidth: coverCacheWidth,
@@ -321,6 +321,27 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
                                     ),
                                   );
                                 },
+                              );
+
+                              return TweenAnimationBuilder<double>(
+                                tween: Tween<double>(begin: 0.0, end: 1.0),
+                                duration: Duration(
+                                    milliseconds: 350 + (index.clamp(0, 15)) * 40),
+                                curve: Curves.easeOutBack,
+                                builder: (context, value, child) {
+                                  return Transform.scale(
+                                    scale: 0.85 + 0.15 * value,
+                                    alignment: Alignment.bottomCenter,
+                                    child: Transform.translate(
+                                      offset: Offset(0, 50 * (1 - value)),
+                                      child: Opacity(
+                                        opacity: value.clamp(0.0, 1.0),
+                                        child: child,
+                                      ),
+                                    ),
+                                  );
+                                },
+                                child: tile,
                               );
                             },
                           );
@@ -432,6 +453,7 @@ class _DiscoverSectionComicTile extends StatelessWidget {
           Expanded(
             child: Hero(
               tag: heroTag,
+              flightShuttleBuilder: buildComicCoverHeroFlightShuttle,
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(8),
                 child: comic.cover.isEmpty

@@ -247,6 +247,7 @@ extension _HistoryWidgets on _HistoryPageState {
                       comic,
                       salt: 'history',
                     ),
+                    flightShuttleBuilder: buildComicCoverHeroFlightShuttle,
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(8),
                       child: comic.cover.isEmpty

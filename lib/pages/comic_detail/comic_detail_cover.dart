@@ -265,28 +265,26 @@ class _ComicCoverPreviewPage extends StatelessWidget {
                 ),
                 child: Hero(
                   tag: heroTag,
-                  child: Material(
-                    color: Colors.transparent,
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(14),
-                      child: InteractiveViewer(
-                        minScale: 1,
-                        maxScale: 4,
-                        child: HazukiCachedImage(
-                          url: imageUrl,
-                          fit: BoxFit.contain,
-                          loading: Container(
-                            width: 220,
-                            height: 300,
-                            color: placeholderColor,
-                          ),
-                          error: Container(
-                            width: 220,
-                            height: 300,
-                            color: placeholderColor,
-                            alignment: Alignment.center,
-                            child: const Icon(Icons.broken_image_outlined),
-                          ),
+                  flightShuttleBuilder: buildComicCoverHeroFlightShuttle,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(14),
+                    child: InteractiveViewer(
+                      minScale: 1,
+                      maxScale: 4,
+                      child: HazukiCachedImage(
+                        url: imageUrl,
+                        fit: BoxFit.contain,
+                        loading: Container(
+                          width: 220,
+                          height: 300,
+                          color: placeholderColor,
+                        ),
+                        error: Container(
+                          width: 220,
+                          height: 300,
+                          color: placeholderColor,
+                          alignment: Alignment.center,
+                          child: const Icon(Icons.broken_image_outlined),
                         ),
                       ),
                     ),
