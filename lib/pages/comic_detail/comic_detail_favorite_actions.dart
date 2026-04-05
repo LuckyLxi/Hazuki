@@ -5,10 +5,12 @@ extension _ComicDetailFavoriteActionsExtension on _ComicDetailPageState {
     if (_favoriteBusy) {
       return;
     }
+    FocusManager.instance.primaryFocus?.unfocus();
     await _showFavoriteFoldersPanel(details);
   }
 
   Future<void> _showFavoriteFoldersPanel(ComicDetailsData details) async {
+    FocusManager.instance.primaryFocus?.unfocus();
     final service = HazukiSourceService.instance;
     final singleFolderOnly = service.favoriteSingleFolderForSingleComic;
 

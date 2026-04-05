@@ -44,6 +44,7 @@ extension _ComicDetailCoverActionsExtension on _ComicDetailPageState {
   }
 
   Future<void> _showCoverActions(String imageUrl) async {
+    FocusManager.instance.primaryFocus?.unfocus();
     final themedData = _buildDetailTheme(Theme.of(context));
     await showModalBottomSheet<void>(
       context: context,
@@ -65,6 +66,7 @@ extension _ComicDetailCoverActionsExtension on _ComicDetailPageState {
     if (normalized.isEmpty) {
       return;
     }
+    FocusManager.instance.primaryFocus?.unfocus();
 
     await Navigator.of(context).push(
       PageRouteBuilder<void>(

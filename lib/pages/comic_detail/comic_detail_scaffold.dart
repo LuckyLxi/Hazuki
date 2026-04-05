@@ -80,9 +80,14 @@ class _ComicDetailParallaxBackground extends StatelessWidget {
         return Positioned(
           left: 0,
           right: 0,
-          top: -offset,
+          top: 0,
           height: backgroundHeight,
-          child: child!,
+          child: ClipRect(
+            child: Transform.translate(
+              offset: Offset(0, -offset),
+              child: child!,
+            ),
+          ),
         );
       },
       child: RepaintBoundary(

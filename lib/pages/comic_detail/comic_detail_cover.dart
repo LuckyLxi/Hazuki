@@ -163,10 +163,20 @@ class _ComicBlurredCoverBackgroundState
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final mediaQuery = MediaQuery.of(context);
     final surface = theme.colorScheme.surface;
     final isDark = theme.brightness == Brightness.dark;
     final hasCover = _coverBytes != null;
     final normalizedUrl = widget.coverUrl.trim();
+    final devicePixelRatio = mediaQuery.devicePixelRatio;
+    final cacheWidth = (mediaQuery.size.width * devicePixelRatio)
+        .round()
+        .clamp(320, 1440)
+        .toInt();
+    final cacheHeight = (mediaQuery.size.height * 0.58 * devicePixelRatio)
+        .round()
+        .clamp(240, 960)
+        .toInt();
     final topScrim = isDark
         ? surface.withValues(alpha: 0.64)
         : const Color(0xA2FAFAFA);
@@ -192,8 +202,10 @@ class _ComicBlurredCoverBackgroundState
                   _coverBytes!,
                   fit: BoxFit.cover,
                   alignment: Alignment.topCenter,
+                  cacheWidth: cacheWidth,
+                  cacheHeight: cacheHeight,
                   gaplessPlayback: true,
-                  filterQuality: FilterQuality.medium,
+                  filterQuality: FilterQuality.low,
                 ),
               ),
             ),

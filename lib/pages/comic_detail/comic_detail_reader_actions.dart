@@ -2,6 +2,7 @@ part of '../comic_detail_page.dart';
 
 extension _ComicDetailReaderActionsExtension on _ComicDetailPageState {
   void _showChaptersPanel(ComicDetailsData details) {
+    FocusManager.instance.primaryFocus?.unfocus();
     if (details.chapters.isEmpty) {
       unawaited(
         showHazukiPrompt(

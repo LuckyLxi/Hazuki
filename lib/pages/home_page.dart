@@ -61,14 +61,6 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
 
   @override
   Widget build(BuildContext context) {
-    final navigation = HomeNavigationActions(
-      context: context,
-      appearanceSettings: widget.appearanceSettings,
-      onAppearanceChanged: widget.onAppearanceChanged,
-      locale: widget.locale,
-      onLocaleChanged: widget.onLocaleChanged,
-    );
-
     return AnimatedBuilder(
       animation: _coordinator,
       builder: (context, _) {
@@ -76,6 +68,22 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
         final profileFlow = _coordinator.createProfileFlow(
           context,
           isMounted: () => mounted,
+        );
+        final navigation = HomeNavigationActions(
+          context: context,
+          scaffoldKey: _coordinator.scaffoldKey,
+          drawerTransitionContent: HomeDrawerContent(
+            isLogged: isLogged,
+            avatarUrl: _coordinator.avatarUrl,
+            username: _coordinator.username,
+            autoCheckInEnabled: _coordinator.autoCheckInEnabled,
+            checkInBusy: _coordinator.checkInBusy,
+            checkedInToday: _coordinator.checkedInToday,
+          ),
+          appearanceSettings: widget.appearanceSettings,
+          onAppearanceChanged: widget.onAppearanceChanged,
+          locale: widget.locale,
+          onLocaleChanged: widget.onLocaleChanged,
         );
 
         return HomeScaffoldShell(
