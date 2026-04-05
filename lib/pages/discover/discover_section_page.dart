@@ -469,7 +469,9 @@ class _DiscoverSectionComicTile extends StatelessWidget {
                         width: double.infinity,
                         cacheWidth: coverCacheWidth,
                         animateOnLoad: true,
-                        loading: ColoredBox(color: placeholderColor),
+                        loading: SizedBox.expand(
+                          child: ColoredBox(color: placeholderColor),
+                        ),
                         error: ColoredBox(
                           color: placeholderColor,
                           child: const Center(

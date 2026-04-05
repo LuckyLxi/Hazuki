@@ -304,15 +304,19 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
       );
     } else if (_loading) {
       if (widget.loading != null) {
-        currentWidget = Stack(
+        currentWidget = SizedBox(
           key: const ValueKey('loading-stack'),
-          fit: StackFit.passthrough,
-          children: [
-            // 用透明 loading 占位来撑开 Stack 的布局尺寸
-            Opacity(opacity: 0.0, child: widget.loading!),
-            // shimmer 铺满整个占位区域
-            const Positioned.fill(child: _HazukiShimmerLoading()),
-          ],
+          width: widget.width,
+          height: widget.height,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // 用透明 loading 占位来撑开 Stack 的布局尺寸
+              Opacity(opacity: 0.0, child: widget.loading!),
+              // shimmer 铺满整个占位区域
+              const _HazukiShimmerLoading(),
+            ],
+          ),
         );
       } else {
         currentWidget = _HazukiShimmerLoading(
