@@ -23,9 +23,35 @@ extension _ComicDetailLifecycleActionsExtension on _ComicDetailPageState {
       _updateAppBarSolidProgress();
     });
     unawaited(_recordHistory());
+
+    // 记录打开漫画详情页事件
+    HazukiSourceService.instance.addApplicationLog(
+      level: 'info',
+      title: 'ComicDetail opened',
+      content: {
+        'comicId': widget.comic.id,
+        'title': widget.comic.title,
+        'heroTag': widget.heroTag,
+        'coverUrl': widget.comic.cover,
+      },
+      source: 'comic_detail',
+    );
   }
 
   void _disposeComicDetailPage() {
+    // 记录关闭漫画详情页事件（Hero 动画此时开始反向播放）
+    HazukiSourceService.instance.addApplicationLog(
+      level: 'info',
+      title: 'ComicDetail disposed',
+      content: {
+        'comicId': widget.comic.id,
+        'title': widget.comic.title,
+        'heroTag': widget.heroTag,
+        'mountedAtDispose': mounted,
+      },
+      source: 'comic_detail',
+    );
+
     _tabController
       ..removeListener(_handleTabChanged)
       ..dispose();

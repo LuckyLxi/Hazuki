@@ -67,14 +67,9 @@ class MangaDownloadService extends ChangeNotifier {
   List<DownloadedMangaComic> get downloadedComics =>
       List<DownloadedMangaComic>.unmodifiable(_downloaded);
 
-  void _logScan(String title, {Object? content, String level = 'info'}) {
-    HazukiSourceService.instance.addApplicationLog(
-      level: level,
-      title: title,
-      content: content,
-      source: 'download_scan',
-    );
-  }
+  // 下载扫描日志已禁用，不再写入应用日志
+  // ignore: unused_element
+  void _logScan(String title, {Object? content, String level = 'info'}) {}
 
   void handleAppLifecycleState(AppLifecycleState state) {
     final suspendDownloads = state != AppLifecycleState.resumed;
