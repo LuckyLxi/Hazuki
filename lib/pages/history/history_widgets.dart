@@ -168,7 +168,7 @@ extension _HistoryWidgets on _HistoryPageState {
   }
 
   Widget _buildItem(ExploreComic comic, int index) {
-    return Padding(
+    final item = Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Builder(
         builder: (itemContext) => GestureDetector(
@@ -296,6 +296,27 @@ extension _HistoryWidgets on _HistoryPageState {
           ),
         ),
       ),
+    );
+
+    return TweenAnimationBuilder<double>(
+      // 首次加载或滑入视野时的从下方放出放大动画
+      tween: Tween<double>(begin: 0.0, end: 1.0),
+      duration: Duration(milliseconds: 350 + (index.clamp(0, 10)) * 60),
+      curve: Curves.easeOutBack,
+      builder: (context, value, child) {
+        return Transform.scale(
+          scale: 0.85 + 0.15 * value,
+          alignment: Alignment.bottomCenter,
+          child: Transform.translate(
+            offset: Offset(0, 50 * (1 - value)),
+            child: Opacity(
+              opacity: value.clamp(0.0, 1.0),
+              child: child,
+            ),
+          ),
+        );
+      },
+      child: item,
     );
   }
 

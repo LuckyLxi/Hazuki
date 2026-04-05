@@ -453,16 +453,10 @@ class _DiscoverPageState extends State<DiscoverPage> {
                                       fit: BoxFit.cover,
                                       width: 130,
                                       cacheWidth: coverCacheWidth,
-                                      loading: ColoredBox(
-                                        color: placeholderColor,
-                                        child: const Center(
-                                          child: SizedBox(
-                                            width: 18,
-                                            height: 18,
-                                            child: CircularProgressIndicator(
-                                              strokeWidth: 2,
-                                            ),
-                                          ),
+                                      animateOnLoad: true,
+                                      loading: SizedBox.expand(
+                                        child: ColoredBox(
+                                          color: placeholderColor,
                                         ),
                                       ),
                                       error: ColoredBox(

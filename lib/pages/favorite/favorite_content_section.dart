@@ -3,21 +3,25 @@ part of '../favorite_page.dart';
 class _FavoriteContentSection extends StatelessWidget {
   const _FavoriteContentSection({
     required this.comics,
+    required this.comicAnimationStyles,
     required this.errorMessage,
     required this.initialLoading,
     required this.loadingMore,
     required this.strings,
     required this.onRetry,
     required this.onComicTap,
+    required this.mode,
   });
 
   final List<ExploreComic> comics;
+  final Map<String, FavoriteEntryAnimationStyle> comicAnimationStyles;
   final String? errorMessage;
   final bool initialLoading;
   final bool loadingMore;
   final AppLocalizations strings;
   final Future<void> Function() onRetry;
   final ValueChanged<ExploreComic> onComicTap;
+  final FavoritePageMode mode;
 
   @override
   Widget build(BuildContext context) {
@@ -80,8 +84,14 @@ class _FavoriteContentSection extends StatelessWidget {
         final comic = comics[index];
         final heroTag = _favoriteComicHeroTag(comic, salt: 'favorite');
         return FavoriteComicTile(
+          key: ValueKey('${comic.id}-${mode.name}'),
           comic: comic,
           heroTag: heroTag,
+          animationStyle: comic.id.isEmpty
+                  ? FavoriteEntryAnimationStyle.none
+                  : (comicAnimationStyles[comic.id] ??
+                      FavoriteEntryAnimationStyle.none),
+          entryIndex: index,
           onTap: () => onComicTap(comic),
         );
       },

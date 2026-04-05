@@ -41,6 +41,8 @@ class HazukiCachedImage extends StatefulWidget {
     this.ignoreNoImageMode = false,
     this.cacheWidth,
     this.cacheHeight,
+    this.animateOnLoad = false,
+    this.loadAnimationDuration = const Duration(milliseconds: 260),
   });
 
   final String url;
@@ -54,6 +56,8 @@ class HazukiCachedImage extends StatefulWidget {
   final bool ignoreNoImageMode;
   final int? cacheWidth;
   final int? cacheHeight;
+  final bool animateOnLoad;
+  final Duration loadAnimationDuration;
 
   @override
   State<HazukiCachedImage> createState() => _HazukiCachedImageState();
@@ -63,6 +67,7 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
   Uint8List? _bytes;
   Object? _error;
   bool _loading = false;
+  bool _showLoadedImage = true;
 
   bool get _noImageModeEnabled {
     return !widget.ignoreNoImageMode && hazukiNoImageModeNotifier.value;
@@ -73,12 +78,14 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
       _bytes = null;
       _error = null;
       _loading = false;
+      _showLoadedImage = true;
       return;
     }
     setState(() {
       _bytes = null;
       _error = null;
       _loading = false;
+      _showLoadedImage = true;
     });
   }
 
@@ -137,6 +144,7 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
       _bytes = null;
       _error = null;
       _loading = false;
+      _showLoadedImage = true;
       return false;
     }
     final cached = takeHazukiWidgetImageMemory(normalized);
@@ -146,7 +154,19 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
     _bytes = cached;
     _error = null;
     _loading = false;
+    _showLoadedImage = true;
     return true;
+  }
+
+  void _queueLoadedImageReveal() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _showLoadedImage || _bytes == null) {
+        return;
+      }
+      setState(() {
+        _showLoadedImage = true;
+      });
+    });
   }
 
   Future<void> _load(String url) async {
@@ -161,12 +181,14 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
         _bytes = null;
         _error = null;
         _loading = false;
+        _showLoadedImage = true;
         return;
       }
       setState(() {
         _bytes = null;
         _error = null;
         _loading = false;
+        _showLoadedImage = true;
       });
       return;
     }
@@ -177,12 +199,14 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
         _bytes = cached;
         _error = null;
         _loading = false;
+        _showLoadedImage = true;
         return;
       }
       setState(() {
         _bytes = cached;
         _error = null;
         _loading = false;
+        _showLoadedImage = true;
       });
       return;
     }
@@ -192,11 +216,13 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
         _bytes = null;
         _error = null;
         _loading = true;
+        _showLoadedImage = false;
       } else {
         setState(() {
           _bytes = null;
           _error = null;
           _loading = true;
+          _showLoadedImage = false;
         });
       }
     }
@@ -216,7 +242,11 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
         _bytes = bytes;
         _error = null;
         _loading = false;
+        _showLoadedImage = !widget.animateOnLoad;
       });
+      if (widget.animateOnLoad) {
+        _queueLoadedImageReveal();
+      }
     } catch (e) {
       if (!mounted || widget.url.trim() != normalized) {
         return;
@@ -225,6 +255,7 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
         _bytes = null;
         _error = e;
         _loading = false;
+        _showLoadedImage = true;
       });
     }
   }
@@ -234,7 +265,7 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
     // 图片已加载完成：直接返回，跳过 AnimatedSwitcher
     // 避免 Hero 飞行期间内部状态切换触发额外动画导致闪烁
     if (_bytes != null && !_noImageModeEnabled) {
-      return Image.memory(
+      final image = Image.memory(
         _bytes!,
         key: ValueKey('loaded-image-${widget.url}'),
         width: widget.width,
@@ -245,6 +276,21 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
         cacheHeight: widget.cacheHeight,
         gaplessPlayback: true,
         filterQuality: FilterQuality.medium,
+      );
+      if (!widget.animateOnLoad) {
+        return image;
+      }
+      return AnimatedOpacity(
+        key: ValueKey('loaded-image-animate-${widget.url}'),
+        opacity: _showLoadedImage ? 1.0 : 0.0,
+        duration: widget.loadAnimationDuration,
+        curve: Curves.easeOutCubic,
+        child: AnimatedScale(
+          scale: _showLoadedImage ? 1.0 : 0.985,
+          duration: widget.loadAnimationDuration,
+          curve: Curves.easeOutCubic,
+          child: image,
+        ),
       );
     }
 
@@ -262,13 +308,10 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
           key: const ValueKey('loading-stack'),
           fit: StackFit.passthrough,
           children: [
+            // 用透明 loading 占位来撑开 Stack 的布局尺寸
             Opacity(opacity: 0.0, child: widget.loading!),
-            Positioned.fill(
-              child: _HazukiShimmerLoading(
-                width: widget.width,
-                height: widget.height,
-              ),
-            ),
+            // shimmer 铺满整个占位区域
+            const Positioned.fill(child: _HazukiShimmerLoading()),
           ],
         );
       } else {
@@ -279,7 +322,8 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
         );
       }
     } else if (_error != null) {
-      currentWidget = widget.error ??
+      currentWidget =
+          widget.error ??
           SizedBox(
             key: const ValueKey('error-image'),
             width: widget.width,
@@ -287,7 +331,8 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
             child: const Icon(Icons.broken_image_outlined),
           );
     } else {
-      currentWidget = widget.error ??
+      currentWidget =
+          widget.error ??
           SizedBox(
             key: const ValueKey('no-supported'),
             width: widget.width,
@@ -302,7 +347,6 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
     );
   }
 }
-
 
 class HazukiCachedCircleAvatar extends StatefulWidget {
   const HazukiCachedCircleAvatar({

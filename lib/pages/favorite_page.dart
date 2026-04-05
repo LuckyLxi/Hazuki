@@ -26,6 +26,8 @@ String _favoriteComicHeroTag(ExploreComic comic, {String? salt}) {
   return 'comic-cover-$key-$salt';
 }
 
+enum FavoriteEntryAnimationStyle { none, staggered }
+
 class FavoritePage extends StatefulWidget {
   const FavoritePage({
     super.key,
@@ -53,6 +55,10 @@ class FavoritePageState extends State<FavoritePage>
   final ScrollController _scrollController = ScrollController();
   bool _showBackToTop = false;
   FavoriteAppBarActionsState? _lastReportedAppBarActionsState;
+  Map<String, FavoriteEntryAnimationStyle> _comicAnimationStyles =
+      <String, FavoriteEntryAnimationStyle>{};
+  bool _pendingFreshListEntryAnimation = true;
+  int _entryAnimationBatchId = 0;
 
   @override
   void initState() {
@@ -76,11 +82,13 @@ class FavoritePageState extends State<FavoritePage>
   @override
   void didUpdateWidget(covariant FavoritePage oldWidget) {
     super.didUpdateWidget(oldWidget);
+
     if (oldWidget.authVersion != widget.authVersion) {
       if (_controller.mode == FavoritePageMode.local) {
         return;
       }
       if (HazukiSourceService.instance.isLogged) {
+        _pendingFreshListEntryAnimation = true;
         _controller.resetForReload();
         _notifyAppBarActions();
         unawaited(
@@ -143,6 +151,7 @@ class FavoritePageState extends State<FavoritePage>
   }
 
   Future<void> changeSortOrder(String order) async {
+    _pendingFreshListEntryAnimation = true;
     final error = await _controller.changeSortOrder(
       order,
       timeoutMessage: _strings(context).favoriteLoadTimeout,
@@ -161,6 +170,7 @@ class FavoritePageState extends State<FavoritePage>
   }
 
   Future<void> toggleMode() {
+    _pendingFreshListEntryAnimation = true;
     return _controller.toggleMode(
       timeoutMessage: _strings(context).favoriteLoadTimeout,
       onFolderLoadError: _showFolderLoadError,
@@ -172,6 +182,7 @@ class FavoritePageState extends State<FavoritePage>
       return;
     }
     _notifyAppBarActions();
+    _syncEntryAnimationTargets();
   }
 
   void _notifyAppBarActions() {
@@ -236,13 +247,18 @@ class FavoritePageState extends State<FavoritePage>
     final error = await _controller.loadMore(
       timeoutMessage: _strings(context).favoriteLoadTimeout,
     );
-    if (!mounted || error == null) {
+    if (!mounted) {
+      return;
+    }
+    if (error == null) {
       return;
     }
     unawaited(showHazukiPrompt(context, error, isError: true));
   }
 
   Future<void> _handleRefresh() {
+    _pendingFreshListEntryAnimation = true;
+    _clearEntryAnimationTargets();
     return _controller.refresh(
       timeoutMessage: _strings(context).favoriteLoadTimeout,
       onFolderLoadError: _showFolderLoadError,
@@ -250,10 +266,64 @@ class FavoritePageState extends State<FavoritePage>
   }
 
   Future<void> _handleSelectFolder(String folderId) {
+    _pendingFreshListEntryAnimation = true;
+    _clearEntryAnimationTargets();
     return _controller.selectFolder(
       folderId,
       timeoutMessage: _strings(context).favoriteLoadTimeout,
     );
+  }
+
+  void _clearEntryAnimationTargets() {
+    if (_comicAnimationStyles.isEmpty) {
+      return;
+    }
+    setState(() {
+      _comicAnimationStyles = <String, FavoriteEntryAnimationStyle>{};
+    });
+  }
+
+  void _scheduleEntryAnimation(
+    List<String> comicIds,
+    FavoriteEntryAnimationStyle style,
+  ) {
+    if (!mounted || comicIds.isEmpty) {
+      return;
+    }
+    final batchId = ++_entryAnimationBatchId;
+    _comicAnimationStyles = {for (final id in comicIds) id: style};
+    Future<void>.delayed(const Duration(milliseconds: 620), () {
+      if (!mounted ||
+          _comicAnimationStyles.isEmpty ||
+          batchId != _entryAnimationBatchId) {
+        return;
+      }
+      setState(() {
+        _comicAnimationStyles = <String, FavoriteEntryAnimationStyle>{};
+      });
+    });
+  }
+
+  void _syncEntryAnimationTargets() {
+    if (_controller.initialLoading ||
+        _controller.refreshing ||
+        _controller.loadingMore) {
+      return;
+    }
+    final currentIds = _controller.comics
+        .map((comic) => comic.id)
+        .where((id) => id.isNotEmpty)
+        .toList();
+    if (currentIds.isEmpty) {
+      return;
+    }
+    if (_pendingFreshListEntryAnimation) {
+      _pendingFreshListEntryAnimation = false;
+      _scheduleEntryAnimation(
+        currentIds.take(8).toList(),
+        FavoriteEntryAnimationStyle.staggered,
+      );
+    }
   }
 
   void _showFolderLoadError(String rawError) {
@@ -326,10 +396,12 @@ class FavoritePageState extends State<FavoritePage>
                   ),
                 _FavoriteContentSection(
                   comics: _controller.comics,
+                  comicAnimationStyles: _comicAnimationStyles,
                   errorMessage: _controller.errorMessage,
                   initialLoading: _controller.initialLoading,
                   loadingMore: _controller.loadingMore,
                   strings: _strings(context),
+                  mode: _controller.mode,
                   onRetry: _handleRefresh,
                   onComicTap: (comic) {
                     final heroTag = _favoriteComicHeroTag(

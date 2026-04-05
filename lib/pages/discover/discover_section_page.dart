@@ -326,7 +326,8 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
                               return TweenAnimationBuilder<double>(
                                 tween: Tween<double>(begin: 0.0, end: 1.0),
                                 duration: Duration(
-                                    milliseconds: 350 + (index.clamp(0, 15)) * 40),
+                                  milliseconds: 350 + (index.clamp(0, 15)) * 40,
+                                ),
                                 curve: Curves.easeOutBack,
                                 builder: (context, value, child) {
                                   return Transform.scale(
@@ -467,6 +468,7 @@ class _DiscoverSectionComicTile extends StatelessWidget {
                         fit: BoxFit.cover,
                         width: double.infinity,
                         cacheWidth: coverCacheWidth,
+                        animateOnLoad: true,
                         loading: ColoredBox(color: placeholderColor),
                         error: ColoredBox(
                           color: placeholderColor,

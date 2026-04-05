@@ -1,7 +1,7 @@
 part of '../comments_page.dart';
 
 extension _CommentsWidgetsExtension on _CommentsPageState {
-  Widget _buildCommentTile(ComicCommentData comment) {
+  Widget _buildCommentTile(ComicCommentData comment, int index) {
     final theme = Theme.of(context);
     final hasReply = (comment.replyCount ?? 0) > 0;
     final bodyStyle = theme.textTheme.bodyMedium;
@@ -10,7 +10,7 @@ extension _CommentsWidgetsExtension on _CommentsPageState {
         ? l10n(context).commentsAnonymousUser
         : comment.userName;
 
-    return InkWell(
+    final item = InkWell(
       onTap: comment.id == null ? null : () => _setReplyTarget(comment),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
@@ -85,6 +85,26 @@ extension _CommentsWidgetsExtension on _CommentsPageState {
           ],
         ),
       ),
+    );
+
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0.0, end: 1.0),
+      duration: Duration(milliseconds: 350 + (index.clamp(0, 10)) * 60),
+      curve: Curves.easeOutBack,
+      builder: (context, value, child) {
+        return Transform.scale(
+          scale: 0.85 + 0.15 * value,
+          alignment: Alignment.bottomCenter,
+          child: Transform.translate(
+            offset: Offset(0, 50 * (1 - value)),
+            child: Opacity(
+              opacity: value.clamp(0.0, 1.0),
+              child: child,
+            ),
+          ),
+        );
+      },
+      child: item,
     );
   }
 
@@ -223,7 +243,7 @@ extension _CommentsWidgetsExtension on _CommentsPageState {
                       return Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          _buildCommentTile(_comments[index]),
+                          _buildCommentTile(_comments[index], index),
                           if (!isLastComment) const Divider(height: 1),
                         ],
                       );
@@ -312,7 +332,7 @@ extension _CommentsWidgetsExtension on _CommentsPageState {
       padding: EdgeInsets.zero,
       itemCount: _comments.length,
       separatorBuilder: (_, _) => const Divider(height: 1),
-      itemBuilder: (context, index) => _buildCommentTile(_comments[index]),
+      itemBuilder: (context, index) => _buildCommentTile(_comments[index], index),
     );
   }
 }

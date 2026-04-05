@@ -164,10 +164,9 @@ class _HistoryPageState extends State<HistoryPage> {
           );
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: hazukiFrostedAppBar(
+        context: context,
         title: Text(strings.historyTitle),
-        surfaceTintColor: Colors.transparent,
-        scrolledUnderElevation: 0,
         actions: [
           if (_history.isNotEmpty)
             IconButton(
