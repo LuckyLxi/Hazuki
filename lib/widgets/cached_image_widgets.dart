@@ -231,18 +231,12 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
 
   @override
   Widget build(BuildContext context) {
-    Widget currentWidget;
-
-    if (_noImageModeEnabled) {
-      currentWidget = SizedBox(
-        key: const ValueKey('no-image'),
-        width: widget.width,
-        height: widget.height,
-      );
-    } else if (_bytes != null) {
-      currentWidget = Image.memory(
+    // 图片已加载完成：直接返回，跳过 AnimatedSwitcher
+    // 避免 Hero 飞行期间内部状态切换触发额外动画导致闪烁
+    if (_bytes != null && !_noImageModeEnabled) {
+      return Image.memory(
         _bytes!,
-        key: ValueKey('loaded-image-'),
+        key: ValueKey('loaded-image-${widget.url}'),
         width: widget.width,
         height: widget.height,
         fit: widget.fit,
@@ -251,6 +245,16 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
         cacheHeight: widget.cacheHeight,
         gaplessPlayback: true,
         filterQuality: FilterQuality.medium,
+      );
+    }
+
+    // 未加载完成时构造占位 widget，走 AnimatedSwitcher 做淡入
+    final Widget currentWidget;
+    if (_noImageModeEnabled) {
+      currentWidget = SizedBox(
+        key: const ValueKey('no-image'),
+        width: widget.width,
+        height: widget.height,
       );
     } else if (_loading) {
       if (widget.loading != null) {
@@ -298,6 +302,7 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
     );
   }
 }
+
 
 class HazukiCachedCircleAvatar extends StatefulWidget {
   const HazukiCachedCircleAvatar({
