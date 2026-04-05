@@ -511,7 +511,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
     );
     final hasSections = visibleSectionCount > 0;
 
-    return RefreshIndicator(
+    return HazukiPullToRefresh(
       onRefresh: _refreshDiscover,
       edgeOffset: 56,
       child: ListView.builder(

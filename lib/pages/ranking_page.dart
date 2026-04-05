@@ -417,7 +417,7 @@ class _RankingPageState extends State<RankingPage> {
       ),
       body: Stack(
         children: [
-          RefreshIndicator(
+          HazukiPullToRefresh(
             onRefresh: () => _loadInitial(forceRefresh: true),
             child: _initialLoading
                 ? _buildCenteredRankingLoading(text: strings.commonLoading)
@@ -425,7 +425,9 @@ class _RankingPageState extends State<RankingPage> {
                       _rankingOptions.isEmpty &&
                       _rankingComics.isEmpty)
                 ? ListView(
-                    physics: const AlwaysScrollableScrollPhysics(),
+                    physics: const AlwaysScrollableScrollPhysics(
+                      parent: ClampingScrollPhysics(),
+                    ),
                     padding: const EdgeInsets.all(16),
                     children: [
                       const SizedBox(height: 90),

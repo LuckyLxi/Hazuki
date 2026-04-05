@@ -351,7 +351,7 @@ extension _SearchResultsShellWidgetsExtension on _SearchResultsPageState {
 
   Widget _buildSearchResultsBody() {
     final strings = AppLocalizations.of(context)!;
-    return RefreshIndicator(
+    return HazukiPullToRefresh(
       onRefresh: () async {
         if (_searchKeyword.isEmpty) {
           await _submitSearch();
