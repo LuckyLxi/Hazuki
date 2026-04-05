@@ -265,7 +265,6 @@ class _ComicCoverPreviewPage extends StatelessWidget {
                 ),
                 child: Hero(
                   tag: heroTag,
-                  flightShuttleBuilder: buildComicCoverHeroFlightShuttle,
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(14),
                     child: InteractiveViewer(

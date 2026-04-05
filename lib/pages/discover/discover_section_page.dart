@@ -453,7 +453,6 @@ class _DiscoverSectionComicTile extends StatelessWidget {
           Expanded(
             child: Hero(
               tag: heroTag,
-              flightShuttleBuilder: buildComicCoverHeroFlightShuttle,
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(8),
                 child: comic.cover.isEmpty

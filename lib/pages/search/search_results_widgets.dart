@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
 
-import '../../app/navigation_tags.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/hazuki_models.dart';
 import '../../widgets/widgets.dart';
@@ -146,7 +145,6 @@ class SearchComicListItem extends StatelessWidget {
             children: [
               Hero(
                 tag: heroTag,
-                flightShuttleBuilder: buildComicCoverHeroFlightShuttle,
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(8),
                   child: comic.cover.isEmpty

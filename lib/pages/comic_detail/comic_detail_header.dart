@@ -52,7 +52,6 @@ class _ComicDetailHeaderSection extends StatelessWidget {
               onTap: displayCoverUrl.isEmpty ? null : onCoverTap,
               child: Hero(
                 tag: heroTag,
-                flightShuttleBuilder: buildComicCoverHeroFlightShuttle,
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(10),
                   child: displayCoverUrl.isNotEmpty
