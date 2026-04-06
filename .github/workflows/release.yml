@@ -12,7 +12,7 @@ on:
 jobs:
   analyze-and-build:
     runs-on: ubuntu-latest
-permissions:
+    permissions:
       contents: write
     steps:
       - name: Checkout
