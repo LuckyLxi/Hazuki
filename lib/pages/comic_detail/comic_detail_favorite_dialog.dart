@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../models/hazuki_models.dart';
@@ -193,6 +194,9 @@ class _FavoriteFoldersMorphDialogState
           _loadError = null;
         }
       });
+      if (initialLoad) {
+        unawaited(HapticFeedback.selectionClick());
+      }
     } catch (e) {
       if (!mounted) {
         return;
@@ -202,6 +206,9 @@ class _FavoriteFoldersMorphDialogState
         _busy = false;
         _loadError = e.toString();
       });
+      if (initialLoad) {
+        unawaited(HapticFeedback.selectionClick());
+      }
     }
   }
 

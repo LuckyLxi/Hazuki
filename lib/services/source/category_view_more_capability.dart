@@ -14,33 +14,39 @@ extension HazukiSourceServiceCategoryViewMoreCapability on HazukiSourceService {
     final parsed = _parseCategoryViewMoreUrl(viewMoreUrl);
     final categoryJson = jsonEncode(parsed.category);
     final paramJson = parsed.param != null ? jsonEncode(parsed.param) : 'null';
-    final dynamic result = engine.evaluate(
-      'this.__hazuki_source.categoryComics.optionLoader($categoryJson, $paramJson)',
-      name: 'source_category_view_more_options.js',
-    );
 
-    final dynamic resolved = await _awaitJsResult(result);
-    if (resolved is! List) {
+    dynamic resolved;
+    try {
+      final dynamic result = engine.evaluate(
+        'this.__hazuki_source.categoryComics.optionLoader($categoryJson, $paramJson)',
+        name: 'source_category_view_more_options.js',
+      );
+
+      resolved = await _awaitJsResult(result);
+      if (resolved is! List) {
+        return const [];
+      }
+
+      for (final group in resolved) {
+        if (group is! Map) {
+          continue;
+        }
+        final map = Map<String, dynamic>.from(group);
+        final rawOptions = map['options'];
+        if (rawOptions is! List) {
+          continue;
+        }
+
+        final options = _parseCategoryRankingOptionsList(rawOptions);
+        if (options.isNotEmpty) {
+          return options;
+        }
+      }
+
       return const [];
+    } catch (e) {
+      rethrow;
     }
-
-    for (final group in resolved) {
-      if (group is! Map) {
-        continue;
-      }
-      final map = Map<String, dynamic>.from(group);
-      final rawOptions = map['options'];
-      if (rawOptions is! List) {
-        continue;
-      }
-
-      final options = _parseCategoryRankingOptionsList(rawOptions);
-      if (options.isNotEmpty) {
-        return options;
-      }
-    }
-
-    return const [];
   }
 
   Future<CategoryComicsResult> loadCategoryComicsByViewMore({
@@ -61,16 +67,24 @@ extension HazukiSourceServiceCategoryViewMoreCapability on HazukiSourceService {
     final categoryJson = jsonEncode(parsed.category);
     final paramJson = parsed.param != null ? jsonEncode(parsed.param) : 'null';
     final optionsJson = jsonEncode([normalizedOrder]);
-    final dynamic result = engine.evaluate(
-      'this.__hazuki_source.categoryComics.load($categoryJson, $paramJson, $optionsJson, $normalizedPage)',
-      name: 'source_category_view_more_load.js',
-    );
 
-    final dynamic resolved = await _awaitJsResult(result);
-    if (resolved is! Map) {
-      return const CategoryComicsResult(comics: [], maxPage: null);
+    try {
+      final dynamic result = engine.evaluate(
+        'this.__hazuki_source.categoryComics.load($categoryJson, $paramJson, $optionsJson, $normalizedPage)',
+        name: 'source_category_view_more_load.js',
+      );
+
+      final dynamic resolved = await _awaitJsResult(result);
+      if (resolved is! Map) {
+        return const CategoryComicsResult(comics: [], maxPage: null);
+      }
+
+      final parsedResult = _parseCategoryComicsResult(
+        Map<String, dynamic>.from(resolved),
+      );
+      return parsedResult;
+    } catch (e) {
+      rethrow;
     }
-
-    return _parseCategoryComicsResult(Map<String, dynamic>.from(resolved));
   }
 }

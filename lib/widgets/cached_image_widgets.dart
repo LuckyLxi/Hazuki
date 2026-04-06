@@ -6,6 +6,13 @@ import 'package:flutter/material.dart';
 import '../app/ui_flags.dart';
 import '../services/hazuki_source_service.dart';
 
+enum HazukiCachedImageLoadState { idle, deferred, loading, loaded, error }
+
+typedef HazukiCachedImageStateChanged = void Function(
+  String url,
+  HazukiCachedImageLoadState state,
+);
+
 const int _hazukiWidgetImageMemoryLimit = 300;
 final Map<String, Uint8List> _hazukiWidgetImageMemory = <String, Uint8List>{};
 
@@ -43,6 +50,10 @@ class HazukiCachedImage extends StatefulWidget {
     this.cacheHeight,
     this.animateOnLoad = false,
     this.loadAnimationDuration = const Duration(milliseconds: 260),
+    this.filterQuality = FilterQuality.medium,
+    this.deferLoadingWhileScrolling = false,
+    this.useShimmerLoading = true,
+    this.onStateChanged,
   });
 
   final String url;
@@ -58,6 +69,10 @@ class HazukiCachedImage extends StatefulWidget {
   final int? cacheHeight;
   final bool animateOnLoad;
   final Duration loadAnimationDuration;
+  final FilterQuality filterQuality;
+  final bool deferLoadingWhileScrolling;
+  final bool useShimmerLoading;
+  final HazukiCachedImageStateChanged? onStateChanged;
 
   @override
   State<HazukiCachedImage> createState() => _HazukiCachedImageState();
@@ -68,17 +83,31 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
   Object? _error;
   bool _loading = false;
   bool _showLoadedImage = true;
+  bool _useLoadedImageReveal = false;
+  Timer? _deferredLoadTimer;
+  HazukiCachedImageLoadState _lastReportedState =
+      HazukiCachedImageLoadState.idle;
 
   bool get _noImageModeEnabled {
     return !widget.ignoreNoImageMode && hazukiNoImageModeNotifier.value;
   }
 
+  void _reportState(HazukiCachedImageLoadState state) {
+    if (_lastReportedState == state) {
+      return;
+    }
+    _lastReportedState = state;
+    widget.onStateChanged?.call(widget.url.trim(), state);
+  }
+
   void _resetStateWithoutImage() {
+    _reportState(HazukiCachedImageLoadState.idle);
     if (!mounted) {
       _bytes = null;
       _error = null;
       _loading = false;
       _showLoadedImage = true;
+      _useLoadedImageReveal = false;
       return;
     }
     setState(() {
@@ -86,6 +115,7 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
       _error = null;
       _loading = false;
       _showLoadedImage = true;
+      _useLoadedImageReveal = false;
     });
   }
 
@@ -99,7 +129,7 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
     }
     final primed = _primeFromMemory(widget.url);
     if (!primed) {
-      _load(widget.url);
+      _startLoadOrDefer(widget.url);
     }
   }
 
@@ -111,15 +141,23 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
       return;
     }
     if (oldWidget.url != widget.url) {
+      _cancelDeferredLoad();
       final primed = _primeFromMemory(widget.url);
       if (!primed) {
-        _load(widget.url);
+        _startLoadOrDefer(widget.url);
       }
+    } else if (oldWidget.deferLoadingWhileScrolling !=
+            widget.deferLoadingWhileScrolling &&
+        _bytes == null &&
+        _error == null) {
+      _startLoadOrDefer(widget.url);
     }
   }
 
   @override
   void dispose() {
+    _cancelDeferredLoad();
+    _reportState(HazukiCachedImageLoadState.idle);
     hazukiNoImageModeNotifier.removeListener(_handleNoImageModeChanged);
     super.dispose();
   }
@@ -134,8 +172,56 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
     }
     final primed = _primeFromMemory(widget.url);
     if (!primed) {
-      unawaited(_load(widget.url));
+      _startLoadOrDefer(widget.url);
     }
+  }
+
+  void _cancelDeferredLoad() {
+    _deferredLoadTimer?.cancel();
+    _deferredLoadTimer = null;
+  }
+
+  void _showDeferredLoadingPlaceholder() {
+    if (_bytes != null || _loading) {
+      return;
+    }
+    _reportState(HazukiCachedImageLoadState.deferred);
+    if (!mounted) {
+      _loading = true;
+      _error = null;
+      _showLoadedImage = false;
+      _useLoadedImageReveal = false;
+      return;
+    }
+    setState(() {
+      _loading = true;
+      _error = null;
+      _showLoadedImage = false;
+      _useLoadedImageReveal = false;
+    });
+  }
+
+  void _startLoadOrDefer(String url) {
+    _cancelDeferredLoad();
+    final normalized = url.trim();
+    if (normalized.isEmpty || _noImageModeEnabled || _bytes != null) {
+      return;
+    }
+    final shouldDefer =
+        widget.deferLoadingWhileScrolling &&
+        Scrollable.recommendDeferredLoadingForContext(context);
+    if (shouldDefer) {
+      _showDeferredLoadingPlaceholder();
+      _deferredLoadTimer = Timer(const Duration(milliseconds: 120), () {
+        _deferredLoadTimer = null;
+        if (!mounted || widget.url.trim() != normalized || _bytes != null) {
+          return;
+        }
+        _startLoadOrDefer(normalized);
+      });
+      return;
+    }
+    unawaited(_load(normalized));
   }
 
   bool _primeFromMemory(String url) {
@@ -145,16 +231,24 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
       _error = null;
       _loading = false;
       _showLoadedImage = true;
+      _useLoadedImageReveal = false;
       return false;
     }
-    final cached = takeHazukiWidgetImageMemory(normalized);
+    final cached =
+        takeHazukiWidgetImageMemory(normalized) ??
+        HazukiSourceService.instance.peekImageBytesFromMemory(normalized);
     if (cached == null) {
       return false;
+    }
+    if (widget.keepInMemory) {
+      putHazukiWidgetImageMemory(normalized, cached);
     }
     _bytes = cached;
     _error = null;
     _loading = false;
     _showLoadedImage = true;
+    _useLoadedImageReveal = false;
+    _reportState(HazukiCachedImageLoadState.loaded);
     return true;
   }
 
@@ -169,7 +263,17 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
     });
   }
 
+  void _handleLoadedImageRevealEnd() {
+    if (!mounted || !_useLoadedImageReveal || !_showLoadedImage) {
+      return;
+    }
+    setState(() {
+      _useLoadedImageReveal = false;
+    });
+  }
+
   Future<void> _load(String url) async {
+    _cancelDeferredLoad();
     if (_noImageModeEnabled) {
       _resetStateWithoutImage();
       return;
@@ -182,6 +286,7 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
         _error = null;
         _loading = false;
         _showLoadedImage = true;
+        _useLoadedImageReveal = false;
         return;
       }
       setState(() {
@@ -189,17 +294,24 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
         _error = null;
         _loading = false;
         _showLoadedImage = true;
+        _useLoadedImageReveal = false;
       });
       return;
     }
 
-    final cached = takeHazukiWidgetImageMemory(normalized);
+    final cached =
+        takeHazukiWidgetImageMemory(normalized) ??
+        HazukiSourceService.instance.peekImageBytesFromMemory(normalized);
     if (cached != null) {
+      if (widget.keepInMemory) {
+        putHazukiWidgetImageMemory(normalized, cached);
+      }
       if (!mounted) {
         _bytes = cached;
         _error = null;
         _loading = false;
         _showLoadedImage = true;
+        _useLoadedImageReveal = false;
         return;
       }
       setState(() {
@@ -207,11 +319,13 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
         _error = null;
         _loading = false;
         _showLoadedImage = true;
+        _useLoadedImageReveal = false;
       });
       return;
     }
 
     if (_bytes == null) {
+      _reportState(HazukiCachedImageLoadState.loading);
       if (!mounted) {
         _bytes = null;
         _error = null;
@@ -223,6 +337,7 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
           _error = null;
           _loading = true;
           _showLoadedImage = false;
+          _useLoadedImageReveal = false;
         });
       }
     }
@@ -243,7 +358,9 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
         _error = null;
         _loading = false;
         _showLoadedImage = !widget.animateOnLoad;
+        _useLoadedImageReveal = widget.animateOnLoad;
       });
+      _reportState(HazukiCachedImageLoadState.loaded);
       if (widget.animateOnLoad) {
         _queueLoadedImageReveal();
       }
@@ -256,7 +373,9 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
         _error = e;
         _loading = false;
         _showLoadedImage = true;
+        _useLoadedImageReveal = false;
       });
+      _reportState(HazukiCachedImageLoadState.error);
     }
   }
 
@@ -275,9 +394,9 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
         cacheWidth: widget.cacheWidth,
         cacheHeight: widget.cacheHeight,
         gaplessPlayback: true,
-        filterQuality: FilterQuality.medium,
+        filterQuality: widget.filterQuality,
       );
-      if (!widget.animateOnLoad) {
+      if (!widget.animateOnLoad || !_useLoadedImageReveal) {
         return image;
       }
       return AnimatedOpacity(
@@ -285,6 +404,7 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
         opacity: _showLoadedImage ? 1.0 : 0.0,
         duration: widget.loadAnimationDuration,
         curve: Curves.easeOutCubic,
+        onEnd: _handleLoadedImageRevealEnd,
         child: AnimatedScale(
           scale: _showLoadedImage ? 1.0 : 0.985,
           duration: widget.loadAnimationDuration,
@@ -304,26 +424,41 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
       );
     } else if (_loading) {
       if (widget.loading != null) {
-        currentWidget = SizedBox(
-          key: const ValueKey('loading-stack'),
-          width: widget.width,
-          height: widget.height,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              // 用透明 loading 占位来撑开 Stack 的布局尺寸
-              Opacity(opacity: 0.0, child: widget.loading!),
-              // shimmer 铺满整个占位区域
-              const _HazukiShimmerLoading(),
-            ],
-          ),
-        );
+        if (widget.useShimmerLoading) {
+          currentWidget = SizedBox(
+            key: const ValueKey('loading-stack'),
+            width: widget.width,
+            height: widget.height,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // 用透明 loading 占位来撑开 Stack 的布局尺寸
+                Opacity(opacity: 0.0, child: widget.loading!),
+                // shimmer 铺满整个占位区域
+                const _HazukiShimmerLoading(),
+              ],
+            ),
+          );
+        } else {
+          currentWidget = SizedBox(
+            key: const ValueKey('loading-static'),
+            width: widget.width,
+            height: widget.height,
+            child: widget.loading,
+          );
+        }
       } else {
-        currentWidget = _HazukiShimmerLoading(
-          key: const ValueKey('loading-shimmer'),
-          width: widget.width,
-          height: widget.height,
-        );
+        currentWidget = widget.useShimmerLoading
+            ? _HazukiShimmerLoading(
+                key: const ValueKey('loading-shimmer'),
+                width: widget.width,
+                height: widget.height,
+              )
+            : SizedBox(
+                key: const ValueKey('loading-empty'),
+                width: widget.width,
+                height: widget.height,
+              );
       }
     } else if (_error != null) {
       currentWidget =

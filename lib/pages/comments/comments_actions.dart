@@ -2,6 +2,7 @@ part of '../comments_page.dart';
 
 extension _CommentsActionsExtension on _CommentsPageState {
   void _onScrollNotification(ScrollNotification notification) {
+    _logTabTopState(notification.metrics);
     if (notification is ScrollUpdateNotification) {
       final metrics = notification.metrics;
       if (metrics.maxScrollExtent > 0 &&
@@ -50,6 +51,8 @@ extension _CommentsActionsExtension on _CommentsPageState {
   }
 
   Future<void> _loadInitial() async {
+    final startedAt = DateTime.now();
+    _logCommentsEvent('Comments load started', content: {'page': 1});
     try {
       final pageResult = await _loadCommentsPage(1);
       if (!mounted) {
@@ -66,6 +69,15 @@ extension _CommentsActionsExtension on _CommentsPageState {
           maxPage: pageResult.maxPage,
         );
       });
+      _logCommentsEvent(
+        'Comments load succeeded',
+        content: {
+          'page': 1,
+          'durationMs': DateTime.now().difference(startedAt).inMilliseconds,
+          'fetchedCount': pageResult.comments.length,
+          'maxPage': pageResult.maxPage,
+        },
+      );
     } catch (e) {
       if (!mounted) {
         return;
@@ -73,6 +85,15 @@ extension _CommentsActionsExtension on _CommentsPageState {
       _updateCommentsState(() {
         _errorMessage = l10n(context).commentsLoadFailed('$e');
       });
+      _logCommentsEvent(
+        'Comments load failed',
+        level: 'error',
+        content: {
+          'page': 1,
+          'durationMs': DateTime.now().difference(startedAt).inMilliseconds,
+          'error': e.toString(),
+        },
+      );
     } finally {
       if (mounted) {
         _updateCommentsState(() {
@@ -87,6 +108,13 @@ extension _CommentsActionsExtension on _CommentsPageState {
       return;
     }
 
+    final nextPage = _currentPage + 1;
+    final startedAt = DateTime.now();
+    _logCommentsEvent(
+      'Comments load more started',
+      content: {'page': nextPage},
+    );
+
     if (_maxPage != null && _currentPage >= _maxPage!) {
       _updateCommentsState(() {
         _hasMore = false;
@@ -99,7 +127,6 @@ extension _CommentsActionsExtension on _CommentsPageState {
     });
 
     try {
-      final nextPage = _currentPage + 1;
       final pageResult = await _loadCommentsPage(nextPage);
       if (!mounted) {
         return;
@@ -120,12 +147,30 @@ extension _CommentsActionsExtension on _CommentsPageState {
         _hasMore = hasMore && appendedCount > 0;
         _loadingMore = false;
       });
+      _logCommentsEvent(
+        'Comments load more succeeded',
+        content: {
+          'page': nextPage,
+          'durationMs': DateTime.now().difference(startedAt).inMilliseconds,
+          'fetchedCount': pageResult.comments.length,
+          'appendedCount': appendedCount,
+          'maxPage': pageResult.maxPage ?? _maxPage,
+        },
+      );
     } catch (_) {
       if (mounted) {
         _updateCommentsState(() {
           _loadingMore = false;
         });
       }
+      _logCommentsEvent(
+        'Comments load more failed',
+        level: 'error',
+        content: {
+          'page': nextPage,
+          'durationMs': DateTime.now().difference(startedAt).inMilliseconds,
+        },
+      );
     }
   }
 

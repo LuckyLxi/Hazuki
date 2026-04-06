@@ -1,89 +1,67 @@
 part of '../comic_detail_page.dart';
 
-class _ComicDetailScrollState {
-  const _ComicDetailScrollState({
-    this.appBarSolidProgress = 0,
-    this.showCollapsedComicTitle = false,
-  });
-
-  final double appBarSolidProgress;
-  final bool showCollapsedComicTitle;
-
-  _ComicDetailScrollState copyWith({
-    double? appBarSolidProgress,
-    bool? showCollapsedComicTitle,
-  }) {
-    return _ComicDetailScrollState(
-      appBarSolidProgress: appBarSolidProgress ?? this.appBarSolidProgress,
-      showCollapsedComicTitle:
-          showCollapsedComicTitle ?? this.showCollapsedComicTitle,
-    );
-  }
-}
-
 class _ComicDetailScrollAwareAppBar extends StatelessWidget
     implements PreferredSizeWidget {
   const _ComicDetailScrollAwareAppBar({
-    required this.scrollListenable,
+    required this.collapsedTitleListenable,
     required this.appBarComicTitle,
     required this.appBarUpdateTime,
     required this.theme,
-    required this.surface,
   });
 
-  final ValueNotifier<_ComicDetailScrollState> scrollListenable;
+  final ValueNotifier<bool> collapsedTitleListenable;
   final String appBarComicTitle;
   final String appBarUpdateTime;
   final ThemeData theme;
-  final Color surface;
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<_ComicDetailScrollState>(
-      valueListenable: scrollListenable,
-      builder: (context, scrollState, _) {
-        return AppBar(
-          titleSpacing: 0,
-          title: _ComicDetailAppBarTitle(
-            showCollapsedComicTitle: scrollState.showCollapsedComicTitle,
+    return AppBar(
+      titleSpacing: 0,
+      title: ValueListenableBuilder<bool>(
+        valueListenable: collapsedTitleListenable,
+        builder: (context, showCollapsedComicTitle, _) {
+          return _ComicDetailAppBarTitle(
+            showCollapsedComicTitle: showCollapsedComicTitle,
             appBarComicTitle: appBarComicTitle,
             appBarUpdateTime: appBarUpdateTime,
             theme: theme,
-          ),
-          backgroundColor: Color.lerp(
-            Colors.transparent,
-            surface,
-            scrollState.appBarSolidProgress,
-          ),
-          surfaceTintColor: Colors.transparent,
-          elevation: 0,
-          scrolledUnderElevation: 0,
-        );
-      },
+          );
+        },
+      ),
+      backgroundColor: Colors.transparent,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      scrolledUnderElevation: 0,
     );
   }
 }
 
 class _ComicDetailTopSurfaceOverlay extends StatelessWidget {
   const _ComicDetailTopSurfaceOverlay({
-    required this.scrollListenable,
+    required this.progressListenable,
     required this.surface,
+    required this.height,
   });
 
-  final ValueNotifier<_ComicDetailScrollState> scrollListenable;
+  final ValueNotifier<double> progressListenable;
   final Color surface;
+  final double height;
 
   @override
   Widget build(BuildContext context) {
-    return Positioned.fill(
+    return Positioned(
+      left: 0,
+      right: 0,
+      top: 0,
+      height: height,
       child: IgnorePointer(
-        child: ValueListenableBuilder<_ComicDetailScrollState>(
-          valueListenable: scrollListenable,
-          builder: (context, scrollState, _) {
-            final alpha = scrollState.appBarSolidProgress;
+        child: ValueListenableBuilder<double>(
+          valueListenable: progressListenable,
+          builder: (context, alpha, _) {
             if (alpha <= 0) {
               return const SizedBox.expand();
             }

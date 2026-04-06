@@ -50,11 +50,12 @@ class ComicDetailPage extends StatefulWidget {
 }
 
 class _ComicDetailPageState extends State<ComicDetailPage>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   static const _mediaChannel = MethodChannel('hazuki.comics/media');
 
   late Future<ComicDetailsData> _future;
-  late final ValueNotifier<_ComicDetailScrollState> _appBarScrollNotifier;
+  late final ValueNotifier<double> _appBarSolidProgressNotifier;
+  late final ValueNotifier<bool> _collapsedTitleNotifier;
   late final TabController _tabController;
 
   final ScrollController _scrollController = ScrollController();
@@ -105,12 +106,12 @@ class _ComicDetailPageState extends State<ComicDetailPage>
       child: Scaffold(
         backgroundColor: surface,
         extendBodyBehindAppBar: true,
+        resizeToAvoidBottomInset: false,
         appBar: _ComicDetailScrollAwareAppBar(
-          scrollListenable: _appBarScrollNotifier,
+          collapsedTitleListenable: _collapsedTitleNotifier,
           appBarComicTitle: _appBarComicTitle,
           appBarUpdateTime: _appBarUpdateTime,
           theme: theme,
-          surface: surface,
         ),
         body: Stack(
           children: [
@@ -119,8 +120,9 @@ class _ComicDetailPageState extends State<ComicDetailPage>
               scrollController: _scrollController,
             ),
             _ComicDetailTopSurfaceOverlay(
-              scrollListenable: _appBarScrollNotifier,
+              progressListenable: _appBarSolidProgressNotifier,
               surface: surface,
+              height: topInset,
             ),
             Padding(
               padding: EdgeInsets.only(top: topInset),

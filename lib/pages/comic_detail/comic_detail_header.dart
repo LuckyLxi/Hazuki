@@ -41,33 +41,49 @@ class _ComicDetailHeaderSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
+    final headerCoverCacheWidth = (135 * devicePixelRatio)
+        .round()
+        .clamp(135, 640)
+        .toInt();
+    final headerCoverCacheHeight = (190 * devicePixelRatio)
+        .round()
+        .clamp(190, 900)
+        .toInt();
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            InkWell(
-              borderRadius: BorderRadius.circular(10),
-              onTap: displayCoverUrl.isEmpty ? null : onCoverTap,
-              child: Hero(
-                tag: heroTag,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: displayCoverUrl.isNotEmpty
-                      ? HazukiCachedImage(
-                          url: displayCoverUrl,
-                          width: 135,
-                          height: 190,
-                          fit: BoxFit.cover,
-                          keepInMemory: true,
-                        )
-                      : Container(
-                          width: 135,
-                          height: 190,
-                          color: skeletonColor,
-                          child: const Icon(Icons.image_not_supported_outlined),
-                        ),
+            RepaintBoundary(
+              child: InkWell(
+                borderRadius: BorderRadius.circular(10),
+                onTap: displayCoverUrl.isEmpty ? null : onCoverTap,
+                child: Hero(
+                  tag: heroTag,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: displayCoverUrl.isNotEmpty
+                        ? HazukiCachedImage(
+                            url: displayCoverUrl,
+                            width: 135,
+                            height: 190,
+                            fit: BoxFit.cover,
+                            keepInMemory: true,
+                            cacheWidth: headerCoverCacheWidth,
+                            cacheHeight: headerCoverCacheHeight,
+                          )
+                        : Container(
+                            width: 135,
+                            height: 190,
+                            color: skeletonColor,
+                            child: const Icon(
+                              Icons.image_not_supported_outlined,
+                            ),
+                          ),
+                  ),
                 ),
               ),
             ),

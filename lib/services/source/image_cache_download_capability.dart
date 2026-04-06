@@ -1,5 +1,32 @@
 part of '../hazuki_source_service.dart';
 
+const int _imageDownloadMaxConcurrent = 4;
+int _activeImageDownloadCount = 0;
+final Queue<Completer<void>> _imageDownloadWaiters = Queue<Completer<void>>();
+
+Future<void> _acquireImageDownloadSlot() async {
+  if (_activeImageDownloadCount < _imageDownloadMaxConcurrent) {
+    _activeImageDownloadCount++;
+    return;
+  }
+  final completer = Completer<void>();
+  _imageDownloadWaiters.addLast(completer);
+  await completer.future;
+}
+
+void _releaseImageDownloadSlot() {
+  if (_imageDownloadWaiters.isNotEmpty) {
+    final next = _imageDownloadWaiters.removeFirst();
+    if (!next.isCompleted) {
+      next.complete();
+    }
+    return;
+  }
+  if (_activeImageDownloadCount > 0) {
+    _activeImageDownloadCount--;
+  }
+}
+
 extension HazukiSourceServiceImageCacheDownloadCapability
     on HazukiSourceService {
   Future<void> prefetchComicImages({
@@ -66,11 +93,18 @@ extension HazukiSourceServiceImageCacheDownloadCapability
       return bytes;
     }
 
-    final future = _downloadImageBytesFromNetwork(
-      normalizedUrl,
-      comicId: comicId,
-      epId: epId,
-    );
+    final future = () async {
+      await _acquireImageDownloadSlot();
+      try {
+        return await _downloadImageBytesFromNetwork(
+          normalizedUrl,
+          comicId: comicId,
+          epId: epId,
+        );
+      } finally {
+        _releaseImageDownloadSlot();
+      }
+    }();
     _imageDownloadInFlight[normalizedUrl] = future;
 
     try {

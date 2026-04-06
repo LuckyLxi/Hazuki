@@ -9,8 +9,8 @@ import '../../services/hazuki_source_service.dart';
 import '../../widgets/widgets.dart';
 
 /// 专栏漫画列表页
-/// 初始数据来自发现页预加载的 [section.comics]，
-/// 若 [section.viewMoreUrl] 不为空则支持上滑分页继续加载
+/// 若 [section.viewMoreUrl] 不为空，则进入页后加载该页面自己的第一页数据；
+/// 若为空，则直接展示 [section.comics]
 class DiscoverSectionPage extends StatefulWidget {
   const DiscoverSectionPage({
     super.key,
@@ -33,10 +33,11 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
 
   final ScrollController _scrollController = ScrollController();
 
-  /// 展示的漫画列表（初始包含发现页预加载数据）
+  /// 展示的漫画列表
   late final List<ExploreComic> _comics;
 
   bool _loadingMore = false;
+  bool _showLoadMoreFooter = false;
   bool _hasMore = true;
   bool _showBackToTop = false;
   int _currentPage = 0;
@@ -45,23 +46,53 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
   List<CategoryRankingOption> _sortOptions = const <CategoryRankingOption>[];
   String? _selectedSortValue;
   bool _sortLoading = false;
+  int _deferredInitialLoadGeneration = 0;
+
+  void _scheduleInitialBootstrap() {
+    final viewMoreUrl = widget.section.viewMoreUrl;
+    if (viewMoreUrl == null) {
+      return;
+    }
+    final generation = ++_deferredInitialLoadGeneration;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || generation != _deferredInitialLoadGeneration) {
+        return;
+      }
+      unawaited(_loadSortOptions());
+    });
+  }
 
   @override
   void initState() {
     super.initState();
-    _comics = List<ExploreComic>.from(widget.section.comics);
+    _comics = widget.section.viewMoreUrl == null
+        ? List<ExploreComic>.from(widget.section.comics)
+        : <ExploreComic>[];
+    _sortLoading = widget.section.viewMoreUrl != null;
     // 无 viewMoreUrl 则不支持分页
     if (widget.section.viewMoreUrl == null) {
       _hasMore = false;
     }
     _scrollController.addListener(_onScroll);
-    unawaited(_loadSortOptions());
+    _scheduleInitialBootstrap();
   }
 
   @override
   void dispose() {
     _scrollController.dispose();
     super.dispose();
+  }
+
+  String _comicEntryKey(ExploreComic comic, int index) {
+    final comicId = comic.id.trim();
+    if (comicId.isNotEmpty) {
+      return 'comic:$comicId';
+    }
+    final cover = comic.cover.trim();
+    if (cover.isNotEmpty) {
+      return 'cover:$cover';
+    }
+    return 'fallback:${comic.title}|$index';
   }
 
   /// 滚动监听：距底部 300px 时触发加载更多
@@ -71,9 +102,20 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
     }
     final pos = _scrollController.position;
     final nextShowBackToTop = pos.pixels > 520;
-    if (nextShowBackToTop != _showBackToTop && mounted) {
+    final shouldRevealInitialLoadFooter =
+        _loadingMore &&
+        !_showLoadMoreFooter &&
+        _currentPage == 0 &&
+        _comics.isNotEmpty &&
+        pos.pixels >= pos.maxScrollExtent - 240;
+    if (mounted &&
+        (nextShowBackToTop != _showBackToTop ||
+            shouldRevealInitialLoadFooter)) {
       setState(() {
         _showBackToTop = nextShowBackToTop;
+        if (shouldRevealInitialLoadFooter) {
+          _showLoadMoreFooter = true;
+        }
       });
     }
 
@@ -98,13 +140,16 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
     final viewMoreUrl = widget.section.viewMoreUrl;
     if (viewMoreUrl == null || _loadingMore || !_hasMore) return;
 
+    final nextPage = _currentPage + 1;
+    final showFooter = nextPage > 1 && _comics.isNotEmpty;
+
     setState(() {
       _loadingMore = true;
+      _showLoadMoreFooter = showFooter;
       _errorMessage = null;
     });
 
     try {
-      final nextPage = _currentPage + 1;
       final result = await HazukiSourceService.instance
           .loadCategoryComicsByViewMore(
             viewMoreUrl: viewMoreUrl,
@@ -127,8 +172,6 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
           _comics.addAll(incoming);
         }
         _currentPage = nextPage;
-        // 没有更多数据 or 已达最大页
-        // 注意：用原始返回数量判断是否还有下一页，避免因为去重后 incoming 为空而误判结束
         final maxPage = result.maxPage;
         _hasMore =
             result.comics.isNotEmpty && (maxPage == null || nextPage < maxPage);
@@ -142,7 +185,10 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
       });
     } finally {
       if (mounted) {
-        setState(() => _loadingMore = false);
+        setState(() {
+          _loadingMore = false;
+          _showLoadMoreFooter = false;
+        });
       }
     }
   }
@@ -153,27 +199,27 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
       return;
     }
 
-    setState(() {
-      _sortLoading = true;
-    });
+    if (!_sortLoading) {
+      setState(() {
+        _sortLoading = true;
+      });
+    }
 
     try {
       final options = await HazukiSourceService.instance
           .loadCategoryRankingOptionsByViewMore(viewMoreUrl: viewMoreUrl);
       if (!mounted) return;
+
       setState(() {
         _sortOptions = options;
         _selectedSortValue = options.isEmpty ? null : options.first.value;
-      });
-      // 排序选项准备好后，按当前排序刷新第一页
-      setState(() {
-        _comics.clear();
         _currentPage = 0;
         _hasMore = true;
         _errorMessage = null;
       });
+
       unawaited(_loadMore());
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       setState(() {
         _sortOptions = const <CategoryRankingOption>[];
@@ -195,9 +241,10 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
     setState(() {
       _selectedSortValue = value;
       _errorMessage = null;
-      _comics.clear();
       _currentPage = 0;
       _hasMore = true;
+      _showLoadMoreFooter = false;
+      _comics.clear();
     });
     unawaited(_loadMore());
   }
@@ -211,6 +258,7 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
       appBar: hazukiFrostedAppBar(
         context: context,
         title: Text(widget.section.title),
+        enableBlur: false,
       ),
       body: Stack(
         children: [
@@ -282,6 +330,7 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
 
                           return GridView.builder(
                             controller: _scrollController,
+                            addAutomaticKeepAlives: false,
                             padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
                             itemCount: _comics.length,
                             gridDelegate:
@@ -298,7 +347,9 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
                                 salt:
                                     'discover-more-${widget.section.title}-$index',
                               );
-                              final tile = _DiscoverSectionComicTile(
+                              final entryKey = _comicEntryKey(comic, index);
+                              return _DiscoverSectionComicTile(
+                                key: ValueKey<String>('tile-$entryKey'),
                                 comic: comic,
                                 heroTag: heroTag,
                                 coverCacheWidth: coverCacheWidth,
@@ -322,37 +373,22 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
                                   );
                                 },
                               );
-
-                              return TweenAnimationBuilder<double>(
-                                tween: Tween<double>(begin: 0.0, end: 1.0),
-                                duration: Duration(
-                                  milliseconds: 350 + (index.clamp(0, 15)) * 40,
-                                ),
-                                curve: Curves.easeOutBack,
-                                builder: (context, value, child) {
-                                  return Transform.scale(
-                                    scale: 0.85 + 0.15 * value,
-                                    alignment: Alignment.bottomCenter,
-                                    child: Transform.translate(
-                                      offset: Offset(0, 50 * (1 - value)),
-                                      child: Opacity(
-                                        opacity: value.clamp(0.0, 1.0),
-                                        child: child,
-                                      ),
-                                    ),
-                                  );
-                                },
-                                child: tile,
-                              );
                             },
                           );
                         },
                       ),
               ),
-              if (_loadingMore && _comics.isNotEmpty)
-                const HazukiLoadMoreFooter(verticalPadding: 4),
             ],
           ),
+          if (_showLoadMoreFooter)
+            const Positioned(
+              left: 0,
+              right: 0,
+              bottom: 8,
+              child: IgnorePointer(
+                child: HazukiLoadMoreFooter(verticalPadding: 4),
+              ),
+            ),
           if (_errorMessage != null)
             Positioned(
               left: 16,
@@ -392,24 +428,26 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
           Positioned(
             right: 16,
             bottom: 16,
-            child: AnimatedSlide(
-              offset: _showBackToTop ? Offset.zero : const Offset(0, 0.24),
-              duration: const Duration(milliseconds: 220),
-              curve: Curves.easeOutCubic,
-              child: AnimatedScale(
-                scale: _showBackToTop ? 1 : 0.86,
+            child: RepaintBoundary(
+              child: AnimatedSlide(
+                offset: _showBackToTop ? Offset.zero : const Offset(0, 0.24),
                 duration: const Duration(milliseconds: 220),
                 curve: Curves.easeOutCubic,
-                child: AnimatedOpacity(
-                  opacity: _showBackToTop ? 1 : 0,
-                  duration: const Duration(milliseconds: 200),
+                child: AnimatedScale(
+                  scale: _showBackToTop ? 1 : 0.86,
+                  duration: const Duration(milliseconds: 220),
                   curve: Curves.easeOutCubic,
-                  child: IgnorePointer(
-                    ignoring: !_showBackToTop,
-                    child: FloatingActionButton(
-                      heroTag: 'discover_section_back_to_top',
-                      onPressed: _scrollToTop,
-                      child: const Icon(Icons.vertical_align_top_rounded),
+                  child: AnimatedOpacity(
+                    opacity: _showBackToTop ? 1 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeOutCubic,
+                    child: IgnorePointer(
+                      ignoring: !_showBackToTop,
+                      child: FloatingActionButton(
+                        heroTag: 'discover_section_back_to_top',
+                        onPressed: _scrollToTop,
+                        child: const Icon(Icons.vertical_align_top_rounded),
+                      ),
                     ),
                   ),
                 ),
@@ -424,6 +462,7 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
 
 class _DiscoverSectionComicTile extends StatelessWidget {
   const _DiscoverSectionComicTile({
+    super.key,
     required this.comic,
     required this.heroTag,
     required this.coverCacheWidth,
@@ -455,6 +494,7 @@ class _DiscoverSectionComicTile extends StatelessWidget {
             child: Hero(
               tag: heroTag,
               child: ClipRRect(
+                clipBehavior: Clip.hardEdge,
                 borderRadius: BorderRadius.circular(8),
                 child: comic.cover.isEmpty
                     ? ColoredBox(
@@ -469,6 +509,9 @@ class _DiscoverSectionComicTile extends StatelessWidget {
                         width: double.infinity,
                         cacheWidth: coverCacheWidth,
                         animateOnLoad: true,
+                        filterQuality: FilterQuality.low,
+                        deferLoadingWhileScrolling: true,
+                        useShimmerLoading: false,
                         loading: SizedBox.expand(
                           child: ColoredBox(color: placeholderColor),
                         ),

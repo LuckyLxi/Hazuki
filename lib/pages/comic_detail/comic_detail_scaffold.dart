@@ -57,7 +57,7 @@ class _ComicDetailAppBarTitle extends StatelessWidget {
   }
 }
 
-class _ComicDetailParallaxBackground extends StatelessWidget {
+class _ComicDetailParallaxBackground extends StatefulWidget {
   const _ComicDetailParallaxBackground({
     required this.coverUrl,
     required this.scrollController,
@@ -67,32 +67,130 @@ class _ComicDetailParallaxBackground extends StatelessWidget {
   final ScrollController scrollController;
 
   @override
+  State<_ComicDetailParallaxBackground> createState() =>
+      _ComicDetailParallaxBackgroundState();
+}
+
+class _ComicDetailParallaxBackgroundState
+    extends State<_ComicDetailParallaxBackground> {
+  double _offset = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.scrollController.addListener(_handleScroll);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _syncOffset();
+      }
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant _ComicDetailParallaxBackground oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.scrollController != widget.scrollController) {
+      oldWidget.scrollController.removeListener(_handleScroll);
+      widget.scrollController.addListener(_handleScroll);
+    }
+    _syncOffset();
+  }
+
+  @override
+  void dispose() {
+    widget.scrollController.removeListener(_handleScroll);
+    super.dispose();
+  }
+
+  void _handleScroll() {
+    _syncOffset();
+  }
+
+  void _syncOffset() {
+    if (!mounted) {
+      return;
+    }
+    final backgroundHeight = math.min(
+      MediaQuery.sizeOf(context).height * 0.58,
+      520.0,
+    );
+    final nextOffset = widget.scrollController.hasClients
+        ? widget.scrollController.offset
+              .clamp(0.0, backgroundHeight)
+              .roundToDouble()
+        : 0.0;
+    if ((_offset - nextOffset).abs() < 1) {
+      return;
+    }
+    setState(() {
+      _offset = nextOffset;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final screenHeight = MediaQuery.of(context).size.height;
+    final screenHeight = MediaQuery.sizeOf(context).height;
     final backgroundHeight = math.min(screenHeight * 0.58, 520.0);
 
-    return AnimatedBuilder(
-      animation: scrollController,
-      builder: (context, child) {
-        final offset = scrollController.hasClients
-            ? scrollController.offset.clamp(0.0, backgroundHeight)
-            : 0.0;
-        return Positioned(
-          left: 0,
-          right: 0,
-          top: 0,
-          height: backgroundHeight,
-          child: ClipRect(
-            child: Transform.translate(
-              offset: Offset(0, -offset),
-              child: child!,
-            ),
+    return Positioned(
+      left: 0,
+      right: 0,
+      top: 0,
+      height: backgroundHeight,
+      child: ClipRect(
+        child: Transform.translate(
+          offset: Offset(0, -_offset),
+          child: RepaintBoundary(
+            child: _ComicBlurredCoverBackground(coverUrl: widget.coverUrl),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ComicDetailTabTickerScope extends StatelessWidget {
+  const _ComicDetailTabTickerScope({
+    required this.tabController,
+    required this.tabIndex,
+    required this.builder,
+  });
+
+  final TabController tabController;
+  final int tabIndex;
+  final Widget Function(
+    BuildContext context,
+    bool shouldRender,
+    bool isSettledActive,
+  )
+  builder;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: tabController.animation ?? tabController,
+      builder: (context, _) {
+        final animationValue =
+            tabController.animation?.value ?? tabController.index.toDouble();
+        final distance = (animationValue - tabIndex).abs();
+        final isSettled =
+            distance < 0.01 &&
+            tabController.index == tabIndex &&
+            !tabController.indexIsChanging;
+        final isTransitioning =
+            tabController.indexIsChanging ||
+            (tabController.animation != null &&
+                (tabController.animation!.value - tabController.index).abs() >=
+                    0.01);
+        final shouldRender =
+            tabController.index == tabIndex ||
+            (isTransitioning && distance <= 1.0);
+        final isSettledActive = isSettled && tabController.index == tabIndex;
+        return TickerMode(
+          enabled: shouldRender,
+          child: builder(context, shouldRender, isSettledActive),
         );
       },
-      child: RepaintBoundary(
-        child: _ComicBlurredCoverBackground(coverUrl: coverUrl),
-      ),
     );
   }
 }
@@ -178,55 +276,63 @@ class _ComicDetailBody extends StatelessWidget {
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                  child: _ComicDetailHeaderSection(
-                    heroTag: heroTag,
-                    details: details,
-                    skeletonColor: skeletonColor,
-                    displayTitle: displayTitle,
-                    displaySubTitle: displaySubTitle,
-                    displayCoverUrl: displayCoverUrl,
-                    viewsText: details != null ? buildViewsText(details) : '',
-                    headerTitleKey: headerTitleKey,
-                    favoriteRowKey: favoriteRowKey,
-                    actionButtonsKey: actionButtonsKey,
-                    favoriteBusy: favoriteBusy,
-                    favoriteOverride: favoriteOverride,
-                    lastReadProgress: lastReadProgress,
-                    onCoverTap: displayCoverUrl.isEmpty
-                        ? null
-                        : () => onShowCoverPreview(displayCoverUrl),
-                    onFavoriteTap: onFavoriteTap,
-                    onShowChapters: onShowChapters,
-                    onOpenReader: onOpenReader,
+                  child: RepaintBoundary(
+                    child: _ComicDetailHeaderSection(
+                      heroTag: heroTag,
+                      details: details,
+                      skeletonColor: skeletonColor,
+                      displayTitle: displayTitle,
+                      displaySubTitle: displaySubTitle,
+                      displayCoverUrl: displayCoverUrl,
+                      viewsText: details != null ? buildViewsText(details) : '',
+                      headerTitleKey: headerTitleKey,
+                      favoriteRowKey: favoriteRowKey,
+                      actionButtonsKey: actionButtonsKey,
+                      favoriteBusy: favoriteBusy,
+                      favoriteOverride: favoriteOverride,
+                      lastReadProgress: lastReadProgress,
+                      onCoverTap: displayCoverUrl.isEmpty
+                          ? null
+                          : () => onShowCoverPreview(displayCoverUrl),
+                      onFavoriteTap: onFavoriteTap,
+                      onShowChapters: onShowChapters,
+                      onOpenReader: onOpenReader,
+                    ),
                   ),
                 ),
               ),
-              SliverPersistentHeader(
-                pinned: true,
-                delegate: _HazukiTabBarDelegate(
-                  TabBar(
-                    controller: tabController,
-                    onTap: (_) => FocusManager.instance.primaryFocus?.unfocus(),
-                    isScrollable: true,
-                    tabAlignment: TabAlignment.center,
-                    padding: EdgeInsets.zero,
-                    labelPadding: const EdgeInsets.symmetric(horizontal: 18),
-                    indicatorSize: TabBarIndicatorSize.label,
-                    indicatorWeight: 3,
-                    dividerColor: Colors.transparent,
-                    tabs: [
-                      Tab(height: 44, text: l10n(context).comicDetailTabInfo),
-                      Tab(
-                        height: 44,
-                        text: l10n(context).comicDetailTabComments,
-                      ),
-                      Tab(
-                        height: 44,
-                        text: l10n(context).comicDetailTabRelated,
-                      ),
-                    ],
+              SliverOverlapAbsorber(
+                handle: NestedScrollView.sliverOverlapAbsorberHandleFor(
+                  context,
+                ),
+                sliver: SliverPersistentHeader(
+                  pinned: true,
+                  delegate: _HazukiTabBarDelegate(
+                    TabBar(
+                      controller: tabController,
+                      onTap: (_) =>
+                          FocusManager.instance.primaryFocus?.unfocus(),
+                      isScrollable: true,
+                      tabAlignment: TabAlignment.center,
+                      padding: EdgeInsets.zero,
+                      labelPadding: const EdgeInsets.symmetric(horizontal: 18),
+                      indicatorSize: TabBarIndicatorSize.label,
+                      indicatorWeight: 3,
+                      dividerColor: Colors.transparent,
+                      tabs: [
+                        Tab(height: 44, text: l10n(context).comicDetailTabInfo),
+                        Tab(
+                          height: 44,
+                          text: l10n(context).comicDetailTabComments,
+                        ),
+                        Tab(
+                          height: 44,
+                          text: l10n(context).comicDetailTabRelated,
+                        ),
+                      ],
+                    ),
+                    surface,
                   ),
-                  surface,
                 ),
               ),
             ];
@@ -235,28 +341,52 @@ class _ComicDetailBody extends StatelessWidget {
             color: surface,
             child: TabBarView(
               controller: tabController,
+              physics: const BouncingScrollPhysics(),
               children: [
-                RepaintBoundary(
-                  child: _ComicDetailInfoTab(
-                    details: details,
-                    skeletonColor: skeletonColor,
-                    metaSectionBuilder: buildMetaSection,
-                  ),
+                _ComicDetailTabTickerScope(
+                  tabController: tabController,
+                  tabIndex: 0,
+                  builder: (context, shouldRender, _) {
+                    return RepaintBoundary(
+                      child: _ComicDetailInfoTab(
+                        details: details,
+                        skeletonColor: skeletonColor,
+                        metaSectionBuilder: buildMetaSection,
+                        isActiveInTabView: shouldRender,
+                      ),
+                    );
+                  },
                 ),
-                details != null
-                    ? RepaintBoundary(
-                        child: CommentsPage(
-                          comicId: details.id,
-                          subId: details.subId.isEmpty ? null : details.subId,
-                          isTabView: true,
-                        ),
-                      )
-                    : const _ComicDetailLoadingView(),
-                RepaintBoundary(
-                  child: _ComicDetailRelatedTab(
-                    details: details,
-                    heroTagPrefix: heroTag,
-                  ),
+                _ComicDetailTabTickerScope(
+                  tabController: tabController,
+                  tabIndex: 1,
+                  builder: (context, shouldRender, _) {
+                    return details != null
+                        ? RepaintBoundary(
+                            child: CommentsPage(
+                              comicId: details.id,
+                              subId: details.subId.isEmpty
+                                  ? null
+                                  : details.subId,
+                              isTabView: true,
+                              isActiveInTabView: shouldRender,
+                            ),
+                          )
+                        : const _ComicDetailLoadingView();
+                  },
+                ),
+                _ComicDetailTabTickerScope(
+                  tabController: tabController,
+                  tabIndex: 2,
+                  builder: (context, shouldRender, _) {
+                    return RepaintBoundary(
+                      child: _ComicDetailRelatedTab(
+                        details: details,
+                        heroTagPrefix: heroTag,
+                        isActiveInTabView: shouldRender,
+                      ),
+                    );
+                  },
                 ),
               ],
             ),

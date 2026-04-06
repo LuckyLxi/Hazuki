@@ -18,11 +18,13 @@ class CommentsPage extends StatefulWidget {
     required this.comicId,
     this.subId,
     this.isTabView = false,
+    this.isActiveInTabView = true,
   });
 
   final String comicId;
   final String? subId;
   final bool isTabView;
+  final bool isActiveInTabView;
 
   @override
   State<CommentsPage> createState() => _CommentsPageState();
@@ -51,6 +53,7 @@ class _CommentsPageState extends State<CommentsPage>
 
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _commentController = TextEditingController();
+  final Set<String> _animatedCommentKeys = <String>{};
 
   List<ComicCommentData> _comments = const [];
   String? _errorMessage;
@@ -61,6 +64,7 @@ class _CommentsPageState extends State<CommentsPage>
   int _currentPage = 1;
   int? _maxPage;
   ComicCommentData? _replyToComment;
+  bool? _tabScrollAtTop;
 
   @override
   bool get wantKeepAlive => true;
@@ -85,16 +89,60 @@ class _CommentsPageState extends State<CommentsPage>
     setState(update);
   }
 
+  void _logCommentsEvent(
+    String title, {
+    String level = 'info',
+    Map<String, Object?>? content,
+  }) {
+    HazukiSourceService.instance.addApplicationLog(
+      level: level,
+      title: title,
+      content: {
+        'comicId': widget.comicId,
+        'subId': widget.subId,
+        'viewMode': widget.isTabView ? 'detail_tab' : 'page',
+        'currentPage': _currentPage,
+        'commentCount': _comments.length,
+        'hasMore': _hasMore,
+        if (content != null) ...content,
+      },
+      source: widget.isTabView ? 'comic_detail_comments' : 'comments',
+    );
+  }
+
+  void _logTabTopState(ScrollMetrics metrics) {
+    if (!widget.isTabView || metrics.axis != Axis.vertical) {
+      return;
+    }
+    final atTop = metrics.pixels <= metrics.minScrollExtent + 0.5;
+    if (_tabScrollAtTop == atTop) {
+      return;
+    }
+    _tabScrollAtTop = atTop;
+    _logCommentsEvent(
+      atTop ? 'Comments tab reached top' : 'Comments tab left top',
+      content: {
+        'pixels': metrics.pixels.round(),
+        'minScrollExtent': metrics.minScrollExtent.round(),
+        'maxScrollExtent': metrics.maxScrollExtent.round(),
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
+    if (widget.isTabView && !widget.isActiveInTabView) {
+      return const SizedBox.expand();
+    }
     final bodyList = _buildCommentsBodyList();
 
     if (widget.isTabView) {
+      final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
       return Column(
         children: [
           Expanded(child: bodyList),
-          _buildBottomComposer(),
+          _buildBottomComposer(bottomInset: bottomInset),
         ],
       );
     }

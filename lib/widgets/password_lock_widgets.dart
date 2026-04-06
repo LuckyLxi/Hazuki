@@ -566,17 +566,10 @@ class _PasswordDigitButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final backgroundColor = isDark
-        ? const Color(0xff242424)
-        : colorScheme.surfaceContainerHigh;
-    final borderColor = isDark
-        ? Colors.white.withValues(alpha: 0.06)
-        : colorScheme.outlineVariant.withValues(alpha: 0.7);
-    final digitColor = isDark ? Colors.white : colorScheme.onSurface;
-    final lettersColor = isDark
-        ? Colors.white.withValues(alpha: 0.48)
-        : colorScheme.onSurfaceVariant;
+    final backgroundColor = colorScheme.surfaceContainerHigh;
+    final borderColor = colorScheme.outlineVariant.withValues(alpha: 0.7);
+    final digitColor = colorScheme.onSurface;
+    final lettersColor = colorScheme.onSurfaceVariant;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -640,14 +633,9 @@ class _PasswordKeyButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final backgroundColor = isDark
-        ? const Color(0xff242424)
-        : colorScheme.surfaceContainerHigh;
-    final borderColor = isDark
-        ? Colors.white.withValues(alpha: 0.06)
-        : colorScheme.outlineVariant.withValues(alpha: 0.7);
-    final iconColor = isDark ? Colors.white : colorScheme.onSurfaceVariant;
+    final backgroundColor = colorScheme.surfaceContainerHigh;
+    final borderColor = colorScheme.outlineVariant.withValues(alpha: 0.7);
+    final iconColor = colorScheme.onSurfaceVariant;
     return Material(
       color: Colors.transparent,
       child: InkWell(

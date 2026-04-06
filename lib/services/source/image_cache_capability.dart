@@ -56,6 +56,20 @@ extension HazukiSourceServiceImageCacheCapability on HazukiSourceService {
     };
   }
 
+  Uint8List? peekImageBytesFromMemory(String url) {
+    final normalizedUrl = url.trim();
+    if (normalizedUrl.isEmpty) {
+      return null;
+    }
+    final cached = _imageBytesCache[normalizedUrl];
+    if (cached == null) {
+      return null;
+    }
+    _imageBytesCache.remove(normalizedUrl);
+    _imageBytesCache[normalizedUrl] = cached;
+    return cached;
+  }
+
   void evictImageBytesFromMemory(Iterable<String> urls) {
     for (final url in urls) {
       final normalizedUrl = url.trim();

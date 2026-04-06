@@ -438,6 +438,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
                           child: Hero(
                             tag: heroTag,
                             child: ClipRRect(
+                              clipBehavior: Clip.hardEdge,
                               borderRadius: BorderRadius.circular(8),
                               child: comic.cover.isEmpty
                                   ? ColoredBox(
@@ -454,6 +455,8 @@ class _DiscoverPageState extends State<DiscoverPage> {
                                       width: 130,
                                       cacheWidth: coverCacheWidth,
                                       animateOnLoad: true,
+                                      filterQuality: FilterQuality.low,
+                                      deferLoadingWhileScrolling: true,
                                       loading: SizedBox.expand(
                                         child: ColoredBox(
                                           color: placeholderColor,

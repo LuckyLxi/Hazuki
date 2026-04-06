@@ -14,6 +14,7 @@ PreferredSizeWidget hazukiFrostedAppBar({
   bool centerTitle = false,
   double backgroundAlpha = 0.72,
   double? titleSpacing,
+  bool enableBlur = true,
 }) {
   final surface = Theme.of(context).colorScheme.surface;
   return AppBar(
@@ -30,11 +31,13 @@ PreferredSizeWidget hazukiFrostedAppBar({
     surfaceTintColor: Colors.transparent,
     scrolledUnderElevation: 0,
     clipBehavior: Clip.antiAlias,
-    flexibleSpace: ClipRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-        child: const SizedBox.expand(),
-      ),
-    ),
+    flexibleSpace: enableBlur
+        ? ClipRect(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+              child: const SizedBox.expand(),
+            ),
+          )
+        : null,
   );
 }

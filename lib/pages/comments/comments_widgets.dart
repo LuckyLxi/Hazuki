@@ -9,6 +9,9 @@ extension _CommentsWidgetsExtension on _CommentsPageState {
     final displayName = comment.userName.isEmpty
         ? l10n(context).commentsAnonymousUser
         : comment.userName;
+    final animationKey =
+        comment.id ?? '${comment.userName}|${comment.time}|${comment.content}';
+    final shouldAnimate = _animatedCommentKeys.add(animationKey);
 
     final item = InkWell(
       onTap: comment.id == null ? null : () => _setReplyTarget(comment),
@@ -87,6 +90,10 @@ extension _CommentsWidgetsExtension on _CommentsPageState {
       ),
     );
 
+    if (!shouldAnimate) {
+      return item;
+    }
+
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(begin: 0.0, end: 1.0),
       duration: Duration(milliseconds: 350 + (index.clamp(0, 10)) * 60),
@@ -97,10 +104,7 @@ extension _CommentsWidgetsExtension on _CommentsPageState {
           alignment: Alignment.bottomCenter,
           child: Transform.translate(
             offset: Offset(0, 50 * (1 - value)),
-            child: Opacity(
-              opacity: value.clamp(0.0, 1.0),
-              child: child,
-            ),
+            child: Opacity(opacity: value.clamp(0.0, 1.0), child: child),
           ),
         );
       },
@@ -158,7 +162,7 @@ extension _CommentsWidgetsExtension on _CommentsPageState {
     );
   }
 
-  Widget _buildBottomComposer() {
+  Widget _buildBottomComposer({double bottomInset = 0}) {
     final hint = _replyToComment == null
         ? l10n(context).commentsComposerHint
         : l10n(context).commentsReplyComposerHint(
@@ -167,45 +171,50 @@ extension _CommentsWidgetsExtension on _CommentsPageState {
                 : _replyToComment!.userName,
           );
 
-    return Material(
-      elevation: 8,
-      color: Theme.of(context).colorScheme.surface,
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildReplyBanner(),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _commentController,
-                      minLines: 1,
-                      maxLines: 3,
-                      textInputAction: TextInputAction.send,
-                      onSubmitted: (_) => unawaited(_submitComment()),
-                      decoration: InputDecoration(
-                        hintText: hint,
-                        border: const OutlineInputBorder(),
-                        isDense: true,
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+      padding: EdgeInsets.only(bottom: bottomInset),
+      child: Material(
+        elevation: 8,
+        color: Theme.of(context).colorScheme.surface,
+        child: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildReplyBanner(),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _commentController,
+                        minLines: 1,
+                        maxLines: 3,
+                        textInputAction: TextInputAction.send,
+                        onSubmitted: (_) => unawaited(_submitComment()),
+                        decoration: InputDecoration(
+                          hintText: hint,
+                          border: const OutlineInputBorder(),
+                          isDense: true,
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  FilledButton(
-                    onPressed: _sendingComment ? null : _submitComment,
-                    child: Text(
-                      _sendingComment
-                          ? l10n(context).commentsSending
-                          : l10n(context).commentsSend,
+                    const SizedBox(width: 10),
+                    FilledButton(
+                      onPressed: _sendingComment ? null : _submitComment,
+                      child: Text(
+                        _sendingComment
+                            ? l10n(context).commentsSending
+                            : l10n(context).commentsSend,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ],
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -213,14 +222,72 @@ extension _CommentsWidgetsExtension on _CommentsPageState {
   }
 
   Widget _buildCommentsBodyList() {
-    final content = _buildCommentsContent();
     final loadMoreFooter = _loadingMore
         ? const HazukiLoadMoreFooter()
         : const SizedBox(height: 4);
 
-    final listBottomPadding = EdgeInsets.only(
-      bottom: MediaQuery.of(context).viewInsets.bottom > 0 ? 8 : 10,
-    );
+    const listBottomPadding = EdgeInsets.only(bottom: 10);
+
+    if (widget.isTabView) {
+      final overlapHandle = NestedScrollView.sliverOverlapAbsorberHandleFor(
+        context,
+      );
+      return NotificationListener<ScrollNotification>(
+        onNotification: (notification) {
+          _onScrollNotification(notification);
+          return false;
+        },
+        child: CustomScrollView(
+          key: const PageStorageKey<String>('comic-detail-comments-tab'),
+          physics: const ClampingScrollPhysics(),
+          slivers: [
+            SliverOverlapInjector(handle: overlapHandle),
+            if (_comments.isNotEmpty)
+              SliverPadding(
+                padding: listBottomPadding,
+                sliver: SliverList(
+                  delegate: SliverChildBuilderDelegate((context, index) {
+                    if (index == _comments.length) {
+                      return loadMoreFooter;
+                    }
+                    final isLastComment = index == _comments.length - 1;
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildCommentTile(_comments[index], index),
+                        if (!isLastComment) const Divider(height: 1),
+                      ],
+                    );
+                  }, childCount: _comments.length + 1),
+                ),
+              )
+            else ...[
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 320),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeOutCubic,
+                  layoutBuilder: (currentChild, previousChildren) {
+                    return Stack(
+                      alignment: Alignment.topCenter,
+                      children: <Widget>[
+                        ...previousChildren,
+                        ...<Widget?>[currentChild].whereType<Widget>(),
+                      ],
+                    );
+                  },
+                  child: _buildCommentsContent(),
+                ),
+              ),
+              SliverToBoxAdapter(child: loadMoreFooter),
+            ],
+          ],
+        ),
+      );
+    }
+
+    final content = _buildCommentsContent();
 
     return NotificationListener<ScrollNotification>(
       onNotification: (notification) {
@@ -229,7 +296,7 @@ extension _CommentsWidgetsExtension on _CommentsPageState {
       },
       child: _comments.isNotEmpty
           ? CustomScrollView(
-              controller: widget.isTabView ? null : _scrollController,
+              controller: _scrollController,
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
                 SliverPadding(
@@ -253,7 +320,7 @@ extension _CommentsWidgetsExtension on _CommentsPageState {
               ],
             )
           : ListView(
-              controller: widget.isTabView ? null : _scrollController,
+              controller: _scrollController,
               physics: const AlwaysScrollableScrollPhysics(),
               padding: listBottomPadding,
               children: [
@@ -332,7 +399,8 @@ extension _CommentsWidgetsExtension on _CommentsPageState {
       padding: EdgeInsets.zero,
       itemCount: _comments.length,
       separatorBuilder: (_, _) => const Divider(height: 1),
-      itemBuilder: (context, index) => _buildCommentTile(_comments[index], index),
+      itemBuilder: (context, index) =>
+          _buildCommentTile(_comments[index], index),
     );
   }
 }

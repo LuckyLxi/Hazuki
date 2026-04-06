@@ -2,9 +2,8 @@ part of '../comic_detail_page.dart';
 
 extension _ComicDetailLifecycleActionsExtension on _ComicDetailPageState {
   void _initializeComicDetailPage() {
-    _appBarScrollNotifier = ValueNotifier<_ComicDetailScrollState>(
-      const _ComicDetailScrollState(),
-    );
+    _appBarSolidProgressNotifier = ValueNotifier<double>(0);
+    _collapsedTitleNotifier = ValueNotifier<bool>(false);
     _tabController = TabController(length: 3, vsync: this)
       ..addListener(_handleTabChanged);
     _appBarComicTitle = widget.comic.title;
@@ -23,42 +22,17 @@ extension _ComicDetailLifecycleActionsExtension on _ComicDetailPageState {
       _updateAppBarSolidProgress();
     });
     unawaited(_recordHistory());
-
-    // 记录打开漫画详情页事件
-    HazukiSourceService.instance.addApplicationLog(
-      level: 'info',
-      title: 'ComicDetail opened',
-      content: {
-        'comicId': widget.comic.id,
-        'title': widget.comic.title,
-        'heroTag': widget.heroTag,
-        'coverUrl': widget.comic.cover,
-      },
-      source: 'comic_detail',
-    );
   }
 
   void _disposeComicDetailPage() {
-    // 记录关闭漫画详情页事件（Hero 动画此时开始反向播放）
-    HazukiSourceService.instance.addApplicationLog(
-      level: 'info',
-      title: 'ComicDetail disposed',
-      content: {
-        'comicId': widget.comic.id,
-        'title': widget.comic.title,
-        'heroTag': widget.heroTag,
-        'mountedAtDispose': mounted,
-      },
-      source: 'comic_detail',
-    );
-
     _tabController
       ..removeListener(_handleTabChanged)
       ..dispose();
     _scrollController
       ..removeListener(_handleScroll)
       ..dispose();
-    _appBarScrollNotifier.dispose();
+    _appBarSolidProgressNotifier.dispose();
+    _collapsedTitleNotifier.dispose();
   }
 
   void _handleTabChanged() {
@@ -82,24 +56,29 @@ extension _ComicDetailLifecycleActionsExtension on _ComicDetailPageState {
     final offset = _scrollController.offset.clamp(0.0, double.infinity);
     const fadeStart = 72.0;
     const fadeDistance = 132.0;
-    const titleCollapseOffset = 186.0;
+    const titleCollapseEnterOffset = 198.0;
+    const titleCollapseExitOffset = 162.0;
 
     final nextProgress = ((offset - fadeStart) / fadeDistance).clamp(0.0, 1.0);
-    final titleCollapsed = offset >= titleCollapseOffset;
+    final wasCollapsed = _collapsedTitleNotifier.value;
+    final titleCollapsed = wasCollapsed
+        ? offset >= titleCollapseExitOffset
+        : offset >= titleCollapseEnterOffset;
 
-    final scrollState = _appBarScrollNotifier.value;
     final progressChanged =
-        (scrollState.appBarSolidProgress - nextProgress).abs() >= 0.02;
-    final titleChanged = titleCollapsed != scrollState.showCollapsedComicTitle;
+        (_appBarSolidProgressNotifier.value - nextProgress).abs() >= 0.02;
+    final titleChanged = titleCollapsed != _collapsedTitleNotifier.value;
 
     if (!progressChanged && !titleChanged) {
       return false;
     }
 
-    _appBarScrollNotifier.value = scrollState.copyWith(
-      appBarSolidProgress: nextProgress,
-      showCollapsedComicTitle: titleCollapsed,
-    );
+    if (progressChanged) {
+      _appBarSolidProgressNotifier.value = nextProgress;
+    }
+    if (titleChanged) {
+      _collapsedTitleNotifier.value = titleCollapsed;
+    }
     return true;
   }
 

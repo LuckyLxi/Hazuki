@@ -1,14 +1,44 @@
 part of '../hazuki_source_service.dart';
 
 extension HazukiSourceServiceCategoryCapability on HazukiSourceService {
+  void _logCategoryTagTiming(
+    String title, {
+    required DateTime startedAt,
+    Map<String, Object?>? content,
+    String level = 'info',
+  }) {
+    addApplicationLog(
+      level: level,
+      title: title,
+      source: 'source_category_tags',
+      content: {
+        'durationMs': DateTime.now().difference(startedAt).inMilliseconds,
+        if (content != null) ...content,
+      },
+    );
+  }
+
   Future<List<CategoryTagGroup>> loadCategoryTagGroups({
     bool forceRefresh = false,
   }) async {
     await ensureInitialized();
 
+    final startedAt = DateTime.now();
+
     if (!forceRefresh) {
       final memoryCached = _getCategoryTagGroupsFromMemoryCache();
       if (memoryCached != null) {
+        _logCategoryTagTiming(
+          'Source category tags loaded from memory cache',
+          startedAt: startedAt,
+          content: {
+            'groupCount': memoryCached.length,
+            'tagCount': memoryCached.fold<int>(
+              0,
+              (sum, group) => sum + group.tags.length,
+            ),
+          },
+        );
         return memoryCached;
       }
     } else {
@@ -18,16 +48,34 @@ extension HazukiSourceServiceCategoryCapability on HazukiSourceService {
 
     final engine = _engine;
     if (engine == null) {
+      _logCategoryTagTiming(
+        'Source category tags load failed',
+        startedAt: startedAt,
+        level: 'error',
+        content: {'error': 'source_not_initialized'},
+      );
       throw Exception('source_not_initialized');
     }
 
+    final hasCategoryEvaluateStartedAt = DateTime.now();
     final hasCategory = _asBool(
       engine.evaluate('!!this.__hazuki_source.category'),
     );
+    _logCategoryTagTiming(
+      'Source category tags availability evaluate finished',
+      startedAt: hasCategoryEvaluateStartedAt,
+      content: {'hasCategory': hasCategory},
+    );
     if (!hasCategory) {
+      _logCategoryTagTiming(
+        'Source category tags loaded',
+        startedAt: startedAt,
+        content: {'groupCount': 0, 'tagCount': 0, 'hasCategory': false},
+      );
       return const [];
     }
 
+    final evaluateStartedAt = DateTime.now();
     final dynamic result = engine.evaluate('''(() => {
         const category = this.__hazuki_source.category;
         const parts = Array.isArray(category?.parts) ? category.parts : [];
@@ -46,9 +94,22 @@ extension HazukiSourceServiceCategoryCapability on HazukiSourceService {
         }
         return groups;
       })()''', name: 'source_category_tag_groups.js');
+    _logCategoryTagTiming(
+      'Source category tags evaluate finished',
+      startedAt: evaluateStartedAt,
+    );
 
     final dynamic resolved = await _awaitJsResult(result);
     if (resolved is! List) {
+      _logCategoryTagTiming(
+        'Source category tags loaded',
+        startedAt: startedAt,
+        content: {
+          'groupCount': 0,
+          'tagCount': 0,
+          'resultType': resolved.runtimeType.toString(),
+        },
+      );
       return const [];
     }
 
@@ -85,6 +146,14 @@ extension HazukiSourceServiceCategoryCapability on HazukiSourceService {
       ),
     );
     _putCategoryTagGroupsInMemoryCache(cached);
+    _logCategoryTagTiming(
+      'Source category tags loaded',
+      startedAt: startedAt,
+      content: {
+        'groupCount': cached.length,
+        'tagCount': cached.fold<int>(0, (sum, group) => sum + group.tags.length),
+      },
+    );
     return cached;
   }
 

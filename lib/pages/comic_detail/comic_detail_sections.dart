@@ -23,23 +23,38 @@ class _ComicDetailInfoTab extends StatelessWidget {
     required this.details,
     required this.skeletonColor,
     required this.metaSectionBuilder,
+    required this.isActiveInTabView,
   });
 
   final ComicDetailsData? details;
   final Color skeletonColor;
   final Widget Function(ComicDetailsData details) metaSectionBuilder;
+  final bool isActiveInTabView;
 
   @override
   Widget build(BuildContext context) {
+    if (!isActiveInTabView) {
+      return const SizedBox.expand();
+    }
+    final overlapHandle = NestedScrollView.sliverOverlapAbsorberHandleFor(
+      context,
+    );
     if (details == null) {
-      return ListView(
+      return CustomScrollView(
         key: const PageStorageKey<String>('comic-detail-info-tab-loading'),
         physics: const ClampingScrollPhysics(),
-        padding: const EdgeInsets.all(16),
-        children: [
-          Container(height: 100, color: skeletonColor),
-          const SizedBox(height: 16),
-          Container(height: 60, color: skeletonColor),
+        slivers: [
+          SliverOverlapInjector(handle: overlapHandle),
+          SliverPadding(
+            padding: const EdgeInsets.all(16),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate.fixed([
+                Container(height: 100, color: skeletonColor),
+                const SizedBox(height: 16),
+                Container(height: 60, color: skeletonColor),
+              ]),
+            ),
+          ),
         ],
       );
     }
@@ -48,6 +63,7 @@ class _ComicDetailInfoTab extends StatelessWidget {
       key: const PageStorageKey<String>('comic-detail-info-tab'),
       physics: const ClampingScrollPhysics(),
       slivers: [
+        SliverOverlapInjector(handle: overlapHandle),
         SliverPadding(
           padding: const EdgeInsets.all(16),
           sliver: SliverToBoxAdapter(
@@ -80,23 +96,59 @@ class _ComicDetailInfoTab extends StatelessWidget {
   }
 }
 
-class _ComicDetailRelatedTab extends StatelessWidget {
+class _ComicDetailRelatedTab extends StatefulWidget {
   const _ComicDetailRelatedTab({
     required this.details,
     required this.heroTagPrefix,
+    required this.isActiveInTabView,
   });
 
   final ComicDetailsData? details;
   final String heroTagPrefix;
+  final bool isActiveInTabView;
+
+  @override
+  State<_ComicDetailRelatedTab> createState() => _ComicDetailRelatedTabState();
+}
+
+class _ComicDetailRelatedTabState extends State<_ComicDetailRelatedTab>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   Widget build(BuildContext context) {
+    super.build(context);
+    if (!widget.isActiveInTabView) {
+      return const SizedBox.expand();
+    }
+    final details = widget.details;
+    final overlapHandle = NestedScrollView.sliverOverlapAbsorberHandleFor(
+      context,
+    );
+
     if (details == null) {
-      return const _ComicDetailLoadingView();
+      return CustomScrollView(
+        physics: const ClampingScrollPhysics(),
+        slivers: [
+          SliverOverlapInjector(handle: overlapHandle),
+          const SliverFillRemaining(child: _ComicDetailLoadingView()),
+        ],
+      );
     }
 
-    if (details!.recommend.isEmpty) {
-      return Center(child: Text(l10n(context).comicDetailNoRelatedComics));
+    if (details.recommend.isEmpty) {
+      return CustomScrollView(
+        physics: const ClampingScrollPhysics(),
+        slivers: [
+          SliverOverlapInjector(handle: overlapHandle),
+          SliverFillRemaining(
+            child: Center(
+              child: Text(l10n(context).comicDetailNoRelatedComics),
+            ),
+          ),
+        ],
+      );
     }
 
     const crossAxisCount = 3;
@@ -113,107 +165,100 @@ class _ComicDetailRelatedTab extends StatelessWidget {
         .clamp(120, 480)
         .toInt();
 
-    return GridView.builder(
+    return CustomScrollView(
       key: const PageStorageKey<String>('comic-detail-related-tab'),
       physics: const ClampingScrollPhysics(),
-      padding: const EdgeInsets.all(16),
-      itemCount: details!.recommend.length,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
-        mainAxisSpacing: 10,
-        crossAxisSpacing: 10,
-        childAspectRatio: 0.57,
-      ),
-      itemBuilder: (context, index) {
-        final comic = details!.recommend[index];
-        final heroTag = '${heroTagPrefix}_related_$index';
-        final child = InkWell(
-          borderRadius: BorderRadius.circular(8),
-          onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => ComicDetailPage(comic: comic, heroTag: heroTag),
-              ),
-            );
-          },
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Hero(
-                  tag: heroTag,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: comic.cover.isEmpty
-                        ? Container(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.surfaceContainerHighest,
-                            child: const Center(
-                              child: Icon(Icons.image_not_supported_outlined),
-                            ),
-                          )
-                        : HazukiCachedImage(
-                            url: comic.cover,
-                            fit: BoxFit.cover,
-                            width: double.infinity,
-                            keepInMemory: false,
-                            cacheWidth: thumbnailCacheWidth,
-                            loading: Container(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.surfaceContainerHighest,
-                              alignment: Alignment.center,
-                            ),
-                            error: Container(
-                              color: Theme.of(
-                                context,
-                              ).colorScheme.surfaceContainerHighest,
-                              alignment: Alignment.center,
-                              child: const Icon(Icons.broken_image_outlined),
-                            ),
-                          ),
-                  ),
+      slivers: [
+        SliverOverlapInjector(handle: overlapHandle),
+        SliverPadding(
+          padding: const EdgeInsets.all(16),
+          sliver: SliverGrid(
+            delegate: SliverChildBuilderDelegate((context, index) {
+              final comic = details.recommend[index];
+              final heroTag = '${widget.heroTagPrefix}_related_$index';
+              final child = InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) =>
+                          ComicDetailPage(comic: comic, heroTag: heroTag),
+                    ),
+                  );
+                },
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Hero(
+                        tag: heroTag,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: comic.cover.isEmpty
+                              ? Container(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.surfaceContainerHighest,
+                                  child: const Center(
+                                    child: Icon(
+                                      Icons.image_not_supported_outlined,
+                                    ),
+                                  ),
+                                )
+                              : HazukiCachedImage(
+                                  url: comic.cover,
+                                  fit: BoxFit.cover,
+                                  width: double.infinity,
+                                  keepInMemory: false,
+                                  cacheWidth: thumbnailCacheWidth,
+                                  loading: Container(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.surfaceContainerHighest,
+                                    alignment: Alignment.center,
+                                  ),
+                                  error: Container(
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.surfaceContainerHighest,
+                                    alignment: Alignment.center,
+                                    child: const Icon(
+                                      Icons.broken_image_outlined,
+                                    ),
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      comic.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                    if (comic.subTitle.isNotEmpty)
+                      Text(
+                        comic.subTitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                comic.title,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              if (comic.subTitle.isNotEmpty)
-                Text(
-                  comic.subTitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-            ],
-          ),
-        );
+              );
 
-        return TweenAnimationBuilder<double>(
-          tween: Tween<double>(begin: 0.0, end: 1.0),
-          duration: Duration(milliseconds: 350 + (index.clamp(0, 10)) * 60),
-          curve: Curves.easeOutBack,
-          builder: (context, value, animationChild) {
-            return Transform.scale(
-              scale: 0.85 + 0.15 * value,
-              alignment: Alignment.bottomCenter,
-              child: Transform.translate(
-                offset: Offset(0, 50 * (1 - value)),
-                child: Opacity(
-                  opacity: value.clamp(0.0, 1.0),
-                  child: animationChild,
-                ),
-              ),
-            );
-          },
-          child: child,
-        );
-      },
+              return child;
+            }, childCount: details.recommend.length),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              childAspectRatio: 0.57,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

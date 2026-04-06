@@ -169,14 +169,15 @@ class _ComicBlurredCoverBackgroundState
     final hasCover = _coverBytes != null;
     final normalizedUrl = widget.coverUrl.trim();
     final devicePixelRatio = mediaQuery.devicePixelRatio;
-    final cacheWidth = (mediaQuery.size.width * devicePixelRatio)
+    final cacheWidth = (mediaQuery.size.width * devicePixelRatio * 0.72)
         .round()
-        .clamp(320, 1440)
+        .clamp(320, 1080)
         .toInt();
-    final cacheHeight = (mediaQuery.size.height * 0.58 * devicePixelRatio)
-        .round()
-        .clamp(240, 960)
-        .toInt();
+    final cacheHeight =
+        (mediaQuery.size.height * 0.58 * devicePixelRatio * 0.72)
+            .round()
+            .clamp(240, 720)
+            .toInt();
     final topScrim = isDark
         ? surface.withValues(alpha: 0.64)
         : const Color(0xA2FAFAFA);

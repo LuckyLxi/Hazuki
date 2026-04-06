@@ -17,7 +17,9 @@ class _HazukiTabBarDelegate extends SliverPersistentHeaderDelegate {
     double shrinkOffset,
     bool overlapsContent,
   ) {
-    return ColoredBox(color: surfaceColor, child: tabBar);
+    return RepaintBoundary(
+      child: ColoredBox(color: surfaceColor, child: tabBar),
+    );
   }
 
   @override
@@ -365,10 +367,7 @@ class _ChaptersPanelSheetState extends State<ChaptersPanelSheet> {
           builder: (context, value, child) {
             return Transform.scale(
               scale: 0.9 + 0.1 * value,
-              child: Opacity(
-                opacity: value.clamp(0.0, 1.0),
-                child: child,
-              ),
+              child: Opacity(opacity: value.clamp(0.0, 1.0), child: child),
             );
           },
           child: chip,
