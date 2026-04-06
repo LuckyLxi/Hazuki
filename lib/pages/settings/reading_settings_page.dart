@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../pages/reader/reader.dart';
+import '../../pages/reader/reader_settings_store.dart';
 import '../../widgets/widgets.dart';
 
 class ReadingSettingsPage extends StatefulWidget {
@@ -13,17 +13,19 @@ class ReadingSettingsPage extends StatefulWidget {
 }
 
 class _ReadingSettingsPageState extends State<ReadingSettingsPage> {
-  ReaderMode _readerMode = ReaderMode.topToBottom;
-  bool _doublePageMode = false;
-  bool _tapToTurnPage = false;
-  bool _volumeButtonTurnPage = false;
-  bool _immersiveMode = true;
-  bool _keepScreenOn = true;
-  bool _customBrightness = false;
-  double _brightnessValue = 0.5;
-  bool _pageIndicator = false;
-  bool _pinchToZoom = false;
-  bool _longPressToSave = false;
+  static const _readerSettingsStore = ReaderSettingsStore();
+
+  ReaderMode _readerMode = ReaderSettingsStore.defaultReaderMode;
+  bool _doublePageMode = ReaderSettingsStore.defaultDoublePageMode;
+  bool _tapToTurnPage = ReaderSettingsStore.defaultTapToTurnPage;
+  bool _volumeButtonTurnPage = ReaderSettingsStore.defaultVolumeButtonTurnPage;
+  bool _immersiveMode = ReaderSettingsStore.defaultImmersiveMode;
+  bool _keepScreenOn = ReaderSettingsStore.defaultKeepScreenOn;
+  bool _customBrightness = ReaderSettingsStore.defaultCustomBrightness;
+  double _brightnessValue = ReaderSettingsStore.defaultBrightnessValue;
+  bool _pageIndicator = ReaderSettingsStore.defaultPageIndicator;
+  bool _pinchToZoom = ReaderSettingsStore.defaultPinchToZoom;
+  bool _longPressToSave = ReaderSettingsStore.defaultLongPressToSave;
 
   @override
   void initState() {
@@ -32,21 +34,22 @@ class _ReadingSettingsPageState extends State<ReadingSettingsPage> {
   }
 
   Future<void> _loadSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (!mounted) return;
+    final settings = await _readerSettingsStore.load();
+    if (!mounted) {
+      return;
+    }
     setState(() {
-      _readerMode = readerModeFromRaw(prefs.getString('reader_reading_mode'));
-      _doublePageMode = prefs.getBool('reader_double_page_mode') ?? false;
-      _tapToTurnPage = prefs.getBool('reader_tap_to_turn_page') ?? false;
-      _volumeButtonTurnPage =
-          prefs.getBool('reader_volume_button_turn_page') ?? false;
-      _immersiveMode = prefs.getBool('reader_immersive_mode') ?? true;
-      _keepScreenOn = prefs.getBool('reader_keep_screen_on') ?? true;
-      _customBrightness = prefs.getBool('reader_custom_brightness') ?? false;
-      _brightnessValue = prefs.getDouble('reader_brightness_value') ?? 0.5;
-      _pageIndicator = prefs.getBool('reader_page_indicator') ?? false;
-      _pinchToZoom = prefs.getBool('reader_pinch_to_zoom') ?? false;
-      _longPressToSave = prefs.getBool('reader_long_press_save') ?? false;
+      _readerMode = settings.readerMode;
+      _doublePageMode = settings.doublePageMode;
+      _tapToTurnPage = settings.tapToTurnPage;
+      _volumeButtonTurnPage = settings.volumeButtonTurnPage;
+      _immersiveMode = settings.immersiveMode;
+      _keepScreenOn = settings.keepScreenOn;
+      _customBrightness = settings.customBrightness;
+      _brightnessValue = settings.brightnessValue;
+      _pageIndicator = settings.pageIndicator;
+      _pinchToZoom = settings.pinchToZoom;
+      _longPressToSave = settings.longPressToSave;
     });
   }
 
@@ -57,68 +60,58 @@ class _ReadingSettingsPageState extends State<ReadingSettingsPage> {
     setState(() {
       _readerMode = value;
     });
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('reader_reading_mode', value.prefsValue);
+    await _readerSettingsStore.saveReaderMode(value);
   }
 
   Future<void> _toggleTapToTurnPage(bool value) async {
     setState(() => _tapToTurnPage = value);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('reader_tap_to_turn_page', value);
+    await _readerSettingsStore.saveTapToTurnPage(value);
   }
 
   Future<void> _toggleDoublePageMode(bool value) async {
     setState(() => _doublePageMode = value);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('reader_double_page_mode', value);
+    await _readerSettingsStore.saveDoublePageMode(value);
   }
 
   Future<void> _toggleVolumeButtonTurnPage(bool value) async {
     setState(() => _volumeButtonTurnPage = value);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('reader_volume_button_turn_page', value);
+    await _readerSettingsStore.saveVolumeButtonTurnPage(value);
   }
 
   Future<void> _toggleImmersiveMode(bool value) async {
     setState(() => _immersiveMode = value);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('reader_immersive_mode', value);
+    await _readerSettingsStore.saveImmersiveMode(value);
   }
 
   Future<void> _toggleKeepScreenOn(bool value) async {
     setState(() => _keepScreenOn = value);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('reader_keep_screen_on', value);
+    await _readerSettingsStore.saveKeepScreenOn(value);
   }
 
   Future<void> _toggleCustomBrightness(bool value) async {
     setState(() => _customBrightness = value);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('reader_custom_brightness', value);
+    await _readerSettingsStore.saveCustomBrightness(value);
   }
 
   Future<void> _updateBrightness(double value) async {
-    setState(() => _brightnessValue = value);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble('reader_brightness_value', value);
+    final normalized = ReaderSettingsStore.normalizeBrightnessValue(value);
+    setState(() => _brightnessValue = normalized);
+    await _readerSettingsStore.saveBrightnessValue(normalized);
   }
 
   Future<void> _togglePageIndicator(bool value) async {
     setState(() => _pageIndicator = value);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('reader_page_indicator', value);
+    await _readerSettingsStore.savePageIndicator(value);
   }
 
   Future<void> _togglePinchToZoom(bool value) async {
     setState(() => _pinchToZoom = value);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('reader_pinch_to_zoom', value);
+    await _readerSettingsStore.savePinchToZoom(value);
   }
 
   Future<void> _toggleLongPressToSave(bool value) async {
     setState(() => _longPressToSave = value);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('reader_long_press_save', value);
+    await _readerSettingsStore.saveLongPressToSave(value);
   }
 
   Widget _buildGroup(BuildContext context, {required List<Widget> children}) {

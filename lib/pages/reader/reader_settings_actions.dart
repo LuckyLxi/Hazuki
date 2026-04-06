@@ -2,45 +2,23 @@ part of '../reader_page.dart';
 
 extension _ReaderSettingsActionsExtension on _ReaderPageState {
   Future<void> _loadReadingSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    final immersiveMode =
-        prefs.getBool('reader_immersive_mode') ??
-        _ReaderPageState._defaultImmersiveMode;
-    final keepScreenOn =
-        prefs.getBool('reader_keep_screen_on') ??
-        _ReaderPageState._defaultKeepScreenOn;
-    final customBrightness =
-        prefs.getBool('reader_custom_brightness') ??
-        _ReaderPageState._defaultCustomBrightness;
-    final pageIndicator =
-        prefs.getBool('reader_page_indicator') ??
-        _ReaderPageState._defaultPageIndicator;
-    final doublePageMode =
-        prefs.getBool('reader_double_page_mode') ??
-        _ReaderPageState._defaultDoublePageMode;
-    final brightnessValue =
-        prefs.getDouble('reader_brightness_value') ??
-        _ReaderPageState._defaultBrightnessValue;
-    final readerMode = readerModeFromRaw(
-      prefs.getString('reader_reading_mode'),
-    );
+    final settings = await _ReaderPageState._readerSettingsStore.load();
     if (!mounted) {
       return;
     }
     _updateReaderState(() {
-      _immersiveMode = immersiveMode;
-      _keepScreenOn = keepScreenOn;
-      _customBrightness = customBrightness;
-      _pageIndicator = pageIndicator;
-      _brightnessValue = math.max(0.0, math.min(brightnessValue, 1.0));
-      _readerMode = readerMode;
-      _doublePageMode = doublePageMode;
+      _immersiveMode = settings.immersiveMode;
+      _keepScreenOn = settings.keepScreenOn;
+      _customBrightness = settings.customBrightness;
+      _pageIndicator = settings.pageIndicator;
+      _brightnessValue = settings.brightnessValue;
+      _readerMode = settings.readerMode;
+      _doublePageMode = settings.doublePageMode;
       _rebuildSpreadItemKeys();
-      _tapToTurnPage = prefs.getBool('reader_tap_to_turn_page') ?? false;
-      _volumeButtonTurnPage =
-          prefs.getBool('reader_volume_button_turn_page') ?? false;
-      _pinchToZoom = prefs.getBool('reader_pinch_to_zoom') ?? false;
-      _longPressToSave = prefs.getBool('reader_long_press_save') ?? false;
+      _tapToTurnPage = settings.tapToTurnPage;
+      _volumeButtonTurnPage = settings.volumeButtonTurnPage;
+      _pinchToZoom = settings.pinchToZoom;
+      _longPressToSave = settings.longPressToSave;
     });
     _logReaderEvent(
       'Reader settings loaded',
@@ -52,58 +30,27 @@ extension _ReaderSettingsActionsExtension on _ReaderPageState {
   }
 
   Future<void> _applyReaderDisplaySettings() async {
-    if (_immersiveMode) {
-      await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    } else {
-      await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    }
-
-    if (Platform.isAndroid) {
-      try {
-        await _ReaderPageState._readerDisplayChannel.invokeMethod<void>(
-          'setKeepScreenOn',
-          {'enabled': _keepScreenOn},
-        );
-        await _ReaderPageState._readerDisplayChannel.invokeMethod<bool>(
-          'setReaderBrightness',
-          {'value': _customBrightness ? _brightnessValue : null},
-        );
-      } catch (_) {}
-    }
+    await _ReaderPageState._readerDisplayController.apply(
+      immersiveMode: _immersiveMode,
+      keepScreenOn: _keepScreenOn,
+      customBrightness: _customBrightness,
+      brightnessValue: _brightnessValue,
+    );
   }
 
   Future<void> _syncReaderVolumeButtonPagingPlatformState({
     bool? enabled,
   }) async {
-    if (!Platform.isAndroid) {
-      return;
-    }
-    try {
-      await _ReaderPageState._readerDisplayChannel.invokeMethod<bool>(
-        'setVolumeButtonPaging',
-        {
-          'enabled': enabled ?? _volumeButtonTurnPage,
-          'sessionId': _readerSessionId,
-        },
-      );
-    } catch (_) {}
+    await _ReaderPageState._readerDisplayController.syncVolumeButtonPaging(
+      enabled: enabled ?? _volumeButtonTurnPage,
+      sessionId: _readerSessionId,
+    );
   }
 
   Future<void> _restoreReaderDisplay() async {
-    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    await _syncReaderVolumeButtonPagingPlatformState(enabled: false);
-    if (Platform.isAndroid) {
-      try {
-        await _ReaderPageState._readerDisplayChannel.invokeMethod<void>(
-          'setKeepScreenOn',
-          {'enabled': false},
-        );
-        await _ReaderPageState._readerDisplayChannel.invokeMethod<bool>(
-          'setReaderBrightness',
-          {'value': null},
-        );
-      } catch (_) {}
-    }
+    await _ReaderPageState._readerDisplayController.restore(
+      sessionId: _readerSessionId,
+    );
   }
 
   void _toggleControlsVisibility() {
@@ -123,21 +70,6 @@ extension _ReaderSettingsActionsExtension on _ReaderPageState {
     _scaffoldKey.currentState?.openEndDrawer();
   }
 
-  Future<void> _persistReaderBool(String key, bool value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(key, value);
-  }
-
-  Future<void> _persistReaderDouble(String key, double value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble(key, value);
-  }
-
-  Future<void> _persistReaderString(String key, String value) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(key, value);
-  }
-
   Future<void> _updateReaderModeSetting(ReaderMode? value) async {
     if (value == null) {
       return;
@@ -148,7 +80,7 @@ extension _ReaderSettingsActionsExtension on _ReaderPageState {
     _updateReaderState(() {
       _readerMode = value;
     });
-    await _persistReaderString('reader_reading_mode', value.prefsValue);
+    await _ReaderPageState._readerSettingsStore.saveReaderMode(value);
     _logReaderEvent(
       changed ? 'Reader mode changed' : 'Reader mode reselected',
       source: 'reader_settings',
@@ -174,7 +106,7 @@ extension _ReaderSettingsActionsExtension on _ReaderPageState {
       _doublePageMode = value;
       _rebuildSpreadItemKeys();
     });
-    await _persistReaderBool('reader_double_page_mode', value);
+    await _ReaderPageState._readerSettingsStore.saveDoublePageMode(value);
     _logReaderEvent(
       previousValue != value
           ? 'Reader double page mode toggled'
@@ -199,7 +131,7 @@ extension _ReaderSettingsActionsExtension on _ReaderPageState {
     _updateReaderState(() {
       _tapToTurnPage = value;
     });
-    await _persistReaderBool('reader_tap_to_turn_page', value);
+    await _ReaderPageState._readerSettingsStore.saveTapToTurnPage(value);
     _logReaderEvent(
       'Reader tap to turn page toggled',
       source: 'reader_settings',
@@ -214,7 +146,7 @@ extension _ReaderSettingsActionsExtension on _ReaderPageState {
     _updateReaderState(() {
       _volumeButtonTurnPage = value;
     });
-    await _persistReaderBool('reader_volume_button_turn_page', value);
+    await _ReaderPageState._readerSettingsStore.saveVolumeButtonTurnPage(value);
     _logReaderEvent(
       'Reader volume button turn page toggled',
       source: 'reader_settings',
@@ -230,7 +162,7 @@ extension _ReaderSettingsActionsExtension on _ReaderPageState {
     _updateReaderState(() {
       _immersiveMode = value;
     });
-    await _persistReaderBool('reader_immersive_mode', value);
+    await _ReaderPageState._readerSettingsStore.saveImmersiveMode(value);
     _logReaderEvent(
       'Reader immersive mode toggled',
       source: 'reader_settings',
@@ -243,7 +175,7 @@ extension _ReaderSettingsActionsExtension on _ReaderPageState {
     _updateReaderState(() {
       _keepScreenOn = value;
     });
-    await _persistReaderBool('reader_keep_screen_on', value);
+    await _ReaderPageState._readerSettingsStore.saveKeepScreenOn(value);
     _logReaderEvent(
       'Reader keep screen on toggled',
       source: 'reader_settings',
@@ -256,7 +188,7 @@ extension _ReaderSettingsActionsExtension on _ReaderPageState {
     _updateReaderState(() {
       _customBrightness = value;
     });
-    await _persistReaderBool('reader_custom_brightness', value);
+    await _ReaderPageState._readerSettingsStore.saveCustomBrightness(value);
     _logReaderEvent(
       'Reader custom brightness toggled',
       source: 'reader_settings',
@@ -269,11 +201,11 @@ extension _ReaderSettingsActionsExtension on _ReaderPageState {
   }
 
   Future<void> _updateBrightnessSetting(double value) async {
-    final normalized = math.max(0.0, math.min(value, 1.0));
+    final normalized = ReaderSettingsStore.normalizeBrightnessValue(value);
     _updateReaderState(() {
       _brightnessValue = normalized;
     });
-    await _persistReaderDouble('reader_brightness_value', normalized);
+    await _ReaderPageState._readerSettingsStore.saveBrightnessValue(normalized);
     await _applyReaderDisplaySettings();
   }
 
@@ -281,7 +213,7 @@ extension _ReaderSettingsActionsExtension on _ReaderPageState {
     _updateReaderState(() {
       _pageIndicator = value;
     });
-    await _persistReaderBool('reader_page_indicator', value);
+    await _ReaderPageState._readerSettingsStore.savePageIndicator(value);
     _logReaderEvent(
       'Reader page indicator toggled',
       source: 'reader_settings',
@@ -300,7 +232,7 @@ extension _ReaderSettingsActionsExtension on _ReaderPageState {
     _updateReaderState(() {
       _pinchToZoom = value;
     });
-    await _persistReaderBool('reader_pinch_to_zoom', value);
+    await _ReaderPageState._readerSettingsStore.savePinchToZoom(value);
     _logReaderEvent(
       'Reader pinch to zoom toggled',
       source: 'reader_settings',
@@ -315,7 +247,7 @@ extension _ReaderSettingsActionsExtension on _ReaderPageState {
     _updateReaderState(() {
       _longPressToSave = value;
     });
-    await _persistReaderBool('reader_long_press_save', value);
+    await _ReaderPageState._readerSettingsStore.saveLongPressToSave(value);
     _logReaderEvent(
       'Reader long press to save toggled',
       source: 'reader_settings',

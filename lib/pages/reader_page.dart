@@ -18,6 +18,7 @@ import 'reader/reader.dart';
 import 'reader/reader_diagnostics_support.dart';
 import 'reader/reader_overlay_controls.dart';
 import 'reader/reader_settings_drawer_content.dart';
+import 'reader/reader_settings_store.dart';
 import 'reader/reader_state_views.dart';
 
 part 'reader/reader_diagnostics_actions.dart';
@@ -59,16 +60,14 @@ class _ReaderPageState extends State<ReaderPage>
   static const _readerDisplayChannel = MethodChannel(
     'hazuki.comics/reader_display',
   );
+  static const _readerSettingsStore = ReaderSettingsStore();
+  static const _readerDisplayController = ReaderDisplayController(
+    _readerDisplayChannel,
+  );
   static bool _readerDisplayMethodHandlerRegistered = false;
   static _ReaderPageState? _activeReaderPageState;
 
   static const int _maxUnscrambleConcurrency = 5;
-  static const bool _defaultImmersiveMode = true;
-  static const bool _defaultKeepScreenOn = true;
-  static const bool _defaultCustomBrightness = false;
-  static const bool _defaultDoublePageMode = false;
-  static const bool _defaultPageIndicator = false;
-  static const double _defaultBrightnessValue = 0.5;
   static const int _prefetchAroundCount = 10;
   static const int _prefetchAheadMemoryCount = 6;
   static const int _providerKeepBehindCount = 12;
@@ -110,17 +109,17 @@ class _ReaderPageState extends State<ReaderPage>
   String? _loadImagesError;
   ComicDetailsData? _chapterDetailsCache;
   bool _chapterPanelLoading = false;
-  bool _immersiveMode = _defaultImmersiveMode;
-  bool _keepScreenOn = _defaultKeepScreenOn;
-  bool _customBrightness = _defaultCustomBrightness;
-  double _brightnessValue = _defaultBrightnessValue;
-  ReaderMode _readerMode = ReaderMode.topToBottom;
-  bool _doublePageMode = _defaultDoublePageMode;
-  bool _tapToTurnPage = false;
-  bool _pageIndicator = _defaultPageIndicator;
-  bool _pinchToZoom = false;
-  bool _longPressToSave = false;
-  bool _volumeButtonTurnPage = false;
+  bool _immersiveMode = ReaderSettingsStore.defaultImmersiveMode;
+  bool _keepScreenOn = ReaderSettingsStore.defaultKeepScreenOn;
+  bool _customBrightness = ReaderSettingsStore.defaultCustomBrightness;
+  double _brightnessValue = ReaderSettingsStore.defaultBrightnessValue;
+  ReaderMode _readerMode = ReaderSettingsStore.defaultReaderMode;
+  bool _doublePageMode = ReaderSettingsStore.defaultDoublePageMode;
+  bool _tapToTurnPage = ReaderSettingsStore.defaultTapToTurnPage;
+  bool _pageIndicator = ReaderSettingsStore.defaultPageIndicator;
+  bool _pinchToZoom = ReaderSettingsStore.defaultPinchToZoom;
+  bool _longPressToSave = ReaderSettingsStore.defaultLongPressToSave;
+  bool _volumeButtonTurnPage = ReaderSettingsStore.defaultVolumeButtonTurnPage;
   bool _isZoomed = false;
   bool _zoomInteracting = false;
   int _activePointerCount = 0;
