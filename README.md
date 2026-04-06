@@ -6,10 +6,6 @@
   <img src="screenshots/favorite.jpg" width="220" alt="收藏页">
 </p>
 
-<p align="center">
-  免费、开源的 JMComic 第三方 Android 阅读器
-</p>
-
 ---
 
 ## 致谢
