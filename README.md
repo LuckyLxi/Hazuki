@@ -48,6 +48,7 @@ Hazuki 是一个基于 Flutter 的 JMComic 第三方漫画阅读客户端
 - [Venera](https://github.com/venera-app/venera) — 参考了部分实现
 - [venera-configs](https://github.com/venera-app/venera-configs) — 使用了 JMComic 漫画源脚本
 - [Animeko](https://github.com/open-ani/animeko) — 参考了部分 UI 设计
+- [flutter_qjs](https://github.com/ekibun/flutter_qjs)
 
 ## 免责声明
 
