@@ -4,6 +4,7 @@
 .dart_tool/
 .packages
 build/
+lib/l10n/app_localizations*.dart
 # If you're building an application, you may want to check-in your pubspec.lock
 pubspec.lock
 
