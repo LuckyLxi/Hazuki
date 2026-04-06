@@ -69,6 +69,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: build/app/outputs/flutter-apk/app-*-release.apk
-          name: Hazuki ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
           draft: false
           prerelease: false
