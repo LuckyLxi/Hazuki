@@ -6,7 +6,6 @@ on:
       - master
     tags:
       - 'v*'
-  pull_request:
   workflow_dispatch:
 
 jobs:
@@ -39,25 +38,23 @@ jobs:
       - name: Static analysis
         run: flutter analyze
 
-      # 把 jks 文件从 Base64 还原出来
+      # 把 jks 文件从 Base64 还原出来，存到 android/app/ 目录下
       - name: Decode keystore
         run: echo "${{ secrets.HazukiNoa }}" | base64 --decode > android/app/keystore.jks
 
-      # 写入签名配置到 key.properties
+      # 写入签名配置，注意不能有前导空格否则 Flutter/Gradle 会读取失败
       - name: Write key.properties
         run: |
-          cat > android/key.properties <<EOF
-          storePassword=${{ secrets.STORE_PASSWORD }}
-          keyPassword=${{ secrets.KEY_PASSWORD }}
-          keyAlias=${{ secrets.KEY_ALIAS }}
-          storeFile=keystore.jks
-          EOF
+          echo "storePassword=${{ secrets.STORE_PASSWORD }}" > android/key.properties
+          echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> android/key.properties
+          echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/key.properties
+          echo "storeFile=keystore.jks" >> android/key.properties
 
-      # 使用 split-per-abi 打包，不指定 target-platform 默认会包含所有架构并拆分
+      # 使用 split-per-abi 打包，生成 armeabi-v7a / arm64-v8a / x86_64 三个 APK
       - name: Build Android APKs (Split per ABI)
         run: flutter build apk --release --split-per-abi
 
-      # 使用通配符上传所有生成的 APK
+      # 上传所有生成的 APK 为 artifact
       - name: Upload APK artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -65,12 +62,11 @@ jobs:
           path: build/app/outputs/flutter-apk/app-*-release.apk
           if-no-files-found: error
 
-      # 只有打了 tag 才发布到 Releases
+      # 只有打了 v* tag 才发布到 Releases
       - name: Release to GitHub Releases
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          # 这里的通配符会将 v7a, v8a, x86_64 等所有 APK 一起发布
           files: build/app/outputs/flutter-apk/app-*-release.apk
           name: Hazuki ${{ github.ref_name }}
           draft: false
