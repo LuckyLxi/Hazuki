@@ -21,6 +21,9 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
   bool _authOnResume = false;
   bool _loading = true;
 
+  bool get _canToggleAuthOnResume =>
+      _biometricAuth || PasswordLockService.instance.isEnabled;
+
   @override
   void initState() {
     super.initState();
@@ -70,13 +73,13 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
 
     setState(() {
       _biometricAuth = value;
-      if (!value) {
+      if (!value && !PasswordLockService.instance.isEnabled) {
         _authOnResume = false;
       }
     });
     try {
       await _channel.invokeMethod('setBiometricAuth', {'enabled': value});
-      if (!value) {
+      if (!value && !PasswordLockService.instance.isEnabled) {
         await _channel.invokeMethod('setAuthOnResume', {'enabled': false});
       }
     } catch (_) {}
@@ -84,7 +87,7 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
   }
 
   Future<void> _toggleAuthOnResume(bool value) async {
-    if (!_biometricAuth) return;
+    if (!_canToggleAuthOnResume) return;
     setState(() => _authOnResume = value);
     try {
       await _channel.invokeMethod('setAuthOnResume', {'enabled': value});
@@ -162,6 +165,12 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
       return;
     }
     await service.disable();
+    if (!_biometricAuth && _authOnResume) {
+      try {
+        await _channel.invokeMethod('setAuthOnResume', {'enabled': false});
+      } catch (_) {}
+      _authOnResume = false;
+    }
     if (!mounted) {
       return;
     }
@@ -227,7 +236,9 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
                       title: Text(strings.privacyAuthOnResumeTitle),
                       subtitle: Text(strings.privacyAuthOnResumeSubtitle),
                       value: _authOnResume,
-                      onChanged: _biometricAuth ? _toggleAuthOnResume : null,
+                      onChanged: _canToggleAuthOnResume
+                          ? _toggleAuthOnResume
+                          : null,
                     ),
                     ListTile(
                       leading: const Icon(Icons.password_rounded),

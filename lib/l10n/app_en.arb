@@ -151,6 +151,19 @@
   },
   "softwareUpdateChangelogTitle": "What's new",
   "softwareUpdateOpenRelease": "Open release page",
+  "softwareUpdateViewDetails": "View details",
+  "softwareUpdateDownloadAction": "Download",
+  "softwareUpdateDownloadingTitle": "Downloading",
+  "softwareUpdateBackgroundDownload": "Background download",
+  "softwareUpdateDownloadUnavailable": "No downloadable package is available right now.",
+  "softwareUpdateDownloadedFileInvalid": "The downloaded APK is invalid.",
+  "softwareUpdateDownloadFailed": "Failed to download update: {error}",
+  "@softwareUpdateDownloadFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "softwareUpdateInstallerLaunchFailed": "The download finished, but the installer could not be opened.",
   "softwareUpdateAlreadyLatest": "You're already on the latest app version",
   "softwareUpdateCheckFailed": "Unable to check for app updates right now",
   "aboutFeedbackTitle": "Feedback",

@@ -151,6 +151,19 @@
   },
   "softwareUpdateChangelogTitle": "更新内容",
   "softwareUpdateOpenRelease": "前往发布页",
+  "softwareUpdateViewDetails": "查看详情",
+  "softwareUpdateDownloadAction": "下载",
+  "softwareUpdateDownloadingTitle": "正在下载",
+  "softwareUpdateBackgroundDownload": "后台下载",
+  "softwareUpdateDownloadUnavailable": "暂时没有可下载的安装包",
+  "softwareUpdateDownloadedFileInvalid": "下载的安装包无效",
+  "softwareUpdateDownloadFailed": "下载更新失败：{error}",
+  "@softwareUpdateDownloadFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "softwareUpdateInstallerLaunchFailed": "下载完成，但无法拉起安装器",
   "softwareUpdateAlreadyLatest": "当前已经是最新软件版本",
   "softwareUpdateCheckFailed": "暂时无法检查软件更新，请稍后再试",
   "aboutFeedbackTitle": "反馈问题",

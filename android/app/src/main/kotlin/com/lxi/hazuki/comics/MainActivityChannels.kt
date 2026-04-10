@@ -13,9 +13,11 @@ import android.view.KeyEvent
 import androidx.annotation.RequiresApi
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.core.net.toUri
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import java.io.File
 
 private const val PRIVACY_CHANNEL = "hazuki.comics/privacy"
 private const val DISPLAY_MODE_CHANNEL = "hazuki.comics/display_mode"
@@ -30,6 +32,8 @@ class MainActivityChannels(
     private var pendingSaveTextResult: MethodChannel.Result? = null
     private var pendingSaveTextContent: String? = null
     private var pendingStorageAccessResult: MethodChannel.Result? = null
+    private var pendingInstallApkResult: MethodChannel.Result? = null
+    private var pendingInstallApkPath: String? = null
     private var readerDisplayChannel: MethodChannel? = null
     private var volumeButtonPagingSessionId: String? = null
 
@@ -45,6 +49,11 @@ class MainActivityChannels(
             activity.registerForActivityResult(
                     ActivityResultContracts.RequestMultiplePermissions(),
             ) { completePendingStorageAccessResult(hasStorageAccess()) }
+    private val manageUnknownAppSourcesLauncher =
+            activity.registerForActivityResult(
+                    ActivityResultContracts.StartActivityForResult(),
+            ) { completePendingInstallApkResult(retryPendingApkInstall()) }
+
     fun register(flutterEngine: FlutterEngine) {
         registerPrivacyChannel(flutterEngine)
         registerDisplayModeChannel(flutterEngine)
@@ -148,6 +157,14 @@ class MainActivityChannels(
                             }
                             MediaScannerConnection.scanFile(activity, arrayOf(path), null, null)
                             result.success(true)
+                        }
+                        "installApk" -> {
+                            val path = call.argument<String>("path")
+                            if (path.isNullOrBlank()) {
+                                result.success(false)
+                                return@setMethodCallHandler
+                            }
+                            installApk(path, result)
                         }
                         "saveTextFile" -> {
                             if (pendingSaveTextResult != null) {
@@ -254,6 +271,82 @@ class MainActivityChannels(
         val result = pendingStorageAccessResult ?: return
         pendingStorageAccessResult = null
         result.success(granted)
+    }
+
+    private fun installApk(path: String, result: MethodChannel.Result) {
+        if (pendingInstallApkResult != null) {
+            result.error(
+                    "install_apk_in_progress",
+                    "Another installApk request is already in progress",
+                    null,
+            )
+            return
+        }
+
+        if (!File(path).exists()) {
+            result.success(false)
+            return
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+                !activity.packageManager.canRequestPackageInstalls()) {
+            pendingInstallApkResult = result
+            pendingInstallApkPath = path
+            val settingsIntent =
+                    Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+                        data = "package:${activity.packageName}".toUri()
+                    }
+            try {
+                manageUnknownAppSourcesLauncher.launch(settingsIntent)
+            } catch (e: Exception) {
+                pendingInstallApkResult = null
+                pendingInstallApkPath = null
+                Log.e("MainActivityChannels", "Failed to launch install settings", e)
+                result.success(false)
+            }
+            return
+        }
+
+        result.success(launchApkInstaller(path))
+    }
+
+    private fun retryPendingApkInstall(): Boolean {
+        val path = pendingInstallApkPath ?: return false
+        pendingInstallApkPath = null
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+                !activity.packageManager.canRequestPackageInstalls()) {
+            return false
+        }
+        return launchApkInstaller(path)
+    }
+
+    private fun completePendingInstallApkResult(launched: Boolean) {
+        val result = pendingInstallApkResult ?: return
+        pendingInstallApkResult = null
+        result.success(launched)
+    }
+
+    private fun launchApkInstaller(path: String): Boolean {
+        val file = File(path)
+        if (!file.exists()) {
+            return false
+        }
+
+        return try {
+            val authority = "${activity.packageName}.fileprovider"
+            val uri = FileProvider.getUriForFile(activity, authority, file)
+            val intent =
+                    Intent(Intent.ACTION_VIEW).apply {
+                        setDataAndType(uri, "application/vnd.android.package-archive")
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+            activity.startActivity(intent)
+            true
+        } catch (e: Exception) {
+            Log.e("MainActivityChannels", "Failed to launch APK installer", e)
+            false
+        }
     }
 
     private fun setVolumeButtonPaging(enabled: Boolean, sessionId: String?): Boolean {

@@ -1,15 +1,20 @@
 // ignore_for_file: use_build_context_synchronously
 
+import 'dart:async';
 import 'dart:convert';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../l10n/app_localizations.dart';
 import '../l10n/l10n.dart';
+import '../services/software_update_download_service.dart';
 import '../services/software_update_service.dart';
+import '../widgets/widgets.dart';
 
-enum SoftwareUpdateDialogAction { skipToday, cancel, openedRelease }
+enum SoftwareUpdateDialogAction { skipToday, cancel }
 
 class SoftwareUpdateDialogSupport {
   const SoftwareUpdateDialogSupport();
@@ -128,78 +133,392 @@ class SoftwareUpdateDialogSupport {
       return null;
     }
 
-    return showDialog<SoftwareUpdateDialogAction>(
+    return showGeneralDialog<SoftwareUpdateDialogAction>(
       context: effectiveDialogContext,
-      builder: (context) {
-        final strings = l10n(context);
-        final changelog = check.changelog;
-        return AlertDialog(
-          title: Text(strings.softwareUpdateAvailableTitle),
-          content: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420, maxHeight: 420),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(strings.softwareUpdateAvailableMessage),
-                  const SizedBox(height: 12),
-                  Text(
-                    strings.softwareUpdateCurrentVersion(check.currentVersion),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    strings.softwareUpdateLatestVersion(check.latestVersion),
-                  ),
-                  if (changelog != null) ...[
-                    const SizedBox(height: 16),
-                    Text(
-                      strings.softwareUpdateChangelogTitle,
-                      style: Theme.of(context).textTheme.titleSmall,
-                    ),
-                    const SizedBox(height: 8),
-                    SelectableText(changelog),
-                  ],
-                ],
-              ),
-            ),
+      barrierDismissible: false,
+      barrierLabel: l10n(effectiveDialogContext).dialogBarrierLabel,
+      barrierColor: Colors.black.withValues(alpha: 0.34),
+      transitionDuration: const Duration(milliseconds: 280),
+      pageBuilder: (context, animation, secondaryAnimation) {
+        return _SoftwareUpdateDialogCard(check: check);
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        final curved = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        );
+        return FadeTransition(
+          opacity: curved,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.96, end: 1).animate(curved),
+            child: child,
           ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop(SoftwareUpdateDialogAction.skipToday);
-              },
-              child: Text(strings.comicDetailRemindLaterToday),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop(SoftwareUpdateDialogAction.cancel);
-              },
-              child: Text(strings.commonCancel),
-            ),
-            FilledButton(
-              onPressed: () async {
-                final uri = Uri.parse(check.releaseUrl);
-                final opened = await launchUrl(
-                  uri,
-                  mode: LaunchMode.externalApplication,
-                );
-                if (!context.mounted) {
-                  return;
-                }
-                if (!opened) {
-                  Navigator.of(context).pop(SoftwareUpdateDialogAction.cancel);
-                  return;
-                }
-                Navigator.of(
-                  context,
-                ).pop(SoftwareUpdateDialogAction.openedRelease);
-              },
-              child: Text(strings.softwareUpdateOpenRelease),
-            ),
-          ],
         );
       },
     );
+  }
+}
+
+class _SoftwareUpdateDialogCard extends StatefulWidget {
+  const _SoftwareUpdateDialogCard({required this.check});
+
+  final SoftwareUpdateCheckResult check;
+
+  @override
+  State<_SoftwareUpdateDialogCard> createState() =>
+      _SoftwareUpdateDialogCardState();
+}
+
+class _SoftwareUpdateDialogCardState extends State<_SoftwareUpdateDialogCard> {
+  final SoftwareUpdateDownloadService _downloadService =
+      SoftwareUpdateDownloadService.instance;
+
+  bool _downloadTriggerBusy = false;
+
+  Future<void> _openReleasePage() async {
+    final opened = await launchUrl(
+      Uri.parse(widget.check.releaseUrl),
+      mode: LaunchMode.externalApplication,
+    );
+    if (!opened && mounted) {
+      unawaited(
+        showHazukiPrompt(
+          context,
+          l10n(context).aboutOpenLinkFailed,
+          isError: true,
+        ),
+      );
+    }
+  }
+
+  Future<void> _startDownload() async {
+    if (_downloadTriggerBusy) {
+      return;
+    }
+    _downloadService.clearFailure();
+    setState(() => _downloadTriggerBusy = true);
+    final launchedInstaller = await _downloadService.startDownload(
+      widget.check,
+    );
+    if (!mounted) {
+      return;
+    }
+    setState(() => _downloadTriggerBusy = false);
+    if (launchedInstaller) {
+      Navigator.of(context).pop();
+    }
+  }
+
+  String? _buildFailureMessage(AppLocalizations strings) {
+    switch (_downloadService.failureKind) {
+      case SoftwareUpdateDownloadFailureKind.none:
+        return null;
+      case SoftwareUpdateDownloadFailureKind.apkUnavailable:
+        return strings.softwareUpdateDownloadUnavailable;
+      case SoftwareUpdateDownloadFailureKind.fileInvalid:
+        return strings.softwareUpdateDownloadedFileInvalid;
+      case SoftwareUpdateDownloadFailureKind.installerLaunchFailed:
+        return strings.softwareUpdateInstallerLaunchFailed;
+      case SoftwareUpdateDownloadFailureKind.downloadFailed:
+        final detail = _downloadService.failureDetail ?? 'Unknown error';
+        return strings.softwareUpdateDownloadFailed(detail);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+    return ListenableBuilder(
+      listenable: _downloadService,
+      builder: (context, _) {
+        final strings = l10n(context);
+        final theme = Theme.of(context);
+        final colorScheme = theme.colorScheme;
+        final textTheme = theme.textTheme;
+        final isDownloading = _downloadService.isDownloading;
+        final canDownload =
+            widget.check.apkUrl?.trim().isNotEmpty == true &&
+            !_downloadTriggerBusy;
+        final failureMessage = _buildFailureMessage(strings);
+
+        return PopScope(
+          canPop: !isDownloading,
+          child: SafeArea(
+            minimum: const EdgeInsets.all(16),
+            child: Center(
+              child: Dialog(
+                clipBehavior: Clip.antiAlias,
+                insetPadding: EdgeInsets.zero,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 280),
+                  curve: Curves.easeInOutCubic,
+                  width: math.min(
+                    isDownloading ? 332.0 : 388.0,
+                    mediaQuery.size.width - 32,
+                  ),
+                  padding: isDownloading
+                      ? const EdgeInsets.fromLTRB(18, 18, 18, 12)
+                      : const EdgeInsets.fromLTRB(20, 20, 20, 18),
+                  child: AnimatedSize(
+                    duration: const Duration(milliseconds: 280),
+                    curve: Curves.easeInOutCubic,
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 220),
+                      switchInCurve: Curves.easeOutCubic,
+                      switchOutCurve: Curves.easeInCubic,
+                      transitionBuilder: (child, animation) {
+                        return FadeTransition(
+                          opacity: animation,
+                          child: SizeTransition(
+                            sizeFactor: animation,
+                            axisAlignment: 0,
+                            child: child,
+                          ),
+                        );
+                      },
+                      child: isDownloading
+                          ? _buildDownloadingContent(
+                              strings: strings,
+                              textTheme: textTheme,
+                              colorScheme: colorScheme,
+                            )
+                          : _buildAvailableContent(
+                              strings: strings,
+                              textTheme: textTheme,
+                              colorScheme: colorScheme,
+                              maxHeight: mediaQuery.size.height * 0.70,
+                              canDownload: canDownload,
+                              failureMessage: failureMessage,
+                            ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildAvailableContent({
+    required AppLocalizations strings,
+    required TextTheme textTheme,
+    required ColorScheme colorScheme,
+    required double maxHeight,
+    required bool canDownload,
+    required String? failureMessage,
+  }) {
+    final changelog = widget.check.changelog?.trim();
+    final hasChangelog = changelog != null && changelog.isNotEmpty;
+
+    return Column(
+      key: const ValueKey<String>('software-update-available'),
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          strings.softwareUpdateAvailableTitle,
+          style: textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w800,
+            fontSize: 22,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          'v${widget.check.latestVersion}',
+          style: textTheme.bodyMedium?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        if (hasChangelog) ...[
+          const SizedBox(height: 14),
+          Container(
+            constraints: BoxConstraints(maxHeight: math.min(maxHeight, 280)),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.36),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  strings.softwareUpdateChangelogTitle,
+                  style: textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: math.min(maxHeight, 220),
+                  ),
+                  child: SingleChildScrollView(
+                    child: Text(
+                      changelog,
+                      style: textTheme.bodySmall?.copyWith(height: 1.45),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+        if (failureMessage != null) ...[
+          const SizedBox(height: 14),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: colorScheme.errorContainer.withValues(alpha: 0.74),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Text(
+              failureMessage,
+              style: textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onErrorContainer,
+                fontWeight: FontWeight.w600,
+                height: 1.4,
+              ),
+            ),
+          ),
+        ],
+        const SizedBox(height: 20),
+        Row(
+          children: [
+            Expanded(
+              child: TextButton(
+                onPressed: () {
+                  Navigator.of(
+                    context,
+                  ).pop(SoftwareUpdateDialogAction.skipToday);
+                },
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(0, 40),
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                ),
+                child: Text(
+                  strings.comicDetailRemindLaterToday,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: OutlinedButton(
+                onPressed: _openReleasePage,
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size(0, 40),
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                ),
+                child: Text(
+                  strings.softwareUpdateViewDetails,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: FilledButton(
+                onPressed: canDownload
+                    ? () => unawaited(_startDownload())
+                    : null,
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(0, 40),
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                ),
+                child: Text(
+                  strings.softwareUpdateDownloadAction,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDownloadingContent({
+    required AppLocalizations strings,
+    required TextTheme textTheme,
+    required ColorScheme colorScheme,
+  }) {
+    final percentText = _downloadService.indeterminate
+        ? null
+        : '${(_downloadService.progress * 100).round()}%';
+    final speedText = _formatDownloadSpeed(
+      _downloadService.speedBytesPerSecond,
+    );
+    final metaText = percentText == null
+        ? speedText
+        : '$percentText  $speedText';
+
+    return Column(
+      key: const ValueKey<String>('software-update-downloading'),
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          strings.softwareUpdateDownloadingTitle,
+          style: textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w800,
+            height: 1.15,
+          ),
+        ),
+        const SizedBox(height: 18),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: LinearProgressIndicator(
+            minHeight: 8,
+            value: _downloadService.indeterminate
+                ? null
+                : _downloadService.progress,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Center(
+          child: Text(
+            metaText,
+            style: textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Align(
+          alignment: Alignment.bottomRight,
+          child: TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(strings.softwareUpdateBackgroundDownload),
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _formatDownloadSpeed(double bytesPerSecond) {
+    final safeBytes = bytesPerSecond.isFinite ? math.max(bytesPerSecond, 0) : 0;
+    if (safeBytes >= 1024 * 1024) {
+      return '${(safeBytes / (1024 * 1024)).toStringAsFixed(1)} MB/s';
+    }
+    if (safeBytes >= 1024) {
+      return '${(safeBytes / 1024).toStringAsFixed(1)} KB/s';
+    }
+    return '${safeBytes.toStringAsFixed(0)} B/s';
   }
 }
