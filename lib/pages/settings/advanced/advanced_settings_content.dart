@@ -7,12 +7,10 @@ class AdvancedSettingsContent extends StatelessWidget {
   const AdvancedSettingsContent({
     super.key,
     required this.loading,
-    required this.comicIdSearchEnhance,
     required this.noImageMode,
     required this.softwareLogCaptureEnabled,
     required this.hasCustomEditedSource,
     required this.logsPageBuilder,
-    required this.onToggleComicIdSearchEnhance,
     required this.onToggleNoImageMode,
     required this.onToggleSoftwareLogCaptureEnabled,
     required this.onOpenComicSourceEditor,
@@ -20,12 +18,10 @@ class AdvancedSettingsContent extends StatelessWidget {
   });
 
   final bool loading;
-  final bool comicIdSearchEnhance;
   final bool noImageMode;
   final bool softwareLogCaptureEnabled;
   final bool hasCustomEditedSource;
   final WidgetBuilder logsPageBuilder;
-  final ValueChanged<bool> onToggleComicIdSearchEnhance;
   final ValueChanged<bool> onToggleNoImageMode;
   final ValueChanged<bool> onToggleSoftwareLogCaptureEnabled;
   final Future<void> Function() onOpenComicSourceEditor;
@@ -43,13 +39,6 @@ class AdvancedSettingsContent extends StatelessWidget {
       children: [
         SettingsGroup(
           children: [
-            SwitchListTile(
-              secondary: const Icon(Icons.tag_outlined),
-              title: Text(strings.advancedComicIdSearchTitle),
-              subtitle: Text(strings.advancedComicIdSearchSubtitle),
-              value: comicIdSearchEnhance,
-              onChanged: onToggleComicIdSearchEnhance,
-            ),
             SwitchListTile(
               secondary: const Icon(Icons.image_not_supported_outlined),
               title: Text(strings.advancedNoImageModeTitle),

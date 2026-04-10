@@ -95,6 +95,7 @@ class _ReaderPageState extends State<ReaderPage>
   final TransformationController _zoomController = TransformationController();
   final ReaderDiagnosticsState _diagnosticsState = ReaderDiagnosticsState();
   final FocusNode _readerKeyFocusNode = FocusNode();
+  final Set<String> _retryingImageUrls = <String>{};
 
   int _activeUnscrambleTasks = 0;
   bool _prefetchAheadRunning = false;

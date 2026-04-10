@@ -24,9 +24,6 @@ class AdvancedSettingsPage extends StatefulWidget {
 }
 
 class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
-  static const _keyComicIdSearchEnhance = 'advanced_comic_id_search_enhance';
-
-  bool _comicIdSearchEnhance = false;
   bool _noImageMode = false;
   bool _softwareLogCaptureEnabled = false;
   bool _hasCustomEditedSource = false;
@@ -48,18 +45,11 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
       return;
     }
     setState(() {
-      _comicIdSearchEnhance = prefs.getBool(_keyComicIdSearchEnhance) ?? false;
       _noImageMode = prefs.getBool(hazukiNoImageModePreferenceKey) ?? false;
       _softwareLogCaptureEnabled = softwareLogCaptureEnabled;
       _hasCustomEditedSource = hasCustomEditedSource;
       _loading = false;
     });
-  }
-
-  Future<void> _toggleComicIdSearchEnhance(bool value) async {
-    setState(() => _comicIdSearchEnhance = value);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_keyComicIdSearchEnhance, value);
   }
 
   Future<void> _toggleNoImageMode(bool value) async {
@@ -116,12 +106,10 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
       ),
       body: AdvancedSettingsContent(
         loading: _loading,
-        comicIdSearchEnhance: _comicIdSearchEnhance,
         noImageMode: _noImageMode,
         softwareLogCaptureEnabled: _softwareLogCaptureEnabled,
         hasCustomEditedSource: _hasCustomEditedSource,
         logsPageBuilder: widget.logsPageBuilder,
-        onToggleComicIdSearchEnhance: _toggleComicIdSearchEnhance,
         onToggleNoImageMode: _toggleNoImageMode,
         onToggleSoftwareLogCaptureEnabled: _toggleSoftwareLogCaptureEnabled,
         onOpenComicSourceEditor: _openComicSourceEditor,

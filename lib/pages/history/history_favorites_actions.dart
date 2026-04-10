@@ -45,7 +45,7 @@ extension _HistoryFavoriteActions on _HistoryPageState {
           child: FavoriteFoldersMorphDialog(
             details: details,
             singleFolderOnly: singleFolderOnly,
-            favoriteOverride: null,
+            cloudFavoriteOverride: null,
             initialIsFavorite: details.isFavorite,
           ),
         );

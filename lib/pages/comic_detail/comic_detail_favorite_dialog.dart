@@ -18,13 +18,13 @@ class FavoriteFoldersMorphDialog extends StatefulWidget {
     super.key,
     required this.details,
     required this.singleFolderOnly,
-    required this.favoriteOverride,
+    required this.cloudFavoriteOverride,
     required this.initialIsFavorite,
   });
 
   final ComicDetailsData details;
   final bool singleFolderOnly;
-  final bool? favoriteOverride;
+  final bool? cloudFavoriteOverride;
   final bool initialIsFavorite;
 
   @override
@@ -67,7 +67,10 @@ class _FavoriteFoldersMorphDialogState
       barrierColor: Colors.black.withValues(alpha: 0.32),
       transitionDuration: const Duration(milliseconds: 240),
       pageBuilder: (dialogContext, animation, secondaryAnimation) {
-        return builder(dialogContext);
+        return InheritedTheme.captureAll(
+          context,
+          Builder(builder: builder),
+        );
       },
       transitionBuilder: (dialogContext, animation, secondaryAnimation, child) {
         final curved = CurvedAnimation(
@@ -151,10 +154,14 @@ class _FavoriteFoldersMorphDialogState
           source: FavoriteFolderSource.local,
         ),
       };
+      final hasCloudSelection = nextInitialFavorited.any((storageKey) {
+        final handle = favoriteFolderHandleFromStorageKey(storageKey);
+        return handle?.source == FavoriteFolderSource.cloud;
+      });
 
-      if (nextInitialFavorited.isEmpty &&
+      if (!hasCloudSelection &&
           widget.singleFolderOnly &&
-          (widget.favoriteOverride ?? widget.initialIsFavorite) &&
+          (widget.cloudFavoriteOverride ?? widget.initialIsFavorite) &&
           _canUseCloudDefaultFavoriteFallback &&
           cloudFolders.isNotEmpty) {
         nextInitialFavorited.add(

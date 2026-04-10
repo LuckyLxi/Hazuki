@@ -13,9 +13,11 @@
   "settingsCloudSyncTitle": "Cloud Sync",
   "settingsCloudSyncSubtitle": "Upload and restore backups",
   "settingsOtherTitle": "Other",
-  "settingsOtherSubtitle": "Check-in and extra actions",
+  "settingsOtherSubtitle": "View additional settings options",
+  "settingsLabTitle": "Lab",
+  "settingsLabSubtitle": "Try experimental features",
   "settingsAdvancedTitle": "Advanced",
-  "settingsAdvancedSubtitle": "Experimental features",
+  "settingsAdvancedSubtitle": "Adjust more settings",
   "settingsAboutTitle": "About",
   "displayTitle": "Display",
   "displayThemeTitle": "Theme",
@@ -106,6 +108,12 @@
   "otherTitle": "Other",
   "otherAutoCheckInTitle": "Auto daily check-in",
   "otherAutoCheckInSubtitle": "Automatically check in once when the app is opened each day",
+  "otherAutoSourceUpdateTitle": "Auto-check source updates",
+  "otherAutoSourceUpdateSubtitle": "Check for comic source updates once each time the app starts",
+  "otherAutoUpdateUpdated": "Source update check setting updated",
+  "otherAutoSoftwareUpdateTitle": "Auto-check app updates",
+  "otherAutoSoftwareUpdateSubtitle": "Check for software updates once each time the app starts",
+  "otherAutoSoftwareUpdateUpdated": "Software update check setting updated",
   "sourceBootstrapDownloading": "Downloading comic source",
   "sourceBootstrapPreparing": "Preparing source files...",
   "sourceBootstrapProgress": "Downloaded {progress}%",
@@ -116,10 +124,34 @@
   },
   "dialogBarrierLabel": "Dialog",
   "aboutTitle": "About",
-  "aboutVersion": "Version 1.0.0",
+  "aboutVersion": "Version {version}",
+  "@aboutVersion": {
+    "placeholders": {
+      "version": {}
+    }
+  },
   "aboutDescription": "A third-party JMComic client",
   "aboutProjectTitle": "Project",
   "aboutProjectSubtitle": "GitHub (https://github.com/LuckyLxi/Hazuki)",
+  "aboutCheckUpdateTitle": "Check for updates",
+  "aboutCheckSoftwareUpdateSubtitle": "Manually check whether a newer app version is available",
+  "softwareUpdateAvailableTitle": "Software update available",
+  "softwareUpdateAvailableMessage": "A newer app version is available. Open the release page to download it.",
+  "softwareUpdateCurrentVersion": "Current version: {version}",
+  "@softwareUpdateCurrentVersion": {
+    "placeholders": {
+      "version": {}
+    }
+  },
+  "softwareUpdateLatestVersion": "Latest version: {version}",
+  "@softwareUpdateLatestVersion": {
+    "placeholders": {
+      "version": {}
+    }
+  },
+  "softwareUpdateOpenRelease": "Open release page",
+  "softwareUpdateAlreadyLatest": "You're already on the latest app version",
+  "softwareUpdateCheckFailed": "Unable to check for app updates right now",
   "aboutFeedbackTitle": "Feedback",
   "aboutFeedbackSubtitle": "Report any issues you encounter while reading",
   "aboutOpenLinkFailed": "Unable to open the link",
@@ -736,6 +768,14 @@
   "favoriteCreateFolderTitle": "New favorite folder",
   "favoriteCreateFolderHint": "Enter a folder name",
   "favoriteCreateFolderNameRequired": "Folder name cannot be empty",
+  "favoriteRenameFolderTitle": "Rename favorite folder",
+  "favoriteRenameFolderHint": "Enter a new folder name",
+  "favoriteRenameFailed": "Rename favorite folder failed: {error}",
+  "@favoriteRenameFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
   "favoriteCreateLocalFolderAction": "Create local favorite folder",
   "favoriteDeleteFolderTitle": "Delete favorite folder",
   "favoriteDeleteFolderContent": "Delete \"{name}\"?",
@@ -817,6 +857,7 @@
     }
   },
   "readerResetZoom": "Reset zoom",
+  "labTitle": "Lab",
   "advancedTitle": "Advanced",
   "advancedDebugTitle": "Logs",
   "advancedDebugSubtitle": "Network, application, and reader logs",

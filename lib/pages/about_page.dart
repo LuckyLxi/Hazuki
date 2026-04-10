@@ -1,13 +1,45 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../app/software_update_dialog_support.dart';
 import '../l10n/app_localizations.dart';
+import '../services/software_update_service.dart';
 import '../widgets/widgets.dart';
 
-class AboutPage extends StatelessWidget {
+class AboutPage extends StatefulWidget {
   const AboutPage({super.key});
+
+  @override
+  State<AboutPage> createState() => _AboutPageState();
+}
+
+class _AboutPageState extends State<AboutPage> {
+  static const _softwareUpdateSkipDateKey = 'software_update_skip_date';
+
+  final SoftwareUpdateDialogSupport _softwareUpdateDialogSupport =
+      const SoftwareUpdateDialogSupport();
+
+  bool _checkingUpdate = false;
+  String? _currentVersion;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadVersion());
+  }
+
+  Future<void> _loadVersion() async {
+    final packageInfo = await PackageInfo.fromPlatform();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _currentVersion = packageInfo.version.trim();
+    });
+  }
 
   Future<void> _showDisclaimerDialog(BuildContext context) {
     final strings = AppLocalizations.of(context)!;
@@ -56,6 +88,56 @@ class AboutPage extends StatelessWidget {
     );
   }
 
+  Future<void> _checkForSoftwareUpdates() async {
+    if (_checkingUpdate) {
+      return;
+    }
+
+    setState(() => _checkingUpdate = true);
+    try {
+      final check = await SoftwareUpdateService.instance.checkForUpdates();
+      if (!mounted) {
+        return;
+      }
+      if (check == null) {
+        await showHazukiPrompt(
+          context,
+          AppLocalizations.of(context)!.softwareUpdateCheckFailed,
+          isError: true,
+        );
+        return;
+      }
+      if (!check.hasUpdate) {
+        await showHazukiPrompt(
+          context,
+          AppLocalizations.of(context)!.softwareUpdateAlreadyLatest,
+        );
+        return;
+      }
+
+      await _softwareUpdateDialogSupport.showForCheck(
+        dialogContext: context,
+        isMounted: () => mounted,
+        skipPrefsKey: _softwareUpdateSkipDateKey,
+        check: check,
+        respectSkipPreference: false,
+      );
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      await showHazukiPrompt(
+        context,
+        AppLocalizations.of(context)!.softwareUpdateCheckFailed,
+        isError: true,
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _checkingUpdate = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final strings = AppLocalizations.of(context)!;
@@ -82,7 +164,7 @@ class AboutPage extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            strings.aboutVersion,
+            strings.aboutVersion(_currentVersion ?? '1.0.0'),
             textAlign: TextAlign.center,
             style: textTheme.bodyMedium?.copyWith(color: colorScheme.outline),
           ),
@@ -97,6 +179,19 @@ class AboutPage extends StatelessWidget {
           ),
           const SizedBox(height: 48),
           const Divider(indent: 32, endIndent: 32),
+          ListTile(
+            leading: const Icon(Icons.system_update_alt_rounded),
+            title: Text(strings.aboutCheckUpdateTitle),
+            subtitle: Text(strings.aboutCheckSoftwareUpdateSubtitle),
+            trailing: _checkingUpdate
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2.4),
+                  )
+                : const Icon(Icons.chevron_right_rounded),
+            onTap: _checkingUpdate ? null : _checkForSoftwareUpdates,
+          ),
           ListTile(
             leading: const Icon(Icons.code_outlined),
             title: Text(strings.aboutProjectTitle),
@@ -155,7 +250,7 @@ class AboutPage extends StatelessWidget {
               showLicensePage(
                 context: context,
                 applicationName: 'Hazuki',
-                applicationVersion: '1.0.0',
+                applicationVersion: _currentVersion ?? '1.0.0',
                 applicationIcon: const Padding(
                   padding: EdgeInsets.all(12),
                   child: FlutterLogo(size: 48),

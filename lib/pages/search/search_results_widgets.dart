@@ -26,15 +26,17 @@ class SearchResultsStateView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final strings = AppLocalizations.of(context)!;
+    late final Widget child;
+
     if (searchKeyword.isEmpty) {
-      return SizedBox(
+      child = SizedBox(
+        key: const ValueKey('search-idle'),
         height: 240,
         child: Center(child: Text(strings.searchStartPrompt)),
       );
-    }
-
-    if (searchLoading && searchComics.isEmpty) {
-      return SizedBox(
+    } else if (searchLoading && searchComics.isEmpty) {
+      child = SizedBox(
+        key: const ValueKey('search-loading'),
         height: 360,
         child: Center(
           child: Column(
@@ -47,10 +49,9 @@ class SearchResultsStateView extends StatelessWidget {
           ),
         ),
       );
-    }
-
-    if (searchErrorMessage != null && searchComics.isEmpty) {
-      return SizedBox(
+    } else if (searchErrorMessage != null && searchComics.isEmpty) {
+      child = SizedBox(
+        key: const ValueKey('search-error'),
         height: 360,
         child: Center(
           child: Column(
@@ -69,10 +70,9 @@ class SearchResultsStateView extends StatelessWidget {
           ),
         ),
       );
-    }
-
-    if (searchComics.isEmpty) {
-      return SizedBox(
+    } else if (searchComics.isEmpty) {
+      child = SizedBox(
+        key: const ValueKey('search-empty'),
         height: 320,
         child: Center(
           child: Column(
@@ -85,9 +85,25 @@ class SearchResultsStateView extends StatelessWidget {
           ),
         ),
       );
+    } else {
+      child = const SizedBox(key: ValueKey('search-hidden'));
     }
 
-    return const SizedBox.shrink();
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 320),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeOutCubic,
+      layoutBuilder: (currentChild, previousChildren) {
+        return Stack(
+          alignment: Alignment.topCenter,
+          children: <Widget>[
+            ...previousChildren,
+            ...<Widget?>[currentChild].whereType<Widget>(),
+          ],
+        );
+      },
+      child: child,
+    );
   }
 }
 
@@ -218,10 +234,7 @@ class SearchComicListItem extends StatelessWidget {
           alignment: Alignment.bottomCenter,
           child: Transform.translate(
             offset: Offset(0, 50 * (1 - value)),
-            child: Opacity(
-              opacity: value.clamp(0.0, 1.0),
-              child: child,
-            ),
+            child: Opacity(opacity: value.clamp(0.0, 1.0), child: child),
           ),
         );
       },

@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -11,9 +13,11 @@ class SourceUpdateDialogSupport {
   const SourceUpdateDialogSupport();
 
   Future<SourceUpdateDialogAction?> showIfNeeded({
-    required GlobalKey<NavigatorState> navigatorKey,
+    GlobalKey<NavigatorState>? navigatorKey,
+    BuildContext? dialogContext,
     required bool Function() isMounted,
     required String skipPrefsKey,
+    bool respectSkipPreference = true,
   }) async {
     final check = await HazukiSourceService.instance
         .checkJmSourceVersionFromCloud();
@@ -21,9 +25,32 @@ class SourceUpdateDialogSupport {
       return null;
     }
 
+    return showForCheck(
+      navigatorKey: navigatorKey,
+      dialogContext: dialogContext,
+      isMounted: isMounted,
+      skipPrefsKey: skipPrefsKey,
+      check: check,
+      respectSkipPreference: respectSkipPreference,
+    );
+  }
+
+  Future<SourceUpdateDialogAction?> showForCheck({
+    GlobalKey<NavigatorState>? navigatorKey,
+    BuildContext? dialogContext,
+    required bool Function() isMounted,
+    required String skipPrefsKey,
+    required SourceVersionCheckResult check,
+    bool respectSkipPreference = true,
+  }) async {
+    if (!isMounted() || !check.hasUpdate) {
+      return null;
+    }
+
     final prefs = await SharedPreferences.getInstance();
     final skipPayload = prefs.getString(skipPrefsKey);
-    if (_shouldSkipSourceUpdateDialog(skipPayload: skipPayload, check: check)) {
+    if (respectSkipPreference &&
+        _shouldSkipSourceUpdateDialog(skipPayload: skipPayload, check: check)) {
       return null;
     }
 
@@ -32,6 +59,7 @@ class SourceUpdateDialogSupport {
 
     final result = await _showAnimatedDialog<SourceUpdateDialogAction>(
       navigatorKey: navigatorKey,
+      dialogContext: dialogContext,
       barrierDismissible: false,
       dismissibleListenable: dismissible,
       child: SourceUpdateDialogCard(
@@ -98,21 +126,23 @@ class SourceUpdateDialogSupport {
   }
 
   Future<T?> _showAnimatedDialog<T>({
-    required GlobalKey<NavigatorState> navigatorKey,
+    GlobalKey<NavigatorState>? navigatorKey,
+    BuildContext? dialogContext,
     required Widget child,
     bool barrierDismissible = true,
     ValueNotifier<bool>? dismissibleListenable,
   }) {
-    final dialogContext =
-        navigatorKey.currentState?.overlay?.context ??
-        navigatorKey.currentContext;
-    if (dialogContext == null) {
+    final effectiveDialogContext =
+        dialogContext ??
+        navigatorKey?.currentState?.overlay?.context ??
+        navigatorKey?.currentContext;
+    if (effectiveDialogContext == null) {
       return Future<T?>.value(null);
     }
     return showGeneralDialog<T>(
-      context: dialogContext,
+      context: effectiveDialogContext,
       barrierDismissible: false,
-      barrierLabel: l10n(dialogContext).dialogBarrierLabel,
+      barrierLabel: l10n(effectiveDialogContext).dialogBarrierLabel,
       barrierColor: Colors.transparent,
       transitionDuration: const Duration(milliseconds: 280),
       pageBuilder: (buildContext, animation, secondaryAnimation) {

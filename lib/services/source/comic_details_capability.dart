@@ -12,6 +12,8 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
       return memoryCached;
     }
 
+    await ensureInitialized();
+
     final engine = _engine;
     if (engine == null) {
       throw Exception('source_not_initialized');

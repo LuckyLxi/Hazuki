@@ -347,6 +347,32 @@ extension _ReaderImagePipelineExtension on _ReaderPageState {
     return created;
   }
 
+  Future<void> _retryReaderImage(String url) async {
+    final normalized = url.trim();
+    if (normalized.isEmpty || _retryingImageUrls.contains(normalized)) {
+      return;
+    }
+
+    _updateReaderState(() {
+      _retryingImageUrls.add(normalized);
+      _providerCache.remove(normalized);
+      _providerFutureCache.remove(normalized);
+    });
+    HazukiSourceService.instance.evictImageBytesFromMemory([normalized]);
+
+    try {
+      await _getOrCreateImageProviderFuture(normalized);
+    } catch (_) {
+      // Keep the error UI visible so the user can retry again.
+    } finally {
+      if (mounted) {
+        _updateReaderState(() {
+          _retryingImageUrls.remove(normalized);
+        });
+      }
+    }
+  }
+
   Future<void> _rememberAspectRatioFromBytes(
     String url,
     Uint8List bytes,

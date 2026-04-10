@@ -257,7 +257,7 @@ class _ComicCoverPreviewPage extends StatelessWidget {
           filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
           child: Center(
             child: GestureDetector(
-              onTap: () {},
+              onTap: () => Navigator.of(context).pop(),
               onLongPress: onLongPress,
               child: Padding(
                 padding: const EdgeInsets.symmetric(

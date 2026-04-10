@@ -256,6 +256,38 @@ class FavoritePageState extends State<FavoritePage>
     unawaited(showHazukiPrompt(context, error, isError: true));
   }
 
+  Future<void> _renameLocalFolder(FavoriteFolder folder) async {
+    if (_controller.mode != FavoritePageMode.local || folder.isAllFolder) {
+      return;
+    }
+
+    final strings = _strings(context);
+    final renamed = await showFavoriteRenameFolderDialog(
+      context,
+      initialName: folder.name,
+    );
+    if (renamed == null) {
+      return;
+    }
+
+    final normalized = renamed.trim();
+    if (normalized.isEmpty || normalized == folder.name.trim()) {
+      return;
+    }
+
+    final error = await _controller.renameLocalFolder(folder.id, normalized);
+    if (!mounted || error == null) {
+      return;
+    }
+    unawaited(
+      showHazukiPrompt(
+        context,
+        strings.favoriteRenameFailed(error),
+        isError: true,
+      ),
+    );
+  }
+
   Future<void> _handleRefresh() {
     _pendingFreshListEntryAnimation = true;
     _clearEntryAnimationTargets();
@@ -387,22 +419,27 @@ class FavoritePageState extends State<FavoritePage>
                     loadingFolders: _controller.loadingFolders,
                     showDeleteActionSlot: _controller.supportsFolderDelete,
                     enableDeleteAction: _controller.canDeleteSelectedFolder,
-                    showCreateLocalFolderButton:
-                        _controller.mode == FavoritePageMode.local &&
-                        _controller.folders.isEmpty,
                     onDeleteCurrentFolder: _deleteCurrentFolder,
                     onSelectFolder: _handleSelectFolder,
-                    onCreateLocalFolder: createFolder,
+                    onLongPressFolder:
+                        _controller.mode == FavoritePageMode.local
+                        ? _renameLocalFolder
+                        : null,
                   ),
                 _FavoriteContentSection(
                   comics: _controller.comics,
                   comicAnimationStyles: _comicAnimationStyles,
                   errorMessage: _controller.errorMessage,
                   initialLoading: _controller.initialLoading,
+                  refreshing: _controller.refreshing,
                   loadingMore: _controller.loadingMore,
                   strings: _strings(context),
                   mode: _controller.mode,
+                  showCreateLocalFolderButton:
+                      _controller.mode == FavoritePageMode.local &&
+                      _controller.folders.isEmpty,
                   onRetry: _handleRefresh,
+                  onCreateLocalFolder: createFolder,
                   onComicTap: (comic) {
                     final heroTag = _favoriteComicHeroTag(
                       comic,

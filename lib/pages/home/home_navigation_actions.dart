@@ -100,6 +100,7 @@ class HomeNavigationActions {
         locale: locale,
         onLocaleChanged: onLocaleChanged,
         cloudSyncPageBuilder: (_) => const CloudSyncPage(),
+        labSettingsPageBuilder: (_) => const LabSettingsPage(),
         advancedSettingsPageBuilder: (_) => AdvancedSettingsPage(
           logsPageBuilder: (_) => const LogsPage(),
           comicSourceEditorPageBuilder: (_) => const ComicSourceEditorPage(),

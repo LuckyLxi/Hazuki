@@ -50,6 +50,7 @@ dependencies:
   lottie: ^3.3.0
   re_editor: ^0.8.0
   re_highlight: ^0.0.3
+  package_info_plus: ^8.3.0
 
 dev_dependencies:
   flutter_test:

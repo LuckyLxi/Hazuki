@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../app/app.dart';
 import '../../l10n/app_localizations.dart';
 
 const searchLoadTimeout = Duration(seconds: 25);
@@ -40,7 +41,7 @@ Future<String> normalizeSubmittedKeyword(
   }
 
   final prefs = await SharedPreferences.getInstance();
-  if (prefs.getBool('advanced_comic_id_search_enhance') == true) {
+  if (prefs.getBool(hazukiComicIdSearchEnhancePreferenceKey) == true) {
     final digitsOnly = keyword.replaceAll(RegExp(r'[^\d]'), '');
     if (digitsOnly.length > 2 && digitsOnly != keyword) {
       keyword = digitsOnly;

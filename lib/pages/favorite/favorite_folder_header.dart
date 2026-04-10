@@ -14,10 +14,9 @@ class FavoriteFolderHeader extends StatelessWidget {
     required this.loadingFolders,
     required this.showDeleteActionSlot,
     required this.enableDeleteAction,
-    required this.showCreateLocalFolderButton,
     required this.onDeleteCurrentFolder,
     required this.onSelectFolder,
-    this.onCreateLocalFolder,
+    this.onLongPressFolder,
   });
 
   final List<FavoriteFolder> folders;
@@ -25,10 +24,9 @@ class FavoriteFolderHeader extends StatelessWidget {
   final bool loadingFolders;
   final bool showDeleteActionSlot;
   final bool enableDeleteAction;
-  final bool showCreateLocalFolderButton;
   final VoidCallback? onDeleteCurrentFolder;
   final ValueChanged<String> onSelectFolder;
-  final VoidCallback? onCreateLocalFolder;
+  final ValueChanged<FavoriteFolder>? onLongPressFolder;
 
   @override
   Widget build(BuildContext context) {
@@ -76,35 +74,32 @@ class FavoriteFolderHeader extends StatelessWidget {
                 child: CircularProgressIndicator(strokeWidth: 2),
               ),
             )
-          else if (showCreateLocalFolderButton)
-            Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: OutlinedButton.icon(
-                onPressed: onCreateLocalFolder,
-                icon: const Icon(Icons.create_new_folder_outlined),
-                label: Text(strings.favoriteCreateLocalFolderAction),
-              ),
-            )
           else
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
-                children: folders
-                    .map(
-                      (folder) => Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: ChoiceChip(
-                          label: Text(
-                            folder.id == '0'
-                                ? strings.favoriteAllFolder
-                                : folder.name,
-                          ),
-                          selected: selectedFolderId == folder.id,
-                          onSelected: (_) => onSelectFolder(folder.id),
-                        ),
-                      ),
-                    )
-                    .toList(),
+                children: folders.map((folder) {
+                  Widget chip = ChoiceChip(
+                    label: Text(
+                      folder.isAllFolder
+                          ? strings.favoriteAllFolder
+                          : folder.name,
+                    ),
+                    selected: selectedFolderId == folder.id,
+                    onSelected: (_) => onSelectFolder(folder.id),
+                  );
+                  if (onLongPressFolder != null && !folder.isAllFolder) {
+                    chip = GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onLongPress: () => onLongPressFolder!(folder),
+                      child: chip,
+                    );
+                  }
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: chip,
+                  );
+                }).toList(),
               ),
             ),
         ],

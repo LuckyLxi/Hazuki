@@ -66,6 +66,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
 
   bool _favoriteBusy = false;
   bool? _favoriteOverride;
+  bool? _cloudFavoriteOverride;
   bool _comicDynamicColorEnabled = false;
   ColorScheme? _lightComicScheme;
   ColorScheme? _darkComicScheme;

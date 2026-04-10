@@ -13,9 +13,11 @@
   "settingsCloudSyncTitle": "云同步",
   "settingsCloudSyncSubtitle": "上传与恢复备份",
   "settingsOtherTitle": "其它",
-  "settingsOtherSubtitle": "签到与附加功能",
+  "settingsOtherSubtitle": "查看补充设置选项",
+  "settingsLabTitle": "实验室",
+  "settingsLabSubtitle": "实验性功能",
   "settingsAdvancedTitle": "高级",
-  "settingsAdvancedSubtitle": "实验性功能",
+  "settingsAdvancedSubtitle": "调整更多设置",
   "settingsAboutTitle": "关于",
   "displayTitle": "显示",
   "displayThemeTitle": "主题",
@@ -106,6 +108,12 @@
   "otherTitle": "其它",
   "otherAutoCheckInTitle": "自动签到",
   "otherAutoCheckInSubtitle": "开启后，每天打开软件时会自动触发一次签到",
+  "otherAutoSourceUpdateTitle": "自动检查漫画源更新",
+  "otherAutoSourceUpdateSubtitle": "每次启动软件时检查一次漫画源更新",
+  "otherAutoUpdateUpdated": "已更新漫画源检查更新设置",
+  "otherAutoSoftwareUpdateTitle": "自动检查软件更新",
+  "otherAutoSoftwareUpdateSubtitle": "每次启动软件时检查一次软件新版本",
+  "otherAutoSoftwareUpdateUpdated": "已更新软件检查更新设置",
   "sourceBootstrapDownloading": "正在下载漫画源",
   "sourceBootstrapPreparing": "正在准备源文件...",
   "sourceBootstrapProgress": "已下载 {progress}%",
@@ -116,10 +124,34 @@
   },
   "dialogBarrierLabel": "对话框",
   "aboutTitle": "关于",
-  "aboutVersion": "版本 1.0.0",
+  "aboutVersion": "版本 {version}",
+  "@aboutVersion": {
+    "placeholders": {
+      "version": {}
+    }
+  },
   "aboutDescription": "JMComic第三方",
   "aboutProjectTitle": "项目地址",
   "aboutProjectSubtitle": "GitHub (https://github.com/LuckyLxi/Hazuki)",
+  "aboutCheckUpdateTitle": "检查更新",
+  "aboutCheckSoftwareUpdateSubtitle": "手动检查是否有新的软件版本",
+  "softwareUpdateAvailableTitle": "软件有更新",
+  "softwareUpdateAvailableMessage": "检测到新的软件版本，可前往发布页下载更新。",
+  "softwareUpdateCurrentVersion": "当前版本：{version}",
+  "@softwareUpdateCurrentVersion": {
+    "placeholders": {
+      "version": {}
+    }
+  },
+  "softwareUpdateLatestVersion": "最新版本：{version}",
+  "@softwareUpdateLatestVersion": {
+    "placeholders": {
+      "version": {}
+    }
+  },
+  "softwareUpdateOpenRelease": "前往发布页",
+  "softwareUpdateAlreadyLatest": "当前已经是最新软件版本",
+  "softwareUpdateCheckFailed": "暂时无法检查软件更新，请稍后再试",
   "aboutFeedbackTitle": "反馈问题",
   "aboutFeedbackSubtitle": "如果在阅读中遇到任何问题，欢迎反馈",
   "aboutOpenLinkFailed": "无法打开链接",
@@ -736,6 +768,14 @@
   "favoriteCreateFolderTitle": "新建收藏夹",
   "favoriteCreateFolderHint": "请输入收藏夹名称",
   "favoriteCreateFolderNameRequired": "收藏夹名称不能为空",
+  "favoriteRenameFolderTitle": "重命名收藏夹",
+  "favoriteRenameFolderHint": "请输入新的收藏夹名称",
+  "favoriteRenameFailed": "重命名收藏夹失败：{error}",
+  "@favoriteRenameFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
   "favoriteCreateLocalFolderAction": "新建本地收藏夹",
   "favoriteDeleteFolderTitle": "删除收藏夹",
   "favoriteDeleteFolderContent": "确定删除「{name}」吗？",
@@ -817,6 +857,7 @@
     }
   },
   "readerResetZoom": "还原大小",
+  "labTitle": "实验室",
   "advancedTitle": "高级",
   "advancedDebugTitle": "日志",
   "advancedDebugSubtitle": "网络日志、应用日志与阅读器日志",

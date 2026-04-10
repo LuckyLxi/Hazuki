@@ -16,6 +16,8 @@ class OtherSettingsPage extends StatefulWidget {
 
 class _OtherSettingsPageState extends State<OtherSettingsPage> {
   bool _autoCheckInEnabled = false;
+  bool _autoSourceUpdateCheckEnabled = true;
+  bool _autoSoftwareUpdateCheckEnabled = true;
   bool _loading = true;
 
   @override
@@ -32,6 +34,12 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
     setState(() {
       _autoCheckInEnabled =
           prefs.getBool(hazukiAutoCheckInEnabledPreferenceKey) ?? false;
+      _autoSourceUpdateCheckEnabled =
+          prefs.getBool(hazukiAutoSourceUpdateCheckEnabledPreferenceKey) ??
+          true;
+      _autoSoftwareUpdateCheckEnabled =
+          prefs.getBool(hazukiAutoSoftwareUpdateCheckEnabledPreferenceKey) ??
+          true;
       _loading = false;
     });
   }
@@ -40,6 +48,35 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
     setState(() => _autoCheckInEnabled = value);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(hazukiAutoCheckInEnabledPreferenceKey, value);
+  }
+
+  Future<void> _toggleAutoSourceUpdateCheck(bool value) async {
+    setState(() => _autoSourceUpdateCheckEnabled = value);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(hazukiAutoSourceUpdateCheckEnabledPreferenceKey, value);
+    if (!mounted) {
+      return;
+    }
+    await showHazukiPrompt(
+      context,
+      AppLocalizations.of(context)!.otherAutoUpdateUpdated,
+    );
+  }
+
+  Future<void> _toggleAutoSoftwareUpdateCheck(bool value) async {
+    setState(() => _autoSoftwareUpdateCheckEnabled = value);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(
+      hazukiAutoSoftwareUpdateCheckEnabledPreferenceKey,
+      value,
+    );
+    if (!mounted) {
+      return;
+    }
+    await showHazukiPrompt(
+      context,
+      AppLocalizations.of(context)!.otherAutoSoftwareUpdateUpdated,
+    );
   }
 
   Widget _buildGroup(BuildContext context, {required List<Widget> children}) {
@@ -83,6 +120,20 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
                       subtitle: Text(strings.otherAutoCheckInSubtitle),
                       value: _autoCheckInEnabled,
                       onChanged: _toggleAutoCheckIn,
+                    ),
+                    SwitchListTile(
+                      secondary: const Icon(Icons.system_update_alt_rounded),
+                      title: Text(strings.otherAutoSourceUpdateTitle),
+                      subtitle: Text(strings.otherAutoSourceUpdateSubtitle),
+                      value: _autoSourceUpdateCheckEnabled,
+                      onChanged: _toggleAutoSourceUpdateCheck,
+                    ),
+                    SwitchListTile(
+                      secondary: const Icon(Icons.mobile_friendly_rounded),
+                      title: Text(strings.otherAutoSoftwareUpdateTitle),
+                      subtitle: Text(strings.otherAutoSoftwareUpdateSubtitle),
+                      value: _autoSoftwareUpdateCheckEnabled,
+                      onChanged: _toggleAutoSoftwareUpdateCheck,
                     ),
                   ],
                 ),

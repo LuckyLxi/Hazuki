@@ -6,6 +6,10 @@ import '../../services/hazuki_source_service.dart';
 import 'search_shared.dart';
 
 class SearchResultsController extends ChangeNotifier {
+  static const Duration _initialSearchRetryDelay = Duration(
+    milliseconds: 450,
+  );
+
   SearchResultsController({required String initialOrder})
     : _searchOrder = searchOrderKeys.contains(initialOrder)
           ? initialOrder
@@ -95,6 +99,14 @@ class SearchResultsController extends ChangeNotifier {
         );
   }
 
+  bool _shouldRetryInitialSearch({
+    required int page,
+    required bool append,
+    required bool silentRefresh,
+  }) {
+    return page == 1 && !append && !silentRefresh;
+  }
+
   Future<void> search(
     BuildContext context, {
     required String keyword,
@@ -127,12 +139,36 @@ class SearchResultsController extends ChangeNotifier {
     _notify();
 
     try {
-      final result = await _loadSearchPage(
-        context,
-        keyword: normalized,
-        page: page,
-        order: _searchOrder,
-      );
+      final maxAttempts = _shouldRetryInitialSearch(
+            page: page,
+            append: append,
+            silentRefresh: silentRefresh,
+          )
+          ? 2
+          : 1;
+      late final SearchComicsResult result;
+
+      for (var attempt = 0; attempt < maxAttempts; attempt++) {
+        try {
+          result = await _loadSearchPage(
+            context,
+            keyword: normalized,
+            page: page,
+            order: _searchOrder,
+          );
+          break;
+        } catch (error) {
+          final hasRemainingAttempt = attempt + 1 < maxAttempts;
+          if (!hasRemainingAttempt) {
+            rethrow;
+          }
+          await Future<void>.delayed(_initialSearchRetryDelay);
+          if (!isCurrentRequest(requestToken)) {
+            return;
+          }
+        }
+      }
+
       if (!isCurrentRequest(requestToken)) {
         return;
       }

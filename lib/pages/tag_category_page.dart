@@ -18,10 +18,7 @@ class TagCategoryPage extends StatefulWidget {
 }
 
 class _TagCategoryGroupCard extends StatelessWidget {
-  const _TagCategoryGroupCard({
-    required this.group,
-    required this.onOpenTag,
-  });
+  const _TagCategoryGroupCard({required this.group, required this.onOpenTag});
 
   final CategoryTagGroup group;
   final ValueChanged<String> onOpenTag;
@@ -41,10 +38,7 @@ class _TagCategoryGroupCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  group.name,
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
+                Text(group.name, style: Theme.of(context).textTheme.titleSmall),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
@@ -130,7 +124,10 @@ class _TagCategoryPageState extends State<TagCategoryPage> {
             .inMilliseconds,
         'initialLoading': _initialLoading,
         'groupCount': _tagGroups.length,
-        'tagCount': _tagGroups.fold<int>(0, (sum, group) => sum + group.tags.length),
+        'tagCount': _tagGroups.fold<int>(
+          0,
+          (sum, group) => sum + group.tags.length,
+        ),
         if (_errorMessage != null) 'errorMessage': _errorMessage,
         if (content != null) ...content,
       },
@@ -158,11 +155,7 @@ class _TagCategoryPageState extends State<TagCategoryPage> {
       _logTagCategoryEvent(
         'Tag category jank frame',
         level: 'warn',
-        content: {
-          'totalMs': totalMs,
-          'buildMs': buildMs,
-          'rasterMs': rasterMs,
-        },
+        content: {'totalMs': totalMs, 'buildMs': buildMs, 'rasterMs': rasterMs},
       );
       return;
     }
@@ -179,6 +172,14 @@ class _TagCategoryPageState extends State<TagCategoryPage> {
   Future<void> _loadInitial() async {
     if (!mounted) {
       return;
+    }
+
+    if (!_initialLoading) {
+      setState(() {
+        _initialLoading = true;
+        _errorMessage = null;
+        _visibleGroupCount = 0;
+      });
     }
 
     final startedAt = DateTime.now();
@@ -211,7 +212,10 @@ class _TagCategoryPageState extends State<TagCategoryPage> {
         content: {
           'durationMs': DateTime.now().difference(startedAt).inMilliseconds,
           'groupCount': tagGroups.length,
-          'tagCount': tagGroups.fold<int>(0, (sum, group) => sum + group.tags.length),
+          'tagCount': tagGroups.fold<int>(
+            0,
+            (sum, group) => sum + group.tags.length,
+          ),
         },
       );
     } catch (e) {

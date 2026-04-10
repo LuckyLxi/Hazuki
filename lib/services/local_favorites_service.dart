@@ -113,6 +113,36 @@ class LocalFavoritesService {
     await _saveStore(store);
   }
 
+  Future<void> renameFavoriteFolder({
+    required String folderId,
+    required String name,
+  }) async {
+    final normalizedFolderId = folderId.trim();
+    if (normalizedFolderId.isEmpty) {
+      throw Exception('favorite_folder_id_required');
+    }
+
+    final normalizedName = name.trim();
+    if (normalizedName.isEmpty) {
+      throw Exception('favorite_folder_name_required');
+    }
+
+    final store = await _loadStore();
+    final folderIndex = store.folders.indexWhere(
+      (folder) => folder.id == normalizedFolderId,
+    );
+    if (folderIndex < 0) {
+      throw Exception('favorite_folder_not_found');
+    }
+
+    final current = store.folders[folderIndex];
+    store.folders[folderIndex] = _LocalFavoriteFolderRecord(
+      id: current.id,
+      name: normalizedName,
+    );
+    await _saveStore(store);
+  }
+
   Future<void> deleteFavoriteFolder(String folderId) async {
     final normalizedFolderId = folderId.trim();
     if (normalizedFolderId.isEmpty) {

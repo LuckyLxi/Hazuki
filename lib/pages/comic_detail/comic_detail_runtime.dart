@@ -13,6 +13,7 @@ extension _ComicDetailRuntimeExtension on _ComicDetailPageState {
       }
       _updateComicDetailState(() {
         _favoriteOverride = details.isFavorite || localFavorite;
+        _cloudFavoriteOverride = details.isFavorite;
       });
     } catch (_) {}
   }

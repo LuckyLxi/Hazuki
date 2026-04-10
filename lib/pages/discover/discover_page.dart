@@ -316,28 +316,36 @@ class _DiscoverPageState extends State<DiscoverPage> {
 
   Widget _buildDiscoverStateView() {
     final strings = AppLocalizations.of(context)!;
-    if (_initialLoading) {
+    final showBlockingLoading =
+        _initialLoading || (_refreshing && _sections.isEmpty);
+    late final Widget child;
+
+    if (showBlockingLoading) {
       if (!widget.allowInitialLoad &&
           widget.hideLoadingUntilInitialLoadAllowed) {
-        return const SizedBox(height: 360);
-      }
-      return SizedBox(
-        height: 360,
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const HazukiSandyLoadingIndicator(size: 136),
-              const SizedBox(height: 10),
-              Text(strings.commonLoading),
-            ],
+        child = const SizedBox(
+          key: ValueKey('discover-placeholder'),
+          height: 360,
+        );
+      } else {
+        child = SizedBox(
+          key: const ValueKey('discover-loading'),
+          height: 360,
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const HazukiSandyLoadingIndicator(size: 136),
+                const SizedBox(height: 10),
+                Text(strings.commonLoading),
+              ],
+            ),
           ),
-        ),
-      );
-    }
-
-    if (_errorMessage != null && _sections.isEmpty) {
-      return SizedBox(
+        );
+      }
+    } else if (_errorMessage != null && _sections.isEmpty) {
+      child = SizedBox(
+        key: const ValueKey('discover-error'),
         height: 360,
         child: Center(
           child: Column(
@@ -356,16 +364,31 @@ class _DiscoverPageState extends State<DiscoverPage> {
           ),
         ),
       );
-    }
-
-    if (_sections.isEmpty) {
-      return SizedBox(
+    } else if (_sections.isEmpty) {
+      child = SizedBox(
+        key: const ValueKey('discover-empty'),
         height: 220,
         child: Center(child: Text(strings.discoverEmpty)),
       );
+    } else {
+      child = const SizedBox(key: ValueKey('discover-hidden'));
     }
 
-    return const SizedBox.shrink();
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 320),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeOutCubic,
+      layoutBuilder: (currentChild, previousChildren) {
+        return Stack(
+          alignment: Alignment.topCenter,
+          children: <Widget>[
+            ...previousChildren,
+            ...<Widget?>[currentChild].whereType<Widget>(),
+          ],
+        );
+      },
+      child: child,
+    );
   }
 
   Widget _buildDiscoverSection(ExploreSection section, int sectionIndex) {

@@ -27,7 +27,7 @@ extension _ComicDetailFavoriteActionsExtension on _ComicDetailPageState {
           child: FavoriteFoldersMorphDialog(
             details: details,
             singleFolderOnly: singleFolderOnly,
-            favoriteOverride: _favoriteOverride,
+            cloudFavoriteOverride: _cloudFavoriteOverride,
             initialIsFavorite: details.isFavorite,
           ),
         );
@@ -206,6 +206,7 @@ extension _ComicDetailFavoriteActionsExtension on _ComicDetailPageState {
     }
 
     _favoriteOverride = selectedResult.isNotEmpty;
+    _cloudFavoriteOverride = selectedCloudIds.isNotEmpty;
   }
 
   Set<FavoriteFolderHandle> _favoriteHandlesFromStorageKeys(Set<String> keys) {

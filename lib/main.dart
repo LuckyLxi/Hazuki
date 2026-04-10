@@ -4,13 +4,16 @@ import 'dart:io';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app/app_settings_store.dart';
+import 'app/app_preferences.dart';
 import 'app/appearance_settings.dart';
 import 'app/hazuki_theme_controller.dart';
 import 'app/hazuki_theme_factory.dart';
 import 'app/source_runtime_coordinator.dart';
 import 'app/source_runtime_widgets.dart';
+import 'app/software_update_dialog_support.dart';
 import 'app/source_update_dialog_support.dart';
 import 'app/ui_flags.dart';
 import 'l10n/app_localizations.dart';
@@ -84,18 +87,25 @@ class HazukiApp extends StatefulWidget {
 
 class _HazukiAppState extends State<HazukiApp> with WidgetsBindingObserver {
   static const _sourceUpdateSkipDateKey = 'source_update_skip_date';
+  static const _softwareUpdateSkipDateKey = 'software_update_skip_date';
 
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   final SourceRuntimeCoordinator _sourceRuntimeCoordinator =
       SourceRuntimeCoordinator();
   final SourceUpdateDialogSupport _sourceUpdateDialogSupport =
       const SourceUpdateDialogSupport();
+  final SoftwareUpdateDialogSupport _softwareUpdateDialogSupport =
+      const SoftwareUpdateDialogSupport();
 
   late final HazukiThemeController _themeController;
   int _homeRefreshTick = 0;
   bool _allowDiscoverInitialLoad = false;
   SourceBootstrapState _bootstrapState = const SourceBootstrapState.idle();
   late Locale? _locale;
+  bool _autoSourceUpdateCheckEnabled = true;
+  bool _autoSoftwareUpdateCheckEnabled = true;
+  bool _didAttemptAutoSourceUpdateCheck = false;
+  bool _didAttemptAutoSoftwareUpdateCheck = false;
 
   @override
   void initState() {
@@ -106,6 +116,7 @@ class _HazukiAppState extends State<HazukiApp> with WidgetsBindingObserver {
       initialSettings: widget.initialAppearance,
     );
     _locale = widget.initialLocale;
+    unawaited(_loadAutoUpdateCheckSettings());
     unawaited(
       _sourceRuntimeCoordinator.initConnectivityWatcher(
         scheduleSourceRecovery: _scheduleSourceRecovery,
@@ -120,7 +131,7 @@ class _HazukiAppState extends State<HazukiApp> with WidgetsBindingObserver {
           isMounted: () => mounted,
           onBootstrapStateChanged: _updateBootstrapState,
           onSourceReady: _handleSourceRuntimeReady,
-          scheduleSourceUpdateDialogCheck: _scheduleSourceUpdateDialogCheck,
+          scheduleSourceUpdateDialogCheck: _scheduleAutomaticSourceUpdateCheck,
         ),
       );
     });
@@ -132,9 +143,6 @@ class _HazukiAppState extends State<HazukiApp> with WidgetsBindingObserver {
     super.didChangeAppLifecycleState(state);
     MangaDownloadService.instance.handleAppLifecycleState(state);
     unawaited(PasswordLockService.instance.handleAppLifecycleState(state));
-    if (state == AppLifecycleState.resumed) {
-      _scheduleSourceUpdateDialogCheck();
-    }
   }
 
   @override
@@ -164,8 +172,74 @@ class _HazukiAppState extends State<HazukiApp> with WidgetsBindingObserver {
   void _scheduleSourceRecovery() {
     _sourceRuntimeCoordinator.scheduleSourceRecovery(
       isMounted: () => mounted,
-      scheduleSourceUpdateDialogCheck: _scheduleSourceUpdateDialogCheck,
+      scheduleSourceUpdateDialogCheck: _scheduleAutomaticSourceUpdateCheck,
     );
+  }
+
+  Future<void> _loadAutoUpdateCheckSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    final sourceEnabled =
+        prefs.getBool(hazukiAutoSourceUpdateCheckEnabledPreferenceKey) ?? true;
+    final softwareEnabled =
+        prefs.getBool(hazukiAutoSoftwareUpdateCheckEnabledPreferenceKey) ??
+        true;
+    if (!mounted) {
+      _autoSourceUpdateCheckEnabled = sourceEnabled;
+      _autoSoftwareUpdateCheckEnabled = softwareEnabled;
+      return;
+    }
+    setState(() {
+      _autoSourceUpdateCheckEnabled = sourceEnabled;
+      _autoSoftwareUpdateCheckEnabled = softwareEnabled;
+    });
+  }
+
+  void _scheduleAutomaticSourceUpdateCheck() {
+    if (_didAttemptAutoSourceUpdateCheck || !_autoSourceUpdateCheckEnabled) {
+      return;
+    }
+    _didAttemptAutoSourceUpdateCheck = true;
+    _scheduleSourceUpdateDialogCheck();
+  }
+
+  void _scheduleAutomaticSoftwareUpdateCheck() {
+    if (_didAttemptAutoSoftwareUpdateCheck ||
+        !_autoSoftwareUpdateCheckEnabled) {
+      return;
+    }
+    _didAttemptAutoSoftwareUpdateCheck = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_runSoftwareUpdateDialogCheckWhenIdle());
+    });
+  }
+
+  Future<void> _runSoftwareUpdateDialogCheckWhenIdle() async {
+    for (var attempt = 0; attempt < 10; attempt++) {
+      if (!mounted) {
+        return;
+      }
+      final navigator = _navigatorKey.currentState;
+      if (!(navigator?.canPop() ?? false)) {
+        break;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 800));
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    final result = await _softwareUpdateDialogSupport.showIfNeeded(
+      navigatorKey: _navigatorKey,
+      isMounted: () => mounted,
+      skipPrefsKey: _softwareUpdateSkipDateKey,
+    );
+    if (!mounted) {
+      return;
+    }
+    if (result == null) {
+      return;
+    }
   }
 
   void _scheduleSourceUpdateDialogCheck() {
@@ -287,6 +361,7 @@ class _HazukiAppState extends State<HazukiApp> with WidgetsBindingObserver {
       _allowDiscoverInitialLoad = true;
       _homeRefreshTick++;
     });
+    _scheduleAutomaticSoftwareUpdateCheck();
   }
 
   void _handleSourceUpdateDownloaded() {

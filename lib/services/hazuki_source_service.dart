@@ -173,6 +173,8 @@ class HazukiSourceService {
     required int page,
     String order = 'mr',
   }) async {
+    await ensureInitialized();
+
     final engine = _engine;
     if (engine == null) {
       throw Exception('source_not_initialized');

@@ -40,6 +40,24 @@ extension _ReaderListItemBuilderExtension on _ReaderPageState {
       );
     }
 
+    Widget buildImageError({required bool stableAspectRatio}) {
+      final errorView = _buildReaderImageErrorView(
+        url,
+        compact: true,
+        backgroundColor: readerPlaceholderColor,
+      );
+      if (!stableAspectRatio) {
+        return errorView;
+      }
+      return ColoredBox(
+        color: readerSurfaceColor,
+        child: AspectRatio(
+          aspectRatio: currentPlaceholderAspectRatio(),
+          child: errorView,
+        ),
+      );
+    }
+
     Widget buildImage(ImageProvider provider) {
       final resolvedAspectRatio = currentResolvedAspectRatio();
       final image = Image(
@@ -57,13 +75,7 @@ extension _ReaderListItemBuilderExtension on _ReaderPageState {
           return ColoredBox(color: readerSurfaceColor);
         },
         errorBuilder: (_, _, _) {
-          return ColoredBox(
-            color: readerPlaceholderColor,
-            child: const SizedBox(
-              height: 120,
-              child: Center(child: Icon(Icons.broken_image_outlined)),
-            ),
-          );
+          return buildImageError(stableAspectRatio: false);
         },
       );
       final stableImage = resolvedAspectRatio == null
@@ -92,10 +104,7 @@ extension _ReaderListItemBuilderExtension on _ReaderPageState {
         if (snapshot.hasError) {
           return AspectRatio(
             aspectRatio: currentPlaceholderAspectRatio(),
-            child: ColoredBox(
-              color: readerPlaceholderColor,
-              child: const Center(child: Icon(Icons.broken_image_outlined)),
-            ),
+            child: buildImageError(stableAspectRatio: false),
           );
         }
         return AspectRatio(
@@ -108,6 +117,58 @@ extension _ReaderListItemBuilderExtension on _ReaderPageState {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildReaderImageErrorView(
+    String url, {
+    bool compact = false,
+    Color? backgroundColor,
+  }) {
+    final isRetrying = _retryingImageUrls.contains(url);
+    final theme = Theme.of(context);
+    final surfaceColor = backgroundColor ?? _resolveReaderPlaceholderColor();
+    final foregroundColor = theme.colorScheme.onSurfaceVariant;
+
+    return ColoredBox(
+      color: surfaceColor,
+      child: Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: compact ? 12 : 20,
+            vertical: compact ? 16 : 24,
+          ),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: compact ? 220 : 320),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.broken_image_outlined,
+                  color: foregroundColor,
+                  size: compact ? 28 : 36,
+                ),
+                SizedBox(height: compact ? 10 : 14),
+                FilledButton.tonalIcon(
+                  onPressed: isRetrying
+                      ? null
+                      : () => unawaited(_retryReaderImage(url)),
+                  icon: isRetrying
+                      ? SizedBox(
+                          width: compact ? 14 : 16,
+                          height: compact ? 14 : 16,
+                          child: const CircularProgressIndicator(
+                            strokeWidth: 2,
+                          ),
+                        )
+                      : const Icon(Icons.refresh_rounded),
+                  label: Text(l10n(context).commonRetry),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

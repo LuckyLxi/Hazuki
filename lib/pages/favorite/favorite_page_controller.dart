@@ -416,6 +416,31 @@ class FavoritePageController extends ChangeNotifier {
     }
   }
 
+  Future<String?> renameLocalFolder(String folderId, String name) async {
+    if (_mode != FavoritePageMode.local) {
+      return null;
+    }
+
+    final normalizedFolderId = folderId.trim();
+    if (normalizedFolderId.isEmpty) {
+      return null;
+    }
+
+    try {
+      await _localFavoritesService.renameFavoriteFolder(
+        folderId: normalizedFolderId,
+        name: name,
+      );
+      if (_disposed) {
+        return null;
+      }
+      await _reloadLocalFolders();
+      return null;
+    } catch (e) {
+      return '$e';
+    }
+  }
+
   Future<String?> changeSortOrder(
     String order, {
     required String timeoutMessage,

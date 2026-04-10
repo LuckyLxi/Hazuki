@@ -91,6 +91,78 @@ Future<String?> showFavoriteCreateFolderDialog(BuildContext context) {
   );
 }
 
+Future<String?> showFavoriteRenameFolderDialog(
+  BuildContext context, {
+  required String initialName,
+}) {
+  final controller = TextEditingController(
+    text: initialName,
+  );
+  controller.selection = TextSelection(
+    baseOffset: 0,
+    extentOffset: controller.text.length,
+  );
+  return _showAnimatedFolderDialog<String>(
+    context: context,
+    builder: (dialogContext) {
+      String? errorText;
+      return StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          final strings = _strings(dialogContext);
+          return AlertDialog(
+            title: Text(strings.favoriteRenameFolderTitle),
+            content: TextField(
+              controller: controller,
+              autofocus: true,
+              decoration: InputDecoration(
+                hintText: strings.favoriteRenameFolderHint,
+                border: const OutlineInputBorder(),
+                errorText: errorText,
+              ),
+              onChanged: (_) {
+                if (errorText != null) {
+                  setDialogState(() => errorText = null);
+                }
+              },
+              onSubmitted: (_) {
+                final text = controller.text.trim();
+                if (text.isEmpty) {
+                  setDialogState(
+                    () =>
+                        errorText = strings.favoriteCreateFolderNameRequired,
+                  );
+                  return;
+                }
+                Navigator.pop(dialogContext, text);
+              },
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: Text(strings.commonCancel),
+              ),
+              FilledButton(
+                onPressed: () {
+                  final text = controller.text.trim();
+                  if (text.isEmpty) {
+                    setDialogState(
+                      () =>
+                          errorText = strings.favoriteCreateFolderNameRequired,
+                    );
+                    return;
+                  }
+                  Navigator.pop(dialogContext, text);
+                },
+                child: Text(strings.commonConfirm),
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
+}
+
 Future<bool> showFavoriteDeleteFolderDialog(
   BuildContext context, {
   required String folderName,

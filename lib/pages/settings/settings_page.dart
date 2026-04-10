@@ -14,6 +14,7 @@ class SettingsPage extends StatefulWidget {
     required this.locale,
     required this.onLocaleChanged,
     required this.cloudSyncPageBuilder,
+    required this.labSettingsPageBuilder,
     required this.advancedSettingsPageBuilder,
   });
 
@@ -22,6 +23,7 @@ class SettingsPage extends StatefulWidget {
   final Locale? locale;
   final Future<void> Function(Locale? locale) onLocaleChanged;
   final WidgetBuilder cloudSyncPageBuilder;
+  final WidgetBuilder labSettingsPageBuilder;
   final WidgetBuilder advancedSettingsPageBuilder;
 
   @override
@@ -132,12 +134,8 @@ class _SettingsPageState extends State<SettingsPage> {
             title: Text(strings.settingsCloudSyncTitle),
             subtitle: Text(strings.settingsCloudSyncSubtitle),
             onTap: () {
-              Navigator.of(
-                context,
-              ).push(
-                MaterialPageRoute<void>(
-                  builder: widget.cloudSyncPageBuilder,
-                ),
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: widget.cloudSyncPageBuilder),
               );
             },
           ),
@@ -150,6 +148,16 @@ class _SettingsPageState extends State<SettingsPage> {
                 MaterialPageRoute<void>(
                   builder: (_) => const OtherSettingsPage(),
                 ),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.science_outlined),
+            title: Text(strings.settingsLabTitle),
+            subtitle: Text(strings.settingsLabSubtitle),
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: widget.labSettingsPageBuilder),
               );
             },
           ),

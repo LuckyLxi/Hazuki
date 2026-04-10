@@ -66,9 +66,9 @@ extension _ReaderNavigationActionsExtension on _ReaderPageState {
                 return ColoredBox(color: readerSurfaceColor);
               },
               errorBuilder: (_, _, _) {
-                return ColoredBox(
-                  color: readerPlaceholderColor,
-                  child: const Center(child: Icon(Icons.broken_image_outlined)),
+                return _buildReaderImageErrorView(
+                  url,
+                  backgroundColor: readerPlaceholderColor,
                 );
               },
             ),
@@ -90,9 +90,9 @@ extension _ReaderNavigationActionsExtension on _ReaderPageState {
           return buildImage(snapshot.data!);
         }
         if (snapshot.hasError) {
-          return ColoredBox(
-            color: readerPlaceholderColor,
-            child: const Center(child: Icon(Icons.broken_image_outlined)),
+          return _buildReaderImageErrorView(
+            url,
+            backgroundColor: readerPlaceholderColor,
           );
         }
         return ColoredBox(
