@@ -1,9 +1,11 @@
 {
-  "version": "1.0.0",
-  "releaseUrl": "https://github.com/LuckyLxi/Hazuki/releases/tag/v1.0.0",
+  "version": "1.0.1",
+  "releaseUrl": "https://github.com/LuckyLxi/Hazuki/releases/tag/v1.0.1",
+  "changelog": "1. 新增应用内 APK 下载安装功能\n2. 支持收藏夹重命名\n3. 优化详情页进场动画与更新弹窗 UI\n4. 支持手动检查更新",
   "apkUrls": {
-    "arm64-v8a": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.0/app-arm64-v8a-release.apk",
-    "armeabi-v7a": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.0/app-armeabi-v7a-release.apk",
-    "x86_64": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.0/app-x86_64-release.apk"
+    "arm64-v8a": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.1/app-arm64-v8a-release.apk",
+    "armeabi-v7a": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.1/app-armeabi-v7a-release.apk",
+    "x86_64": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.1/app-x86_64-release.apk"
   }
 }
+

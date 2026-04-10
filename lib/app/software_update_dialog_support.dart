@@ -405,7 +405,8 @@ class _SoftwareUpdateDialogCardState extends State<_SoftwareUpdateDialogCard> {
                 },
                 style: TextButton.styleFrom(
                   minimumSize: const Size(0, 40),
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  padding: EdgeInsets.zero,
+                  foregroundColor: colorScheme.onSurfaceVariant,
                 ),
                 child: Text(
                   strings.comicDetailRemindLaterToday,
@@ -414,13 +415,13 @@ class _SoftwareUpdateDialogCardState extends State<_SoftwareUpdateDialogCard> {
                 ),
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
             Expanded(
-              child: OutlinedButton(
+              child: TextButton(
                 onPressed: _openReleasePage,
-                style: OutlinedButton.styleFrom(
+                style: TextButton.styleFrom(
                   minimumSize: const Size(0, 40),
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  padding: EdgeInsets.zero,
                 ),
                 child: Text(
                   strings.softwareUpdateViewDetails,
@@ -429,7 +430,7 @@ class _SoftwareUpdateDialogCardState extends State<_SoftwareUpdateDialogCard> {
                 ),
               ),
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
             Expanded(
               child: FilledButton(
                 onPressed: canDownload
@@ -437,7 +438,7 @@ class _SoftwareUpdateDialogCardState extends State<_SoftwareUpdateDialogCard> {
                     : null,
                 style: FilledButton.styleFrom(
                   minimumSize: const Size(0, 40),
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  padding: EdgeInsets.zero,
                 ),
                 child: Text(
                   strings.softwareUpdateDownloadAction,
