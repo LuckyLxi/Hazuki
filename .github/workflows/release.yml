@@ -70,5 +70,62 @@ jobs:
         with:
           files: build/app/outputs/flutter-apk/app-*-release.apk
           name: ${{ github.ref_name }}
+          generate_release_notes: true
           draft: false
           prerelease: false
+
+      - name: Generate update.json
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          release_json="$(curl -fsSL \
+            -H "Accept: application/vnd.github+json" \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "X-GitHub-Api-Version: 2022-11-28" \
+            "https://api.github.com/repos/${REPOSITORY}/releases/tags/${RELEASE_TAG}")"
+
+          version="${RELEASE_TAG#v}"
+          release_url="$(printf '%s' "${release_json}" | jq -r '.html_url')"
+          changelog="$(printf '%s' "${release_json}" | jq -r '.body // ""')"
+          arm64_url="$(printf '%s' "${release_json}" | jq -r '.assets[] | select(.name | test("arm64-v8a"; "i")) | .browser_download_url' | head -n 1)"
+          armv7_url="$(printf '%s' "${release_json}" | jq -r '.assets[] | select(.name | test("armeabi-v7a"; "i")) | .browser_download_url' | head -n 1)"
+          x64_url="$(printf '%s' "${release_json}" | jq -r '.assets[] | select(.name | test("x86_64"; "i")) | .browser_download_url' | head -n 1)"
+          x86_url="$(printf '%s' "${release_json}" | jq -r '.assets[] | select(.name | test("(^|[^0-9])x86([^0-9]|$)"; "i")) | .browser_download_url' | head -n 1)"
+
+          jq -n \
+            --arg version "${version}" \
+            --arg releaseUrl "${release_url}" \
+            --arg arm64 "${arm64_url}" \
+            --arg armv7 "${armv7_url}" \
+            --arg x64 "${x64_url}" \
+            --arg x86 "${x86_url}" \
+            --arg changelog "${changelog}" \
+            '{
+              version: $version,
+              releaseUrl: $releaseUrl,
+              apkUrls: (
+                {}
+                + (if $arm64 != "" then {"arm64-v8a": $arm64} else {} end)
+                + (if $armv7 != "" then {"armeabi-v7a": $armv7} else {} end)
+                + (if $x64 != "" then {"x86_64": $x64} else {} end)
+                + (if $x86 != "" then {"x86": $x86} else {} end)
+              )
+            }
+            + (if $changelog != "" then {changelog: $changelog} else {} end)' > update.json
+
+      - name: Commit update.json
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          git fetch origin "${DEFAULT_BRANCH}"
+          git checkout "${DEFAULT_BRANCH}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add update.json
+          git diff --cached --quiet && exit 0
+          git commit -m "chore: update update.json for ${GITHUB_REF_NAME} [skip ci]"
+          git push origin "HEAD:${DEFAULT_BRANCH}"

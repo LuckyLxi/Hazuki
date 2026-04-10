@@ -24,12 +24,14 @@ class _ComicDetailInfoTab extends StatelessWidget {
     required this.skeletonColor,
     required this.metaSectionBuilder,
     required this.isActiveInTabView,
+    required this.shouldAnimateResolvedContent,
   });
 
   final ComicDetailsData? details;
   final Color skeletonColor;
   final Widget Function(ComicDetailsData details) metaSectionBuilder;
   final bool isActiveInTabView;
+  final bool shouldAnimateResolvedContent;
 
   @override
   Widget build(BuildContext context) {
@@ -46,13 +48,9 @@ class _ComicDetailInfoTab extends StatelessWidget {
         slivers: [
           SliverOverlapInjector(handle: overlapHandle),
           SliverPadding(
-            padding: const EdgeInsets.all(16),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate.fixed([
-                Container(height: 100, color: skeletonColor),
-                const SizedBox(height: 16),
-                Container(height: 60, color: skeletonColor),
-              ]),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+            sliver: SliverToBoxAdapter(
+              child: _ComicDetailInfoSkeleton(skeletonColor: skeletonColor),
             ),
           ),
         ],
@@ -67,29 +65,88 @@ class _ComicDetailInfoTab extends StatelessWidget {
         SliverPadding(
           padding: const EdgeInsets.all(16),
           sliver: SliverToBoxAdapter(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (details!.description.isNotEmpty) ...[
-                  Text(
-                    l10n(context).comicDetailSummary,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 6),
-                  _ExpandableDescription(text: details!.description),
+            child: _ComicDetailEntranceReveal(
+              key: ValueKey<String>('comic-detail-info-${details!.id}'),
+              beginOffset: const Offset(0, 20),
+              enabled: shouldAnimateResolvedContent,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (details!.description.isNotEmpty) ...[
+                    Text(
+                      l10n(context).comicDetailSummary,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 6),
+                    _ExpandableDescription(text: details!.description),
+                  ],
+                  if (details!.id.trim().isNotEmpty ||
+                      details!.tags.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    metaSectionBuilder(details!),
+                  ],
                 ],
-                if (details!.id.trim().isNotEmpty ||
-                    details!.tags.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  metaSectionBuilder(details!),
-                ],
-              ],
+              ),
             ),
           ),
         ),
         const SliverFillRemaining(
           hasScrollBody: false,
           child: SizedBox.shrink(),
+        ),
+      ],
+    );
+  }
+}
+
+class _ComicDetailInfoSkeleton extends StatelessWidget {
+  const _ComicDetailInfoSkeleton({required this.skeletonColor});
+
+  final Color skeletonColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _ComicDetailSkeletonBlock(
+          color: skeletonColor,
+          width: 92,
+          height: 18,
+          radius: 9,
+        ),
+        const SizedBox(height: 14),
+        _ComicDetailSkeletonBlock(
+          color: skeletonColor,
+          height: 16,
+          radius: 8,
+        ),
+        const SizedBox(height: 10),
+        _ComicDetailSkeletonBlock(
+          color: skeletonColor,
+          width: MediaQuery.sizeOf(context).width * 0.72,
+          height: 16,
+          radius: 8,
+        ),
+        const SizedBox(height: 10),
+        _ComicDetailSkeletonBlock(
+          color: skeletonColor,
+          width: MediaQuery.sizeOf(context).width * 0.54,
+          height: 16,
+          radius: 8,
+        ),
+        const SizedBox(height: 18),
+        ...List<Widget>.generate(
+          4,
+          (index) => Padding(
+            padding: EdgeInsets.only(bottom: index == 3 ? 0 : 10),
+            child: _ComicDetailSkeletonBlock(
+              color: skeletonColor,
+              width: MediaQuery.sizeOf(context).width * (index.isEven ? 0.9 : 0.76),
+              height: 16,
+              radius: 8,
+            ),
+          ),
         ),
       ],
     );

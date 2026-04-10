@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:io';
 
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
@@ -36,15 +38,34 @@ class SoftwareUpdateService {
   Future<SoftwareUpdateCheckResult?> checkForUpdates() async {
     final packageInfo = await PackageInfo.fromPlatform();
     final currentVersion = packageInfo.version.trim();
+    final supportedAbis = await _resolveSupportedAbis();
 
     final manifestData = await _loadUpdateManifest();
     if (manifestData != null) {
-      final result = _buildResultFromManifest(
+      final manifestResult = _buildResultFromManifest(
         manifestData,
         currentVersion: currentVersion,
+        supportedAbis: supportedAbis,
       );
-      if (result != null) {
-        return result;
+      if (manifestResult != null) {
+        if (manifestResult.hasUpdate && manifestResult.changelog == null) {
+          final releaseData = await _loadLatestReleaseFromGitHubApi();
+          if (releaseData != null) {
+            final releaseResult = _buildResultFromRelease(
+              releaseData,
+              currentVersion: currentVersion,
+              supportedAbis: supportedAbis,
+            );
+            if (releaseResult != null &&
+                releaseResult.latestVersion == manifestResult.latestVersion &&
+                releaseResult.changelog != null) {
+              return manifestResult.copyWith(
+                changelog: releaseResult.changelog,
+              );
+            }
+          }
+        }
+        return manifestResult;
       }
     }
 
@@ -53,7 +74,11 @@ class SoftwareUpdateService {
       return null;
     }
 
-    return _buildResultFromRelease(releaseData, currentVersion: currentVersion);
+    return _buildResultFromRelease(
+      releaseData,
+      currentVersion: currentVersion,
+      supportedAbis: supportedAbis,
+    );
   }
 
   Future<Map<String, dynamic>?> _loadUpdateManifest() async {
@@ -92,10 +117,15 @@ class SoftwareUpdateService {
   SoftwareUpdateCheckResult? _buildResultFromManifest(
     Map<String, dynamic> manifest, {
     required String currentVersion,
+    required List<String> supportedAbis,
   }) {
     final latestVersionRaw = manifest['version']?.toString().trim();
     final releaseUrl = manifest['releaseUrl']?.toString().trim();
-    final apkUrl = manifest['apkUrl']?.toString().trim();
+    final apkUrl = _resolveManifestApkUrl(
+      manifest,
+      supportedAbis: supportedAbis,
+    );
+    final changelog = _normalizeChangelog(manifest['changelog']?.toString());
 
     if (latestVersionRaw == null ||
         latestVersionRaw.isEmpty ||
@@ -110,6 +140,7 @@ class SoftwareUpdateService {
       latestVersion: latestVersion,
       releaseUrl: releaseUrl,
       apkUrl: apkUrl != null && apkUrl.isNotEmpty ? apkUrl : null,
+      changelog: changelog,
       hasUpdate: _isVersionGreater(latestVersion, currentVersion),
     );
   }
@@ -117,32 +148,22 @@ class SoftwareUpdateService {
   SoftwareUpdateCheckResult? _buildResultFromRelease(
     Map<String, dynamic> release, {
     required String currentVersion,
+    required List<String> supportedAbis,
   }) {
     final latestVersionRaw =
         release['tag_name']?.toString().trim().isNotEmpty == true
         ? release['tag_name'].toString().trim()
         : release['name']?.toString().trim();
     final releaseUrl = release['html_url']?.toString().trim();
+    final changelog = _normalizeChangelog(release['body']?.toString());
     final assets = release['assets'];
 
     String? apkUrl;
     if (assets is List) {
-      for (final asset in assets) {
-        if (asset is! Map) {
-          continue;
-        }
-        final map = Map<String, dynamic>.from(asset);
-        final name = map['name']?.toString().trim().toLowerCase() ?? '';
-        final url = map['browser_download_url']?.toString().trim();
-        if (!name.endsWith('.apk') || url == null || url.isEmpty) {
-          continue;
-        }
-        if (name.contains('arm64-v8a')) {
-          apkUrl = url;
-          break;
-        }
-        apkUrl ??= url;
-      }
+      apkUrl = _selectBestApkUrlFromAssets(
+        assets,
+        supportedAbis: supportedAbis,
+      );
     }
 
     if (latestVersionRaw == null ||
@@ -158,6 +179,7 @@ class SoftwareUpdateService {
       latestVersion: latestVersion,
       releaseUrl: releaseUrl,
       apkUrl: apkUrl,
+      changelog: changelog,
       hasUpdate: _isVersionGreater(latestVersion, currentVersion),
     );
   }
@@ -165,6 +187,123 @@ class SoftwareUpdateService {
   String _normalizeVersion(String version) {
     return version.trim().replaceFirst(RegExp(r'^[vV]'), '');
   }
+
+  String? _normalizeChangelog(String? changelog) {
+    if (changelog == null) {
+      return null;
+    }
+    final normalized = changelog.replaceAll('\r\n', '\n').trim();
+    return normalized.isEmpty ? null : normalized;
+  }
+
+  Future<List<String>> _resolveSupportedAbis() async {
+    if (!Platform.isAndroid) {
+      return const [];
+    }
+    try {
+      final androidInfo = await DeviceInfoPlugin().androidInfo;
+      return androidInfo.supportedAbis
+          .map((abi) => abi.trim().toLowerCase())
+          .where((abi) => abi.isNotEmpty)
+          .toList(growable: false);
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  String? _resolveManifestApkUrl(
+    Map<String, dynamic> manifest, {
+    required List<String> supportedAbis,
+  }) {
+    final apkUrlsRaw = manifest['apkUrls'];
+    if (apkUrlsRaw is Map) {
+      final apkUrls = <String, String>{};
+      for (final entry in apkUrlsRaw.entries) {
+        final key = entry.key.toString().trim().toLowerCase();
+        final value = entry.value?.toString().trim() ?? '';
+        if (key.isEmpty || value.isEmpty) {
+          continue;
+        }
+        apkUrls[key] = value;
+      }
+      final selected = _selectBestApkUrlFromMap(
+        apkUrls,
+        supportedAbis: supportedAbis,
+      );
+      if (selected != null) {
+        return selected;
+      }
+    }
+
+    final legacyApkUrl = manifest['apkUrl']?.toString().trim();
+    return legacyApkUrl != null && legacyApkUrl.isNotEmpty
+        ? legacyApkUrl
+        : null;
+  }
+
+  String? _selectBestApkUrlFromAssets(
+    List assets, {
+    required List<String> supportedAbis,
+  }) {
+    final candidates = <String, String>{};
+    String? fallback;
+    for (final asset in assets) {
+      if (asset is! Map) {
+        continue;
+      }
+      final map = Map<String, dynamic>.from(asset);
+      final name = map['name']?.toString().trim().toLowerCase() ?? '';
+      final url = map['browser_download_url']?.toString().trim();
+      if (!name.endsWith('.apk') || url == null || url.isEmpty) {
+        continue;
+      }
+      fallback ??= url;
+      for (final abi in _apkAbiPriority) {
+        if (name.contains(abi)) {
+          candidates.putIfAbsent(abi, () => url);
+        }
+      }
+      if (name.contains('universal')) {
+        candidates.putIfAbsent('universal', () => url);
+      }
+    }
+    return _selectBestApkUrlFromMap(candidates, supportedAbis: supportedAbis) ??
+        fallback;
+  }
+
+  String? _selectBestApkUrlFromMap(
+    Map<String, String> apkUrls, {
+    required List<String> supportedAbis,
+  }) {
+    for (final abi in supportedAbis) {
+      final direct = apkUrls[abi];
+      if (direct != null && direct.isNotEmpty) {
+        return direct;
+      }
+    }
+    for (final abi in _apkAbiPriority) {
+      if (supportedAbis.contains(abi)) {
+        final matched = apkUrls[abi];
+        if (matched != null && matched.isNotEmpty) {
+          return matched;
+        }
+      }
+    }
+    for (final abi in _apkAbiPriority) {
+      final matched = apkUrls[abi];
+      if (matched != null && matched.isNotEmpty) {
+        return matched;
+      }
+    }
+    return apkUrls['universal'];
+  }
+
+  static const List<String> _apkAbiPriority = [
+    'arm64-v8a',
+    'armeabi-v7a',
+    'x86_64',
+    'x86',
+  ];
 
   bool _isVersionGreater(String a, String b) {
     final pa = _parseVersionSegments(a);
@@ -199,11 +338,31 @@ class SoftwareUpdateCheckResult {
     required this.releaseUrl,
     required this.hasUpdate,
     this.apkUrl,
+    this.changelog,
   });
 
   final String currentVersion;
   final String latestVersion;
   final String releaseUrl;
   final String? apkUrl;
+  final String? changelog;
   final bool hasUpdate;
+
+  SoftwareUpdateCheckResult copyWith({
+    String? currentVersion,
+    String? latestVersion,
+    String? releaseUrl,
+    String? apkUrl,
+    String? changelog,
+    bool? hasUpdate,
+  }) {
+    return SoftwareUpdateCheckResult(
+      currentVersion: currentVersion ?? this.currentVersion,
+      latestVersion: latestVersion ?? this.latestVersion,
+      releaseUrl: releaseUrl ?? this.releaseUrl,
+      apkUrl: apkUrl ?? this.apkUrl,
+      changelog: changelog ?? this.changelog,
+      hasUpdate: hasUpdate ?? this.hasUpdate,
+    );
+  }
 }

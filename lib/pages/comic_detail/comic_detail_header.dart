@@ -15,6 +15,7 @@ class _ComicDetailHeaderSection extends StatelessWidget {
     required this.favoriteBusy,
     required this.favoriteOverride,
     required this.lastReadProgress,
+    required this.shouldAnimateInitialDetailReveal,
     required this.onCoverTap,
     required this.onFavoriteTap,
     required this.onShowChapters,
@@ -34,6 +35,7 @@ class _ComicDetailHeaderSection extends StatelessWidget {
   final bool favoriteBusy;
   final bool? favoriteOverride;
   final Map<String, dynamic>? lastReadProgress;
+  final bool shouldAnimateInitialDetailReveal;
   final VoidCallback? onCoverTap;
   final ValueChanged<ComicDetailsData> onFavoriteTap;
   final ValueChanged<ComicDetailsData> onShowChapters;
@@ -41,6 +43,8 @@ class _ComicDetailHeaderSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final detailsReady = details != null;
+    final theme = Theme.of(context);
     final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
     final headerCoverCacheWidth = (135 * devicePixelRatio)
         .round()
@@ -50,6 +54,12 @@ class _ComicDetailHeaderSection extends StatelessWidget {
         .round()
         .clamp(190, 900)
         .toInt();
+    final favoriteButtonWidth = MediaQuery.of(context).size.width / 2.2;
+    final statsText = [
+      if (details?.likesCount.isNotEmpty ?? false)
+        l10n(context).comicDetailLikesCount(details!.likesCount),
+      if (viewsText.isNotEmpty) l10n(context).comicDetailViewsCount(viewsText),
+    ].join(' / ');
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -101,116 +111,155 @@ class _ComicDetailHeaderSection extends StatelessWidget {
                     const SizedBox(height: 6),
                     Text(displaySubTitle),
                   ],
-                  if (details == null) ...[
-                    const SizedBox(height: 12),
-                    Container(height: 14, width: 140, color: skeletonColor),
-                    const SizedBox(height: 6),
-                    Container(height: 14, width: 100, color: skeletonColor),
-                  ],
                 ],
               ),
             ),
           ],
         ),
-        const SizedBox(height: 16),
-        if (details != null)
-          Padding(
-            key: favoriteRowKey,
-            padding: const EdgeInsets.symmetric(vertical: 4.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    [
-                      if (details!.likesCount.isNotEmpty)
-                        l10n(
-                          context,
-                        ).comicDetailLikesCount(details!.likesCount),
-                      if (viewsText.isNotEmpty)
-                        l10n(context).comicDetailViewsCount(viewsText),
-                    ].join(' / '),
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+        AnimatedContainer(
+          duration: shouldAnimateInitialDetailReveal
+              ? const Duration(milliseconds: 320)
+              : Duration.zero,
+          curve: Curves.easeOutCubic,
+          height: shouldAnimateInitialDetailReveal
+              ? (detailsReady ? 22 : 14)
+              : 22,
+        ),
+        Padding(
+          key: favoriteRowKey,
+          padding: const EdgeInsets.symmetric(vertical: 4.0),
+          child: SizedBox(
+            height: 48,
+            child: AnimatedSlide(
+              offset: shouldAnimateInitialDetailReveal
+                  ? (detailsReady ? Offset.zero : const Offset(0, -0.08))
+                  : Offset.zero,
+              duration: shouldAnimateInitialDetailReveal
+                  ? const Duration(milliseconds: 320)
+                  : Duration.zero,
+              curve: Curves.easeOutCubic,
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.only(right: 12),
+                      child: detailsReady
+                          ? Align(
+                              alignment: Alignment.centerLeft,
+                              child: _ComicDetailEntranceReveal(
+                                key: const ValueKey('comic-detail-stats'),
+                                beginOffset: const Offset(0, 12),
+                                enabled: shouldAnimateInitialDetailReveal,
+                                child: Text(
+                                  statsText,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: theme.colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ),
+                            )
+                          : Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _ComicDetailSkeletonBlock(
+                                  color: skeletonColor,
+                                  width: 112,
+                                  height: 12,
+                                ),
+                                const SizedBox(height: 8),
+                                _ComicDetailSkeletonBlock(
+                                  color: skeletonColor,
+                                  width: 84,
+                                  height: 12,
+                                ),
+                              ],
+                            ),
                     ),
                   ),
+                  SizedBox(
+                    width: favoriteButtonWidth,
+                    child: AbsorbPointer(
+                      absorbing: !detailsReady || favoriteBusy,
+                      child: FilledButton.icon(
+                        onPressed: () {
+                          if (detailsReady) {
+                            onFavoriteTap(details!);
+                          }
+                        },
+                        icon: Icon(
+                          (favoriteOverride ?? details?.isFavorite ?? false)
+                              ? Icons.favorite
+                              : Icons.favorite_border,
+                        ),
+                        label: Text(
+                          (favoriteOverride ?? details?.isFavorite ?? false)
+                              ? l10n(context).comicDetailUnfavorite
+                              : l10n(context).comicDetailFavorite,
+                        ),
+                        style: FilledButton.styleFrom(
+                          backgroundColor:
+                              (favoriteOverride ?? details?.isFavorite ?? false)
+                              ? theme.colorScheme.primaryContainer
+                              : null,
+                          foregroundColor:
+                              (favoriteOverride ?? details?.isFavorite ?? false)
+                              ? theme.colorScheme.onPrimaryContainer
+                              : null,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        SizedBox(
+          key: actionButtonsKey,
+          height: 48,
+          child: AnimatedSlide(
+            offset: shouldAnimateInitialDetailReveal
+                ? (detailsReady ? Offset.zero : const Offset(0, -0.08))
+                : Offset.zero,
+            duration: shouldAnimateInitialDetailReveal
+                ? const Duration(milliseconds: 320)
+                : Duration.zero,
+            curve: Curves.easeOutCubic,
+            child: Row(
+              children: [
+                AbsorbPointer(
+                  absorbing: !detailsReady,
+                  child: IconButton(
+                    tooltip: l10n(context).comicDetailChapters,
+                    onPressed: () {
+                      if (detailsReady) {
+                        onShowChapters(details!);
+                      }
+                    },
+                    icon: const Icon(Icons.format_list_bulleted_rounded),
+                  ),
                 ),
-                SizedBox(
-                  width: MediaQuery.of(context).size.width / 2.2,
-                  child: FilledButton.icon(
-                    onPressed: favoriteBusy
-                        ? null
-                        : () => onFavoriteTap(details!),
-                    icon: Icon(
-                      (favoriteOverride ?? details!.isFavorite)
-                          ? Icons.favorite
-                          : Icons.favorite_border,
-                    ),
-                    label: Text(
-                      (favoriteOverride ?? details!.isFavorite)
-                          ? l10n(context).comicDetailUnfavorite
-                          : l10n(context).comicDetailFavorite,
-                    ),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: (favoriteOverride ?? details!.isFavorite)
-                          ? Theme.of(context).colorScheme.primaryContainer
-                          : null,
-                      foregroundColor: (favoriteOverride ?? details!.isFavorite)
-                          ? Theme.of(context).colorScheme.onPrimaryContainer
-                          : null,
+                const SizedBox(width: 8),
+                Expanded(
+                  child: AbsorbPointer(
+                    absorbing: !detailsReady,
+                    child: FilledButton.icon(
+                      onPressed: () {
+                        if (detailsReady) {
+                          onOpenReader(details!);
+                        }
+                      },
+                      icon: const Icon(Icons.menu_book_outlined),
+                      label: Text(_buildReaderButtonLabel(context)),
                     ),
                   ),
                 ),
               ],
             ),
-          )
-        else
-          Container(
-            key: favoriteRowKey,
-            height: 40,
-            decoration: BoxDecoration(
-              color: skeletonColor,
-              borderRadius: BorderRadius.circular(12),
-            ),
           ),
-        const SizedBox(height: 8),
-        if (details != null)
-          Row(
-            key: actionButtonsKey,
-            children: [
-              IconButton(
-                tooltip: l10n(context).comicDetailChapters,
-                onPressed: () => onShowChapters(details!),
-                icon: const Icon(Icons.format_list_bulleted_rounded),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: FilledButton.icon(
-                  onPressed: () => onOpenReader(details!),
-                  icon: const Icon(Icons.menu_book_outlined),
-                  label: Text(_buildReaderButtonLabel(context)),
-                ),
-              ),
-            ],
-          )
-        else
-          Row(
-            key: actionButtonsKey,
-            children: [
-              SizedBox(
-                width: 48,
-                height: 48,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: skeletonColor,
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(child: Container(height: 48, color: skeletonColor)),
-            ],
-          ),
+        ),
         const SizedBox(height: 8),
       ],
     );

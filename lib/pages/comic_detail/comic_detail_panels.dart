@@ -1,10 +1,17 @@
 part of '../comic_detail_page.dart';
 
 class _HazukiTabBarDelegate extends SliverPersistentHeaderDelegate {
-  const _HazukiTabBarDelegate(this.tabBar, this.surfaceColor);
+  const _HazukiTabBarDelegate(
+    this.tabBar,
+    this.surfaceColor, {
+    required this.detailsReady,
+    required this.shouldAnimateInitialDetailReveal,
+  });
 
   final TabBar tabBar;
   final Color surfaceColor;
+  final bool detailsReady;
+  final bool shouldAnimateInitialDetailReveal;
 
   @override
   double get minExtent => tabBar.preferredSize.height;
@@ -18,14 +25,29 @@ class _HazukiTabBarDelegate extends SliverPersistentHeaderDelegate {
     bool overlapsContent,
   ) {
     return RepaintBoundary(
-      child: ColoredBox(color: surfaceColor, child: tabBar),
+      child: ColoredBox(
+        color: surfaceColor,
+        child: AnimatedSlide(
+          offset: shouldAnimateInitialDetailReveal
+              ? (detailsReady ? Offset.zero : const Offset(0, -0.12))
+              : Offset.zero,
+          duration: shouldAnimateInitialDetailReveal
+              ? const Duration(milliseconds: 320)
+              : Duration.zero,
+          curve: Curves.easeOutCubic,
+          child: tabBar,
+        ),
+      ),
     );
   }
 
   @override
   bool shouldRebuild(covariant _HazukiTabBarDelegate oldDelegate) {
     return tabBar != oldDelegate.tabBar ||
-        surfaceColor != oldDelegate.surfaceColor;
+        surfaceColor != oldDelegate.surfaceColor ||
+        detailsReady != oldDelegate.detailsReady ||
+        shouldAnimateInitialDetailReveal !=
+            oldDelegate.shouldAnimateInitialDetailReveal;
   }
 }
 

@@ -52,22 +52,25 @@ class ComicDetailPage extends StatefulWidget {
 class _ComicDetailPageState extends State<ComicDetailPage>
     with TickerProviderStateMixin {
   static const _mediaChannel = MethodChannel('hazuki.comics/media');
+  static final Set<String> _animatedComicDetailIds = <String>{};
 
   late Future<ComicDetailsData> _future;
   late final ValueNotifier<double> _appBarSolidProgressNotifier;
   late final ValueNotifier<bool> _collapsedTitleNotifier;
   late final TabController _tabController;
+  late final bool _shouldAnimateInitialDetailReveal;
 
   final ScrollController _scrollController = ScrollController();
   final GlobalKey _actionButtonsKey = GlobalKey();
   final GlobalKey _favoriteRowKey = GlobalKey();
   final GlobalKey _headerTitleKey = GlobalKey();
-  final Map<String, Uint8List> _dynamicColorImageCache = <String, Uint8List>{};
 
   bool _favoriteBusy = false;
   bool? _favoriteOverride;
   bool? _cloudFavoriteOverride;
   bool _comicDynamicColorEnabled = false;
+  bool _didBindComicDynamicColorSetting = false;
+  bool? _observedComicDynamicColorEnabled;
   ColorScheme? _lightComicScheme;
   ColorScheme? _darkComicScheme;
   String _appBarComicTitle = '';
@@ -79,6 +82,12 @@ class _ComicDetailPageState extends State<ComicDetailPage>
   void initState() {
     super.initState();
     _initializeComicDetailPage();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _syncComicDynamicColorSettingFromScope();
   }
 
   @override
@@ -140,6 +149,8 @@ class _ComicDetailPageState extends State<ComicDetailPage>
                 favoriteBusy: _favoriteBusy,
                 favoriteOverride: _favoriteOverride,
                 lastReadProgress: _lastReadProgress,
+                shouldAnimateInitialDetailReveal:
+                    _shouldAnimateInitialDetailReveal,
                 buildViewsText: _extractComicViewsText,
                 buildMetaSection: _buildDetailMetaSection,
                 onShowCoverPreview: (imageUrl) =>
@@ -147,6 +158,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
                 onFavoriteTap: _toggleFavorite,
                 onShowChapters: _showChaptersPanel,
                 onOpenReader: _openReader,
+                onDetailsLoaded: _markComicDetailRevealHandled,
                 onDetailsResolved: ({required title, required updateTime}) {
                   _updateAppBarMetadata(title: title, updateTime: updateTime);
                 },

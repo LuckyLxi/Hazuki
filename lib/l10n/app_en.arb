@@ -149,6 +149,7 @@
       "version": {}
     }
   },
+  "softwareUpdateChangelogTitle": "What's new",
   "softwareUpdateOpenRelease": "Open release page",
   "softwareUpdateAlreadyLatest": "You're already on the latest app version",
   "softwareUpdateCheckFailed": "Unable to check for app updates right now",

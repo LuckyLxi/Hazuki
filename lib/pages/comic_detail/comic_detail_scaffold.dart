@@ -195,6 +195,69 @@ class _ComicDetailTabTickerScope extends StatelessWidget {
   }
 }
 
+class _ComicDetailEntranceReveal extends StatelessWidget {
+  const _ComicDetailEntranceReveal({
+    super.key,
+    required this.child,
+    this.beginOffset = const Offset(0, 16),
+    this.enabled = true,
+  });
+
+  final Widget child;
+  final Offset beginOffset;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!enabled) {
+      return child;
+    }
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOutCubic,
+      child: child,
+      builder: (context, value, child) {
+        final dx = lerpDouble(beginOffset.dx, 0, value) ?? 0;
+        final dy = lerpDouble(beginOffset.dy, 0, value) ?? 0;
+        return Opacity(
+          opacity: value,
+          child: Transform.translate(
+            offset: Offset(dx, dy),
+            child: child,
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ComicDetailSkeletonBlock extends StatelessWidget {
+  const _ComicDetailSkeletonBlock({
+    required this.color,
+    this.width,
+    this.height = 14,
+    this.radius = 10,
+  });
+
+  final Color color;
+  final double? width;
+  final double height;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(radius),
+      ),
+    );
+  }
+}
+
 class _ComicDetailBody extends StatelessWidget {
   const _ComicDetailBody({
     required this.tabController,
@@ -209,12 +272,14 @@ class _ComicDetailBody extends StatelessWidget {
     required this.favoriteBusy,
     required this.favoriteOverride,
     required this.lastReadProgress,
+    required this.shouldAnimateInitialDetailReveal,
     required this.buildViewsText,
     required this.buildMetaSection,
     required this.onShowCoverPreview,
     required this.onFavoriteTap,
     required this.onShowChapters,
     required this.onOpenReader,
+    required this.onDetailsLoaded,
     required this.onDetailsResolved,
   });
 
@@ -230,6 +295,7 @@ class _ComicDetailBody extends StatelessWidget {
   final bool favoriteBusy;
   final bool? favoriteOverride;
   final Map<String, dynamic>? lastReadProgress;
+  final bool shouldAnimateInitialDetailReveal;
   final String Function(ComicDetailsData details) buildViewsText;
   final Widget Function(ComicDetailsData details) buildMetaSection;
   final ValueChanged<String> onShowCoverPreview;
@@ -242,6 +308,7 @@ class _ComicDetailBody extends StatelessWidget {
     int? chapterIndex,
   })
   onOpenReader;
+  final ValueChanged<ComicDetailsData> onDetailsLoaded;
   final void Function({required String title, required String updateTime})
   onDetailsResolved;
 
@@ -262,11 +329,16 @@ class _ComicDetailBody extends StatelessWidget {
         final displayCoverUrl = listCoverUrl.isNotEmpty
             ? listCoverUrl
             : (details?.cover.trim() ?? '');
+        final shouldAnimateResolvedContent =
+            shouldAnimateInitialDetailReveal && details != null;
 
         onDetailsResolved(
           title: displayTitle,
           updateTime: details?.updateTime ?? '',
         );
+        if (details != null) {
+          onDetailsLoaded(details);
+        }
 
         return NestedScrollView(
           controller: scrollController,
@@ -276,27 +348,37 @@ class _ComicDetailBody extends StatelessWidget {
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                  child: RepaintBoundary(
-                    child: _ComicDetailHeaderSection(
-                      heroTag: heroTag,
-                      details: details,
-                      skeletonColor: skeletonColor,
-                      displayTitle: displayTitle,
-                      displaySubTitle: displaySubTitle,
-                      displayCoverUrl: displayCoverUrl,
-                      viewsText: details != null ? buildViewsText(details) : '',
-                      headerTitleKey: headerTitleKey,
-                      favoriteRowKey: favoriteRowKey,
-                      actionButtonsKey: actionButtonsKey,
-                      favoriteBusy: favoriteBusy,
-                      favoriteOverride: favoriteOverride,
-                      lastReadProgress: lastReadProgress,
-                      onCoverTap: displayCoverUrl.isEmpty
-                          ? null
-                          : () => onShowCoverPreview(displayCoverUrl),
-                      onFavoriteTap: onFavoriteTap,
-                      onShowChapters: onShowChapters,
-                      onOpenReader: onOpenReader,
+                  child: AnimatedSize(
+                    duration: const Duration(milliseconds: 320),
+                    curve: Curves.easeOutCubic,
+                    alignment: Alignment.topCenter,
+                    clipBehavior: Clip.hardEdge,
+                    child: RepaintBoundary(
+                      child: _ComicDetailHeaderSection(
+                        heroTag: heroTag,
+                        details: details,
+                        skeletonColor: skeletonColor,
+                        displayTitle: displayTitle,
+                        displaySubTitle: displaySubTitle,
+                        displayCoverUrl: displayCoverUrl,
+                        viewsText: details != null
+                            ? buildViewsText(details)
+                            : '',
+                        headerTitleKey: headerTitleKey,
+                        favoriteRowKey: favoriteRowKey,
+                        actionButtonsKey: actionButtonsKey,
+                        favoriteBusy: favoriteBusy,
+                        favoriteOverride: favoriteOverride,
+                        lastReadProgress: lastReadProgress,
+                        shouldAnimateInitialDetailReveal:
+                            shouldAnimateInitialDetailReveal,
+                        onCoverTap: displayCoverUrl.isEmpty
+                            ? null
+                            : () => onShowCoverPreview(displayCoverUrl),
+                        onFavoriteTap: onFavoriteTap,
+                        onShowChapters: onShowChapters,
+                        onOpenReader: onOpenReader,
+                      ),
                     ),
                   ),
                 ),
@@ -332,6 +414,9 @@ class _ComicDetailBody extends StatelessWidget {
                       ],
                     ),
                     surface,
+                    detailsReady: details != null,
+                    shouldAnimateInitialDetailReveal:
+                        shouldAnimateInitialDetailReveal,
                   ),
                 ),
               ),
@@ -353,6 +438,8 @@ class _ComicDetailBody extends StatelessWidget {
                         skeletonColor: skeletonColor,
                         metaSectionBuilder: buildMetaSection,
                         isActiveInTabView: shouldRender,
+                        shouldAnimateResolvedContent:
+                            shouldAnimateResolvedContent,
                       ),
                     );
                   },

@@ -149,6 +149,7 @@
       "version": {}
     }
   },
+  "softwareUpdateChangelogTitle": "更新内容",
   "softwareUpdateOpenRelease": "前往发布页",
   "softwareUpdateAlreadyLatest": "当前已经是最新软件版本",
   "softwareUpdateCheckFailed": "暂时无法检查软件更新，请稍后再试",

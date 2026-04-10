@@ -282,58 +282,61 @@ class _HazukiAppState extends State<HazukiApp> with WidgetsBindingObserver {
               theme: HazukiThemeFactory.buildLight(appearance, lightDynamic),
               darkTheme: HazukiThemeFactory.buildDark(appearance, darkDynamic),
               builder: (context, child) {
-                return Stack(
-                  children: [
-                    // ignore: use_null_aware_elements
-                    if (child != null) child,
-                    Positioned.fill(
-                      child: IgnorePointer(
-                        ignoring:
-                            !_bootstrapState.showOverlay &&
-                            !_bootstrapState.showIntro,
-                        child: AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 280),
-                          switchInCurve: Curves.easeOutCubic,
-                          switchOutCurve: Curves.easeInCubic,
-                          transitionBuilder: (widget, animation) {
-                            final curved = CurvedAnimation(
-                              parent: animation,
-                              curve: Curves.easeOutCubic,
-                              reverseCurve: Curves.easeInCubic,
-                            );
-                            return FadeTransition(
-                              opacity: curved,
-                              child: ScaleTransition(
-                                scale: Tween<double>(
-                                  begin: 0.94,
-                                  end: 1,
-                                ).animate(curved),
-                                child: widget,
-                              ),
-                            );
-                          },
-                          child: InitialSourceBootstrapOverlay(
-                            showOverlay: _bootstrapState.showOverlay,
-                            showIntro: _bootstrapState.showIntro,
-                            indeterminate: _bootstrapState.indeterminate,
-                            progress: _bootstrapState.progress,
-                            errorText: _bootstrapState.errorText,
+                return HazukiThemeControllerScope(
+                  controller: _themeController,
+                  child: Stack(
+                    children: [
+                      // ignore: use_null_aware_elements
+                      if (child != null) child,
+                      Positioned.fill(
+                        child: IgnorePointer(
+                          ignoring:
+                              !_bootstrapState.showOverlay &&
+                              !_bootstrapState.showIntro,
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 280),
+                            switchInCurve: Curves.easeOutCubic,
+                            switchOutCurve: Curves.easeInCubic,
+                            transitionBuilder: (widget, animation) {
+                              final curved = CurvedAnimation(
+                                parent: animation,
+                                curve: Curves.easeOutCubic,
+                                reverseCurve: Curves.easeInCubic,
+                              );
+                              return FadeTransition(
+                                opacity: curved,
+                                child: ScaleTransition(
+                                  scale: Tween<double>(
+                                    begin: 0.94,
+                                    end: 1,
+                                  ).animate(curved),
+                                  child: widget,
+                                ),
+                              );
+                            },
+                            child: InitialSourceBootstrapOverlay(
+                              showOverlay: _bootstrapState.showOverlay,
+                              showIntro: _bootstrapState.showIntro,
+                              indeterminate: _bootstrapState.indeterminate,
+                              progress: _bootstrapState.progress,
+                              errorText: _bootstrapState.errorText,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    ListenableBuilder(
-                      listenable: PasswordLockService.instance,
-                      builder: (context, _) {
-                        if (!PasswordLockService.instance.shouldBlockApp) {
-                          return const SizedBox.shrink();
-                        }
-                        return PasswordLockGateOverlay(
-                          controller: PasswordLockService.instance,
-                        );
-                      },
-                    ),
-                  ],
+                      ListenableBuilder(
+                        listenable: PasswordLockService.instance,
+                        builder: (context, _) {
+                          if (!PasswordLockService.instance.shouldBlockApp) {
+                            return const SizedBox.shrink();
+                          }
+                          return PasswordLockGateOverlay(
+                            controller: PasswordLockService.instance,
+                          );
+                        },
+                      ),
+                    ],
+                  ),
                 );
               },
               home: HazukiHomePage(

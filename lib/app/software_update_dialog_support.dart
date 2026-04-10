@@ -132,18 +132,37 @@ class SoftwareUpdateDialogSupport {
       context: effectiveDialogContext,
       builder: (context) {
         final strings = l10n(context);
+        final changelog = check.changelog;
         return AlertDialog(
           title: Text(strings.softwareUpdateAvailableTitle),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(strings.softwareUpdateAvailableMessage),
-              const SizedBox(height: 12),
-              Text(strings.softwareUpdateCurrentVersion(check.currentVersion)),
-              const SizedBox(height: 6),
-              Text(strings.softwareUpdateLatestVersion(check.latestVersion)),
-            ],
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420, maxHeight: 420),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(strings.softwareUpdateAvailableMessage),
+                  const SizedBox(height: 12),
+                  Text(
+                    strings.softwareUpdateCurrentVersion(check.currentVersion),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    strings.softwareUpdateLatestVersion(check.latestVersion),
+                  ),
+                  if (changelog != null) ...[
+                    const SizedBox(height: 16),
+                    Text(
+                      strings.softwareUpdateChangelogTitle,
+                      style: Theme.of(context).textTheme.titleSmall,
+                    ),
+                    const SizedBox(height: 8),
+                    SelectableText(changelog),
+                  ],
+                ],
+              ),
+            ),
           ),
           actions: [
             TextButton(

@@ -1,6 +1,75 @@
 part of '../comic_detail_page.dart';
 
+const int _comicDynamicColorSchemeCacheLimit = 24;
+final Map<String, _ComicDynamicColorCacheEntry> _comicDynamicColorSchemeCache =
+    <String, _ComicDynamicColorCacheEntry>{};
+final Map<String, Future<_ComicDynamicColorCacheEntry>>
+_comicDynamicColorSchemeInFlight =
+    <String, Future<_ComicDynamicColorCacheEntry>>{};
+
+class _ComicDynamicColorCacheEntry {
+  const _ComicDynamicColorCacheEntry({
+    required this.lightScheme,
+    required this.darkScheme,
+  });
+
+  final ColorScheme lightScheme;
+  final ColorScheme darkScheme;
+}
+
+_ComicDynamicColorCacheEntry? _takeComicDynamicColorScheme(String url) {
+  final normalizedUrl = url.trim();
+  if (normalizedUrl.isEmpty) {
+    return null;
+  }
+  final entry = _comicDynamicColorSchemeCache.remove(normalizedUrl);
+  if (entry == null) {
+    return null;
+  }
+  _comicDynamicColorSchemeCache[normalizedUrl] = entry;
+  return entry;
+}
+
+void _putComicDynamicColorScheme(
+  String url,
+  _ComicDynamicColorCacheEntry entry,
+) {
+  final normalizedUrl = url.trim();
+  if (normalizedUrl.isEmpty) {
+    return;
+  }
+  _comicDynamicColorSchemeCache.remove(normalizedUrl);
+  _comicDynamicColorSchemeCache[normalizedUrl] = entry;
+  while (_comicDynamicColorSchemeCache.length >
+      _comicDynamicColorSchemeCacheLimit) {
+    _comicDynamicColorSchemeCache.remove(
+      _comicDynamicColorSchemeCache.keys.first,
+    );
+  }
+}
+
 extension _ComicDetailRuntimeExtension on _ComicDetailPageState {
+  void _syncComicDynamicColorSettingFromScope() {
+    final controller = HazukiThemeControllerScope.maybeOf(context);
+    if (controller == null) {
+      if (_didBindComicDynamicColorSetting) {
+        return;
+      }
+      _didBindComicDynamicColorSetting = true;
+      unawaited(_loadDynamicColorSetting());
+      return;
+    }
+
+    final enabled = controller.settings.comicDetailDynamicColor;
+    final hasBound = _didBindComicDynamicColorSetting;
+    _didBindComicDynamicColorSetting = true;
+    if (hasBound && _observedComicDynamicColorEnabled == enabled) {
+      return;
+    }
+    _observedComicDynamicColorEnabled = enabled;
+    unawaited(_applyComicDynamicColorSetting(enabled, immediate: hasBound));
+  }
+
   Future<void> _loadFavoriteOverrideState() async {
     try {
       final details = await _future;
@@ -104,16 +173,51 @@ extension _ComicDetailRuntimeExtension on _ComicDetailPageState {
     final prefs = await SharedPreferences.getInstance();
     final enabled =
         prefs.getBool('appearance_comic_detail_dynamic_color') ?? false;
+    await _applyComicDynamicColorSetting(enabled, immediate: false);
+  }
+
+  Future<void> _applyComicDynamicColorSetting(
+    bool enabled, {
+    required bool immediate,
+  }) async {
     if (!mounted) {
       return;
     }
-    _updateComicDetailState(() {
-      _comicDynamicColorEnabled = enabled;
-    });
     if (!enabled) {
+      _updateComicDetailState(() {
+        _comicDynamicColorEnabled = false;
+        _lightComicScheme = null;
+        _darkComicScheme = null;
+      });
       return;
     }
-    unawaited(_scheduleDynamicColorExtraction());
+
+    if (!_comicDynamicColorEnabled) {
+      _updateComicDetailState(() {
+        _comicDynamicColorEnabled = true;
+      });
+    }
+
+    if (_applyCachedDynamicColorScheme(widget.comic.cover)) {
+      return;
+    }
+
+    if (!immediate) {
+      unawaited(_scheduleDynamicColorExtraction());
+      return;
+    }
+
+    if (hazukiNoImageModeNotifier.value) {
+      return;
+    }
+    final coverUrl = await _resolveDynamicColorCoverUrl();
+    if (!mounted || !_comicDynamicColorEnabled || coverUrl.isEmpty) {
+      return;
+    }
+    if (_applyCachedDynamicColorScheme(coverUrl)) {
+      return;
+    }
+    unawaited(_extractColorScheme(coverUrl));
   }
 
   Future<void> _scheduleDynamicColorExtraction() async {
@@ -125,6 +229,9 @@ extension _ComicDetailRuntimeExtension on _ComicDetailPageState {
     }
     final coverUrl = await _resolveDynamicColorCoverUrl();
     if (coverUrl.isEmpty || !mounted) {
+      return;
+    }
+    if (_applyCachedDynamicColorScheme(coverUrl)) {
       return;
     }
     unawaited(_extractColorScheme(coverUrl));
@@ -202,56 +309,95 @@ extension _ComicDetailRuntimeExtension on _ComicDetailPageState {
 
   Future<void> _extractColorScheme(String url) async {
     try {
-      final cachedBytes = _dynamicColorImageCache[url];
-      final bytes =
-          cachedBytes ??
-          await HazukiSourceService.instance.downloadImageBytes(
-            url,
+      final normalizedUrl = url.trim();
+      if (normalizedUrl.isEmpty) {
+        return;
+      }
+      final cachedEntry = _takeComicDynamicColorScheme(normalizedUrl);
+      if (cachedEntry != null) {
+        _applyDynamicColorSchemeEntry(cachedEntry);
+        return;
+      }
+
+      final inFlight = _comicDynamicColorSchemeInFlight[normalizedUrl];
+      final Future<_ComicDynamicColorCacheEntry> future;
+      final bool createdFuture;
+      if (inFlight != null) {
+        future = inFlight;
+        createdFuture = false;
+      } else {
+        future = () async {
+          final bytes = await HazukiSourceService.instance.downloadImageBytes(
+            normalizedUrl,
             keepInMemory: true,
           );
-      if (!mounted) {
-        return;
-      }
-      if (cachedBytes == null) {
-        _dynamicColorImageCache[url] = bytes;
-      }
-      final imgProvider = MemoryImage(bytes);
-      final light = await ColorScheme.fromImageProvider(
-        provider: imgProvider,
-        brightness: Brightness.light,
-      );
+          final imgProvider = MemoryImage(bytes);
+          final light = await ColorScheme.fromImageProvider(
+            provider: imgProvider,
+            brightness: Brightness.light,
+          );
 
-      final fallbackLight = ColorScheme.fromSeed(
-        seedColor: const Color(0xff4285F4),
-        brightness: Brightness.light,
-      );
+          final fallbackLight = ColorScheme.fromSeed(
+            seedColor: const Color(0xff4285F4),
+            brightness: Brightness.light,
+          );
 
-      late final ColorScheme resolvedLight;
-      late final ColorScheme resolvedDark;
-      if (light.primary == fallbackLight.primary) {
-        resolvedLight = await _buildNeutralComicScheme(
-          bytes: bytes,
-          brightness: Brightness.light,
-        );
-        resolvedDark = await _buildNeutralComicScheme(
-          bytes: bytes,
-          brightness: Brightness.dark,
-        );
-      } else {
-        resolvedLight = light;
-        resolvedDark = await ColorScheme.fromImageProvider(
-          provider: imgProvider,
-          brightness: Brightness.dark,
-        );
+          late final ColorScheme resolvedLight;
+          late final ColorScheme resolvedDark;
+          if (light.primary == fallbackLight.primary) {
+            resolvedLight = await _buildNeutralComicScheme(
+              bytes: bytes,
+              brightness: Brightness.light,
+            );
+            resolvedDark = await _buildNeutralComicScheme(
+              bytes: bytes,
+              brightness: Brightness.dark,
+            );
+          } else {
+            resolvedLight = light;
+            resolvedDark = await ColorScheme.fromImageProvider(
+              provider: imgProvider,
+              brightness: Brightness.dark,
+            );
+          }
+
+          return _ComicDynamicColorCacheEntry(
+            lightScheme: resolvedLight,
+            darkScheme: resolvedDark,
+          );
+        }();
+        _comicDynamicColorSchemeInFlight[normalizedUrl] = future;
+        createdFuture = true;
       }
 
-      if (!mounted) {
-        return;
+      try {
+        final entry = await future;
+        _putComicDynamicColorScheme(normalizedUrl, entry);
+        _applyDynamicColorSchemeEntry(entry);
+      } finally {
+        if (createdFuture) {
+          _comicDynamicColorSchemeInFlight.remove(normalizedUrl);
+        }
       }
-      _updateComicDetailState(() {
-        _lightComicScheme = resolvedLight;
-        _darkComicScheme = resolvedDark;
-      });
     } catch (_) {}
+  }
+
+  bool _applyCachedDynamicColorScheme(String url) {
+    final entry = _takeComicDynamicColorScheme(url);
+    if (entry == null) {
+      return false;
+    }
+    _applyDynamicColorSchemeEntry(entry);
+    return true;
+  }
+
+  void _applyDynamicColorSchemeEntry(_ComicDynamicColorCacheEntry entry) {
+    if (!mounted) {
+      return;
+    }
+    _updateComicDetailState(() {
+      _lightComicScheme = entry.lightScheme;
+      _darkComicScheme = entry.darkScheme;
+    });
   }
 }
