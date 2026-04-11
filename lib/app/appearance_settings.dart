@@ -5,6 +5,9 @@ import '../l10n/app_localizations.dart';
 const int hazukiDefaultAppearancePresetIndex = 0;
 const bool hazukiDefaultDynamicColorEnabled = false;
 
+typedef AppearanceSettingsApplyCallback =
+    Future<void> Function(AppearanceSettingsData next, {Offset? revealOrigin});
+
 class AppearanceSettingsData {
   const AppearanceSettingsData({
     required this.themeMode,

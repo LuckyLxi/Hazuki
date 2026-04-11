@@ -1,11 +1,11 @@
 {
-  "version": "1.0.1",
-  "releaseUrl": "https://github.com/LuckyLxi/Hazuki/releases/tag/v1.0.1",
+  "version": "1.0.2",
+  "releaseUrl": "https://github.com/LuckyLxi/Hazuki/releases/tag/v1.0.2",
   "apkUrls": {
-    "arm64-v8a": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.1/app-arm64-v8a-release.apk",
-    "armeabi-v7a": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.1/app-armeabi-v7a-release.apk",
-    "x86_64": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.1/app-x86_64-release.apk",
-    "x86": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.1/app-x86_64-release.apk"
+    "arm64-v8a": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.2/app-arm64-v8a-release.apk",
+    "armeabi-v7a": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.2/app-armeabi-v7a-release.apk",
+    "x86_64": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.2/app-x86_64-release.apk",
+    "x86": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.2/app-x86_64-release.apk"
   },
-  "changelog": "**Full Changelog**: https://github.com/LuckyLxi/Hazuki/compare/v1.0.0...v1.0.1"
+  "changelog": "**Full Changelog**: https://github.com/LuckyLxi/Hazuki/compare/v1.0.1...v1.0.2"
 }

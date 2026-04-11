@@ -1,19 +1,22 @@
 name: Release
+
 on:
   push:
     branches:
       - main
       - master
     tags:
-      - 'v*'
+      - "v*"
   workflow_dispatch: {}
 
 permissions:
   contents: write
 
 jobs:
-  analyze-and-build:
+  android-release:
+    name: Android Release
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,7 +27,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: "17"
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -41,11 +44,9 @@ jobs:
       - name: Static analysis
         run: flutter analyze
 
-      # 把 jks 文件从 Base64 还原出来，存到 android/app/ 目录下
       - name: Decode keystore
         run: echo "${{ secrets.HazukiNoa }}" | base64 --decode > android/app/keystore.jks
 
-      # 写入签名配置，注意不能有前导空格否则 Flutter/Gradle 会读取失败
       - name: Write key.properties
         run: |
           echo "storePassword=${{ secrets.STORE_PASSWORD }}" > android/key.properties
@@ -53,11 +54,9 @@ jobs:
           echo "keyAlias=${{ secrets.KEY_ALIAS }}" >> android/key.properties
           echo "storeFile=keystore.jks" >> android/key.properties
 
-      # 使用 split-per-abi 打包，生成 armeabi-v7a / arm64-v8a / x86_64 三个 APK
-      - name: Build Android APKs (Split per ABI)
+      - name: Build Android APKs
         run: flutter build apk --release --split-per-abi
 
-      # 上传所有生成的 APK 为 artifact
       - name: Upload APK artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -65,7 +64,6 @@ jobs:
           path: build/app/outputs/flutter-apk/app-*-release.apk
           if-no-files-found: error
 
-      # 从 annotated tag 里读取发布说明，避免自动生成 Full Changelog
       - name: Resolve release notes from tag annotation
         id: release_notes
         if: startsWith(github.ref, 'refs/tags/v')
@@ -93,8 +91,7 @@ jobs:
             echo "EOF"
           } >> "${GITHUB_OUTPUT}"
 
-      # 只有打了 v* tag 才发布到 Releases
-      - name: Release to GitHub Releases
+      - name: Release Android assets to GitHub Releases
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
@@ -105,8 +102,71 @@ jobs:
           draft: false
           prerelease: false
 
-      - name: Generate update.json
+  windows-release:
+    name: Windows Release
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Enable Windows desktop
+        run: flutter config --enable-windows-desktop
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Generate localization files
+        run: flutter gen-l10n
+
+      - name: Build Windows app
+        run: flutter build windows --release
+
+      - name: Create Windows package
+        shell: pwsh
+        run: |
+          $packageName = "hazuki-windows-x64-${{ github.ref_name }}.zip"
+          Compress-Archive -Path "build/windows/x64/runner/Release/*" -DestinationPath $packageName -Force
+          "WINDOWS_PACKAGE=$packageName" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: hazuki-windows-x64
+          path: ${{ env.WINDOWS_PACKAGE }}
+          if-no-files-found: error
+
+      - name: Release Windows asset to GitHub Releases
         if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.WINDOWS_PACKAGE }}
+          name: ${{ github.ref_name }}
+          generate_release_notes: false
+          draft: false
+          prerelease: false
+
+  update-manifest:
+    name: Update Manifest
+    runs-on: ubuntu-latest
+    needs:
+      - android-release
+      - windows-release
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate update.json
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
@@ -125,6 +185,7 @@ jobs:
           armv7_url="$(printf '%s' "${release_json}" | jq -r '.assets[] | select(.name | test("armeabi-v7a"; "i")) | .browser_download_url' | head -n 1)"
           x64_url="$(printf '%s' "${release_json}" | jq -r '.assets[] | select(.name | test("x86_64"; "i")) | .browser_download_url' | head -n 1)"
           x86_url="$(printf '%s' "${release_json}" | jq -r '.assets[] | select(.name | test("(^|[^0-9])x86([^0-9]|$)"; "i")) | .browser_download_url' | head -n 1)"
+          windows_x64_url="$(printf '%s' "${release_json}" | jq -r '.assets[] | select(.name | test("hazuki-windows-x64.*\\.zip$"; "i")) | .browser_download_url' | head -n 1)"
 
           jq -n \
             --arg version "${version}" \
@@ -133,6 +194,7 @@ jobs:
             --arg armv7 "${armv7_url}" \
             --arg x64 "${x64_url}" \
             --arg x86 "${x86_url}" \
+            --arg windowsX64 "${windows_x64_url}" \
             --arg changelog "${changelog}" \
             '{
               version: $version,
@@ -145,10 +207,10 @@ jobs:
                 + (if $x86 != "" then {"x86": $x86} else {} end)
               )
             }
+            + (if $windowsX64 != "" then {windowsUrls: {"x64": $windowsX64}} else {} end)
             + (if $changelog != "" then {changelog: $changelog} else {} end)' > update.json
 
       - name: Commit update.json
-        if: startsWith(github.ref, 'refs/tags/v')
         env:
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         run: |

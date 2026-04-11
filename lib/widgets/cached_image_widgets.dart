@@ -129,7 +129,14 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
     }
     final primed = _primeFromMemory(widget.url);
     if (!primed) {
-      _startLoadOrDefer(widget.url);
+      // _startLoadOrDefer 内部会调用 Scrollable.recommendDeferredLoadingForContext，
+      // 该方法需要访问继承 widget（View.of），在 initState 阶段尚不可用。
+      // 推迟到首帧后执行，此时 widget 已完全挂载，可安全访问 inherited widget。
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _startLoadOrDefer(widget.url);
+        }
+      });
     }
   }
 

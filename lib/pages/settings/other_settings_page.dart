@@ -1,10 +1,13 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../app/app.dart';
 import '../../l10n/app_localizations.dart';
+import '../../services/manga_download_service.dart';
+import '../../services/manga_download_storage_support.dart';
 import '../../widgets/widgets.dart';
 
 class OtherSettingsPage extends StatefulWidget {
@@ -18,6 +21,7 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
   bool _autoCheckInEnabled = false;
   bool _autoSourceUpdateCheckEnabled = true;
   bool _autoSoftwareUpdateCheckEnabled = true;
+  String _mangaDownloadsRootPath = MangaDownloadAccess.defaultDownloadsRootPath;
   bool _loading = true;
 
   @override
@@ -28,6 +32,8 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
 
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
+    final mangaDownloadsRootPath =
+        await MangaDownloadAccess.loadDownloadsRootPath(prefs: prefs);
     if (!mounted) {
       return;
     }
@@ -40,6 +46,7 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
       _autoSoftwareUpdateCheckEnabled =
           prefs.getBool(hazukiAutoSoftwareUpdateCheckEnabledPreferenceKey) ??
           true;
+      _mangaDownloadsRootPath = mangaDownloadsRootPath;
       _loading = false;
     });
   }
@@ -77,6 +84,49 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
       context,
       AppLocalizations.of(context)!.otherAutoSoftwareUpdateUpdated,
     );
+  }
+
+  Future<void> _editMangaDownloadPath() async {
+    final strings = AppLocalizations.of(context)!;
+    String? result;
+    try {
+      result = await MangaDownloadAccess.pickDownloadsRootPath(
+        currentPath: _mangaDownloadsRootPath,
+      );
+    } on PlatformException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      await showHazukiPrompt(
+        context,
+        strings.otherMangaDownloadPathPickFailed(error.message ?? error.code),
+      );
+      return;
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      await showHazukiPrompt(
+        context,
+        strings.otherMangaDownloadPathPickFailed(error.toString()),
+      );
+      return;
+    }
+    if (!mounted || result == null) {
+      return;
+    }
+
+    final normalized = MangaDownloadAccess.normalizeDownloadsRootPath(result);
+    await MangaDownloadAccess.saveDownloadsRootPath(normalized);
+    await MangaDownloadAccess.ensureNoMediaMarkerForPath(normalized);
+    await MangaDownloadService.instance.handleRootPathChanged();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _mangaDownloadsRootPath = normalized;
+    });
+    await showHazukiPrompt(context, strings.otherMangaDownloadPathSaved);
   }
 
   Widget _buildGroup(BuildContext context, {required List<Widget> children}) {
@@ -134,6 +184,13 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
                       subtitle: Text(strings.otherAutoSoftwareUpdateSubtitle),
                       value: _autoSoftwareUpdateCheckEnabled,
                       onChanged: _toggleAutoSoftwareUpdateCheck,
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.folder_outlined),
+                      title: Text(strings.otherMangaDownloadPathTitle),
+                      subtitle: Text(_mangaDownloadsRootPath),
+                      trailing: const Icon(Icons.chevron_right_rounded),
+                      onTap: _editMangaDownloadPath,
                     ),
                   ],
                 ),

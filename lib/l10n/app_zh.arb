@@ -114,6 +114,19 @@
   "otherAutoSoftwareUpdateTitle": "自动检查软件更新",
   "otherAutoSoftwareUpdateSubtitle": "每次启动软件时检查一次软件新版本",
   "otherAutoSoftwareUpdateUpdated": "已更新软件检查更新设置",
+  "otherMangaDownloadPathTitle": "漫画下载保存路径",
+  "otherMangaDownloadPathDialogTitle": "设置漫画下载保存路径",
+  "otherMangaDownloadPathDialogHelper": "请输入绝对路径，例如 /storage/emulated/0/Download/Hazuki_Manga",
+  "otherMangaDownloadPathInputLabel": "保存路径",
+  "otherMangaDownloadPathReset": "恢复默认",
+  "otherMangaDownloadPathInvalid": "请输入以 / 开头的绝对路径",
+  "otherMangaDownloadPathSaved": "漫画下载保存路径已更新",
+  "otherMangaDownloadPathPickFailed": "选择保存目录失败：{error}",
+  "@otherMangaDownloadPathPickFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
   "sourceBootstrapDownloading": "正在下载漫画源",
   "sourceBootstrapPreparing": "正在准备源文件...",
   "sourceBootstrapProgress": "已下载 {progress}%",

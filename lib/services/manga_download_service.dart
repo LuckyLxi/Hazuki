@@ -36,6 +36,7 @@ class MangaDownloadService extends ChangeNotifier {
       flushState: _flushState,
       ensureAndroidDownloadsAccess: _ensureAndroidDownloadsAccess,
       ensureRootDir: _ensureRootDir,
+      loadDownloadsRootPath: _loadDownloadsRootPath,
       findExistingImagePath: _findExistingImagePath,
       downloadCoverIfNeeded: _downloadCoverIfNeeded,
       writeMetadataFile: _writeMetadataFile,
@@ -329,6 +330,24 @@ class MangaDownloadService extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> handleRootPathChanged({bool rescan = true}) async {
+    await ensureInitialized();
+    _downloaded.clear();
+
+    if (rescan) {
+      final hasAccess = await _ensureAndroidDownloadsAccess();
+      if (hasAccess) {
+        final rootDir = await _ensureRootDir();
+        final result = await _recoveryScanner.scanDownloadedFromDisk(rootDir);
+        _downloaded.addAll(result.comics);
+        _downloaded.sort((a, b) => b.updatedAtMillis.compareTo(a.updatedAtMillis));
+      }
+    }
+
+    await _persistState();
+    notifyListeners();
+  }
+
   Future<void> _init() async {
     _prefs = await SharedPreferences.getInstance();
     final restored = await _stateStore.restore(_prefs);
@@ -348,6 +367,10 @@ class MangaDownloadService extends ChangeNotifier {
 
   Future<Directory> _ensureRootDir() {
     return _access.ensureRootDir();
+  }
+
+  Future<String> _loadDownloadsRootPath() {
+    return MangaDownloadAccess.loadDownloadsRootPath(prefs: _prefs);
   }
 
   Future<void> _persistState() {

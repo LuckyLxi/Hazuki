@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -124,18 +125,121 @@ class MangaDownloadAccess {
   MangaDownloadAccess({required MangaDownloadLogCallback logScan})
     : _logScan = logScan;
 
-  static const String downloadsRootPath =
+  static const String _androidDefaultDownloadsRootPath =
       '/storage/emulated/0/Download/Hazuki_Manga';
+  static const String _downloadsFolderName = 'Hazuki_Manga';
+  static const String _downloadsRootPathPrefsKey =
+      'manga_download_root_path_v1';
   static const MethodChannel _mediaChannel = MethodChannel(
     'hazuki.comics/media',
   );
 
   final MangaDownloadLogCallback _logScan;
 
+  static String get defaultDownloadsRootPath {
+    if (Platform.isWindows) {
+      final userProfile = Platform.environment['USERPROFILE']?.trim();
+      if (userProfile != null && userProfile.isNotEmpty) {
+        return '$userProfile/Downloads/$_downloadsFolderName'.replaceAll(
+          '\\',
+          '/',
+        );
+      }
+      return 'C:/Users/Public/Downloads/$_downloadsFolderName';
+    }
+    return _androidDefaultDownloadsRootPath;
+  }
+
+  static String normalizeDownloadsRootPath(String? rawPath) {
+    final trimmed = rawPath?.trim() ?? '';
+    if (trimmed.isEmpty) {
+      return defaultDownloadsRootPath;
+    }
+    var normalized = trimmed.replaceAll('\\', '/');
+    while (normalized.length > 1 && normalized.endsWith('/')) {
+      normalized = normalized.substring(0, normalized.length - 1);
+    }
+    return normalized.isEmpty ? defaultDownloadsRootPath : normalized;
+  }
+
+  static Future<String> loadDownloadsRootPath({
+    SharedPreferences? prefs,
+  }) async {
+    final resolvedPrefs = prefs ?? await SharedPreferences.getInstance();
+    return normalizeDownloadsRootPath(
+      resolvedPrefs.getString(_downloadsRootPathPrefsKey),
+    );
+  }
+
+  static Future<void> saveDownloadsRootPath(
+    String path, {
+    SharedPreferences? prefs,
+  }) async {
+    final resolvedPrefs = prefs ?? await SharedPreferences.getInstance();
+    final normalized = normalizeDownloadsRootPath(path);
+    if (normalized == defaultDownloadsRootPath) {
+      await resolvedPrefs.remove(_downloadsRootPathPrefsKey);
+      return;
+    }
+    await resolvedPrefs.setString(_downloadsRootPathPrefsKey, normalized);
+  }
+
+  static Future<void> ensureNoMediaMarkerForPath(String dirPath) async {
+    final normalized = normalizeDownloadsRootPath(dirPath);
+    if (normalized.trim().isEmpty) {
+      return;
+    }
+    try {
+      final dir = Directory(normalized);
+      if (!await dir.exists()) {
+        await dir.create(recursive: true);
+      }
+      final noMediaFile = File('${dir.path}/.nomedia');
+      if (!await noMediaFile.exists()) {
+        await noMediaFile.writeAsString('', flush: true);
+      }
+    } catch (_) {}
+  }
+
+  static Future<String?> pickDownloadsRootPath({String? currentPath}) async {
+    if (Platform.isWindows) {
+      final pickedPath = await getDirectoryPath(
+        initialDirectory: normalizeDownloadsRootPath(currentPath),
+      );
+      if (pickedPath == null || pickedPath.trim().isEmpty) {
+        return null;
+      }
+      return normalizeDownloadsRootPath(pickedPath);
+    }
+
+    if (!Platform.isAndroid) {
+      throw UnsupportedError(
+        'Directory picking is not supported on this platform',
+      );
+    }
+
+    try {
+      final pickedPath = await _mediaChannel.invokeMethod<String>(
+        'pickDownloadsDirectory',
+        <String, Object?>{
+          'currentPath': normalizeDownloadsRootPath(currentPath),
+        },
+      );
+      if (pickedPath == null || pickedPath.trim().isEmpty) {
+        return null;
+      }
+      return normalizeDownloadsRootPath(pickedPath);
+    } on MissingPluginException {
+      return null;
+    }
+  }
+
   Future<bool> ensureAndroidDownloadsAccess() async {
     if (!Platform.isAndroid) {
       return true;
     }
+
+    final rootPath = await loadDownloadsRootPath();
 
     try {
       final hasAccess =
@@ -147,7 +251,7 @@ class MangaDownloadAccess {
       _logScan(
         'Requesting Android downloads access',
         level: 'warning',
-        content: {'path': downloadsRootPath},
+        content: {'path': rootPath},
       );
 
       final granted =
@@ -158,7 +262,7 @@ class MangaDownloadAccess {
             ? 'Granted Android downloads access'
             : 'Android downloads access not granted',
         level: granted ? 'info' : 'warning',
-        content: {'path': downloadsRootPath, 'granted': granted},
+        content: {'path': rootPath, 'granted': granted},
       );
       return granted;
     } on MissingPluginException catch (e) {
@@ -179,7 +283,7 @@ class MangaDownloadAccess {
   }
 
   Future<Directory> ensureRootDir() async {
-    final dir = Directory(downloadsRootPath);
+    final dir = Directory(await loadDownloadsRootPath());
     if (!await dir.exists()) {
       await dir.create(recursive: true);
       _logScan('Created downloads root directory', content: {'path': dir.path});

@@ -42,6 +42,35 @@ jobs:
         working-directory: third_party/flutter_qjs
         run: flutter test
 
+  windows-debug:
+    name: Windows Debug Build
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Enable Windows desktop
+        run: flutter config --enable-windows-desktop
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Generate localization files
+        run: flutter gen-l10n
+
+      - name: Analyze app
+        run: flutter analyze
+
+      - name: Build Windows app
+        run: flutter build windows --debug
+
   android-debug:
     name: Android Debug Build
     runs-on: ubuntu-latest

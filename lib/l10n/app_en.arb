@@ -114,6 +114,19 @@
   "otherAutoSoftwareUpdateTitle": "Auto-check app updates",
   "otherAutoSoftwareUpdateSubtitle": "Check for software updates once each time the app starts",
   "otherAutoSoftwareUpdateUpdated": "Software update check setting updated",
+  "otherMangaDownloadPathTitle": "Manga download save path",
+  "otherMangaDownloadPathDialogTitle": "Set manga download save path",
+  "otherMangaDownloadPathDialogHelper": "Enter an absolute path, for example /storage/emulated/0/Download/Hazuki_Manga",
+  "otherMangaDownloadPathInputLabel": "Save path",
+  "otherMangaDownloadPathReset": "Reset to default",
+  "otherMangaDownloadPathInvalid": "Please enter an absolute path starting with /",
+  "otherMangaDownloadPathSaved": "Manga download save path updated",
+  "otherMangaDownloadPathPickFailed": "Failed to choose a save folder: {error}",
+  "@otherMangaDownloadPathPickFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
   "sourceBootstrapDownloading": "Downloading comic source",
   "sourceBootstrapPreparing": "Preparing source files...",
   "sourceBootstrapProgress": "Downloaded {progress}%",

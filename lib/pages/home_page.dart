@@ -20,7 +20,7 @@ class HazukiHomePage extends StatefulWidget {
 
   final int initialTabIndex;
   final AppearanceSettingsData appearanceSettings;
-  final Future<void> Function(AppearanceSettingsData next) onAppearanceChanged;
+  final AppearanceSettingsApplyCallback onAppearanceChanged;
   final Locale? locale;
   final Future<void> Function(Locale? locale) onLocaleChanged;
   final bool allowDiscoverInitialLoad;

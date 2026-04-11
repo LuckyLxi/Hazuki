@@ -15,7 +15,7 @@ class AppearanceSettingsPage extends StatefulWidget {
   });
 
   final AppearanceSettingsData appearanceSettings;
-  final Future<void> Function(AppearanceSettingsData next) onAppearanceChanged;
+  final AppearanceSettingsApplyCallback onAppearanceChanged;
   final Locale? locale;
   final Future<void> Function(Locale? locale) onLocaleChanged;
 
@@ -45,11 +45,14 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
     }
   }
 
-  Future<void> _apply(AppearanceSettingsData next) async {
+  Future<void> _apply(
+    AppearanceSettingsData next, {
+    Offset? revealOrigin,
+  }) async {
     setState(() {
       _settings = next;
     });
-    await widget.onAppearanceChanged(next);
+    await widget.onAppearanceChanged(next, revealOrigin: revealOrigin);
   }
 
   Future<void> _applyLocale(Locale? locale) async {

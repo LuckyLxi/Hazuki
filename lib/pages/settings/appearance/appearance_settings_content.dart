@@ -4,11 +4,13 @@ import 'package:flutter/material.dart';
 
 import '../../../app/app.dart';
 import '../../../l10n/app_localizations.dart';
+import '../../../services/hazuki_source_service.dart';
+import '../../../widgets/sun_moon_icon.dart';
 import '../display_mode_settings_page.dart';
 import '../settings_group.dart';
 import 'appearance_settings_locale_dialog.dart';
 
-class AppearanceSettingsContent extends StatelessWidget {
+class AppearanceSettingsContent extends StatefulWidget {
   const AppearanceSettingsContent({
     super.key,
     required this.settings,
@@ -19,11 +21,37 @@ class AppearanceSettingsContent extends StatelessWidget {
 
   final AppearanceSettingsData settings;
   final Locale? locale;
-  final Future<void> Function(AppearanceSettingsData next) onApply;
+  final AppearanceSettingsApplyCallback onApply;
   final Future<void> Function(Locale? locale) onApplyLocale;
 
+  @override
+  State<AppearanceSettingsContent> createState() =>
+      _AppearanceSettingsContentState();
+}
+
+class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
+  final GlobalKey _themeIconKey = GlobalKey();
+
+  void _logThemeUiEvent(
+    String title, {
+    String level = 'info',
+    Map<String, Object?>? content,
+  }) {
+    HazukiSourceService.instance.addApplicationLog(
+      level: level,
+      title: title,
+      source: 'appearance_theme_ui',
+      content: {
+        'route': 'appearance_settings',
+        'themeModeSetting': widget.settings.themeMode.name,
+        'effectiveBrightness': Theme.of(context).brightness.name,
+        if (content != null) ...content,
+      },
+    );
+  }
+
   String _localeLabel(AppLocalizations strings) {
-    return switch (locale?.languageCode) {
+    return switch (widget.locale?.languageCode) {
       'zh' => strings.displayLanguageZhHans,
       'en' => strings.displayLanguageEnglish,
       _ => strings.displayLanguageSystem,
@@ -31,7 +59,7 @@ class AppearanceSettingsContent extends StatelessWidget {
   }
 
   String _displayModeLabel(AppLocalizations strings) {
-    final raw = settings.displayModeRaw;
+    final raw = widget.settings.displayModeRaw;
     if (raw == 'native:auto') {
       return strings.displayRefreshRateAuto;
     }
@@ -45,23 +73,78 @@ class AppearanceSettingsContent extends StatelessWidget {
   Future<void> _handleLocaleTap(BuildContext context) async {
     final next = await showAppearanceLocaleDialog(
       context,
-      currentLocale: locale,
+      currentLocale: widget.locale,
     );
     if (next == null) {
       return;
     }
     final nextLocale = next.followSystem ? null : next.locale;
-    if (locale?.languageCode == nextLocale?.languageCode &&
-        ((locale != null) == (nextLocale != null))) {
+    if (widget.locale?.languageCode == nextLocale?.languageCode &&
+        ((widget.locale != null) == (nextLocale != null))) {
       return;
     }
-    await onApplyLocale(nextLocale);
+    await widget.onApplyLocale(nextLocale);
+  }
+
+  Offset? _themeToggleOrigin() {
+    final iconContext = _themeIconKey.currentContext;
+    final renderObject = iconContext?.findRenderObject();
+    if (renderObject is! RenderBox) {
+      _logThemeUiEvent(
+        'Theme toggle origin unavailable',
+        level: 'warning',
+        content: {'reason': 'icon_render_box_not_found'},
+      );
+      return null;
+    }
+    final origin = renderObject.localToGlobal(
+      renderObject.size.center(Offset.zero),
+    );
+    _logThemeUiEvent(
+      'Theme toggle origin resolved',
+      content: {'x': origin.dx.round(), 'y': origin.dy.round()},
+    );
+    return origin;
+  }
+
+  Future<void> _applyThemeMode(ThemeMode mode) async {
+    if (widget.settings.themeMode == mode) {
+      _logThemeUiEvent(
+        'Theme mode apply skipped',
+        content: {'requestedThemeMode': mode.name, 'reason': 'same_mode'},
+      );
+      return;
+    }
+    _logThemeUiEvent(
+      'Theme mode apply requested',
+      content: {'requestedThemeMode': mode.name},
+    );
+    await widget.onApply(
+      widget.settings.copyWith(themeMode: mode),
+      revealOrigin: _themeToggleOrigin(),
+    );
+  }
+
+  Future<void> _toggleThemeMode() async {
+    final brightness = Theme.of(context).brightness;
+    final nextMode = brightness == Brightness.dark
+        ? ThemeMode.light
+        : ThemeMode.dark;
+    _logThemeUiEvent(
+      'Theme toggle button tapped',
+      content: {
+        'currentBrightness': brightness.name,
+        'requestedThemeMode': nextMode.name,
+      },
+    );
+    await _applyThemeMode(nextMode);
   }
 
   @override
   Widget build(BuildContext context) {
     final strings = AppLocalizations.of(context)!;
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final presetWidth = (MediaQuery.of(context).size.width - 96) / 3;
 
     return ListView(
@@ -72,13 +155,25 @@ class AppearanceSettingsContent extends StatelessWidget {
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-              child: Text(
-                strings.displayThemeTitle,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: colorScheme.primary,
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    strings.displayThemeTitle,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: colorScheme.primary,
+                    ),
+                  ),
+                  const SizedBox(width: 2),
+                  _ThemeModeToggleButton(
+                    iconKey: _themeIconKey,
+                    isDark: theme.brightness == Brightness.dark,
+                    color: colorScheme.primary,
+                    onPressed: _toggleThemeMode,
+                  ),
+                ],
               ),
             ),
             Padding(
@@ -101,22 +196,24 @@ class AppearanceSettingsContent extends StatelessWidget {
                     icon: const Icon(Icons.settings_suggest_outlined),
                   ),
                 ],
-                selected: {settings.themeMode},
+                selected: {widget.settings.themeMode},
                 onSelectionChanged: (selection) {
-                  unawaited(
-                    onApply(settings.copyWith(themeMode: selection.first)),
-                  );
+                  unawaited(_applyThemeMode(selection.first));
                 },
                 showSelectedIcon: false,
               ),
             ),
             const Divider(height: 1, indent: 16, endIndent: 16),
             SwitchListTile(
-              value: settings.oledPureBlack,
+              value: widget.settings.oledPureBlack,
               title: Text(strings.displayPureBlackTitle),
               subtitle: Text(strings.displayPureBlackSubtitle),
               onChanged: (value) {
-                unawaited(onApply(settings.copyWith(oledPureBlack: value)));
+                unawaited(
+                  widget.onApply(
+                    widget.settings.copyWith(oledPureBlack: value),
+                  ),
+                );
               },
             ),
           ],
@@ -142,10 +239,12 @@ class AppearanceSettingsContent extends StatelessWidget {
                 await Navigator.of(context).push(
                   MaterialPageRoute<void>(
                     builder: (_) => DisplayModeSettingsPage(
-                      currentDisplayModeRaw: settings.displayModeRaw,
+                      currentDisplayModeRaw: widget.settings.displayModeRaw,
                       onDisplayModeChanged: (displayModeRaw) {
-                        return onApply(
-                          settings.copyWith(displayModeRaw: displayModeRaw),
+                        return widget.onApply(
+                          widget.settings.copyWith(
+                            displayModeRaw: displayModeRaw,
+                          ),
                         );
                       },
                     ),
@@ -159,22 +258,26 @@ class AppearanceSettingsContent extends StatelessWidget {
           children: [
             SwitchListTile(
               secondary: const Icon(Icons.color_lens_outlined),
-              value: settings.dynamicColor,
+              value: widget.settings.dynamicColor,
               title: Text(strings.displayDynamicColorTitle),
               subtitle: Text(strings.displayDynamicColorSubtitle),
               onChanged: (value) {
-                unawaited(onApply(settings.copyWith(dynamicColor: value)));
+                unawaited(
+                  widget.onApply(widget.settings.copyWith(dynamicColor: value)),
+                );
               },
             ),
             const Divider(height: 1, indent: 56),
             SwitchListTile(
               secondary: const Icon(Icons.format_paint_outlined),
-              value: settings.comicDetailDynamicColor,
+              value: widget.settings.comicDetailDynamicColor,
               title: Text(strings.displayComicDynamicColorTitle),
               subtitle: Text(strings.displayComicDynamicColorSubtitle),
               onChanged: (value) {
                 unawaited(
-                  onApply(settings.copyWith(comicDetailDynamicColor: value)),
+                  widget.onApply(
+                    widget.settings.copyWith(comicDetailDynamicColor: value),
+                  ),
                 );
               },
             ),
@@ -199,7 +302,7 @@ class AppearanceSettingsContent extends StatelessWidget {
                   index,
                 ) {
                   final preset = kHazukiColorPresets[index];
-                  final selected = settings.presetIndex == index;
+                  final selected = widget.settings.presetIndex == index;
                   return AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
                     curve: Curves.easeOutCubic,
@@ -208,7 +311,9 @@ class AppearanceSettingsContent extends StatelessWidget {
                       borderRadius: BorderRadius.circular(16),
                       onTap: () {
                         unawaited(
-                          onApply(settings.copyWith(presetIndex: index)),
+                          widget.onApply(
+                            widget.settings.copyWith(presetIndex: index),
+                          ),
                         );
                       },
                       child: Container(
@@ -278,6 +383,51 @@ class AppearanceSettingsContent extends StatelessWidget {
         ),
         const SizedBox(height: 24),
       ],
+    );
+  }
+}
+
+class _ThemeModeToggleButton extends StatelessWidget {
+  const _ThemeModeToggleButton({
+    this.iconKey,
+    required this.isDark,
+    required this.color,
+    required this.onPressed,
+  });
+
+  static const double _iconSize = 24;
+
+  final Key? iconKey;
+  final bool isDark;
+  final Color color;
+  final Future<void> Function() onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      onPressed: () {
+        unawaited(onPressed());
+      },
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints.tightFor(width: 36, height: 36),
+      splashRadius: 20,
+      iconSize: _iconSize,
+      style: ButtonStyle(
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        overlayColor: WidgetStatePropertyAll(color.withValues(alpha: 0.12)),
+      ),
+      icon: SizedBox(
+        key: iconKey,
+        width: _iconSize,
+        height: _iconSize,
+        child: SunMoonIcon(
+          isDark: isDark,
+          size: _iconSize,
+          duration: const Duration(milliseconds: 600),
+          sunColor: color,
+          moonColor: color,
+        ),
+      ),
     );
   }
 }

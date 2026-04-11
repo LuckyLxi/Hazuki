@@ -17,6 +17,7 @@ typedef MangaDownloadUpsertComic = void Function(DownloadedMangaComic comic);
 typedef MangaDownloadStateFlush = Future<void> Function();
 typedef MangaDownloadEnsureAccess = Future<bool> Function();
 typedef MangaDownloadEnsureRootDir = Future<Directory> Function();
+typedef MangaDownloadRootPathProvider = Future<String> Function();
 typedef MangaDownloadFindExistingImagePath =
     Future<String?> Function(Directory chapterDir, int imageIndex);
 typedef MangaDownloadCoverDownload =
@@ -44,6 +45,7 @@ class MangaDownloadQueueExecutor {
     required MangaDownloadStateFlush flushState,
     required MangaDownloadEnsureAccess ensureAndroidDownloadsAccess,
     required MangaDownloadEnsureRootDir ensureRootDir,
+    required MangaDownloadRootPathProvider loadDownloadsRootPath,
     required MangaDownloadFindExistingImagePath findExistingImagePath,
     required MangaDownloadCoverDownload downloadCoverIfNeeded,
     required MangaDownloadWriteMetadata writeMetadataFile,
@@ -62,6 +64,7 @@ class MangaDownloadQueueExecutor {
        _flushState = flushState,
        _ensureAndroidDownloadsAccess = ensureAndroidDownloadsAccess,
        _ensureRootDir = ensureRootDir,
+       _loadDownloadsRootPath = loadDownloadsRootPath,
        _findExistingImagePath = findExistingImagePath,
        _downloadCoverIfNeeded = downloadCoverIfNeeded,
        _writeMetadataFile = writeMetadataFile,
@@ -80,6 +83,7 @@ class MangaDownloadQueueExecutor {
   final MangaDownloadStateFlush _flushState;
   final MangaDownloadEnsureAccess _ensureAndroidDownloadsAccess;
   final MangaDownloadEnsureRootDir _ensureRootDir;
+  final MangaDownloadRootPathProvider _loadDownloadsRootPath;
   final MangaDownloadFindExistingImagePath _findExistingImagePath;
   final MangaDownloadCoverDownload _downloadCoverIfNeeded;
   final MangaDownloadWriteMetadata _writeMetadataFile;
@@ -135,9 +139,10 @@ class MangaDownloadQueueExecutor {
 
     try {
       if (!await _ensureAndroidDownloadsAccess()) {
+        final rootPath = await _loadDownloadsRootPath();
         throw FileSystemException(
           'Android downloads access not granted',
-          MangaDownloadAccess.downloadsRootPath,
+          rootPath,
         );
       }
       final rootDir = await _ensureRootDir();

@@ -27,7 +27,7 @@ class HomeNavigationActions {
   final GlobalKey<ScaffoldState> scaffoldKey;
   final Widget drawerTransitionContent;
   final AppearanceSettingsData appearanceSettings;
-  final Future<void> Function(AppearanceSettingsData next) onAppearanceChanged;
+  final AppearanceSettingsApplyCallback onAppearanceChanged;
   final Locale? locale;
   final Future<void> Function(Locale? locale) onLocaleChanged;
 

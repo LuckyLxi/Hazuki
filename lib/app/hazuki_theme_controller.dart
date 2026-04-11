@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../services/hazuki_source_service.dart';
 import 'app_settings_store.dart';
 import 'appearance_settings.dart';
 
@@ -39,11 +40,39 @@ class HazukiThemeController extends ChangeNotifier {
 
   Future<void> update(AppearanceSettingsData next) async {
     if (_settings == next) {
+      HazukiSourceService.instance.addApplicationLog(
+        level: 'info',
+        title: 'Theme controller update skipped',
+        source: 'theme_controller',
+        content: {
+          'themeMode': _settings.themeMode.name,
+          'reason': 'settings_equal',
+        },
+      );
       return;
     }
 
+    final previous = _settings;
     _settings = next;
+    HazukiSourceService.instance.addApplicationLog(
+      level: 'info',
+      title: 'Theme controller state updated',
+      source: 'theme_controller',
+      content: {
+        'fromThemeMode': previous.themeMode.name,
+        'toThemeMode': next.themeMode.name,
+        'dynamicColor': next.dynamicColor,
+        'oledPureBlack': next.oledPureBlack,
+        'presetIndex': next.presetIndex,
+      },
+    );
     notifyListeners();
     await _settingsStore.saveAppearance(next);
+    HazukiSourceService.instance.addApplicationLog(
+      level: 'info',
+      title: 'Theme controller settings persisted',
+      source: 'theme_controller',
+      content: {'themeMode': next.themeMode.name},
+    );
   }
 }

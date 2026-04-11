@@ -138,20 +138,24 @@ class HomeScaffoldShell extends StatelessWidget {
           onOpenSettings: onOpenSettings,
           onOpenLines: onOpenLines,
         ),
-        body: HomeContentStack(
-          currentIndex: currentIndex,
-          discoverChild: DiscoverPage(
-            comicDetailPageBuilder: comicDetailPageBuilder,
-            allowInitialLoad: allowDiscoverInitialLoad,
-            hideLoadingUntilInitialLoadAllowed: hideDiscoverLoadingUntilAllowed,
-            onSearchMorphProgressChanged: onDiscoverSearchMorphProgressChanged,
-          ),
-          favoriteChild: FavoritePage(
-            key: favoritePageKey,
-            authVersion: authVersion,
-            onAppBarActionsChanged: onFavoriteAppBarActionsChanged,
-            onRequestLogin: onRequestLogin,
-            detailRouteBuilder: favoriteDetailRouteBuilder,
+        body: HazukiDesktopPageContainer(
+          child: HomeContentStack(
+            currentIndex: currentIndex,
+            discoverChild: DiscoverPage(
+              comicDetailPageBuilder: comicDetailPageBuilder,
+              allowInitialLoad: allowDiscoverInitialLoad,
+              hideLoadingUntilInitialLoadAllowed:
+                  hideDiscoverLoadingUntilAllowed,
+              onSearchMorphProgressChanged:
+                  onDiscoverSearchMorphProgressChanged,
+            ),
+            favoriteChild: FavoritePage(
+              key: favoritePageKey,
+              authVersion: authVersion,
+              onAppBarActionsChanged: onFavoriteAppBarActionsChanged,
+              onRequestLogin: onRequestLogin,
+              detailRouteBuilder: favoriteDetailRouteBuilder,
+            ),
           ),
         ),
         bottomNavigationBar: HomeBottomNavigation(

@@ -1,12 +1,14 @@
 package com.lxi.hazuki.comics
 
 import android.Manifest
+import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
+import android.provider.DocumentsContract
 import android.provider.Settings
 import android.util.Log
 import android.view.KeyEvent
@@ -32,6 +34,7 @@ class MainActivityChannels(
     private var pendingSaveTextResult: MethodChannel.Result? = null
     private var pendingSaveTextContent: String? = null
     private var pendingStorageAccessResult: MethodChannel.Result? = null
+    private var pendingPickDirectoryResult: MethodChannel.Result? = null
     private var pendingInstallApkResult: MethodChannel.Result? = null
     private var pendingInstallApkPath: String? = null
     private var readerDisplayChannel: MethodChannel? = null
@@ -49,6 +52,12 @@ class MainActivityChannels(
             activity.registerForActivityResult(
                     ActivityResultContracts.RequestMultiplePermissions(),
             ) { completePendingStorageAccessResult(hasStorageAccess()) }
+    private val pickDirectoryLauncher =
+            activity.registerForActivityResult(
+                    ActivityResultContracts.StartActivityForResult(),
+            ) { result ->
+                handlePickDirectoryResult(result.resultCode, result.data)
+            }
     private val manageUnknownAppSourcesLauncher =
             activity.registerForActivityResult(
                     ActivityResultContracts.StartActivityForResult(),
@@ -149,6 +158,7 @@ class MainActivityChannels(
                     when (call.method) {
                         "hasStorageAccess" -> result.success(hasStorageAccess())
                         "requestStorageAccess" -> requestStorageAccess(result)
+                        "pickDownloadsDirectory" -> pickDownloadsDirectory(result)
                         "scanFile" -> {
                             val path = call.argument<String>("path")
                             if (path.isNullOrBlank()) {
@@ -271,6 +281,121 @@ class MainActivityChannels(
         val result = pendingStorageAccessResult ?: return
         pendingStorageAccessResult = null
         result.success(granted)
+    }
+
+    private fun pickDownloadsDirectory(result: MethodChannel.Result) {
+        if (pendingPickDirectoryResult != null) {
+            result.error(
+                    "pick_directory_in_progress",
+                    "Another pickDownloadsDirectory request is already in progress",
+                    null,
+            )
+            return
+        }
+
+        pendingPickDirectoryResult = result
+        try {
+            val intent =
+                    Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+                        addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+                        addFlags(Intent.FLAG_GRANT_PREFIX_URI_PERMISSION)
+                    }
+            pickDirectoryLauncher.launch(intent)
+        } catch (e: Exception) {
+            pendingPickDirectoryResult = null
+            result.error(
+                    "pick_directory_launch_failed",
+                    "Failed to launch directory picker: ${e.message}",
+                    null,
+            )
+        }
+    }
+
+    private fun handlePickDirectoryResult(resultCode: Int, data: Intent?) {
+        val result = pendingPickDirectoryResult ?: return
+        pendingPickDirectoryResult = null
+
+        if (resultCode != Activity.RESULT_OK) {
+            result.success(null)
+            return
+        }
+
+        val uri = data?.data
+        if (uri == null) {
+            result.success(null)
+            return
+        }
+
+        try {
+            val flags =
+                    data.flags and
+                            (Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                                    Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+            activity.contentResolver.takePersistableUriPermission(uri, flags)
+        } catch (_: Exception) {}
+
+        val path = resolveDirectoryPathFromTreeUri(uri)
+        if (path == null) {
+            result.error(
+                    "pick_directory_unsupported",
+                    "The selected folder could not be mapped to a writable file path",
+                    null,
+            )
+            return
+        }
+
+        result.success(path)
+    }
+
+    private fun resolveDirectoryPathFromTreeUri(uri: Uri): String? {
+        if (uri.authority != "com.android.externalstorage.documents") {
+            return null
+        }
+
+        val documentId =
+                try {
+                    DocumentsContract.getTreeDocumentId(uri)
+                } catch (_: Exception) {
+                    return null
+                }
+        if (documentId.isBlank()) {
+            return null
+        }
+
+        val parts = documentId.split(":", limit = 2)
+        val volumeId = parts.firstOrNull()?.takeIf { it.isNotBlank() } ?: return null
+        val relativePath =
+                parts.getOrNull(1)?.trim('/')?.replace('/', File.separatorChar).orEmpty()
+
+        val volumePath = resolveStorageVolumePath(volumeId) ?: return null
+        return if (relativePath.isBlank()) {
+            volumePath.absolutePath
+        } else {
+            File(volumePath, relativePath).absolutePath
+        }
+    }
+
+    private fun resolveStorageVolumePath(volumeId: String): File? {
+        if (volumeId.equals("primary", ignoreCase = true)) {
+            return Environment.getExternalStorageDirectory()
+        }
+
+        val directPath = File("/storage/$volumeId")
+        if (directPath.exists()) {
+            return directPath
+        }
+
+        return activity.getExternalFilesDirs(null).firstNotNullOfOrNull { dir ->
+            var current = dir
+            repeat(4) {
+                current = current?.parentFile
+            }
+            current?.takeIf {
+                it.name.equals(volumeId, ignoreCase = true) || it.absolutePath.endsWith("/$volumeId")
+            }
+        }
     }
 
     private fun installApk(path: String, result: MethodChannel.Result) {
