@@ -142,12 +142,41 @@ jobs:
           path: ${{ env.WINDOWS_PACKAGE }}
           if-no-files-found: error
 
+      - name: Resolve release notes from tag annotation
+        id: release_notes
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          object_type="$(git cat-file -t "${RELEASE_TAG}")"
+          if [ "${object_type}" != "tag" ]; then
+            echo "Please create an annotated tag so the release notes can be reused in update.json." >&2
+            echo "Example:" >&2
+            echo "  git tag -a ${RELEASE_TAG} -m \"1. Feature A" >&2
+            echo "2. Feature B\"" >&2
+            exit 1
+          fi
+
+          tag_message="$(git for-each-ref "refs/tags/${RELEASE_TAG}" --format='%(contents)')"
+          if ! printf '%s' "${tag_message}" | grep -q '[^[:space:]]'; then
+            echo "Annotated tag ${RELEASE_TAG} does not contain release notes." >&2
+            exit 1
+          fi
+
+          {
+            echo "body<<EOF"
+            printf '%s\n' "${tag_message}"
+            echo "EOF"
+          } >> "${GITHUB_OUTPUT}"
+
       - name: Release Windows asset to GitHub Releases
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ env.WINDOWS_PACKAGE }}
           name: ${{ github.ref_name }}
+          body: ${{ steps.release_notes.outputs.body }}
           generate_release_notes: false
           draft: false
           prerelease: false
