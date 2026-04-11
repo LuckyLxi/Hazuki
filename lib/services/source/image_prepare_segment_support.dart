@@ -29,13 +29,10 @@ extension HazukiSourceServiceImagePrepareSegmentSupport on HazukiSourceService {
 
   String _extractJmPictureName(String imageUrl) {
     final normalizedUrl = imageUrl.trim();
-    final slashIndex = normalizedUrl.lastIndexOf('/');
-    final lastSegment = slashIndex >= 0
-        ? normalizedUrl.substring(slashIndex + 1)
-        : normalizedUrl;
-    if (lastSegment.length > 5) {
-      return lastSegment.substring(0, lastSegment.length - 5);
-    }
+    final uri = Uri.tryParse(normalizedUrl);
+    final lastSegment = uri?.pathSegments.isNotEmpty == true
+        ? uri!.pathSegments.last
+        : normalizedUrl.split('/').last.split('?').first;
     final dotIndex = lastSegment.lastIndexOf('.');
     if (dotIndex > 0) {
       return lastSegment.substring(0, dotIndex);
@@ -61,12 +58,23 @@ extension HazukiSourceServiceImagePrepareSegmentSupport on HazukiSourceService {
       if (config is! Map) {
         return null;
       }
+      final directSegments = config['segments'] ?? config['num'];
+      if (directSegments is num) {
+        return directSegments.toInt();
+      }
+      final directSegmentsText = directSegments?.toString().trim() ?? '';
+      if (directSegmentsText.isNotEmpty) {
+        final parsed = int.tryParse(directSegmentsText);
+        if (parsed != null) {
+          return parsed;
+        }
+      }
       final modifyImage = config['modifyImage']?.toString().trim() ?? '';
       if (modifyImage.isEmpty) {
-        return 0;
+        return null;
       }
       final match = RegExp(
-        r'(?:const|let|var)\s+num\s*=\s*(\d+)\b',
+        r'\bnum\s*=\s*(\d+)\b',
       ).firstMatch(modifyImage);
       return int.tryParse(match?.group(1) ?? '');
     } catch (_) {

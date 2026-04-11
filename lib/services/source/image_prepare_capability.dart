@@ -47,8 +47,10 @@ extension HazukiSourceServiceImagePrepareCapability on HazukiSourceService {
       epId: epId,
     );
     final sourceExtension = _imageExtensionFromUrl(imageUrl);
-    final segments =
-        declaredSegments ?? calculateJmImageSegments(epId, imageUrl);
+    final fallbackSegments = calculateJmImageSegments(epId, imageUrl);
+    final segments = declaredSegments != null && declaredSegments > 1
+        ? declaredSegments
+        : fallbackSegments;
     if (segments > 1 && sourceExtension != 'gif') {
       final fixed = await _unscrambleJmImageBytes(
         rawBytes,
