@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:ffi';
 import 'dart:io';
 
 import 'package:device_info_plus/device_info_plus.dart';
@@ -125,6 +126,7 @@ class SoftwareUpdateService {
       manifest,
       supportedAbis: supportedAbis,
     );
+    final windowsUrl = _resolveManifestWindowsUrl(manifest);
     final changelog = _normalizeChangelog(manifest['changelog']?.toString());
 
     if (latestVersionRaw == null ||
@@ -140,6 +142,9 @@ class SoftwareUpdateService {
       latestVersion: latestVersion,
       releaseUrl: releaseUrl,
       apkUrl: apkUrl != null && apkUrl.isNotEmpty ? apkUrl : null,
+      windowsUrl: windowsUrl != null && windowsUrl.isNotEmpty
+          ? windowsUrl
+          : null,
       changelog: changelog,
       hasUpdate: _isVersionGreater(latestVersion, currentVersion),
     );
@@ -159,11 +164,13 @@ class SoftwareUpdateService {
     final assets = release['assets'];
 
     String? apkUrl;
+    String? windowsUrl;
     if (assets is List) {
       apkUrl = _selectBestApkUrlFromAssets(
         assets,
         supportedAbis: supportedAbis,
       );
+      windowsUrl = _selectBestWindowsUrlFromAssets(assets);
     }
 
     if (latestVersionRaw == null ||
@@ -179,6 +186,7 @@ class SoftwareUpdateService {
       latestVersion: latestVersion,
       releaseUrl: releaseUrl,
       apkUrl: apkUrl,
+      windowsUrl: windowsUrl,
       changelog: changelog,
       hasUpdate: _isVersionGreater(latestVersion, currentVersion),
     );
@@ -241,6 +249,28 @@ class SoftwareUpdateService {
         : null;
   }
 
+  String? _resolveManifestWindowsUrl(Map<String, dynamic> manifest) {
+    final windowsUrlsRaw = manifest['windowsUrls'];
+    if (windowsUrlsRaw is! Map) {
+      final legacyWindowsUrl = manifest['windowsUrl']?.toString().trim();
+      return legacyWindowsUrl != null && legacyWindowsUrl.isNotEmpty
+          ? legacyWindowsUrl
+          : null;
+    }
+
+    final windowsUrls = <String, String>{};
+    for (final entry in windowsUrlsRaw.entries) {
+      final key = entry.key.toString().trim().toLowerCase();
+      final value = entry.value?.toString().trim() ?? '';
+      if (key.isEmpty || value.isEmpty) {
+        continue;
+      }
+      windowsUrls[key] = value;
+    }
+
+    return _selectBestWindowsUrlFromMap(windowsUrls);
+  }
+
   String? _selectBestApkUrlFromAssets(
     List assets, {
     required List<String> supportedAbis,
@@ -271,6 +301,35 @@ class SoftwareUpdateService {
         fallback;
   }
 
+  String? _selectBestWindowsUrlFromAssets(List assets) {
+    final candidates = <String, String>{};
+    String? fallback;
+    for (final asset in assets) {
+      if (asset is! Map) {
+        continue;
+      }
+      final map = Map<String, dynamic>.from(asset);
+      final name = map['name']?.toString().trim().toLowerCase() ?? '';
+      final url = map['browser_download_url']?.toString().trim();
+      final isWindowsPackage =
+          name.endsWith('.zip') ||
+          name.endsWith('.msi') ||
+          name.endsWith('.exe') ||
+          name.endsWith('.msix') ||
+          name.endsWith('.msixbundle');
+      if (!isWindowsPackage || url == null || url.isEmpty) {
+        continue;
+      }
+      fallback ??= url;
+      for (final arch in _windowsArchPriority) {
+        if (name.contains(arch)) {
+          candidates.putIfAbsent(arch, () => url);
+        }
+      }
+    }
+    return _selectBestWindowsUrlFromMap(candidates) ?? fallback;
+  }
+
   String? _selectBestApkUrlFromMap(
     Map<String, String> apkUrls, {
     required List<String> supportedAbis,
@@ -298,12 +357,62 @@ class SoftwareUpdateService {
     return apkUrls['universal'];
   }
 
+  String? _selectBestWindowsUrlFromMap(Map<String, String> windowsUrls) {
+    final currentArch = _resolveWindowsArch();
+    if (currentArch != null) {
+      final direct = windowsUrls[currentArch];
+      if (direct != null && direct.isNotEmpty) {
+        return direct;
+      }
+    }
+
+    for (final arch in _windowsArchPriority) {
+      final matched = windowsUrls[arch];
+      if (matched != null && matched.isNotEmpty) {
+        return matched;
+      }
+    }
+    return null;
+  }
+
+  String? _resolveWindowsArch() {
+    if (!Platform.isWindows) {
+      return null;
+    }
+
+    final abiLabel = Abi.current().toString().toLowerCase();
+    if (abiLabel.contains('arm64')) {
+      return 'arm64';
+    }
+    if (abiLabel.contains('x64')) {
+      return 'x64';
+    }
+    if (abiLabel.contains('ia32') || abiLabel.contains('x86')) {
+      return 'x86';
+    }
+
+    final processArch = Platform.environment['PROCESSOR_ARCHITECTURE']
+        ?.toLowerCase();
+    if (processArch == 'amd64' || processArch == 'x86_64') {
+      return 'x64';
+    }
+    if (processArch == 'arm64') {
+      return 'arm64';
+    }
+    if (processArch == 'x86') {
+      return 'x86';
+    }
+    return null;
+  }
+
   static const List<String> _apkAbiPriority = [
     'arm64-v8a',
     'armeabi-v7a',
     'x86_64',
     'x86',
   ];
+
+  static const List<String> _windowsArchPriority = ['x64', 'arm64', 'x86'];
 
   bool _isVersionGreater(String a, String b) {
     final pa = _parseVersionSegments(a);
@@ -338,6 +447,7 @@ class SoftwareUpdateCheckResult {
     required this.releaseUrl,
     required this.hasUpdate,
     this.apkUrl,
+    this.windowsUrl,
     this.changelog,
   });
 
@@ -345,6 +455,7 @@ class SoftwareUpdateCheckResult {
   final String latestVersion;
   final String releaseUrl;
   final String? apkUrl;
+  final String? windowsUrl;
   final String? changelog;
   final bool hasUpdate;
 
@@ -353,6 +464,7 @@ class SoftwareUpdateCheckResult {
     String? latestVersion,
     String? releaseUrl,
     String? apkUrl,
+    String? windowsUrl,
     String? changelog,
     bool? hasUpdate,
   }) {
@@ -361,6 +473,7 @@ class SoftwareUpdateCheckResult {
       latestVersion: latestVersion ?? this.latestVersion,
       releaseUrl: releaseUrl ?? this.releaseUrl,
       apkUrl: apkUrl ?? this.apkUrl,
+      windowsUrl: windowsUrl ?? this.windowsUrl,
       changelog: changelog ?? this.changelog,
       hasUpdate: hasUpdate ?? this.hasUpdate,
     );

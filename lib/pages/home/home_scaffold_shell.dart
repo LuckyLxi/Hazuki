@@ -6,6 +6,7 @@ import '../../app/app.dart';
 import '../../l10n/l10n.dart';
 import '../../services/hazuki_source_service.dart';
 import '../../widgets/widgets.dart';
+import '../../widgets/windows_comic_detail_host.dart';
 import '../discover/discover.dart';
 import '../favorite/favorite.dart';
 import '../favorite_page.dart';
@@ -49,7 +50,7 @@ class HomeScaffoldShell extends StatelessWidget {
     required this.onRequestLogin,
     required this.onDestinationSelected,
     required this.comicDetailPageBuilder,
-    required this.favoriteDetailRouteBuilder,
+    required this.favoriteComicTapHandler,
   });
 
   final GlobalKey<ScaffoldState> scaffoldKey;
@@ -84,7 +85,7 @@ class HomeScaffoldShell extends StatelessWidget {
   final Future<void> Function() onRequestLogin;
   final ValueChanged<int> onDestinationSelected;
   final ComicDetailPageBuilder comicDetailPageBuilder;
-  final FavoriteDetailRouteBuilder favoriteDetailRouteBuilder;
+  final FavoriteComicTapHandler favoriteComicTapHandler;
 
   @override
   Widget build(BuildContext context) {
@@ -102,67 +103,69 @@ class HomeScaffoldShell extends StatelessWidget {
           }),
         );
       },
-      child: Scaffold(
-        key: scaffoldKey,
-        appBar: hazukiFrostedAppBar(
-          context: context,
-          title: const Text('Hazuki'),
-          actions: [
-            HomeAppBarActions(
+      child: WindowsComicDetailHost(
+        child: Scaffold(
+          key: scaffoldKey,
+          appBar: hazukiFrostedAppBar(
+            context: context,
+            title: const Text('Hazuki'),
+            actions: [
+              HomeAppBarActions(
+                currentIndex: currentIndex,
+                discoverSearchMorphProgress: discoverSearchMorphProgress,
+                favoriteAppBarActions: favoriteAppBarActions,
+                onOpenSearch: onOpenSearch,
+                onFavoriteSortSelected: onFavoriteSortSelected,
+                onFavoriteCreateFolderPressed: onFavoriteCreateFolderPressed,
+                onFavoriteModeTogglePressed: onFavoriteModeTogglePressed,
+              ),
+            ],
+          ),
+          drawer: HomeDrawer(
+            isLogged: isLogged,
+            avatarUrl: avatarUrl,
+            username: username,
+            autoCheckInEnabled: autoCheckInEnabled,
+            checkInBusy: checkInBusy,
+            checkedInToday: checkedInToday,
+            onProfileTap:
+                HazukiSourceService.instance.sourceMeta?.supportsAccount == true
+                ? onProfileTap
+                : null,
+            onCheckInPressed: onCheckInPressed,
+            onOpenHistory: onOpenHistory,
+            onOpenCategories: onOpenCategories,
+            onOpenRanking: onOpenRanking,
+            onOpenDownloads: onOpenDownloads,
+            onOpenSettings: onOpenSettings,
+            onOpenLines: onOpenLines,
+          ),
+          body: HazukiDesktopPageContainer(
+            child: HomeContentStack(
               currentIndex: currentIndex,
-              discoverSearchMorphProgress: discoverSearchMorphProgress,
-              favoriteAppBarActions: favoriteAppBarActions,
-              onOpenSearch: onOpenSearch,
-              onFavoriteSortSelected: onFavoriteSortSelected,
-              onFavoriteCreateFolderPressed: onFavoriteCreateFolderPressed,
-              onFavoriteModeTogglePressed: onFavoriteModeTogglePressed,
-            ),
-          ],
-        ),
-        drawer: HomeDrawer(
-          isLogged: isLogged,
-          avatarUrl: avatarUrl,
-          username: username,
-          autoCheckInEnabled: autoCheckInEnabled,
-          checkInBusy: checkInBusy,
-          checkedInToday: checkedInToday,
-          onProfileTap:
-              HazukiSourceService.instance.sourceMeta?.supportsAccount == true
-              ? onProfileTap
-              : null,
-          onCheckInPressed: onCheckInPressed,
-          onOpenHistory: onOpenHistory,
-          onOpenCategories: onOpenCategories,
-          onOpenRanking: onOpenRanking,
-          onOpenDownloads: onOpenDownloads,
-          onOpenSettings: onOpenSettings,
-          onOpenLines: onOpenLines,
-        ),
-        body: HazukiDesktopPageContainer(
-          child: HomeContentStack(
-            currentIndex: currentIndex,
-            discoverChild: DiscoverPage(
-              comicDetailPageBuilder: comicDetailPageBuilder,
-              allowInitialLoad: allowDiscoverInitialLoad,
-              hideLoadingUntilInitialLoadAllowed:
-                  hideDiscoverLoadingUntilAllowed,
-              onSearchMorphProgressChanged:
-                  onDiscoverSearchMorphProgressChanged,
-            ),
-            favoriteChild: FavoritePage(
-              key: favoritePageKey,
-              authVersion: authVersion,
-              onAppBarActionsChanged: onFavoriteAppBarActionsChanged,
-              onRequestLogin: onRequestLogin,
-              detailRouteBuilder: favoriteDetailRouteBuilder,
+              discoverChild: DiscoverPage(
+                comicDetailPageBuilder: comicDetailPageBuilder,
+                allowInitialLoad: allowDiscoverInitialLoad,
+                hideLoadingUntilInitialLoadAllowed:
+                    hideDiscoverLoadingUntilAllowed,
+                onSearchMorphProgressChanged:
+                    onDiscoverSearchMorphProgressChanged,
+              ),
+              favoriteChild: FavoritePage(
+                key: favoritePageKey,
+                authVersion: authVersion,
+                onAppBarActionsChanged: onFavoriteAppBarActionsChanged,
+                onRequestLogin: onRequestLogin,
+                onComicTap: favoriteComicTapHandler,
+              ),
             ),
           ),
-        ),
-        bottomNavigationBar: HomeBottomNavigation(
-          currentIndex: currentIndex,
-          onDestinationSelected: onDestinationSelected,
-          discoverLabel: l10n(context).homeTabDiscover,
-          favoriteLabel: l10n(context).homeTabFavorite,
+          bottomNavigationBar: HomeBottomNavigation(
+            currentIndex: currentIndex,
+            onDestinationSelected: onDestinationSelected,
+            discoverLabel: l10n(context).homeTabDiscover,
+            favoriteLabel: l10n(context).homeTabFavorite,
+          ),
         ),
       ),
     );

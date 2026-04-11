@@ -40,10 +40,16 @@ class ComicDetailPage extends StatefulWidget {
     super.key,
     required this.comic,
     required this.heroTag,
+    this.isDesktopPanel = false,
+    this.shouldAnimateInitialRevealOverride,
+    this.onCloseRequested,
   });
 
   final ExploreComic comic;
   final String heroTag;
+  final bool isDesktopPanel;
+  final bool? shouldAnimateInitialRevealOverride;
+  final VoidCallback? onCloseRequested;
 
   @override
   State<ComicDetailPage> createState() => _ComicDetailPageState();
@@ -122,6 +128,8 @@ class _ComicDetailPageState extends State<ComicDetailPage>
           appBarComicTitle: _appBarComicTitle,
           appBarUpdateTime: _appBarUpdateTime,
           theme: theme,
+          isDesktopPanel: widget.isDesktopPanel,
+          onCloseRequested: widget.onCloseRequested,
         ),
         body: Stack(
           children: [
@@ -162,6 +170,8 @@ class _ComicDetailPageState extends State<ComicDetailPage>
                 onDetailsResolved: ({required title, required updateTime}) {
                   _updateAppBarMetadata(title: title, updateTime: updateTime);
                 },
+                isDesktopPanel: widget.isDesktopPanel,
+                onCloseRequested: widget.onCloseRequested,
               ),
             ),
           ],

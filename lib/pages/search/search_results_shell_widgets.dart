@@ -294,9 +294,12 @@ extension _SearchResultsShellWidgetsExtension on _SearchResultsPageState {
       heroTag: heroTag,
       index: index,
       onTap: () {
-        Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => widget.comicDetailPageBuilder(comic, heroTag),
+        unawaited(
+          openComicDetail(
+            context,
+            comic: comic,
+            heroTag: heroTag,
+            pageBuilder: widget.comicDetailPageBuilder,
           ),
         );
       },

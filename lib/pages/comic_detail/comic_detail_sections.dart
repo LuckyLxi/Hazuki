@@ -116,11 +116,7 @@ class _ComicDetailInfoSkeleton extends StatelessWidget {
           radius: 9,
         ),
         const SizedBox(height: 14),
-        _ComicDetailSkeletonBlock(
-          color: skeletonColor,
-          height: 16,
-          radius: 8,
-        ),
+        _ComicDetailSkeletonBlock(color: skeletonColor, height: 16, radius: 8),
         const SizedBox(height: 10),
         _ComicDetailSkeletonBlock(
           color: skeletonColor,
@@ -142,7 +138,9 @@ class _ComicDetailInfoSkeleton extends StatelessWidget {
             padding: EdgeInsets.only(bottom: index == 3 ? 0 : 10),
             child: _ComicDetailSkeletonBlock(
               color: skeletonColor,
-              width: MediaQuery.sizeOf(context).width * (index.isEven ? 0.9 : 0.76),
+              width:
+                  MediaQuery.sizeOf(context).width *
+                  (index.isEven ? 0.9 : 0.76),
               height: 16,
               radius: 8,
             ),
@@ -158,11 +156,15 @@ class _ComicDetailRelatedTab extends StatefulWidget {
     required this.details,
     required this.heroTagPrefix,
     required this.isActiveInTabView,
+    required this.isDesktopPanel,
+    required this.onCloseRequested,
   });
 
   final ComicDetailsData? details;
   final String heroTagPrefix;
   final bool isActiveInTabView;
+  final bool isDesktopPanel;
+  final VoidCallback? onCloseRequested;
 
   @override
   State<_ComicDetailRelatedTab> createState() => _ComicDetailRelatedTabState();
@@ -236,6 +238,22 @@ class _ComicDetailRelatedTabState extends State<_ComicDetailRelatedTab>
               final child = InkWell(
                 borderRadius: BorderRadius.circular(8),
                 onTap: () {
+                  if (widget.isDesktopPanel) {
+                    unawaited(
+                      openComicDetail(
+                        context,
+                        comic: comic,
+                        heroTag: heroTag,
+                        pageBuilder: (comic, heroTag) => ComicDetailPage(
+                          comic: comic,
+                          heroTag: heroTag,
+                          isDesktopPanel: true,
+                          onCloseRequested: widget.onCloseRequested,
+                        ),
+                      ),
+                    );
+                    return;
+                  }
                   Navigator.of(context).push(
                     MaterialPageRoute<void>(
                       builder: (_) =>

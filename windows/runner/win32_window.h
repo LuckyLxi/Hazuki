@@ -5,6 +5,7 @@
 
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 
 // A class abstraction for a high DPI-aware Win32 Window. Intended to be
@@ -75,6 +76,11 @@ class Win32Window {
   virtual void OnDestroy();
 
  private:
+  struct SavedWindowPlacement {
+    RECT rect;
+    bool maximized;
+  };
+
   friend class WindowClassRegistrar;
 
   // OS callback called by message pump. Handles the WM_NCCREATE message which
@@ -92,6 +98,12 @@ class Win32Window {
 
   // Update the window frame's theme to match the system theme.
   static void UpdateTheme(HWND const window);
+
+  std::wstring GetWindowStatePath() const;
+  std::optional<SavedWindowPlacement> LoadWindowPlacement() const;
+  void RestoreWindowPlacement();
+  void SaveWindowPlacement() const;
+  bool IsValidSavedRect(const RECT& rect) const;
 
   bool quit_on_close_ = false;
 

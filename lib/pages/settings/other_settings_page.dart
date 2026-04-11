@@ -9,6 +9,7 @@ import '../../l10n/app_localizations.dart';
 import '../../services/manga_download_service.dart';
 import '../../services/manga_download_storage_support.dart';
 import '../../widgets/widgets.dart';
+import 'settings_group.dart';
 
 class OtherSettingsPage extends StatefulWidget {
   const OtherSettingsPage({super.key});
@@ -156,46 +157,48 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
         context: context,
         title: Text(strings.otherTitle),
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              children: [
-                _buildGroup(
-                  context,
-                  children: [
-                    SwitchListTile(
-                      secondary: const Icon(Icons.event_available_outlined),
-                      title: Text(strings.otherAutoCheckInTitle),
-                      subtitle: Text(strings.otherAutoCheckInSubtitle),
-                      value: _autoCheckInEnabled,
-                      onChanged: _toggleAutoCheckIn,
-                    ),
-                    SwitchListTile(
-                      secondary: const Icon(Icons.system_update_alt_rounded),
-                      title: Text(strings.otherAutoSourceUpdateTitle),
-                      subtitle: Text(strings.otherAutoSourceUpdateSubtitle),
-                      value: _autoSourceUpdateCheckEnabled,
-                      onChanged: _toggleAutoSourceUpdateCheck,
-                    ),
-                    SwitchListTile(
-                      secondary: const Icon(Icons.mobile_friendly_rounded),
-                      title: Text(strings.otherAutoSoftwareUpdateTitle),
-                      subtitle: Text(strings.otherAutoSoftwareUpdateSubtitle),
-                      value: _autoSoftwareUpdateCheckEnabled,
-                      onChanged: _toggleAutoSoftwareUpdateCheck,
-                    ),
-                    ListTile(
-                      leading: const Icon(Icons.folder_outlined),
-                      title: Text(strings.otherMangaDownloadPathTitle),
-                      subtitle: Text(_mangaDownloadsRootPath),
-                      trailing: const Icon(Icons.chevron_right_rounded),
-                      onTap: _editMangaDownloadPath,
-                    ),
-                  ],
-                ),
-              ],
-            ),
+      body: HazukiSettingsPageBody(
+        child: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : ListView(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                children: [
+                  _buildGroup(
+                    context,
+                    children: [
+                      SwitchListTile(
+                        secondary: const Icon(Icons.event_available_outlined),
+                        title: Text(strings.otherAutoCheckInTitle),
+                        subtitle: Text(strings.otherAutoCheckInSubtitle),
+                        value: _autoCheckInEnabled,
+                        onChanged: _toggleAutoCheckIn,
+                      ),
+                      SwitchListTile(
+                        secondary: const Icon(Icons.system_update_alt_rounded),
+                        title: Text(strings.otherAutoSourceUpdateTitle),
+                        subtitle: Text(strings.otherAutoSourceUpdateSubtitle),
+                        value: _autoSourceUpdateCheckEnabled,
+                        onChanged: _toggleAutoSourceUpdateCheck,
+                      ),
+                      SwitchListTile(
+                        secondary: const Icon(Icons.mobile_friendly_rounded),
+                        title: Text(strings.otherAutoSoftwareUpdateTitle),
+                        subtitle: Text(strings.otherAutoSoftwareUpdateSubtitle),
+                        value: _autoSoftwareUpdateCheckEnabled,
+                        onChanged: _toggleAutoSoftwareUpdateCheck,
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.folder_outlined),
+                        title: Text(strings.otherMangaDownloadPathTitle),
+                        subtitle: Text(_mangaDownloadsRootPath),
+                        trailing: const Icon(Icons.chevron_right_rounded),
+                        onTap: _editMangaDownloadPath,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+      ),
     );
   }
 }

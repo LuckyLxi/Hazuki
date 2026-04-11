@@ -35,12 +35,12 @@ class HomeNavigationActions {
     return ComicDetailPage(comic: comic, heroTag: heroTag);
   }
 
-  MaterialPageRoute<void> buildFavoriteDetailRoute(
-    ExploreComic comic,
-    String heroTag,
-  ) {
-    return MaterialPageRoute<void>(
-      builder: (_) => ComicDetailPage(comic: comic, heroTag: heroTag),
+  Future<void> openFavoriteDetail(ExploreComic comic, String heroTag) {
+    return openComicDetail(
+      context,
+      comic: comic,
+      heroTag: heroTag,
+      pageBuilder: buildComicDetailPage,
     );
   }
 
@@ -65,6 +65,7 @@ class HomeNavigationActions {
 
   Future<void> openCategories() async {
     await _openDrawerDestination(
+      hideComicDetailPanel: true,
       (_) => TagCategoryPage(
         searchPageBuilder: (tag) => buildSearchPage(initialKeyword: tag),
       ),
@@ -94,6 +95,7 @@ class HomeNavigationActions {
 
   Future<void> openSettings() async {
     await _openDrawerDestination(
+      hideComicDetailPanel: true,
       (_) => SettingsPage(
         appearanceSettings: appearanceSettings,
         onAppearanceChanged: onAppearanceChanged,
@@ -111,28 +113,46 @@ class HomeNavigationActions {
   }
 
   Future<void> openLines() async {
-    await _openDrawerDestination((_) => const LineSettingsPage());
+    await _openDrawerDestination(
+      hideComicDetailPanel: true,
+      (_) => const LineSettingsPage(),
+    );
   }
 
-  Future<void> _openDrawerDestination(WidgetBuilder builder) async {
+  Future<void> _openDrawerDestination(
+    WidgetBuilder builder, {
+    bool hideComicDetailPanel = false,
+  }) async {
     final navigator = Navigator.of(context);
     if (!navigator.mounted) {
       return;
     }
+    final drawerWidth = resolveHomeDrawerWidth(context);
+    final drawerColor =
+        DrawerTheme.of(context).backgroundColor ??
+        Theme.of(context).drawerTheme.backgroundColor ??
+        Theme.of(context).colorScheme.surface;
+    final preserveComicDetailPanel =
+        useWindowsComicDetailPanel &&
+        !hideComicDetailPanel &&
+        WindowsComicDetailController.instance.isPanelVisible;
 
     final route = _DrawerExpandPageRoute<void>(
       builder: builder,
-      drawerWidth: resolveHomeDrawerWidth(context),
-      drawerColor:
-          DrawerTheme.of(context).backgroundColor ??
-          Theme.of(context).drawerTheme.backgroundColor ??
-          Theme.of(context).colorScheme.surface,
+      drawerWidth: drawerWidth,
+      drawerColor: drawerColor,
       drawerContent: drawerTransitionContent,
+      reservedTrailingWidthFactor: preserveComicDetailPanel ? 0.6 : 0,
     );
 
-    final push = navigator.push<void>(route);
     scaffoldKey.currentState?.closeDrawer();
-    await push;
+    final controller = WindowsComicDetailController.instance;
+    if (hideComicDetailPanel && useWindowsComicDetailPanel) {
+      await controller.hideWhile(() => navigator.push<void>(route));
+      return;
+    }
+
+    await navigator.push<void>(route);
   }
 }
 
@@ -142,11 +162,18 @@ class _DrawerExpandPageRoute<T> extends MaterialPageRoute<T> {
     required this.drawerWidth,
     required this.drawerColor,
     required this.drawerContent,
+    required this.reservedTrailingWidthFactor,
   });
 
   final double drawerWidth;
   final Color drawerColor;
   final Widget drawerContent;
+  final double reservedTrailingWidthFactor;
+
+  bool get _preserveTrailingPanel => reservedTrailingWidthFactor > 0;
+
+  @override
+  bool get opaque => !_preserveTrailingPanel;
 
   @override
   Duration get transitionDuration => const Duration(milliseconds: 460);
@@ -161,7 +188,7 @@ class _DrawerExpandPageRoute<T> extends MaterialPageRoute<T> {
     Animation<double> secondaryAnimation,
     Widget child,
   ) {
-    if (animation.status != AnimationStatus.forward) {
+    if (!_preserveTrailingPanel && animation.status != AnimationStatus.forward) {
       return super.buildTransitions(
         context,
         animation,
@@ -174,21 +201,30 @@ class _DrawerExpandPageRoute<T> extends MaterialPageRoute<T> {
     }
 
     final screenWidth = MediaQuery.sizeOf(context).width;
+    final reservedTrailingWidth = screenWidth * reservedTrailingWidthFactor;
+    final targetContentWidth = (screenWidth - reservedTrailingWidth).clamp(
+      drawerWidth,
+      screenWidth,
+    );
     final expandCurve = CurvedAnimation(
       parent: animation,
       curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
     );
     final drawerFadeCurve = CurvedAnimation(
       parent: animation,
       curve: const Interval(0.0, 0.32, curve: Curves.easeOutCubic),
+      reverseCurve: const Interval(0.0, 0.32, curve: Curves.easeInCubic),
     );
     final pageFadeCurve = CurvedAnimation(
       parent: animation,
       curve: const Interval(0.22, 0.88, curve: Curves.easeOutCubic),
+      reverseCurve: const Interval(0.12, 0.78, curve: Curves.easeInCubic),
     );
     final pageSlideCurve = CurvedAnimation(
       parent: animation,
       curve: const Interval(0.18, 1.0, curve: Curves.easeOutCubic),
+      reverseCurve: const Interval(0.0, 0.82, curve: Curves.easeInCubic),
     );
 
     return AnimatedBuilder(
@@ -197,11 +233,11 @@ class _DrawerExpandPageRoute<T> extends MaterialPageRoute<T> {
       builder: (context, pageChild) {
         final width = Tween<double>(
           begin: drawerWidth,
-          end: screenWidth,
+          end: targetContentWidth,
         ).evaluate(expandCurve);
-        final revealFactor = screenWidth <= 0
+        final revealFactor = targetContentWidth <= 0
             ? 1.0
-            : (width / screenWidth).clamp(0.0, 1.0);
+            : (width / targetContentWidth).clamp(0.0, 1.0);
         final drawerOpacity = (1.0 - drawerFadeCurve.value).clamp(0.0, 1.0);
         final drawerOffset = Tween<double>(
           begin: 0,

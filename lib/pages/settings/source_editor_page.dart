@@ -7,6 +7,7 @@ import '../../widgets/widgets.dart';
 import 'source_editor/source_editor_content.dart';
 import 'source_editor/source_editor_controller.dart';
 import 'source_editor/source_editor_restore_dialog.dart';
+import 'settings_group.dart';
 
 class ComicSourceEditorPage extends StatefulWidget {
   const ComicSourceEditorPage({super.key});
@@ -184,21 +185,23 @@ class _ComicSourceEditorPageState extends State<ComicSourceEditorPage> {
             const SizedBox(width: 4),
           ],
         ),
-        body: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 220),
-          switchInCurve: Curves.easeOutCubic,
-          switchOutCurve: Curves.easeInCubic,
-          child: _loading
-              ? _buildLoadingState(context)
-              : _loadErrorText != null
-              ? _buildFatalErrorState(context, _loadErrorText!)
-              : SourceEditorContent(
-                  strings: _strings,
-                  controller: _controller,
-                  saving: _saving,
-                  inlineErrorText: _inlineErrorText,
-                  onSaveRequested: _saveSource,
-                ),
+        body: HazukiSettingsPageBody(
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 220),
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeInCubic,
+            child: _loading
+                ? _buildLoadingState(context)
+                : _loadErrorText != null
+                ? _buildFatalErrorState(context, _loadErrorText!)
+                : SourceEditorContent(
+                    strings: _strings,
+                    controller: _controller,
+                    saving: _saving,
+                    inlineErrorText: _inlineErrorText,
+                    onSaveRequested: _saveSource,
+                  ),
+          ),
         ),
       ),
     );

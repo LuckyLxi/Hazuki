@@ -10,4 +10,5 @@ export 'other_settings_page.dart';
 export 'privacy_settings_page.dart';
 export 'reading_settings_page.dart';
 export 'settings_page.dart';
+export 'settings_group.dart';
 export 'source_editor_page.dart';

@@ -6,12 +6,12 @@ class HazukiDesktopPageContainer extends StatelessWidget {
   const HazukiDesktopPageContainer({
     super.key,
     required this.child,
-    this.maxWidth = 560,
+    this.maxWidth,
     this.padding = const EdgeInsets.symmetric(horizontal: 16),
   });
 
   final Widget child;
-  final double maxWidth;
+  final double? maxWidth;
   final EdgeInsetsGeometry padding;
 
   @override
@@ -24,10 +24,12 @@ class HazukiDesktopPageContainer extends StatelessWidget {
       alignment: Alignment.topCenter,
       child: Padding(
         padding: padding,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: maxWidth),
-          child: child,
-        ),
+        child: maxWidth == null
+            ? child
+            : ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: maxWidth!),
+                child: child,
+              ),
       ),
     );
   }

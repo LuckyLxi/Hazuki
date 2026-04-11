@@ -6,14 +6,15 @@ import '../l10n/app_localizations.dart';
 import '../models/hazuki_models.dart';
 import '../services/hazuki_source_service.dart';
 import '../widgets/widgets.dart';
+import '../widgets/windows_comic_detail_host.dart';
 import 'favorite/favorite.dart';
 
 part 'favorite/favorite_back_to_top_button.dart';
 part 'favorite/favorite_content_section.dart';
 part 'favorite/favorite_comic_tile.dart';
 
-typedef FavoriteDetailRouteBuilder =
-    Route<void> Function(ExploreComic comic, String heroTag);
+typedef FavoriteComicTapHandler =
+    Future<void> Function(ExploreComic comic, String heroTag);
 
 AppLocalizations _strings(BuildContext context) =>
     AppLocalizations.of(context)!;
@@ -32,13 +33,13 @@ class FavoritePage extends StatefulWidget {
   const FavoritePage({
     super.key,
     required this.authVersion,
-    required this.detailRouteBuilder,
+    required this.onComicTap,
     this.onAppBarActionsChanged,
     this.onRequestLogin,
   });
 
   final int authVersion;
-  final FavoriteDetailRouteBuilder detailRouteBuilder;
+  final FavoriteComicTapHandler onComicTap;
   final ValueChanged<FavoriteAppBarActionsState>? onAppBarActionsChanged;
   final Future<void> Function()? onRequestLogin;
 
@@ -404,63 +405,63 @@ class FavoritePageState extends State<FavoritePage>
           );
         }
 
-        return Stack(
-          children: [
-            ListView(
-              controller: _scrollController,
-              physics: const AlwaysScrollableScrollPhysics(
-                parent: ClampingScrollPhysics(),
-              ),
-              children: [
-                if (_controller.supportsFolderLoad)
-                  FavoriteFolderHeader(
-                    folders: _controller.folders,
-                    selectedFolderId: _controller.selectedFolderId,
-                    loadingFolders: _controller.loadingFolders,
-                    showDeleteActionSlot: _controller.supportsFolderDelete,
-                    enableDeleteAction: _controller.canDeleteSelectedFolder,
-                    onDeleteCurrentFolder: _deleteCurrentFolder,
-                    onSelectFolder: _handleSelectFolder,
-                    onLongPressFolder:
-                        _controller.mode == FavoritePageMode.local
-                        ? _renameLocalFolder
-                        : null,
-                  ),
-                _FavoriteContentSection(
-                  comics: _controller.comics,
-                  comicAnimationStyles: _comicAnimationStyles,
-                  errorMessage: _controller.errorMessage,
-                  initialLoading: _controller.initialLoading,
-                  refreshing: _controller.refreshing,
-                  loadingMore: _controller.loadingMore,
-                  strings: _strings(context),
-                  mode: _controller.mode,
-                  showCreateLocalFolderButton:
-                      _controller.mode == FavoritePageMode.local &&
-                      _controller.folders.isEmpty,
-                  onRetry: _handleRefresh,
-                  onCreateLocalFolder: createFolder,
-                  onComicTap: (comic) {
-                    final heroTag = _favoriteComicHeroTag(
-                      comic,
-                      salt: 'favorite',
-                    );
-                    Navigator.of(
-                      context,
-                    ).push(widget.detailRouteBuilder(comic, heroTag));
-                  },
+        return WindowsComicDetailHost(
+          child: Stack(
+            children: [
+              ListView(
+                controller: _scrollController,
+                physics: const AlwaysScrollableScrollPhysics(
+                  parent: ClampingScrollPhysics(),
                 ),
-              ],
-            ),
-            Positioned(
-              right: 16,
-              bottom: 16,
-              child: _FavoriteBackToTopButton(
-                visible: _showBackToTop,
-                onPressed: _scrollToTop,
+                children: [
+                  if (_controller.supportsFolderLoad)
+                    FavoriteFolderHeader(
+                      folders: _controller.folders,
+                      selectedFolderId: _controller.selectedFolderId,
+                      loadingFolders: _controller.loadingFolders,
+                      showDeleteActionSlot: _controller.supportsFolderDelete,
+                      enableDeleteAction: _controller.canDeleteSelectedFolder,
+                      onDeleteCurrentFolder: _deleteCurrentFolder,
+                      onSelectFolder: _handleSelectFolder,
+                      onLongPressFolder:
+                          _controller.mode == FavoritePageMode.local
+                          ? _renameLocalFolder
+                          : null,
+                    ),
+                  _FavoriteContentSection(
+                    comics: _controller.comics,
+                    comicAnimationStyles: _comicAnimationStyles,
+                    errorMessage: _controller.errorMessage,
+                    initialLoading: _controller.initialLoading,
+                    refreshing: _controller.refreshing,
+                    loadingMore: _controller.loadingMore,
+                    strings: _strings(context),
+                    mode: _controller.mode,
+                    showCreateLocalFolderButton:
+                        _controller.mode == FavoritePageMode.local &&
+                        _controller.folders.isEmpty,
+                    onRetry: _handleRefresh,
+                    onCreateLocalFolder: createFolder,
+                    onComicTap: (comic) {
+                      final heroTag = _favoriteComicHeroTag(
+                        comic,
+                        salt: 'favorite',
+                      );
+                      unawaited(widget.onComicTap(comic, heroTag));
+                    },
+                  ),
+                ],
               ),
-            ),
-          ],
+              Positioned(
+                right: 16,
+                bottom: 16,
+                child: _FavoriteBackToTopButton(
+                  visible: _showBackToTop,
+                  onPressed: _scrollToTop,
+                ),
+              ),
+            ],
+          ),
         );
       },
     );

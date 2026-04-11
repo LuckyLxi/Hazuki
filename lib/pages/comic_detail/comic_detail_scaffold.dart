@@ -222,10 +222,7 @@ class _ComicDetailEntranceReveal extends StatelessWidget {
         final dy = lerpDouble(beginOffset.dy, 0, value) ?? 0;
         return Opacity(
           opacity: value,
-          child: Transform.translate(
-            offset: Offset(dx, dy),
-            child: child,
-          ),
+          child: Transform.translate(offset: Offset(dx, dy), child: child),
         );
       },
     );
@@ -281,6 +278,8 @@ class _ComicDetailBody extends StatelessWidget {
     required this.onOpenReader,
     required this.onDetailsLoaded,
     required this.onDetailsResolved,
+    required this.isDesktopPanel,
+    required this.onCloseRequested,
   });
 
   final TabController tabController;
@@ -311,6 +310,8 @@ class _ComicDetailBody extends StatelessWidget {
   final ValueChanged<ComicDetailsData> onDetailsLoaded;
   final void Function({required String title, required String updateTime})
   onDetailsResolved;
+  final bool isDesktopPanel;
+  final VoidCallback? onCloseRequested;
 
   @override
   Widget build(BuildContext context) {
@@ -471,6 +472,8 @@ class _ComicDetailBody extends StatelessWidget {
                         details: details,
                         heroTagPrefix: heroTag,
                         isActiveInTabView: shouldRender,
+                        isDesktopPanel: isDesktopPanel,
+                        onCloseRequested: onCloseRequested,
                       ),
                     );
                   },

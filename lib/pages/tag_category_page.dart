@@ -7,6 +7,7 @@ import '../l10n/app_localizations.dart';
 import '../models/hazuki_models.dart';
 import '../services/hazuki_source_service.dart';
 import '../widgets/widgets.dart';
+import '../widgets/windows_comic_detail_host.dart';
 
 class TagCategoryPage extends StatefulWidget {
   const TagCategoryPage({super.key, required this.searchPageBuilder});
@@ -249,82 +250,84 @@ class _TagCategoryPageState extends State<TagCategoryPage> {
   Widget build(BuildContext context) {
     final strings = AppLocalizations.of(context)!;
 
-    return Scaffold(
-      appBar: hazukiFrostedAppBar(
-        context: context,
-        title: Text(strings.tagCategoryTitle),
-      ),
-      body: _initialLoading
-          ? ListView(
-              children: [
-                const SizedBox(height: 160),
-                Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const HazukiSandyLoadingIndicator(size: 136),
-                      const SizedBox(height: 10),
-                      Text(strings.commonLoading),
-                    ],
+    return WindowsComicDetailHost(
+      child: Scaffold(
+        appBar: hazukiFrostedAppBar(
+          context: context,
+          title: Text(strings.tagCategoryTitle),
+        ),
+        body: _initialLoading
+            ? ListView(
+                children: [
+                  const SizedBox(height: 160),
+                  Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const HazukiSandyLoadingIndicator(size: 136),
+                        const SizedBox(height: 10),
+                        Text(strings.commonLoading),
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            )
-          : (_errorMessage != null && _tagGroups.isEmpty)
-          ? ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                const SizedBox(height: 90),
-                Text(_errorMessage!, textAlign: TextAlign.center),
-                const SizedBox(height: 12),
-                Center(
-                  child: FilledButton(
-                    onPressed: () {
-                      unawaited(_loadInitial());
-                    },
-                    child: Text(strings.commonRetry),
+                ],
+              )
+            : (_errorMessage != null && _tagGroups.isEmpty)
+            ? ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  const SizedBox(height: 90),
+                  Text(_errorMessage!, textAlign: TextAlign.center),
+                  const SizedBox(height: 12),
+                  Center(
+                    child: FilledButton(
+                      onPressed: () {
+                        unawaited(_loadInitial());
+                      },
+                      child: Text(strings.commonRetry),
+                    ),
                   ),
-                ),
-              ],
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-              itemCount: _visibleGroupCount + 1,
-              itemBuilder: (context, index) {
-                if (index == 0) {
-                  return Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (_errorMessage != null)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Text(
-                            _errorMessage!,
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.error,
+                ],
+              )
+            : ListView.builder(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+                itemCount: _visibleGroupCount + 1,
+                itemBuilder: (context, index) {
+                  if (index == 0) {
+                    return Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (_errorMessage != null)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Text(
+                              _errorMessage!,
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.error,
+                              ),
                             ),
                           ),
-                        ),
-                      if (_tagGroups.isNotEmpty) ...[
-                        Text(
-                          strings.tagCategoryTitle,
-                          style: Theme.of(context).textTheme.titleMedium,
-                        ),
-                        const SizedBox(height: 10),
-                      ] else
-                        Text(strings.tagCategoryEmpty),
-                    ],
-                  );
-                }
+                        if (_tagGroups.isNotEmpty) ...[
+                          Text(
+                            strings.tagCategoryTitle,
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 10),
+                        ] else
+                          Text(strings.tagCategoryEmpty),
+                      ],
+                    );
+                  }
 
-                final group = _tagGroups[index - 1];
-                return _TagCategoryGroupCard(
-                  group: group,
-                  onOpenTag: _openSearchByTag,
-                );
-              },
-            ),
+                  final group = _tagGroups[index - 1];
+                  return _TagCategoryGroupCard(
+                    group: group,
+                    onOpenTag: _openSearchByTag,
+                  );
+                },
+              ),
+      ),
     );
   }
 }

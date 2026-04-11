@@ -37,8 +37,12 @@ extension _ComicDetailMetaSectionExtension on _ComicDetailPageState {
               MaterialPageRoute<void>(
                 builder: (_) => SearchPage(
                   initialKeyword: value,
-                  comicDetailPageBuilder: (comic, heroTag) =>
-                      ComicDetailPage(comic: comic, heroTag: heroTag),
+                  comicDetailPageBuilder: (comic, heroTag) => ComicDetailPage(
+                    comic: comic,
+                    heroTag: heroTag,
+                    isDesktopPanel: widget.isDesktopPanel,
+                    onCloseRequested: widget.onCloseRequested,
+                  ),
                 ),
               ),
             );
@@ -72,8 +76,12 @@ extension _ComicDetailMetaSectionExtension on _ComicDetailPageState {
               MaterialPageRoute<void>(
                 builder: (_) => SearchPage(
                   initialKeyword: value,
-                  comicDetailPageBuilder: (comic, heroTag) =>
-                      ComicDetailPage(comic: comic, heroTag: heroTag),
+                  comicDetailPageBuilder: (comic, heroTag) => ComicDetailPage(
+                    comic: comic,
+                    heroTag: heroTag,
+                    isDesktopPanel: widget.isDesktopPanel,
+                    onCloseRequested: widget.onCloseRequested,
+                  ),
                 ),
               ),
             );

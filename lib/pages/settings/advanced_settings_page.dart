@@ -6,6 +6,7 @@ import '../../l10n/app_localizations.dart';
 import '../../services/hazuki_source_service.dart';
 import '../../widgets/widgets.dart';
 import 'advanced/advanced_settings_content.dart';
+import 'settings_group.dart';
 
 class AdvancedSettingsPage extends StatefulWidget {
   const AdvancedSettingsPage({
@@ -104,16 +105,18 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
         context: context,
         title: Text(strings.advancedTitle),
       ),
-      body: AdvancedSettingsContent(
-        loading: _loading,
-        noImageMode: _noImageMode,
-        softwareLogCaptureEnabled: _softwareLogCaptureEnabled,
-        hasCustomEditedSource: _hasCustomEditedSource,
-        logsPageBuilder: widget.logsPageBuilder,
-        onToggleNoImageMode: _toggleNoImageMode,
-        onToggleSoftwareLogCaptureEnabled: _toggleSoftwareLogCaptureEnabled,
-        onOpenComicSourceEditor: _openComicSourceEditor,
-        onRestoreComicSource: _restoreComicSource,
+      body: HazukiSettingsPageBody(
+        child: AdvancedSettingsContent(
+          loading: _loading,
+          noImageMode: _noImageMode,
+          softwareLogCaptureEnabled: _softwareLogCaptureEnabled,
+          hasCustomEditedSource: _hasCustomEditedSource,
+          logsPageBuilder: widget.logsPageBuilder,
+          onToggleNoImageMode: _toggleNoImageMode,
+          onToggleSoftwareLogCaptureEnabled: _toggleSoftwareLogCaptureEnabled,
+          onOpenComicSourceEditor: _openComicSourceEditor,
+          onRestoreComicSource: _restoreComicSource,
+        ),
       ),
     );
   }

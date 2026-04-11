@@ -7,12 +7,16 @@ class _ComicDetailScrollAwareAppBar extends StatelessWidget
     required this.appBarComicTitle,
     required this.appBarUpdateTime,
     required this.theme,
+    required this.isDesktopPanel,
+    required this.onCloseRequested,
   });
 
   final ValueNotifier<bool> collapsedTitleListenable;
   final String appBarComicTitle;
   final String appBarUpdateTime;
   final ThemeData theme;
+  final bool isDesktopPanel;
+  final VoidCallback? onCloseRequested;
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
@@ -20,6 +24,14 @@ class _ComicDetailScrollAwareAppBar extends StatelessWidget
   @override
   Widget build(BuildContext context) {
     return AppBar(
+      automaticallyImplyLeading: !isDesktopPanel,
+      leading: isDesktopPanel
+          ? IconButton(
+              tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
+              onPressed: onCloseRequested,
+              icon: const Icon(Icons.close),
+            )
+          : null,
       titleSpacing: 0,
       title: ValueListenableBuilder<bool>(
         valueListenable: collapsedTitleListenable,

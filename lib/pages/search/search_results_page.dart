@@ -9,6 +9,7 @@ import '../../l10n/app_localizations.dart';
 import '../../models/hazuki_models.dart';
 import '../../services/hazuki_source_service.dart';
 import '../../widgets/widgets.dart';
+import '../../widgets/windows_comic_detail_host.dart';
 import 'search_results_controller.dart';
 import 'search_results_widgets.dart';
 import 'search_shared.dart';
@@ -91,19 +92,21 @@ class _SearchResultsPageState extends State<SearchResultsPage>
 
   @override
   Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: _resultsController,
-      builder: (context, _) => PopScope(
-        canPop: !_collapsedSearchExpanded,
-        onPopInvokedWithResult: _handlePopInvoked,
-        child: Scaffold(
-          backgroundColor: Theme.of(context).colorScheme.surface,
-          appBar: _buildSearchResultsAppBar(),
-          body: Stack(
-            children: [
-              _buildSearchResultsBody(),
-              _buildSearchBackToTopButton(),
-            ],
+    return WindowsComicDetailHost(
+      child: ListenableBuilder(
+        listenable: _resultsController,
+        builder: (context, _) => PopScope(
+          canPop: !_collapsedSearchExpanded,
+          onPopInvokedWithResult: _handlePopInvoked,
+          child: Scaffold(
+            backgroundColor: Theme.of(context).colorScheme.surface,
+            appBar: _buildSearchResultsAppBar(),
+            body: Stack(
+              children: [
+                _buildSearchResultsBody(),
+                _buildSearchBackToTopButton(),
+              ],
+            ),
           ),
         ),
       ),

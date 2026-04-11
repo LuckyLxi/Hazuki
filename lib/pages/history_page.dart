@@ -12,6 +12,7 @@ import '../models/hazuki_models.dart';
 import '../services/hazuki_source_service.dart';
 import '../services/local_favorites_service.dart';
 import '../widgets/widgets.dart';
+import '../widgets/windows_comic_detail_host.dart';
 import 'comic_detail/comic_detail.dart';
 
 part 'history/history_actions.dart';
@@ -163,65 +164,67 @@ class _HistoryPageState extends State<HistoryPage> {
             },
           );
 
-    return Scaffold(
-      appBar: hazukiFrostedAppBar(
-        context: context,
-        title: Text(strings.historyTitle),
-        actions: [
-          if (_history.isNotEmpty)
-            IconButton(
-              tooltip: _selectionMode
-                  ? strings.historySelectionCancelTooltip
-                  : strings.historySelectionEnterTooltip,
-              icon: Icon(_selectionMode ? Icons.close : Icons.checklist),
-              onPressed: () {
-                _updateHistoryState(() {
-                  _selectionMode = !_selectionMode;
-                  _selectedIds.clear();
-                });
-              },
-            ),
-          if (_history.isNotEmpty)
-            IconButton(
-              tooltip: _selectionMode
-                  ? strings.historyDeleteSelectedTooltip
-                  : strings.historyClearAllTooltip,
-              icon: const Icon(Icons.delete_outline),
-              onPressed: _selectionMode ? _deleteSelected : _clearAll,
-            ),
-        ],
-      ),
-      body: Stack(
-        children: [
-          bodyContent,
-          Positioned(
-            right: 16,
-            bottom: 16,
-            child: AnimatedSlide(
-              offset: _showBackToTop ? Offset.zero : const Offset(0, 0.24),
-              duration: const Duration(milliseconds: 220),
-              curve: Curves.easeOutCubic,
-              child: AnimatedScale(
-                scale: _showBackToTop ? 1 : 0.86,
+    return WindowsComicDetailHost(
+      child: Scaffold(
+        appBar: hazukiFrostedAppBar(
+          context: context,
+          title: Text(strings.historyTitle),
+          actions: [
+            if (_history.isNotEmpty)
+              IconButton(
+                tooltip: _selectionMode
+                    ? strings.historySelectionCancelTooltip
+                    : strings.historySelectionEnterTooltip,
+                icon: Icon(_selectionMode ? Icons.close : Icons.checklist),
+                onPressed: () {
+                  _updateHistoryState(() {
+                    _selectionMode = !_selectionMode;
+                    _selectedIds.clear();
+                  });
+                },
+              ),
+            if (_history.isNotEmpty)
+              IconButton(
+                tooltip: _selectionMode
+                    ? strings.historyDeleteSelectedTooltip
+                    : strings.historyClearAllTooltip,
+                icon: const Icon(Icons.delete_outline),
+                onPressed: _selectionMode ? _deleteSelected : _clearAll,
+              ),
+          ],
+        ),
+        body: Stack(
+          children: [
+            bodyContent,
+            Positioned(
+              right: 16,
+              bottom: 16,
+              child: AnimatedSlide(
+                offset: _showBackToTop ? Offset.zero : const Offset(0, 0.24),
                 duration: const Duration(milliseconds: 220),
                 curve: Curves.easeOutCubic,
-                child: AnimatedOpacity(
-                  opacity: _showBackToTop ? 1 : 0,
-                  duration: const Duration(milliseconds: 200),
+                child: AnimatedScale(
+                  scale: _showBackToTop ? 1 : 0.86,
+                  duration: const Duration(milliseconds: 220),
                   curve: Curves.easeOutCubic,
-                  child: IgnorePointer(
-                    ignoring: !_showBackToTop,
-                    child: FloatingActionButton(
-                      heroTag: 'history_back_to_top',
-                      onPressed: _scrollToTop,
-                      child: const Icon(Icons.vertical_align_top_rounded),
+                  child: AnimatedOpacity(
+                    opacity: _showBackToTop ? 1 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeOutCubic,
+                    child: IgnorePointer(
+                      ignoring: !_showBackToTop,
+                      child: FloatingActionButton(
+                        heroTag: 'history_back_to_top',
+                        onPressed: _scrollToTop,
+                        child: const Icon(Icons.vertical_align_top_rounded),
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

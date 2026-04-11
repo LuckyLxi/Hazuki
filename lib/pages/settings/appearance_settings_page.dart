@@ -4,6 +4,7 @@ import '../../app/app.dart';
 import '../../l10n/app_localizations.dart';
 import '../../widgets/widgets.dart';
 import 'appearance/appearance_settings_content.dart';
+import 'settings_group.dart';
 
 class AppearanceSettingsPage extends StatefulWidget {
   const AppearanceSettingsPage({
@@ -70,11 +71,13 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
         context: context,
         title: Text(strings.displayTitle),
       ),
-      body: AppearanceSettingsContent(
-        settings: _settings,
-        locale: _locale,
-        onApply: _apply,
-        onApplyLocale: _applyLocale,
+      body: HazukiSettingsPageBody(
+        child: AppearanceSettingsContent(
+          settings: _settings,
+          locale: _locale,
+          onApply: _apply,
+          onApplyLocale: _applyLocale,
+        ),
       ),
     );
   }

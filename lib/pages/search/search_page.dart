@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../app/app.dart';
 import '../../l10n/app_localizations.dart';
 import '../../widgets/widgets.dart';
+import '../../widgets/windows_comic_detail_host.dart';
 import 'search_results_page.dart';
 import 'search_shared.dart';
 
@@ -579,50 +580,52 @@ class _SearchEntryPageState extends State<_SearchEntryPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Focus(
-      focusNode: _pageFocusNode,
-      skipTraversal: true,
-      child: Scaffold(
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        floatingActionButton: _historyList.isNotEmpty
-            ? GestureDetector(
-                onLongPress: _confirmClearHistory,
-                child: FloatingActionButton(
-                  onPressed: () {
-                    setState(() {
-                      _historyEditMode = !_historyEditMode;
-                    });
-                    _scheduleSearchRevealSyncBurst(force: true);
-                  },
-                  child: Icon(
-                    _historyEditMode ? Icons.done : Icons.delete_outline,
+    return WindowsComicDetailHost(
+      child: Focus(
+        focusNode: _pageFocusNode,
+        skipTraversal: true,
+        child: Scaffold(
+          backgroundColor: Theme.of(context).colorScheme.surface,
+          floatingActionButton: _historyList.isNotEmpty
+              ? GestureDetector(
+                  onLongPress: _confirmClearHistory,
+                  child: FloatingActionButton(
+                    onPressed: () {
+                      setState(() {
+                        _historyEditMode = !_historyEditMode;
+                      });
+                      _scheduleSearchRevealSyncBurst(force: true);
+                    },
+                    child: Icon(
+                      _historyEditMode ? Icons.done : Icons.delete_outline,
+                    ),
                   ),
-                ),
-              )
-            : null,
-        appBar: hazukiFrostedAppBar(
-          context: context,
-          title: Text(AppLocalizations.of(context)!.searchTitle),
-          actions: [
-            _buildCollapsedSearchBox(),
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 220),
-              curve: Curves.easeOutCubic,
-              width: _showCollapsedSearch ? 12 : 0,
-            ),
-          ],
-        ),
-        body: ListView(
-          controller: _scrollController,
-          physics: const AlwaysScrollableScrollPhysics(
-            parent: ClampingScrollPhysics(),
+                )
+              : null,
+          appBar: hazukiFrostedAppBar(
+            context: context,
+            title: Text(AppLocalizations.of(context)!.searchTitle),
+            actions: [
+              _buildCollapsedSearchBox(),
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+                width: _showCollapsedSearch ? 12 : 0,
+              ),
+            ],
           ),
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-          children: [
-            _buildTopSearchBox(),
-            const SizedBox(height: 18),
-            _buildHistoryView(),
-          ],
+          body: ListView(
+            controller: _scrollController,
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: ClampingScrollPhysics(),
+            ),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+            children: [
+              _buildTopSearchBox(),
+              const SizedBox(height: 18),
+              _buildHistoryView(),
+            ],
+          ),
         ),
       ),
     );

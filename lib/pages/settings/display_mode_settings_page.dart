@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../app/app.dart';
 import '../../l10n/app_localizations.dart';
 import '../../widgets/widgets.dart';
+import 'settings_group.dart';
 
 class DisplayModeSettingsPage extends StatefulWidget {
   const DisplayModeSettingsPage({
@@ -623,15 +624,17 @@ class _DisplayModeSettingsPageState extends State<DisplayModeSettingsPage> {
         context: context,
         title: Text(AppLocalizations.of(context)!.displayRefreshRateTitle),
       ),
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 220),
-        switchInCurve: Curves.easeOutCubic,
-        switchOutCurve: Curves.easeInCubic,
-        child: _loading
-            ? _buildLoadingState(context)
-            : _error != null
-            ? _buildErrorState(context)
-            : _buildContent(context),
+      body: HazukiSettingsPageBody(
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 220),
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeInCubic,
+          child: _loading
+              ? _buildLoadingState(context)
+              : _error != null
+              ? _buildErrorState(context)
+              : _buildContent(context),
+        ),
       ),
     );
   }

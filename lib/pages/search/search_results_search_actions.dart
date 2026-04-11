@@ -19,7 +19,6 @@ extension _SearchResultsSearchActionsExtension on _SearchResultsPageState {
     }
 
     try {
-      final navigator = Navigator.of(context);
       final details = await HazukiSourceService.instance
           .loadComicDetails(comicId)
           .timeout(const Duration(seconds: 25));
@@ -34,13 +33,18 @@ extension _SearchResultsSearchActionsExtension on _SearchResultsPageState {
         cover: details.cover,
       );
       await addSearchHistory(keyword);
-      await navigator.pushReplacement(
-        MaterialPageRoute<void>(
-          builder: (_) => widget.comicDetailPageBuilder(
-            comic,
-            widget.comicCoverHeroTagBuilder(comic, salt: 'search-id-direct'),
-          ),
+      if (!mounted) {
+        return true;
+      }
+      await openComicDetail(
+        context,
+        comic: comic,
+        heroTag: widget.comicCoverHeroTagBuilder(
+          comic,
+          salt: 'search-id-direct',
         ),
+        pageBuilder: widget.comicDetailPageBuilder,
+        replaceCurrentRoute: true,
       );
       return true;
     } catch (_) {

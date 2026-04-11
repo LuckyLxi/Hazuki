@@ -2,6 +2,7 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -177,10 +178,28 @@ class _SoftwareUpdateDialogCardState extends State<_SoftwareUpdateDialogCard> {
   bool _downloadTriggerBusy = false;
 
   Future<void> _openReleasePage() async {
-    final opened = await launchUrl(
-      Uri.parse(widget.check.releaseUrl),
-      mode: LaunchMode.externalApplication,
-    );
+    final opened = await _openExternalUrl(widget.check.releaseUrl);
+    if (!opened && mounted) {
+      unawaited(
+        showHazukiPrompt(
+          context,
+          l10n(context).aboutOpenLinkFailed,
+          isError: true,
+        ),
+      );
+    }
+  }
+
+  Future<bool> _openExternalUrl(String url) {
+    return launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _openDirectDownloadUrl() async {
+    final url = widget.check.windowsUrl?.trim();
+    if (url == null || url.isEmpty) {
+      return;
+    }
+    final opened = await _openExternalUrl(url);
     if (!opened && mounted) {
       unawaited(
         showHazukiPrompt(
@@ -207,6 +226,16 @@ class _SoftwareUpdateDialogCardState extends State<_SoftwareUpdateDialogCard> {
     setState(() => _downloadTriggerBusy = false);
     if (launchedInstaller) {
       Navigator.of(context).pop();
+    }
+  }
+
+  Future<void> _handlePrimaryAction() async {
+    if (Platform.isAndroid) {
+      await _startDownload();
+      return;
+    }
+    if (Platform.isWindows) {
+      await _openDirectDownloadUrl();
     }
   }
 
@@ -238,7 +267,11 @@ class _SoftwareUpdateDialogCardState extends State<_SoftwareUpdateDialogCard> {
         final textTheme = theme.textTheme;
         final isDownloading = _downloadService.isDownloading;
         final canDownload =
-            widget.check.apkUrl?.trim().isNotEmpty == true &&
+            (Platform.isAndroid
+                ? widget.check.apkUrl?.trim().isNotEmpty == true
+                : Platform.isWindows
+                ? widget.check.windowsUrl?.trim().isNotEmpty == true
+                : false) &&
             !_downloadTriggerBusy;
         final failureMessage = _buildFailureMessage(strings);
 
@@ -434,7 +467,7 @@ class _SoftwareUpdateDialogCardState extends State<_SoftwareUpdateDialogCard> {
             Expanded(
               child: FilledButton(
                 onPressed: canDownload
-                    ? () => unawaited(_startDownload())
+                    ? () => unawaited(_handlePrimaryAction())
                     : null,
                 style: FilledButton.styleFrom(
                   minimumSize: const Size(0, 40),

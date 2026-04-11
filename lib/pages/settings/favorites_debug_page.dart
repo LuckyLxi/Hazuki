@@ -4,6 +4,7 @@ import '../../l10n/l10n.dart';
 import '../../widgets/widgets.dart';
 import 'logs/logs_export_button.dart';
 import 'logs/logs_tabs.dart';
+import 'settings_group.dart';
 
 class LogsPage extends StatelessWidget {
   const LogsPage({super.key});
@@ -35,8 +36,10 @@ class LogsPage extends StatelessWidget {
             ],
           ),
         ),
-        body: const TabBarView(
-          children: [NetworkLogsTab(), ApplicationLogsTab(), ReaderLogsTab()],
+        body: const HazukiSettingsPageBody(
+          child: TabBarView(
+            children: [NetworkLogsTab(), ApplicationLogsTab(), ReaderLogsTab()],
+          ),
         ),
       ),
     );

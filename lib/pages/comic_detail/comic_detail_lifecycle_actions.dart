@@ -2,9 +2,11 @@ part of '../comic_detail_page.dart';
 
 extension _ComicDetailLifecycleActionsExtension on _ComicDetailPageState {
   void _initializeComicDetailPage() {
-    _shouldAnimateInitialDetailReveal = !_ComicDetailPageState
-        ._animatedComicDetailIds
-        .contains(widget.comic.id.trim());
+    _shouldAnimateInitialDetailReveal =
+        widget.shouldAnimateInitialRevealOverride ??
+        !_ComicDetailPageState._animatedComicDetailIds.contains(
+          widget.comic.id.trim(),
+        );
     _appBarSolidProgressNotifier = ValueNotifier<double>(0);
     _collapsedTitleNotifier = ValueNotifier<bool>(false);
     _tabController = TabController(length: 3, vsync: this)

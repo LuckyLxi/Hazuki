@@ -183,7 +183,7 @@ extension _HistoryWidgets on _HistoryPageState {
           },
           child: InkWell(
             borderRadius: BorderRadius.circular(10),
-            onTap: () {
+            onTap: () async {
               if (_selectionMode) {
                 _toggleSelection(comic.id);
                 return;
@@ -192,16 +192,16 @@ extension _HistoryWidgets on _HistoryPageState {
                 comic,
                 salt: 'history',
               );
-              Navigator.of(context)
-                  .push(
-                    MaterialPageRoute<void>(
-                      builder: (_) =>
-                          widget.comicDetailPageBuilder(comic, heroTag),
-                    ),
-                  )
-                  .then((_) {
-                    _loadHistory();
-                  });
+              await openComicDetail(
+                context,
+                comic: comic,
+                heroTag: heroTag,
+                pageBuilder: widget.comicDetailPageBuilder,
+              );
+              if (!mounted) {
+                return;
+              }
+              _loadHistory();
             },
             child: Ink(
               padding: EdgeInsets.fromLTRB(_selectionMode ? 6 : 10, 10, 10, 10),
@@ -309,10 +309,7 @@ extension _HistoryWidgets on _HistoryPageState {
           alignment: Alignment.bottomCenter,
           child: Transform.translate(
             offset: Offset(0, 50 * (1 - value)),
-            child: Opacity(
-              opacity: value.clamp(0.0, 1.0),
-              child: child,
-            ),
+            child: Opacity(opacity: value.clamp(0.0, 1.0), child: child),
           ),
         );
       },

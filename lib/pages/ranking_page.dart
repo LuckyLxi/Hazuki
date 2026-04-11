@@ -7,6 +7,7 @@ import '../l10n/app_localizations.dart';
 import '../models/hazuki_models.dart';
 import '../services/hazuki_source_service.dart';
 import '../widgets/widgets.dart';
+import '../widgets/windows_comic_detail_host.dart';
 
 class RankingPage extends StatefulWidget {
   const RankingPage({
@@ -285,11 +286,12 @@ class _RankingPageState extends State<RankingPage> {
       padding: const EdgeInsets.only(top: 10),
       child: InkWell(
         borderRadius: BorderRadius.circular(10),
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => widget.comicDetailPageBuilder(comic, heroTag),
-            ),
+        onTap: () async {
+          await openComicDetail(
+            context,
+            comic: comic,
+            heroTag: heroTag,
+            pageBuilder: widget.comicDetailPageBuilder,
           );
         },
         child: Ink(
@@ -380,10 +382,7 @@ class _RankingPageState extends State<RankingPage> {
           alignment: Alignment.bottomCenter,
           child: Transform.translate(
             offset: Offset(0, 50 * (1 - value)),
-            child: Opacity(
-              opacity: value.clamp(0.0, 1.0),
-              child: child,
-            ),
+            child: Opacity(opacity: value.clamp(0.0, 1.0), child: child),
           ),
         );
       },
@@ -431,149 +430,159 @@ class _RankingPageState extends State<RankingPage> {
   Widget build(BuildContext context) {
     final strings = AppLocalizations.of(context)!;
 
-    return Scaffold(
-      appBar: hazukiFrostedAppBar(
-        context: context,
-        title: Text(strings.rankingTitle),
-      ),
-      body: Stack(
-        children: [
-          HazukiPullToRefresh(
-            onRefresh: () => _loadInitial(forceRefresh: true),
-            child: _initialLoading
-                ? _buildCenteredRankingLoading(text: strings.commonLoading)
-                : (_errorMessage != null &&
-                      _rankingOptions.isEmpty &&
-                      _rankingComics.isEmpty)
-                ? ListView(
-                    physics: const AlwaysScrollableScrollPhysics(
-                      parent: ClampingScrollPhysics(),
-                    ),
-                    padding: const EdgeInsets.all(16),
-                    children: [
-                      const SizedBox(height: 90),
-                      Text(_errorMessage!, textAlign: TextAlign.center),
-                      const SizedBox(height: 12),
-                      Center(
-                        child: FilledButton(
-                          onPressed: () {
-                            unawaited(_loadInitial(forceRefresh: true));
-                          },
-                          child: Text(strings.commonRetry),
-                        ),
+    return WindowsComicDetailHost(
+      child: Scaffold(
+        appBar: hazukiFrostedAppBar(
+          context: context,
+          title: Text(strings.rankingTitle),
+        ),
+        body: Stack(
+          children: [
+            HazukiPullToRefresh(
+              onRefresh: () => _loadInitial(forceRefresh: true),
+              child: _initialLoading
+                  ? _buildCenteredRankingLoading(text: strings.commonLoading)
+                  : (_errorMessage != null &&
+                        _rankingOptions.isEmpty &&
+                        _rankingComics.isEmpty)
+                  ? ListView(
+                      physics: const AlwaysScrollableScrollPhysics(
+                        parent: ClampingScrollPhysics(),
                       ),
-                    ],
-                  )
-                : ListView(
-                    controller: _scrollController,
-                    physics: const AlwaysScrollableScrollPhysics(
-                      parent: ClampingScrollPhysics(),
-                    ),
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-                    children: [
-                      if (_errorMessage != null)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Text(
-                            _errorMessage!,
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.error,
+                      padding: const EdgeInsets.all(16),
+                      children: [
+                        const SizedBox(height: 90),
+                        Text(_errorMessage!, textAlign: TextAlign.center),
+                        const SizedBox(height: 12),
+                        Center(
+                          child: FilledButton(
+                            onPressed: () {
+                              unawaited(_loadInitial(forceRefresh: true));
+                            },
+                            child: Text(strings.commonRetry),
+                          ),
+                        ),
+                      ],
+                    )
+                  : ListView(
+                      controller: _scrollController,
+                      physics: const AlwaysScrollableScrollPhysics(
+                        parent: ClampingScrollPhysics(),
+                      ),
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+                      children: [
+                        if (_errorMessage != null)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Text(
+                              _errorMessage!,
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.error,
+                              ),
                             ),
                           ),
-                        ),
-                      if (_rankingOptions.isEmpty)
-                        Text(strings.rankingEmptyOptions)
-                      else
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: _rankingOptions.asMap().entries.map((entry) {
-                            final index = entry.key;
-                            final option = entry.value;
-                            // 为每个分类按钮添加从左向右滑入并渐显的交错动画
-                            return TweenAnimationBuilder<double>(
-                              tween: Tween<double>(begin: 0.0, end: 1.0),
-                              duration: Duration(milliseconds: 300 + (index * 50)),
-                              curve: Curves.easeOutCubic,
-                              builder: (context, value, child) {
-                                return Transform.translate(
-                                  offset: Offset(
-                                    -MediaQuery.of(context).size.width * (1 - value),
-                                    0,
-                                  ),
-                                  child: Opacity(
-                                    opacity: value,
-                                    child: child,
-                                  ),
-                                );
-                              },
-                              child: ChoiceChip(
-                                label: Text(option.label),
-                                selected: _selectedRankingValue == option.value,
-                                onSelected: (_) =>
-                                    _onSelectRankingOption(option.value),
-                              ),
-                            );
-                          }).toList(),
-                        ),
-                      const SizedBox(height: 10),
-                      if (_rankingLoading && _rankingComics.isEmpty)
-                        _buildRankingLoadingSection(strings.commonLoading)
-                      else if (_rankingComics.isEmpty)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 20),
-                          child: Center(
-                            child: Text(strings.rankingEmptyComics),
+                        if (_rankingOptions.isEmpty)
+                          Text(strings.rankingEmptyOptions)
+                        else
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: _rankingOptions.asMap().entries.map((
+                              entry,
+                            ) {
+                              final index = entry.key;
+                              final option = entry.value;
+                              // 为每个分类按钮添加从左向右滑入并渐显的交错动画
+                              return TweenAnimationBuilder<double>(
+                                tween: Tween<double>(begin: 0.0, end: 1.0),
+                                duration: Duration(
+                                  milliseconds: 300 + (index * 50),
+                                ),
+                                curve: Curves.easeOutCubic,
+                                builder: (context, value, child) {
+                                  return Transform.translate(
+                                    offset: Offset(
+                                      -MediaQuery.of(context).size.width *
+                                          (1 - value),
+                                      0,
+                                    ),
+                                    child: Opacity(
+                                      opacity: value,
+                                      child: child,
+                                    ),
+                                  );
+                                },
+                                child: ChoiceChip(
+                                  label: Text(option.label),
+                                  selected:
+                                      _selectedRankingValue == option.value,
+                                  onSelected: (_) =>
+                                      _onSelectRankingOption(option.value),
+                                ),
+                              );
+                            }).toList(),
                           ),
-                        )
-                      else
-                        for (int i = 0; i < _rankingComics.length; i++)
-                          _buildRankingComicItem(_rankingComics[i], i),
-                      if (_rankingLoadingMore)
-                        const HazukiLoadMoreFooter(verticalPadding: 8),
-                      if (!_rankingLoading &&
-                          !_rankingLoadingMore &&
-                          !_rankingHasMore)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 12, bottom: 6),
-                          child: Center(child: Text(strings.rankingReachedEnd)),
-                        ),
-                      if (_refreshing)
-                        const Padding(
-                          padding: EdgeInsets.only(top: 8),
-                          child: SizedBox.shrink(),
-                        ),
-                    ],
-                  ),
-          ),
-          Positioned(
-            right: 16,
-            bottom: 16,
-            child: AnimatedSlide(
-              offset: _showBackToTop ? Offset.zero : const Offset(0, 0.24),
-              duration: const Duration(milliseconds: 220),
-              curve: Curves.easeOutCubic,
-              child: AnimatedScale(
-                scale: _showBackToTop ? 1 : 0.86,
+                        const SizedBox(height: 10),
+                        if (_rankingLoading && _rankingComics.isEmpty)
+                          _buildRankingLoadingSection(strings.commonLoading)
+                        else if (_rankingComics.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 20),
+                            child: Center(
+                              child: Text(strings.rankingEmptyComics),
+                            ),
+                          )
+                        else
+                          for (int i = 0; i < _rankingComics.length; i++)
+                            _buildRankingComicItem(_rankingComics[i], i),
+                        if (_rankingLoadingMore)
+                          const HazukiLoadMoreFooter(verticalPadding: 8),
+                        if (!_rankingLoading &&
+                            !_rankingLoadingMore &&
+                            !_rankingHasMore)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 12, bottom: 6),
+                            child: Center(
+                              child: Text(strings.rankingReachedEnd),
+                            ),
+                          ),
+                        if (_refreshing)
+                          const Padding(
+                            padding: EdgeInsets.only(top: 8),
+                            child: SizedBox.shrink(),
+                          ),
+                      ],
+                    ),
+            ),
+            Positioned(
+              right: 16,
+              bottom: 16,
+              child: AnimatedSlide(
+                offset: _showBackToTop ? Offset.zero : const Offset(0, 0.24),
                 duration: const Duration(milliseconds: 220),
                 curve: Curves.easeOutCubic,
-                child: AnimatedOpacity(
-                  opacity: _showBackToTop ? 1 : 0,
-                  duration: const Duration(milliseconds: 200),
+                child: AnimatedScale(
+                  scale: _showBackToTop ? 1 : 0.86,
+                  duration: const Duration(milliseconds: 220),
                   curve: Curves.easeOutCubic,
-                  child: IgnorePointer(
-                    ignoring: !_showBackToTop,
-                    child: FloatingActionButton(
-                      heroTag: 'ranking_back_to_top',
-                      onPressed: _scrollToTop,
-                      child: const Icon(Icons.vertical_align_top_rounded),
+                  child: AnimatedOpacity(
+                    opacity: _showBackToTop ? 1 : 0,
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeOutCubic,
+                    child: IgnorePointer(
+                      ignoring: !_showBackToTop,
+                      child: FloatingActionButton(
+                        heroTag: 'ranking_back_to_top',
+                        onPressed: _scrollToTop,
+                        child: const Icon(Icons.vertical_align_top_rounded),
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

@@ -447,10 +447,12 @@ class _DiscoverPageState extends State<DiscoverPage> {
                   child: InkWell(
                     borderRadius: BorderRadius.circular(8),
                     onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) =>
-                              widget.comicDetailPageBuilder(comic, heroTag),
+                      unawaited(
+                        openComicDetail(
+                          context,
+                          comic: comic,
+                          heroTag: heroTag,
+                          pageBuilder: widget.comicDetailPageBuilder,
                         ),
                       );
                     },

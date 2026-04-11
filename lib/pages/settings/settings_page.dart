@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../app/app.dart';
 import '../../l10n/app_localizations.dart';
 import '../../widgets/widgets.dart';
+import '../../widgets/windows_comic_detail_host.dart';
 import '../about_page.dart';
 import 'settings.dart';
 
@@ -74,125 +75,131 @@ class _SettingsPageState extends State<SettingsPage> {
   @override
   Widget build(BuildContext context) {
     final strings = AppLocalizations.of(context)!;
-    return Scaffold(
-      appBar: hazukiFrostedAppBar(
-        context: context,
-        title: Text(strings.settingsTitle),
-      ),
-      body: HazukiDesktopPageContainer(
-        child: ListView(
-          children: [
-            ListTile(
-              leading: const Icon(Icons.cached_outlined),
-              title: Text(strings.settingsCacheTitle),
-              subtitle: Text(strings.settingsCacheSubtitle),
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => const CacheSettingsPage(),
-                  ),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.palette_outlined),
-              title: Text(strings.settingsDisplayTitle),
-              subtitle: Text(strings.settingsDisplaySubtitle),
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => AppearanceSettingsPage(
-                      appearanceSettings: _appearanceSettings,
-                      onAppearanceChanged: _handleAppearanceChanged,
-                      locale: _locale,
-                      onLocaleChanged: _handleLocaleChanged,
-                    ),
-                  ),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.auto_stories_outlined),
-              title: Text(strings.settingsReadingTitle),
-              subtitle: Text(strings.settingsReadingSubtitle),
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => const ReadingSettingsPage(),
-                  ),
-                );
-              },
-            ),
-            if (!Platform.isWindows)
+    return WindowsComicDetailHost(
+      child: Scaffold(
+        appBar: hazukiFrostedAppBar(
+          context: context,
+          title: Text(strings.settingsTitle),
+        ),
+        body: HazukiSettingsPageBody(
+          maxWidth: 960,
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: ListView(
+            children: [
               ListTile(
-                leading: const Icon(Icons.security_outlined),
-                title: Text(strings.settingsPrivacyTitle),
-                subtitle: Text(strings.settingsPrivacySubtitle),
+                leading: Icon(Icons.cached_outlined),
+                title: Text(strings.settingsCacheTitle),
+                subtitle: Text(strings.settingsCacheSubtitle),
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute<void>(
-                      builder: (_) => const PrivacySettingsPage(),
+                      builder: (_) => const CacheSettingsPage(),
                     ),
                   );
                 },
               ),
-            ListTile(
-              leading: const Icon(Icons.cloud_sync_outlined),
-              title: Text(strings.settingsCloudSyncTitle),
-              subtitle: Text(strings.settingsCloudSyncSubtitle),
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(builder: widget.cloudSyncPageBuilder),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.widgets_outlined),
-              title: Text(strings.settingsOtherTitle),
-              subtitle: Text(strings.settingsOtherSubtitle),
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => const OtherSettingsPage(),
-                  ),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.science_outlined),
-              title: Text(strings.settingsLabTitle),
-              subtitle: Text(strings.settingsLabSubtitle),
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: widget.labSettingsPageBuilder,
-                  ),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.settings_applications_outlined),
-              title: Text(strings.settingsAdvancedTitle),
-              subtitle: Text(strings.settingsAdvancedSubtitle),
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: widget.advancedSettingsPageBuilder,
-                  ),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.info_outline),
-              title: Text(strings.settingsAboutTitle),
-              subtitle: const Text('Hazuki'),
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(builder: (_) => const AboutPage()),
-                );
-              },
-            ),
-          ],
+              ListTile(
+                leading: Icon(Icons.palette_outlined),
+                title: Text(strings.settingsDisplayTitle),
+                subtitle: Text(strings.settingsDisplaySubtitle),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => AppearanceSettingsPage(
+                        appearanceSettings: _appearanceSettings,
+                        onAppearanceChanged: _handleAppearanceChanged,
+                        locale: _locale,
+                        onLocaleChanged: _handleLocaleChanged,
+                      ),
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.auto_stories_outlined),
+                title: Text(strings.settingsReadingTitle),
+                subtitle: Text(strings.settingsReadingSubtitle),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const ReadingSettingsPage(),
+                    ),
+                  );
+                },
+              ),
+              if (!Platform.isWindows)
+                ListTile(
+                  leading: Icon(Icons.security_outlined),
+                  title: Text(strings.settingsPrivacyTitle),
+                  subtitle: Text(strings.settingsPrivacySubtitle),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const PrivacySettingsPage(),
+                      ),
+                    );
+                  },
+                ),
+              ListTile(
+                leading: Icon(Icons.cloud_sync_outlined),
+                title: Text(strings.settingsCloudSyncTitle),
+                subtitle: Text(strings.settingsCloudSyncSubtitle),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: widget.cloudSyncPageBuilder,
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.widgets_outlined),
+                title: Text(strings.settingsOtherTitle),
+                subtitle: Text(strings.settingsOtherSubtitle),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => const OtherSettingsPage(),
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.science_outlined),
+                title: Text(strings.settingsLabTitle),
+                subtitle: Text(strings.settingsLabSubtitle),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: widget.labSettingsPageBuilder,
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.settings_applications_outlined),
+                title: Text(strings.settingsAdvancedTitle),
+                subtitle: Text(strings.settingsAdvancedSubtitle),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: widget.advancedSettingsPageBuilder,
+                    ),
+                  );
+                },
+              ),
+              ListTile(
+                leading: Icon(Icons.info_outline),
+                title: Text(strings.settingsAboutTitle),
+                subtitle: const Text('Hazuki'),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(builder: (_) => const AboutPage()),
+                  );
+                },
+              ),
+            ],
+          ),
         ),
       ),
     );

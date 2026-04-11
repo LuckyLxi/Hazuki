@@ -7,6 +7,7 @@ import '../../l10n/app_localizations.dart';
 import '../../models/hazuki_models.dart';
 import '../../services/hazuki_source_service.dart';
 import '../../widgets/widgets.dart';
+import '../../widgets/windows_comic_detail_host.dart';
 
 /// 专栏漫画列表页
 /// 若 [section.viewMoreUrl] 不为空，则进入页后加载该页面自己的第一页数据；
@@ -254,207 +255,211 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
     final strings = AppLocalizations.of(context)!;
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Scaffold(
-      appBar: hazukiFrostedAppBar(
-        context: context,
-        title: Text(widget.section.title),
-        enableBlur: false,
-      ),
-      body: Stack(
-        children: [
-          Column(
-            children: [
-              if (_sortLoading || _sortOptions.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: _sortLoading
-                        ? const SizedBox(
-                            height: 30,
-                            child: Center(
-                              child: SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              ),
-                            ),
-                          )
-                        : SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: Row(
-                              children: [
-                                for (final option in _sortOptions)
-                                  Padding(
-                                    padding: const EdgeInsets.only(right: 8),
-                                    child: ChoiceChip(
-                                      label: Text(option.label),
-                                      selected:
-                                          _selectedSortValue == option.value,
-                                      onSelected: (_) =>
-                                          _onSelectSortOption(option.value),
-                                    ),
+    return WindowsComicDetailHost(
+      child: Scaffold(
+        appBar: hazukiFrostedAppBar(
+          context: context,
+          title: Text(widget.section.title),
+          enableBlur: false,
+        ),
+        body: Stack(
+          children: [
+            Column(
+              children: [
+                if (_sortLoading || _sortOptions.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: _sortLoading
+                          ? const SizedBox(
+                              height: 30,
+                              child: Center(
+                                child: SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
                                   ),
-                              ],
-                            ),
-                          ),
-                  ),
-                ),
-              Expanded(
-                child: _comics.isEmpty
-                    ? (_loadingMore || _sortLoading)
-                          ? Center(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const HazukiSandyLoadingIndicator(size: 168),
-                                  const SizedBox(height: 10),
-                                  Text(strings.commonLoading),
-                                ],
+                                ),
                               ),
                             )
-                          : Center(child: Text(strings.discoverSectionEmpty))
-                    : LayoutBuilder(
-                        builder: (context, constraints) {
-                          final contentWidth = constraints.maxWidth - 32;
-                          final coverWidth =
-                              (contentWidth -
-                                  (_gridCrossAxisCount - 1) * _gridSpacing) /
-                              _gridCrossAxisCount;
-                          final coverCacheWidth =
-                              (coverWidth *
-                                      MediaQuery.devicePixelRatioOf(context))
-                                  .round();
-
-                          return GridView.builder(
-                            controller: _scrollController,
-                            addAutomaticKeepAlives: false,
-                            padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-                            itemCount: _comics.length,
-                            gridDelegate:
-                                const SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: _gridCrossAxisCount,
-                                  mainAxisSpacing: _gridSpacing,
-                                  crossAxisSpacing: _gridSpacing,
-                                  childAspectRatio: 0.57,
-                                ),
-                            itemBuilder: (context, index) {
-                              final comic = _comics[index];
-                              final heroTag = widget.comicCoverHeroTagBuilder(
-                                comic,
-                                salt:
-                                    'discover-more-${widget.section.title}-$index',
-                              );
-                              final entryKey = _comicEntryKey(comic, index);
-                              return _DiscoverSectionComicTile(
-                                key: ValueKey<String>('tile-$entryKey'),
-                                comic: comic,
-                                heroTag: heroTag,
-                                coverCacheWidth: coverCacheWidth,
-                                placeholderColor:
-                                    colorScheme.surfaceContainerHighest,
-                                titleStyle: Theme.of(
-                                  context,
-                                ).textTheme.bodyMedium,
-                                subtitleStyle: Theme.of(
-                                  context,
-                                ).textTheme.bodySmall,
-                                onTap: () async {
-                                  await Navigator.of(context).push(
-                                    MaterialPageRoute<void>(
-                                      builder: (_) =>
-                                          widget.comicDetailPageBuilder(
-                                            comic,
-                                            heroTag,
-                                          ),
+                          : SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                children: [
+                                  for (final option in _sortOptions)
+                                    Padding(
+                                      padding: const EdgeInsets.only(right: 8),
+                                      child: ChoiceChip(
+                                        label: Text(option.label),
+                                        selected:
+                                            _selectedSortValue == option.value,
+                                        onSelected: (_) =>
+                                            _onSelectSortOption(option.value),
+                                      ),
                                     ),
-                                  );
-                                },
-                              );
-                            },
-                          );
-                        },
-                      ),
-              ),
-            ],
-          ),
-          if (_showLoadMoreFooter)
-            const Positioned(
-              left: 0,
-              right: 0,
-              bottom: 8,
-              child: IgnorePointer(
-                child: HazukiLoadMoreFooter(verticalPadding: 4),
-              ),
+                                ],
+                              ),
+                            ),
+                    ),
+                  ),
+                Expanded(
+                  child: _comics.isEmpty
+                      ? (_loadingMore || _sortLoading)
+                            ? Center(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const HazukiSandyLoadingIndicator(
+                                      size: 168,
+                                    ),
+                                    const SizedBox(height: 10),
+                                    Text(strings.commonLoading),
+                                  ],
+                                ),
+                              )
+                            : Center(child: Text(strings.discoverSectionEmpty))
+                      : LayoutBuilder(
+                          builder: (context, constraints) {
+                            final contentWidth = constraints.maxWidth - 32;
+                            final coverWidth =
+                                (contentWidth -
+                                    (_gridCrossAxisCount - 1) * _gridSpacing) /
+                                _gridCrossAxisCount;
+                            final coverCacheWidth =
+                                (coverWidth *
+                                        MediaQuery.devicePixelRatioOf(context))
+                                    .round();
+
+                            return GridView.builder(
+                              controller: _scrollController,
+                              addAutomaticKeepAlives: false,
+                              padding: const EdgeInsets.fromLTRB(
+                                16,
+                                16,
+                                16,
+                                12,
+                              ),
+                              itemCount: _comics.length,
+                              gridDelegate:
+                                  const SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: _gridCrossAxisCount,
+                                    mainAxisSpacing: _gridSpacing,
+                                    crossAxisSpacing: _gridSpacing,
+                                    childAspectRatio: 0.57,
+                                  ),
+                              itemBuilder: (context, index) {
+                                final comic = _comics[index];
+                                final heroTag = widget.comicCoverHeroTagBuilder(
+                                  comic,
+                                  salt:
+                                      'discover-more-${widget.section.title}-$index',
+                                );
+                                final entryKey = _comicEntryKey(comic, index);
+                                return _DiscoverSectionComicTile(
+                                  key: ValueKey<String>('tile-$entryKey'),
+                                  comic: comic,
+                                  heroTag: heroTag,
+                                  coverCacheWidth: coverCacheWidth,
+                                  placeholderColor:
+                                      colorScheme.surfaceContainerHighest,
+                                  titleStyle: Theme.of(
+                                    context,
+                                  ).textTheme.bodyMedium,
+                                  subtitleStyle: Theme.of(
+                                    context,
+                                  ).textTheme.bodySmall,
+                                  onTap: () => openComicDetail(
+                                    context,
+                                    comic: comic,
+                                    heroTag: heroTag,
+                                    pageBuilder: widget.comicDetailPageBuilder,
+                                  ),
+                                );
+                              },
+                            );
+                          },
+                        ),
+                ),
+              ],
             ),
-          if (_errorMessage != null)
+            if (_showLoadMoreFooter)
+              const Positioned(
+                left: 0,
+                right: 0,
+                bottom: 8,
+                child: IgnorePointer(
+                  child: HazukiLoadMoreFooter(verticalPadding: 4),
+                ),
+              ),
+            if (_errorMessage != null)
+              Positioned(
+                left: 16,
+                right: 16,
+                bottom: 16,
+                child: Center(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceContainerHigh,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              _errorMessage!,
+                              style: Theme.of(context).textTheme.bodySmall,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          TextButton(
+                            onPressed: _loadMore,
+                            child: Text(strings.commonRetry),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             Positioned(
-              left: 16,
               right: 16,
               bottom: 16,
-              child: Center(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surfaceContainerHigh,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Flexible(
-                          child: Text(
-                            _errorMessage!,
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        TextButton(
-                          onPressed: _loadMore,
-                          child: Text(strings.commonRetry),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          Positioned(
-            right: 16,
-            bottom: 16,
-            child: RepaintBoundary(
-              child: AnimatedSlide(
-                offset: _showBackToTop ? Offset.zero : const Offset(0, 0.24),
-                duration: const Duration(milliseconds: 220),
-                curve: Curves.easeOutCubic,
-                child: AnimatedScale(
-                  scale: _showBackToTop ? 1 : 0.86,
+              child: RepaintBoundary(
+                child: AnimatedSlide(
+                  offset: _showBackToTop ? Offset.zero : const Offset(0, 0.24),
                   duration: const Duration(milliseconds: 220),
                   curve: Curves.easeOutCubic,
-                  child: AnimatedOpacity(
-                    opacity: _showBackToTop ? 1 : 0,
-                    duration: const Duration(milliseconds: 200),
+                  child: AnimatedScale(
+                    scale: _showBackToTop ? 1 : 0.86,
+                    duration: const Duration(milliseconds: 220),
                     curve: Curves.easeOutCubic,
-                    child: IgnorePointer(
-                      ignoring: !_showBackToTop,
-                      child: FloatingActionButton(
-                        heroTag: 'discover_section_back_to_top',
-                        onPressed: _scrollToTop,
-                        child: const Icon(Icons.vertical_align_top_rounded),
+                    child: AnimatedOpacity(
+                      opacity: _showBackToTop ? 1 : 0,
+                      duration: const Duration(milliseconds: 200),
+                      curve: Curves.easeOutCubic,
+                      child: IgnorePointer(
+                        ignoring: !_showBackToTop,
+                        child: FloatingActionButton(
+                          heroTag: 'discover_section_back_to_top',
+                          onPressed: _scrollToTop,
+                          child: const Icon(Icons.vertical_align_top_rounded),
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

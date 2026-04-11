@@ -6,3 +6,4 @@ export 'hazuki_theme_controller.dart';
 export 'hazuki_theme_factory.dart';
 export 'navigation_tags.dart';
 export 'ui_flags.dart';
+export 'windows_comic_detail.dart';

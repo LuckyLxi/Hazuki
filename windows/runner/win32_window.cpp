@@ -2,6 +2,8 @@
 
 #include <dwmapi.h>
 #include <flutter_windows.h>
+#include <filesystem>
+#include <fstream>
 
 #include "resource.h"
 
@@ -145,6 +147,7 @@ bool Win32Window::Create(const std::wstring& title,
   }
 
   UpdateTheme(window);
+  RestoreWindowPlacement();
 
   return OnCreate();
 }
@@ -194,6 +197,7 @@ Win32Window::MessageHandler(HWND hwnd,
     }
 
     case WM_DESTROY:
+      SaveWindowPlacement();
       window_handle_ = nullptr;
       Destroy();
       if (quit_on_close_) {
@@ -303,4 +307,97 @@ void Win32Window::UpdateTheme(HWND const window) {
     DwmSetWindowAttribute(window, DWMWA_USE_IMMERSIVE_DARK_MODE,
                           &enable_dark_mode, sizeof(enable_dark_mode));
   }
+}
+
+std::wstring Win32Window::GetWindowStatePath() const {
+  wchar_t* appdata_path = nullptr;
+  size_t len = 0;
+  if (_wdupenv_s(&appdata_path, &len, L"APPDATA") != 0 || appdata_path == nullptr) {
+    return L"hazuki-window-state.txt";
+  }
+
+  std::filesystem::path directory(appdata_path);
+  free(appdata_path);
+  directory /= L"Hazuki";
+  std::error_code ec;
+  std::filesystem::create_directories(directory, ec);
+  return (directory / L"window-state.txt").wstring();
+}
+
+std::optional<Win32Window::SavedWindowPlacement>
+Win32Window::LoadWindowPlacement() const {
+  std::ifstream input(GetWindowStatePath());
+  if (!input.is_open()) {
+    return std::nullopt;
+  }
+
+  SavedWindowPlacement placement{};
+  int maximized = 0;
+  input >> placement.rect.left >> placement.rect.top >> placement.rect.right >>
+      placement.rect.bottom >> maximized;
+  if (!input.good() && !input.eof()) {
+    return std::nullopt;
+  }
+  placement.maximized = maximized != 0;
+  if (!IsValidSavedRect(placement.rect)) {
+    return std::nullopt;
+  }
+  return placement;
+}
+
+void Win32Window::RestoreWindowPlacement() {
+  if (!window_handle_) {
+    return;
+  }
+
+  const auto placement = LoadWindowPlacement();
+  if (!placement.has_value()) {
+    return;
+  }
+
+  const RECT& rect = placement->rect;
+  SetWindowPos(window_handle_, nullptr, rect.left, rect.top,
+               rect.right - rect.left, rect.bottom - rect.top,
+               SWP_NOZORDER | SWP_NOACTIVATE);
+
+  if (placement->maximized) {
+    ShowWindow(window_handle_, SW_MAXIMIZE);
+  }
+}
+
+void Win32Window::SaveWindowPlacement() const {
+  if (!window_handle_) {
+    return;
+  }
+
+  WINDOWPLACEMENT placement{};
+  placement.length = sizeof(WINDOWPLACEMENT);
+  if (!GetWindowPlacement(window_handle_, &placement)) {
+    return;
+  }
+
+  if (placement.showCmd == SW_SHOWMINIMIZED) {
+    return;
+  }
+
+  const RECT rect = placement.rcNormalPosition;
+  if (!IsValidSavedRect(rect)) {
+    return;
+  }
+
+  std::ofstream output(GetWindowStatePath(), std::ios::trunc);
+  if (!output.is_open()) {
+    return;
+  }
+
+  output << rect.left << ' ' << rect.top << ' ' << rect.right << ' '
+         << rect.bottom << ' '
+         << (placement.showCmd == SW_SHOWMAXIMIZED ? 1 : 0);
+}
+
+bool Win32Window::IsValidSavedRect(const RECT& rect) const {
+  if (rect.right <= rect.left || rect.bottom <= rect.top) {
+    return false;
+  }
+  return MonitorFromRect(&rect, MONITOR_DEFAULTTONULL) != nullptr;
 }

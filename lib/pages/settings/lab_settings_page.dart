@@ -49,24 +49,26 @@ class _LabSettingsPageState extends State<LabSettingsPage> {
         context: context,
         title: Text(strings.labTitle),
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              children: [
-                SettingsGroup(
-                  children: [
-                    SwitchListTile(
-                      secondary: const Icon(Icons.tag_outlined),
-                      title: Text(strings.advancedComicIdSearchTitle),
-                      subtitle: Text(strings.advancedComicIdSearchSubtitle),
-                      value: _comicIdSearchEnhance,
-                      onChanged: _toggleComicIdSearchEnhance,
-                    ),
-                  ],
-                ),
-              ],
-            ),
+      body: HazukiSettingsPageBody(
+        child: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : ListView(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                children: [
+                  SettingsGroup(
+                    children: [
+                      SwitchListTile(
+                        secondary: const Icon(Icons.tag_outlined),
+                        title: Text(strings.advancedComicIdSearchTitle),
+                        subtitle: Text(strings.advancedComicIdSearchSubtitle),
+                        value: _comicIdSearchEnhance,
+                        onChanged: _toggleComicIdSearchEnhance,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+      ),
     );
   }
 }

@@ -163,7 +163,7 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
             unawaited(_coordinator.handleDestinationSelected(index));
           },
           comicDetailPageBuilder: navigation.buildComicDetailPage,
-          favoriteDetailRouteBuilder: navigation.buildFavoriteDetailRoute,
+          favoriteComicTapHandler: navigation.openFavoriteDetail,
         );
       },
     );
