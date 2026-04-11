@@ -13,6 +13,9 @@ List<_Decode> _decoders = [
   IsolateFunction._decode,
 ];
 
+const Duration _modulePollInterval = Duration(milliseconds: 1);
+const Duration _moduleResponseTimeout = Duration(seconds: 30);
+
 abstract class _IsolateEncodable {
   Map _encode();
 }
@@ -126,8 +129,13 @@ void _runJsIsolate(Map spawnMessage) async {
         #name: name,
         #ptr: ptr.address,
       });
+      final wait = Stopwatch()..start();
       while (ptr.value.address == ptr.address) {
-        sleep(Duration(microseconds: 1));
+        if (wait.elapsed >= _moduleResponseTimeout) {
+          malloc.free(ptr);
+          throw JSError('Module handler timeout for "$name"');
+        }
+        sleep(_modulePollInterval);
       }
       final ret = ptr.value;
       malloc.free(ptr);

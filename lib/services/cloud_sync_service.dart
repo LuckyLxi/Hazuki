@@ -58,6 +58,7 @@ class CloudSyncService {
   static const _urlKey = 'cloud_sync_url';
   static const _usernameKey = 'cloud_sync_username';
   static const _passwordKey = 'cloud_sync_password';
+  static const _downloadStateKey = 'manga_download_service_state_v2';
 
   static const _settingsFileName = 'settings.json';
   static const _readingFileName = 'reading.sqlite';
@@ -278,6 +279,9 @@ class CloudSyncService {
     final prefs = await SharedPreferences.getInstance();
     final settingsMap = <String, dynamic>{};
     for (final key in prefs.getKeys()) {
+      if (key == _downloadStateKey) {
+        continue;
+      }
       settingsMap[key] = prefs.get(key);
     }
     final settingsJson = jsonEncode({
@@ -385,7 +389,8 @@ class CloudSyncService {
     dynamic value,
   ) {
     final normalizedKey = key.trim();
-    if (normalizedKey == 'cookie_store_v1') {
+    if (normalizedKey == 'cookie_store_v1' ||
+        normalizedKey == _downloadStateKey) {
       return null;
     }
     if (!normalizedKey.startsWith('source_data_')) {

@@ -64,7 +64,7 @@ extern "C"
     data[1] = &argc;
     data[2] = argv;
     data[3] = func_data;
-    return *(JSValue *)opaque->channel(ctx, JSChannelType_METHON, data);
+    return *(JSValue *)opaque->channel(ctx, JSChannelType_METHOD, data);
   }
 
   void js_promise_rejection_tracker(JSContext *ctx, JSValueConst promise,
@@ -312,7 +312,11 @@ extern "C"
 
   DLLEXPORT int32_t jsIsPromise(JSContext *ctx, JSValueConst *val)
   {
+#ifdef _MSC_VER
     return JS_IsPromise(ctx, *val);
+#else
+    return JS_PromiseState(ctx, *val) >= 0;
+#endif
   }
 
   DLLEXPORT int32_t jsIsArray(JSContext *ctx, JSValueConst *val)

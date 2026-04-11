@@ -1,3 +1,64 @@
+2025-09-13:
+
+- added JSON modules and import attributes
+- added JS_PrintValue() API
+- qjs: pretty print objects in print() and console.log()
+- qjs: better promise rejection tracker heuristics
+- added RegExp v flag
+- added RegExp modifiers
+- added RegExp.escape
+- added Float16Array
+- added Promise.try
+- improved JSON parser spec conformance
+- qjs: improved compatibility of std.parseExtJSON() with JSON5 and
+  accept JSON5 modules
+- added JS_FreePropertyEnum() and JS_AtomToCStringLen() API
+- added Error.isError()
+- misc bug fixes
+
+2025-04-26:
+
+- removed the bignum extensions and qjscalc
+- new BigInt implementation optimized for small numbers
+- added WeakRef, FinalizationRegistry and symbols as weakrefs
+- added builtin float64 printing and parsing functions for more correctness
+- faster repeated string concatenation
+- qjs: promise unhandled rejections are fatal errors by default
+- added column number in debug information
+- removed the "use strip" extension
+- qjs: added -s and --strip-source options
+- qjsc: added -s and --keep-source options
+- added JS_GetAnyOpaque()
+- added more callbacks for exotic objects in JSClassExoticMethods
+- misc bug fixes
+
+2024-01-13:
+
+- top-level-await support in modules
+- allow 'await' in the REPL
+- added Array.prototype.{with,toReversed,toSpliced,toSorted} and
+TypedArray.prototype.{with,toReversed,toSorted}
+- added String.prototype.isWellFormed and String.prototype.toWellFormed
+- added Object.groupBy and Map.groupBy
+- added Promise.withResolvers
+- class static block
+- 'in' operator support for private fields
+- optional chaining fixes
+- added RegExp 'd' flag
+- fixed RegExp zero length match logic
+- fixed RegExp case insensitive flag
+- added os.sleepAsync(), os.getpid() and os.now()
+- added cosmopolitan build
+- misc bug fixes
+
+2023-12-09:
+
+- added Object.hasOwn, {String|Array|TypedArray}.prototype.at,
+  {Array|TypedArray}.prototype.findLast{Index}
+- BigInt support is enabled even if CONFIG_BIGNUM disabled
+- updated to Unicode 15.0.0
+- misc bug fixes
+
 2021-03-27:
 
 - faster Array.prototype.push and Array.prototype.unshift

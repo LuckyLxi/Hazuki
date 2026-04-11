@@ -49,7 +49,7 @@ class FlutterQjs {
     final rt = jsNewRuntime((ctx, type, ptr) {
       try {
         switch (type) {
-          case JSChannelType.METHON:
+          case JSChannelType.METHOD:
             final pdata = ptr.cast<Pointer<JSValue>>();
             final argc = pdata.elementAt(1).value.cast<Int32>().value;
             final pargs = [];

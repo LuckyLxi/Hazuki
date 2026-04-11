@@ -1,4 +1,8 @@
+#ifdef _MSC_VER
+#include "quickjs_msvc/quickjs.h"
+#else
 #include "quickjs/quickjs.h"
+#endif
 
 #ifdef _MSC_VER
 #define DLLEXPORT __declspec(dllexport)
@@ -9,7 +13,7 @@
 extern "C"
 {
   enum JSChannelType {
-    JSChannelType_METHON = 0,
+    JSChannelType_METHOD = 0,
     JSChannelType_MODULE = 1,
     JSChannelType_PROMISE_TRACK = 2,
     JSChannelType_FREE_OBJECT = 3,

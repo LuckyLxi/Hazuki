@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  flutter-qjs-windows:
+    name: flutter_qjs / Windows
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Get flutter_qjs dependencies
+        working-directory: third_party/flutter_qjs
+        run: flutter pub get
+
+      - name: Analyze flutter_qjs
+        working-directory: third_party/flutter_qjs
+        run: flutter analyze
+
+      - name: Test flutter_qjs
+        working-directory: third_party/flutter_qjs
+        run: flutter test
+
+  android-debug:
+    name: Android Debug Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Generate localization files
+        run: flutter gen-l10n
+
+      - name: Analyze app
+        run: flutter analyze
+
+      - name: Build debug APK
+        run: flutter build apk --debug

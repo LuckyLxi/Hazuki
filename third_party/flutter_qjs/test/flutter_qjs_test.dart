@@ -11,6 +11,7 @@ import 'dart:io';
 
 import 'package:flutter_qjs/flutter_qjs.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter_tools/src/base/os.dart';
 import 'package:flutter_tools/src/base/io.dart';
 import 'package:flutter_tools/src/base/logger.dart';
 import 'package:flutter_tools/src/base/terminal.dart';
@@ -81,21 +82,28 @@ void main() async {
     String cmakePath = 'cmake';
     if (platform.isWindows) {
       final stdio = Stdio();
+      final logger = StdoutLogger(
+        terminal: AnsiTerminal(
+          stdio: stdio,
+          platform: platform,
+        ),
+        stdio: stdio,
+        outputPreferences: OutputPreferences(
+          wrapText: stdio.hasTerminal,
+          showColor: platform.stdoutSupportsAnsi,
+          stdio: stdio,
+        ),
+      );
       final vs = VisualStudio(
           fileSystem: const LocalFileSystem(),
           processManager: const LocalProcessManager(),
           platform: platform,
-          logger: StdoutLogger(
-            terminal: AnsiTerminal(
-              stdio: stdio,
-              platform: platform,
-            ),
-            stdio: stdio,
-            outputPreferences: OutputPreferences(
-              wrapText: stdio.hasTerminal,
-              showColor: platform.stdoutSupportsAnsi,
-              stdio: stdio,
-            ),
+          logger: logger,
+          osUtils: OperatingSystemUtils(
+            fileSystem: const LocalFileSystem(),
+            logger: logger,
+            platform: platform,
+            processManager: const LocalProcessManager(),
           ));
       cmakePath = vs.cmakePath!;
     }
@@ -136,7 +144,7 @@ void main() async {
       expect(e.message, startsWith('InternalError: interrupted'),
           reason: 'throw interrupted');
     }
-    await qjs.close();
+    qjs.close();
   });
   test('memory leak', () async {
     final qjs = FlutterQjs(
@@ -150,7 +158,7 @@ void main() async {
       expect(e.message, startsWith('InternalError: out of memory'),
           reason: 'throw interrupted');
     }
-    await qjs.close();
+    qjs.close();
   });
   test('module', () async {
     final qjs = IsolateQjs(
@@ -166,7 +174,7 @@ void main() async {
       ''', name: 'evalModule', evalFlags: JSEvalFlag.MODULE);
     var result = await qjs.evaluate('import("evalModule")');
     expect(result['default']['data'], 'test module', reason: 'eval module');
-    await qjs.close();
+    qjs.close();
   });
   test('data conversion', () async {
     final qjs = FlutterQjs(
@@ -174,7 +182,7 @@ void main() async {
     );
     qjs.dispatch();
     await testEvaluate(qjs);
-    await qjs.close();
+    qjs.close();
   });
   test('isolate conversion', () async {
     final qjs = IsolateQjs(

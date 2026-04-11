@@ -1,3 +1,4 @@
+// @dart=3.0
 /*
  * @Description: ffi
  * @Author: ekibun
@@ -73,7 +74,7 @@ class JSEvalFlag {
 }
 
 class JSChannelType {
-  static const METHON = 0;
+  static const METHOD = 0;
   static const MODULE = 1;
   static const PROMISE_TRACK = 2;
   static const FREE_OBJECT = 3;
@@ -107,13 +108,13 @@ class JSTag {
   static const FLOAT64 = 7;
 }
 
-abstract class JSValue extends Opaque {}
+final class JSValue extends Opaque {}
 
-abstract class JSContext extends Opaque {}
+final class JSContext extends Opaque {}
 
-abstract class JSRuntime extends Opaque {}
+final class JSRuntime extends Opaque {}
 
-abstract class JSPropertyEnum extends Opaque {}
+final class JSPropertyEnum extends Opaque {}
 
 final DynamicLibrary _qjsLib = Platform.environment['FLUTTER_TEST'] == 'true'
     ? (Platform.isWindows

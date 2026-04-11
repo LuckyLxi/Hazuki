@@ -14,6 +14,8 @@
 
 This plugin is a simple js engine for flutter using the `quickjs` project with `dart:ffi`. Plugin currently supports all the platforms except web!
 
+Hazuki-specific maintenance notes live in [HAZUKI_NOTES.md](HAZUKI_NOTES.md).
+
 ## Getting Started
 
 ### Basic usage
