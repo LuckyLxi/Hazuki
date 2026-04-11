@@ -70,21 +70,7 @@ jobs:
         env:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          object_type="$(git cat-file -t "${RELEASE_TAG}")"
-          if [ "${object_type}" != "tag" ]; then
-            echo "Please create an annotated tag so the release notes can be reused in update.json." >&2
-            echo "Example:" >&2
-            echo "  git tag -a ${RELEASE_TAG} -m \"1. Feature A" >&2
-            echo "2. Feature B\"" >&2
-            exit 1
-          fi
-
           tag_message="$(git for-each-ref "refs/tags/${RELEASE_TAG}" --format='%(contents)')"
-          if ! printf '%s' "${tag_message}" | grep -q '[^[:space:]]'; then
-            echo "Annotated tag ${RELEASE_TAG} does not contain release notes." >&2
-            exit 1
-          fi
-
           {
             echo "body<<EOF"
             printf '%s\n' "${tag_message}"
@@ -149,21 +135,7 @@ jobs:
         env:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          object_type="$(git cat-file -t "${RELEASE_TAG}")"
-          if [ "${object_type}" != "tag" ]; then
-            echo "Please create an annotated tag so the release notes can be reused in update.json." >&2
-            echo "Example:" >&2
-            echo "  git tag -a ${RELEASE_TAG} -m \"1. Feature A" >&2
-            echo "2. Feature B\"" >&2
-            exit 1
-          fi
-
           tag_message="$(git for-each-ref "refs/tags/${RELEASE_TAG}" --format='%(contents)')"
-          if ! printf '%s' "${tag_message}" | grep -q '[^[:space:]]'; then
-            echo "Annotated tag ${RELEASE_TAG} does not contain release notes." >&2
-            exit 1
-          fi
-
           {
             echo "body<<EOF"
             printf '%s\n' "${tag_message}"

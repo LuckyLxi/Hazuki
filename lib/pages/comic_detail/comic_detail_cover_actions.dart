@@ -14,15 +14,23 @@ extension _ComicDetailCoverActionsExtension on _ComicDetailPageState {
       final fileName = lastSegment.isEmpty
           ? defaultName
           : lastSegment.split('?').first;
-      final directory = Directory('/storage/emulated/0/Pictures/Hazuki');
+      Directory directory;
+      if (Platform.isWindows) {
+        final exeDir = File(Platform.resolvedExecutable).parent.path;
+        directory = Directory('$exeDir/Saved_Images');
+      } else {
+        directory = Directory('/storage/emulated/0/Pictures/Hazuki');
+      }
       if (!await directory.exists()) {
         await directory.create(recursive: true);
       }
       final file = File('${directory.path}/$fileName');
       await file.writeAsBytes(bytes, flush: true);
-      await _ComicDetailPageState._mediaChannel.invokeMethod<bool>('scanFile', {
-        'path': file.path,
-      });
+      if (Platform.isAndroid) {
+        await _ComicDetailPageState._mediaChannel.invokeMethod<bool>('scanFile', {
+          'path': file.path,
+        });
+      }
       if (!mounted) {
         return;
       }

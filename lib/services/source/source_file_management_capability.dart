@@ -37,7 +37,12 @@ extension HazukiSourceServiceSourceFileManagementCapability
       return Directory('${supportDir.path}/comic_source');
     }
 
-    if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+    if (Platform.isWindows) {
+      final exeDir = File(Platform.resolvedExecutable).parent.path;
+      return Directory('$exeDir/comic_source');
+    }
+
+    if (Platform.isLinux || Platform.isMacOS) {
       final downloadsDir = await getDownloadsDirectory();
       if (downloadsDir != null) {
         return Directory('${downloadsDir.path}/hazuki_source_test');

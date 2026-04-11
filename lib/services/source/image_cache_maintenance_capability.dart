@@ -12,8 +12,14 @@ extension HazukiSourceServiceImageCacheMaintenanceCapability
     if (existed != null) {
       return existed;
     }
-    final supportDir = await getApplicationSupportDirectory();
-    final dir = Directory('${supportDir.path}/image_cache');
+    Directory dir;
+    if (Platform.isWindows) {
+      final exeDir = File(Platform.resolvedExecutable).parent.path;
+      dir = Directory('$exeDir/image_cache');
+    } else {
+      final supportDir = await getApplicationSupportDirectory();
+      dir = Directory('${supportDir.path}/image_cache');
+    }
     if (!await dir.exists()) {
       await dir.create(recursive: true);
     }

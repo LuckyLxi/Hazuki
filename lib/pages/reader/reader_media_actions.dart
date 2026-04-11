@@ -111,7 +111,13 @@ extension _ReaderMediaActionsExtension on _ReaderPageState {
               '.$outputExtension',
             )
           : '$fileName.$outputExtension';
-      final directory = Directory('/storage/emulated/0/Pictures/Hazuki');
+      Directory directory;
+      if (Platform.isWindows) {
+        final exeDir = File(Platform.resolvedExecutable).parent.path;
+        directory = Directory('$exeDir/Saved_Images');
+      } else {
+        directory = Directory('/storage/emulated/0/Pictures/Hazuki');
+      }
       if (!await directory.exists()) {
         await directory.create(recursive: true);
       }
