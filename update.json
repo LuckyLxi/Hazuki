@@ -10,5 +10,5 @@
   "windowsUrls": {
     "x64": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.2/hazuki-windows-x64-v1.0.2.zip"
   },
-  "changelog": "feat: 迁移 Windows 端本地存储路径至安装目录并放宽 Release 标签校验"
+  "changelog": "- 优化主题切换动画"
 }
