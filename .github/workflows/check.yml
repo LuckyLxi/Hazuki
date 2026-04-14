@@ -1,0 +1,192 @@
+name: Project Check
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: project-check-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app-quality:
+    name: App quality / Linux
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Set up Flutter (stable)
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Show tool versions
+        run: |
+          flutter --version
+          dart --version
+          java -version
+
+      - name: Install app dependencies
+        run: flutter pub get
+
+      - name: Generate localization code
+        run: flutter gen-l10n
+
+      - name: Check Dart formatting
+        run: dart format --output=none --set-exit-if-changed lib test
+
+      - name: Analyze app source
+        run: flutter analyze
+
+      - name: Run app tests with coverage
+        run: flutter test --coverage --reporter expanded
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-coverage-lcov
+          path: coverage/lcov.info
+          if-no-files-found: warn
+
+  flutter-qjs-quality:
+    name: flutter_qjs quality / Windows
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    defaults:
+      run:
+        working-directory: third_party/flutter_qjs
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter (stable)
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Show tool versions
+        shell: bash
+        run: |
+          flutter --version
+          dart --version
+
+      - name: Install flutter_qjs dependencies
+        run: flutter pub get
+
+      - name: Check flutter_qjs formatting
+        run: dart format --output=none --set-exit-if-changed lib test
+
+      - name: Analyze flutter_qjs
+        run: flutter analyze
+
+      - name: Run flutter_qjs tests
+        run: flutter test --reporter expanded
+
+  android-smoke-build:
+    name: Android debug smoke build
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    needs:
+      - app-quality
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Set up Flutter (stable)
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install app dependencies
+        run: flutter pub get
+
+      - name: Generate localization code
+        run: flutter gen-l10n
+
+      - name: Build debug APK
+        run: flutter build apk --debug
+
+      - name: Upload APK artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hazuki-debug-apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: warn
+
+  windows-smoke-build:
+    name: Windows debug smoke build
+    runs-on: windows-latest
+    timeout-minutes: 40
+    needs:
+      - app-quality
+      - flutter-qjs-quality
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Flutter (stable)
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Enable Windows desktop
+        run: flutter config --enable-windows-desktop
+
+      - name: Install app dependencies
+        run: flutter pub get
+
+      - name: Generate localization code
+        run: flutter gen-l10n
+
+      - name: Build Windows debug app
+        run: flutter build windows --debug
+
+      - name: Pack Windows artifact
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "build/windows/x64/runner/Debug/*" -DestinationPath "hazuki-windows-debug.zip" -Force
+
+      - name: Upload Windows artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: hazuki-windows-debug
+          path: hazuki-windows-debug.zip
+          if-no-files-found: warn
