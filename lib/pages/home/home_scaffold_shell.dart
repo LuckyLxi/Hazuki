@@ -106,6 +106,7 @@ class HomeScaffoldShell extends StatelessWidget {
       child: WindowsComicDetailHost(
         child: Scaffold(
           key: scaffoldKey,
+          extendBody: true,
           appBar: hazukiFrostedAppBar(
             context: context,
             title: const Text('Hazuki'),

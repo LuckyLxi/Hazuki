@@ -27,6 +27,7 @@ class FavoritePageController extends ChangeNotifier {
   final LocalFavoritesService _localFavoritesService;
 
   bool _disposed = false;
+  bool _isFirstLoad = true;
   FavoritePageMode _mode = FavoritePageMode.cloud;
   List<ExploreComic> _comics = const [];
   List<FavoriteFolder> _folders = const [defaultCloudFavoriteFolder];
@@ -125,6 +126,18 @@ class FavoritePageController extends ChangeNotifier {
     required String timeoutMessage,
     ValueChanged<String>? onFolderLoadError,
   }) async {
+    if (_isFirstLoad) {
+      _isFirstLoad = false;
+      final savedMode = await _localFavoritesService.loadFavoritePageMode();
+      if (savedMode != _mode) {
+        _mode = savedMode;
+        _folders = _mode == FavoritePageMode.local
+            ? const <FavoriteFolder>[]
+            : const <FavoriteFolder>[defaultCloudFavoriteFolder];
+        _notify();
+      }
+    }
+
     if (_mode == FavoritePageMode.local) {
       await _loadInitialLocal();
       return;
@@ -176,6 +189,7 @@ class FavoritePageController extends ChangeNotifier {
     _mode = _mode == FavoritePageMode.cloud
         ? FavoritePageMode.local
         : FavoritePageMode.cloud;
+    unawaited(_localFavoritesService.saveFavoritePageMode(_mode));
     _comics = const [];
     _folders = _mode == FavoritePageMode.local
         ? const <FavoriteFolder>[]

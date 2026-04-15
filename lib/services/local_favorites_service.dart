@@ -12,6 +12,7 @@ class LocalFavoritesService {
   static const String _foldersKey = 'local_favorite_folders_v1';
   static const String _entriesKey = 'local_favorite_entries_v1';
   static const String _sortOrderKey = 'local_favorite_sort_order_v1';
+  static const String _pageModeKey = 'favorite_page_mode_v1';
   static const int _pageSize = 24;
 
   Future<String> loadSortOrder() async {
@@ -24,6 +25,20 @@ class LocalFavoritesService {
     final prefs = await SharedPreferences.getInstance();
     final normalized = order.trim() == 'mp' ? 'mp' : 'mr';
     await prefs.setString(_sortOrderKey, normalized);
+  }
+
+  Future<FavoritePageMode> loadFavoritePageMode() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_pageModeKey);
+    return raw == 'local' ? FavoritePageMode.local : FavoritePageMode.cloud;
+  }
+
+  Future<void> saveFavoritePageMode(FavoritePageMode mode) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _pageModeKey,
+      mode == FavoritePageMode.local ? 'local' : 'cloud',
+    );
   }
 
   Future<FavoriteFoldersResult> loadFavoriteFolders({String? comicId}) async {
