@@ -81,7 +81,10 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
 
     return Padding(
       padding: EdgeInsets.only(bottom: 10 + bottomPadding),
+      // heightFactor: 1.0 — Center only takes the height of its child,
+      // preventing it from expanding to fill the full Scaffold bottomNav area.
       child: Center(
+        heightFactor: 1.0,
         child: ClipRRect(
           borderRadius: BorderRadius.circular(36),
           child: BackdropFilter(
@@ -105,7 +108,6 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
                   ),
                 ],
               ),
-              // Tight horizontal padding — pill wraps its content
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -117,8 +119,8 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
                     label: widget.discoverLabel,
                     colorScheme: colorScheme,
                   ),
-                  // Gap between the two items
-                  const SizedBox(width: 8),
+                  // Wider gap between the two items
+                  const SizedBox(width: 20),
                   _buildItem(
                     index: 1,
                     icon: Icons.favorite_border,
@@ -150,8 +152,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeOutCubic,
-        // Compact padding — highlight tightly wraps icon+label
-        padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 16),
+        padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 20),
         decoration: BoxDecoration(
           color: isSelected
               ? colorScheme.primaryContainer.withValues(alpha: 0.88)
