@@ -152,7 +152,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeOutCubic,
-        padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 20),
+        padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 26),
         decoration: BoxDecoration(
           color: isSelected
               ? colorScheme.primaryContainer.withValues(alpha: 0.88)
