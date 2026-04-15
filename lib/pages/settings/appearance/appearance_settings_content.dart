@@ -125,19 +125,59 @@ class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
     );
   }
 
-  Future<void> _toggleThemeMode() async {
-    final brightness = Theme.of(context).brightness;
-    final nextMode = brightness == Brightness.dark
-        ? ThemeMode.light
-        : ThemeMode.dark;
-    _logThemeUiEvent(
-      'Theme toggle button tapped',
-      content: {
-        'currentBrightness': brightness.name,
-        'requestedThemeMode': nextMode.name,
-      },
+  Widget _buildThemeOption({
+    required ThemeMode value,
+    required IconData icon,
+    required String label,
+    required bool isSelected,
+    required ColorScheme colorScheme,
+  }) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => unawaited(_applyThemeMode(value)),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? colorScheme.primaryContainer
+                : colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected
+                  ? colorScheme.primary
+                  : colorScheme.outlineVariant.withValues(alpha: 0.3),
+              width: isSelected ? 1.5 : 1.0,
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                color: isSelected
+                    ? colorScheme.primary
+                    : colorScheme.onSurfaceVariant,
+                size: 22,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight:
+                      isSelected ? FontWeight.w600 : FontWeight.w400,
+                  color: isSelected
+                      ? colorScheme.primary
+                      : colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
-    await _applyThemeMode(nextMode);
   }
 
   @override
@@ -166,41 +206,50 @@ class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
                       color: colorScheme.primary,
                     ),
                   ),
-                  const SizedBox(width: 2),
-                  _ThemeModeToggleButton(
-                    iconKey: _themeIconKey,
-                    isDark: theme.brightness == Brightness.dark,
-                    color: colorScheme.primary,
-                    onPressed: _toggleThemeMode,
+                  const SizedBox(width: 6),
+                  SizedBox(
+                    key: _themeIconKey,
+                    width: 20,
+                    height: 20,
+                    child: SunMoonIcon(
+                      isDark: theme.brightness == Brightness.dark,
+                      size: 20,
+                      duration: const Duration(milliseconds: 600),
+                      sunColor: colorScheme.primary,
+                      moonColor: colorScheme.primary,
+                    ),
                   ),
                 ],
               ),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: SegmentedButton<ThemeMode>(
-                segments: [
-                  ButtonSegment<ThemeMode>(
+              child: Row(
+                children: [
+                  _buildThemeOption(
                     value: ThemeMode.light,
-                    label: Text(strings.displayThemeLight),
-                    icon: const Icon(Icons.light_mode_outlined),
+                    icon: Icons.light_mode_rounded,
+                    label: strings.displayThemeLight,
+                    isSelected: widget.settings.themeMode == ThemeMode.light,
+                    colorScheme: colorScheme,
                   ),
-                  ButtonSegment<ThemeMode>(
+                  const SizedBox(width: 8),
+                  _buildThemeOption(
                     value: ThemeMode.dark,
-                    label: Text(strings.displayThemeDark),
-                    icon: const Icon(Icons.dark_mode_outlined),
+                    icon: Icons.dark_mode_rounded,
+                    label: strings.displayThemeDark,
+                    isSelected: widget.settings.themeMode == ThemeMode.dark,
+                    colorScheme: colorScheme,
                   ),
-                  ButtonSegment<ThemeMode>(
+                  const SizedBox(width: 8),
+                  _buildThemeOption(
                     value: ThemeMode.system,
-                    label: Text(strings.displayThemeSystem),
-                    icon: const Icon(Icons.settings_suggest_outlined),
+                    icon: Icons.settings_suggest_outlined,
+                    label: strings.displayThemeSystem,
+                    isSelected: widget.settings.themeMode == ThemeMode.system,
+                    colorScheme: colorScheme,
                   ),
                 ],
-                selected: {widget.settings.themeMode},
-                onSelectionChanged: (selection) {
-                  unawaited(_applyThemeMode(selection.first));
-                },
-                showSelectedIcon: false,
               ),
             ),
             const Divider(height: 1, indent: 16, endIndent: 16),
@@ -387,47 +436,3 @@ class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
   }
 }
 
-class _ThemeModeToggleButton extends StatelessWidget {
-  const _ThemeModeToggleButton({
-    this.iconKey,
-    required this.isDark,
-    required this.color,
-    required this.onPressed,
-  });
-
-  static const double _iconSize = 24;
-
-  final Key? iconKey;
-  final bool isDark;
-  final Color color;
-  final Future<void> Function() onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return IconButton(
-      onPressed: () {
-        unawaited(onPressed());
-      },
-      padding: EdgeInsets.zero,
-      constraints: const BoxConstraints.tightFor(width: 36, height: 36),
-      splashRadius: 20,
-      iconSize: _iconSize,
-      style: ButtonStyle(
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        overlayColor: WidgetStatePropertyAll(color.withValues(alpha: 0.12)),
-      ),
-      icon: SizedBox(
-        key: iconKey,
-        width: _iconSize,
-        height: _iconSize,
-        child: SunMoonIcon(
-          isDark: isDark,
-          size: _iconSize,
-          duration: const Duration(milliseconds: 600),
-          sunColor: color,
-          moonColor: color,
-        ),
-      ),
-    );
-  }
-}
