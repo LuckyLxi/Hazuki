@@ -34,14 +34,21 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
       _itemCount,
       (i) => AnimationController(
         vsync: this,
-        duration: const Duration(milliseconds: 420),
+        // Forward: bouncy spring feel
+        duration: const Duration(milliseconds: 360),
+        // Reverse: snappy and instant
+        reverseDuration: const Duration(milliseconds: 140),
         value: i == widget.currentIndex ? 1.0 : 0.0,
       ),
     );
     _scaleAnims = _controllers
         .map(
-          (c) => Tween<double>(begin: 1.0, end: 1.18).animate(
-            CurvedAnimation(parent: c, curve: Curves.elasticOut),
+          (c) => Tween<double>(begin: 1.0, end: 1.12).animate(
+            CurvedAnimation(
+              parent: c,
+              curve: Curves.easeOutBack,
+              reverseCurve: Curves.easeIn,
+            ),
           ),
         )
         .toList();
@@ -51,7 +58,9 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
   void didUpdateWidget(covariant HomeBottomNavigation oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.currentIndex != widget.currentIndex) {
+      // Snap back the old item instantly
       _controllers[oldWidget.currentIndex].reverse();
+      // Animate in the new item with spring
       _controllers[widget.currentIndex].forward();
     }
   }
@@ -71,46 +80,54 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
     final bottomPadding = MediaQuery.of(context).padding.bottom;
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(28, 0, 28, 12 + bottomPadding),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(40),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-          child: Container(
-            decoration: BoxDecoration(
-              color: isDark
-                  ? colorScheme.surface.withValues(alpha: 0.72)
-                  : colorScheme.surface.withValues(alpha: 0.82),
-              borderRadius: BorderRadius.circular(40),
-              border: Border.all(
-                color: colorScheme.outlineVariant.withValues(alpha: 0.22),
+      padding: EdgeInsets.only(bottom: 10 + bottomPadding),
+      child: Center(
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(36),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+            child: Container(
+              decoration: BoxDecoration(
+                color: isDark
+                    ? colorScheme.surface.withValues(alpha: 0.75)
+                    : colorScheme.surface.withValues(alpha: 0.85),
+                borderRadius: BorderRadius.circular(36),
+                border: Border.all(
+                  color: colorScheme.outlineVariant.withValues(alpha: 0.22),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(
+                      alpha: isDark ? 0.20 : 0.08,
+                    ),
+                    blurRadius: 20,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: isDark ? 0.22 : 0.10),
-                  blurRadius: 24,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            child: Row(
-              children: [
-                _buildItem(
-                  index: 0,
-                  icon: Icons.explore_outlined,
-                  selectedIcon: Icons.explore,
-                  label: widget.discoverLabel,
-                  colorScheme: colorScheme,
-                ),
-                _buildItem(
-                  index: 1,
-                  icon: Icons.favorite_border,
-                  selectedIcon: Icons.favorite,
-                  label: widget.favoriteLabel,
-                  colorScheme: colorScheme,
-                ),
-              ],
+              // Tight horizontal padding — pill wraps its content
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildItem(
+                    index: 0,
+                    icon: Icons.explore_outlined,
+                    selectedIcon: Icons.explore,
+                    label: widget.discoverLabel,
+                    colorScheme: colorScheme,
+                  ),
+                  // Gap between the two items
+                  const SizedBox(width: 8),
+                  _buildItem(
+                    index: 1,
+                    icon: Icons.favorite_border,
+                    selectedIcon: Icons.favorite,
+                    label: widget.favoriteLabel,
+                    colorScheme: colorScheme,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -127,48 +144,46 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
   }) {
     final isSelected = widget.currentIndex == index;
 
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => widget.onDestinationSelected(index),
-        behavior: HitTestBehavior.opaque,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 260),
-          curve: Curves.easeOutCubic,
-          margin: const EdgeInsets.symmetric(horizontal: 4),
-          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
-          decoration: BoxDecoration(
-            color: isSelected
-                ? colorScheme.primaryContainer.withValues(alpha: 0.9)
-                : Colors.transparent,
-            borderRadius: BorderRadius.circular(32),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ScaleTransition(
-                scale: _scaleAnims[index],
-                child: Icon(
-                  isSelected ? selectedIcon : icon,
-                  color: isSelected
-                      ? colorScheme.primary
-                      : colorScheme.onSurfaceVariant,
-                  size: 24,
-                ),
+    return GestureDetector(
+      onTap: () => widget.onDestinationSelected(index),
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOutCubic,
+        // Compact padding — highlight tightly wraps icon+label
+        padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 16),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? colorScheme.primaryContainer.withValues(alpha: 0.88)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(28),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ScaleTransition(
+              scale: _scaleAnims[index],
+              child: Icon(
+                isSelected ? selectedIcon : icon,
+                color: isSelected
+                    ? colorScheme.primary
+                    : colorScheme.onSurfaceVariant,
+                size: 22,
               ),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight:
-                      isSelected ? FontWeight.w600 : FontWeight.w400,
-                  color: isSelected
-                      ? colorScheme.primary
-                      : colorScheme.onSurfaceVariant,
-                ),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight:
+                    isSelected ? FontWeight.w600 : FontWeight.w400,
+                color: isSelected
+                    ? colorScheme.primary
+                    : colorScheme.onSurfaceVariant,
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
