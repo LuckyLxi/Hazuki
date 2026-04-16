@@ -137,7 +137,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
                     ),
                   ],
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -149,7 +149,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
                       colorScheme: colorScheme,
                       labelOnRight: true,
                     ),
-                    const SizedBox(width: 20),
+                    const SizedBox(width: 44),
                     _buildItem(
                       index: 1,
                       icon: Icons.favorite_border,
@@ -221,21 +221,37 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
     return GestureDetector(
       onTap: () => widget.onDestinationSelected(index),
       behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        curve: Curves.easeOutCubic,
-        padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 14),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? colorScheme.primaryContainer.withValues(alpha: 0.88)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(28),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: labelOnRight
-              ? [iconWidget, labelWidget]
-              : [labelWidget, iconWidget],
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(28),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Positioned.fill(
+              child: AnimatedOpacity(
+                opacity: isSelected ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOutCubic,
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: colorScheme.primaryContainer.withValues(alpha: 0.55),
+                      borderRadius: BorderRadius.circular(28),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 14),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: labelOnRight
+                    ? [iconWidget, labelWidget]
+                    : [labelWidget, iconWidget],
+              ),
+            ),
+          ],
         ),
       ),
     );
