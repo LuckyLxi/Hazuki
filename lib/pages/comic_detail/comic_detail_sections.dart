@@ -18,7 +18,7 @@ class _ComicDetailLoadingView extends StatelessWidget {
   }
 }
 
-class _ComicDetailInfoTab extends StatelessWidget {
+class _ComicDetailInfoTab extends StatefulWidget {
   const _ComicDetailInfoTab({
     required this.details,
     required this.skeletonColor,
@@ -34,14 +34,24 @@ class _ComicDetailInfoTab extends StatelessWidget {
   final bool shouldAnimateResolvedContent;
 
   @override
+  State<_ComicDetailInfoTab> createState() => _ComicDetailInfoTabState();
+}
+
+class _ComicDetailInfoTabState extends State<_ComicDetailInfoTab> {
+  // Tracks whether the entrance animation has already played once.
+  // Survives tab switches because Flutter preserves State objects as long as
+  // the widget type and position in the tree are unchanged.
+  bool _hasAnimated = false;
+
+  @override
   Widget build(BuildContext context) {
-    if (!isActiveInTabView) {
+    if (!widget.isActiveInTabView) {
       return const SizedBox.expand();
     }
     final overlapHandle = NestedScrollView.sliverOverlapAbsorberHandleFor(
       context,
     );
-    if (details == null) {
+    if (widget.details == null) {
       return CustomScrollView(
         key: const PageStorageKey<String>('comic-detail-info-tab-loading'),
         physics: const ClampingScrollPhysics(),
@@ -50,11 +60,22 @@ class _ComicDetailInfoTab extends StatelessWidget {
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
             sliver: SliverToBoxAdapter(
-              child: _ComicDetailInfoSkeleton(skeletonColor: skeletonColor),
+              child: _ComicDetailInfoSkeleton(
+                skeletonColor: widget.skeletonColor,
+              ),
             ),
           ),
         ],
       );
+    }
+
+    final details = widget.details!;
+    // Only animate on the very first active render with loaded content.
+    final shouldAnimate = widget.shouldAnimateResolvedContent && !_hasAnimated;
+    if (shouldAnimate) {
+      // Set synchronously — no setState needed since we only ever go false→true
+      // and this flag never drives a rebuild on its own.
+      _hasAnimated = true;
     }
 
     return CustomScrollView(
@@ -66,24 +87,24 @@ class _ComicDetailInfoTab extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           sliver: SliverToBoxAdapter(
             child: _ComicDetailEntranceReveal(
-              key: ValueKey<String>('comic-detail-info-${details!.id}'),
+              key: ValueKey<String>('comic-detail-info-${details.id}'),
               beginOffset: const Offset(0, 20),
-              enabled: shouldAnimateResolvedContent,
+              enabled: shouldAnimate,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (details!.description.isNotEmpty) ...[
+                  if (details.description.isNotEmpty) ...[
                     Text(
                       l10n(context).comicDetailSummary,
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                     const SizedBox(height: 6),
-                    _ExpandableDescription(text: details!.description),
+                    _ExpandableDescription(text: details.description),
                   ],
-                  if (details!.id.trim().isNotEmpty ||
-                      details!.tags.isNotEmpty) ...[
+                  if (details.id.trim().isNotEmpty ||
+                      details.tags.isNotEmpty) ...[
                     const SizedBox(height: 12),
-                    metaSectionBuilder(details!),
+                    widget.metaSectionBuilder(details),
                   ],
                 ],
               ),

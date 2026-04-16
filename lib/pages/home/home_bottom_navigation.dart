@@ -26,6 +26,8 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
 
   late final List<AnimationController> _controllers;
   late final List<Animation<double>> _scaleAnims;
+  late final List<Animation<double>> _labelAnims;
+  late final List<Animation<Offset>> _labelSlideAnims;
 
   @override
   void initState() {
@@ -52,6 +54,32 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
           ),
         )
         .toList();
+
+    // Label fade/size: easeOutCubic in, easeIn out
+    _labelAnims = _controllers
+        .map(
+          (c) => CurvedAnimation(
+            parent: c,
+            curve: Curves.easeOutCubic,
+            reverseCurve: Curves.easeIn,
+          ),
+        )
+        .toList();
+
+    // Label slide: Discover (index 0) comes from the left (-0.5),
+    // Favorites (index 1) comes from the right (+0.5).
+    _labelSlideAnims = List.generate(_itemCount, (i) {
+      return Tween<Offset>(
+        begin: Offset(i == 0 ? -0.5 : 0.5, 0),
+        end: Offset.zero,
+      ).animate(
+        CurvedAnimation(
+          parent: _controllers[i],
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeIn,
+        ),
+      );
+    });
   }
 
   @override
@@ -172,16 +200,28 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
                 size: 22,
               ),
             ),
-            const SizedBox(height: 3),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight:
-                    isSelected ? FontWeight.w600 : FontWeight.w400,
-                color: isSelected
-                    ? colorScheme.primary
-                    : colorScheme.onSurfaceVariant,
+            // Animated label: only visible and takes space when selected.
+            // SizeTransition collapses height; SlideTransition provides the
+            // directional entrance; FadeTransition handles opacity.
+            SizeTransition(
+              sizeFactor: _labelAnims[index],
+              axis: Axis.vertical,
+              child: SlideTransition(
+                position: _labelSlideAnims[index],
+                child: FadeTransition(
+                  opacity: _labelAnims[index],
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 3),
+                    child: Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ),
           ],

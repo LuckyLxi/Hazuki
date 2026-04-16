@@ -20,9 +20,11 @@ extension _ComicDetailReaderActionsExtension on _ComicDetailPageState {
       isDismissible: true,
       enableDrag: true,
       useSafeArea: false,
-      sheetAnimationStyle: const AnimationStyle(
-        duration: Duration(milliseconds: 380),
-        reverseDuration: Duration(milliseconds: 280),
+      sheetAnimationStyle: AnimationStyle(
+        duration: const Duration(milliseconds: 360),
+        curve: Curves.easeOutCubic,
+        reverseDuration: const Duration(milliseconds: 220),
+        reverseCurve: Curves.easeInCubic,
       ),
       builder: (routeContext) {
         final themedData = _buildDetailTheme(Theme.of(routeContext));

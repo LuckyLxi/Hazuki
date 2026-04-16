@@ -149,7 +149,7 @@ class _ComicDetailParallaxBackgroundState
   }
 }
 
-class _ComicDetailTabTickerScope extends StatelessWidget {
+class _ComicDetailTabTickerScope extends StatefulWidget {
   const _ComicDetailTabTickerScope({
     required this.tabController,
     required this.tabIndex,
@@ -166,31 +166,76 @@ class _ComicDetailTabTickerScope extends StatelessWidget {
   builder;
 
   @override
+  State<_ComicDetailTabTickerScope> createState() =>
+      _ComicDetailTabTickerScopeState();
+}
+
+class _ComicDetailTabTickerScopeState
+    extends State<_ComicDetailTabTickerScope> {
+  bool _shouldRender = false;
+  bool _isSettledActive = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _attach();
+    _compute();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ComicDetailTabTickerScope oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.tabController != widget.tabController) {
+      _detach(oldWidget.tabController);
+      _attach();
+    }
+    _compute();
+  }
+
+  @override
+  void dispose() {
+    _detach(widget.tabController);
+    super.dispose();
+  }
+
+  void _attach() {
+    widget.tabController.animation?.addListener(_compute);
+    widget.tabController.addListener(_compute);
+  }
+
+  void _detach(TabController controller) {
+    controller.animation?.removeListener(_compute);
+    controller.removeListener(_compute);
+  }
+
+  void _compute() {
+    final tc = widget.tabController;
+    final animValue = tc.animation?.value ?? tc.index.toDouble();
+    final distance = (animValue - widget.tabIndex).abs();
+    final isTransitioning =
+        tc.indexIsChanging ||
+        (tc.animation != null &&
+            (tc.animation!.value - tc.index).abs() >= 0.01);
+    final newShouldRender =
+        tc.index == widget.tabIndex || (isTransitioning && distance <= 1.0);
+    final isSettled =
+        distance < 0.01 && tc.index == widget.tabIndex && !tc.indexIsChanging;
+    final newIsSettledActive = isSettled && tc.index == widget.tabIndex;
+
+    if (newShouldRender != _shouldRender ||
+        newIsSettledActive != _isSettledActive) {
+      setState(() {
+        _shouldRender = newShouldRender;
+        _isSettledActive = newIsSettledActive;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: tabController.animation ?? tabController,
-      builder: (context, _) {
-        final animationValue =
-            tabController.animation?.value ?? tabController.index.toDouble();
-        final distance = (animationValue - tabIndex).abs();
-        final isSettled =
-            distance < 0.01 &&
-            tabController.index == tabIndex &&
-            !tabController.indexIsChanging;
-        final isTransitioning =
-            tabController.indexIsChanging ||
-            (tabController.animation != null &&
-                (tabController.animation!.value - tabController.index).abs() >=
-                    0.01);
-        final shouldRender =
-            tabController.index == tabIndex ||
-            (isTransitioning && distance <= 1.0);
-        final isSettledActive = isSettled && tabController.index == tabIndex;
-        return TickerMode(
-          enabled: shouldRender,
-          child: builder(context, shouldRender, isSettledActive),
-        );
-      },
+    return TickerMode(
+      enabled: _shouldRender,
+      child: widget.builder(context, _shouldRender, _isSettledActive),
     );
   }
 }
@@ -427,7 +472,7 @@ class _ComicDetailBody extends StatelessWidget {
             color: surface,
             child: TabBarView(
               controller: tabController,
-              physics: const BouncingScrollPhysics(),
+              physics: const ClampingScrollPhysics(),
               children: [
                 _ComicDetailTabTickerScope(
                   tabController: tabController,

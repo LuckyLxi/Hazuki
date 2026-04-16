@@ -471,40 +471,43 @@ class _ExpandableCommentContentState extends State<_ExpandableCommentContent> {
               ),
             ),
             if (isOverflowing)
-              Padding(
-                padding: const EdgeInsets.only(top: 6),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(8),
-                  onTap: () {
-                    setState(() {
-                      _expanded = !_expanded;
-                    });
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 2),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          _expanded
-                              ? l10n(context).comicDetailCollapse
-                              : l10n(context).comicDetailExpand,
-                          style: theme.textTheme.labelMedium?.copyWith(
-                            color: theme.colorScheme.primary,
+              Align(
+                alignment: Alignment.centerRight,
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () {
+                      setState(() {
+                        _expanded = !_expanded;
+                      });
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 2),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _expanded
+                                ? l10n(context).comicDetailCollapse
+                                : l10n(context).comicDetailExpand,
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: theme.colorScheme.primary,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 2),
-                        AnimatedRotation(
-                          duration: const Duration(milliseconds: 220),
-                          curve: Curves.easeOutCubic,
-                          turns: _expanded ? 0.5 : 0,
-                          child: Icon(
-                            Icons.keyboard_arrow_down,
-                            size: 16,
-                            color: theme.colorScheme.primary,
+                          const SizedBox(width: 2),
+                          AnimatedRotation(
+                            duration: const Duration(milliseconds: 220),
+                            curve: Curves.easeOutCubic,
+                            turns: _expanded ? 0.5 : 0,
+                            child: Icon(
+                              Icons.keyboard_arrow_down,
+                              size: 16,
+                              color: theme.colorScheme.primary,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),

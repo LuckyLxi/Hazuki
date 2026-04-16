@@ -27,8 +27,20 @@ extension _ComicDetailThemeSupportExtension on _ComicDetailPageState {
         canvasColor: Colors.black,
         cardColor: Colors.black,
         colorScheme: scheme,
+        textSelectionTheme: TextSelectionThemeData(
+          selectionColor: scheme.primary.withValues(alpha: 0.38),
+          selectionHandleColor: scheme.primary,
+          cursorColor: scheme.primary,
+        ),
       );
     }
-    return theme.copyWith(colorScheme: scheme);
+    return theme.copyWith(
+      colorScheme: scheme,
+      textSelectionTheme: TextSelectionThemeData(
+        selectionColor: scheme.primary.withValues(alpha: 0.38),
+        selectionHandleColor: scheme.primary,
+        cursorColor: scheme.primary,
+      ),
+    );
   }
 }
