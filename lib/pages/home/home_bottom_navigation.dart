@@ -111,56 +111,55 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
 
     return Padding(
       padding: EdgeInsets.only(bottom: 10 + bottomPadding),
-      // heightFactor: 1.0 — Center only takes the height of its child,
-      // preventing it from expanding to fill the full Scaffold bottomNav area.
       child: Center(
         heightFactor: 1.0,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(36),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-            child: Container(
-              decoration: BoxDecoration(
-                color: isDark
-                    ? colorScheme.surface.withValues(alpha: 0.75)
-                    : colorScheme.surface.withValues(alpha: 0.85),
-                borderRadius: BorderRadius.circular(36),
-                border: Border.all(
-                  color: colorScheme.outlineVariant.withValues(alpha: 0.22),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(
-                      alpha: isDark ? 0.20 : 0.08,
+        child: UnconstrainedBox(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(36),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+              child: Container(
+                decoration: BoxDecoration(
+                  color: isDark
+                      ? colorScheme.surface.withValues(alpha: 0.75)
+                      : colorScheme.surface.withValues(alpha: 0.85),
+                  borderRadius: BorderRadius.circular(36),
+                  border: Border.all(
+                    color: colorScheme.outlineVariant.withValues(alpha: 0.22),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(
+                        alpha: isDark ? 0.20 : 0.08,
+                      ),
+                      blurRadius: 20,
+                      offset: const Offset(0, 4),
                     ),
-                    blurRadius: 20,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildItem(
-                    index: 0,
-                    icon: Icons.explore_outlined,
-                    selectedIcon: Icons.explore,
-                    label: widget.discoverLabel,
-                    colorScheme: colorScheme,
-                    labelOnRight: true,
-                  ),
-                  // Wider gap between the two items
-                  const SizedBox(width: 20),
-                  _buildItem(
-                    index: 1,
-                    icon: Icons.favorite_border,
-                    selectedIcon: Icons.favorite,
-                    label: widget.favoriteLabel,
-                    colorScheme: colorScheme,
-                    labelOnRight: false,
-                  ),
-                ],
+                  ],
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildItem(
+                      index: 0,
+                      icon: Icons.explore_outlined,
+                      selectedIcon: Icons.explore,
+                      label: widget.discoverLabel,
+                      colorScheme: colorScheme,
+                      labelOnRight: true,
+                    ),
+                    const SizedBox(width: 20),
+                    _buildItem(
+                      index: 1,
+                      icon: Icons.favorite_border,
+                      selectedIcon: Icons.favorite,
+                      label: widget.favoriteLabel,
+                      colorScheme: colorScheme,
+                      labelOnRight: false,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
@@ -209,7 +208,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
             child: Text(
               label,
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 13,
                 fontWeight: FontWeight.w600,
                 color: colorScheme.primary,
               ),
