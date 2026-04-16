@@ -53,6 +53,9 @@ jobs:
       - name: Generate localization code
         run: flutter gen-l10n
 
+      - name: Format Dart code
+        run: dart format lib test
+
       - name: Check Dart formatting
         run: dart format --output=none --set-exit-if-changed lib test
 
@@ -97,6 +100,9 @@ jobs:
 
       - name: Install flutter_qjs dependencies
         run: flutter pub get
+
+      - name: Format flutter_qjs code
+        run: dart format lib test
 
       - name: Check flutter_qjs formatting
         run: dart format --output=none --set-exit-if-changed lib test
