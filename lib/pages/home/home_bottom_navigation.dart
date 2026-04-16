@@ -66,8 +66,10 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
         )
         .toList();
 
-    // Label slide: Discover (index 0) comes from the left (-0.5),
-    // Favorites (index 1) comes from the right (+0.5).
+    // Label slide: Discover (index 0) label is to the right of icon, so it
+    // springs in from the left (near-icon side). Favorites (index 1) label is
+    // to the left of icon, so it springs in from the right (near-icon side).
+    // easeOutBack gives the horizontal bounce/spring feel.
     _labelSlideAnims = List.generate(_itemCount, (i) {
       return Tween<Offset>(
         begin: Offset(i == 0 ? -0.5 : 0.5, 0),
@@ -75,7 +77,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
       ).animate(
         CurvedAnimation(
           parent: _controllers[i],
-          curve: Curves.easeOutCubic,
+          curve: Curves.easeOutBack,
           reverseCurve: Curves.easeIn,
         ),
       );
@@ -146,6 +148,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
                     selectedIcon: Icons.explore,
                     label: widget.discoverLabel,
                     colorScheme: colorScheme,
+                    labelOnRight: true,
                   ),
                   // Wider gap between the two items
                   const SizedBox(width: 20),
@@ -155,6 +158,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
                     selectedIcon: Icons.favorite,
                     label: widget.favoriteLabel,
                     colorScheme: colorScheme,
+                    labelOnRight: false,
                   ),
                 ],
               ),
@@ -171,8 +175,49 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
     required IconData selectedIcon,
     required String label,
     required ColorScheme colorScheme,
+    required bool labelOnRight,
   }) {
     final isSelected = widget.currentIndex == index;
+
+    final iconWidget = ScaleTransition(
+      scale: _scaleAnims[index],
+      child: Icon(
+        isSelected ? selectedIcon : icon,
+        color: isSelected
+            ? colorScheme.primary
+            : colorScheme.onSurfaceVariant,
+        size: 22,
+      ),
+    );
+
+    // Label expands horizontally from the icon side:
+    // - Discover (labelOnRight): clip grows rightward (axisAlignment: -1.0)
+    // - Favorites (!labelOnRight): clip grows leftward (axisAlignment: 1.0)
+    // SlideTransition with easeOutBack gives the horizontal spring/bounce feel.
+    final labelWidget = SizeTransition(
+      sizeFactor: _labelAnims[index],
+      axis: Axis.horizontal,
+      axisAlignment: labelOnRight ? -1.0 : 1.0,
+      child: SlideTransition(
+        position: _labelSlideAnims[index],
+        child: FadeTransition(
+          opacity: _labelAnims[index],
+          child: Padding(
+            padding: labelOnRight
+                ? const EdgeInsets.only(left: 5)
+                : const EdgeInsets.only(right: 5),
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: colorScheme.primary,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
 
     return GestureDetector(
       onTap: () => widget.onDestinationSelected(index),
@@ -180,51 +225,18 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeOutCubic,
-        padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 26),
+        padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 14),
         decoration: BoxDecoration(
           color: isSelected
               ? colorScheme.primaryContainer.withValues(alpha: 0.88)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(28),
         ),
-        child: Column(
+        child: Row(
           mainAxisSize: MainAxisSize.min,
-          children: [
-            ScaleTransition(
-              scale: _scaleAnims[index],
-              child: Icon(
-                isSelected ? selectedIcon : icon,
-                color: isSelected
-                    ? colorScheme.primary
-                    : colorScheme.onSurfaceVariant,
-                size: 22,
-              ),
-            ),
-            // Animated label: only visible and takes space when selected.
-            // SizeTransition collapses height; SlideTransition provides the
-            // directional entrance; FadeTransition handles opacity.
-            SizeTransition(
-              sizeFactor: _labelAnims[index],
-              axis: Axis.vertical,
-              child: SlideTransition(
-                position: _labelSlideAnims[index],
-                child: FadeTransition(
-                  opacity: _labelAnims[index],
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 3),
-                    child: Text(
-                      label,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: colorScheme.primary,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
+          children: labelOnRight
+              ? [iconWidget, labelWidget]
+              : [labelWidget, iconWidget],
         ),
       ),
     );

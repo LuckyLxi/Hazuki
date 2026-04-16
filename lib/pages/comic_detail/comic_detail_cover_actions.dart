@@ -54,9 +54,13 @@ extension _ComicDetailCoverActionsExtension on _ComicDetailPageState {
   Future<void> _showCoverActions(String imageUrl) async {
     FocusManager.instance.primaryFocus?.unfocus();
     final themedData = _buildDetailTheme(Theme.of(context));
-    await showDialog<void>(
+    await showGeneralDialog<void>(
       context: context,
-      builder: (dialogContext) {
+      barrierDismissible: true,
+      barrierLabel: '',
+      barrierColor: Colors.black.withValues(alpha: 0.32),
+      transitionDuration: const Duration(milliseconds: 240),
+      pageBuilder: (dialogContext, animation, secondaryAnimation) {
         return Theme(
           data: themedData,
           child: AlertDialog(
@@ -74,6 +78,25 @@ extension _ComicDetailCoverActionsExtension on _ComicDetailPageState {
                 child: Text(l10n(context).commonSave),
               ),
             ],
+          ),
+        );
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        final fadeCurved = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        );
+        final scaleCurved = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutBack,
+          reverseCurve: Curves.easeInCubic,
+        );
+        return FadeTransition(
+          opacity: fadeCurved,
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 0.88, end: 1.0).animate(scaleCurved),
+            child: child,
           ),
         );
       },
