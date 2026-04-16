@@ -32,6 +32,10 @@ class _HazukiPullToRefreshState extends State<HazukiPullToRefresh> {
   bool _armed = false;
   bool _refreshing = false;
   bool _didHaptic = false;
+  // Set to true just before calling position.jumpTo() so that the
+  // ScrollEndNotification dispatched synchronously inside jumpTo is
+  // ignored rather than misinterpreted as the user releasing the drag.
+  bool _pinningToTop = false;
 
   double get _targetContentOffset {
     if (_refreshing) {
@@ -93,6 +97,12 @@ class _HazukiPullToRefreshState extends State<HazukiPullToRefresh> {
     }
 
     if (notification is ScrollEndNotification) {
+      // Ignore the synthetic ScrollEndNotification emitted by jumpTo()
+      // inside _pinScrollToTop — it is not a real user gesture end.
+      if (_pinningToTop) {
+        _pinningToTop = false;
+        return false;
+      }
       _dragging = false;
       final shouldRefresh = _armed && _lastDragDeltaY >= 0;
       _lastDragDeltaY = 0;
@@ -120,7 +130,12 @@ class _HazukiPullToRefreshState extends State<HazukiPullToRefresh> {
     if ((position.pixels - position.minScrollExtent).abs() < 0.1) {
       return;
     }
+    // Mark that the upcoming ScrollEndNotification is from jumpTo, not the user.
+    _pinningToTop = true;
     position.jumpTo(position.minScrollExtent);
+    // If jumpTo did NOT dispatch a ScrollEndNotification (e.g. position was
+    // already at min after correction), clear the flag to stay consistent.
+    _pinningToTop = false;
   }
 
   void _updatePullDistance(double next) {

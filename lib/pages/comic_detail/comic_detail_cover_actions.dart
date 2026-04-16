@@ -54,15 +54,26 @@ extension _ComicDetailCoverActionsExtension on _ComicDetailPageState {
   Future<void> _showCoverActions(String imageUrl) async {
     FocusManager.instance.primaryFocus?.unfocus();
     final themedData = _buildDetailTheme(Theme.of(context));
-    await showModalBottomSheet<void>(
+    await showDialog<void>(
       context: context,
-      showDragHandle: true,
-      backgroundColor: themedData.colorScheme.surface,
-      builder: (sheetContext) {
+      builder: (dialogContext) {
         return Theme(
           data: themedData,
-          child: _ComicCoverActionsSheet(
-            onSavePressed: () => unawaited(_saveImageToDownloads(imageUrl)),
+          child: AlertDialog(
+            title: Text(l10n(context).comicDetailSaveImage),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: Text(l10n(context).commonCancel),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.of(dialogContext).pop();
+                  unawaited(_saveImageToDownloads(imageUrl));
+                },
+                child: Text(l10n(context).commonSave),
+              ),
+            ],
           ),
         );
       },
