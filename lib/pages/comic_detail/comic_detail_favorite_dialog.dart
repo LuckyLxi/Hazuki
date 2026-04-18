@@ -67,10 +67,7 @@ class _FavoriteFoldersMorphDialogState
       barrierColor: Colors.black.withValues(alpha: 0.32),
       transitionDuration: const Duration(milliseconds: 240),
       pageBuilder: (dialogContext, animation, secondaryAnimation) {
-        return InheritedTheme.captureAll(
-          context,
-          Builder(builder: builder),
-        );
+        return InheritedTheme.captureAll(context, Builder(builder: builder));
       },
       transitionBuilder: (dialogContext, animation, secondaryAnimation, child) {
         final curved = CurvedAnimation(

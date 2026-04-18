@@ -37,10 +37,7 @@ Widget buildComicCoverHeroFlightShuttle(
         opacity: ReverseAnimation(animation),
         child: fromHero.child,
       ),
-      FadeTransition(
-        opacity: animation,
-        child: toHero.child,
-      ),
+      FadeTransition(opacity: animation, child: toHero.child),
     ],
   );
 }

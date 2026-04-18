@@ -171,7 +171,10 @@ extension _ReaderDiagnosticsActionsExtension on _ReaderPageState {
     if (_images.isEmpty) {
       return;
     }
-    final normalizedIndex = math.max(0, math.min(index, _readerSpreadCount - 1));
+    final normalizedIndex = math.max(
+      0,
+      math.min(index, _readerSpreadCount - 1),
+    );
     final safeIndex = _normalizeSpreadIndex(normalizedIndex);
     if (_diagnosticsState.lastLoggedVisiblePageIndex == safeIndex) {
       return;

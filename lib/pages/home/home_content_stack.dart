@@ -45,9 +45,7 @@ class HomeContentStack extends StatelessWidget {
               child: AnimatedSlide(
                 duration: const Duration(milliseconds: 240),
                 curve: Curves.easeOutCubic,
-                offset: currentIndex == 1
-                    ? Offset.zero
-                    : const Offset(0.04, 0),
+                offset: currentIndex == 1 ? Offset.zero : const Offset(0.04, 0),
                 child: AnimatedOpacity(
                   duration: const Duration(milliseconds: 220),
                   curve: Curves.easeOut,

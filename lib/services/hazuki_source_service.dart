@@ -142,8 +142,7 @@ class SourceRuntimeState {
   bool get isReady => phase == SourceRuntimePhase.ready;
   bool get hasFailure => phase == SourceRuntimePhase.failed;
   bool get canRetry => phase == SourceRuntimePhase.failed;
-  bool get isWaitingForRestart =>
-      phase == SourceRuntimePhase.waitingForRestart;
+  bool get isWaitingForRestart => phase == SourceRuntimePhase.waitingForRestart;
   bool get shouldSurfaceOnPage => isBusy || hasFailure || isWaitingForRestart;
 
   Map<String, dynamic> toDebugMap() {

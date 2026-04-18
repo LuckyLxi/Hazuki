@@ -25,7 +25,9 @@ class MyApp extends StatelessWidget {
       title: 'flutter_qjs',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        appBarTheme: AppBarTheme(elevation: 0, systemOverlayStyle: SystemUiOverlayStyle.light), colorScheme: ColorScheme(background: Colors.grey[300]),
+        appBarTheme: AppBarTheme(
+            elevation: 0, systemOverlayStyle: SystemUiOverlayStyle.light),
+        colorScheme: ColorScheme(background: Colors.grey[300]),
       ),
       routes: {
         'home': (BuildContext context) => TestPage(),

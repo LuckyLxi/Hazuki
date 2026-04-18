@@ -166,8 +166,7 @@ class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
                 label,
                 style: TextStyle(
                   fontSize: 12,
-                  fontWeight:
-                      isSelected ? FontWeight.w600 : FontWeight.w400,
+                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
                   color: isSelected
                       ? colorScheme.primary
                       : colorScheme.onSurfaceVariant,
@@ -435,4 +434,3 @@ class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
     );
   }
 }
-

@@ -152,7 +152,11 @@ class CloudSyncService {
     await _ensureDir(dio, backupDirUrl);
 
     final snapshot = await _buildLocalSnapshotFiles();
-    await _putString(dio, '$backupDirUrl/$_settingsFileName', snapshot.settings);
+    await _putString(
+      dio,
+      '$backupDirUrl/$_settingsFileName',
+      snapshot.settings,
+    );
     await _putString(dio, '$backupDirUrl/$_readingFileName', snapshot.reading);
     await _putString(
       dio,
@@ -184,7 +188,10 @@ class CloudSyncService {
       dio,
       '$backupDirUrl/$_settingsFileName',
     );
-    final readingText = await _getString(dio, '$backupDirUrl/$_readingFileName');
+    final readingText = await _getString(
+      dio,
+      '$backupDirUrl/$_readingFileName',
+    );
     final searchHistoryText = await _getString(
       dio,
       '$backupDirUrl/$_searchHistoryFileName',
@@ -240,9 +247,7 @@ class CloudSyncService {
     final response = await dio.put<dynamic>(
       url,
       data: utf8.encode(content),
-      options: Options(
-        headers: {'content-type': 'application/octet-stream'},
-      ),
+      options: Options(headers: {'content-type': 'application/octet-stream'}),
     );
     final code = response.statusCode ?? 0;
     if (code < 200 || code >= 300) {
@@ -371,11 +376,7 @@ class CloudSyncService {
     final data = Map<String, dynamic>.from(dataRaw);
     final prefs = await SharedPreferences.getInstance();
     for (final entry in data.entries) {
-      final sanitized = _sanitizeRestoredSetting(
-        prefs,
-        entry.key,
-        entry.value,
-      );
+      final sanitized = _sanitizeRestoredSetting(prefs, entry.key, entry.value);
       if (sanitized == null) {
         continue;
       }

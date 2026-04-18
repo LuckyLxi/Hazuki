@@ -95,9 +95,7 @@ Future<String?> showFavoriteRenameFolderDialog(
   BuildContext context, {
   required String initialName,
 }) {
-  final controller = TextEditingController(
-    text: initialName,
-  );
+  final controller = TextEditingController(text: initialName);
   controller.selection = TextSelection(
     baseOffset: 0,
     extentOffset: controller.text.length,
@@ -128,8 +126,7 @@ Future<String?> showFavoriteRenameFolderDialog(
                 final text = controller.text.trim();
                 if (text.isEmpty) {
                   setDialogState(
-                    () =>
-                        errorText = strings.favoriteCreateFolderNameRequired,
+                    () => errorText = strings.favoriteCreateFolderNameRequired,
                   );
                   return;
                 }

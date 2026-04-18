@@ -27,9 +27,10 @@ extension _ComicDetailCoverActionsExtension on _ComicDetailPageState {
       final file = File('${directory.path}/$fileName');
       await file.writeAsBytes(bytes, flush: true);
       if (Platform.isAndroid) {
-        await _ComicDetailPageState._mediaChannel.invokeMethod<bool>('scanFile', {
-          'path': file.path,
-        });
+        await _ComicDetailPageState._mediaChannel.invokeMethod<bool>(
+          'scanFile',
+          {'path': file.path},
+        );
       }
       if (!mounted) {
         return;

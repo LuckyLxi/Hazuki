@@ -102,9 +102,7 @@ class CodeInputController extends TextEditingController {
     return TextSpan(style: style, children: [
       ...beforeSpans,
       TextSpan(
-          style: leftSpan == rightSpan
-              ? leftSpan.style
-              : style,
+          style: leftSpan == rightSpan ? leftSpan.style : style,
           text: newText.substring(start, max(start, newText.length - end))),
       ...endSpans.reversed
     ]);

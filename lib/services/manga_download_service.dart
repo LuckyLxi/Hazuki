@@ -340,7 +340,9 @@ class MangaDownloadService extends ChangeNotifier {
         final rootDir = await _ensureRootDir();
         final result = await _recoveryScanner.scanDownloadedFromDisk(rootDir);
         _downloaded.addAll(result.comics);
-        _downloaded.sort((a, b) => b.updatedAtMillis.compareTo(a.updatedAtMillis));
+        _downloaded.sort(
+          (a, b) => b.updatedAtMillis.compareTo(a.updatedAtMillis),
+        );
       }
     }
 

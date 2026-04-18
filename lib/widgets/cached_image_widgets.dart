@@ -8,10 +8,8 @@ import '../services/hazuki_source_service.dart';
 
 enum HazukiCachedImageLoadState { idle, deferred, loading, loaded, error }
 
-typedef HazukiCachedImageStateChanged = void Function(
-  String url,
-  HazukiCachedImageLoadState state,
-);
+typedef HazukiCachedImageStateChanged =
+    void Function(String url, HazukiCachedImageLoadState state);
 
 const int _hazukiWidgetImageMemoryLimit = 300;
 final Map<String, Uint8List> _hazukiWidgetImageMemory = <String, Uint8List>{};

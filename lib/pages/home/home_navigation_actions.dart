@@ -188,7 +188,8 @@ class _DrawerExpandPageRoute<T> extends MaterialPageRoute<T> {
     Animation<double> secondaryAnimation,
     Widget child,
   ) {
-    if (!_preserveTrailingPanel && animation.status != AnimationStatus.forward) {
+    if (!_preserveTrailingPanel &&
+        animation.status != AnimationStatus.forward) {
       return super.buildTransitions(
         context,
         animation,
