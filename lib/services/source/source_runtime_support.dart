@@ -108,10 +108,7 @@ extension HazukiSourceServiceSourceRuntimeSupport on HazukiSourceService {
     );
   }
 
-  void _setRuntimeFailedState(
-    Object error, {
-    SourceRuntimeStep? step,
-  }) {
+  void _setRuntimeFailedState(Object error, {SourceRuntimeStep? step}) {
     final failedStep = step ?? _runtimeState.step;
     _setRuntimeState(
       phase: SourceRuntimePhase.failed,

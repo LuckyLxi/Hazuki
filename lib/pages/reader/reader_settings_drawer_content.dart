@@ -130,7 +130,7 @@ class ReaderSettingsDrawerContent extends StatelessWidget {
               ],
             ),
           ),
-          
+
           // 分组 1: 阅读模式与排版
           ReaderSettingsGroup(
             theme: theme,
@@ -293,7 +293,9 @@ class ReaderSettingsDrawerContent extends StatelessWidget {
                 ),
                 subtitle: SliderTheme(
                   data: SliderTheme.of(context).copyWith(
-                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
+                    overlayShape: const RoundSliderOverlayShape(
+                      overlayRadius: 16,
+                    ),
                   ),
                   child: Slider(
                     value: brightnessValue,
@@ -301,8 +303,12 @@ class ReaderSettingsDrawerContent extends StatelessWidget {
                     max: 1,
                     divisions: 100,
                     onChanged: customBrightness ? onBrightnessChanged : null,
-                    onChangeEnd: customBrightness ? onBrightnessChangeEnd : null,
-                    activeColor: customBrightness ? sliderActiveColor : sliderInactiveColor,
+                    onChangeEnd: customBrightness
+                        ? onBrightnessChangeEnd
+                        : null,
+                    activeColor: customBrightness
+                        ? sliderActiveColor
+                        : sliderInactiveColor,
                     inactiveColor: sliderInactiveColor,
                   ),
                 ),

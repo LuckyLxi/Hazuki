@@ -73,9 +73,7 @@ extension HazukiSourceServiceImagePrepareSegmentSupport on HazukiSourceService {
       if (modifyImage.isEmpty) {
         return null;
       }
-      final match = RegExp(
-        r'\bnum\s*=\s*(\d+)\b',
-      ).firstMatch(modifyImage);
+      final match = RegExp(r'\bnum\s*=\s*(\d+)\b').firstMatch(modifyImage);
       return int.tryParse(match?.group(1) ?? '');
     } catch (_) {
       return null;

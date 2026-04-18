@@ -17,10 +17,7 @@ FavoriteFolderSource favoriteFolderSourceFromStorage(String raw) {
 }
 
 class FavoriteFolderHandle {
-  const FavoriteFolderHandle({
-    required this.source,
-    required this.id,
-  });
+  const FavoriteFolderHandle({required this.source, required this.id});
 
   final FavoriteFolderSource source;
   final String id;
@@ -67,8 +64,8 @@ class FavoriteFoldersResult {
   }) : errorMessage = null;
 
   const FavoriteFoldersResult.error(this.errorMessage)
-      : folders = const [],
-        favoritedFolderIds = const <String>{};
+    : folders = const [],
+      favoritedFolderIds = const <String>{};
 
   final List<FavoriteFolder> folders;
   final Set<String> favoritedFolderIds;
@@ -76,14 +73,12 @@ class FavoriteFoldersResult {
 }
 
 class FavoriteComicsResult {
-  const FavoriteComicsResult.success(
-    this.comics, {
-    this.maxPage,
-  }) : errorMessage = null;
+  const FavoriteComicsResult.success(this.comics, {this.maxPage})
+    : errorMessage = null;
 
   const FavoriteComicsResult.error(this.errorMessage)
-      : comics = const [],
-        maxPage = null;
+    : comics = const [],
+      maxPage = null;
 
   final List<ExploreComic> comics;
   final int? maxPage;
@@ -99,6 +94,7 @@ class ExploreSection {
 
   final String title;
   final List<ExploreComic> comics;
+
   /// jm.js 专栏 viewMore 字段，如 "category:禁漫天堂@0"，可用于分页加载更多
   final String? viewMoreUrl;
 }
@@ -118,40 +114,28 @@ class ExploreComic {
 }
 
 class SearchComicsResult {
-  const SearchComicsResult({
-    required this.comics,
-    required this.maxPage,
-  });
+  const SearchComicsResult({required this.comics, required this.maxPage});
 
   final List<ExploreComic> comics;
   final int? maxPage;
 }
 
 class CategoryTagGroup {
-  const CategoryTagGroup({
-    required this.name,
-    required this.tags,
-  });
+  const CategoryTagGroup({required this.name, required this.tags});
 
   final String name;
   final List<String> tags;
 }
 
 class CategoryRankingOption {
-  const CategoryRankingOption({
-    required this.value,
-    required this.label,
-  });
+  const CategoryRankingOption({required this.value, required this.label});
 
   final String value;
   final String label;
 }
 
 class CategoryComicsResult {
-  const CategoryComicsResult({
-    required this.comics,
-    required this.maxPage,
-  });
+  const CategoryComicsResult({required this.comics, required this.maxPage});
 
   final List<ExploreComic> comics;
   final int? maxPage;

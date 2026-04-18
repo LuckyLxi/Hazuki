@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'app_preferences.dart';
 import 'appearance_settings.dart';
 import 'display_mode.dart';
 
@@ -70,6 +71,16 @@ class HazukiAppSettingsStore {
     };
     await prefs.setString(_localeKey, localeTag);
     return localeTag == 'system' ? null : locale;
+  }
+
+  Future<bool> loadUseSystemTitleBar() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(hazukiUseSystemTitleBarPreferenceKey) ?? false;
+  }
+
+  Future<void> saveUseSystemTitleBar(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(hazukiUseSystemTitleBarPreferenceKey, value);
   }
 
   Locale? _localeFromTag(String? localeTag) {

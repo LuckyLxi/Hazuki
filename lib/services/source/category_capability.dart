@@ -151,7 +151,10 @@ extension HazukiSourceServiceCategoryCapability on HazukiSourceService {
       startedAt: startedAt,
       content: {
         'groupCount': cached.length,
-        'tagCount': cached.fold<int>(0, (sum, group) => sum + group.tags.length),
+        'tagCount': cached.fold<int>(
+          0,
+          (sum, group) => sum + group.tags.length,
+        ),
       },
     );
     return cached;

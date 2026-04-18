@@ -3,5 +3,6 @@ const hazukiAutoSourceUpdateCheckEnabledPreferenceKey =
     'other_auto_source_update_check_enabled';
 const hazukiAutoSoftwareUpdateCheckEnabledPreferenceKey =
     'other_auto_software_update_check_enabled';
+const hazukiUseSystemTitleBarPreferenceKey = 'other_use_system_title_bar';
 const hazukiComicIdSearchEnhancePreferenceKey =
     'advanced_comic_id_search_enhance';

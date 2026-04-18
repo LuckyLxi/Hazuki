@@ -10,9 +10,10 @@ extension HazukiSourceServiceCheckInCapability on HazukiSourceService {
     }
 
     final today = _dailyCheckInDateTag(DateTime.now());
-    final cachedDate = (_loadSourceData(sourceMeta.key, 'lastCheckInDate') ?? '')
-        .toString()
-        .trim();
+    final cachedDate =
+        (_loadSourceData(sourceMeta.key, 'lastCheckInDate') ?? '')
+            .toString()
+            .trim();
     return cachedDate == today;
   }
 
@@ -30,9 +31,10 @@ extension HazukiSourceServiceCheckInCapability on HazukiSourceService {
     }
 
     final today = _dailyCheckInDateTag(DateTime.now());
-    final cachedDate = (_loadSourceData(sourceMeta.key, 'lastCheckInDate') ?? '')
-        .toString()
-        .trim();
+    final cachedDate =
+        (_loadSourceData(sourceMeta.key, 'lastCheckInDate') ?? '')
+            .toString()
+            .trim();
     if (cachedDate == today) {
       return const DailyCheckInResult.alreadyCheckedIn();
     }

@@ -8,9 +8,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:window_manager/window_manager.dart';
 
 import 'app/app_settings_store.dart';
 import 'app/app_preferences.dart';
+import 'app/hazuki_app_controller.dart';
 import 'app/appearance_settings.dart';
 import 'app/hazuki_theme_controller.dart';
 import 'app/hazuki_theme_factory.dart';
@@ -19,6 +21,7 @@ import 'app/source_runtime_widgets.dart';
 import 'app/software_update_dialog_support.dart';
 import 'app/source_update_dialog_support.dart';
 import 'app/ui_flags.dart';
+import 'app/windows_title_bar_controller.dart';
 import 'l10n/app_localizations.dart';
 import 'l10n/l10n.dart';
 import 'pages/home_page.dart';
@@ -29,6 +32,7 @@ import 'services/manga_download_storage_support.dart';
 import 'services/password_lock_service.dart';
 import 'widgets/password_lock_widgets.dart';
 import 'widgets/hazuki_prompt.dart';
+import 'widgets/windows_custom_title_bar.dart';
 
 Future<void> _ensureAndroidNoMediaMarker() async {
   if (!Platform.isAndroid) {
@@ -66,11 +70,30 @@ Future<void> main() async {
   const settingsStore = HazukiAppSettingsStore();
   final initialAppearance = await settingsStore.loadAppearance();
   final initialLocale = await settingsStore.loadLocalePreference();
+  final initialUseSystemTitleBar = await settingsStore.loadUseSystemTitleBar();
+  if (Platform.isWindows) {
+    await windowManager.ensureInitialized();
+    windowManager.waitUntilReadyToShow(
+      WindowOptions(
+        minimumSize: const Size(960, 640),
+        title: 'Hazuki',
+        titleBarStyle: initialUseSystemTitleBar
+            ? TitleBarStyle.normal
+            : TitleBarStyle.hidden,
+        windowButtonVisibility: initialUseSystemTitleBar,
+      ),
+      () async {
+        await windowManager.show();
+        await windowManager.focus();
+      },
+    );
+  }
   runApp(
     HazukiApp(
       settingsStore: settingsStore,
       initialAppearance: initialAppearance,
       initialLocale: initialLocale,
+      initialUseSystemTitleBar: initialUseSystemTitleBar,
     ),
   );
 }
@@ -81,11 +104,13 @@ class HazukiApp extends StatefulWidget {
     required this.settingsStore,
     required this.initialAppearance,
     required this.initialLocale,
+    required this.initialUseSystemTitleBar,
   });
 
   final HazukiAppSettingsStore settingsStore;
   final AppearanceSettingsData initialAppearance;
   final Locale? initialLocale;
+  final bool initialUseSystemTitleBar;
 
   @override
   State<HazukiApp> createState() => _HazukiAppState();
@@ -108,6 +133,8 @@ class _HazukiAppState extends State<HazukiApp>
       const SoftwareUpdateDialogSupport();
 
   late final HazukiThemeController _themeController;
+  late final HazukiAppController _appController;
+  late final HazukiWindowsTitleBarController _windowsTitleBarController;
   late final AnimationController _themeRevealController;
   int _homeRefreshTick = 0;
   bool _allowDiscoverInitialLoad = false;
@@ -137,6 +164,17 @@ class _HazukiAppState extends State<HazukiApp>
     _themeController = HazukiThemeController(
       settingsStore: widget.settingsStore,
       initialSettings: widget.initialAppearance,
+    );
+    _windowsTitleBarController = HazukiWindowsTitleBarController(
+      settingsStore: widget.settingsStore,
+      initialUseSystemTitleBar: widget.initialUseSystemTitleBar,
+    );
+    _appController = HazukiAppController(
+      settingsStore: widget.settingsStore,
+      themeController: _themeController,
+      windowsTitleBarController: _windowsTitleBarController,
+      reloadLocale: _reloadLocalePreference,
+      refreshHome: _refreshHome,
     );
     _locale = widget.initialLocale;
     unawaited(_loadAutoUpdateCheckSettings());
@@ -174,6 +212,7 @@ class _HazukiAppState extends State<HazukiApp>
     _themeRevealController.dispose();
     _themeRevealImage?.dispose();
     _themeController.dispose();
+    _windowsTitleBarController.dispose();
     unawaited(_sourceRuntimeCoordinator.dispose());
     super.dispose();
   }
@@ -290,6 +329,17 @@ class _HazukiAppState extends State<HazukiApp>
     }
     setState(() {
       _locale = effectiveLocale;
+    });
+  }
+
+  Future<void> _reloadLocalePreference() async {
+    final locale = await widget.settingsStore.loadLocalePreference();
+    if (!mounted) {
+      _locale = locale;
+      return;
+    }
+    setState(() {
+      _locale = locale;
     });
   }
 
@@ -563,79 +613,87 @@ class _HazukiAppState extends State<HazukiApp>
               theme: HazukiThemeFactory.buildLight(appearance, lightDynamic),
               darkTheme: HazukiThemeFactory.buildDark(appearance, darkDynamic),
               builder: (context, child) {
-                return HazukiThemeControllerScope(
-                  controller: _themeController,
-                  child: RepaintBoundary(
-                    key: _themeRepaintBoundaryKey,
-                    child: Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        // ignore: use_null_aware_elements
-                        if (child != null) child,
-                        if (_themeRevealImage != null &&
-                            _themeRevealCenter != null)
-                          Positioned.fill(
-                            child: IgnorePointer(
-                              child: AnimatedBuilder(
-                                animation: _themeRevealController,
-                                builder: (context, _) {
-                                  return _ThemeRevealOverlay(
-                                    image: _themeRevealImage!,
-                                    center: _themeRevealCenter!,
-                                    progress: _themeRevealController.value,
-                                  );
-                                },
+                return HazukiAppControllerScope(
+                  controller: _appController,
+                  child: HazukiWindowsTitleBarScope(
+                    controller: _windowsTitleBarController,
+                    child: HazukiThemeControllerScope(
+                      controller: _themeController,
+                      child: RepaintBoundary(
+                        key: _themeRepaintBoundaryKey,
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            _HazukiWindowFrame(child: child),
+                            if (_themeRevealImage != null &&
+                                _themeRevealCenter != null)
+                              Positioned.fill(
+                                child: IgnorePointer(
+                                  child: AnimatedBuilder(
+                                    animation: _themeRevealController,
+                                    builder: (context, _) {
+                                      return _ThemeRevealOverlay(
+                                        image: _themeRevealImage!,
+                                        center: _themeRevealCenter!,
+                                        progress: _themeRevealController.value,
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ),
+                            Positioned.fill(
+                              child: IgnorePointer(
+                                ignoring:
+                                    !_bootstrapState.showOverlay &&
+                                    !_bootstrapState.showIntro,
+                                child: AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 280),
+                                  switchInCurve: Curves.easeOutCubic,
+                                  switchOutCurve: Curves.easeInCubic,
+                                  transitionBuilder: (widget, animation) {
+                                    final curved = CurvedAnimation(
+                                      parent: animation,
+                                      curve: Curves.easeOutCubic,
+                                      reverseCurve: Curves.easeInCubic,
+                                    );
+                                    return FadeTransition(
+                                      opacity: curved,
+                                      child: ScaleTransition(
+                                        scale: Tween<double>(
+                                          begin: 0.94,
+                                          end: 1,
+                                        ).animate(curved),
+                                        child: widget,
+                                      ),
+                                    );
+                                  },
+                                  child: InitialSourceBootstrapOverlay(
+                                    showOverlay: _bootstrapState.showOverlay,
+                                    showIntro: _bootstrapState.showIntro,
+                                    indeterminate:
+                                        _bootstrapState.indeterminate,
+                                    progress: _bootstrapState.progress,
+                                    errorText: _bootstrapState.errorText,
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
-                        Positioned.fill(
-                          child: IgnorePointer(
-                            ignoring:
-                                !_bootstrapState.showOverlay &&
-                                !_bootstrapState.showIntro,
-                            child: AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 280),
-                              switchInCurve: Curves.easeOutCubic,
-                              switchOutCurve: Curves.easeInCubic,
-                              transitionBuilder: (widget, animation) {
-                                final curved = CurvedAnimation(
-                                  parent: animation,
-                                  curve: Curves.easeOutCubic,
-                                  reverseCurve: Curves.easeInCubic,
-                                );
-                                return FadeTransition(
-                                  opacity: curved,
-                                  child: ScaleTransition(
-                                    scale: Tween<double>(
-                                      begin: 0.94,
-                                      end: 1,
-                                    ).animate(curved),
-                                    child: widget,
-                                  ),
+                            ListenableBuilder(
+                              listenable: PasswordLockService.instance,
+                              builder: (context, _) {
+                                if (!PasswordLockService
+                                    .instance
+                                    .shouldBlockApp) {
+                                  return const SizedBox.shrink();
+                                }
+                                return PasswordLockGateOverlay(
+                                  controller: PasswordLockService.instance,
                                 );
                               },
-                              child: InitialSourceBootstrapOverlay(
-                                showOverlay: _bootstrapState.showOverlay,
-                                showIntro: _bootstrapState.showIntro,
-                                indeterminate: _bootstrapState.indeterminate,
-                                progress: _bootstrapState.progress,
-                                errorText: _bootstrapState.errorText,
-                              ),
                             ),
-                          ),
+                          ],
                         ),
-                        ListenableBuilder(
-                          listenable: PasswordLockService.instance,
-                          builder: (context, _) {
-                            if (!PasswordLockService.instance.shouldBlockApp) {
-                              return const SizedBox.shrink();
-                            }
-                            return PasswordLockGateOverlay(
-                              controller: PasswordLockService.instance,
-                            );
-                          },
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                 );
@@ -669,12 +727,7 @@ class _HazukiAppState extends State<HazukiApp>
   }
 
   void _handleSourceUpdateDownloaded() {
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _homeRefreshTick++;
-    });
+    _refreshHome();
   }
 
   void _updateBootstrapState(SourceBootstrapState state) {
@@ -687,6 +740,47 @@ class _HazukiAppState extends State<HazukiApp>
       }
       _bootstrapState = state;
     });
+  }
+
+  void _refreshHome() {
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _homeRefreshTick++;
+    });
+  }
+}
+
+class _HazukiWindowFrame extends StatelessWidget {
+  const _HazukiWindowFrame({required this.child});
+
+  final Widget? child;
+
+  @override
+  Widget build(BuildContext context) {
+    final effectiveChild = child ?? const SizedBox.shrink();
+    final titleBarController = HazukiWindowsTitleBarScope.of(context);
+    return ListenableBuilder(
+      listenable: titleBarController,
+      builder: (context, _) {
+        if (!titleBarController.shouldShowCustomTitleBar) {
+          return effectiveChild;
+        }
+        return Column(
+          children: [
+            TextSelectionTheme(
+              data: const TextSelectionThemeData(
+                selectionColor: Colors.transparent,
+                selectionHandleColor: Colors.transparent,
+              ),
+              child: const HazukiWindowsCustomTitleBar(),
+            ),
+            Expanded(child: effectiveChild),
+          ],
+        );
+      },
+    );
   }
 }
 

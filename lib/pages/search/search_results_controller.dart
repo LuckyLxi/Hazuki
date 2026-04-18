@@ -6,9 +6,7 @@ import '../../services/hazuki_source_service.dart';
 import 'search_shared.dart';
 
 class SearchResultsController extends ChangeNotifier {
-  static const Duration _initialSearchRetryDelay = Duration(
-    milliseconds: 450,
-  );
+  static const Duration _initialSearchRetryDelay = Duration(milliseconds: 450);
 
   SearchResultsController({required String initialOrder})
     : _searchOrder = searchOrderKeys.contains(initialOrder)
@@ -139,7 +137,8 @@ class SearchResultsController extends ChangeNotifier {
     _notify();
 
     try {
-      final maxAttempts = _shouldRetryInitialSearch(
+      final maxAttempts =
+          _shouldRetryInitialSearch(
             page: page,
             append: append,
             silentRefresh: silentRefresh,

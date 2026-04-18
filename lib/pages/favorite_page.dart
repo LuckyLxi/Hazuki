@@ -400,10 +400,7 @@ class FavoritePageState extends State<FavoritePage>
     super.build(context);
 
     return AnimatedBuilder(
-      animation: Listenable.merge([
-        _controller,
-        HazukiSourceService.instance,
-      ]),
+      animation: Listenable.merge([_controller, HazukiSourceService.instance]),
       builder: (context, _) {
         if (_controller.showLoginRequired) {
           return FavoriteLoginRequiredView(

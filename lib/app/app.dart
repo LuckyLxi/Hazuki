@@ -1,4 +1,5 @@
 export 'app_preferences.dart';
+export 'hazuki_app_controller.dart';
 export 'appearance_settings.dart';
 export 'chapter_title_resolver.dart';
 export 'display_mode.dart';

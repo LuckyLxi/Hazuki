@@ -15,7 +15,8 @@ class DownloadsPageController extends ChangeNotifier {
   bool _scanningDownloaded = false;
   bool _disposed = false;
 
-  Set<String> get selectedComicIds => Set<String>.unmodifiable(_selectedComicIds);
+  Set<String> get selectedComicIds =>
+      Set<String>.unmodifiable(_selectedComicIds);
   int get selectedCount => _selectedComicIds.length;
   bool get scanningDownloaded => _scanningDownloaded;
 

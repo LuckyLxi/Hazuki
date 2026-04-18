@@ -114,6 +114,8 @@
   "otherAutoSoftwareUpdateTitle": "自动检查软件更新",
   "otherAutoSoftwareUpdateSubtitle": "每次启动软件时检查一次软件新版本",
   "otherAutoSoftwareUpdateUpdated": "已更新软件检查更新设置",
+  "otherUseSystemTitleBarTitle": "使用系统标题栏",
+  "otherUseSystemTitleBarSubtitle": "开启后恢复 Windows 原生标题栏，关闭时使用应用自定义标题栏",
   "otherMangaDownloadPathTitle": "漫画下载保存路径",
   "otherMangaDownloadPathDialogTitle": "设置漫画下载保存路径",
   "otherMangaDownloadPathDialogHelper": "请输入绝对路径，例如 /storage/emulated/0/Download/Hazuki_Manga",
@@ -671,7 +673,9 @@
   "cloudSyncRestoreTitle": "恢复备份",
   "cloudSyncRestoreContent": "是否覆盖本地文件并恢复云端最新备份？",
   "cloudSyncRestoreConfirm": "覆盖恢复",
-  "cloudSyncRestoreCompleted": "恢复备份完成，已覆盖本地数据",
+  "cloudSyncRestoreCompleted": "恢复完成",
+  "cloudSyncRestoreSkippedPlatformSettings": "已跳过当前平台不兼容设置",
+  "cloudSyncRestoreSourceRestartRequired": "漫画源将在下次启动时生效",
   "cloudSyncRestoreFailed": "恢复失败: {error}",
   "@cloudSyncRestoreFailed": {
     "placeholders": {
