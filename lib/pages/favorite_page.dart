@@ -290,6 +290,9 @@ class FavoritePageState extends State<FavoritePage>
   }
 
   Future<void> _handleRefresh() {
+    if (HazukiSourceService.instance.sourceRuntimeState.canRetry) {
+      HazukiSourceService.instance.logRuntimeRetryRequested('favorite_page');
+    }
     _pendingFreshListEntryAnimation = true;
     _clearEntryAnimationTargets();
     return _controller.refresh(
@@ -397,7 +400,10 @@ class FavoritePageState extends State<FavoritePage>
     super.build(context);
 
     return AnimatedBuilder(
-      animation: _controller,
+      animation: Listenable.merge([
+        _controller,
+        HazukiSourceService.instance,
+      ]),
       builder: (context, _) {
         if (_controller.showLoginRequired) {
           return FavoriteLoginRequiredView(
@@ -435,6 +441,8 @@ class FavoritePageState extends State<FavoritePage>
                     initialLoading: _controller.initialLoading,
                     refreshing: _controller.refreshing,
                     loadingMore: _controller.loadingMore,
+                    sourceRuntimeState:
+                        HazukiSourceService.instance.sourceRuntimeState,
                     strings: _strings(context),
                     mode: _controller.mode,
                     showCreateLocalFolderButton:

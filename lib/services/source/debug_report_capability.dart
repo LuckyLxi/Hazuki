@@ -8,6 +8,7 @@ extension HazukiSourceServiceDebugReportCapability on HazukiSourceService {
     );
     return <String, dynamic>{
       'statusText': _statusText,
+      'sourceRuntimeState': _runtimeState.toDebugMap(),
       'platform': Platform.operatingSystem,
       'sourceMeta': {
         'name': _sourceMeta?.name,
@@ -36,6 +37,7 @@ extension HazukiSourceServiceDebugReportCapability on HazukiSourceService {
     );
     return <String, dynamic>{
       'statusText': _statusText,
+      'sourceRuntimeState': _runtimeState.toDebugMap(),
       'platform': Platform.operatingSystem,
       'sourceMeta': {
         'name': _sourceMeta?.name,
@@ -61,6 +63,7 @@ extension HazukiSourceServiceDebugReportCapability on HazukiSourceService {
     );
     return <String, dynamic>{
       'statusText': _statusText,
+      'sourceRuntimeState': _runtimeState.toDebugMap(),
       'platform': Platform.operatingSystem,
       'sourceMeta': {
         'name': _sourceMeta?.name,

@@ -8,6 +8,7 @@ class _FavoriteContentSection extends StatelessWidget {
     required this.initialLoading,
     required this.refreshing,
     required this.loadingMore,
+    required this.sourceRuntimeState,
     required this.strings,
     required this.onRetry,
     required this.showCreateLocalFolderButton,
@@ -22,6 +23,7 @@ class _FavoriteContentSection extends StatelessWidget {
   final bool initialLoading;
   final bool refreshing;
   final bool loadingMore;
+  final SourceRuntimeState sourceRuntimeState;
   final AppLocalizations strings;
   final Future<void> Function() onRetry;
   final bool showCreateLocalFolderButton;
@@ -57,6 +59,13 @@ class _FavoriteContentSection extends StatelessWidget {
     final showBlockingLoading =
         initialLoading || (refreshing && comics.isEmpty);
     if (showBlockingLoading) {
+      if (shouldShowSourceRuntimeStatusCard(sourceRuntimeState)) {
+        return SourceRuntimeStatusCard(
+          key: const ValueKey('favorite-source-runtime-loading'),
+          state: sourceRuntimeState,
+          minHeight: 360,
+        );
+      }
       return SizedBox(
         key: const ValueKey('favorite-loading'),
         height: 360,
@@ -73,6 +82,18 @@ class _FavoriteContentSection extends StatelessWidget {
       );
     }
     if (errorMessage != null && comics.isEmpty) {
+      if (shouldShowSourceRuntimeStatusCard(
+        sourceRuntimeState,
+        fallbackError: errorMessage,
+      )) {
+        return SourceRuntimeStatusCard(
+          key: const ValueKey('favorite-source-runtime-error'),
+          state: sourceRuntimeState,
+          fallbackError: errorMessage,
+          onRetry: onRetry,
+          minHeight: 360,
+        );
+      }
       return SizedBox(
         key: const ValueKey('favorite-error'),
         height: 360,

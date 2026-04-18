@@ -6,6 +6,15 @@
  * @LastEditTime: 2020-12-02 11:36:40
 -->
 
+## Unreleased (Hazuki maintenance)
+
+* document the split QuickJS maintenance strategy used by Hazuki.
+* confirm upstream QuickJS `2025-09-13` remains the current non-MSVC runtime.
+* keep Windows/MSVC on the legacy fallback snapshot until a dedicated
+  compatibility pass is completed.
+* align repository hygiene with existing ignore rules by removing tracked
+  Android Gradle cache files from the vendored plugin.
+
 ## 0.3.7
 
 * add timeout and memory limit

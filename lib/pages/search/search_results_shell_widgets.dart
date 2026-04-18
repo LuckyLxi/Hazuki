@@ -279,8 +279,19 @@ extension _SearchResultsShellWidgetsExtension on _SearchResultsPageState {
       searchLoading: _searchLoading,
       searchComics: _searchComics,
       searchErrorMessage: _searchErrorMessage,
-      onRetry: () =>
-          _resultsController.search(context, keyword: _searchKeyword, page: 1),
+      sourceRuntimeState: HazukiSourceService.instance.sourceRuntimeState,
+      onRetry: () {
+        if (HazukiSourceService.instance.sourceRuntimeState.canRetry) {
+          HazukiSourceService.instance.logRuntimeRetryRequested(
+            'search_results_page',
+          );
+        }
+        return _resultsController.search(
+          context,
+          keyword: _searchKeyword,
+          page: 1,
+        );
+      },
     );
   }
 

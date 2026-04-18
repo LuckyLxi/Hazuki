@@ -5,6 +5,7 @@ import 'package:lottie/lottie.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../models/hazuki_models.dart';
+import '../../services/hazuki_source_service.dart';
 import '../../widgets/widgets.dart';
 
 class SearchResultsStateView extends StatelessWidget {
@@ -14,6 +15,7 @@ class SearchResultsStateView extends StatelessWidget {
     required this.searchLoading,
     required this.searchComics,
     required this.searchErrorMessage,
+    required this.sourceRuntimeState,
     required this.onRetry,
   });
 
@@ -21,6 +23,7 @@ class SearchResultsStateView extends StatelessWidget {
   final bool searchLoading;
   final List<ExploreComic> searchComics;
   final String? searchErrorMessage;
+  final SourceRuntimeState sourceRuntimeState;
   final Future<void> Function() onRetry;
 
   @override
@@ -35,41 +38,62 @@ class SearchResultsStateView extends StatelessWidget {
         child: Center(child: Text(strings.searchStartPrompt)),
       );
     } else if (searchLoading && searchComics.isEmpty) {
-      child = SizedBox(
-        key: const ValueKey('search-loading'),
-        height: 360,
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const HazukiSearchingAnimationIndicator(size: 156),
-              const SizedBox(height: 12),
-              Text(strings.searchLoading),
-            ],
+      if (shouldShowSourceRuntimeStatusCard(sourceRuntimeState)) {
+        child = SourceRuntimeStatusCard(
+          key: const ValueKey('search-source-runtime-loading'),
+          state: sourceRuntimeState,
+          minHeight: 360,
+        );
+      } else {
+        child = SizedBox(
+          key: const ValueKey('search-loading'),
+          height: 360,
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const HazukiSearchingAnimationIndicator(size: 156),
+                const SizedBox(height: 12),
+                Text(strings.searchLoading),
+              ],
+            ),
           ),
-        ),
-      );
+        );
+      }
     } else if (searchErrorMessage != null && searchComics.isEmpty) {
-      child = SizedBox(
-        key: const ValueKey('search-error'),
-        height: 360,
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Text(searchErrorMessage!, textAlign: TextAlign.center),
-              ),
-              const SizedBox(height: 12),
-              FilledButton(
-                onPressed: () => unawaited(onRetry()),
-                child: Text(strings.commonRetry),
-              ),
-            ],
+      if (shouldShowSourceRuntimeStatusCard(
+        sourceRuntimeState,
+        fallbackError: searchErrorMessage,
+      )) {
+        child = SourceRuntimeStatusCard(
+          key: const ValueKey('search-source-runtime-error'),
+          state: sourceRuntimeState,
+          fallbackError: searchErrorMessage,
+          onRetry: () => unawaited(onRetry()),
+          minHeight: 360,
+        );
+      } else {
+        child = SizedBox(
+          key: const ValueKey('search-error'),
+          height: 360,
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Text(searchErrorMessage!, textAlign: TextAlign.center),
+                ),
+                const SizedBox(height: 12),
+                FilledButton(
+                  onPressed: () => unawaited(onRetry()),
+                  child: Text(strings.commonRetry),
+                ),
+              ],
+            ),
           ),
-        ),
-      );
+        );
+      }
     } else if (searchComics.isEmpty) {
       child = SizedBox(
         key: const ValueKey('search-empty'),

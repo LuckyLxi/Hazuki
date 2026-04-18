@@ -7,6 +7,7 @@ import 'dart:ui';
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:dio/io.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_qjs/flutter_qjs.dart';
 import 'package:path_provider/path_provider.dart';
@@ -48,6 +49,7 @@ part 'source/line_settings.dart';
 part 'source/source_bootstrap_support.dart';
 part 'source/source_file_management_capability.dart';
 part 'source/source_loader_capability.dart';
+part 'source/source_runtime_support.dart';
 part 'source/source_store_support.dart';
 part 'source/version_update_capability.dart';
 
@@ -89,7 +91,76 @@ class DailyCheckInResult {
   bool get isSkipped => status == DailyCheckInStatus.skipped;
 }
 
-class HazukiSourceService {
+enum SourceRuntimePhase {
+  idle,
+  prewarming,
+  loading,
+  ready,
+  failed,
+  retrying,
+  waitingForRestart,
+}
+
+enum SourceRuntimeStep {
+  none,
+  loadingCache,
+  downloadingSource,
+  creatingEngine,
+  runningSourceInit,
+}
+
+@immutable
+class SourceRuntimeState {
+  const SourceRuntimeState({
+    required this.phase,
+    required this.step,
+    required this.statusText,
+    required this.updatedAt,
+    this.debugDetail,
+    this.error,
+  });
+
+  const SourceRuntimeState.idle()
+    : this(
+        phase: SourceRuntimePhase.idle,
+        step: SourceRuntimeStep.none,
+        statusText: 'source_idle',
+        updatedAt: null,
+      );
+
+  final SourceRuntimePhase phase;
+  final SourceRuntimeStep step;
+  final String statusText;
+  final DateTime? updatedAt;
+  final String? debugDetail;
+  final String? error;
+
+  bool get isBusy =>
+      phase == SourceRuntimePhase.prewarming ||
+      phase == SourceRuntimePhase.loading ||
+      phase == SourceRuntimePhase.retrying;
+  bool get isReady => phase == SourceRuntimePhase.ready;
+  bool get hasFailure => phase == SourceRuntimePhase.failed;
+  bool get canRetry => phase == SourceRuntimePhase.failed;
+  bool get isWaitingForRestart =>
+      phase == SourceRuntimePhase.waitingForRestart;
+  bool get shouldSurfaceOnPage => isBusy || hasFailure || isWaitingForRestart;
+
+  Map<String, dynamic> toDebugMap() {
+    return <String, dynamic>{
+      'phase': phase.name,
+      'step': step.name,
+      'statusText': statusText,
+      'updatedAt': updatedAt?.toIso8601String(),
+      'debugDetail': debugDetail,
+      'error': error,
+      'canRetry': canRetry,
+      'shouldSurfaceOnPage': shouldSurfaceOnPage,
+    };
+  }
+}
+
+class HazukiSourceService extends ChangeNotifier {
   HazukiSourceService._();
 
   static final HazukiSourceService instance = HazukiSourceService._();
@@ -121,7 +192,8 @@ class HazukiSourceService {
   SharedPreferences? _prefs;
   Future<void>? _initFuture;
 
-  String _statusText = 'source_initializing';
+  String _statusText = 'source_idle';
+  SourceRuntimeState _runtimeState = const SourceRuntimeState.idle();
   SourceMeta? _sourceMeta;
   Map<String, dynamic>? _favoritesDebugCache;
   bool _isWarmingUpFavoritesDebug = false;
@@ -164,9 +236,14 @@ class HazukiSourceService {
   }
 
   String get statusText => _statusText;
+  SourceRuntimeState get sourceRuntimeState => _runtimeState;
   SourceMeta? get sourceMeta => _sourceMeta;
   bool get isInitialized => _engine != null && _sourceMeta != null;
   bool get softwareLogCaptureEnabled => _softwareLogCaptureEnabled;
+
+  void _notifyRuntimeStateChanged() {
+    notifyListeners();
+  }
 
   Future<SearchComicsResult> searchComics({
     required String keyword,

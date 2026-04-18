@@ -184,6 +184,9 @@ class _DiscoverPageState extends State<DiscoverPage> {
     if (_refreshing) {
       return;
     }
+    if (HazukiSourceService.instance.sourceRuntimeState.canRetry) {
+      HazukiSourceService.instance.logRuntimeRetryRequested('discover_page');
+    }
 
     setState(() {
       _refreshing = true;
@@ -316,12 +319,19 @@ class _DiscoverPageState extends State<DiscoverPage> {
 
   Widget _buildDiscoverStateView() {
     final strings = AppLocalizations.of(context)!;
+    final sourceRuntimeState = HazukiSourceService.instance.sourceRuntimeState;
     final showBlockingLoading =
         _initialLoading || (_refreshing && _sections.isEmpty);
     late final Widget child;
 
     if (showBlockingLoading) {
-      if (!widget.allowInitialLoad &&
+      if (shouldShowSourceRuntimeStatusCard(sourceRuntimeState)) {
+        child = SourceRuntimeStatusCard(
+          key: const ValueKey('discover-source-runtime-loading'),
+          state: sourceRuntimeState,
+          minHeight: 360,
+        );
+      } else if (!widget.allowInitialLoad &&
           widget.hideLoadingUntilInitialLoadAllowed) {
         child = const SizedBox(
           key: ValueKey('discover-placeholder'),
@@ -344,26 +354,39 @@ class _DiscoverPageState extends State<DiscoverPage> {
         );
       }
     } else if (_errorMessage != null && _sections.isEmpty) {
-      child = SizedBox(
-        key: const ValueKey('discover-error'),
-        height: 360,
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Text(_errorMessage!, textAlign: TextAlign.center),
-              ),
-              const SizedBox(height: 12),
-              FilledButton(
-                onPressed: _refreshDiscover,
-                child: Text(strings.commonRetry),
-              ),
-            ],
+      if (shouldShowSourceRuntimeStatusCard(
+        sourceRuntimeState,
+        fallbackError: _errorMessage,
+      )) {
+        child = SourceRuntimeStatusCard(
+          key: const ValueKey('discover-source-runtime-error'),
+          state: sourceRuntimeState,
+          fallbackError: _errorMessage,
+          onRetry: _refreshDiscover,
+          minHeight: 360,
+        );
+      } else {
+        child = SizedBox(
+          key: const ValueKey('discover-error'),
+          height: 360,
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Text(_errorMessage!, textAlign: TextAlign.center),
+                ),
+                const SizedBox(height: 12),
+                FilledButton(
+                  onPressed: _refreshDiscover,
+                  child: Text(strings.commonRetry),
+                ),
+              ],
+            ),
           ),
-        ),
-      );
+        );
+      }
     } else if (_sections.isEmpty) {
       child = SizedBox(
         key: const ValueKey('discover-empty'),
@@ -527,32 +550,37 @@ class _DiscoverPageState extends State<DiscoverPage> {
 
   @override
   Widget build(BuildContext context) {
-    final visibleSectionCount = math.min(
-      _visibleSectionCount,
-      _sections.length,
-    );
-    final hasSections = visibleSectionCount > 0;
+    return ListenableBuilder(
+      listenable: HazukiSourceService.instance,
+      builder: (context, _) {
+        final visibleSectionCount = math.min(
+          _visibleSectionCount,
+          _sections.length,
+        );
+        final hasSections = visibleSectionCount > 0;
 
-    return HazukiPullToRefresh(
-      onRefresh: _refreshDiscover,
-      edgeOffset: 56,
-      child: ListView.builder(
-        controller: _scrollController,
-        physics: const AlwaysScrollableScrollPhysics(
-          parent: ClampingScrollPhysics(),
-        ),
-        padding: const EdgeInsets.all(16),
-        itemCount: hasSections ? visibleSectionCount + 1 : 2,
-        itemBuilder: (context, index) {
-          if (index == 0) {
-            return _buildTopSearchBox();
-          }
-          if (!hasSections) {
-            return _buildDiscoverStateView();
-          }
-          return _buildDiscoverSection(_sections[index - 1], index - 1);
-        },
-      ),
+        return HazukiPullToRefresh(
+          onRefresh: _refreshDiscover,
+          edgeOffset: 56,
+          child: ListView.builder(
+            controller: _scrollController,
+            physics: const AlwaysScrollableScrollPhysics(
+              parent: ClampingScrollPhysics(),
+            ),
+            padding: const EdgeInsets.all(16),
+            itemCount: hasSections ? visibleSectionCount + 1 : 2,
+            itemBuilder: (context, index) {
+              if (index == 0) {
+                return _buildTopSearchBox();
+              }
+              if (!hasSections) {
+                return _buildDiscoverStateView();
+              }
+              return _buildDiscoverSection(_sections[index - 1], index - 1);
+            },
+          ),
+        );
+      },
     );
   }
 }

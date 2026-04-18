@@ -28,6 +28,7 @@ import 'services/manga_download_service.dart';
 import 'services/manga_download_storage_support.dart';
 import 'services/password_lock_service.dart';
 import 'widgets/password_lock_widgets.dart';
+import 'widgets/hazuki_prompt.dart';
 
 Future<void> _ensureAndroidNoMediaMarker() async {
   if (!Platform.isAndroid) {
@@ -557,6 +558,7 @@ class _HazukiAppState extends State<HazukiApp>
                 GlobalCupertinoLocalizations.delegate,
               ],
               supportedLocales: AppLocalizations.supportedLocales,
+              navigatorObservers: [hazukiPromptNavigatorObserver],
               themeMode: _themeController.themeMode,
               theme: HazukiThemeFactory.buildLight(appearance, lightDynamic),
               darkTheme: HazukiThemeFactory.buildDark(appearance, darkDynamic),

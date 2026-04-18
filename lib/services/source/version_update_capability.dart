@@ -153,7 +153,10 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
       'remoteVersion': downloadedVersion,
       'outcome': 'downloaded_waiting_for_restart',
     };
-    _statusText = 'source_downloaded_waiting_for_restart|$downloadedVersion';
+    _setRuntimeWaitingForRestartState(
+      statusText: 'source_downloaded_waiting_for_restart|$downloadedVersion',
+      debugDetail: 'downloaded_jm_script',
+    );
     return true;
   }
 
@@ -163,6 +166,14 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
     }
     _isRefreshingSource = true;
     try {
+      _setRuntimeBusyState(
+        _runtimeState.hasFailure
+            ? SourceRuntimePhase.retrying
+            : SourceRuntimePhase.loading,
+        SourceRuntimeStep.downloadingSource,
+        statusText: 'source_refreshing_after_network_recovery',
+        debugDetail: 'network_recovery',
+      );
       _lastReloginAt = null;
       _favoritesDebugCache = null;
       _exploreSectionsMemoryCache = null;
@@ -173,13 +184,13 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
       final result = await _downloadOrLoadSourceFiles();
       final meta = await _loadSourceMetadata(result.initFile, result.jmFile);
       _sourceMeta = meta;
-      _statusText =
-          '${result.message}|${meta.name}|${meta.key}|${meta.version}';
+      _setRuntimeReadyState(result: result, meta: meta);
       if (isLogged) {
         await _tryReloginFromStoredAccount(force: true);
       }
       return true;
-    } catch (_) {
+    } catch (e) {
+      _setRuntimeFailedState(e);
       return false;
     } finally {
       _isRefreshingSource = false;
