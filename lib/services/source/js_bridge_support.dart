@@ -59,7 +59,8 @@ extension _JsBridgeSupport on HazukiSourceService {
         result = 'zh_CN';
         break;
       case 'getPlatform':
-        result = Platform.operatingSystem;
+        final os = Platform.operatingSystem;
+        result = (os == 'android' || os == 'ios') ? os : 'android';
         break;
       case 'log':
         addApplicationLog(

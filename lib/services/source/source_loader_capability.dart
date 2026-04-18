@@ -112,17 +112,23 @@ extension HazukiSourceServiceSourceLoaderCapability on HazukiSourceService {
         SourceRuntimeStep.runningSourceInit,
         debugDetail: 'running_source_init',
       );
-      final initResult = engine.evaluate(
-        'this.__hazuki_source.init?.()',
-        name: 'source_init.js',
-      );
-      if (initResult is Future) {
-        await initResult;
+      final oldMeta = _sourceMeta;
+      _sourceMeta = meta;
+      try {
+        final initResult = engine.evaluate(
+          'this.__hazuki_source.init?.()',
+          name: 'source_init.js',
+        );
+        if (initResult is Future) {
+          await initResult;
+        }
+      } catch (_) {
+        _sourceMeta = oldMeta;
+        rethrow;
       }
       final oldEngine = _engine;
       _engine = engine;
       oldEngine?.close();
-      _sourceMeta = meta;
       return meta;
     } catch (_) {
       engine.close();
