@@ -48,6 +48,7 @@ class HomeCoordinator extends ChangeNotifier {
     unawaited(syncUserProfile(context));
     unawaited(loadFirstUseText(context));
     unawaited(loadOtherSettings(context));
+    unawaited(_prewarmSourceRuntime(context));
     if (HazukiSourceService.instance.isLogged) {
       unawaited(HazukiSourceService.instance.warmUpFavoritesDebugInfo());
     }
@@ -141,6 +142,17 @@ class HomeCoordinator extends ChangeNotifier {
   void _relayChange() {
     if (!_disposed) {
       notifyListeners();
+    }
+  }
+
+  Future<void> _prewarmSourceRuntime(BuildContext context) async {
+    await HazukiSourceService.instance.prewarmInBackground();
+    if (!context.mounted) {
+      return;
+    }
+    await syncUserProfile(context);
+    if (HazukiSourceService.instance.isLogged) {
+      unawaited(HazukiSourceService.instance.warmUpFavoritesDebugInfo());
     }
   }
 

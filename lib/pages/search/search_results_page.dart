@@ -94,7 +94,10 @@ class _SearchResultsPageState extends State<SearchResultsPage>
   Widget build(BuildContext context) {
     return WindowsComicDetailHost(
       child: ListenableBuilder(
-        listenable: _resultsController,
+        listenable: Listenable.merge([
+          _resultsController,
+          HazukiSourceService.instance,
+        ]),
         builder: (context, _) => PopScope(
           canPop: !_collapsedSearchExpanded,
           onPopInvokedWithResult: _handlePopInvoked,

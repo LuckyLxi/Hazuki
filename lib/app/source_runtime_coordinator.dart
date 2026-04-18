@@ -135,7 +135,6 @@ class SourceRuntimeCoordinator {
       return;
     }
 
-    await HazukiSourceService.instance.ensureInitialized();
     if (!isMounted()) {
       return;
     }

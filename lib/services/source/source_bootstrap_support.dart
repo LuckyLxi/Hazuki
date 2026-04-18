@@ -36,6 +36,7 @@ extension SourceBootstrapSupport on HazukiSourceService {
 
   Future<void> init({
     void Function(int received, int total)? onSourceDownloadProgress,
+    bool prewarm = false,
   }) async {
     final inFlight = _initFuture;
     if (inFlight != null) {
@@ -45,9 +46,16 @@ extension SourceBootstrapSupport on HazukiSourceService {
 
     final future = _initInternal(
       onSourceDownloadProgress: onSourceDownloadProgress,
+      prewarm: prewarm,
     );
     _initFuture = future;
-    await future;
+    try {
+      await future;
+    } finally {
+      if (identical(_initFuture, future)) {
+        _initFuture = null;
+      }
+    }
   }
 
   Future<void> ensureInitialized() async {
@@ -76,8 +84,21 @@ extension SourceBootstrapSupport on HazukiSourceService {
 
   Future<void> _initInternal({
     void Function(int received, int total)? onSourceDownloadProgress,
+    required bool prewarm,
   }) async {
+    final busyPhase = switch (_runtimeState.phase) {
+      SourceRuntimePhase.failed => SourceRuntimePhase.retrying,
+      _ when prewarm => SourceRuntimePhase.prewarming,
+      _ => SourceRuntimePhase.loading,
+    };
+
     try {
+      _setRuntimeBusyState(
+        busyPhase,
+        SourceRuntimeStep.loadingCache,
+        statusText: prewarm ? 'source_prewarming' : 'source_initializing',
+        debugDetail: 'loading_cache',
+      );
       _prefs = await SharedPreferences.getInstance();
       _softwareLogCaptureEnabled =
           _prefs?.getBool(HazukiSourceService._softwareLogCaptureEnabledKey) ??
@@ -85,15 +106,24 @@ extension SourceBootstrapSupport on HazukiSourceService {
       _configureDioCookieBridge();
       await _initImageCache();
       await _initDiscoverCache();
+      _setRuntimeBusyState(
+        busyPhase,
+        SourceRuntimeStep.downloadingSource,
+        debugDetail: 'downloading_source',
+      );
       final result = await _downloadOrLoadSourceFiles(
         onProgress: onSourceDownloadProgress,
       );
+      _setRuntimeBusyState(
+        busyPhase,
+        SourceRuntimeStep.creatingEngine,
+        debugDetail: 'creating_engine',
+      );
       final meta = await _loadSourceMetadata(result.initFile, result.jmFile);
       _sourceMeta = meta;
-      _statusText =
-          '${result.message}|${meta.name}|${meta.key}|${meta.version}';
+      _setRuntimeReadyState(result: result, meta: meta);
     } catch (e) {
-      _statusText = 'source_init_failed:$e';
+      _setRuntimeFailedState(e);
     }
   }
 

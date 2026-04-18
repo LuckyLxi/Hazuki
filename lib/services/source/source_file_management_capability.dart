@@ -17,7 +17,10 @@ extension HazukiSourceServiceSourceFileManagementCapability
       'resolvedFrom': 'local_source_editor',
       'outcome': 'edited_waiting_for_restart',
     };
-    _statusText = 'source_edited_waiting_for_restart';
+    _setRuntimeWaitingForRestartState(
+      statusText: 'source_edited_waiting_for_restart',
+      debugDetail: 'local_source_editor',
+    );
   }
 
   Future<bool> hasLocalJmSourceFile() async {

@@ -2,6 +2,8 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
+import '../../widgets/hazuki_prompt.dart';
+
 class HomeBottomNavigation extends StatefulWidget {
   const HomeBottomNavigation({
     super.key,
@@ -10,6 +12,12 @@ class HomeBottomNavigation extends StatefulWidget {
     required this.discoverLabel,
     required this.favoriteLabel,
   });
+
+  static const double floatingBarHeight = 64;
+  static const double bottomSpacing = 10;
+  static const double promptGap = 10;
+  static const double promptBottomPadding =
+      floatingBarHeight + bottomSpacing + promptGap;
 
   final int currentIndex;
   final ValueChanged<int> onDestinationSelected;
@@ -82,6 +90,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
         ),
       );
     });
+    _schedulePromptAnchorSync();
   }
 
   @override
@@ -93,6 +102,13 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
       // Animate in the new item with spring
       _controllers[widget.currentIndex].forward();
     }
+    _schedulePromptAnchorSync();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _schedulePromptAnchorSync();
   }
 
   @override
@@ -137,7 +153,10 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
                     ),
                   ],
                 ),
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 10,
+                ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -168,6 +187,18 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
     );
   }
 
+  void _schedulePromptAnchorSync() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      hazukiPromptPlacementController.updateHomeAnchor(
+        tabIndex: widget.currentIndex,
+        elevatedBottomPadding: HomeBottomNavigation.promptBottomPadding,
+      );
+    });
+  }
+
   Widget _buildItem({
     required int index,
     required IconData icon,
@@ -182,9 +213,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
       scale: _scaleAnims[index],
       child: Icon(
         isSelected ? selectedIcon : icon,
-        color: isSelected
-            ? colorScheme.primary
-            : colorScheme.onSurfaceVariant,
+        color: isSelected ? colorScheme.primary : colorScheme.onSurfaceVariant,
         size: 22,
       ),
     );
@@ -235,7 +264,9 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
                   filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
                   child: Container(
                     decoration: BoxDecoration(
-                      color: colorScheme.primaryContainer.withValues(alpha: 0.55),
+                      color: colorScheme.primaryContainer.withValues(
+                        alpha: 0.55,
+                      ),
                       borderRadius: BorderRadius.circular(28),
                     ),
                   ),

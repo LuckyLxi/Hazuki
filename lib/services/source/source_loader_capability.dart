@@ -91,6 +91,11 @@ extension HazukiSourceServiceSourceLoaderCapability on HazukiSourceService {
 
     _sourceMeta = meta;
 
+    _setRuntimeBusyState(
+      _runtimeState.phase,
+      SourceRuntimeStep.runningSourceInit,
+      debugDetail: 'running_source_init',
+    );
     final initResult = engine.evaluate(
       'this.__hazuki_source.init?.()',
       name: 'source_init.js',
