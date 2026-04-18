@@ -59,6 +59,7 @@ class HomeNavigationActions {
 
   Future<void> openHistory() async {
     await _openDrawerDestination(
+      hideComicDetailPanel: true,
       (_) => HistoryPage(comicDetailPageBuilder: buildComicDetailPage),
     );
   }
@@ -74,12 +75,14 @@ class HomeNavigationActions {
 
   Future<void> openRanking() async {
     await _openDrawerDestination(
+      hideComicDetailPanel: true,
       (_) => RankingPage(comicDetailPageBuilder: buildComicDetailPage),
     );
   }
 
   Future<void> openDownloads() async {
     await _openDrawerDestination(
+      hideComicDetailPanel: true,
       (_) => DownloadsPage(
         readerPageBuilder: (comic, chapter) => ReaderPage(
           title: comic.title,
@@ -132,23 +135,27 @@ class HomeNavigationActions {
         DrawerTheme.of(context).backgroundColor ??
         Theme.of(context).drawerTheme.backgroundColor ??
         Theme.of(context).colorScheme.surface;
-    final preserveComicDetailPanel =
-        useWindowsComicDetailPanel &&
-        !hideComicDetailPanel &&
-        WindowsComicDetailController.instance.isPanelVisible;
 
     final route = _DrawerExpandPageRoute<void>(
       builder: builder,
       drawerWidth: drawerWidth,
       drawerColor: drawerColor,
       drawerContent: drawerTransitionContent,
-      reservedTrailingWidthFactor: preserveComicDetailPanel ? 0.6 : 0,
+      reservedTrailingWidthFactor: 0,
     );
 
     scaffoldKey.currentState?.closeDrawer();
     final controller = WindowsComicDetailController.instance;
     if (hideComicDetailPanel && useWindowsComicDetailPanel) {
-      await controller.hideWhile(() => navigator.push<void>(route));
+      final hideToken = controller.beginTemporaryHide();
+      route.onPopStarted = () {
+        controller.endTemporaryHide(hideToken);
+      };
+      try {
+        await navigator.push<void>(route);
+      } finally {
+        controller.endTemporaryHide(hideToken);
+      }
       return;
     }
 
@@ -169,6 +176,7 @@ class _DrawerExpandPageRoute<T> extends MaterialPageRoute<T> {
   final Color drawerColor;
   final Widget drawerContent;
   final double reservedTrailingWidthFactor;
+  VoidCallback? onPopStarted;
 
   bool get _preserveTrailingPanel => reservedTrailingWidthFactor > 0;
 
@@ -180,6 +188,13 @@ class _DrawerExpandPageRoute<T> extends MaterialPageRoute<T> {
 
   @override
   Duration get reverseTransitionDuration => const Duration(milliseconds: 300);
+
+  @override
+  bool didPop(T? result) {
+    onPopStarted?.call();
+    onPopStarted = null;
+    return super.didPop(result);
+  }
 
   @override
   Widget buildTransitions(

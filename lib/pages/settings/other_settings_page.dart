@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../app/app.dart';
+import '../../app/windows_title_bar_controller.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/manga_download_service.dart';
 import '../../services/manga_download_storage_support.dart';
@@ -12,7 +13,14 @@ import '../../widgets/widgets.dart';
 import 'settings_group.dart';
 
 class OtherSettingsPage extends StatefulWidget {
-  const OtherSettingsPage({super.key});
+  const OtherSettingsPage({
+    super.key,
+    this.initialUseSystemTitleBar = false,
+    this.onUseSystemTitleBarChanged,
+  });
+
+  final bool initialUseSystemTitleBar;
+  final Future<void> Function(bool value)? onUseSystemTitleBarChanged;
 
   @override
   State<OtherSettingsPage> createState() => _OtherSettingsPageState();
@@ -22,6 +30,7 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
   bool _autoCheckInEnabled = false;
   bool _autoSourceUpdateCheckEnabled = true;
   bool _autoSoftwareUpdateCheckEnabled = true;
+  late bool _useSystemTitleBar = widget.initialUseSystemTitleBar;
   String _mangaDownloadsRootPath = MangaDownloadAccess.defaultDownloadsRootPath;
   bool _loading = true;
 
@@ -85,6 +94,21 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
       context,
       AppLocalizations.of(context)!.otherAutoSoftwareUpdateUpdated,
     );
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (Theme.of(context).platform == TargetPlatform.windows) {
+      _useSystemTitleBar = HazukiWindowsTitleBarScope.of(
+        context,
+      ).useSystemTitleBar;
+    }
+  }
+
+  Future<void> _toggleUseSystemTitleBar(bool value) async {
+    setState(() => _useSystemTitleBar = value);
+    await widget.onUseSystemTitleBarChanged?.call(value);
   }
 
   Future<void> _editMangaDownloadPath() async {
@@ -187,6 +211,16 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
                         value: _autoSoftwareUpdateCheckEnabled,
                         onChanged: _toggleAutoSoftwareUpdateCheck,
                       ),
+                      if (Theme.of(context).platform == TargetPlatform.windows)
+                        SwitchListTile(
+                          secondary: const Icon(Icons.web_asset_outlined),
+                          title: Text(strings.otherUseSystemTitleBarTitle),
+                          subtitle: Text(
+                            strings.otherUseSystemTitleBarSubtitle,
+                          ),
+                          value: _useSystemTitleBar,
+                          onChanged: _toggleUseSystemTitleBar,
+                        ),
                       ListTile(
                         leading: const Icon(Icons.folder_outlined),
                         title: Text(strings.otherMangaDownloadPathTitle),

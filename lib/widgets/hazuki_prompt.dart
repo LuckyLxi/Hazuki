@@ -106,6 +106,8 @@ Future<void> showHazukiPrompt(
 
   var expanded = false;
   var textVisible = false;
+  var collapsePrimed = false;
+  var fadingOut = false;
   var removed = false;
   final completer = Completer<void>();
 
@@ -181,78 +183,105 @@ Future<void> showHazukiPrompt(
                     padding: EdgeInsets.only(
                       bottom: hazukiPromptPlacementController.bottomPadding,
                     ),
-                    child: AnimatedScale(
-                      duration: Duration(milliseconds: expanded ? 340 : 220),
-                      curve: expanded
-                          ? Curves.easeOutBack
-                          : Curves.easeOutCubic,
-                      scale: expanded ? 1 : 0.96,
-                      child: AnimatedContainer(
-                        duration: Duration(milliseconds: expanded ? 340 : 220),
-                        curve: expanded
-                            ? Curves.easeOutBack
-                            : const Cubic(0.22, 0.0, 0.2, 1.0),
-                        width: expanded
-                            ? (expandedWidth < 44 ? 44 : expandedWidth)
-                            : 44,
-                        height: 44,
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        decoration: BoxDecoration(
-                          color: backgroundColor,
-                          borderRadius: BorderRadius.circular(22),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.12),
-                              blurRadius: expanded ? 18 : 14,
-                              offset: const Offset(0, 8),
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 150),
+                      curve: Curves.easeOutCubic,
+                      opacity: fadingOut ? 0 : 1,
+                      child: AnimatedScale(
+                        duration: const Duration(milliseconds: 150),
+                        curve: const Cubic(0.3, 0.0, 0.2, 1.0),
+                        scale: fadingOut ? 0.82 : 1,
+                        child: AnimatedContainer(
+                          duration: Duration(
+                            milliseconds: collapsePrimed
+                                ? 140
+                                : (expanded ? 340 : 220),
+                          ),
+                          curve: collapsePrimed
+                              ? const Cubic(0.16, 0.9, 0.22, 1.0)
+                              : (expanded
+                                    ? Curves.easeOutBack
+                                    : Curves.easeOutCubic),
+                          transformAlignment: Alignment.center,
+                          transform: Matrix4.diagonal3Values(
+                            collapsePrimed ? 1.11 : (expanded ? 1 : 0.96),
+                            collapsePrimed ? 0.9 : (expanded ? 1 : 0.96),
+                            1,
+                          ),
+                          child: AnimatedContainer(
+                            duration: Duration(
+                              milliseconds: collapsePrimed
+                                  ? 140
+                                  : (expanded ? 340 : 220),
                             ),
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            AnimatedScale(
-                              duration: Duration(
-                                milliseconds: expanded ? 260 : 180,
-                              ),
-                              curve: expanded
-                                  ? Curves.easeOutBack
-                                  : Curves.easeOutCubic,
-                              scale: expanded ? 1 : 0.94,
-                              child: Icon(
-                                Icons.tips_and_updates_rounded,
-                                size: 18,
-                                color: foregroundColor,
-                              ),
+                            curve: expanded
+                                ? Curves.easeOutBack
+                                : const Cubic(0.22, 0.0, 0.2, 1.0),
+                            width: expanded
+                                ? (expandedWidth < 44 ? 44 : expandedWidth)
+                                : 44,
+                            height: 44,
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            decoration: BoxDecoration(
+                              color: backgroundColor,
+                              borderRadius: BorderRadius.circular(22),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.12),
+                                  blurRadius: expanded ? 18 : 14,
+                                  offset: const Offset(0, 8),
+                                ),
+                              ],
                             ),
-                            ClipRect(
-                              child: AnimatedAlign(
-                                alignment: Alignment.centerLeft,
-                                duration: const Duration(milliseconds: 220),
-                                curve: textVisible
-                                    ? const Cubic(0.18, 0.84, 0.22, 1.0)
-                                    : const Cubic(0.4, 0.0, 0.2, 1.0),
-                                widthFactor: textVisible ? 1 : 0,
-                                child: Padding(
-                                  padding: const EdgeInsets.only(left: 8),
-                                  child: AnimatedOpacity(
-                                    duration: const Duration(milliseconds: 160),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                AnimatedScale(
+                                  duration: Duration(
+                                    milliseconds: expanded ? 260 : 180,
+                                  ),
+                                  curve: expanded
+                                      ? Curves.easeOutBack
+                                      : Curves.easeOutCubic,
+                                  scale: expanded ? 1 : 0.94,
+                                  child: Icon(
+                                    Icons.tips_and_updates_rounded,
+                                    size: 18,
+                                    color: foregroundColor,
+                                  ),
+                                ),
+                                ClipRect(
+                                  child: AnimatedAlign(
+                                    alignment: Alignment.centerLeft,
+                                    duration: const Duration(milliseconds: 220),
                                     curve: textVisible
-                                        ? Curves.easeOutCubic
-                                        : Curves.easeInCubic,
-                                    opacity: textVisible ? 1 : 0,
-                                    child: Text(
-                                      message,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.fade,
-                                      softWrap: false,
-                                      style: textStyle,
+                                        ? const Cubic(0.18, 0.84, 0.22, 1.0)
+                                        : const Cubic(0.4, 0.0, 0.2, 1.0),
+                                    widthFactor: textVisible ? 1 : 0,
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(left: 8),
+                                      child: AnimatedOpacity(
+                                        duration: const Duration(
+                                          milliseconds: 160,
+                                        ),
+                                        curve: textVisible
+                                            ? Curves.easeOutCubic
+                                            : Curves.easeInCubic,
+                                        opacity: textVisible ? 1 : 0,
+                                        child: Text(
+                                          message,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.fade,
+                                          softWrap: false,
+                                          style: textStyle,
+                                        ),
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
+                              ],
                             ),
-                          ],
+                          ),
                         ),
                       ),
                     ),
@@ -298,15 +327,32 @@ Future<void> showHazukiPrompt(
     textVisible = false;
     markNeedsBuild();
 
-    await Future<void>.delayed(const Duration(milliseconds: 90));
+    await Future<void>.delayed(const Duration(milliseconds: 70));
     if (removed || ticket != _hazukiPromptTicket) {
       removeEntry();
       return;
     }
+    collapsePrimed = true;
+    markNeedsBuild();
+
+    await Future<void>.delayed(const Duration(milliseconds: 140));
+    if (removed || ticket != _hazukiPromptTicket) {
+      removeEntry();
+      return;
+    }
+    collapsePrimed = false;
     expanded = false;
     markNeedsBuild();
 
-    await Future<void>.delayed(const Duration(milliseconds: 240));
+    await Future<void>.delayed(const Duration(milliseconds: 180));
+    if (removed || ticket != _hazukiPromptTicket) {
+      removeEntry();
+      return;
+    }
+    fadingOut = true;
+    markNeedsBuild();
+
+    await Future<void>.delayed(const Duration(milliseconds: 150));
     removeEntry();
   }());
 

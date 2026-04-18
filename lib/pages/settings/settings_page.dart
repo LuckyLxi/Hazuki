@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../../app/app.dart';
+import '../../app/windows_title_bar_controller.dart';
 import '../../l10n/app_localizations.dart';
 import '../../widgets/widgets.dart';
 import '../../widgets/windows_comic_detail_host.dart';
@@ -157,9 +158,17 @@ class _SettingsPageState extends State<SettingsPage> {
                 title: Text(strings.settingsOtherTitle),
                 subtitle: Text(strings.settingsOtherSubtitle),
                 onTap: () {
+                  final titleBarController = HazukiWindowsTitleBarScope.of(
+                    context,
+                  );
                   Navigator.of(context).push(
                     MaterialPageRoute<void>(
-                      builder: (_) => const OtherSettingsPage(),
+                      builder: (_) => OtherSettingsPage(
+                        initialUseSystemTitleBar:
+                            titleBarController.useSystemTitleBar,
+                        onUseSystemTitleBarChanged:
+                            titleBarController.updateUseSystemTitleBar,
+                      ),
                     ),
                   );
                 },

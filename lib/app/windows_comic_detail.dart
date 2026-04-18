@@ -29,6 +29,7 @@ class WindowsComicDetailController extends ChangeNotifier {
   WindowsComicDetailEntry? _entry;
   int _revision = 0;
   int _temporaryHideDepth = 0;
+  int _temporaryHideTokenSeed = 0;
   int? _pendingPanelRevealRevision;
 
   WindowsComicDetailEntry? get entry => _entry;
@@ -76,18 +77,34 @@ class WindowsComicDetailController extends ChangeNotifier {
     await Future<void>.delayed(windowsComicDetailPanelAnimationDuration);
   }
 
+  int beginTemporaryHide() {
+    if (_entry == null) {
+      return 0;
+    }
+    _temporaryHideDepth += 1;
+    _temporaryHideTokenSeed += 1;
+    notifyListeners();
+    return _temporaryHideTokenSeed;
+  }
+
+  void endTemporaryHide(int token) {
+    if (token <= 0 || _temporaryHideDepth <= 0) {
+      return;
+    }
+    _temporaryHideDepth -= 1;
+    notifyListeners();
+  }
+
   Future<T> hideWhile<T>(Future<T> Function() action) async {
     if (_entry == null) {
       return action();
     }
 
-    _temporaryHideDepth += 1;
-    notifyListeners();
+    final token = beginTemporaryHide();
     try {
       return await action();
     } finally {
-      _temporaryHideDepth -= 1;
-      notifyListeners();
+      endTemporaryHide(token);
     }
   }
 }

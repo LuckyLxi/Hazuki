@@ -1,8 +1,8 @@
 part of '../hazuki_source_service.dart';
 
 extension HazukiSourceServiceSourceLoaderCapability on HazukiSourceService {
-  Future<_SourceLoadResult> _downloadOrLoadSourceFiles({
-    void Function(int received, int total)? onProgress,
+  Future<_SourceLoadResult> _ensureLocalSourceFiles({
+    bool requireJmFile = true,
   }) async {
     final sourceDir = await _getSourceStorageDirectory();
     if (!await sourceDir.exists()) {
@@ -16,6 +16,24 @@ extension HazukiSourceServiceSourceLoaderCapability on HazukiSourceService {
       final bundledInit = await rootBundle.loadString(_bundledInitAssetPath);
       await initFile.writeAsString(bundledInit);
     }
+
+    if (requireJmFile && !await jmFile.exists()) {
+      throw Exception('source_local_jm_missing');
+    }
+
+    return _SourceLoadResult(
+      initFile: initFile,
+      jmFile: jmFile,
+      message: 'source_loaded_from_local_cache',
+    );
+  }
+
+  Future<_SourceLoadResult> _downloadOrLoadSourceFiles({
+    void Function(int received, int total)? onProgress,
+  }) async {
+    final localFiles = await _ensureLocalSourceFiles(requireJmFile: false);
+    final initFile = localFiles.initFile;
+    final jmFile = localFiles.jmFile;
 
     if (await jmFile.exists()) {
       return _SourceLoadResult(
@@ -46,64 +64,69 @@ extension HazukiSourceServiceSourceLoaderCapability on HazukiSourceService {
     final jmScript = await jmFile.readAsString();
     final className = _extractSourceClassName(jmScript);
 
-    _engine?.close();
     final engine = FlutterQjs(hostPromiseRejectionHandler: (_) {});
-    engine.dispatch();
-    _engine = engine;
+    try {
+      engine.dispatch();
 
-    final setGlobal =
-        engine.evaluate('(k, v) => { this[k] = v; }') as JSInvokable;
-    setGlobal.invoke(['sendMessage', _handleJsMessage]);
-    setGlobal.invoke(['appVersion', '1.0.0']);
-    setGlobal.free();
+      final setGlobal =
+          engine.evaluate('(k, v) => { this[k] = v; }') as JSInvokable;
+      setGlobal.invoke(['sendMessage', _handleJsMessage]);
+      setGlobal.invoke(['appVersion', '1.0.0']);
+      setGlobal.free();
 
-    engine.evaluate(initScript, name: 'init.js');
-    engine.evaluate(jmScript, name: 'jm.js');
-    engine.evaluate(
-      "this.__hazuki_source = new $className();",
-      name: 'create_source.js',
-    );
+      engine.evaluate(initScript, name: 'init.js');
+      engine.evaluate(jmScript, name: 'jm.js');
+      engine.evaluate(
+        "this.__hazuki_source = new $className();",
+        name: 'create_source.js',
+      );
 
-    final name = (engine.evaluate('this.__hazuki_source.name') ?? '')
-        .toString();
-    final key = (engine.evaluate('this.__hazuki_source.key') ?? '').toString();
-    final version = (engine.evaluate('this.__hazuki_source.version') ?? '')
-        .toString();
-    final supportsAccount = _asBool(
-      engine.evaluate('!!this.__hazuki_source.account?.login'),
-    );
+      final name = (engine.evaluate('this.__hazuki_source.name') ?? '')
+          .toString();
+      final key = (engine.evaluate('this.__hazuki_source.key') ?? '')
+          .toString();
+      final version = (engine.evaluate('this.__hazuki_source.version') ?? '')
+          .toString();
+      final supportsAccount = _asBool(
+        engine.evaluate('!!this.__hazuki_source.account?.login'),
+      );
 
-    if (name.isEmpty || key.isEmpty || version.isEmpty) {
-      throw Exception('source_metadata_incomplete');
+      if (name.isEmpty || key.isEmpty || version.isEmpty) {
+        throw Exception('source_metadata_incomplete');
+      }
+
+      final settingsDefaults = _parseSettingsDefaultMap(
+        engine.evaluate('this.__hazuki_source.settings ?? {}'),
+      );
+
+      final meta = SourceMeta(
+        name: name,
+        key: key,
+        version: version,
+        supportsAccount: supportsAccount,
+        settingsDefaults: settingsDefaults,
+      );
+
+      _setRuntimeBusyState(
+        _runtimeState.phase,
+        SourceRuntimeStep.runningSourceInit,
+        debugDetail: 'running_source_init',
+      );
+      final initResult = engine.evaluate(
+        'this.__hazuki_source.init?.()',
+        name: 'source_init.js',
+      );
+      if (initResult is Future) {
+        await initResult;
+      }
+      final oldEngine = _engine;
+      _engine = engine;
+      oldEngine?.close();
+      _sourceMeta = meta;
+      return meta;
+    } catch (_) {
+      engine.close();
+      rethrow;
     }
-
-    final settingsDefaults = _parseSettingsDefaultMap(
-      engine.evaluate('this.__hazuki_source.settings ?? {}'),
-    );
-
-    final meta = SourceMeta(
-      name: name,
-      key: key,
-      version: version,
-      supportsAccount: supportsAccount,
-      settingsDefaults: settingsDefaults,
-    );
-
-    _sourceMeta = meta;
-
-    _setRuntimeBusyState(
-      _runtimeState.phase,
-      SourceRuntimeStep.runningSourceInit,
-      debugDetail: 'running_source_init',
-    );
-    final initResult = engine.evaluate(
-      'this.__hazuki_source.init?.()',
-      name: 'source_init.js',
-    );
-    if (initResult is Future) {
-      await initResult;
-    }
-
-    return meta;
   }
 }

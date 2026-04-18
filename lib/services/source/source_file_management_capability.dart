@@ -2,9 +2,23 @@ part of '../hazuki_source_service.dart';
 
 extension HazukiSourceServiceSourceFileManagementCapability
     on HazukiSourceService {
+  Future<String?> readLocalJmSourceIfExists() async {
+    final sourceDir = await _getSourceStorageDirectory();
+    final jmFile = File('${sourceDir.path}/jm.js');
+    if (!await jmFile.exists()) {
+      return null;
+    }
+    return jmFile.readAsString();
+  }
+
   Future<String> loadEditableJmSource() async {
     final result = await _downloadOrLoadSourceFiles();
     return result.jmFile.readAsString();
+  }
+
+  Future<void> writeLocalJmSource(String content) async {
+    final result = await _ensureLocalSourceFiles(requireJmFile: false);
+    await result.jmFile.writeAsString(content, flush: true);
   }
 
   Future<void> saveEditedJmSource(String content) async {
@@ -32,6 +46,41 @@ extension HazukiSourceServiceSourceFileManagementCapability
   Future<bool> hasCustomEditedJmSource() async {
     final prefs = _prefs ??= await SharedPreferences.getInstance();
     return prefs.getBool(HazukiSourceService._customEditedJmSourceKey) ?? false;
+  }
+
+  Future<void> reloadFromLocalSourceFiles() async {
+    if (_isRefreshingSource) {
+      throw Exception('source_reload_in_progress');
+    }
+    _isRefreshingSource = true;
+    try {
+      _setRuntimeBusyState(
+        SourceRuntimePhase.loading,
+        SourceRuntimeStep.loadingCache,
+        statusText: 'source_reloading_from_local_restore',
+        debugDetail: 'cloud_sync_restore',
+      );
+      _lastReloginAt = null;
+      _favoritesDebugCache = null;
+      _exploreSectionsMemoryCache = null;
+      _exploreSectionsMemoryCachedAt = null;
+      _categoryTagGroupsMemoryCache = null;
+      _categoryTagGroupsMemoryCachedAt = null;
+      final result = await _ensureLocalSourceFiles();
+      _setRuntimeBusyState(
+        SourceRuntimePhase.loading,
+        SourceRuntimeStep.creatingEngine,
+        debugDetail: 'creating_engine',
+      );
+      final meta = await _loadSourceMetadata(result.initFile, result.jmFile);
+      _sourceMeta = meta;
+      _setRuntimeReadyState(result: result, meta: meta);
+      if (isLogged) {
+        await _tryReloginFromStoredAccount(force: true);
+      }
+    } finally {
+      _isRefreshingSource = false;
+    }
   }
 
   Future<Directory> _getSourceStorageDirectory() async {

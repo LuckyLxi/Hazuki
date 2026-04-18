@@ -114,6 +114,8 @@
   "otherAutoSoftwareUpdateTitle": "Auto-check app updates",
   "otherAutoSoftwareUpdateSubtitle": "Check for software updates once each time the app starts",
   "otherAutoSoftwareUpdateUpdated": "Software update check setting updated",
+  "otherUseSystemTitleBarTitle": "Use system title bar",
+  "otherUseSystemTitleBarSubtitle": "Turn on to restore the native Windows title bar, or keep it off to use Hazuki's custom title bar",
   "otherMangaDownloadPathTitle": "Manga download save path",
   "otherMangaDownloadPathDialogTitle": "Set manga download save path",
   "otherMangaDownloadPathDialogHelper": "Enter an absolute path, for example /storage/emulated/0/Download/Hazuki_Manga",
@@ -671,7 +673,9 @@
   "cloudSyncRestoreTitle": "Restore backup",
   "cloudSyncRestoreContent": "Overwrite local files and restore the latest cloud backup?",
   "cloudSyncRestoreConfirm": "Overwrite and restore",
-  "cloudSyncRestoreCompleted": "Backup restored and local data overwritten",
+  "cloudSyncRestoreCompleted": "Restore completed",
+  "cloudSyncRestoreSkippedPlatformSettings": "Skipped incompatible settings for this platform",
+  "cloudSyncRestoreSourceRestartRequired": "Comic source changes will apply on next launch",
   "cloudSyncRestoreFailed": "Restore failed: {error}",
   "@cloudSyncRestoreFailed": {
     "placeholders": {

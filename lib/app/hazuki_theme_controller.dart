@@ -39,6 +39,17 @@ class HazukiThemeController extends ChangeNotifier {
   ThemeMode get themeMode => _settings.themeMode;
 
   Future<void> update(AppearanceSettingsData next) async {
+    await _applySettings(next, persist: true);
+  }
+
+  Future<void> applyRestoredSettings(AppearanceSettingsData next) async {
+    await _applySettings(next, persist: false);
+  }
+
+  Future<void> _applySettings(
+    AppearanceSettingsData next, {
+    required bool persist,
+  }) async {
     if (_settings == next) {
       HazukiSourceService.instance.addApplicationLog(
         level: 'info',
@@ -46,7 +57,7 @@ class HazukiThemeController extends ChangeNotifier {
         source: 'theme_controller',
         content: {
           'themeMode': _settings.themeMode.name,
-          'reason': 'settings_equal',
+          'reason': persist ? 'settings_equal' : 'restored_settings_equal',
         },
       );
       return;
@@ -67,12 +78,14 @@ class HazukiThemeController extends ChangeNotifier {
       },
     );
     notifyListeners();
-    await _settingsStore.saveAppearance(next);
-    HazukiSourceService.instance.addApplicationLog(
-      level: 'info',
-      title: 'Theme controller settings persisted',
-      source: 'theme_controller',
-      content: {'themeMode': next.themeMode.name},
-    );
+    if (persist) {
+      await _settingsStore.saveAppearance(next);
+      HazukiSourceService.instance.addApplicationLog(
+        level: 'info',
+        title: 'Theme controller settings persisted',
+        source: 'theme_controller',
+        content: {'themeMode': next.themeMode.name},
+      );
+    }
   }
 }

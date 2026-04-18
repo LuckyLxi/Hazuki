@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../app/app.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/cloud_sync_service.dart';
 import '../../widgets/widgets.dart';
@@ -272,9 +273,15 @@ class _CloudSyncPageState extends State<CloudSyncPage> {
       _syncing = true;
     });
     try {
-      await CloudSyncService.instance.restoreLatestBackup(
+      final result = await CloudSyncService.instance.restoreLatestBackup(
         configOverride: config,
       );
+      if (!mounted) {
+        return;
+      }
+      final applyResult = await HazukiAppControllerScope.of(
+        context,
+      ).applyCloudSyncRestore(result);
       final status = await CloudSyncService.instance.testConnection(
         configOverride: config,
       );
@@ -284,7 +291,14 @@ class _CloudSyncPageState extends State<CloudSyncPage> {
       setState(() {
         _status = status;
       });
-      unawaited(showHazukiPrompt(context, strings.cloudSyncRestoreCompleted));
+      final message = StringBuffer(strings.cloudSyncRestoreCompleted);
+      if (result.skippedKeys.isNotEmpty) {
+        message.write('\n${strings.cloudSyncRestoreSkippedPlatformSettings}');
+      }
+      if (applyResult.sourceNeedsRestart) {
+        message.write('\n${strings.cloudSyncRestoreSourceRestartRequired}');
+      }
+      unawaited(showHazukiPrompt(context, message.toString()));
     } catch (e) {
       if (!mounted) {
         return;

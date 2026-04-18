@@ -18,6 +18,7 @@ class _WindowsComicDetailHostState extends State<WindowsComicDetailHost> {
   WindowsComicDetailEntry? _displayEntry;
   bool _displayEntryShouldAnimatePanelReveal = false;
   Animation<double>? _routeAnimation;
+  Animation<double>? _secondaryRouteAnimation;
   bool _deferPanelUntilRouteSettles = false;
   Timer? _closeTimer;
 
@@ -96,19 +97,29 @@ class _WindowsComicDetailHostState extends State<WindowsComicDetailHost> {
   void _attachRouteAnimationIfNeeded() {
     final route = ModalRoute.of(context);
     final nextAnimation = route?.animation;
-    if (identical(nextAnimation, _routeAnimation)) {
+    final nextSecondaryAnimation = route?.secondaryAnimation;
+    if (identical(nextAnimation, _routeAnimation) &&
+        identical(nextSecondaryAnimation, _secondaryRouteAnimation)) {
       _syncDeferredPanelVisibility();
       return;
     }
     _detachRouteAnimation();
     _routeAnimation = nextAnimation;
+    _secondaryRouteAnimation = nextSecondaryAnimation;
     _routeAnimation?.addStatusListener(_handleRouteAnimationStatusChanged);
+    _secondaryRouteAnimation?.addStatusListener(
+      _handleRouteAnimationStatusChanged,
+    );
     _syncDeferredPanelVisibility();
   }
 
   void _detachRouteAnimation() {
     _routeAnimation?.removeStatusListener(_handleRouteAnimationStatusChanged);
+    _secondaryRouteAnimation?.removeStatusListener(
+      _handleRouteAnimationStatusChanged,
+    );
     _routeAnimation = null;
+    _secondaryRouteAnimation = null;
   }
 
   void _handleRouteAnimationStatusChanged(AnimationStatus _) {
@@ -118,13 +129,25 @@ class _WindowsComicDetailHostState extends State<WindowsComicDetailHost> {
     _syncDeferredPanelVisibility();
   }
 
+  bool get _isCoveredByAnotherRoute {
+    final secondaryAnimation = _secondaryRouteAnimation;
+    if (secondaryAnimation == null) {
+      return false;
+    }
+    return secondaryAnimation.status != AnimationStatus.dismissed &&
+        secondaryAnimation.value > 0;
+  }
+
   void _syncDeferredPanelVisibility() {
     final animation = _routeAnimation;
+    final routeInTransition =
+        animation != null &&
+        animation.status != AnimationStatus.dismissed &&
+        animation.status != AnimationStatus.completed &&
+        animation.value < 1;
     final shouldDefer =
         _displayEntry != null &&
-        animation != null &&
-        animation.status == AnimationStatus.forward &&
-        animation.value < 1;
+        (routeInTransition || _isCoveredByAnotherRoute);
     if (shouldDefer == _deferPanelUntilRouteSettles) {
       return;
     }
@@ -144,8 +167,10 @@ class _WindowsComicDetailHostState extends State<WindowsComicDetailHost> {
       builder: (context, _) {
         final controller = WindowsComicDetailController.instance;
         final entry = controller.isPanelVisible ? controller.entry : null;
-        final isOpen = entry != null;
         final activeEntry = entry ?? _displayEntry;
+        final shouldReservePanelSpace =
+            activeEntry != null &&
+            (controller.isPanelVisible || _isCoveredByAnotherRoute);
         final shouldAnimatePanelReveal =
             activeEntry != null &&
             _displayEntry != null &&
@@ -154,7 +179,9 @@ class _WindowsComicDetailHostState extends State<WindowsComicDetailHost> {
         final showPanel = activeEntry != null && !_deferPanelUntilRouteSettles;
         final totalWidth = MediaQuery.sizeOf(context).width;
         final panelWidth = totalWidth * 0.6;
-        final contentWidth = isOpen ? totalWidth - panelWidth : totalWidth;
+        final contentWidth = shouldReservePanelSpace
+            ? totalWidth - panelWidth
+            : totalWidth;
 
         return Row(
           children: [
@@ -162,14 +189,17 @@ class _WindowsComicDetailHostState extends State<WindowsComicDetailHost> {
               duration: windowsComicDetailPanelAnimationDuration,
               curve: Curves.easeOutCubic,
               width: contentWidth,
-              child: widget.child,
+              child: HeroMode(
+                enabled: !shouldReservePanelSpace,
+                child: widget.child,
+              ),
             ),
             AnimatedContainer(
               duration: windowsComicDetailPanelAnimationDuration,
               curve: Curves.easeOutCubic,
-              width: isOpen ? panelWidth : 0,
+              width: shouldReservePanelSpace ? panelWidth : 0,
               child: IgnorePointer(
-                ignoring: !isOpen || !showPanel,
+                ignoring: !shouldReservePanelSpace || !showPanel,
                 child: Align(
                   alignment: Alignment.centerRight,
                   child: SizedBox(
@@ -194,7 +224,7 @@ class _WindowsComicDetailHostState extends State<WindowsComicDetailHost> {
                           child: activeEntry == null
                               ? const SizedBox.shrink()
                               : HeroMode(
-                                  enabled: false,
+                                  enabled: showPanel,
                                   child: AnimatedSwitcher(
                                     duration: const Duration(milliseconds: 280),
                                     reverseDuration: const Duration(
