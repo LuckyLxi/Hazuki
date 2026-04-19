@@ -1319,6 +1319,39 @@ class _DiscoverDailyRecommendationCarouselState
                             outerTranslateX = desiredLeft - slotLeft;
                           } else if (delta > 1 && delta <= 2) {
                             final progress = (2 - delta).clamp(0.0, 1.0);
+
+                            final lockedRightLeft = _itemSpacing + narrowWidth;
+                            double index1DesiredLeft;
+                            double index1ClipScaleX;
+
+                            if (progress < incomingExpansionHold) {
+                              final phase = progress / incomingExpansionHold;
+                              index1ClipScaleX = _lerp(narrowRatio, 1.0, phase);
+                              index1DesiredLeft = _lerp(
+                                heroCardWidth + _itemSpacing,
+                                lockedRightLeft,
+                                phase,
+                              );
+                            } else {
+                              final phase =
+                                  (progress - incomingExpansionHold) /
+                                  (1.0 - incomingExpansionHold);
+                              index1ClipScaleX = 1.0;
+                              index1DesiredLeft = _lerp(
+                                lockedRightLeft,
+                                0.0,
+                                phase,
+                              );
+                            }
+
+                            final index1ClippedWidth =
+                                (heroCardWidth * index1ClipScaleX).clamp(
+                                  0.0,
+                                  heroCardWidth,
+                                );
+                            final index1RightEdge =
+                                index1DesiredLeft + index1ClippedWidth;
+
                             final revealProgress =
                                 ((progress - trailingSmallRevealDelay) /
                                         (1.0 - trailingSmallRevealDelay))
@@ -1335,11 +1368,8 @@ class _DiscoverDailyRecommendationCarouselState
                             );
                             cardScale = 1.0;
                             cardOpacity = clipScaleX <= 0.001 ? 0.0 : 1.0;
-                            final currentX = _lerp(
-                              availableWidth,
-                              heroCardWidth + _itemSpacing,
-                              revealProgress,
-                            );
+
+                            final currentX = index1RightEdge + _itemSpacing;
                             outerTranslateX = currentX - slotLeft;
                           } else {
                             clipScaleX = 0.0;
