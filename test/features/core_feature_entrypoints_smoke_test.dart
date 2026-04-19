@@ -1,0 +1,48 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:hazuki/app/appearance_settings.dart';
+import 'package:hazuki/features/comic_detail/view/comic_detail_page.dart';
+import 'package:hazuki/features/home/view/home_page.dart';
+import 'package:hazuki/features/reader/view/reader_page.dart';
+import 'package:hazuki/models/hazuki_models.dart';
+
+void main() {
+  test('feature-first entry widgets are constructible from public paths', () {
+    final home = HazukiHomePage(
+      initialTabIndex: 1,
+      appearanceSettings: const AppearanceSettingsData(
+        themeMode: ThemeMode.system,
+        oledPureBlack: false,
+        dynamicColor: false,
+        presetIndex: hazukiDefaultAppearancePresetIndex,
+        displayModeRaw: 'system',
+        comicDetailDynamicColor: false,
+      ),
+      onAppearanceChanged: (_, {revealOrigin}) async {},
+      locale: const Locale('en'),
+      onLocaleChanged: (_) async {},
+    );
+    const comic = ExploreComic(
+      id: 'comic-id',
+      title: 'Hazuki',
+      subTitle: 'Smoke',
+      cover: '',
+    );
+    final detail = const ComicDetailPage(comic: comic, heroTag: 'hero');
+    final reader = ReaderPage(
+      title: 'Hazuki',
+      chapterTitle: 'Chapter 1',
+      comicId: 'comic-id',
+      epId: 'ep-id',
+      chapterIndex: 0,
+      images: const ['a', 'b'],
+      comicTheme: ThemeData.light(),
+    );
+
+    expect(home.initialTabIndex, 1);
+    expect(detail.comic, comic);
+    expect(detail.heroTag, 'hero');
+    expect(reader.images, const ['a', 'b']);
+    expect(reader.chapterIndex, 0);
+  });
+}

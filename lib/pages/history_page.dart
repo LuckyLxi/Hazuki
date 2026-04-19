@@ -13,7 +13,7 @@ import '../services/hazuki_source_service.dart';
 import '../services/local_favorites_service.dart';
 import '../widgets/widgets.dart';
 import '../widgets/windows_comic_detail_host.dart';
-import 'comic_detail/comic_detail.dart';
+import 'package:hazuki/features/comic_detail/comic_detail.dart';
 
 part 'history/history_actions.dart';
 part 'history/history_favorites_actions.dart';

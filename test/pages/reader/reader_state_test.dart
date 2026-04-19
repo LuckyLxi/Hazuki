@@ -3,12 +3,12 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:hazuki/pages/reader/reader_diagnostics_support.dart';
-import 'package:hazuki/pages/reader/reader_image_pipeline_state.dart';
-import 'package:hazuki/pages/reader/reader_mode.dart';
-import 'package:hazuki/pages/reader/reader_navigation_controller.dart';
-import 'package:hazuki/pages/reader/reader_runtime_state.dart';
-import 'package:hazuki/pages/reader/reader_settings_store.dart';
+import 'package:hazuki/features/reader/support/reader_diagnostics_support.dart';
+import 'package:hazuki/features/reader/state/reader_image_pipeline_state.dart';
+import 'package:hazuki/features/reader/state/reader_mode.dart';
+import 'package:hazuki/features/reader/support/reader_navigation_controller.dart';
+import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
+import 'package:hazuki/features/reader/state/reader_settings_store.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

@@ -21,7 +21,7 @@ import 'app/ui_flags.dart';
 import 'app/windows_title_bar_controller.dart';
 import 'l10n/app_localizations.dart';
 import 'l10n/l10n.dart';
-import 'pages/home_page.dart';
+import 'package:hazuki/features/home/view/home_page.dart';
 import 'services/cloud_sync_service.dart';
 import 'services/hazuki_source_service.dart';
 import 'services/manga_download_service.dart';

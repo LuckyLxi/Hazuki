@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../l10n/app_localizations.dart';
-import '../../pages/reader/reader.dart';
-import '../../pages/reader/reader_settings_store.dart';
+import 'package:hazuki/features/reader/reader.dart';
+import 'package:hazuki/features/reader/state/reader_settings_store.dart';
 import '../../widgets/widgets.dart';
 import 'settings_group.dart';
 
