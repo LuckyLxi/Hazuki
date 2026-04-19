@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/app.dart';
 import '../../l10n/l10n.dart';
+import '../../services/discover_daily_recommendation_service.dart';
 import '../../services/hazuki_source_service.dart';
 import '../../widgets/widgets.dart';
 import '../../widgets/windows_comic_detail_host.dart';
@@ -21,6 +22,8 @@ class HomeScaffoldShell extends StatelessWidget {
     required this.scaffoldKey,
     required this.currentIndex,
     required this.discoverSearchMorphProgress,
+    required this.usePinnedDiscoverSearch,
+    required this.dailyRecommendations,
     required this.favoriteAppBarActions,
     required this.isLogged,
     required this.avatarUrl,
@@ -56,6 +59,8 @@ class HomeScaffoldShell extends StatelessWidget {
   final GlobalKey<ScaffoldState> scaffoldKey;
   final int currentIndex;
   final double discoverSearchMorphProgress;
+  final bool usePinnedDiscoverSearch;
+  final List<DiscoverDailyRecommendationEntry> dailyRecommendations;
   final FavoriteAppBarActionsState favoriteAppBarActions;
   final bool isLogged;
   final String? avatarUrl;
@@ -110,10 +115,12 @@ class HomeScaffoldShell extends StatelessWidget {
           appBar: hazukiFrostedAppBar(
             context: context,
             title: const Text('Hazuki'),
+            enableBlur: currentIndex != 0,
             actions: [
               HomeAppBarActions(
                 currentIndex: currentIndex,
                 discoverSearchMorphProgress: discoverSearchMorphProgress,
+                forceDiscoverSearchInAppBar: usePinnedDiscoverSearch,
                 favoriteAppBarActions: favoriteAppBarActions,
                 onOpenSearch: onOpenSearch,
                 onFavoriteSortSelected: onFavoriteSortSelected,
@@ -146,6 +153,8 @@ class HomeScaffoldShell extends StatelessWidget {
               currentIndex: currentIndex,
               discoverChild: DiscoverPage(
                 comicDetailPageBuilder: comicDetailPageBuilder,
+                usePinnedSearchInAppBar: usePinnedDiscoverSearch,
+                dailyRecommendations: dailyRecommendations,
                 allowInitialLoad: allowDiscoverInitialLoad,
                 hideLoadingUntilInitialLoadAllowed:
                     hideDiscoverLoadingUntilAllowed,

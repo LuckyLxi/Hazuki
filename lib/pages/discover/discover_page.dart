@@ -666,6 +666,7 @@ class _DiscoverDailyRecommendationCarouselState
   late final String _carouselSessionId;
   int _currentPage = 0;
   bool _detailOpen = false;
+  String? _activeOverlayHeroTag;
   bool _isHovered = false;
   bool _isUserScrolling = false;
   bool _isNormalizingLoopBoundary = false;
@@ -1121,7 +1122,18 @@ class _DiscoverDailyRecommendationCarouselState
     DiscoverDailyRecommendationEntry entry,
     String heroTag,
   ) async {
-    _detailOpen = true;
+    if (_detailOpen) {
+      return;
+    }
+    if (mounted) {
+      setState(() {
+        _detailOpen = true;
+        _activeOverlayHeroTag = heroTag;
+      });
+    } else {
+      _detailOpen = true;
+      _activeOverlayHeroTag = heroTag;
+    }
     _logCarouselEvent(
       'Discover carousel recommendation opening',
       content: {
@@ -1141,7 +1153,9 @@ class _DiscoverDailyRecommendationCarouselState
       );
     } finally {
       if (mounted) {
-        _detailOpen = false;
+        setState(() {
+          _detailOpen = false;
+        });
         _logCarouselEvent(
           'Discover carousel recommendation closed',
           content: {
@@ -1256,7 +1270,7 @@ class _DiscoverDailyRecommendationCarouselState
                       );
                       return AnimatedBuilder(
                         animation: _pageController,
-                        builder: (context, child) {
+                        builder: (context, _) {
                           final page = _pageController.hasClients
                               ? (_pageController.page ??
                                     _physicalPageForLogical(
@@ -1390,6 +1404,37 @@ class _DiscoverDailyRecommendationCarouselState
                             pageExtent: pageExtent,
                           );
 
+                          final imageChild = entry.comic.cover.trim().isEmpty
+                              ? ColoredBox(color: placeholderColor)
+                              : HazukiCachedImage(
+                                  url: entry.comic.cover,
+                                  fit: BoxFit.cover,
+                                  cacheWidth: coverCacheWidth.round(),
+                                  animateOnLoad: true,
+                                  filterQuality: FilterQuality.low,
+                                  deferLoadingWhileScrolling: true,
+                                  loading: SizedBox.expand(
+                                    child: ColoredBox(color: placeholderColor),
+                                  ),
+                                  error: ColoredBox(color: placeholderColor),
+                                  onStateChanged: (url, state) {
+                                    _reportImageState(
+                                      physicalIndex: index,
+                                      logicalIndex: effectiveIndex,
+                                      heroTag: heroTag,
+                                      imageUrl: url,
+                                      state: state,
+                                    );
+                                  },
+                                );
+
+                          if (entry.comic.cover.trim().isNotEmpty) {
+                            registerComicCoverHeroUrl(
+                              heroTag,
+                              entry.comic.cover,
+                            );
+                          }
+
                           return Transform.translate(
                             offset: Offset(outerTranslateX, 0),
                             child: Align(
@@ -1402,15 +1447,55 @@ class _DiscoverDailyRecommendationCarouselState
                                   child: SizedBox(
                                     width: clippedWidth,
                                     height: _heroCardHeight,
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(28),
-                                      child: OverflowBox(
-                                        alignment: Alignment.center,
-                                        minWidth: heroCardWidth,
-                                        maxWidth: heroCardWidth,
-                                        child: Transform.translate(
-                                          offset: Offset(imageTranslateX, 0),
-                                          child: child,
+                                    child: Material(
+                                      color: Colors.transparent,
+                                      child: InkWell(
+                                        borderRadius: BorderRadius.circular(28),
+                                        onTap: () => unawaited(
+                                          _openRecommendation(
+                                            context,
+                                            entry,
+                                            heroTag,
+                                          ),
+                                        ),
+                                        child: ClipRRect(
+                                          borderRadius: BorderRadius.circular(
+                                            28,
+                                          ),
+                                          child: Stack(
+                                            fit: StackFit.expand,
+                                            children: [
+                                              Hero(
+                                                tag: heroTag,
+                                                flightShuttleBuilder:
+                                                    buildComicCoverHeroFlightShuttle,
+                                                placeholderBuilder:
+                                                    buildComicCoverHeroPlaceholder,
+                                                child: OverflowBox(
+                                                  alignment: Alignment.center,
+                                                  minWidth: heroCardWidth,
+                                                  maxWidth: heroCardWidth,
+                                                  child: Transform.translate(
+                                                    offset: Offset(
+                                                      imageTranslateX,
+                                                      0,
+                                                    ),
+                                                    child: SizedBox(
+                                                      width: heroCardWidth,
+                                                      height: _heroCardHeight,
+                                                      child: imageChild,
+                                                    ),
+                                                  ),
+                                                ),
+                                              ),
+                                              _CarouselCardOverlay(
+                                                entry: entry,
+                                                isActive:
+                                                    _activeOverlayHeroTag ==
+                                                    heroTag,
+                                              ),
+                                            ],
+                                          ),
                                         ),
                                       ),
                                     ),
@@ -1420,105 +1505,6 @@ class _DiscoverDailyRecommendationCarouselState
                             ),
                           );
                         },
-                        child: SizedBox(
-                          width: heroCardWidth,
-                          height: _heroCardHeight,
-                          child: Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              borderRadius: BorderRadius.circular(28),
-                              onTap: () => unawaited(
-                                _openRecommendation(context, entry, heroTag),
-                              ),
-                              child: Stack(
-                                fit: StackFit.expand,
-                                children: [
-                                  Hero(
-                                    tag: heroTag,
-                                    flightShuttleBuilder:
-                                        buildComicCoverHeroFlightShuttle,
-                                    child: ClipRRect(
-                                      borderRadius: BorderRadius.circular(28),
-                                      child: entry.comic.cover.trim().isEmpty
-                                          ? ColoredBox(color: placeholderColor)
-                                          : HazukiCachedImage(
-                                              url: entry.comic.cover,
-                                              fit: BoxFit.cover,
-                                              cacheWidth: coverCacheWidth
-                                                  .round(),
-                                              animateOnLoad: true,
-                                              filterQuality: FilterQuality.low,
-                                              deferLoadingWhileScrolling: true,
-                                              loading: SizedBox.expand(
-                                                child: ColoredBox(
-                                                  color: placeholderColor,
-                                                ),
-                                              ),
-                                              error: ColoredBox(
-                                                color: placeholderColor,
-                                              ),
-                                              onStateChanged: (url, state) {
-                                                _reportImageState(
-                                                  physicalIndex: index,
-                                                  logicalIndex: effectiveIndex,
-                                                  heroTag: heroTag,
-                                                  imageUrl: url,
-                                                  state: state,
-                                                );
-                                              },
-                                            ),
-                                    ),
-                                  ),
-                                  DecoratedBox(
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        begin: Alignment.topCenter,
-                                        end: Alignment.bottomCenter,
-                                        colors: [
-                                          Colors.black.withValues(alpha: 0.06),
-                                          Colors.black.withValues(alpha: 0.61),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                  Positioned(
-                                    left: 16,
-                                    right: 16,
-                                    bottom: 16,
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          entry.author,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: theme.textTheme.labelMedium
-                                              ?.copyWith(
-                                                color: Colors.white.withValues(
-                                                  alpha: 0.92,
-                                                ),
-                                              ),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          entry.comic.title,
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: theme.textTheme.titleSmall
-                                              ?.copyWith(
-                                                color: Colors.white,
-                                                fontWeight: FontWeight.w700,
-                                              ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
                       );
                     },
                   ),
@@ -1592,5 +1578,148 @@ class _AnimekoEmphasizedCurve extends Curve {
     }
     final localT = (t - _split) / (1.0 - _split);
     return 0.4 + (_segment2.transform(localT) * 0.6);
+  }
+}
+
+class _CarouselCardOverlay extends StatefulWidget {
+  const _CarouselCardOverlay({required this.entry, required this.isActive});
+
+  final DiscoverDailyRecommendationEntry entry;
+  final bool isActive;
+
+  @override
+  State<_CarouselCardOverlay> createState() => _CarouselCardOverlayState();
+}
+
+class _CarouselCardOverlayState extends State<_CarouselCardOverlay> {
+  bool _isVisible = true;
+  Animation<double>? _secondaryAnimation;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = ModalRoute.of(context);
+    final secondary = route?.secondaryAnimation;
+    if (_secondaryAnimation != secondary) {
+      _secondaryAnimation?.removeStatusListener(_onStatusChanged);
+      _secondaryAnimation = secondary;
+      _secondaryAnimation?.addStatusListener(_onStatusChanged);
+    }
+    _syncVisibilityWithRoute();
+  }
+
+  @override
+  void didUpdateWidget(covariant _CarouselCardOverlay oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isActive != widget.isActive) {
+      _syncVisibilityWithActiveState();
+    }
+  }
+
+  @override
+  void dispose() {
+    _secondaryAnimation?.removeStatusListener(_onStatusChanged);
+    super.dispose();
+  }
+
+  void _onStatusChanged(AnimationStatus status) {
+    if (!widget.isActive) {
+      return;
+    }
+    if (status == AnimationStatus.dismissed) {
+      _updateVisibility(true);
+      return;
+    }
+    _updateVisibility(false);
+  }
+
+  void _syncVisibilityWithActiveState() {
+    if (!widget.isActive) {
+      _updateVisibility(true);
+      return;
+    }
+    // Active overlay should stay hidden throughout the Hero flight and only
+    // reveal after the route transition is fully dismissed.
+    _updateVisibility(false);
+  }
+
+  void _syncVisibilityWithRoute() {
+    if (!widget.isActive) {
+      _updateVisibility(true);
+      return;
+    }
+    _updateVisibility(_secondaryAnimation?.status == AnimationStatus.dismissed);
+  }
+
+  void _updateVisibility(bool visible) {
+    if (_isVisible == visible) {
+      return;
+    }
+    setState(() {
+      _isVisible = visible;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final revealDuration = _isVisible
+        ? const Duration(milliseconds: 280)
+        : Duration.zero;
+    return AnimatedOpacity(
+      opacity: _isVisible ? 1.0 : 0.0,
+      duration: revealDuration,
+      curve: Curves.easeOutCubic,
+      child: AnimatedSlide(
+        offset: _isVisible ? Offset.zero : const Offset(0, 0.05),
+        duration: revealDuration,
+        curve: Curves.easeOutCubic,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withValues(alpha: 0.06),
+                    Colors.black.withValues(alpha: 0.61),
+                  ],
+                ),
+              ),
+            ),
+            Positioned(
+              left: 16,
+              right: 16,
+              bottom: 16,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.entry.author,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: Colors.white.withValues(alpha: 0.92),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    widget.entry.comic.title,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

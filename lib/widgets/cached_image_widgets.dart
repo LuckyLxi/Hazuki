@@ -14,6 +14,10 @@ typedef HazukiCachedImageStateChanged =
 const int _hazukiWidgetImageMemoryLimit = 300;
 final Map<String, Uint8List> _hazukiWidgetImageMemory = <String, Uint8List>{};
 
+Uint8List? peekHazukiWidgetImageMemory(String url) {
+  return _hazukiWidgetImageMemory[url.trim()];
+}
+
 Uint8List? takeHazukiWidgetImageMemory(String url) {
   final bytes = _hazukiWidgetImageMemory[url];
   if (bytes == null) {

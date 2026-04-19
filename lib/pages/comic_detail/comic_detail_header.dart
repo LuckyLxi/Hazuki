@@ -45,6 +45,7 @@ class _ComicDetailHeaderSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final detailsReady = details != null;
     final theme = Theme.of(context);
+    final coverBorderRadius = comicCoverHeroBorderRadius(heroTag, fallback: 10);
     final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
     final headerCoverCacheWidth = (135 * devicePixelRatio)
         .round()
@@ -61,6 +62,10 @@ class _ComicDetailHeaderSection extends StatelessWidget {
       if (viewsText.isNotEmpty) l10n(context).comicDetailViewsCount(viewsText),
     ].join(' / ');
 
+    if (displayCoverUrl.isNotEmpty) {
+      registerComicCoverHeroUrl(heroTag, displayCoverUrl);
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -68,31 +73,33 @@ class _ComicDetailHeaderSection extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             RepaintBoundary(
-              child: InkWell(
-                borderRadius: BorderRadius.circular(10),
-                onTap: displayCoverUrl.isEmpty ? null : onCoverTap,
-                child: Hero(
-                  tag: heroTag,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: displayCoverUrl.isNotEmpty
-                        ? HazukiCachedImage(
-                            url: displayCoverUrl,
-                            width: 135,
-                            height: 190,
-                            fit: BoxFit.cover,
-                            keepInMemory: true,
-                            cacheWidth: headerCoverCacheWidth,
-                            cacheHeight: headerCoverCacheHeight,
-                          )
-                        : Container(
-                            width: 135,
-                            height: 190,
-                            color: skeletonColor,
-                            child: const Icon(
-                              Icons.image_not_supported_outlined,
+              child: SizedBox(
+                width: 135,
+                height: 190,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(coverBorderRadius),
+                  onTap: displayCoverUrl.isEmpty ? null : onCoverTap,
+                  child: Hero(
+                    tag: heroTag,
+                    flightShuttleBuilder: buildComicCoverHeroFlightShuttle,
+                    placeholderBuilder: buildComicCoverHeroPlaceholder,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(coverBorderRadius),
+                      child: displayCoverUrl.isNotEmpty
+                          ? HazukiCachedImage(
+                              url: displayCoverUrl,
+                              fit: BoxFit.cover,
+                              keepInMemory: true,
+                              cacheWidth: headerCoverCacheWidth,
+                              cacheHeight: headerCoverCacheHeight,
+                            )
+                          : Container(
+                              color: skeletonColor,
+                              child: const Icon(
+                                Icons.image_not_supported_outlined,
+                              ),
                             ),
-                          ),
+                    ),
                   ),
                 ),
               ),

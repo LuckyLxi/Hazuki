@@ -90,6 +90,10 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
           scaffoldKey: _coordinator.scaffoldKey,
           currentIndex: _coordinator.currentIndex,
           discoverSearchMorphProgress: _coordinator.discoverSearchMorphProgress,
+          usePinnedDiscoverSearch:
+              _coordinator.dailyRecommendationState.hasRecommendations,
+          dailyRecommendations:
+              _coordinator.dailyRecommendationState.recommendations,
           favoriteAppBarActions: _coordinator.favoriteAppBarActions,
           isLogged: isLogged,
           avatarUrl: _coordinator.avatarUrl,

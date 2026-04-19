@@ -10,6 +10,7 @@ class HomeAppBarActions extends StatelessWidget {
     super.key,
     required this.currentIndex,
     required this.discoverSearchMorphProgress,
+    required this.forceDiscoverSearchInAppBar,
     required this.favoriteAppBarActions,
     required this.onOpenSearch,
     required this.onFavoriteSortSelected,
@@ -19,6 +20,7 @@ class HomeAppBarActions extends StatelessWidget {
 
   final int currentIndex;
   final double discoverSearchMorphProgress;
+  final bool forceDiscoverSearchInAppBar;
   final FavoriteAppBarActionsState favoriteAppBarActions;
   final VoidCallback onOpenSearch;
   final ValueChanged<String> onFavoriteSortSelected;
@@ -27,7 +29,8 @@ class HomeAppBarActions extends StatelessWidget {
 
   Widget _buildDiscoverSearchAction(BuildContext context) {
     final showCollapsedSearch =
-        currentIndex == 0 && discoverSearchMorphProgress >= 0.96;
+        currentIndex == 0 &&
+        (forceDiscoverSearchInAppBar || discoverSearchMorphProgress >= 0.96);
     return HeroMode(
       enabled: showCollapsedSearch,
       child: Hero(
@@ -194,7 +197,11 @@ class HomeAppBarActions extends StatelessWidget {
         AnimatedContainer(
           duration: const Duration(milliseconds: 220),
           curve: Curves.easeOutCubic,
-          width: discoverSearchMorphProgress >= 0.96 ? 12 : 0,
+          width:
+              (forceDiscoverSearchInAppBar ||
+                  discoverSearchMorphProgress >= 0.96)
+              ? 12
+              : 0,
         ),
       ],
     );

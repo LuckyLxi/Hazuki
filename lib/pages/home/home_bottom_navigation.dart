@@ -31,6 +31,7 @@ class HomeBottomNavigation extends StatefulWidget {
 class _HomeBottomNavigationState extends State<HomeBottomNavigation>
     with TickerProviderStateMixin {
   static const int _itemCount = 2;
+  final _barKey = GlobalKey();
 
   late final List<AnimationController> _controllers;
   late final List<Animation<double>> _scaleAnims;
@@ -157,7 +158,19 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
                   horizontal: 10,
                   vertical: 10,
                 ),
-                child: Row(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTapDown: (details) {
+                    final box = _barKey.currentContext!.findRenderObject()!
+                        as RenderBox;
+                    final localX =
+                        box.globalToLocal(details.globalPosition).dx;
+                    widget.onDestinationSelected(
+                      localX < box.size.width / 2 ? 0 : 1,
+                    );
+                  },
+                  child: Row(
+                    key: _barKey,
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     _buildItem(
@@ -178,6 +191,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
                       labelOnRight: false,
                     ),
                   ],
+                  ),
                 ),
               ),
             ),
@@ -218,10 +232,6 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
       ),
     );
 
-    // Label expands horizontally from the icon side:
-    // - Discover (labelOnRight): clip grows rightward (axisAlignment: -1.0)
-    // - Favorites (!labelOnRight): clip grows leftward (axisAlignment: 1.0)
-    // SlideTransition with easeOutBack gives the horizontal spring/bounce feel.
     final labelWidget = SizeTransition(
       sizeFactor: _labelAnims[index],
       axis: Axis.horizontal,
@@ -247,10 +257,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
       ),
     );
 
-    return GestureDetector(
-      onTap: () => widget.onDestinationSelected(index),
-      behavior: HitTestBehavior.opaque,
-      child: ClipRRect(
+    return ClipRRect(
         borderRadius: BorderRadius.circular(28),
         child: Stack(
           alignment: Alignment.center,
@@ -284,7 +291,6 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
             ),
           ],
         ),
-      ),
-    );
+      );
   }
 }

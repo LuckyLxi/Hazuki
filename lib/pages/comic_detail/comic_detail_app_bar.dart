@@ -74,10 +74,20 @@ class _ComicDetailTopSurfaceOverlay extends StatelessWidget {
         child: ValueListenableBuilder<double>(
           valueListenable: progressListenable,
           builder: (context, alpha, _) {
-            if (alpha <= 0) {
-              return const SizedBox.expand();
-            }
-            return ColoredBox(color: surface.withValues(alpha: alpha));
+            final targetAlpha = alpha.clamp(0.0, 1.0);
+            return TweenAnimationBuilder<double>(
+              tween: Tween<double>(begin: 0, end: targetAlpha),
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOutCubic,
+              builder: (context, animatedAlpha, _) {
+                if (animatedAlpha <= 0.001) {
+                  return const SizedBox.expand();
+                }
+                return ColoredBox(
+                  color: surface.withValues(alpha: animatedAlpha),
+                );
+              },
+            );
           },
         ),
       ),

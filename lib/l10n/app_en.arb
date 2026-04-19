@@ -114,6 +114,8 @@
   "otherAutoSoftwareUpdateTitle": "Auto-check app updates",
   "otherAutoSoftwareUpdateSubtitle": "Check for software updates once each time the app starts",
   "otherAutoSoftwareUpdateUpdated": "Software update check setting updated",
+  "otherDiscoverDailyRecommendationTitle": "Discover daily recommendations",
+  "otherDiscoverDailyRecommendationSubtitle": "Pin the discover search bar to the app bar and show a 5-comic author recommendation carousel when startup recommendations are available",
   "otherUseSystemTitleBarTitle": "Use system title bar",
   "otherUseSystemTitleBarSubtitle": "Turn on to restore the native Windows title bar, or keep it off to use Hazuki's custom title bar",
   "otherMangaDownloadPathTitle": "Manga download save path",

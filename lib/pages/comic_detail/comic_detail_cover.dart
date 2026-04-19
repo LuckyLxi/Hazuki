@@ -245,6 +245,7 @@ class _ComicCoverPreviewPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final coverBorderRadius = comicCoverHeroBorderRadius(heroTag, fallback: 10);
     final placeholderColor = Theme.of(context).brightness == Brightness.dark
         ? Colors.white.withValues(alpha: 0.1)
         : Colors.black.withValues(alpha: 0.06);
@@ -266,8 +267,10 @@ class _ComicCoverPreviewPage extends StatelessWidget {
                 ),
                 child: Hero(
                   tag: heroTag,
+                  flightShuttleBuilder: buildComicCoverHeroFlightShuttle,
+                  placeholderBuilder: buildComicCoverHeroPlaceholder,
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(coverBorderRadius),
                     child: InteractiveViewer(
                       minScale: 1,
                       maxScale: 4,

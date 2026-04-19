@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../app/app.dart';
 import '../../app/windows_title_bar_controller.dart';
 import '../../l10n/app_localizations.dart';
+import '../../services/discover_daily_recommendation_service.dart';
 import '../../services/manga_download_service.dart';
 import '../../services/manga_download_storage_support.dart';
 import '../../widgets/widgets.dart';
@@ -30,6 +31,7 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
   bool _autoCheckInEnabled = false;
   bool _autoSourceUpdateCheckEnabled = true;
   bool _autoSoftwareUpdateCheckEnabled = true;
+  bool _discoverDailyRecommendationEnabled = false;
   late bool _useSystemTitleBar = widget.initialUseSystemTitleBar;
   String _mangaDownloadsRootPath = MangaDownloadAccess.defaultDownloadsRootPath;
   bool _loading = true;
@@ -56,6 +58,11 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
       _autoSoftwareUpdateCheckEnabled =
           prefs.getBool(hazukiAutoSoftwareUpdateCheckEnabledPreferenceKey) ??
           true;
+      _discoverDailyRecommendationEnabled =
+          prefs.getBool(
+            hazukiDiscoverDailyRecommendationEnabledPreferenceKey,
+          ) ??
+          false;
       _mangaDownloadsRootPath = mangaDownloadsRootPath;
       _loading = false;
     });
@@ -94,6 +101,11 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
       context,
       AppLocalizations.of(context)!.otherAutoSoftwareUpdateUpdated,
     );
+  }
+
+  Future<void> _toggleDiscoverDailyRecommendation(bool value) async {
+    setState(() => _discoverDailyRecommendationEnabled = value);
+    await DiscoverDailyRecommendationService.instance.setEnabled(value);
   }
 
   @override
@@ -210,6 +222,17 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
                         subtitle: Text(strings.otherAutoSoftwareUpdateSubtitle),
                         value: _autoSoftwareUpdateCheckEnabled,
                         onChanged: _toggleAutoSoftwareUpdateCheck,
+                      ),
+                      SwitchListTile(
+                        secondary: const Icon(Icons.auto_awesome_outlined),
+                        title: Text(
+                          strings.otherDiscoverDailyRecommendationTitle,
+                        ),
+                        subtitle: Text(
+                          strings.otherDiscoverDailyRecommendationSubtitle,
+                        ),
+                        value: _discoverDailyRecommendationEnabled,
+                        onChanged: _toggleDiscoverDailyRecommendation,
                       ),
                       if (Theme.of(context).platform == TargetPlatform.windows)
                         SwitchListTile(

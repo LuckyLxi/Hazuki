@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../services/discover_daily_recommendation_service.dart';
 import '../../services/hazuki_source_service.dart';
 import '../favorite_page.dart';
 import '../favorite/favorite.dart';
@@ -26,6 +27,8 @@ class HomeCoordinator extends ChangeNotifier {
 
   final HomeProfileController _profileController;
   final HomeShellController _shellController;
+  final DiscoverDailyRecommendationService _dailyRecommendationService =
+      DiscoverDailyRecommendationService.instance;
   final GlobalKey<ScaffoldState> scaffoldKey;
   final GlobalKey<FavoritePageState> favoritePageKey;
   bool _disposed = false;
@@ -43,6 +46,8 @@ class HomeCoordinator extends ChangeNotifier {
       _shellController.discoverSearchMorphProgress;
   FavoriteAppBarActionsState get favoriteAppBarActions =>
       _shellController.favoriteAppBarActions;
+  DiscoverDailyRecommendationState get dailyRecommendationState =>
+      _dailyRecommendationService.state;
 
   void start(BuildContext context) {
     unawaited(syncUserProfile(context));
@@ -83,6 +88,9 @@ class HomeCoordinator extends ChangeNotifier {
 
   Future<void> loadOtherSettings(BuildContext context) async {
     await _profileController.loadOtherSettings(context);
+    final enabled = await _dailyRecommendationService.loadEnabled();
+    await _dailyRecommendationService.ensurePrepared(enabled: enabled);
+    _relayChange();
   }
 
   Future<void> performCheckIn(

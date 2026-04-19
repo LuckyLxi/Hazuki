@@ -79,6 +79,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/init.js
+    - assets/data/authors.txt
     - assets/animations/
     - assets/stickers/loading/
     - assets/avatars/
