@@ -5,7 +5,7 @@ import '../../l10n/l10n.dart';
 import '../../models/hazuki_models.dart';
 import '../favorite/favorite.dart';
 
-class HomeAppBarActions extends StatelessWidget {
+class HomeAppBarActions extends StatefulWidget {
   const HomeAppBarActions({
     super.key,
     required this.currentIndex,
@@ -27,17 +27,58 @@ class HomeAppBarActions extends StatelessWidget {
   final VoidCallback onFavoriteCreateFolderPressed;
   final VoidCallback onFavoriteModeTogglePressed;
 
+  @override
+  State<HomeAppBarActions> createState() => _HomeAppBarActionsState();
+}
+
+class _HomeAppBarActionsState extends State<HomeAppBarActions> {
+  bool _suppressPinnedDiscoverSearchAnimation = false;
+
+  @override
+  void didUpdateWidget(covariant HomeAppBarActions oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    final becamePinnedInDiscoverAppBar =
+        oldWidget.currentIndex == 0 &&
+        widget.currentIndex == 0 &&
+        !oldWidget.forceDiscoverSearchInAppBar &&
+        widget.forceDiscoverSearchInAppBar &&
+        oldWidget.discoverSearchMorphProgress < 0.96 &&
+        widget.discoverSearchMorphProgress < 0.96;
+    if (!becamePinnedInDiscoverAppBar ||
+        _suppressPinnedDiscoverSearchAnimation) {
+      return;
+    }
+
+    _suppressPinnedDiscoverSearchAnimation = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_suppressPinnedDiscoverSearchAnimation) {
+        return;
+      }
+      setState(() {
+        _suppressPinnedDiscoverSearchAnimation = false;
+      });
+    });
+  }
+
+  Duration _discoverSearchDuration(int milliseconds) {
+    return _suppressPinnedDiscoverSearchAnimation
+        ? Duration.zero
+        : Duration(milliseconds: milliseconds);
+  }
+
   Widget _buildDiscoverSearchAction(BuildContext context) {
     final showCollapsedSearch =
-        currentIndex == 0 &&
-        (forceDiscoverSearchInAppBar || discoverSearchMorphProgress >= 0.96);
+        widget.currentIndex == 0 &&
+        (widget.forceDiscoverSearchInAppBar ||
+            widget.discoverSearchMorphProgress >= 0.96);
     return HeroMode(
       enabled: showCollapsedSearch,
       child: Hero(
         tag: discoverSearchHeroTag,
         child: ClipRect(
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 220),
+            duration: _discoverSearchDuration(220),
             curve: Curves.easeOutCubic,
             width: showCollapsedSearch ? 180 : 0,
             child: Align(
@@ -46,21 +87,21 @@ class HomeAppBarActions extends StatelessWidget {
                 offset: showCollapsedSearch
                     ? Offset.zero
                     : const Offset(-0.08, 0),
-                duration: const Duration(milliseconds: 220),
+                duration: _discoverSearchDuration(220),
                 curve: Curves.easeOutCubic,
                 child: AnimatedScale(
                   scale: showCollapsedSearch ? 1 : 0.94,
-                  duration: const Duration(milliseconds: 240),
+                  duration: _discoverSearchDuration(240),
                   curve: Curves.easeOutBack,
                   child: AnimatedOpacity(
                     opacity: showCollapsedSearch ? 1 : 0,
-                    duration: const Duration(milliseconds: 180),
+                    duration: _discoverSearchDuration(180),
                     curve: Curves.easeOutCubic,
                     child: IgnorePointer(
                       ignoring: !showCollapsedSearch,
                       child: InkWell(
                         borderRadius: BorderRadius.circular(14),
-                        onTap: onOpenSearch,
+                        onTap: widget.onOpenSearch,
                         child: Container(
                           height: 40,
                           padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -110,12 +151,12 @@ class HomeAppBarActions extends StatelessWidget {
 
   Widget _buildFavoriteActionGroup(BuildContext context) {
     final isLocalMode =
-        favoriteAppBarActions.currentMode == FavoritePageMode.local;
+        widget.favoriteAppBarActions.currentMode == FavoritePageMode.local;
     return Row(
       key: const ValueKey<String>('favorite-appbar-actions'),
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (favoriteAppBarActions.showModeToggle)
+        if (widget.favoriteAppBarActions.showModeToggle)
           Padding(
             padding: const EdgeInsets.only(right: 4),
             child: AnimatedSwitcher(
@@ -136,9 +177,9 @@ class HomeAppBarActions extends StatelessWidget {
               },
               child: TextButton.icon(
                 key: ValueKey<FavoritePageMode>(
-                  favoriteAppBarActions.currentMode,
+                  widget.favoriteAppBarActions.currentMode,
                 ),
-                onPressed: onFavoriteModeTogglePressed,
+                onPressed: widget.onFavoriteModeTogglePressed,
                 icon: Icon(
                   isLocalMode
                       ? Icons.folder_copy_outlined
@@ -158,29 +199,29 @@ class HomeAppBarActions extends StatelessWidget {
               ),
             ),
           ),
-        if (favoriteAppBarActions.showSort)
+        if (widget.favoriteAppBarActions.showSort)
           PopupMenuButton<String>(
             tooltip: l10n(context).homeSortTooltip,
-            initialValue: favoriteAppBarActions.currentSortOrder,
-            onSelected: onFavoriteSortSelected,
+            initialValue: widget.favoriteAppBarActions.currentSortOrder,
+            onSelected: widget.onFavoriteSortSelected,
             itemBuilder: (context) => [
               CheckedPopupMenuItem<String>(
                 value: 'mr',
-                checked: favoriteAppBarActions.currentSortOrder == 'mr',
+                checked: widget.favoriteAppBarActions.currentSortOrder == 'mr',
                 child: Text(l10n(context).homeFavoriteSortByFavoriteTime),
               ),
               CheckedPopupMenuItem<String>(
                 value: 'mp',
-                checked: favoriteAppBarActions.currentSortOrder == 'mp',
+                checked: widget.favoriteAppBarActions.currentSortOrder == 'mp',
                 child: Text(l10n(context).homeFavoriteSortByUpdateTime),
               ),
             ],
             icon: const Icon(Icons.sort_rounded),
           ),
-        if (favoriteAppBarActions.showCreateFolder)
+        if (widget.favoriteAppBarActions.showCreateFolder)
           IconButton(
             tooltip: l10n(context).homeCreateFavoriteFolder,
-            onPressed: onFavoriteCreateFolderPressed,
+            onPressed: widget.onFavoriteCreateFolderPressed,
             icon: const Icon(Icons.create_new_folder_outlined),
           ),
       ],
@@ -189,24 +230,23 @@ class HomeAppBarActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final showDiscoverSpacer =
+        widget.forceDiscoverSearchInAppBar ||
+        widget.discoverSearchMorphProgress >= 0.96;
     final discoverActions = Row(
       key: const ValueKey<String>('discover-appbar-actions'),
       mainAxisSize: MainAxisSize.min,
       children: [
         _buildDiscoverSearchAction(context),
         AnimatedContainer(
-          duration: const Duration(milliseconds: 220),
+          duration: _discoverSearchDuration(220),
           curve: Curves.easeOutCubic,
-          width:
-              (forceDiscoverSearchInAppBar ||
-                  discoverSearchMorphProgress >= 0.96)
-              ? 12
-              : 0,
+          width: showDiscoverSpacer ? 12 : 0,
         ),
       ],
     );
 
-    final actionsChild = currentIndex == 1
+    final actionsChild = widget.currentIndex == 1
         ? _buildFavoriteActionGroup(context)
         : discoverActions;
 
@@ -227,13 +267,15 @@ class HomeAppBarActions extends StatelessWidget {
           curve: Curves.easeOutCubic,
           reverseCurve: Curves.easeInCubic,
         );
-        final slide = Tween<Offset>(
-          begin: const Offset(0.24, 0),
-          end: Offset.zero,
-        ).animate(curved);
         return FadeTransition(
           opacity: curved,
-          child: SlideTransition(position: slide, child: child),
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0.24, 0),
+              end: Offset.zero,
+            ).animate(curved),
+            child: child,
+          ),
         );
       },
       child: actionsChild,
