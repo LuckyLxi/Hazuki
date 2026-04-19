@@ -11,12 +11,16 @@ import 'package:hazuki/widgets/widgets.dart';
 class DiscoverDailyRecommendationCarousel extends StatefulWidget {
   const DiscoverDailyRecommendationCarousel({
     super.key,
-    required this.recommendations,
+    required this.displayedRecommendations,
+    this.pendingRecommendations = const <DiscoverDailyRecommendationEntry>[],
+    this.isPendingReady = false,
     required this.comicDetailPageBuilder,
     required this.comicCoverHeroTagBuilder,
   });
 
-  final List<DiscoverDailyRecommendationEntry> recommendations;
+  final List<DiscoverDailyRecommendationEntry> displayedRecommendations;
+  final List<DiscoverDailyRecommendationEntry> pendingRecommendations;
+  final bool isPendingReady;
   final ComicDetailPageBuilder comicDetailPageBuilder;
   final ComicHeroTagBuilder comicCoverHeroTagBuilder;
 
@@ -37,20 +41,35 @@ class _DiscoverDailyRecommendationCarouselState
   late PageController _pageController;
   Timer? _autoPlayTimer;
   late final String _carouselSessionId;
+  late List<DiscoverDailyRecommendationEntry> _displayedRecommendations;
+  List<DiscoverDailyRecommendationEntry> _pendingRecommendations =
+      const <DiscoverDailyRecommendationEntry>[];
+  final Set<int> _protectedVisibleItems = <int>{};
+  final Set<int> _prefetchedCoverIndexes = <int>{};
+  final Map<int, String> _reportedCardSnapshots = <int, String>{};
+  final Map<int, String> _reportedImageStates = <int, String>{};
   int _currentPage = 0;
   bool _detailOpen = false;
   String? _activeOverlayHeroTag;
   bool _isHovered = false;
   bool _isUserScrolling = false;
   bool _isNormalizingLoopBoundary = false;
-  final Map<int, String> _reportedCardSnapshots = <int, String>{};
-  final Map<int, String> _reportedImageStates = <int, String>{};
+  bool _usingMixedSnapshots = false;
+  bool _pendingActivationScheduled = false;
+  double? _lastHeroCardWidth;
+  double? _lastPageExtent;
+  double? _lastViewportWidth;
+  String _displayedSnapshotKey = '';
+  String _pendingSnapshotKey = '';
 
-  bool get _isLooping => widget.recommendations.length > 1;
+  int get _recommendationCount => _displayedRecommendations.length;
 
-  int get _loopedItemCount => _isLooping
-      ? widget.recommendations.length + 5
-      : widget.recommendations.length;
+  bool get _hasPendingRecommendations => _pendingRecommendations.isNotEmpty;
+
+  bool get _isLooping => _recommendationCount > 1;
+
+  int get _loopedItemCount =>
+      _isLooping ? _recommendationCount + 5 : _recommendationCount;
 
   int get _initialPhysicalPage => _isLooping ? 2 : 0;
 
@@ -62,21 +81,39 @@ class _DiscoverDailyRecommendationCarouselState
   }
 
   int _logicalPageForPhysical(int physicalPage) {
-    if (widget.recommendations.isEmpty) {
+    if (_recommendationCount == 0) {
       return 0;
     }
     if (!_isLooping) {
-      return physicalPage.clamp(0, widget.recommendations.length - 1);
+      return physicalPage.clamp(0, _recommendationCount - 1);
     }
-    final normalized = (physicalPage - 2) % widget.recommendations.length;
-    return normalized < 0
-        ? normalized + widget.recommendations.length
-        : normalized;
+    final normalized = (physicalPage - 2) % _recommendationCount;
+    return normalized < 0 ? normalized + _recommendationCount : normalized;
+  }
+
+  int _normalizeLogicalPage(int logicalPage) {
+    if (_recommendationCount == 0) {
+      return 0;
+    }
+    final normalized = logicalPage % _recommendationCount;
+    return normalized < 0 ? normalized + _recommendationCount : normalized;
   }
 
   @override
   void initState() {
     super.initState();
+    _displayedRecommendations =
+        List<DiscoverDailyRecommendationEntry>.unmodifiable(
+          widget.displayedRecommendations,
+        );
+    _displayedSnapshotKey = _snapshotKey(_displayedRecommendations);
+    if (widget.isPendingReady && widget.pendingRecommendations.isNotEmpty) {
+      _pendingRecommendations =
+          List<DiscoverDailyRecommendationEntry>.unmodifiable(
+            widget.pendingRecommendations,
+          );
+      _pendingSnapshotKey = _snapshotKey(_pendingRecommendations);
+    }
     _carouselSessionId = DateTime.now().microsecondsSinceEpoch.toString();
     _pageController = PageController(
       initialPage: _initialPhysicalPage,
@@ -91,7 +128,66 @@ class _DiscoverDailyRecommendationCarouselState
         'isLooping': _isLooping,
       },
     );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      _warmUpRecommendationCovers(_currentPage);
+      if (_hasPendingRecommendations) {
+        _schedulePendingActivation(trigger: 'init_state_pending');
+      }
+    });
     _startAutoPlay(trigger: 'init_state');
+  }
+
+  @override
+  void didUpdateWidget(
+    covariant DiscoverDailyRecommendationCarousel oldWidget,
+  ) {
+    super.didUpdateWidget(oldWidget);
+    final nextDisplayedKey = _snapshotKey(widget.displayedRecommendations);
+    final nextPendingKey = widget.isPendingReady
+        ? _snapshotKey(widget.pendingRecommendations)
+        : '';
+    var changed = false;
+
+    if (!widget.isPendingReady || widget.pendingRecommendations.isEmpty) {
+      if (nextDisplayedKey != _displayedSnapshotKey ||
+          _hasPendingRecommendations ||
+          _usingMixedSnapshots) {
+        _replaceDisplayedRecommendations(widget.displayedRecommendations);
+        _clearPendingRecommendations();
+        changed = true;
+      }
+      if (changed && mounted) {
+        setState(() {});
+      }
+      return;
+    }
+
+    if (nextDisplayedKey != _displayedSnapshotKey && !_usingMixedSnapshots) {
+      _replaceDisplayedRecommendations(widget.displayedRecommendations);
+      changed = true;
+    }
+
+    if (nextPendingKey != _pendingSnapshotKey) {
+      _pendingRecommendations =
+          List<DiscoverDailyRecommendationEntry>.unmodifiable(
+            widget.pendingRecommendations,
+          );
+      _pendingSnapshotKey = nextPendingKey;
+      changed = true;
+      if (_displayedRecommendations.isEmpty) {
+        _replaceDisplayedRecommendations(widget.pendingRecommendations);
+        _clearPendingRecommendations();
+      } else {
+        _schedulePendingActivation(trigger: 'widget_update_pending');
+      }
+    }
+
+    if (changed && mounted) {
+      setState(() {});
+    }
   }
 
   @override
@@ -108,6 +204,37 @@ class _DiscoverDailyRecommendationCarouselState
     super.dispose();
   }
 
+  void _replaceDisplayedRecommendations(
+    List<DiscoverDailyRecommendationEntry> recommendations,
+  ) {
+    _displayedRecommendations =
+        List<DiscoverDailyRecommendationEntry>.unmodifiable(recommendations);
+    _displayedSnapshotKey = _snapshotKey(_displayedRecommendations);
+    _prefetchedCoverIndexes.clear();
+    _reportedCardSnapshots.clear();
+    _reportedImageStates.clear();
+    _currentPage = _recommendationCount == 0
+        ? 0
+        : _normalizeLogicalPage(_currentPage);
+  }
+
+  void _clearPendingRecommendations() {
+    _pendingRecommendations = const <DiscoverDailyRecommendationEntry>[];
+    _pendingSnapshotKey = '';
+    _usingMixedSnapshots = false;
+    _pendingActivationScheduled = false;
+    _protectedVisibleItems.clear();
+  }
+
+  String _snapshotKey(List<DiscoverDailyRecommendationEntry> recommendations) {
+    return recommendations
+        .map(
+          (entry) =>
+              '${entry.author}|${entry.comic.id}|${entry.comic.title}|${entry.comic.cover}',
+        )
+        .join('||');
+  }
+
   void _logCarouselEvent(
     String title, {
     String level = 'info',
@@ -119,7 +246,7 @@ class _DiscoverDailyRecommendationCarouselState
       source: 'discover_carousel',
       content: {
         'sessionId': _carouselSessionId,
-        'recommendationCount': widget.recommendations.length,
+        'recommendationCount': _recommendationCount,
         'currentLogicalPage': _currentPage,
         'currentPhysicalPage': _pageController.hasClients
             ? _roundTo(
@@ -131,6 +258,9 @@ class _DiscoverDailyRecommendationCarouselState
         'isHovered': _isHovered,
         'isUserScrolling': _isUserScrolling,
         'isNormalizingLoopBoundary': _isNormalizingLoopBoundary,
+        'usingMixedSnapshots': _usingMixedSnapshots,
+        'protectedVisibleItemCount': _protectedVisibleItems.length,
+        'hasPendingRecommendations': _hasPendingRecommendations,
         if (content != null) ...content,
       },
     );
@@ -201,7 +331,7 @@ class _DiscoverDailyRecommendationCarouselState
   }
 
   void _handlePageChanged(int page) {
-    if (!mounted || widget.recommendations.isEmpty) {
+    if (!mounted || _recommendationCount == 0) {
       return;
     }
     final nextLogicalPage = _logicalPageForPhysical(page);
@@ -209,6 +339,8 @@ class _DiscoverDailyRecommendationCarouselState
     setState(() {
       _currentPage = nextLogicalPage;
     });
+    _warmUpRecommendationCovers(nextLogicalPage);
+    _scheduleProtectedItemRelease(trigger: 'page_changed');
     _logCarouselEvent(
       'Discover carousel page changed',
       content: {
@@ -216,8 +348,7 @@ class _DiscoverDailyRecommendationCarouselState
         'fromLogicalPage': previousLogicalPage,
         'toLogicalPage': nextLogicalPage,
         'isLoopGhost':
-            _isLooping &&
-            (page <= 1 || page >= widget.recommendations.length + 2),
+            _isLooping && (page <= 1 || page >= _recommendationCount + 2),
       },
     );
   }
@@ -232,7 +363,7 @@ class _DiscoverDailyRecommendationCarouselState
     if (settledPage == null) {
       return;
     }
-    final itemCount = widget.recommendations.length;
+    final itemCount = _recommendationCount;
     if (settledPage <= 1) {
       _logCarouselEvent(
         'Discover carousel loop boundary detected',
@@ -288,6 +419,7 @@ class _DiscoverDailyRecommendationCarouselState
       }
       _pageController.jumpToPage(targetPage);
       _isNormalizingLoopBoundary = false;
+      _scheduleProtectedItemRelease(trigger: 'loop_boundary_jump');
       _logCarouselEvent(
         'Discover carousel loop boundary jump applied',
         content: {
@@ -329,6 +461,7 @@ class _DiscoverDailyRecommendationCarouselState
 
     if (notification is ScrollEndNotification) {
       _normalizeLoopBoundary();
+      _scheduleProtectedItemRelease(trigger: 'scroll_end');
       if (_isUserScrolling) {
         setState(() {
           _isUserScrolling = false;
@@ -339,6 +472,305 @@ class _DiscoverDailyRecommendationCarouselState
     }
 
     return false;
+  }
+
+  void _schedulePendingActivation({required String trigger}) {
+    if (_pendingActivationScheduled) {
+      return;
+    }
+    _pendingActivationScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _pendingActivationScheduled = false;
+      if (!mounted) {
+        return;
+      }
+      _activatePendingRecommendations(trigger: trigger);
+    });
+  }
+
+  void _activatePendingRecommendations({required String trigger}) {
+    if (_usingMixedSnapshots ||
+        !_hasPendingRecommendations ||
+        _displayedRecommendations.isEmpty) {
+      return;
+    }
+    if (_pendingSnapshotKey == _displayedSnapshotKey) {
+      _completePendingPromotion(trigger: '${trigger}_same_snapshot');
+      return;
+    }
+    final protectedVisibleItems = _computeVisibleLogicalItems();
+    if (protectedVisibleItems.isEmpty && _recommendationCount > 0) {
+      protectedVisibleItems.add(_normalizeLogicalPage(_currentPage));
+    }
+    setState(() {
+      _usingMixedSnapshots = true;
+      _protectedVisibleItems
+        ..clear()
+        ..addAll(protectedVisibleItems);
+    });
+    _logCarouselEvent(
+      'Discover carousel pending recommendations activated',
+      content: {
+        'trigger': trigger,
+        'protectedVisibleItems': protectedVisibleItems.toList()..sort(),
+      },
+    );
+  }
+
+  void _scheduleProtectedItemRelease({required String trigger}) {
+    if (!_usingMixedSnapshots) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      _releaseOffscreenProtectedItems(trigger: trigger);
+    });
+  }
+
+  void _releaseOffscreenProtectedItems({required String trigger}) {
+    if (!_usingMixedSnapshots || !_hasPendingRecommendations) {
+      return;
+    }
+    final visibleLogicalItems = _computeVisibleLogicalItems();
+    final releasedItems = _protectedVisibleItems
+        .where((index) => !visibleLogicalItems.contains(index))
+        .toList(growable: false);
+    if (releasedItems.isNotEmpty) {
+      setState(() {
+        _protectedVisibleItems.removeAll(releasedItems);
+      });
+      _logCarouselEvent(
+        'Discover carousel protected items released',
+        content: {
+          'trigger': trigger,
+          'releasedItems': releasedItems,
+          'remainingProtectedItems': _protectedVisibleItems.toList()..sort(),
+        },
+      );
+    }
+    if (_protectedVisibleItems.isEmpty) {
+      _completePendingPromotion(trigger: '${trigger}_promotion');
+    }
+  }
+
+  void _completePendingPromotion({required String trigger}) {
+    if (!_hasPendingRecommendations) {
+      return;
+    }
+    final nextRecommendations = _pendingRecommendations;
+    setState(() {
+      _replaceDisplayedRecommendations(nextRecommendations);
+      _clearPendingRecommendations();
+    });
+    _warmUpRecommendationCovers(_currentPage);
+    unawaited(
+      DiscoverDailyRecommendationService.instance
+          .promotePendingRecommendations(),
+    );
+    _logCarouselEvent(
+      'Discover carousel pending recommendations promoted',
+      content: {'trigger': trigger},
+    );
+  }
+
+  Set<int> _computeVisibleLogicalItems() {
+    if (_recommendationCount == 0) {
+      return <int>{};
+    }
+    final heroCardWidth = _lastHeroCardWidth;
+    final pageExtent = _lastPageExtent;
+    final viewportWidth = _lastViewportWidth;
+    if (heroCardWidth == null || pageExtent == null || viewportWidth == null) {
+      return <int>{_normalizeLogicalPage(_currentPage)};
+    }
+    final visibleLogicalItems = <int>{};
+    final page = _pageController.hasClients
+        ? (_pageController.page ??
+              _physicalPageForLogical(_currentPage).toDouble())
+        : _physicalPageForLogical(_currentPage).toDouble();
+    final start = math.max(0, page.floor() - 2);
+    final end = math.min(_loopedItemCount - 1, page.ceil() + 3);
+    for (var physicalIndex = start; physicalIndex <= end; physicalIndex++) {
+      final metrics = _buildCardLayoutMetrics(
+        delta: physicalIndex - page,
+        heroCardWidth: heroCardWidth,
+        pageExtent: pageExtent,
+      );
+      if (metrics.visibleWidth(
+            heroCardWidth: heroCardWidth,
+            viewportWidth: viewportWidth,
+          ) <=
+          0.5) {
+        continue;
+      }
+      visibleLogicalItems.add(_logicalPageForPhysical(physicalIndex));
+    }
+    return visibleLogicalItems;
+  }
+
+  List<int> _coverWarmUpOrder(int anchorLogicalPage) {
+    if (_recommendationCount == 0) {
+      return const <int>[];
+    }
+    final order = <int>[];
+    for (var offset = 0; offset < _recommendationCount; offset++) {
+      order.add(_normalizeLogicalPage(anchorLogicalPage + offset));
+      if (offset > 0) {
+        order.add(_normalizeLogicalPage(anchorLogicalPage - offset));
+      }
+    }
+    return order.toSet().toList(growable: false);
+  }
+
+  void _warmUpRecommendationCovers(int anchorLogicalPage) {
+    if (_recommendationCount == 0) {
+      return;
+    }
+    for (final index in _coverWarmUpOrder(anchorLogicalPage)) {
+      if (!_prefetchedCoverIndexes.add(index)) {
+        continue;
+      }
+      unawaited(_prefetchRecommendationCover(index));
+    }
+  }
+
+  Future<void> _prefetchRecommendationCover(int logicalIndex) async {
+    final normalizedIndex = _normalizeLogicalPage(logicalIndex);
+    final coverUrl = _resolvedRecommendationEntry(
+      normalizedIndex,
+    ).comic.cover.trim();
+    if (coverUrl.isEmpty) {
+      return;
+    }
+    try {
+      final bytes = await HazukiSourceService.instance.downloadImageBytes(
+        coverUrl,
+        keepInMemory: true,
+      );
+      putHazukiWidgetImageMemory(coverUrl, bytes);
+    } catch (_) {
+      _prefetchedCoverIndexes.remove(normalizedIndex);
+    }
+  }
+
+  DiscoverDailyRecommendationEntry _resolvedRecommendationEntry(
+    int logicalIndex,
+  ) {
+    final normalizedIndex = _normalizeLogicalPage(logicalIndex);
+    if (_usingMixedSnapshots &&
+        _hasPendingRecommendations &&
+        !_protectedVisibleItems.contains(normalizedIndex) &&
+        normalizedIndex < _pendingRecommendations.length) {
+      return _pendingRecommendations[normalizedIndex];
+    }
+    return _displayedRecommendations[normalizedIndex];
+  }
+
+  _CarouselCardLayoutMetrics _buildCardLayoutMetrics({
+    required double delta,
+    required double heroCardWidth,
+    required double pageExtent,
+  }) {
+    const narrowRatio = 0.29;
+    const incomingExpansionHold = 0.72;
+    const parallaxRatio = 0.035;
+    const trailingSmallRevealDelay = 0.42;
+
+    double clipScaleX;
+    double imageTranslateX;
+    double cardScale;
+    double cardOpacity;
+    double outerTranslateX;
+    final slotLeft = delta * pageExtent;
+    final narrowWidth = heroCardWidth * narrowRatio;
+
+    if (delta >= -1 && delta <= 0) {
+      final progress = (-delta).clamp(0.0, 1.0);
+      clipScaleX = _lerp(1.0, 0.0, progress);
+      imageTranslateX = heroCardWidth * parallaxRatio * progress;
+      cardScale = 1.0;
+      cardOpacity = clipScaleX <= 0.001 ? 0.0 : 1.0;
+      outerTranslateX = -slotLeft;
+    } else if (delta > 0 && delta <= 1) {
+      final progress = (1 - delta).clamp(0.0, 1.0);
+      final lockedRightLeft = _itemSpacing + narrowWidth;
+      double desiredLeft;
+
+      if (progress < incomingExpansionHold) {
+        final phase = progress / incomingExpansionHold;
+        clipScaleX = _lerp(narrowRatio, 1.0, phase);
+        desiredLeft = _lerp(
+          heroCardWidth + _itemSpacing,
+          lockedRightLeft,
+          phase,
+        );
+      } else {
+        final phase =
+            (progress - incomingExpansionHold) / (1.0 - incomingExpansionHold);
+        clipScaleX = 1.0;
+        desiredLeft = _lerp(lockedRightLeft, 0.0, phase);
+      }
+
+      imageTranslateX = heroCardWidth * parallaxRatio * (1.0 - progress);
+      cardScale = 1.0;
+      cardOpacity = clipScaleX <= 0.001 ? 0.0 : 1.0;
+      outerTranslateX = desiredLeft - slotLeft;
+    } else if (delta > 1 && delta <= 2) {
+      final progress = (2 - delta).clamp(0.0, 1.0);
+
+      final lockedRightLeft = _itemSpacing + narrowWidth;
+      double index1DesiredLeft;
+      double index1ClipScaleX;
+
+      if (progress < incomingExpansionHold) {
+        final phase = progress / incomingExpansionHold;
+        index1ClipScaleX = _lerp(narrowRatio, 1.0, phase);
+        index1DesiredLeft = _lerp(
+          heroCardWidth + _itemSpacing,
+          lockedRightLeft,
+          phase,
+        );
+      } else {
+        final phase =
+            (progress - incomingExpansionHold) / (1.0 - incomingExpansionHold);
+        index1ClipScaleX = 1.0;
+        index1DesiredLeft = _lerp(lockedRightLeft, 0.0, phase);
+      }
+
+      final index1ClippedWidth = (heroCardWidth * index1ClipScaleX).clamp(
+        0.0,
+        heroCardWidth,
+      );
+      final index1RightEdge = index1DesiredLeft + index1ClippedWidth;
+
+      final revealProgress =
+          ((progress - trailingSmallRevealDelay) /
+                  (1.0 - trailingSmallRevealDelay))
+              .clamp(0.0, 1.0);
+      clipScaleX = _lerp(0.0, narrowRatio, revealProgress);
+      imageTranslateX = heroCardWidth * parallaxRatio * delta;
+      cardScale = 1.0;
+      cardOpacity = clipScaleX <= 0.001 ? 0.0 : 1.0;
+
+      final currentX = index1RightEdge + _itemSpacing;
+      outerTranslateX = currentX - slotLeft;
+    } else {
+      clipScaleX = 0.0;
+      imageTranslateX = 0.0;
+      cardScale = 1.0;
+      cardOpacity = 0.0;
+      outerTranslateX = 0.0;
+    }
+
+    return _CarouselCardLayoutMetrics(
+      clipScaleX: clipScaleX,
+      imageTranslateX: imageTranslateX,
+      cardScale: cardScale,
+      cardOpacity: cardOpacity,
+      outerTranslateX: outerTranslateX,
+    );
   }
 
   double _lerp(double begin, double end, double t) {
@@ -436,8 +868,7 @@ class _DiscoverDailyRecommendationCarouselState
     final phase = _describeCardPhase(delta, clipScaleX, cardOpacity);
     final isLoopGhost =
         _isLooping &&
-        (physicalIndex <= 1 ||
-            physicalIndex >= widget.recommendations.length + 2);
+        (physicalIndex <= 1 || physicalIndex >= _recommendationCount + 2);
     final clipBucket = (clipScaleX * 10).round();
     final deltaBucket = (delta * 10).round();
     final outerBucket = (outerTranslateX / 12).round();
@@ -545,6 +976,10 @@ class _DiscoverDailyRecommendationCarouselState
 
   @override
   Widget build(BuildContext context) {
+    if (_recommendationCount == 0) {
+      return const SizedBox.shrink();
+    }
+
     final theme = Theme.of(context);
     final placeholderColor = theme.colorScheme.surfaceContainerHighest;
 
@@ -569,6 +1004,14 @@ class _DiscoverDailyRecommendationCarouselState
               final coverCacheWidth =
                   heroCardWidth * MediaQuery.devicePixelRatioOf(context);
 
+              _lastHeroCardWidth = heroCardWidth;
+              _lastPageExtent = pageExtent;
+              _lastViewportWidth = availableWidth;
+
+              if (_hasPendingRecommendations && !_usingMixedSnapshots) {
+                _schedulePendingActivation(trigger: 'layout_ready');
+              }
+
               if ((_pageController.viewportFraction - viewportFraction).abs() >
                   0.001) {
                 WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -584,6 +1027,7 @@ class _DiscoverDailyRecommendationCarouselState
                     initialPage: currentPage,
                     viewportFraction: viewportFraction,
                   );
+                  _scheduleProtectedItemRelease(trigger: 'controller_rebuilt');
                   _logCarouselEvent(
                     'Discover carousel controller rebuilt',
                     content: {
@@ -634,10 +1078,10 @@ class _DiscoverDailyRecommendationCarouselState
                     itemCount: _loopedItemCount,
                     onPageChanged: _handlePageChanged,
                     itemBuilder: (context, index) {
-                      final effectiveIndex = widget.recommendations.isEmpty
-                          ? 0
-                          : _logicalPageForPhysical(index);
-                      final entry = widget.recommendations[effectiveIndex];
+                      final effectiveIndex = _logicalPageForPhysical(index);
+                      final entry = _resolvedRecommendationEntry(
+                        effectiveIndex,
+                      );
                       final heroTag = widget.comicCoverHeroTagBuilder(
                         entry.comic,
                         salt: 'discover-daily-$effectiveIndex',
@@ -654,126 +1098,25 @@ class _DiscoverDailyRecommendationCarouselState
                                   _currentPage,
                                 ).toDouble();
                           final delta = index - page;
-
-                          const narrowRatio = 0.29;
-                          const incomingExpansionHold = 0.72;
-                          const parallaxRatio = 0.035;
-                          const trailingSmallRevealDelay = 0.42;
-
-                          double clipScaleX;
-                          double imageTranslateX;
-                          double cardScale;
-                          double cardOpacity;
-                          double outerTranslateX;
-                          final slotLeft = delta * pageExtent;
-                          final narrowWidth = heroCardWidth * narrowRatio;
-
-                          if (delta >= -1 && delta <= 0) {
-                            final progress = (-delta).clamp(0.0, 1.0);
-                            clipScaleX = _lerp(1.0, 0.0, progress);
-                            imageTranslateX =
-                                heroCardWidth * parallaxRatio * progress;
-                            cardScale = 1.0;
-                            cardOpacity = clipScaleX <= 0.001 ? 0.0 : 1.0;
-                            outerTranslateX = -slotLeft;
-                          } else if (delta > 0 && delta <= 1) {
-                            final progress = (1 - delta).clamp(0.0, 1.0);
-                            final lockedRightLeft = _itemSpacing + narrowWidth;
-                            double desiredLeft;
-
-                            if (progress < incomingExpansionHold) {
-                              final phase = progress / incomingExpansionHold;
-                              clipScaleX = _lerp(narrowRatio, 1.0, phase);
-                              desiredLeft = _lerp(
-                                heroCardWidth + _itemSpacing,
-                                lockedRightLeft,
-                                phase,
-                              );
-                            } else {
-                              final phase =
-                                  (progress - incomingExpansionHold) /
-                                  (1.0 - incomingExpansionHold);
-                              clipScaleX = 1.0;
-                              desiredLeft = _lerp(lockedRightLeft, 0.0, phase);
-                            }
-
-                            imageTranslateX =
-                                heroCardWidth *
-                                parallaxRatio *
-                                (1.0 - progress);
-                            cardScale = 1.0;
-                            cardOpacity = clipScaleX <= 0.001 ? 0.0 : 1.0;
-                            outerTranslateX = desiredLeft - slotLeft;
-                          } else if (delta > 1 && delta <= 2) {
-                            final progress = (2 - delta).clamp(0.0, 1.0);
-
-                            final lockedRightLeft = _itemSpacing + narrowWidth;
-                            double index1DesiredLeft;
-                            double index1ClipScaleX;
-
-                            if (progress < incomingExpansionHold) {
-                              final phase = progress / incomingExpansionHold;
-                              index1ClipScaleX = _lerp(narrowRatio, 1.0, phase);
-                              index1DesiredLeft = _lerp(
-                                heroCardWidth + _itemSpacing,
-                                lockedRightLeft,
-                                phase,
-                              );
-                            } else {
-                              final phase =
-                                  (progress - incomingExpansionHold) /
-                                  (1.0 - incomingExpansionHold);
-                              index1ClipScaleX = 1.0;
-                              index1DesiredLeft = _lerp(
-                                lockedRightLeft,
-                                0.0,
-                                phase,
-                              );
-                            }
-
-                            final index1ClippedWidth =
-                                (heroCardWidth * index1ClipScaleX).clamp(
-                                  0.0,
-                                  heroCardWidth,
-                                );
-                            final index1RightEdge =
-                                index1DesiredLeft + index1ClippedWidth;
-
-                            final revealProgress =
-                                ((progress - trailingSmallRevealDelay) /
-                                        (1.0 - trailingSmallRevealDelay))
-                                    .clamp(0.0, 1.0);
-                            clipScaleX = _lerp(
-                              0.0,
-                              narrowRatio,
-                              revealProgress,
-                            );
-                            imageTranslateX =
-                                heroCardWidth * parallaxRatio * delta;
-                            cardScale = 1.0;
-                            cardOpacity = clipScaleX <= 0.001 ? 0.0 : 1.0;
-
-                            final currentX = index1RightEdge + _itemSpacing;
-                            outerTranslateX = currentX - slotLeft;
-                          } else {
-                            clipScaleX = 0.0;
-                            imageTranslateX = 0.0;
-                            cardScale = 1.0;
-                            cardOpacity = 0.0;
-                            outerTranslateX = 0.0;
-                          }
-
-                          final clippedWidth = (heroCardWidth * clipScaleX)
-                              .clamp(0.0, heroCardWidth);
+                          final metrics = _buildCardLayoutMetrics(
+                            delta: delta,
+                            heroCardWidth: heroCardWidth,
+                            pageExtent: pageExtent,
+                          );
+                          final clippedWidth = metrics.clippedWidth(
+                            heroCardWidth,
+                          );
+                          final shouldDeferLoading =
+                              _isUserScrolling && delta.abs() > 1.35;
                           _reportCardLayout(
                             physicalIndex: index,
                             logicalIndex: effectiveIndex,
                             delta: delta,
-                            clipScaleX: clipScaleX,
+                            clipScaleX: metrics.clipScaleX,
                             clippedWidth: clippedWidth,
-                            outerTranslateX: outerTranslateX,
-                            imageTranslateX: imageTranslateX,
-                            cardOpacity: cardOpacity,
+                            outerTranslateX: metrics.outerTranslateX,
+                            imageTranslateX: metrics.imageTranslateX,
+                            cardOpacity: metrics.cardOpacity,
                             heroCardWidth: heroCardWidth,
                             pageExtent: pageExtent,
                           );
@@ -786,7 +1129,8 @@ class _DiscoverDailyRecommendationCarouselState
                                   cacheWidth: coverCacheWidth.round(),
                                   animateOnLoad: true,
                                   filterQuality: FilterQuality.low,
-                                  deferLoadingWhileScrolling: true,
+                                  deferLoadingWhileScrolling:
+                                      shouldDeferLoading,
                                   loading: SizedBox.expand(
                                     child: ColoredBox(color: placeholderColor),
                                   ),
@@ -810,13 +1154,13 @@ class _DiscoverDailyRecommendationCarouselState
                           }
 
                           return Transform.translate(
-                            offset: Offset(outerTranslateX, 0),
+                            offset: Offset(metrics.outerTranslateX, 0),
                             child: Align(
                               alignment: Alignment.centerLeft,
                               child: Opacity(
-                                opacity: cardOpacity.clamp(0.0, 1.0),
+                                opacity: metrics.cardOpacity.clamp(0.0, 1.0),
                                 child: Transform.scale(
-                                  scale: cardScale,
+                                  scale: metrics.cardScale,
                                   alignment: Alignment.centerLeft,
                                   child: SizedBox(
                                     width: clippedWidth,
@@ -851,7 +1195,7 @@ class _DiscoverDailyRecommendationCarouselState
                                                   maxWidth: heroCardWidth,
                                                   child: Transform.translate(
                                                     offset: Offset(
-                                                      imageTranslateX,
+                                                      metrics.imageTranslateX,
                                                       0,
                                                     ),
                                                     child: SizedBox(
@@ -891,7 +1235,7 @@ class _DiscoverDailyRecommendationCarouselState
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            for (int index = 0; index < widget.recommendations.length; index++)
+            for (int index = 0; index < _recommendationCount; index++)
               AnimatedContainer(
                 key: ValueKey('discover_daily_recommendation_indicator_$index'),
                 duration: const Duration(milliseconds: 220),
@@ -1012,8 +1356,6 @@ class _CarouselCardOverlayState extends State<_CarouselCardOverlay> {
       _updateVisibility(true);
       return;
     }
-    // Active overlay stays hidden during the Hero flight and only reappears
-    // after the pushed route is fully dismissed.
     _updateVisibility(false);
   }
 
@@ -1095,5 +1437,40 @@ class _CarouselCardOverlayState extends State<_CarouselCardOverlay> {
         ),
       ),
     );
+  }
+}
+
+class _CarouselCardLayoutMetrics {
+  const _CarouselCardLayoutMetrics({
+    required this.clipScaleX,
+    required this.imageTranslateX,
+    required this.cardScale,
+    required this.cardOpacity,
+    required this.outerTranslateX,
+  });
+
+  final double clipScaleX;
+  final double imageTranslateX;
+  final double cardScale;
+  final double cardOpacity;
+  final double outerTranslateX;
+
+  double clippedWidth(double heroCardWidth) {
+    return (heroCardWidth * clipScaleX).clamp(0.0, heroCardWidth);
+  }
+
+  double visibleWidth({
+    required double heroCardWidth,
+    required double viewportWidth,
+  }) {
+    final width = clippedWidth(heroCardWidth);
+    if (width <= 0 || cardOpacity <= 0.001) {
+      return 0;
+    }
+    final left = outerTranslateX;
+    final right = left + width;
+    final visibleLeft = math.max(0.0, left);
+    final visibleRight = math.min(viewportWidth, right);
+    return math.max(0.0, visibleRight - visibleLeft);
   }
 }

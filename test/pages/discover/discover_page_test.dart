@@ -164,7 +164,10 @@ Widget _buildDiscoverPage(
         comicDetailPageBuilder: (comic, heroTag) =>
             Scaffold(body: Center(child: Text('detail:${comic.id}'))),
         usePinnedSearchInAppBar: true,
-        dailyRecommendations: recommendations,
+        dailyRecommendationState: DiscoverDailyRecommendationState(
+          enabled: true,
+          displayedRecommendations: recommendations,
+        ),
         allowInitialLoad: false,
         hideLoadingUntilInitialLoadAllowed: true,
       ),

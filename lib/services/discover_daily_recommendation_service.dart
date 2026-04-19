@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -58,26 +60,74 @@ class DiscoverDailyRecommendationEntry {
 class DiscoverDailyRecommendationState {
   const DiscoverDailyRecommendationState({
     required this.enabled,
-    required this.recommendations,
+    this.displayedRecommendations = const <DiscoverDailyRecommendationEntry>[],
+    this.pendingRecommendations = const <DiscoverDailyRecommendationEntry>[],
     this.selectedAuthor,
     this.generatedAt,
+    this.pendingSelectedAuthor,
+    this.pendingGeneratedAt,
+    this.isRefreshing = false,
+    this.isPendingReady = false,
   });
 
-  const DiscoverDailyRecommendationState.disabled()
-    : this(
-        enabled: false,
-        recommendations: const <DiscoverDailyRecommendationEntry>[],
-      );
+  const DiscoverDailyRecommendationState.disabled() : this(enabled: false);
 
   final bool enabled;
-  final List<DiscoverDailyRecommendationEntry> recommendations;
+  final List<DiscoverDailyRecommendationEntry> displayedRecommendations;
+  final List<DiscoverDailyRecommendationEntry> pendingRecommendations;
   final String? selectedAuthor;
   final DateTime? generatedAt;
+  final String? pendingSelectedAuthor;
+  final DateTime? pendingGeneratedAt;
+  final bool isRefreshing;
+  final bool isPendingReady;
 
-  bool get hasRecommendations => enabled && recommendations.isNotEmpty;
+  List<DiscoverDailyRecommendationEntry> get recommendations =>
+      displayedRecommendations;
+
+  bool get hasRecommendations => enabled && displayedRecommendations.isNotEmpty;
+
+  bool get hasPendingRecommendations => pendingRecommendations.isNotEmpty;
+
+  DiscoverDailyRecommendationState copyWith({
+    bool? enabled,
+    List<DiscoverDailyRecommendationEntry>? displayedRecommendations,
+    List<DiscoverDailyRecommendationEntry>? pendingRecommendations,
+    Object? selectedAuthor = _discoverRecommendationUnset,
+    Object? generatedAt = _discoverRecommendationUnset,
+    Object? pendingSelectedAuthor = _discoverRecommendationUnset,
+    Object? pendingGeneratedAt = _discoverRecommendationUnset,
+    bool? isRefreshing,
+    bool? isPendingReady,
+  }) {
+    return DiscoverDailyRecommendationState(
+      enabled: enabled ?? this.enabled,
+      displayedRecommendations:
+          displayedRecommendations ?? this.displayedRecommendations,
+      pendingRecommendations:
+          pendingRecommendations ?? this.pendingRecommendations,
+      selectedAuthor: selectedAuthor == _discoverRecommendationUnset
+          ? this.selectedAuthor
+          : selectedAuthor as String?,
+      generatedAt: generatedAt == _discoverRecommendationUnset
+          ? this.generatedAt
+          : generatedAt as DateTime?,
+      pendingSelectedAuthor:
+          pendingSelectedAuthor == _discoverRecommendationUnset
+          ? this.pendingSelectedAuthor
+          : pendingSelectedAuthor as String?,
+      pendingGeneratedAt: pendingGeneratedAt == _discoverRecommendationUnset
+          ? this.pendingGeneratedAt
+          : pendingGeneratedAt as DateTime?,
+      isRefreshing: isRefreshing ?? this.isRefreshing,
+      isPendingReady: isPendingReady ?? this.isPendingReady,
+    );
+  }
 }
 
-class DiscoverDailyRecommendationService {
+const Object _discoverRecommendationUnset = Object();
+
+class DiscoverDailyRecommendationService extends ChangeNotifier {
   DiscoverDailyRecommendationService._();
 
   static final DiscoverDailyRecommendationService instance =
@@ -85,14 +135,14 @@ class DiscoverDailyRecommendationService {
 
   static const String authorsAssetPath = 'assets/data/authors.txt';
   static const String _cachePayloadKey = 'discover_daily_recommendation_cache';
-  static const Duration _cacheTtl = Duration(hours: 2);
+  static const Duration _cacheTtl = Duration(hours: 1);
   static const int recommendationCount = 7;
 
   final math.Random _random = math.Random();
 
   DiscoverDailyRecommendationState _state =
       const DiscoverDailyRecommendationState.disabled();
-  bool _sessionResolved = false;
+  Future<void>? _refreshInFlight;
 
   DiscoverDailyRecommendationState get state => _state;
 
@@ -102,12 +152,11 @@ class DiscoverDailyRecommendationService {
       hazukiDiscoverDailyRecommendationEnabledPreferenceKey,
       enabled,
     );
-    _state = DiscoverDailyRecommendationState(
-      enabled: enabled,
-      recommendations: _state.recommendations,
-      selectedAuthor: _state.selectedAuthor,
-      generatedAt: _state.generatedAt,
-    );
+    if (!enabled) {
+      _setState(const DiscoverDailyRecommendationState.disabled());
+      return;
+    }
+    _setState(_state.copyWith(enabled: true));
   }
 
   Future<bool> loadEnabled() async {
@@ -122,71 +171,194 @@ class DiscoverDailyRecommendationService {
     required bool enabled,
   }) async {
     if (!enabled) {
-      _state = DiscoverDailyRecommendationState(
-        enabled: false,
-        recommendations: _state.recommendations,
-        selectedAuthor: _state.selectedAuthor,
-        generatedAt: _state.generatedAt,
-      );
+      _setState(const DiscoverDailyRecommendationState.disabled());
       return _state;
     }
 
-    if (_sessionResolved) {
-      _state = DiscoverDailyRecommendationState(
-        enabled: true,
-        recommendations: _state.recommendations,
-        selectedAuthor: _state.selectedAuthor,
-        generatedAt: _state.generatedAt,
-      );
+    if (_state.isPendingReady && _state.hasPendingRecommendations) {
+      _setState(_state.copyWith(enabled: true, isRefreshing: false));
+      return _state;
+    }
+
+    if (_state.hasRecommendations) {
+      _setState(_state.copyWith(enabled: true));
+      if (!_isDisplayedFresh(_state)) {
+        unawaited(_refreshPendingRecommendations());
+      }
       return _state;
     }
 
     final prefs = await SharedPreferences.getInstance();
     final cached = _readCache(prefs);
-    if (cached != null && _isCacheFresh(cached)) {
-      _sessionResolved = true;
-      _state = DiscoverDailyRecommendationState(
-        enabled: true,
-        recommendations: cached.recommendations,
-        selectedAuthor: cached.selectedAuthor,
-        generatedAt: cached.generatedAt,
-      );
+    if (cached != null) {
+      _setState(_snapshotToDisplayedState(cached));
+      if (!_isCacheFresh(cached)) {
+        unawaited(_refreshPendingRecommendations(prefs: prefs));
+      }
       return _state;
     }
 
     if (!HazukiSourceService.instance.isInitialized) {
-      _state = const DiscoverDailyRecommendationState(
-        enabled: true,
-        recommendations: <DiscoverDailyRecommendationEntry>[],
-      );
+      _setState(const DiscoverDailyRecommendationState(enabled: true));
       return _state;
     }
 
-    _sessionResolved = true;
     final generated = await _generateRecommendations();
     if (generated == null) {
-      _state = const DiscoverDailyRecommendationState(
-        enabled: true,
-        recommendations: <DiscoverDailyRecommendationEntry>[],
-      );
+      _setState(const DiscoverDailyRecommendationState(enabled: true));
       return _state;
     }
 
-    _state = generated;
-    await prefs.setString(
+    await _persistSnapshot(prefs, generated);
+    _setState(_snapshotToDisplayedState(generated));
+    return _state;
+  }
+
+  Future<void> promotePendingRecommendations() async {
+    if (!_state.isPendingReady || !_state.hasPendingRecommendations) {
+      return;
+    }
+    _setState(
+      DiscoverDailyRecommendationState(
+        enabled: _state.enabled,
+        displayedRecommendations: _state.pendingRecommendations,
+        selectedAuthor: _state.pendingSelectedAuthor,
+        generatedAt: _state.pendingGeneratedAt,
+        isRefreshing: false,
+        isPendingReady: false,
+      ),
+    );
+  }
+
+  void _setState(DiscoverDailyRecommendationState next) {
+    _state = DiscoverDailyRecommendationState(
+      enabled: next.enabled,
+      displayedRecommendations:
+          List<DiscoverDailyRecommendationEntry>.unmodifiable(
+            next.displayedRecommendations,
+          ),
+      pendingRecommendations:
+          List<DiscoverDailyRecommendationEntry>.unmodifiable(
+            next.pendingRecommendations,
+          ),
+      selectedAuthor: next.selectedAuthor,
+      generatedAt: next.generatedAt,
+      pendingSelectedAuthor: next.pendingSelectedAuthor,
+      pendingGeneratedAt: next.pendingGeneratedAt,
+      isRefreshing: next.isRefreshing,
+      isPendingReady: next.isPendingReady,
+    );
+    notifyListeners();
+  }
+
+  DiscoverDailyRecommendationState _snapshotToDisplayedState(
+    _DiscoverDailyRecommendationSnapshot snapshot,
+  ) {
+    return DiscoverDailyRecommendationState(
+      enabled: true,
+      displayedRecommendations: snapshot.recommendations,
+      selectedAuthor: snapshot.selectedAuthor,
+      generatedAt: snapshot.generatedAt,
+      isRefreshing: false,
+      isPendingReady: false,
+    );
+  }
+
+  Future<void> _refreshPendingRecommendations({
+    SharedPreferences? prefs,
+  }) async {
+    if (_refreshInFlight != null ||
+        !_state.enabled ||
+        _state.isPendingReady ||
+        !HazukiSourceService.instance.isInitialized) {
+      return;
+    }
+
+    final completer = Completer<void>();
+    _refreshInFlight = completer.future;
+    _setState(_state.copyWith(isRefreshing: true));
+
+    try {
+      final generated = await _generateRecommendations();
+      if (generated == null || !_state.enabled) {
+        return;
+      }
+
+      final preloaded = await _preloadRecommendationImages(
+        generated.recommendations,
+      );
+      if (!preloaded || !_state.enabled) {
+        return;
+      }
+
+      final resolvedPrefs = prefs ?? await SharedPreferences.getInstance();
+      await _persistSnapshot(resolvedPrefs, generated);
+      _setState(
+        _state.copyWith(
+          pendingRecommendations: generated.recommendations,
+          pendingSelectedAuthor: generated.selectedAuthor,
+          pendingGeneratedAt: generated.generatedAt,
+          isRefreshing: false,
+          isPendingReady: true,
+        ),
+      );
+    } finally {
+      _refreshInFlight = null;
+      if (!_state.isPendingReady) {
+        _setState(_state.copyWith(isRefreshing: false));
+      }
+      if (!completer.isCompleted) {
+        completer.complete();
+      }
+    }
+  }
+
+  Future<bool> _preloadRecommendationImages(
+    List<DiscoverDailyRecommendationEntry> recommendations,
+  ) async {
+    final imageUrls = recommendations
+        .map((entry) => entry.comic.cover.trim())
+        .where((url) => url.isNotEmpty)
+        .toList(growable: false);
+    if (imageUrls.length != recommendations.length) {
+      return false;
+    }
+    try {
+      await Future.wait(
+        imageUrls.map((url) async {
+          final bytes = await HazukiSourceService.instance.downloadImageBytes(
+            url,
+            keepInMemory: true,
+          );
+          if (bytes.isEmpty) {
+            throw Exception('recommendation_cover_empty');
+          }
+        }),
+        eagerError: true,
+      );
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _persistSnapshot(
+    SharedPreferences prefs,
+    _DiscoverDailyRecommendationSnapshot snapshot,
+  ) {
+    return prefs.setString(
       _cachePayloadKey,
       jsonEncode(<String, dynamic>{
-        'generatedAt': generated.generatedAt?.toIso8601String(),
-        'selectedAuthor': generated.selectedAuthor,
-        'entries': generated.recommendations
+        'generatedAt': snapshot.generatedAt.toIso8601String(),
+        'selectedAuthor': snapshot.selectedAuthor,
+        'entries': snapshot.recommendations
             .map((entry) => entry.toJson())
             .toList(),
       }),
     );
-    return _state;
   }
 
-  DiscoverDailyRecommendationState? _readCache(SharedPreferences prefs) {
+  _DiscoverDailyRecommendationSnapshot? _readCache(SharedPreferences prefs) {
     final raw = prefs.getString(_cachePayloadKey);
     if (raw == null || raw.trim().isEmpty) {
       return null;
@@ -213,8 +385,7 @@ class DiscoverDailyRecommendationService {
           entries.length != recommendationCount) {
         return null;
       }
-      return DiscoverDailyRecommendationState(
-        enabled: true,
+      return _DiscoverDailyRecommendationSnapshot(
         recommendations: entries,
         selectedAuthor: selectedAuthor,
         generatedAt: generatedAt,
@@ -224,7 +395,7 @@ class DiscoverDailyRecommendationService {
     }
   }
 
-  bool _isCacheFresh(DiscoverDailyRecommendationState state) {
+  bool _isDisplayedFresh(DiscoverDailyRecommendationState state) {
     final generatedAt = state.generatedAt;
     if (generatedAt == null) {
       return false;
@@ -232,7 +403,12 @@ class DiscoverDailyRecommendationService {
     return DateTime.now().difference(generatedAt) <= _cacheTtl;
   }
 
-  Future<DiscoverDailyRecommendationState?> _generateRecommendations() async {
+  bool _isCacheFresh(_DiscoverDailyRecommendationSnapshot snapshot) {
+    return DateTime.now().difference(snapshot.generatedAt) <= _cacheTtl;
+  }
+
+  Future<_DiscoverDailyRecommendationSnapshot?>
+  _generateRecommendations() async {
     final authors = await _loadAuthors();
     if (authors.isEmpty) {
       return null;
@@ -252,8 +428,7 @@ class DiscoverDailyRecommendationService {
       return null;
     }
 
-    return DiscoverDailyRecommendationState(
-      enabled: true,
+    return _DiscoverDailyRecommendationSnapshot(
       recommendations: sampledComics
           .map(
             (comic) =>
@@ -271,7 +446,7 @@ class DiscoverDailyRecommendationService {
     final authors = <String>[];
     for (final line in lines) {
       final normalized = line
-          .replaceFirst(RegExp(r'^\s*\d+\s*[\.、]\s*'), '')
+          .replaceFirst(RegExp(r'^\s*\d+\s*[.\s、]*'), '')
           .trim();
       if (normalized.isEmpty) {
         continue;
@@ -301,4 +476,16 @@ class DiscoverDailyRecommendationService {
     }
     return candidates.take(count).toList(growable: false);
   }
+}
+
+class _DiscoverDailyRecommendationSnapshot {
+  const _DiscoverDailyRecommendationSnapshot({
+    required this.recommendations,
+    required this.selectedAuthor,
+    required this.generatedAt,
+  });
+
+  final List<DiscoverDailyRecommendationEntry> recommendations;
+  final String selectedAuthor;
+  final DateTime generatedAt;
 }

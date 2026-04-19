@@ -18,7 +18,8 @@ class DiscoverPage extends StatefulWidget {
     super.key,
     required this.comicDetailPageBuilder,
     this.usePinnedSearchInAppBar = false,
-    this.dailyRecommendations = const <DiscoverDailyRecommendationEntry>[],
+    this.dailyRecommendationState =
+        const DiscoverDailyRecommendationState.disabled(),
     this.onSearchMorphProgressChanged,
     this.onSearchTap,
     this.allowInitialLoad = true,
@@ -28,7 +29,7 @@ class DiscoverPage extends StatefulWidget {
 
   final ComicDetailPageBuilder comicDetailPageBuilder;
   final bool usePinnedSearchInAppBar;
-  final List<DiscoverDailyRecommendationEntry> dailyRecommendations;
+  final DiscoverDailyRecommendationState dailyRecommendationState;
   final ValueChanged<double>? onSearchMorphProgressChanged;
   final VoidCallback? onSearchTap;
   final bool allowInitialLoad;
@@ -264,7 +265,8 @@ class _DiscoverPageState extends State<DiscoverPage> {
   }
 
   bool get _showRecommendationCarousel =>
-      widget.usePinnedSearchInAppBar && widget.dailyRecommendations.isNotEmpty;
+      widget.usePinnedSearchInAppBar &&
+      widget.dailyRecommendationState.displayedRecommendations.isNotEmpty;
 
   int get _headerItemCount =>
       (widget.usePinnedSearchInAppBar ? 0 : 1) +
@@ -274,7 +276,11 @@ class _DiscoverPageState extends State<DiscoverPage> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 20),
       child: DiscoverDailyRecommendationCarousel(
-        recommendations: widget.dailyRecommendations,
+        displayedRecommendations:
+            widget.dailyRecommendationState.displayedRecommendations,
+        pendingRecommendations:
+            widget.dailyRecommendationState.pendingRecommendations,
+        isPendingReady: widget.dailyRecommendationState.isPendingReady,
         comicDetailPageBuilder: widget.comicDetailPageBuilder,
         comicCoverHeroTagBuilder: widget.comicCoverHeroTagBuilder,
       ),

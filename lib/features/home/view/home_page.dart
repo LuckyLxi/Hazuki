@@ -92,8 +92,7 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
           discoverSearchMorphProgress: _coordinator.discoverSearchMorphProgress,
           usePinnedDiscoverSearch:
               _coordinator.dailyRecommendationState.hasRecommendations,
-          dailyRecommendations:
-              _coordinator.dailyRecommendationState.recommendations,
+          dailyRecommendationState: _coordinator.dailyRecommendationState,
           favoriteAppBarActions: _coordinator.favoriteAppBarActions,
           isLogged: isLogged,
           avatarUrl: _coordinator.avatarUrl,

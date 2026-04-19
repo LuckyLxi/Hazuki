@@ -23,7 +23,7 @@ class HomeScaffoldShell extends StatelessWidget {
     required this.currentIndex,
     required this.discoverSearchMorphProgress,
     required this.usePinnedDiscoverSearch,
-    required this.dailyRecommendations,
+    required this.dailyRecommendationState,
     required this.favoriteAppBarActions,
     required this.isLogged,
     required this.avatarUrl,
@@ -60,7 +60,7 @@ class HomeScaffoldShell extends StatelessWidget {
   final int currentIndex;
   final double discoverSearchMorphProgress;
   final bool usePinnedDiscoverSearch;
-  final List<DiscoverDailyRecommendationEntry> dailyRecommendations;
+  final DiscoverDailyRecommendationState dailyRecommendationState;
   final FavoriteAppBarActionsState favoriteAppBarActions;
   final bool isLogged;
   final String? avatarUrl;
@@ -154,7 +154,7 @@ class HomeScaffoldShell extends StatelessWidget {
               discoverChild: DiscoverPage(
                 comicDetailPageBuilder: comicDetailPageBuilder,
                 usePinnedSearchInAppBar: usePinnedDiscoverSearch,
-                dailyRecommendations: dailyRecommendations,
+                dailyRecommendationState: dailyRecommendationState,
                 allowInitialLoad: allowDiscoverInitialLoad,
                 hideLoadingUntilInitialLoadAllowed:
                     hideDiscoverLoadingUntilAllowed,
