@@ -170,63 +170,116 @@ extension _CommentsWidgetsExtension on _CommentsPageState {
                 ? l10n(context).commentsAnonymousUser
                 : _replyToComment!.userName,
           );
+    final isFocused = _commentFocusNode.hasFocus;
 
     return AnimatedPadding(
       duration: const Duration(milliseconds: 220),
       curve: Curves.easeOutCubic,
       padding: EdgeInsets.only(bottom: bottomInset),
-      child: Material(
-        elevation: 8,
-        color: Theme.of(context).colorScheme.surface,
-        child: SafeArea(
-          top: false,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildReplyBanner(),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _commentController,
-                        minLines: 1,
-                        maxLines: 3,
-                        textInputAction: TextInputAction.send,
-                        onSubmitted: (_) => unawaited(_submitComment()),
-                        decoration: InputDecoration(
-                          hintText: hint,
-                          border: const OutlineInputBorder(),
-                          isDense: true,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildReplyBanner(),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final expandedWidth = constraints.maxWidth;
+                final collapsedWidth = expandedWidth > 420
+                    ? 420.0
+                    : expandedWidth * 0.9;
+                final composerWidth = isFocused
+                    ? expandedWidth
+                    : collapsedWidth.clamp(0.0, expandedWidth);
+
+                return AnimatedContainer(
+                  duration: const Duration(milliseconds: 260),
+                  curve: Curves.easeOutCubic,
+                  width: composerWidth,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(24),
+                    child: BackdropFilter(
+                      filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.surface.withAlpha(176),
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.outlineVariant.withAlpha(150),
+                          ),
+                        ),
+                        child: TextField(
+                          controller: _commentController,
+                          focusNode: _commentFocusNode,
+                          onTapOutside: (_) => _commentFocusNode.unfocus(),
+                          minLines: 1,
+                          maxLines: 3,
+                          textInputAction: TextInputAction.send,
+                          onSubmitted: (_) => unawaited(_submitComment()),
+                          decoration: InputDecoration(
+                            hintText: hint,
+                            border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            contentPadding: const EdgeInsets.only(
+                              left: 16,
+                              top: 10,
+                              bottom: 10,
+                              right: 4,
+                            ),
+                            isDense: true,
+                            suffixIcon: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                                vertical: 4,
+                              ),
+                              child: FilledButton(
+                                onPressed: _sendingComment
+                                    ? null
+                                    : _submitComment,
+                                style: FilledButton.styleFrom(
+                                  minimumSize: Size.zero,
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 14,
+                                    vertical: 0,
+                                  ),
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                ),
+                                child: Text(
+                                  _sendingComment
+                                      ? l10n(context).commentsSending
+                                      : l10n(context).commentsSend,
+                                ),
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    FilledButton(
-                      onPressed: _sendingComment ? null : _submitComment,
-                      child: Text(
-                        _sendingComment
-                            ? l10n(context).commentsSending
-                            : l10n(context).commentsSend,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+                  ),
+                );
+              },
             ),
-          ),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildCommentsBodyList() {
+  Widget _buildCommentsBodyList({double extraBottomPadding = 0}) {
     final loadMoreFooter = _loadingMore
         ? const HazukiLoadMoreFooter()
         : const SizedBox(height: 4);
 
-    const listBottomPadding = EdgeInsets.only(bottom: 10);
+    final listBottomPadding = EdgeInsets.only(bottom: 10 + extraBottomPadding);
 
     if (widget.isTabView) {
       final overlapHandle = NestedScrollView.sliverOverlapAbsorberHandleFor(

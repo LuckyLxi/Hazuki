@@ -48,6 +48,7 @@ class HomeScaffoldShell extends StatelessWidget {
     required this.onOpenDownloads,
     required this.onOpenSettings,
     required this.onOpenLines,
+    this.selectedDrawerDestination,
     required this.onDiscoverSearchMorphProgressChanged,
     required this.onFavoriteAppBarActionsChanged,
     required this.onRequestLogin,
@@ -85,6 +86,7 @@ class HomeScaffoldShell extends StatelessWidget {
   final VoidCallback onOpenDownloads;
   final VoidCallback onOpenSettings;
   final VoidCallback onOpenLines;
+  final HomeDrawerDestination? selectedDrawerDestination;
   final ValueChanged<double> onDiscoverSearchMorphProgressChanged;
   final ValueChanged<FavoriteAppBarActionsState> onFavoriteAppBarActionsChanged;
   final Future<void> Function() onRequestLogin;
@@ -147,6 +149,7 @@ class HomeScaffoldShell extends StatelessWidget {
             onOpenDownloads: onOpenDownloads,
             onOpenSettings: onOpenSettings,
             onOpenLines: onOpenLines,
+            selectedDestination: selectedDrawerDestination,
           ),
           body: HazukiDesktopPageContainer(
             child: HomeContentStack(

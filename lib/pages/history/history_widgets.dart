@@ -3,69 +3,52 @@ part of '../history_page.dart';
 extension _HistoryWidgets on _HistoryPageState {
   Future<void> _showComicMenu(
     ExploreComic comic,
-    BuildContext itemContext,
     Offset globalPosition,
+    BuildContext itemContext,
   ) async {
     final navigator = Navigator.of(context);
     final overlay = navigator.overlay?.context.findRenderObject() as RenderBox?;
-    final itemRender = itemContext.findRenderObject() as RenderBox?;
-    if (overlay == null || itemRender == null || !itemRender.hasSize) {
+    final cardBox = itemContext.findRenderObject() as RenderBox?;
+    if (overlay == null || cardBox == null) {
       return;
     }
 
-    final itemTopLeft = itemRender.localToGlobal(
-      Offset.zero,
-      ancestor: overlay,
-    );
-    final itemRect = itemTopLeft & itemRender.size;
     final fingerOffset = overlay.globalToLocal(globalPosition);
+    final cardOffset = cardBox.localToGlobal(Offset.zero, ancestor: overlay);
+    final cardSize = cardBox.size;
+    final cardTopDy = cardOffset.dy;
+    final cardBottomDy = cardOffset.dy + cardSize.height;
 
     const menuWidth = 212.0;
     const menuHeight = 174.0;
     const gap = 8.0;
     const screenPadding = 8.0;
 
-    final preferRight = fingerOffset.dx <= itemRect.center.dx;
-    var dx = preferRight
-        ? itemRect.right + gap
-        : itemRect.left - menuWidth - gap;
-    if (dx + menuWidth > overlay.size.width - screenPadding) {
-      dx = itemRect.left - menuWidth - gap;
-    }
-    if (dx < screenPadding) {
-      dx = itemRect.right + gap;
-    }
-    if (dx + menuWidth > overlay.size.width - screenPadding) {
-      dx = (overlay.size.width - menuWidth) / 2;
-    }
-
     final mediaPadding = MediaQuery.of(context).padding;
-    final scrollableRender =
-        Scrollable.maybeOf(itemContext)?.context.findRenderObject()
-            as RenderBox?;
-    final viewportRect = scrollableRender != null && scrollableRender.hasSize
-        ? scrollableRender.localToGlobal(Offset.zero, ancestor: overlay) &
-              scrollableRender.size
-        : Offset.zero & overlay.size;
-    final minY = math.max(
-      screenPadding + mediaPadding.top,
-      viewportRect.top + screenPadding,
-    );
-    final maxY = math.min(
-      overlay.size.height - mediaPadding.bottom - menuHeight - screenPadding,
-      viewportRect.bottom - menuHeight - screenPadding,
-    );
-    final availableAbove = itemRect.top - minY;
-    final availableBelow = maxY + menuHeight - itemRect.bottom;
-    final canShowBelow = availableBelow >= menuHeight + gap;
-    final canShowAbove = availableAbove >= menuHeight;
-    final showBelow =
-        canShowBelow || (!canShowAbove && availableBelow >= availableAbove);
-    final preferredTop = itemRect.bottom + gap;
-    final dy = preferredTop.clamp(minY, math.max(minY, maxY)).toDouble();
-    final upwardBottom = (overlay.size.height - itemRect.top).toDouble();
+    final minX = screenPadding;
+    final maxX = overlay.size.width - menuWidth - screenPadding;
+    final minY = screenPadding + mediaPadding.top;
+    final maxY =
+        overlay.size.height - mediaPadding.bottom - menuHeight - screenPadding;
 
-    final originX = fingerOffset.dx < dx + menuWidth / 2 ? 0.0 : 1.0;
+    // 尝试让菜单左边缘对齐手指，超出屏幕则镜像到右侧
+    var dx = fingerOffset.dx - menuWidth / 2;
+    dx = dx.clamp(minX, maxX);
+
+    // 菜单默认在卡片下方，空间不足则显示在上方
+    final showBelow =
+        cardBottomDy + gap + menuHeight <=
+        overlay.size.height - mediaPadding.bottom - screenPadding;
+    final dy = showBelow
+        ? (cardBottomDy + gap).clamp(minY, maxY)
+        : (cardTopDy - gap - menuHeight).clamp(minY, maxY);
+    final upwardBottom = overlay.size.height - cardTopDy + gap;
+
+    // 动画缩放原点与水平手指位置相关，垂直方向固定上下边缘
+    final originX = ((fingerOffset.dx - dx) / menuWidth * 2 - 1).clamp(
+      -1.0,
+      1.0,
+    );
     final originY = showBelow ? -1.0 : 1.0;
 
     final strings = AppLocalizations.of(context)!;
@@ -74,7 +57,7 @@ extension _HistoryWidgets on _HistoryPageState {
       barrierDismissible: true,
       barrierLabel: strings.commonClose,
       barrierColor: Colors.black26,
-      transitionDuration: const Duration(milliseconds: 280),
+      transitionDuration: const Duration(milliseconds: 300),
       pageBuilder: (dialogContext, animation, secondaryAnimation) {
         final scheme = Theme.of(context).colorScheme;
         return Stack(
@@ -84,43 +67,55 @@ extension _HistoryWidgets on _HistoryPageState {
               top: showBelow ? dy : null,
               bottom: showBelow ? null : upwardBottom,
               width: menuWidth,
-              child: Material(
-                color: Colors.transparent,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: scheme.surfaceContainerHigh,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: scheme.outlineVariant),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.16),
-                        blurRadius: 20,
-                        offset: const Offset(0, 8),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: BackdropFilter(
+                  filter: ui.ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+                  child: Material(
+                    color: Colors.transparent,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: scheme.surfaceContainerHigh.withValues(
+                          alpha: 0.75,
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: scheme.outlineVariant.withValues(alpha: 0.6),
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.16),
+                            blurRadius: 20,
+                            offset: const Offset(0, 8),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _HistoryMenuItem(
-                        icon: Icons.copy,
-                        label: strings.historyMenuCopyComicId,
-                        onTap: () => Navigator.of(dialogContext).pop('copy'),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          _HistoryMenuItem(
+                            icon: Icons.copy,
+                            label: strings.historyMenuCopyComicId,
+                            onTap: () =>
+                                Navigator.of(dialogContext).pop('copy'),
+                          ),
+                          _HistoryMenuItem(
+                            icon: Icons.favorite_border,
+                            label: strings.historyMenuToggleFavorite,
+                            onTap: () =>
+                                Navigator.of(dialogContext).pop('favorite'),
+                          ),
+                          Divider(height: 1, color: scheme.outlineVariant),
+                          _HistoryMenuItem(
+                            icon: Icons.delete_outline,
+                            label: strings.historyMenuDeleteItem,
+                            danger: true,
+                            onTap: () =>
+                                Navigator.of(dialogContext).pop('delete'),
+                          ),
+                        ],
                       ),
-                      _HistoryMenuItem(
-                        icon: Icons.favorite_border,
-                        label: strings.historyMenuToggleFavorite,
-                        onTap: () =>
-                            Navigator.of(dialogContext).pop('favorite'),
-                      ),
-                      Divider(height: 1, color: scheme.outlineVariant),
-                      _HistoryMenuItem(
-                        icon: Icons.delete_outline,
-                        label: strings.historyMenuDeleteItem,
-                        danger: true,
-                        onTap: () => Navigator.of(dialogContext).pop('delete'),
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -132,14 +127,14 @@ extension _HistoryWidgets on _HistoryPageState {
         final scaleCurve = CurvedAnimation(
           parent: animation,
           curve: Curves.easeOutBack,
-          reverseCurve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
         );
         final opacityCurve = CurvedAnimation(
           parent: animation,
           curve: Curves.easeOutCubic,
-          reverseCurve: Curves.linear,
+          reverseCurve: Curves.easeInCubic,
         );
-        final scale = Tween<double>(begin: 0.6, end: 1.0).animate(scaleCurve);
+        final scale = Tween<double>(begin: 0.5, end: 1.0).animate(scaleCurve);
         final align = Alignment(originX, originY);
         return FadeTransition(
           opacity: opacityCurve,
@@ -177,7 +172,7 @@ extension _HistoryWidgets on _HistoryPageState {
             if (!_selectionMode) {
               HapticFeedback.mediumImpact();
               unawaited(
-                _showComicMenu(comic, itemContext, details.globalPosition),
+                _showComicMenu(comic, details.globalPosition, itemContext),
               );
             }
           },

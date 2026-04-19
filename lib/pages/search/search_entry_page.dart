@@ -1,10 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../app/app.dart';
 import '../../l10n/app_localizations.dart';
+import '../../services/hazuki_source_service.dart';
 import '../../widgets/widgets.dart';
 import '../../widgets/windows_comic_detail_host.dart';
 import 'search_history_section.dart';
@@ -29,6 +31,11 @@ class SearchEntryPage extends StatefulWidget {
 class _SearchEntryPageState extends State<SearchEntryPage> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
+  final FocusNode _collapsedSearchFocusNode = FocusNode(
+    debugLabel: 'collapsed_search_focus',
+    canRequestFocus: false,
+    skipTraversal: true,
+  );
   final FocusNode _pageFocusNode = FocusNode(
     debugLabel: 'search_entry_page_focus',
     skipTraversal: true,
@@ -42,6 +49,9 @@ class _SearchEntryPageState extends State<SearchEntryPage> {
   bool _historyEditMode = false;
   bool _historyExpanded = false;
   double _searchRevealProgress = 0;
+  bool _entryFocusDone = false;
+  bool _entryAutoFocusCancelled = false;
+  Animation<double>? _routeAnimation;
 
   bool get _showCollapsedSearch => _revealSupport.showCollapsedSearch;
 
@@ -50,23 +60,82 @@ class _SearchEntryPageState extends State<SearchEntryPage> {
     super.initState();
     unawaited(_loadHistory());
     _scrollController.addListener(_onScroll);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) {
-        return;
+    _searchFocusNode.addListener(_onSearchFocusChanged);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_entryFocusDone) {
+      _entryFocusDone = true;
+      final animation = ModalRoute.of(context)?.animation;
+      if (animation == null || animation.isCompleted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          _logSearchEvent(
+            'search: entry requestFocus',
+            content: {'trigger': 'no_animation'},
+          );
+          unawaited(_focusSearchOnEntry());
+        });
+      } else {
+        _routeAnimation = animation;
+        animation.addStatusListener(_onRouteAnimationStatus);
       }
-      _searchFocusNode.requestFocus();
-    });
+    }
+  }
+
+  void _onRouteAnimationStatus(AnimationStatus status) {
+    if (status == AnimationStatus.completed) {
+      _routeAnimation?.removeStatusListener(_onRouteAnimationStatus);
+      _routeAnimation = null;
+      if (!mounted) return;
+      _logSearchEvent(
+        'search: entry requestFocus',
+        content: {'trigger': 'route_animation_completed'},
+      );
+      unawaited(_focusSearchOnEntry());
+    }
+  }
+
+  void _onSearchFocusChanged() {
+    if (_searchFocusNode.hasFocus) {
+      _logSearchEvent('search: focus gained (keyboard up)');
+    } else {
+      _logSearchEvent('search: focus lost (keyboard down)');
+    }
   }
 
   @override
   void dispose() {
+    _routeAnimation?.removeStatusListener(_onRouteAnimationStatus);
+    _searchFocusNode.removeListener(_onSearchFocusChanged);
     _revealSupport.dispose();
     _scrollController.removeListener(_onScroll);
     _searchController.dispose();
     _searchFocusNode.dispose();
+    _collapsedSearchFocusNode.dispose();
     _pageFocusNode.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _logSearchEvent(
+    String title, {
+    String level = 'info',
+    Map<String, Object?>? content,
+  }) {
+    HazukiSourceService.instance.addApplicationLog(
+      level: level,
+      title: title,
+      source: 'search_entry',
+      content: {
+        'searchText': _searchController.text,
+        'historyCount': _historyList.length,
+        'hasFocus': _searchFocusNode.hasFocus,
+        if (content != null) ...content,
+      },
+    );
   }
 
   void _syncSearchRevealProgress(bool force) {
@@ -101,12 +170,38 @@ class _SearchEntryPageState extends State<SearchEntryPage> {
     _syncSearchRevealProgress(false);
   }
 
+  void _cancelEntryAutoFocus() {
+    _entryAutoFocusCancelled = true;
+    _routeAnimation?.removeStatusListener(_onRouteAnimationStatus);
+    _routeAnimation = null;
+  }
+
   void _parkSearchFocus() {
     if (!mounted) {
       return;
     }
+    _cancelEntryAutoFocus();
     FocusManager.instance.primaryFocus?.unfocus();
     FocusScope.of(context).requestFocus(_pageFocusNode);
+  }
+
+  void _requestExpandedSearchFocus() {
+    if (!mounted) {
+      return;
+    }
+    _searchFocusNode.requestFocus();
+  }
+
+  Future<void> _focusSearchOnEntry() async {
+    if (!mounted || _entryAutoFocusCancelled) {
+      return;
+    }
+    _requestExpandedSearchFocus();
+    await Future<void>.delayed(const Duration(milliseconds: 180));
+    if (!mounted || _entryAutoFocusCancelled || !_searchFocusNode.hasFocus) {
+      return;
+    }
+    await SystemChannels.textInput.invokeMethod<void>('TextInput.show');
   }
 
   Future<void> _scrollToTop({bool focusSearch = false}) async {
@@ -118,7 +213,7 @@ class _SearchEntryPageState extends State<SearchEntryPage> {
       );
     }
     if (focusSearch && mounted) {
-      _searchFocusNode.requestFocus();
+      _requestExpandedSearchFocus();
     }
   }
 
@@ -127,6 +222,7 @@ class _SearchEntryPageState extends State<SearchEntryPage> {
     if (!mounted) {
       return;
     }
+    final hadSearchFocus = _searchFocusNode.hasFocus;
     setState(() {
       _historyList = prefs.getStringList('search_history') ?? <String>[];
       if (_historyList.isEmpty) {
@@ -134,6 +230,13 @@ class _SearchEntryPageState extends State<SearchEntryPage> {
       }
     });
     _scheduleSearchRevealSyncBurst(false);
+    if (hadSearchFocus) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _logSearchEvent('search: refocus after history load');
+        _searchFocusNode.requestFocus();
+      });
+    }
   }
 
   Future<void> _removeHistory(String keyword) async {
@@ -178,6 +281,7 @@ class _SearchEntryPageState extends State<SearchEntryPage> {
   }
 
   Future<void> _openResults(String rawKeyword) async {
+    _cancelEntryAutoFocus();
     _syncSearchText(rawKeyword);
     final keyword = await normalizeSubmittedKeyword(
       rawKeyword,
@@ -263,11 +367,12 @@ class _SearchEntryPageState extends State<SearchEntryPage> {
   Widget _buildSearchBar({
     required String clearKey,
     required String submitKey,
+    FocusNode? focusNode,
   }) {
     return SizedBox(
       height: 56,
       child: SearchBar(
-        focusNode: _searchFocusNode,
+        focusNode: focusNode ?? _searchFocusNode,
         controller: _searchController,
         hintText: AppLocalizations.of(context)!.searchHint,
         elevation: const WidgetStatePropertyAll(0),
@@ -282,36 +387,22 @@ class _SearchEntryPageState extends State<SearchEntryPage> {
         ),
         leading: const Icon(Icons.search),
         trailing: [
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 180),
-            transitionBuilder: (child, animation) {
-              return ScaleTransition(
-                scale: CurvedAnimation(
-                  parent: animation,
-                  curve: Curves.easeOutBack,
-                  reverseCurve: Curves.easeInCubic,
-                ),
-                child: FadeTransition(opacity: animation, child: child),
+          buildAnimatedSearchActionButton(
+            showClearAction: _searchController.text.isNotEmpty,
+            clearKey: clearKey,
+            submitKey: submitKey,
+            clearTooltip: AppLocalizations.of(context)!.searchClearTooltip,
+            submitTooltip: AppLocalizations.of(context)!.searchSubmitTooltip,
+            onClear: () {
+              _logSearchEvent(
+                'search: clear button tapped',
+                content: {'clearedText': _searchController.text},
               );
+              _searchController.clear();
+              setState(() {});
+              _requestExpandedSearchFocus();
             },
-            child: _searchController.text.isNotEmpty
-                ? IconButton(
-                    key: ValueKey<String>(clearKey),
-                    tooltip: AppLocalizations.of(context)!.searchClearTooltip,
-                    onPressed: () {
-                      _searchController.clear();
-                      setState(() {});
-                      _searchFocusNode.requestFocus();
-                    },
-                    icon: const Icon(Icons.close),
-                  )
-                : IconButton(
-                    key: ValueKey<String>(submitKey),
-                    tooltip: AppLocalizations.of(context)!.searchSubmitTooltip,
-                    onPressed: () =>
-                        unawaited(_openResults(_searchController.text)),
-                    icon: const Icon(Icons.arrow_forward),
-                  ),
+            onSubmit: () => unawaited(_openResults(_searchController.text)),
           ),
         ],
         onSubmitted: (value) => unawaited(_openResults(value)),
@@ -386,6 +477,7 @@ class _SearchEntryPageState extends State<SearchEntryPage> {
                           child: _buildSearchBar(
                             clearKey: 'entry-collapsed-clear',
                             submitKey: 'entry-collapsed-submit',
+                            focusNode: _collapsedSearchFocusNode,
                           ),
                         ),
                       ),
@@ -408,6 +500,9 @@ class _SearchEntryPageState extends State<SearchEntryPage> {
         skipTraversal: true,
         child: Scaffold(
           backgroundColor: Theme.of(context).colorScheme.surface,
+          resizeToAvoidBottomInset: true,
+          floatingActionButtonAnimator:
+              FloatingActionButtonAnimator.noAnimation,
           floatingActionButton: _historyList.isNotEmpty
               ? GestureDetector(
                   onLongPress: _confirmClearHistory,
@@ -427,6 +522,7 @@ class _SearchEntryPageState extends State<SearchEntryPage> {
           appBar: hazukiFrostedAppBar(
             context: context,
             title: Text(AppLocalizations.of(context)!.searchTitle),
+            enableBlur: false,
             actions: [
               _buildCollapsedSearchBox(),
               AnimatedContainer(
@@ -449,7 +545,13 @@ class _SearchEntryPageState extends State<SearchEntryPage> {
                 historyList: _historyList,
                 historyEditMode: _historyEditMode,
                 historyExpanded: _historyExpanded,
-                onKeywordPressed: (keyword) => unawaited(_openResults(keyword)),
+                onKeywordPressed: (keyword) {
+                  _logSearchEvent(
+                    'search: history keyword tapped',
+                    content: {'keyword': keyword},
+                  );
+                  unawaited(_openResults(keyword));
+                },
                 onKeywordDeleted: (keyword) =>
                     unawaited(_removeHistory(keyword)),
                 onExpandedChanged: (expanded) {

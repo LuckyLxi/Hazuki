@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
@@ -53,6 +54,7 @@ class _CommentsPageState extends State<CommentsPage>
 
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _commentController = TextEditingController();
+  final FocusNode _commentFocusNode = FocusNode();
   final Set<String> _animatedCommentKeys = <String>{};
 
   List<ComicCommentData> _comments = const [];
@@ -72,14 +74,25 @@ class _CommentsPageState extends State<CommentsPage>
   @override
   void initState() {
     super.initState();
+    _commentFocusNode.addListener(_handleCommentFocusChanged);
     unawaited(_loadInitial());
   }
 
   @override
   void dispose() {
     _scrollController.dispose();
+    _commentFocusNode
+      ..removeListener(_handleCommentFocusChanged)
+      ..dispose();
     _commentController.dispose();
     super.dispose();
+  }
+
+  void _handleCommentFocusChanged() {
+    if (!mounted) {
+      return;
+    }
+    setState(() {});
   }
 
   void _updateCommentsState(VoidCallback update) {
@@ -135,26 +148,46 @@ class _CommentsPageState extends State<CommentsPage>
     if (widget.isTabView && !widget.isActiveInTabView) {
       return const SizedBox.expand();
     }
-    final bodyList = _buildCommentsBodyList();
 
     if (widget.isTabView) {
       final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-      return Column(
+      final safeBottom = MediaQuery.paddingOf(context).bottom;
+      const pillHoriz = 16.0;
+      const pillMarginBottom = 6.0;
+      const pillApproxHeight = 56.0;
+      final listExtraBottom =
+          pillApproxHeight + pillMarginBottom + safeBottom + bottomInset;
+      return Stack(
         children: [
-          Expanded(child: bodyList),
-          _buildBottomComposer(bottomInset: bottomInset),
+          _buildCommentsBodyList(extraBottomPadding: listExtraBottom),
+          Positioned(
+            left: pillHoriz,
+            right: pillHoriz,
+            bottom: safeBottom + pillMarginBottom + bottomInset,
+            child: _buildBottomComposer(),
+          ),
         ],
       );
     }
 
+    final safeBottom = MediaQuery.paddingOf(context).bottom;
     return Scaffold(
       appBar: hazukiFrostedAppBar(
         context: context,
         title: Text(l10n(context).commentsTitle),
       ),
       resizeToAvoidBottomInset: true,
-      body: bodyList,
-      bottomNavigationBar: _buildBottomComposer(),
+      body: Stack(
+        children: [
+          _buildCommentsBodyList(extraBottomPadding: 80),
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: safeBottom + 6,
+            child: _buildBottomComposer(),
+          ),
+        ],
+      ),
     );
   }
 }

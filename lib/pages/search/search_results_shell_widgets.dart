@@ -29,31 +29,14 @@ extension _SearchResultsShellWidgetsExtension on _SearchResultsPageState {
       ),
       leading: Icon(Icons.search, size: compact ? 20 : 24),
       trailing: [
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 180),
-          transitionBuilder: (child, animation) {
-            return ScaleTransition(
-              scale: CurvedAnimation(
-                parent: animation,
-                curve: Curves.easeOutBack,
-                reverseCurve: Curves.easeInCubic,
-              ),
-              child: FadeTransition(opacity: animation, child: child),
-            );
-          },
-          child: controller.text.isNotEmpty
-              ? IconButton(
-                  key: ValueKey(clearKey),
-                  tooltip: strings.searchClearTooltip,
-                  onPressed: onClear,
-                  icon: const Icon(Icons.close),
-                )
-              : IconButton(
-                  key: ValueKey(submitKey),
-                  tooltip: strings.searchSubmitTooltip,
-                  onPressed: () => unawaited(_submitSearch()),
-                  icon: const Icon(Icons.arrow_forward),
-                ),
+        buildAnimatedSearchActionButton(
+          showClearAction: controller.text.isNotEmpty,
+          clearKey: clearKey,
+          submitKey: submitKey,
+          clearTooltip: strings.searchClearTooltip,
+          submitTooltip: strings.searchSubmitTooltip,
+          onClear: onClear,
+          onSubmit: () => unawaited(_submitSearch()),
         ),
       ],
       onSubmitted: (value) => unawaited(_submitSearch(submittedText: value)),

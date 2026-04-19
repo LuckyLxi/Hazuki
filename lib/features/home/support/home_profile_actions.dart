@@ -428,14 +428,33 @@ Future<void> showHomeAvatarCard(
 }) {
   return showHomeAnimatedDialog<void>(
     context,
-    child: AlertDialog(
-      contentPadding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-      content: HomeProfileCardContent(
-        avatarUrl: avatarUrl,
-        username: username,
-        firstUseText: firstUseText,
-        onLogoutTap: onLogoutTap,
-        onRequestSaveAvatar: onRequestSaveAvatar,
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(28),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+        child: IntrinsicWidth(
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            decoration: BoxDecoration(
+              color: Theme.of(
+                context,
+              ).colorScheme.surface.withValues(alpha: 0.72),
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(
+                color: Theme.of(
+                  context,
+                ).colorScheme.outlineVariant.withValues(alpha: 0.4),
+              ),
+            ),
+            child: HomeProfileCardContent(
+              avatarUrl: avatarUrl,
+              username: username,
+              firstUseText: firstUseText,
+              onLogoutTap: onLogoutTap,
+              onRequestSaveAvatar: onRequestSaveAvatar,
+            ),
+          ),
+        ),
       ),
     ),
   );

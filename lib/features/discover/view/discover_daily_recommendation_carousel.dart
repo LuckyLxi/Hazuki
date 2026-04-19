@@ -51,6 +51,8 @@ class _DiscoverDailyRecommendationCarouselState
   int _currentPage = 0;
   bool _detailOpen = false;
   String? _activeOverlayHeroTag;
+  Animation<double>? _routeSecondaryAnimation;
+  Timer? _overlayRevealTimer;
   bool _isHovered = false;
   bool _isUserScrolling = false;
   bool _isNormalizingLoopBoundary = false;
@@ -102,6 +104,11 @@ class _DiscoverDailyRecommendationCarouselState
   @override
   void initState() {
     super.initState();
+    if (useWindowsComicDetailPanel) {
+      WindowsComicDetailController.instance.addListener(
+        _handleWindowsDetailControllerChanged,
+      );
+    }
     _displayedRecommendations =
         List<DiscoverDailyRecommendationEntry>.unmodifiable(
           widget.displayedRecommendations,
@@ -138,6 +145,12 @@ class _DiscoverDailyRecommendationCarouselState
       }
     });
     _startAutoPlay(trigger: 'init_state');
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _attachRouteAnimationIfNeeded();
   }
 
   @override
@@ -193,6 +206,13 @@ class _DiscoverDailyRecommendationCarouselState
   @override
   void dispose() {
     _cancelAutoPlay(trigger: 'dispose');
+    _overlayRevealTimer?.cancel();
+    _detachRouteAnimation();
+    if (useWindowsComicDetailPanel) {
+      WindowsComicDetailController.instance.removeListener(
+        _handleWindowsDetailControllerChanged,
+      );
+    }
     _logCarouselEvent(
       'Discover carousel disposed',
       content: {
@@ -202,6 +222,77 @@ class _DiscoverDailyRecommendationCarouselState
     );
     _pageController.dispose();
     super.dispose();
+  }
+
+  void _attachRouteAnimationIfNeeded() {
+    final route = ModalRoute.of(context);
+    final nextSecondaryAnimation = route?.secondaryAnimation;
+    if (identical(nextSecondaryAnimation, _routeSecondaryAnimation)) {
+      _syncOverlayHeroTagWithRoute();
+      return;
+    }
+    _detachRouteAnimation();
+    _routeSecondaryAnimation = nextSecondaryAnimation;
+    _routeSecondaryAnimation?.addStatusListener(_handleRouteStatusChanged);
+    _syncOverlayHeroTagWithRoute();
+  }
+
+  void _detachRouteAnimation() {
+    _routeSecondaryAnimation?.removeStatusListener(_handleRouteStatusChanged);
+    _routeSecondaryAnimation = null;
+  }
+
+  void _handleRouteStatusChanged(AnimationStatus _) {
+    if (!mounted) {
+      return;
+    }
+    _syncOverlayHeroTagWithRoute();
+  }
+
+  void _syncOverlayHeroTagWithRoute() {
+    if (_detailOpen || _activeOverlayHeroTag == null) {
+      return;
+    }
+    final secondaryAnimation = _routeSecondaryAnimation;
+    if (secondaryAnimation != null &&
+        secondaryAnimation.status != AnimationStatus.dismissed) {
+      return;
+    }
+    _scheduleOverlayReveal();
+  }
+
+  void _scheduleOverlayReveal({
+    Duration delay = Duration.zero,
+    String? trigger,
+  }) {
+    _overlayRevealTimer?.cancel();
+    if (_activeOverlayHeroTag == null) {
+      return;
+    }
+    if (delay <= Duration.zero) {
+      if (!mounted) {
+        _activeOverlayHeroTag = null;
+      } else {
+        setState(() {
+          _activeOverlayHeroTag = null;
+        });
+      }
+      return;
+    }
+    _overlayRevealTimer = Timer(delay, () {
+      if (!mounted || _detailOpen || _activeOverlayHeroTag == null) {
+        return;
+      }
+      setState(() {
+        _activeOverlayHeroTag = null;
+      });
+      if (trigger != null) {
+        _logCarouselEvent(
+          'Discover carousel overlay restored',
+          content: {'trigger': trigger, 'logicalPage': _currentPage},
+        );
+      }
+    });
   }
 
   void _replaceDisplayedRecommendations(
@@ -930,6 +1021,7 @@ class _DiscoverDailyRecommendationCarouselState
     if (_detailOpen) {
       return;
     }
+    _overlayRevealTimer?.cancel();
     if (mounted) {
       setState(() {
         _detailOpen = true;
@@ -957,7 +1049,10 @@ class _DiscoverDailyRecommendationCarouselState
         pageBuilder: widget.comicDetailPageBuilder,
       );
     } finally {
-      if (mounted) {
+      final keepDetailOpen =
+          useWindowsComicDetailPanel &&
+          WindowsComicDetailController.instance.isOpen;
+      if (!keepDetailOpen && mounted) {
         setState(() {
           _detailOpen = false;
         });
@@ -969,8 +1064,48 @@ class _DiscoverDailyRecommendationCarouselState
             'comicId': entry.comic.id,
           },
         );
+        _syncOverlayHeroTagWithRoute();
         _startAutoPlay(trigger: 'detail_closed');
+      } else if (!keepDetailOpen) {
+        _detailOpen = false;
       }
+    }
+  }
+
+  void _handleWindowsDetailControllerChanged() {
+    final controller = WindowsComicDetailController.instance;
+    final panelOpen = controller.isOpen;
+    final closedHeroTag = !panelOpen ? _activeOverlayHeroTag : null;
+    if (_detailOpen == panelOpen &&
+        (panelOpen || _activeOverlayHeroTag == null)) {
+      return;
+    }
+    if (!mounted) {
+      _detailOpen = panelOpen;
+      if (!panelOpen) {
+        _scheduleOverlayReveal(
+          delay: windowsComicDetailPanelAnimationDuration,
+          trigger: 'windows_detail_closed',
+        );
+      }
+      return;
+    }
+    if (panelOpen) {
+      _overlayRevealTimer?.cancel();
+    }
+    setState(() {
+      _detailOpen = panelOpen;
+    });
+    if (!panelOpen) {
+      _scheduleOverlayReveal(
+        delay: windowsComicDetailPanelAnimationDuration,
+        trigger: 'windows_detail_closed',
+      );
+      _logCarouselEvent(
+        'Discover carousel recommendation closed',
+        content: {'heroTag': closedHeroTag, 'logicalPage': _currentPage},
+      );
+      _startAutoPlay(trigger: 'windows_detail_closed');
     }
   }
 
@@ -1000,7 +1135,7 @@ class _DiscoverDailyRecommendationCarouselState
               );
               final viewportFraction = availableWidth <= 0
                   ? 1.0
-                  : (pageExtent / availableWidth).clamp(0.74, 0.94).toDouble();
+                  : (pageExtent / availableWidth).clamp(0.01, 1.0).toDouble();
               final coverCacheWidth =
                   heroCardWidth * MediaQuery.devicePixelRatioOf(context);
 
@@ -1163,6 +1298,9 @@ class _DiscoverDailyRecommendationCarouselState
                                   scale: metrics.cardScale,
                                   alignment: Alignment.centerLeft,
                                   child: SizedBox(
+                                    key: ValueKey(
+                                      'discover_daily_recommendation_card_$index',
+                                    ),
                                     width: clippedWidth,
                                     height: _heroCardHeight,
                                     child: Material(
@@ -1208,9 +1346,10 @@ class _DiscoverDailyRecommendationCarouselState
                                               ),
                                               _CarouselCardOverlay(
                                                 entry: entry,
-                                                isActive:
+                                                isHidden:
                                                     _activeOverlayHeroTag ==
                                                     heroTag,
+                                                heroTag: heroTag,
                                               ),
                                             ],
                                           ),
@@ -1300,94 +1439,35 @@ class _AnimekoEmphasizedCurve extends Curve {
 }
 
 class _CarouselCardOverlay extends StatefulWidget {
-  const _CarouselCardOverlay({required this.entry, required this.isActive});
+  const _CarouselCardOverlay({
+    required this.entry,
+    required this.isHidden,
+    required this.heroTag,
+  });
 
   final DiscoverDailyRecommendationEntry entry;
-  final bool isActive;
+  final bool isHidden;
+  final String heroTag;
 
   @override
   State<_CarouselCardOverlay> createState() => _CarouselCardOverlayState();
 }
 
 class _CarouselCardOverlayState extends State<_CarouselCardOverlay> {
-  bool _isVisible = true;
-  Animation<double>? _secondaryAnimation;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final route = ModalRoute.of(context);
-    final secondary = route?.secondaryAnimation;
-    if (_secondaryAnimation != secondary) {
-      _secondaryAnimation?.removeStatusListener(_onStatusChanged);
-      _secondaryAnimation = secondary;
-      _secondaryAnimation?.addStatusListener(_onStatusChanged);
-    }
-    _syncVisibilityWithRoute();
-  }
-
-  @override
-  void didUpdateWidget(covariant _CarouselCardOverlay oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.isActive != widget.isActive) {
-      _syncVisibilityWithActiveState();
-    }
-  }
-
-  @override
-  void dispose() {
-    _secondaryAnimation?.removeStatusListener(_onStatusChanged);
-    super.dispose();
-  }
-
-  void _onStatusChanged(AnimationStatus status) {
-    if (!widget.isActive) {
-      return;
-    }
-    if (status == AnimationStatus.dismissed) {
-      _updateVisibility(true);
-      return;
-    }
-    _updateVisibility(false);
-  }
-
-  void _syncVisibilityWithActiveState() {
-    if (!widget.isActive) {
-      _updateVisibility(true);
-      return;
-    }
-    _updateVisibility(false);
-  }
-
-  void _syncVisibilityWithRoute() {
-    if (!widget.isActive) {
-      _updateVisibility(true);
-      return;
-    }
-    _updateVisibility(_secondaryAnimation?.status == AnimationStatus.dismissed);
-  }
-
-  void _updateVisibility(bool visible) {
-    if (_isVisible == visible) {
-      return;
-    }
-    setState(() {
-      _isVisible = visible;
-    });
-  }
+  static const Duration _overlayRevealDuration = Duration(milliseconds: 280);
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final revealDuration = _isVisible
-        ? const Duration(milliseconds: 280)
-        : Duration.zero;
+    final isVisible = !widget.isHidden;
+    final revealDuration = isVisible ? _overlayRevealDuration : Duration.zero;
     return AnimatedOpacity(
-      opacity: _isVisible ? 1.0 : 0.0,
+      key: ValueKey('discover_daily_recommendation_overlay_${widget.heroTag}'),
+      opacity: isVisible ? 1.0 : 0.0,
       duration: revealDuration,
       curve: Curves.easeOutCubic,
       child: AnimatedSlide(
-        offset: _isVisible ? Offset.zero : const Offset(0, 0.05),
+        offset: isVisible ? Offset.zero : const Offset(0, 0.05),
         duration: revealDuration,
         curve: Curves.easeOutCubic,
         child: Stack(

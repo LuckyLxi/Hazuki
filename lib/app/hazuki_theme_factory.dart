@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
 
@@ -16,6 +17,7 @@ class HazukiThemeFactory {
         Brightness.light,
         dynamicColorScheme,
       ),
+      fontFamily: _resolvePlatformFontFamily(),
       useMaterial3: true,
     );
   }
@@ -30,6 +32,7 @@ class HazukiThemeFactory {
         Brightness.dark,
         dynamicColorScheme,
       ),
+      fontFamily: _resolvePlatformFontFamily(),
       useMaterial3: true,
     );
 
@@ -73,5 +76,12 @@ class HazukiThemeFactory {
       brightness: brightness,
       dynamicSchemeVariant: DynamicSchemeVariant.tonalSpot,
     );
+  }
+
+  static String? _resolvePlatformFontFamily() {
+    return switch (defaultTargetPlatform) {
+      TargetPlatform.windows => 'Microsoft YaHei UI',
+      _ => null,
+    };
   }
 }

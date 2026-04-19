@@ -104,13 +104,13 @@ void main() {
         const ValueKey('discover_daily_recommendation_page_view'),
       );
 
-      await tester.drag(carousel, const Offset(-500, 0));
+      await tester.drag(carousel, const Offset(-320, 0));
       await tester.pumpAndSettle();
 
       expect(_indicatorWidth(tester, 0), _unselectedIndicatorRenderWidth);
       expect(_indicatorWidth(tester, 1), _selectedIndicatorRenderWidth);
 
-      await tester.drag(carousel, const Offset(-500, 0));
+      await tester.drag(carousel, const Offset(-320, 0));
       await tester.pumpAndSettle();
 
       expect(_indicatorWidth(tester, 0), _selectedIndicatorRenderWidth);
@@ -132,6 +132,38 @@ void main() {
       expect(_indicatorWidth(tester, 0), _selectedIndicatorRenderWidth);
     });
 
+    testWidgets(
+      'wide layouts keep the preview card adjacent to the hero card',
+      (tester) async {
+        tester.view.physicalSize = const Size(1440, 900);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        final recommendations = <DiscoverDailyRecommendationEntry>[
+          _recommendation('1', 'Author 1', 'Comic 1'),
+          _recommendation('2', 'Author 2', 'Comic 2'),
+          _recommendation('3', 'Author 3', 'Comic 3'),
+        ];
+
+        await tester.pumpWidget(_buildDiscoverPage(recommendations));
+        await tester.pump();
+
+        final heroCardFinder = find.byKey(
+          const ValueKey('discover_daily_recommendation_card_2'),
+        );
+        final previewCardFinder = find.byKey(
+          const ValueKey('discover_daily_recommendation_card_3'),
+        );
+
+        final heroCardRect = tester.getRect(heroCardFinder);
+        final previewCardRect = tester.getRect(previewCardFinder);
+
+        expect(heroCardRect.width, 300);
+        expect(previewCardRect.left - heroCardRect.right, closeTo(8, 0.5));
+      },
+    );
+
     testWidgets('tapping recommendation still opens comic detail path', (
       tester,
     ) async {
@@ -149,6 +181,47 @@ void main() {
       } else {
         expect(find.text('detail:1'), findsOneWidget);
       }
+    });
+
+    testWidgets('windows overlay reappears after closing detail panel', (
+      tester,
+    ) async {
+      if (!useWindowsComicDetailPanel) {
+        return;
+      }
+
+      await tester.pumpWidget(
+        _buildDiscoverPage(<DiscoverDailyRecommendationEntry>[
+          _recommendation('1', 'Author 1', 'Comic 1'),
+        ]),
+      );
+
+      final overlayFinder = find.byKey(
+        const ValueKey(
+          'discover_daily_recommendation_overlay_comic-cover-1-discover-daily-0',
+        ),
+      );
+
+      expect(
+        tester.widget<AnimatedOpacity>(overlayFinder).opacity,
+        equals(1.0),
+      );
+
+      await tester.tap(find.text('Comic 1'));
+      await tester.pump();
+
+      expect(
+        tester.widget<AnimatedOpacity>(overlayFinder).opacity,
+        equals(0.0),
+      );
+
+      WindowsComicDetailController.instance.close();
+      await tester.pump(const Duration(milliseconds: 400));
+
+      expect(
+        tester.widget<AnimatedOpacity>(overlayFinder).opacity,
+        equals(1.0),
+      );
     });
   });
 }

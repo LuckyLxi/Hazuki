@@ -40,18 +40,18 @@ dependencies:
   path_provider: ^2.0.15
   shared_preferences: ^2.5.3
   crypto: ^3.0.6
-  pointycastle: ^3.9.1
+  pointycastle: ^4.0.0
   dynamic_color: ^1.7.0
   flutter_qjs:
     path: third_party/flutter_qjs
   flutter_displaymode: ^0.7.0
-  connectivity_plus: ^6.1.1
+  connectivity_plus: ^7.1.1
   url_launcher: ^6.3.2
-  lottie: ^3.3.0
+  lottie: ^3.3.3
   re_editor: ^0.8.0
   re_highlight: ^0.0.3
-  package_info_plus: ^8.3.0
-  device_info_plus: ^11.5.0
+  package_info_plus: ^10.0.0
+  device_info_plus: ^13.0.0
   file_selector: ^1.1.0
   window_manager: ^0.5.1
 

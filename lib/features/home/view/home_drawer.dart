@@ -1,9 +1,19 @@
 import 'dart:math' as math;
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/widgets/widgets.dart';
+
+enum HomeDrawerDestination {
+  history,
+  categories,
+  ranking,
+  downloads,
+  lines,
+  settings,
+}
 
 double resolveHomeDrawerWidth(BuildContext context) {
   final themedWidth = DrawerTheme.of(context).width;
@@ -31,6 +41,7 @@ class HomeDrawer extends StatelessWidget {
     required this.onOpenDownloads,
     required this.onOpenSettings,
     required this.onOpenLines,
+    this.selectedDestination,
   });
 
   final bool isLogged;
@@ -47,28 +58,29 @@ class HomeDrawer extends StatelessWidget {
   final VoidCallback onOpenDownloads;
   final VoidCallback onOpenSettings;
   final VoidCallback onOpenLines;
+  final HomeDrawerDestination? selectedDestination;
 
   @override
   Widget build(BuildContext context) {
     return Drawer(
       width: resolveHomeDrawerWidth(context),
-      child: SafeArea(
-        child: HomeDrawerContent(
-          isLogged: isLogged,
-          avatarUrl: avatarUrl,
-          username: username,
-          autoCheckInEnabled: autoCheckInEnabled,
-          checkInBusy: checkInBusy,
-          checkedInToday: checkedInToday,
-          onProfileTap: onProfileTap,
-          onCheckInPressed: onCheckInPressed,
-          onOpenHistory: onOpenHistory,
-          onOpenCategories: onOpenCategories,
-          onOpenRanking: onOpenRanking,
-          onOpenDownloads: onOpenDownloads,
-          onOpenSettings: onOpenSettings,
-          onOpenLines: onOpenLines,
-        ),
+      // 移除原有的 SafeArea，让头部背景延伸到状态栏
+      child: HomeDrawerContent(
+        isLogged: isLogged,
+        avatarUrl: avatarUrl,
+        username: username,
+        autoCheckInEnabled: autoCheckInEnabled,
+        checkInBusy: checkInBusy,
+        checkedInToday: checkedInToday,
+        onProfileTap: onProfileTap,
+        onCheckInPressed: onCheckInPressed,
+        onOpenHistory: onOpenHistory,
+        onOpenCategories: onOpenCategories,
+        onOpenRanking: onOpenRanking,
+        onOpenDownloads: onOpenDownloads,
+        onOpenSettings: onOpenSettings,
+        onOpenLines: onOpenLines,
+        selectedDestination: selectedDestination,
       ),
     );
   }
@@ -91,6 +103,7 @@ class HomeDrawerContent extends StatelessWidget {
     this.onOpenDownloads,
     this.onOpenSettings,
     this.onOpenLines,
+    this.selectedDestination,
   });
 
   final bool isLogged;
@@ -107,108 +120,336 @@ class HomeDrawerContent extends StatelessWidget {
   final VoidCallback? onOpenDownloads;
   final VoidCallback? onOpenSettings;
   final VoidCallback? onOpenLines;
+  final HomeDrawerDestination? selectedDestination;
+
+  Widget _buildMenuItem(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required bool selected,
+    VoidCallback? onTap,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final selectedForeground = colorScheme.onSecondaryContainer;
+
+    // 移除所有背景效果，仅保留文字和图标的变色反馈
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: ListTile(
+        leading: Icon(
+          icon,
+          color: selected ? selectedForeground : colorScheme.onSurfaceVariant,
+        ),
+        title: Text(
+          title,
+          style: TextStyle(
+            color: selected ? selectedForeground : colorScheme.onSurface,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+          ),
+        ),
+        tileColor: Colors.transparent,
+        selectedTileColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+        hoverColor: Colors.transparent,
+        focusColor: Colors.transparent,
+        splashColor: Colors.transparent,
+        selected: selected,
+        onTap: onTap,
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        const SizedBox(height: 16),
-        InkWell(
-          onTap: onProfileTap,
-          borderRadius: BorderRadius.circular(40),
-          child: (!isLogged && (avatarUrl ?? '').trim().isEmpty)
-              ? const CircleAvatar(
-                  radius: 36,
-                  backgroundImage: AssetImage(
-                    'assets/avatars/guest_avatar.png',
+    final colorScheme = Theme.of(context).colorScheme;
+    final drawerBackground =
+        DrawerTheme.of(context).backgroundColor ??
+        Theme.of(context).drawerTheme.backgroundColor ??
+        colorScheme.surface;
+    final textTheme = Theme.of(context).textTheme;
+    final topPadding = MediaQuery.paddingOf(context).top;
+    final bottomPadding = MediaQuery.paddingOf(context).bottom;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final topScrim = isDark
+        ? Colors.white.withValues(alpha: 0.04)
+        : Colors.white.withValues(alpha: 0.22);
+    final midScrim = isDark
+        ? colorScheme.surface.withValues(alpha: 0.10)
+        : Colors.white.withValues(alpha: 0.12);
+    final bottomScrim = isDark
+        ? drawerBackground.withValues(alpha: 0.55)
+        : colorScheme.surface.withValues(alpha: 0.7);
+    final darkModeDim = isDark
+        ? Colors.black.withValues(alpha: 0.30)
+        : Colors.transparent;
+    final highlightColor = isDark
+        ? Colors.white.withValues(alpha: 0.12)
+        : Colors.white.withValues(alpha: 0.34);
+    final transparentHighlightColor = highlightColor.withValues(alpha: 0);
+    final outlineColor = isDark
+        ? Colors.white.withValues(alpha: 0.09)
+        : Colors.white.withValues(alpha: 0.42);
+
+    return ColoredBox(
+      color: drawerBackground,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ClipRect(
+            child: Stack(
+              children: [
+                Positioned.fill(child: ColoredBox(color: drawerBackground)),
+                Positioned.fill(
+                  child: ImageFiltered(
+                    imageFilter: ImageFilter.blur(sigmaX: 9, sigmaY: 9),
+                    child: (!isLogged && (avatarUrl ?? '').trim().isEmpty)
+                        ? Image.asset(
+                            'assets/avatars/guest_avatar.png',
+                            fit: BoxFit.cover,
+                          )
+                        : HazukiCachedImage(
+                            url: avatarUrl ?? '',
+                            fit: BoxFit.cover,
+                            ignoreNoImageMode: true,
+                          ),
                   ),
-                )
-              : HazukiCachedCircleAvatar(
-                  radius: 36,
-                  url: avatarUrl ?? '',
-                  fallbackIcon: const Icon(Icons.person, size: 36),
-                  ignoreNoImageMode: true,
                 ),
-        ),
-        const SizedBox(height: 12),
-        Text(username, style: Theme.of(context).textTheme.titleMedium),
-        if (isLogged && !autoCheckInEnabled) ...[
-          const SizedBox(height: 8),
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 260),
-            switchInCurve: Curves.easeOutBack,
-            switchOutCurve: Curves.easeInCubic,
-            transitionBuilder: (child, animation) {
-              return ScaleTransition(
-                scale: Tween<double>(begin: 0.92, end: 1).animate(animation),
-                child: FadeTransition(opacity: animation, child: child),
-              );
-            },
-            child: FilledButton.icon(
-              key: ValueKey(
-                'checkin-${checkInBusy
-                    ? 'busy'
-                    : checkedInToday
-                    ? 'done'
-                    : 'idle'}',
-              ),
-              onPressed: (checkInBusy || checkedInToday)
-                  ? null
-                  : onCheckInPressed,
-              icon: checkInBusy
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Icon(
-                      checkedInToday
-                          ? Icons.check_circle_outline
-                          : Icons.event_available_outlined,
+                Positioned.fill(child: ColoredBox(color: darkModeDim)),
+                Positioned.fill(
+                  child: ClipRect(
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 3, sigmaY: 3),
+                      child: const SizedBox.expand(),
                     ),
-              label: Text(
-                checkInBusy
-                    ? l10n(context).homeCheckInInProgress
-                    : checkedInToday
-                    ? l10n(context).homeCheckInDone
-                    : l10n(context).homeCheckInAction,
+                  ),
+                ),
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          topScrim,
+                          midScrim,
+                          bottomScrim.withValues(alpha: isDark ? 0.58 : 0.8),
+                          bottomScrim,
+                        ],
+                        stops: const [0.0, 0.3, 0.76, 1.0],
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: RadialGradient(
+                        center: const Alignment(-0.78, -0.92),
+                        radius: 1.18,
+                        colors: [highlightColor, transparentHighlightColor],
+                        stops: const [0.0, 0.62],
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      border: Border(
+                        bottom: BorderSide(color: outlineColor, width: 1),
+                      ),
+                    ),
+                  ),
+                ),
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.transparent,
+                            Colors.transparent,
+                            drawerBackground.withValues(alpha: 0.06),
+                            drawerBackground.withValues(
+                              alpha: isDark ? 0.22 : 0.18,
+                            ),
+                            drawerBackground.withValues(
+                              alpha: isDark ? 0.52 : 0.46,
+                            ),
+                            drawerBackground,
+                          ],
+                          stops: const [0.0, 0.48, 0.64, 0.78, 0.90, 1.0],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: EdgeInsets.fromLTRB(24, topPadding + 24, 24, 24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      InkWell(
+                        onTap: onProfileTap,
+                        borderRadius: BorderRadius.circular(40),
+                        child: (!isLogged && (avatarUrl ?? '').trim().isEmpty)
+                            ? const CircleAvatar(
+                                radius: 36,
+                                backgroundImage: AssetImage(
+                                  'assets/avatars/guest_avatar.png',
+                                ),
+                              )
+                            : HazukiCachedCircleAvatar(
+                                radius: 36,
+                                url: avatarUrl ?? '',
+                                fallbackIcon: const Icon(
+                                  Icons.person,
+                                  size: 36,
+                                ),
+                                ignoreNoImageMode: true,
+                              ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        username,
+                        style: textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: colorScheme.onSurface,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (isLogged && !autoCheckInEnabled) ...[
+                        const SizedBox(height: 16),
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 260),
+                          switchInCurve: Curves.easeOutBack,
+                          switchOutCurve: Curves.easeInCubic,
+                          transitionBuilder: (child, animation) {
+                            return ScaleTransition(
+                              scale: Tween<double>(
+                                begin: 0.92,
+                                end: 1,
+                              ).animate(animation),
+                              child: FadeTransition(
+                                opacity: animation,
+                                child: child,
+                              ),
+                            );
+                          },
+                          child: FilledButton.tonalIcon(
+                            key: ValueKey(
+                              'checkin-${checkInBusy
+                                  ? 'busy'
+                                  : checkedInToday
+                                  ? 'done'
+                                  : 'idle'}',
+                            ),
+                            onPressed: (checkInBusy || checkedInToday)
+                                ? null
+                                : onCheckInPressed,
+                            icon: checkInBusy
+                                ? SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: colorScheme.onSecondaryContainer,
+                                    ),
+                                  )
+                                : Icon(
+                                    checkedInToday
+                                        ? Icons.check_circle_outline
+                                        : Icons.event_available_outlined,
+                                  ),
+                            label: Text(
+                              checkInBusy
+                                  ? l10n(context).homeCheckInInProgress
+                                  : checkedInToday
+                                  ? l10n(context).homeCheckInDone
+                                  : l10n(context).homeCheckInAction,
+                            ),
+                            style: FilledButton.styleFrom(
+                              minimumSize: const Size(double.infinity, 40),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Expanded(
+            child: ListView(
+              padding: EdgeInsets.only(
+                left: 12,
+                right: 12,
+                top: 0,
+                bottom: bottomPadding + 12,
               ),
+              children: [
+                _buildMenuItem(
+                  context,
+                  icon: Icons.history_outlined,
+                  title: l10n(context).homeMenuHistory,
+                  selected:
+                      selectedDestination == HomeDrawerDestination.history,
+                  onTap: onOpenHistory,
+                ),
+                _buildMenuItem(
+                  context,
+                  icon: Icons.category_outlined,
+                  title: l10n(context).homeMenuCategories,
+                  selected:
+                      selectedDestination == HomeDrawerDestination.categories,
+                  onTap: onOpenCategories,
+                ),
+                _buildMenuItem(
+                  context,
+                  icon: Icons.leaderboard_outlined,
+                  title: l10n(context).homeMenuRanking,
+                  selected:
+                      selectedDestination == HomeDrawerDestination.ranking,
+                  onTap: onOpenRanking,
+                ),
+                _buildMenuItem(
+                  context,
+                  icon: Icons.download_outlined,
+                  title: l10n(context).homeMenuDownloads,
+                  selected:
+                      selectedDestination == HomeDrawerDestination.downloads,
+                  onTap: onOpenDownloads,
+                ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Divider(),
+                ),
+                _buildMenuItem(
+                  context,
+                  icon: Icons.alt_route_outlined,
+                  title: l10n(context).homeMenuLines,
+                  selected: selectedDestination == HomeDrawerDestination.lines,
+                  onTap: onOpenLines,
+                ),
+                _buildMenuItem(
+                  context,
+                  icon: Icons.settings_outlined,
+                  title: l10n(context).settingsTitle,
+                  selected:
+                      selectedDestination == HomeDrawerDestination.settings,
+                  onTap: onOpenSettings,
+                ),
+              ],
             ),
           ),
         ],
-        const SizedBox(height: 16),
-        const Divider(height: 1),
-        ListTile(
-          leading: const Icon(Icons.history_outlined),
-          title: Text(l10n(context).homeMenuHistory),
-          onTap: onOpenHistory,
-        ),
-        ListTile(
-          leading: const Icon(Icons.category_outlined),
-          title: Text(l10n(context).homeMenuCategories),
-          onTap: onOpenCategories,
-        ),
-        ListTile(
-          leading: const Icon(Icons.leaderboard_outlined),
-          title: Text(l10n(context).homeMenuRanking),
-          onTap: onOpenRanking,
-        ),
-        ListTile(
-          leading: const Icon(Icons.download_outlined),
-          title: Text(l10n(context).homeMenuDownloads),
-          onTap: onOpenDownloads,
-        ),
-        ListTile(
-          leading: const Icon(Icons.settings_outlined),
-          title: Text(l10n(context).settingsTitle),
-          onTap: onOpenSettings,
-        ),
-        ListTile(
-          leading: const Icon(Icons.alt_route_outlined),
-          title: Text(l10n(context).homeMenuLines),
-          onTap: onOpenLines,
-        ),
-      ],
+      ),
     );
   }
 }

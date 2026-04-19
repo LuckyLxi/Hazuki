@@ -33,6 +33,7 @@ class HazukiHomePage extends StatefulWidget {
 
 class _HazukiHomePageState extends State<HazukiHomePage> {
   late final HomeCoordinator _coordinator;
+  HomeDrawerDestination? _selectedDrawerDestination;
 
   @override
   void initState() {
@@ -79,6 +80,7 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
             autoCheckInEnabled: _coordinator.autoCheckInEnabled,
             checkInBusy: _coordinator.checkInBusy,
             checkedInToday: _coordinator.checkedInToday,
+            selectedDestination: _selectedDrawerDestination,
           ),
           appearanceSettings: widget.appearanceSettings,
           onAppearanceChanged: widget.onAppearanceChanged,
@@ -134,18 +136,33 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
             );
           },
           onOpenHistory: () {
+            setState(() {
+              _selectedDrawerDestination = HomeDrawerDestination.history;
+            });
             unawaited(navigation.openHistory());
           },
           onOpenCategories: () {
+            setState(() {
+              _selectedDrawerDestination = HomeDrawerDestination.categories;
+            });
             unawaited(navigation.openCategories());
           },
           onOpenRanking: () {
+            setState(() {
+              _selectedDrawerDestination = HomeDrawerDestination.ranking;
+            });
             unawaited(navigation.openRanking());
           },
           onOpenDownloads: () {
+            setState(() {
+              _selectedDrawerDestination = HomeDrawerDestination.downloads;
+            });
             unawaited(navigation.openDownloads());
           },
           onOpenSettings: () {
+            setState(() {
+              _selectedDrawerDestination = HomeDrawerDestination.settings;
+            });
             unawaited(() async {
               await navigation.openSettings();
               if (!context.mounted) {
@@ -155,8 +172,12 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
             }());
           },
           onOpenLines: () {
+            setState(() {
+              _selectedDrawerDestination = HomeDrawerDestination.lines;
+            });
             unawaited(navigation.openLines());
           },
+          selectedDrawerDestination: _selectedDrawerDestination,
           onDiscoverSearchMorphProgressChanged:
               _coordinator.handleDiscoverSearchMorphProgressChanged,
           onFavoriteAppBarActionsChanged:

@@ -16,6 +16,7 @@ extension _SearchResultsLifecycleActionsExtension on _SearchResultsPageState {
       if (!mounted) {
         return;
       }
+      unawaited(_focusSearchOnEntry());
       unawaited(_submitSearch());
     });
   }
@@ -91,6 +92,25 @@ extension _SearchResultsLifecycleActionsExtension on _SearchResultsPageState {
     }
   }
 
+  void _requestExpandedSearchFocus({bool showKeyboard = true}) {
+    if (!mounted) {
+      return;
+    }
+    FocusScope.of(context).requestFocus(_searchFocusNode);
+    if (showKeyboard) {
+      SystemChannels.textInput.invokeMethod<void>('TextInput.show');
+    }
+  }
+
+  Future<void> _focusSearchOnEntry() async {
+    _requestExpandedSearchFocus(showKeyboard: false);
+    await Future<void>.delayed(const Duration(milliseconds: 280));
+    if (!mounted) {
+      return;
+    }
+    _requestExpandedSearchFocus();
+  }
+
   void _expandCollapsedSearch() {
     if (!_showCollapsedSearch) {
       return;
@@ -151,7 +171,7 @@ extension _SearchResultsLifecycleActionsExtension on _SearchResultsPageState {
       );
     }
     if (focusSearch && mounted) {
-      _searchFocusNode.requestFocus();
+      _requestExpandedSearchFocus();
     }
   }
 
@@ -181,7 +201,7 @@ extension _SearchResultsLifecycleActionsExtension on _SearchResultsPageState {
     _searchController.clear();
     _collapsedSearchController.clear();
     _resultsController.clearSearchData();
-    _searchFocusNode.requestFocus();
+    _requestExpandedSearchFocus();
     if (_collapsedSearchExpanded) {
       _updateSearchResultsState(() {
         _collapsedSearchExpanded = false;
