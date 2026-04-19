@@ -3,7 +3,6 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../app/app.dart';
 import '../../l10n/app_localizations.dart';
@@ -11,6 +10,8 @@ import '../../models/hazuki_models.dart';
 import '../../services/hazuki_source_service.dart';
 import '../../widgets/widgets.dart';
 import '../../widgets/windows_comic_detail_host.dart';
+import 'search_bar_shell.dart';
+import 'search_focus_coordinator.dart';
 import 'search_results_controller.dart';
 import 'search_results_widgets.dart';
 import 'search_shared.dart';
@@ -24,14 +25,18 @@ class SearchResultsPage extends StatefulWidget {
     super.key,
     required this.initialKeyword,
     this.initialOrder = 'mr',
+    this.entryIntent = SearchEntryIntent.externalKeyword,
     required this.comicDetailPageBuilder,
     this.comicCoverHeroTagBuilder = comicCoverHeroTag,
+    this.searchPageLoader,
   });
 
   final String initialKeyword;
   final String initialOrder;
+  final SearchEntryIntent entryIntent;
   final ComicDetailPageBuilder comicDetailPageBuilder;
   final ComicHeroTagBuilder comicCoverHeroTagBuilder;
+  final SearchPageLoader? searchPageLoader;
 
   @override
   State<SearchResultsPage> createState() => _SearchResultsPageState();
@@ -40,20 +45,16 @@ class SearchResultsPage extends StatefulWidget {
 class _SearchResultsPageState extends State<SearchResultsPage>
     with WidgetsBindingObserver, TickerProviderStateMixin {
   late final SearchResultsController _resultsController;
+  late final SearchFocusCoordinator _focusCoordinator = SearchFocusCoordinator(
+    isMounted: () => mounted,
+    initialText: widget.initialKeyword,
+  );
 
   final ScrollController _scrollController = ScrollController();
-  final TextEditingController _searchController = TextEditingController();
-  final TextEditingController _collapsedSearchController =
-      TextEditingController();
-  final FocusNode _searchFocusNode = FocusNode();
-  final FocusNode _collapsedSearchFocusNode = FocusNode();
   final GlobalKey _collapsedSearchKey = GlobalKey();
 
   bool _showBackToTop = false;
   double _searchRevealProgress = 0;
-  bool _collapsedSearchExpanded = false;
-  double _lastViewInsetsBottom = 0;
-  bool _awaitingCollapsedSearchFocus = false;
   bool _flyingSearchToTop = false;
   AnimationController? _flyController;
   OverlayEntry? _flyOverlay;
@@ -65,6 +66,9 @@ class _SearchResultsPageState extends State<SearchResultsPage>
   bool get _searchLoading => _resultsController.searchLoading;
   bool get _searchLoadingMore => _resultsController.searchLoadingMore;
   String get _searchOrder => _resultsController.searchOrder;
+  bool get _collapsedSearchExpanded =>
+      _focusCoordinator.collapsedSearchExpanded;
+  bool get _showKeyboardOnEnter => widget.entryIntent.showKeyboardOnEnter;
 
   @override
   void initState() {
@@ -97,10 +101,11 @@ class _SearchResultsPageState extends State<SearchResultsPage>
       child: ListenableBuilder(
         listenable: Listenable.merge([
           _resultsController,
+          _focusCoordinator,
           HazukiSourceService.instance,
         ]),
         builder: (context, _) => PopScope(
-          canPop: !_collapsedSearchExpanded,
+          canPop: !_focusCoordinator.collapsedSearchExpanded,
           onPopInvokedWithResult: _handlePopInvoked,
           child: Scaffold(
             backgroundColor: Theme.of(context).colorScheme.surface,

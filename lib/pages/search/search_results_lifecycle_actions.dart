@@ -4,127 +4,53 @@ extension _SearchResultsLifecycleActionsExtension on _SearchResultsPageState {
   void _initializeSearchResultsPage() {
     _resultsController = SearchResultsController(
       initialOrder: widget.initialOrder,
+      searchPageLoader: widget.searchPageLoader,
     );
-    _searchController.text = widget.initialKeyword;
-    _collapsedSearchController.text = widget.initialKeyword;
     _scrollController.addListener(_onScroll);
-    _searchFocusNode.addListener(_onFocusChanged);
-    _collapsedSearchFocusNode.addListener(_onFocusChanged);
     WidgetsBinding.instance.addObserver(this);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
         return;
       }
-      unawaited(_focusSearchOnEntry());
+      _focusCoordinator.syncKeyboardVisibility();
+      _focusCoordinator.attachRouteAutoFocus(
+        context,
+        showKeyboard: _showKeyboardOnEnter,
+      );
       unawaited(_submitSearch());
     });
   }
 
   void _disposeSearchResultsPage() {
     _scrollController.removeListener(_onScroll);
-    _searchFocusNode.removeListener(_onFocusChanged);
-    _collapsedSearchFocusNode.removeListener(_onFocusChanged);
     WidgetsBinding.instance.removeObserver(this);
     _scrollController.dispose();
-    _searchController.dispose();
-    _collapsedSearchController.dispose();
-    _searchFocusNode.dispose();
-    _collapsedSearchFocusNode.dispose();
     _resultsController.dispose();
+    _focusCoordinator.dispose();
     _flyController?.dispose();
     _flyOverlay?.remove();
-  }
-
-  void _onFocusChanged() {
-    if (!mounted) {
-      return;
-    }
-
-    final collapsedHasFocus = _collapsedSearchFocusNode.hasFocus;
-    final keyboardVisible = _lastViewInsetsBottom > 0;
-
-    if (collapsedHasFocus && _awaitingCollapsedSearchFocus) {
-      _awaitingCollapsedSearchFocus = false;
-    }
-
-    if (!collapsedHasFocus &&
-        _collapsedSearchExpanded &&
-        !keyboardVisible &&
-        !_awaitingCollapsedSearchFocus) {
-      _updateSearchResultsState(() {
-        _collapsedSearchExpanded = false;
-      });
-      return;
-    }
-
-    _updateSearchResultsState(() {});
   }
 
   void _handleMetricsChanged() {
     if (!mounted) {
       return;
     }
-
-    final viewInsetsBottom = WidgetsBinding
-        .instance
-        .platformDispatcher
-        .views
-        .first
-        .viewInsets
-        .bottom;
-    final keyboardJustClosed =
-        _lastViewInsetsBottom > 0 && viewInsetsBottom <= 0;
-    _lastViewInsetsBottom = viewInsetsBottom;
-
-    if (viewInsetsBottom > 0 && _awaitingCollapsedSearchFocus) {
-      _awaitingCollapsedSearchFocus = false;
-    }
-
-    if (keyboardJustClosed &&
-        _collapsedSearchExpanded &&
-        _collapsedSearchFocusNode.hasFocus) {
-      _awaitingCollapsedSearchFocus = false;
-      _collapsedSearchFocusNode.unfocus();
-      _updateSearchResultsState(() {
-        _collapsedSearchExpanded = false;
-      });
-    }
+    _focusCoordinator.syncKeyboardVisibility();
   }
 
-  void _requestExpandedSearchFocus({bool showKeyboard = true}) {
-    if (!mounted) {
-      return;
-    }
-    FocusScope.of(context).requestFocus(_searchFocusNode);
-    if (showKeyboard) {
-      SystemChannels.textInput.invokeMethod<void>('TextInput.show');
-    }
-  }
-
-  Future<void> _focusSearchOnEntry() async {
-    _requestExpandedSearchFocus(showKeyboard: false);
-    await Future<void>.delayed(const Duration(milliseconds: 280));
-    if (!mounted) {
-      return;
-    }
-    _requestExpandedSearchFocus();
+  Future<void> _requestExpandedSearchFocus({bool showKeyboard = true}) {
+    return _focusCoordinator.requestPrimarySearchFocus(
+      context,
+      showKeyboard: showKeyboard,
+    );
   }
 
   void _expandCollapsedSearch() {
     if (!_showCollapsedSearch) {
       return;
     }
-    _updateSearchResultsState(() {
-      _collapsedSearchExpanded = true;
-      _awaitingCollapsedSearchFocus = true;
-    });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) {
-        return;
-      }
-      _collapsedSearchFocusNode.requestFocus();
-    });
+    _focusCoordinator.enterCollapsedMode(context);
   }
 
   void _onScroll() {
@@ -143,10 +69,8 @@ extension _SearchResultsLifecycleActionsExtension on _SearchResultsPageState {
         position.pixels >= position.maxScrollExtent - 260;
 
     final nextShowCollapsed = nextReveal >= 0.94;
-    if (!nextShowCollapsed && _collapsedSearchExpanded) {
-      _collapsedSearchFocusNode.unfocus();
-      _collapsedSearchExpanded = false;
-      _awaitingCollapsedSearchFocus = false;
+    if (!nextShowCollapsed && _focusCoordinator.collapsedSearchExpanded) {
+      _focusCoordinator.exitCollapsedMode();
     }
 
     if ((nextReveal - _searchRevealProgress).abs() >= 0.01 ||
@@ -171,43 +95,15 @@ extension _SearchResultsLifecycleActionsExtension on _SearchResultsPageState {
       );
     }
     if (focusSearch && mounted) {
-      _requestExpandedSearchFocus();
-    }
-  }
-
-  void _syncSearchText(
-    String value, {
-    bool updateExpanded = true,
-    bool updateCollapsed = true,
-  }) {
-    if (updateExpanded && _searchController.text != value) {
-      _searchController.value = _searchController.value.copyWith(
-        text: value,
-        selection: TextSelection.collapsed(offset: value.length),
-        composing: TextRange.empty,
-      );
-    }
-    if (updateCollapsed && _collapsedSearchController.text != value) {
-      _collapsedSearchController.value = _collapsedSearchController.value
-          .copyWith(
-            text: value,
-            selection: TextSelection.collapsed(offset: value.length),
-            composing: TextRange.empty,
-          );
+      await _requestExpandedSearchFocus();
     }
   }
 
   void _clearSearch() {
-    _searchController.clear();
-    _collapsedSearchController.clear();
+    _focusCoordinator.clearText();
     _resultsController.clearSearchData();
-    _requestExpandedSearchFocus();
-    if (_collapsedSearchExpanded) {
-      _updateSearchResultsState(() {
-        _collapsedSearchExpanded = false;
-        _awaitingCollapsedSearchFocus = false;
-      });
-    }
+    unawaited(_requestExpandedSearchFocus());
+    _focusCoordinator.exitCollapsedMode();
   }
 
   Future<void> _onSearchOrderSelected(String order) async {
@@ -216,13 +112,7 @@ extension _SearchResultsLifecycleActionsExtension on _SearchResultsPageState {
       return;
     }
 
-    if (_collapsedSearchExpanded) {
-      _collapsedSearchFocusNode.unfocus();
-      _updateSearchResultsState(() {
-        _collapsedSearchExpanded = false;
-        _awaitingCollapsedSearchFocus = false;
-      });
-    }
+    _focusCoordinator.exitCollapsedMode();
 
     if (_scrollController.hasClients && _scrollController.offset > 0) {
       await _scrollToTop();
@@ -252,11 +142,7 @@ extension _SearchResultsLifecycleActionsExtension on _SearchResultsPageState {
     if (didPop) {
       return;
     }
-    _updateSearchResultsState(() {
-      _collapsedSearchExpanded = false;
-      _awaitingCollapsedSearchFocus = false;
-    });
-    _collapsedSearchFocusNode.unfocus();
+    _focusCoordinator.exitCollapsedMode();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         Navigator.of(context).pop();

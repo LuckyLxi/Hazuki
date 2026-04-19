@@ -2,6 +2,7 @@ part of 'search_results_page.dart';
 
 extension _SearchResultsShellWidgetsExtension on _SearchResultsPageState {
   Widget _buildSearchBar({
+    Key? key,
     required TextEditingController controller,
     required FocusNode focusNode,
     required String clearKey,
@@ -10,46 +11,17 @@ extension _SearchResultsShellWidgetsExtension on _SearchResultsPageState {
     required ValueChanged<String> onChanged,
     bool compact = false,
   }) {
-    final strings = AppLocalizations.of(context)!;
-    final searchBar = SearchBar(
-      focusNode: focusNode,
+    return SearchBarShell(
+      key: key,
       controller: controller,
-      hintText: strings.searchHint,
-      elevation: const WidgetStatePropertyAll(0),
-      backgroundColor: WidgetStatePropertyAll(
-        Theme.of(context).colorScheme.surfaceContainerHigh,
-      ),
-      shape: WidgetStatePropertyAll(
-        RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(compact ? 14 : 16),
-        ),
-      ),
-      padding: WidgetStatePropertyAll(
-        EdgeInsets.symmetric(horizontal: compact ? 12 : 16),
-      ),
-      leading: Icon(Icons.search, size: compact ? 20 : 24),
-      trailing: [
-        buildAnimatedSearchActionButton(
-          showClearAction: controller.text.isNotEmpty,
-          clearKey: clearKey,
-          submitKey: submitKey,
-          clearTooltip: strings.searchClearTooltip,
-          submitTooltip: strings.searchSubmitTooltip,
-          onClear: onClear,
-          onSubmit: () => unawaited(_submitSearch()),
-        ),
-      ],
+      focusNode: focusNode,
+      clearKey: clearKey,
+      submitKey: submitKey,
+      compact: compact,
+      onClear: onClear,
+      onSubmit: () => unawaited(_submitSearch()),
       onSubmitted: (value) => unawaited(_submitSearch(submittedText: value)),
       onChanged: onChanged,
-    );
-
-    if (!compact) {
-      return SizedBox(height: 56, child: searchBar);
-    }
-
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxHeight: 40),
-      child: searchBar,
     );
   }
 
@@ -72,17 +44,16 @@ extension _SearchResultsShellWidgetsExtension on _SearchResultsPageState {
                 child: Hero(
                   tag: discoverSearchHeroTag,
                   child: _buildSearchBar(
-                    controller: _searchController,
-                    focusNode: _searchFocusNode,
+                    key: const ValueKey('search-results-primary-search-bar'),
+                    controller: _focusCoordinator.primaryController,
+                    focusNode: _focusCoordinator.primaryFocusNode,
                     clearKey: 'results-clear',
                     submitKey: 'results-submit',
                     onClear: () {
                       _clearSearch();
-                      _updateSearchResultsState(() {});
                     },
                     onChanged: (value) {
-                      _syncSearchText(value, updateExpanded: false);
-                      _updateSearchResultsState(() {});
+                      _focusCoordinator.syncText(value, updatePrimary: false);
                     },
                   ),
                 ),
@@ -103,6 +74,7 @@ extension _SearchResultsShellWidgetsExtension on _SearchResultsPageState {
         ? theme.colorScheme.onSurfaceVariant
         : theme.colorScheme.onSurface;
     return Material(
+      key: const ValueKey('search-results-collapsed-preview'),
       color: theme.colorScheme.surfaceContainerHigh,
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
@@ -168,21 +140,24 @@ extension _SearchResultsShellWidgetsExtension on _SearchResultsPageState {
                       duration: const Duration(milliseconds: 220),
                       curve: Curves.easeOutCubic,
                       width: currentWidth,
-                      child: _collapsedSearchExpanded
+                      child: _focusCoordinator.collapsedSearchExpanded
                           ? _buildSearchBar(
-                              controller: _collapsedSearchController,
-                              focusNode: _collapsedSearchFocusNode,
+                              key: const ValueKey(
+                                'search-results-collapsed-search-bar',
+                              ),
+                              controller: _focusCoordinator.collapsedController,
+                              focusNode: _focusCoordinator.collapsedFocusNode,
                               clearKey: 'results-collapsed-clear',
                               submitKey: 'results-collapsed-submit',
                               compact: true,
                               onClear: () {
-                                _collapsedSearchController.clear();
-                                _syncSearchText('', updateCollapsed: false);
-                                _updateSearchResultsState(() {});
+                                _focusCoordinator.clearText();
                               },
                               onChanged: (value) {
-                                _syncSearchText(value, updateCollapsed: false);
-                                _updateSearchResultsState(() {});
+                                _focusCoordinator.syncText(
+                                  value,
+                                  updateCollapsed: false,
+                                );
                               },
                             )
                           : _buildCollapsedSearchPreview(),
@@ -232,7 +207,7 @@ extension _SearchResultsShellWidgetsExtension on _SearchResultsPageState {
               AnimatedOpacity(
                 duration: const Duration(milliseconds: 180),
                 curve: Curves.easeOutCubic,
-                opacity: _collapsedSearchExpanded ? 0 : 1,
+                opacity: _focusCoordinator.collapsedSearchExpanded ? 0 : 1,
                 child: Padding(
                   padding: EdgeInsets.only(right: reserveForCollapsedPreview),
                   child: Text(

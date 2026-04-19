@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../app/app.dart';
 import '../../l10n/app_localizations.dart';
+import '../../models/hazuki_models.dart';
 
 const searchLoadTimeout = Duration(seconds: 25);
 const searchAppBarRevealOffset = 68.0;
@@ -17,6 +18,25 @@ const searchOrderKeys = <String>{
   'mp',
   'tf',
 };
+
+enum SearchEntryIntent {
+  editFromEntry,
+  submitFromEntry,
+  historySelection,
+  externalKeyword,
+}
+
+extension SearchEntryIntentExtension on SearchEntryIntent {
+  bool get showKeyboardOnEnter => this == SearchEntryIntent.submitFromEntry;
+}
+
+typedef SearchPageLoader =
+    Future<SearchComicsResult> Function(
+      BuildContext context, {
+      required String keyword,
+      required int page,
+      required String order,
+    });
 
 Map<String, String> searchOrderLabels(BuildContext context) {
   final strings = AppLocalizations.of(context)!;

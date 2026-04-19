@@ -53,24 +53,18 @@ extension _SearchResultsSearchActionsExtension on _SearchResultsPageState {
   }
 
   Future<void> _submitSearch({String? submittedText}) async {
-    final activeController = _collapsedSearchFocusNode.hasFocus
-        ? _collapsedSearchController
-        : _searchController;
+    final activeController = _focusCoordinator.activeController;
     final rawKeyword = submittedText ?? activeController.text;
-    _syncSearchText(rawKeyword);
+    _focusCoordinator.syncText(rawKeyword);
     final keyword = await normalizeSubmittedKeyword(
       rawKeyword,
       controller: activeController,
     );
 
-    _syncSearchText(keyword);
+    _focusCoordinator.syncText(keyword);
 
-    final submittedFromCollapsed = _collapsedSearchExpanded;
-    if (_collapsedSearchExpanded) {
-      _collapsedSearchFocusNode.unfocus();
-      _collapsedSearchExpanded = false;
-      _awaitingCollapsedSearchFocus = false;
-    }
+    final submittedFromCollapsed = _focusCoordinator.collapsedSearchExpanded;
+    _focusCoordinator.exitCollapsedMode();
     if (submittedFromCollapsed) {
       _animateSearchFlyToTop();
     }
@@ -131,7 +125,7 @@ extension _SearchResultsSearchActionsExtension on _SearchResultsPageState {
     final bgColor = Theme.of(context).colorScheme.surfaceContainerHigh;
     final textStyle = Theme.of(context).textTheme.bodyLarge;
     final iconColor = Theme.of(context).colorScheme.onSurfaceVariant;
-    final searchText = _searchController.text;
+    final searchText = _focusCoordinator.text;
 
     _updateSearchResultsState(() {
       _flyingSearchToTop = true;

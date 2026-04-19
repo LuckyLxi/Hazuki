@@ -8,10 +8,15 @@ import 'search_shared.dart';
 class SearchResultsController extends ChangeNotifier {
   static const Duration _initialSearchRetryDelay = Duration(milliseconds: 450);
 
-  SearchResultsController({required String initialOrder})
-    : _searchOrder = searchOrderKeys.contains(initialOrder)
-          ? initialOrder
-          : 'mr';
+  SearchResultsController({
+    required String initialOrder,
+    SearchPageLoader? searchPageLoader,
+  }) : _searchPageLoader = searchPageLoader ?? _defaultSearchPageLoader,
+       _searchOrder = searchOrderKeys.contains(initialOrder)
+           ? initialOrder
+           : 'mr';
+
+  final SearchPageLoader _searchPageLoader;
 
   String _searchKeyword = '';
   String? _searchErrorMessage;
@@ -81,6 +86,20 @@ class SearchResultsController extends ChangeNotifier {
   }
 
   Future<SearchComicsResult> _loadSearchPage(
+    BuildContext context, {
+    required String keyword,
+    required int page,
+    required String order,
+  }) {
+    return _searchPageLoader(
+      context,
+      keyword: keyword,
+      page: page,
+      order: order,
+    );
+  }
+
+  static Future<SearchComicsResult> _defaultSearchPageLoader(
     BuildContext context, {
     required String keyword,
     required int page,
