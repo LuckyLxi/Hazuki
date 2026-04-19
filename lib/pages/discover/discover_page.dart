@@ -1361,11 +1361,8 @@ class _DiscoverDailyRecommendationCarouselState
                               narrowRatio,
                               revealProgress,
                             );
-                            imageTranslateX = _lerp(
-                              heroCardWidth * parallaxRatio,
-                              0.0,
-                              revealProgress,
-                            );
+                            imageTranslateX =
+                                heroCardWidth * parallaxRatio * delta;
                             cardScale = 1.0;
                             cardOpacity = clipScaleX <= 0.001 ? 0.0 : 1.0;
 
