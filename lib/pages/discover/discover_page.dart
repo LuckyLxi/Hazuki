@@ -675,16 +675,16 @@ class _DiscoverDailyRecommendationCarouselState
   bool get _isLooping => widget.recommendations.length > 1;
 
   int get _loopedItemCount => _isLooping
-      ? widget.recommendations.length + 2
+      ? widget.recommendations.length + 5
       : widget.recommendations.length;
 
-  int get _initialPhysicalPage => _isLooping ? 1 : 0;
+  int get _initialPhysicalPage => _isLooping ? 2 : 0;
 
   int _physicalPageForLogical(int logicalPage) {
     if (!_isLooping) {
       return logicalPage;
     }
-    return logicalPage + 1;
+    return logicalPage + 2;
   }
 
   int _logicalPageForPhysical(int physicalPage) {
@@ -694,7 +694,7 @@ class _DiscoverDailyRecommendationCarouselState
     if (!_isLooping) {
       return physicalPage.clamp(0, widget.recommendations.length - 1);
     }
-    final normalized = (physicalPage - 1) % widget.recommendations.length;
+    final normalized = (physicalPage - 2) % widget.recommendations.length;
     return normalized < 0
         ? normalized + widget.recommendations.length
         : normalized;
@@ -846,7 +846,7 @@ class _DiscoverDailyRecommendationCarouselState
         'toLogicalPage': nextLogicalPage,
         'isLoopGhost':
             _isLooping &&
-            (page == 0 || page == widget.recommendations.length + 1),
+            (page <= 1 || page >= widget.recommendations.length + 2),
       },
     );
   }
@@ -861,32 +861,31 @@ class _DiscoverDailyRecommendationCarouselState
     if (settledPage == null) {
       return;
     }
-    if (settledPage == 0) {
+    final N = widget.recommendations.length;
+    if (settledPage <= 1) {
       _logCarouselEvent(
         'Discover carousel loop boundary detected',
         content: {
           'settledPhysicalPage': settledPage,
-          'jumpTargetPhysicalPage': widget.recommendations.length,
+          'jumpTargetPhysicalPage': settledPage + N,
           'settledLogicalPage': _logicalPageForPhysical(settledPage),
-          'jumpTargetLogicalPage': _logicalPageForPhysical(
-            widget.recommendations.length,
-          ),
+          'jumpTargetLogicalPage': _logicalPageForPhysical(settledPage + N),
         },
       );
-      _scheduleLoopBoundaryJump(widget.recommendations.length);
+      _scheduleLoopBoundaryJump(settledPage + N);
       return;
     }
-    if (settledPage == widget.recommendations.length + 1) {
+    if (settledPage >= N + 2) {
       _logCarouselEvent(
         'Discover carousel loop boundary detected',
         content: {
           'settledPhysicalPage': settledPage,
-          'jumpTargetPhysicalPage': 1,
+          'jumpTargetPhysicalPage': settledPage - N,
           'settledLogicalPage': _logicalPageForPhysical(settledPage),
-          'jumpTargetLogicalPage': _logicalPageForPhysical(1),
+          'jumpTargetLogicalPage': _logicalPageForPhysical(settledPage - N),
         },
       );
-      _scheduleLoopBoundaryJump(1);
+      _scheduleLoopBoundaryJump(settledPage - N);
     }
   }
 
@@ -1062,8 +1061,8 @@ class _DiscoverDailyRecommendationCarouselState
     final phase = _describeCardPhase(delta, clipScaleX, cardOpacity);
     final isLoopGhost =
         _isLooping &&
-        (physicalIndex == 0 ||
-            physicalIndex == widget.recommendations.length + 1);
+        (physicalIndex <= 1 ||
+            physicalIndex >= widget.recommendations.length + 2);
     final clipBucket = (clipScaleX * 10).round();
     final deltaBucket = (delta * 10).round();
     final outerBucket = (outerTranslateX / 12).round();
