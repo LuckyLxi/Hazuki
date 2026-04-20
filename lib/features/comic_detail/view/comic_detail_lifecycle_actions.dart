@@ -52,6 +52,33 @@ extension _ComicDetailLifecycleActionsExtension on _ComicDetailPageState {
     _updateAppBarSolidProgress();
   }
 
+  Future<void> _ensureCommentsTabFullscreen() async {
+    if (!mounted ||
+        _tabController.index != 1 ||
+        !_scrollController.hasClients ||
+        _isAnimatingCommentsFullscreen) {
+      return;
+    }
+
+    final position = _scrollController.position;
+    final targetOffset = position.maxScrollExtent.clamp(0.0, double.infinity);
+    final currentOffset = position.pixels.clamp(0.0, targetOffset);
+    if (targetOffset <= 0 || currentOffset >= targetOffset - 1) {
+      return;
+    }
+
+    _isAnimatingCommentsFullscreen = true;
+    try {
+      await _scrollController.animateTo(
+        targetOffset,
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOutCubic,
+      );
+    } finally {
+      _isAnimatingCommentsFullscreen = false;
+    }
+  }
+
   bool _updateAppBarSolidProgress() {
     if (!_scrollController.hasClients) {
       return false;

@@ -177,7 +177,7 @@ extension _CommentsWidgetsExtension on _CommentsPageState {
       curve: Curves.easeOutCubic,
       padding: EdgeInsets.only(bottom: bottomInset),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+        padding: const EdgeInsets.fromLTRB(8, 8, 8, 4),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -185,12 +185,13 @@ extension _CommentsWidgetsExtension on _CommentsPageState {
             LayoutBuilder(
               builder: (context, constraints) {
                 final expandedWidth = constraints.maxWidth;
-                final collapsedWidth = expandedWidth > 420
-                    ? 420.0
-                    : expandedWidth * 0.9;
+                final collapsedWidth = math.min(
+                  expandedWidth,
+                  math.max(272.0, expandedWidth * 0.82),
+                );
                 final composerWidth = isFocused
                     ? expandedWidth
-                    : collapsedWidth.clamp(0.0, expandedWidth);
+                    : collapsedWidth;
 
                 return AnimatedContainer(
                   duration: const Duration(milliseconds: 260),
@@ -215,6 +216,7 @@ extension _CommentsWidgetsExtension on _CommentsPageState {
                         child: TextField(
                           controller: _commentController,
                           focusNode: _commentFocusNode,
+                          onTap: _handleCommentInputTap,
                           onTapOutside: (_) => _commentFocusNode.unfocus(),
                           minLines: 1,
                           maxLines: 3,

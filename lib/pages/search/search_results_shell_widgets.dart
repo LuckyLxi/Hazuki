@@ -30,10 +30,7 @@ class _SearchResultsTopSearchBox extends StatelessWidget {
               alignment: Alignment.topCenter,
               child: HeroMode(
                 enabled: !showCollapsedSearch && visible,
-                child: Hero(
-                  tag: discoverSearchHeroTag,
-                  child: searchBar,
-                ),
+                child: Hero(tag: discoverSearchHeroTag, child: searchBar),
               ),
             ),
           ),
@@ -106,8 +103,9 @@ class _SearchResultsAppBarTitle extends StatelessWidget {
     required double expandedWidth,
   }) {
     final visible = showCollapsedSearch && !flyingSearchToTop;
-    final currentWidth =
-        collapsedSearchExpanded ? expandedWidth : collapsedWidth;
+    final currentWidth = collapsedSearchExpanded
+        ? expandedWidth
+        : collapsedWidth;
     return HeroMode(
       enabled: visible,
       child: Hero(

@@ -76,6 +76,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
   bool? _cloudFavoriteOverride;
   bool _comicDynamicColorEnabled = false;
   bool _didBindComicDynamicColorSetting = false;
+  bool _isAnimatingCommentsFullscreen = false;
   bool? _observedComicDynamicColorEnabled;
   ColorScheme? _lightComicScheme;
   ColorScheme? _darkComicScheme;
@@ -167,6 +168,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
                 onShowChapters: _showChaptersPanel,
                 onOpenReader: _openReader,
                 onDetailsLoaded: _markComicDetailRevealHandled,
+                onRequestCommentsTabFullscreen: _ensureCommentsTabFullscreen,
                 onDetailsResolved: ({required title, required updateTime}) {
                   _updateAppBarMetadata(title: title, updateTime: updateTime);
                 },

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -20,19 +21,21 @@ class CommentsPage extends StatefulWidget {
     this.subId,
     this.isTabView = false,
     this.isActiveInTabView = true,
+    this.onRequestTabFullscreen,
   });
 
   final String comicId;
   final String? subId;
   final bool isTabView;
   final bool isActiveInTabView;
+  final Future<void> Function()? onRequestTabFullscreen;
 
   @override
   State<CommentsPage> createState() => _CommentsPageState();
 }
 
 class _CommentsPageState extends State<CommentsPage>
-    with AutomaticKeepAliveClientMixin {
+    with AutomaticKeepAliveClientMixin, WidgetsBindingObserver {
   static const _commentsLoadTimeout = Duration(seconds: 20);
   static const _pageSize = 16;
   static final RegExp _commentInlineImagePattern = RegExp(
@@ -67,6 +70,9 @@ class _CommentsPageState extends State<CommentsPage>
   int? _maxPage;
   ComicCommentData? _replyToComment;
   bool? _tabScrollAtTop;
+  int _fullscreenRequestEpoch = 0;
+  // 真实键盘高度（从 PlatformDispatcher 直接读取，绕过 NestedScrollView 对 viewInsets 的覆盖）
+  double _keyboardHeight = 0;
 
   @override
   bool get wantKeepAlive => true;
@@ -74,12 +80,14 @@ class _CommentsPageState extends State<CommentsPage>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _commentFocusNode.addListener(_handleCommentFocusChanged);
     unawaited(_loadInitial());
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _scrollController.dispose();
     _commentFocusNode
       ..removeListener(_handleCommentFocusChanged)
@@ -88,9 +96,39 @@ class _CommentsPageState extends State<CommentsPage>
     super.dispose();
   }
 
+  @override
+  void didChangeMetrics() {
+    if (!mounted) {
+      return;
+    }
+    // 直接从 PlatformDispatcher 读取键盘高度，不受 NestedScrollView 重写 viewInsets 的影响
+    final rawBottom = WidgetsBinding
+        .instance
+        .platformDispatcher
+        .views
+        .first
+        .viewInsets
+        .bottom;
+    // viewInsets.bottom 是物理像素，需要除以 devicePixelRatio 转换为逻辑像素
+    final pixelRatio =
+        WidgetsBinding.instance.platformDispatcher.views.first.devicePixelRatio;
+    final newKeyboardHeight = rawBottom / pixelRatio;
+    if (newKeyboardHeight != _keyboardHeight) {
+      setState(() {
+        _keyboardHeight = newKeyboardHeight;
+      });
+    }
+    if (_commentFocusNode.hasFocus) {
+      _scheduleFullscreenSyncAttempts();
+    }
+  }
+
   void _handleCommentFocusChanged() {
     if (!mounted) {
       return;
+    }
+    if (_commentFocusNode.hasFocus) {
+      _scheduleFullscreenSyncAttempts();
     }
     setState(() {});
   }
@@ -150,17 +188,21 @@ class _CommentsPageState extends State<CommentsPage>
     }
 
     if (widget.isTabView) {
-      final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+      final isFocused = _commentFocusNode.hasFocus;
+      // 使用从 didChangeMetrics 中缓存的真实键盘高度，避免 NestedScrollView 覆盖 viewInsets 导致值为 0
+      final bottomInset = _keyboardHeight;
       final safeBottom = MediaQuery.paddingOf(context).bottom;
-      const pillHoriz = 16.0;
-      const pillMarginBottom = 6.0;
-      const pillApproxHeight = 56.0;
+      final pillHoriz = isFocused ? 10.0 : 16.0;
+      final pillMarginBottom = isFocused ? 2.0 : 4.0;
+      final pillApproxHeight = _replyToComment == null ? 72.0 : 126.0;
       final listExtraBottom =
           pillApproxHeight + pillMarginBottom + safeBottom + bottomInset;
       return Stack(
         children: [
           _buildCommentsBodyList(extraBottomPadding: listExtraBottom),
-          Positioned(
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
             left: pillHoriz,
             right: pillHoriz,
             bottom: safeBottom + pillMarginBottom + bottomInset,

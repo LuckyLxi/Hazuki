@@ -20,6 +20,7 @@ import 'package:hazuki/features/reader/support/reader_navigation_controller.dart
 import 'package:hazuki/features/reader/view/reader_overlay_controls.dart';
 import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
 import 'package:hazuki/features/reader/support/reader_session_controller.dart';
+import 'package:hazuki/features/reader/support/reader_zoom_controller.dart';
 import 'package:hazuki/features/reader/view/reader_settings_drawer_content.dart';
 import 'package:hazuki/features/reader/state/reader_settings_store.dart';
 import 'package:hazuki/features/reader/view/reader_state_views.dart';
@@ -87,6 +88,15 @@ class _ReaderPageState extends State<ReaderPage>
         loadImagesErrorBuilder: (error) =>
             l10n(context).readerChapterLoadFailed('$error'),
       );
+  late final ReaderZoomController _readerZoomController = ReaderZoomController(
+    transformationController: _zoomController,
+    resetAnimController: _resetAnimController,
+    runtimeState: _runtimeState,
+    isMounted: () => mounted,
+    updateState: _updateReaderState,
+    logEvent: _logReaderEvent,
+    logPayload: _readerLogPayload,
+  );
   late final ReaderNavigationController _navigationController =
       ReaderNavigationController(
         runtimeState: _runtimeState,
@@ -98,7 +108,7 @@ class _ReaderPageState extends State<ReaderPage>
         logEvent: _logReaderEvent,
         logPayload: _readerLogPayload,
         logVisiblePageChange: _logVisiblePageChange,
-        resetZoomImmediately: _resetZoomImmediately,
+        resetZoomImmediately: _readerZoomController.resetZoomImmediately,
         prefetchAround: _imagePipelineController.prefetchAround,
         requestPrefetchAhead: _imagePipelineController.requestPrefetchAhead,
         noImageModeEnabled: () => _noImageModeEnabled,
@@ -120,7 +130,7 @@ class _ReaderPageState extends State<ReaderPage>
         logPayload: _readerLogPayload,
         onScrollPositionChanged:
             _navigationController.handleScrollPositionChanged,
-        onZoomChanged: _onZoomChanged,
+        onZoomChanged: _readerZoomController.onZoomChanged,
         comicId: widget.comicId,
         epId: widget.epId,
         chapterTitle: widget.chapterTitle,
@@ -521,7 +531,9 @@ class _ReaderPageState extends State<ReaderPage>
       }),
     );
     if (changed) {
-      _resetZoomImmediately(reason: 'reading_mode_changed');
+      _readerZoomController.resetZoomImmediately(
+        reason: 'reading_mode_changed',
+      );
       _navigationController.syncPositionToImageIndex(
         targetImageIndex,
         trigger: 'mode_changed_sync',
@@ -551,7 +563,9 @@ class _ReaderPageState extends State<ReaderPage>
       }),
     );
     if (previousValue != value) {
-      _resetZoomImmediately(reason: 'double_page_mode_changed');
+      _readerZoomController.resetZoomImmediately(
+        reason: 'double_page_mode_changed',
+      );
       _navigationController.syncPositionToImageIndex(
         targetImageIndex,
         trigger: 'double_page_mode_changed_sync',
@@ -659,7 +673,9 @@ class _ReaderPageState extends State<ReaderPage>
         ? 0
         : _runtimeState.spreadStartIndex(_runtimeState.pageIndexNotifier.value);
     if (!value) {
-      _resetZoomImmediately(reason: 'pinch_to_zoom_disabled');
+      _readerZoomController.resetZoomImmediately(
+        reason: 'pinch_to_zoom_disabled',
+      );
     }
     _updateReaderState(() {
       _runtimeState.pinchToZoom = value;
@@ -931,168 +947,6 @@ class _ReaderPageState extends State<ReaderPage>
     }
   }
 
-  void _onZoomChanged() {
-    final scale = _zoomController.value.getMaxScaleOnAxis();
-    final zoomed = scale > 1.05;
-    if (_runtimeState.zoomInteracting) {
-      _runtimeState.isZoomed = zoomed;
-      return;
-    }
-    if (zoomed != _runtimeState.isZoomed && mounted) {
-      _updateReaderState(() => _runtimeState.isZoomed = zoomed);
-    }
-  }
-
-  void _handleReaderPointerDown(PointerDownEvent _) {
-    final previousCount = _runtimeState.activePointerCount;
-    _runtimeState.activePointerCount = previousCount + 1;
-    if (!_runtimeState.pinchToZoom ||
-        previousCount > 1 ||
-        _runtimeState.activePointerCount <= 1 ||
-        !mounted) {
-      return;
-    }
-    _updateReaderState(() {
-      _runtimeState.zoomInteracting = true;
-    });
-  }
-
-  void _handleReaderPointerEnd(PointerEvent _) {
-    final previousCount = _runtimeState.activePointerCount;
-    _runtimeState.activePointerCount = math.max(0, previousCount - 1);
-    if (!_runtimeState.pinchToZoom ||
-        previousCount <= 1 ||
-        _runtimeState.activePointerCount > 1) {
-      return;
-    }
-    final zoomed = _zoomController.value.getMaxScaleOnAxis() > 1.05;
-    if (!mounted) {
-      _runtimeState.zoomInteracting = false;
-      _runtimeState.isZoomed = zoomed;
-      if (!zoomed) {
-        _zoomController.value = Matrix4.identity();
-      }
-      return;
-    }
-    _updateReaderState(() {
-      _runtimeState.zoomInteracting = false;
-      _runtimeState.isZoomed = zoomed;
-    });
-    if (!zoomed) {
-      _zoomController.value = Matrix4.identity();
-    }
-  }
-
-  void _handleZoomInteractionStart(ScaleStartDetails _) {
-    if (!mounted) {
-      _runtimeState.zoomInteracting = true;
-      return;
-    }
-    _updateReaderState(() {
-      _runtimeState.zoomInteracting = true;
-    });
-  }
-
-  void _handleZoomInteractionUpdate(ScaleUpdateDetails _) {
-    final zoomed = _zoomController.value.getMaxScaleOnAxis() > 1.05;
-    if (!mounted) {
-      _runtimeState.isZoomed = zoomed;
-      return;
-    }
-    if (zoomed != _runtimeState.isZoomed) {
-      _updateReaderState(() {
-        _runtimeState.isZoomed = zoomed;
-      });
-    }
-  }
-
-  void _handleZoomInteractionEnd(ScaleEndDetails _) {
-    final zoomed = _zoomController.value.getMaxScaleOnAxis() > 1.05;
-    if (!mounted) {
-      _runtimeState.zoomInteracting = _runtimeState.activePointerCount > 1;
-      _runtimeState.isZoomed = zoomed;
-      if (!zoomed) {
-        _zoomController.value = Matrix4.identity();
-      }
-      return;
-    }
-    _updateReaderState(() {
-      _runtimeState.zoomInteracting = _runtimeState.activePointerCount > 1;
-      _runtimeState.isZoomed = zoomed;
-    });
-    if (!zoomed) {
-      _zoomController.value = Matrix4.identity();
-    }
-  }
-
-  void _resetZoom() {
-    final controller = _zoomController;
-    final startScale = controller.value.getMaxScaleOnAxis();
-    _logReaderEvent(
-      'Reader zoom reset animated',
-      source: 'reader_zoom',
-      content: _readerLogPayload({
-        'trigger': 'manual_reset_button',
-        'previousScale': _normalizeLogDouble(startScale),
-      }),
-    );
-
-    final Matrix4 start = controller.value.clone();
-    final Matrix4 end = Matrix4.identity();
-    _resetAnimController.reset();
-    final Animation<double> anim = CurvedAnimation(
-      parent: _resetAnimController,
-      curve: Curves.easeOutCubic,
-    );
-    void listener() {
-      final t = anim.value;
-      final Matrix4 current = Matrix4.zero();
-      for (var i = 0; i < 16; i++) {
-        current[i] = start[i] + (end[i] - start[i]) * t;
-      }
-      controller.value = current;
-    }
-
-    anim.addListener(listener);
-    _resetAnimController.forward().whenComplete(() {
-      anim.removeListener(listener);
-      controller.value = Matrix4.identity();
-      if (!mounted) {
-        _runtimeState.isZoomed = false;
-        _runtimeState.zoomInteracting = false;
-        return;
-      }
-      _updateReaderState(() {
-        _runtimeState.isZoomed = false;
-        _runtimeState.zoomInteracting = false;
-      });
-    });
-  }
-
-  void _resetZoomImmediately({String reason = 'unspecified'}) {
-    final previousScale = _zoomController.value.getMaxScaleOnAxis();
-    final hadZoomState =
-        _runtimeState.isZoomed ||
-        _runtimeState.zoomInteracting ||
-        _runtimeState.activePointerCount > 0 ||
-        previousScale > 1.001;
-    _resetAnimController.stop();
-    _zoomController.value = Matrix4.identity();
-    _runtimeState.zoomInteracting = false;
-    _runtimeState.activePointerCount = 0;
-    _runtimeState.isZoomed = false;
-    if (hadZoomState) {
-      _logReaderEvent(
-        'Reader zoom reset immediately',
-        source: 'reader_zoom',
-        content: _readerLogPayload({
-          'trigger': reason,
-          'previousScale': _normalizeLogDouble(previousScale),
-        }),
-      );
-    }
-  }
-
   Widget _buildZoomableReader({
     required Widget child,
     bool constrained = true,
@@ -1107,9 +961,9 @@ class _ReaderPageState extends State<ReaderPage>
       clipBehavior: Clip.hardEdge,
       minScale: 1.0,
       maxScale: 5.0,
-      onInteractionStart: _handleZoomInteractionStart,
-      onInteractionUpdate: _handleZoomInteractionUpdate,
-      onInteractionEnd: _handleZoomInteractionEnd,
+      onInteractionStart: _readerZoomController.handleInteractionStart,
+      onInteractionUpdate: _readerZoomController.handleInteractionUpdate,
+      onInteractionEnd: _readerZoomController.handleInteractionEnd,
       child: child,
     );
   }
@@ -1585,7 +1439,7 @@ class _ReaderPageState extends State<ReaderPage>
     return ReaderZoomResetOverlay(
       controlsVisible: _runtimeState.controlsVisible,
       isZoomed: _runtimeState.isZoomed,
-      onResetZoom: _resetZoom,
+      onResetZoom: _readerZoomController.resetZoom,
       label: l10n(context).readerResetZoom,
     );
   }
@@ -1643,9 +1497,9 @@ class _ReaderPageState extends State<ReaderPage>
               children: [
                 Listener(
                   behavior: HitTestBehavior.translucent,
-                  onPointerDown: _handleReaderPointerDown,
-                  onPointerUp: _handleReaderPointerEnd,
-                  onPointerCancel: _handleReaderPointerEnd,
+                  onPointerDown: _readerZoomController.handlePointerDown,
+                  onPointerUp: _readerZoomController.handlePointerEnd,
+                  onPointerCancel: _readerZoomController.handlePointerEnd,
                   child: _wrapReaderTapPaging(
                     _runtimeState.readerMode == ReaderMode.rightToLeft
                         ? _buildReaderPageView()

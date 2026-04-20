@@ -72,7 +72,7 @@ void main() {
   });
 
   testWidgets(
-    'submitting from entry opens results and keeps keyboard visible',
+    'submitting from entry opens results without reopening keyboard',
     (tester) async {
       SharedPreferences.setMockInitialValues(const {});
 
@@ -102,16 +102,8 @@ void main() {
       );
       await _pumpSearchSettled(tester);
 
-      final resultsEditableText = tester.widget<EditableText>(
-        find.descendant(
-          of: find.byKey(const ValueKey('search-results-primary-search-bar')),
-          matching: find.byType(EditableText),
-        ),
-      );
-
       expect(find.text('Comic submit-keyword 0'), findsOneWidget);
-      expect(resultsEditableText.focusNode.hasFocus, isTrue);
-      expect(tester.testTextInput.isVisible, isTrue);
+      expect(tester.testTextInput.isVisible, isFalse);
     },
   );
 

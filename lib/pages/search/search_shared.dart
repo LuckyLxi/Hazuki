@@ -27,7 +27,7 @@ enum SearchEntryIntent {
 }
 
 extension SearchEntryIntentExtension on SearchEntryIntent {
-  bool get showKeyboardOnEnter => this == SearchEntryIntent.submitFromEntry;
+  bool get showKeyboardOnEnter => this == SearchEntryIntent.editFromEntry;
 }
 
 typedef SearchPageLoader =

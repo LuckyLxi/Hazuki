@@ -1,6 +1,49 @@
 part of '../comments_page.dart';
 
 extension _CommentsActionsExtension on _CommentsPageState {
+  void _handleCommentInputTap() {
+    _scheduleFullscreenSyncAttempts();
+  }
+
+  void _scheduleFullscreenSyncAttempts() {
+    if (!widget.isTabView) {
+      return;
+    }
+    final requestEpoch = ++_fullscreenRequestEpoch;
+
+    void runIfStillNeeded() {
+      if (!mounted ||
+          !_commentFocusNode.hasFocus ||
+          requestEpoch != _fullscreenRequestEpoch) {
+        return;
+      }
+      unawaited(_requestTabFullscreenIfNeeded());
+    }
+
+    runIfStillNeeded();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      runIfStillNeeded();
+    });
+    for (final delay in const [
+      Duration(milliseconds: 120),
+      Duration(milliseconds: 260),
+      Duration(milliseconds: 420),
+    ]) {
+      Future<void>.delayed(delay, runIfStillNeeded);
+    }
+  }
+
+  Future<void> _requestTabFullscreenIfNeeded() async {
+    if (!widget.isTabView) {
+      return;
+    }
+    final callback = widget.onRequestTabFullscreen;
+    if (callback == null) {
+      return;
+    }
+    await callback();
+  }
+
   void _onScrollNotification(ScrollNotification notification) {
     _logTabTopState(notification.metrics);
     if (notification is ScrollUpdateNotification) {
