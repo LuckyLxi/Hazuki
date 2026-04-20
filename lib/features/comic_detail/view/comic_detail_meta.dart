@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 
 List<String> normalizeComicMetaValues(List<String> rawValues, {String? label}) {
@@ -53,6 +54,63 @@ bool isComicAuthorKey(String key) {
   return normalized == 'author' ||
       normalized == 'authors' ||
       key.trim() == '\u4f5c\u8005';
+}
+
+class ComicDetailMetaSection extends StatelessWidget {
+  const ComicDetailMetaSection({
+    super.key,
+    required this.details,
+    required this.onCopyId,
+    required this.onMetaValuePressed,
+    required this.onMetaValueLongPress,
+  });
+
+  final ComicDetailsData details;
+  final ValueChanged<String> onCopyId;
+  final ValueChanged<String> onMetaValuePressed;
+  final ValueChanged<String> onMetaValueLongPress;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = l10n(context);
+    final authorLabel = strings.comicDetailAuthor;
+    final tagLabel = strings.comicDetailTags;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        ComicDetailIdRow(id: details.id, onCopy: () => onCopyId(details.id)),
+        ComicDetailMetaRow(
+          label: authorLabel,
+          values: normalizeComicMetaValues(
+            details.tags.keys
+                .where(isComicAuthorKey)
+                .expand((key) => details.tags[key] ?? const <String>[])
+                .toList(),
+            label: authorLabel,
+          ),
+          onValuePressed: onMetaValuePressed,
+          onValueLongPress: onMetaValueLongPress,
+        ),
+        ComicDetailMetaRow(
+          label: tagLabel,
+          values: normalizeComicMetaValues(
+            details.tags.entries
+                .where(
+                  (entry) =>
+                      !isComicAuthorKey(entry.key) &&
+                      entry.key != details.tags.keys.lastOrNull,
+                )
+                .expand((entry) => entry.value)
+                .toList(),
+            label: tagLabel,
+          ),
+          onValuePressed: onMetaValuePressed,
+          onValueLongPress: onMetaValueLongPress,
+        ),
+      ],
+    );
+  }
 }
 
 class ComicDetailIdRow extends StatelessWidget {

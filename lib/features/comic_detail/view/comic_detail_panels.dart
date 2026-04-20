@@ -28,18 +28,32 @@ class HazukiTabBarDelegate extends SliverPersistentHeaderDelegate {
     double shrinkOffset,
     bool overlapsContent,
   ) {
+    final tabBarHeight = tabBar.preferredSize.height;
+    final targetOffsetY = shouldAnimateInitialDetailReveal && !detailsReady
+        ? -(tabBarHeight * 0.12)
+        : 0.0;
+
     return RepaintBoundary(
       child: ColoredBox(
         color: surfaceColor,
-        child: AnimatedSlide(
-          offset: shouldAnimateInitialDetailReveal
-              ? (detailsReady ? Offset.zero : const Offset(0, -0.12))
-              : Offset.zero,
-          duration: shouldAnimateInitialDetailReveal
-              ? const Duration(milliseconds: 320)
-              : Duration.zero,
-          curve: Curves.easeOutCubic,
-          child: tabBar,
+        child: SizedBox(
+          height: tabBarHeight,
+          child: ClipRect(
+            child: TweenAnimationBuilder<double>(
+              tween: Tween<double>(begin: targetOffsetY, end: targetOffsetY),
+              duration: shouldAnimateInitialDetailReveal
+                  ? const Duration(milliseconds: 320)
+                  : Duration.zero,
+              curve: Curves.easeOutCubic,
+              child: tabBar,
+              builder: (context, value, child) {
+                return Transform.translate(
+                  offset: Offset(0, value),
+                  child: child,
+                );
+              },
+            ),
+          ),
         ),
       ),
     );
