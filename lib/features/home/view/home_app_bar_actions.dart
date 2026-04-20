@@ -250,35 +250,6 @@ class _HomeAppBarActionsState extends State<HomeAppBarActions> {
         ? _buildFavoriteActionGroup(context)
         : discoverActions;
 
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 260),
-      switchInCurve: Curves.easeOutCubic,
-      switchOutCurve: Curves.easeInCubic,
-      layoutBuilder: (currentChild, previousChildren) {
-        return Stack(
-          alignment: Alignment.centerRight,
-          clipBehavior: Clip.none,
-          children: <Widget>[...previousChildren, ?currentChild],
-        );
-      },
-      transitionBuilder: (child, animation) {
-        final curved = CurvedAnimation(
-          parent: animation,
-          curve: Curves.easeOutCubic,
-          reverseCurve: Curves.easeInCubic,
-        );
-        return FadeTransition(
-          opacity: curved,
-          child: SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(0.24, 0),
-              end: Offset.zero,
-            ).animate(curved),
-            child: child,
-          ),
-        );
-      },
-      child: actionsChild,
-    );
+    return actionsChild;
   }
 }
