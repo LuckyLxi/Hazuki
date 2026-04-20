@@ -1,4 +1,4 @@
-package com.lxi.hazuki.comics
+package com.lxi.hazuki
 
 import android.os.Bundle
 import android.view.KeyEvent

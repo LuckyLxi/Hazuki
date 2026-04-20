@@ -77,6 +77,12 @@ class SearchResultsController extends ChangeNotifier {
 
   bool isCurrentRequest(int token) => token == _searchRequestToken;
 
+  Future<ComicDetailsData> loadComicById(String comicId) {
+    return HazukiSourceService.instance
+        .loadComicDetails(comicId)
+        .timeout(searchLoadTimeout);
+  }
+
   void finishDirectIdLookup(int token) {
     if (!isCurrentRequest(token)) {
       return;

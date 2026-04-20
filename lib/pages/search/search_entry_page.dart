@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../app/app.dart';
 import '../../l10n/app_localizations.dart';
@@ -10,6 +9,7 @@ import '../../widgets/windows_comic_detail_host.dart';
 import 'search_bar_shell.dart';
 import 'search_focus_coordinator.dart';
 import 'search_history_section.dart';
+import 'search_history_service.dart';
 import 'search_results_page.dart';
 import 'search_reveal_support.dart';
 import 'search_shared.dart';
@@ -36,6 +36,7 @@ class _SearchEntryPageState extends State<SearchEntryPage> {
     allowCollapsedFocus: false,
   );
   final ScrollController _scrollController = ScrollController();
+  final SearchHistoryService _historyService = SearchHistoryService();
   late final SearchRevealSupport _revealSupport = SearchRevealSupport(
     _scrollController,
   );
@@ -109,12 +110,12 @@ class _SearchEntryPageState extends State<SearchEntryPage> {
   }
 
   Future<void> _loadHistory() async {
-    final prefs = await SharedPreferences.getInstance();
+    final history = await _historyService.load();
     if (!mounted) {
       return;
     }
     setState(() {
-      _historyList = prefs.getStringList('search_history') ?? <String>[];
+      _historyList = history;
       if (_historyList.isEmpty) {
         _historyEditMode = false;
       }
@@ -123,9 +124,7 @@ class _SearchEntryPageState extends State<SearchEntryPage> {
   }
 
   Future<void> _removeHistory(String keyword) async {
-    final prefs = await SharedPreferences.getInstance();
-    final newHistory = _historyList.where((e) => e != keyword).toList();
-    await prefs.setStringList('search_history', newHistory);
+    final newHistory = await _historyService.remove(keyword);
     if (!mounted) {
       return;
     }
@@ -139,8 +138,7 @@ class _SearchEntryPageState extends State<SearchEntryPage> {
   }
 
   Future<void> _clearHistory() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('search_history');
+    await _historyService.clear();
     if (!mounted) {
       return;
     }
@@ -301,6 +299,7 @@ class _SearchEntryPageState extends State<SearchEntryPage> {
                     key: const ValueKey('search-entry-primary-search-bar'),
                     clearKey: 'entry-clear',
                     submitKey: 'entry-submit',
+                    autofocus: true,
                   ),
                 ),
               ),

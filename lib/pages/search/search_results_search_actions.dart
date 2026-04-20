@@ -19,9 +19,7 @@ extension _SearchResultsSearchActionsExtension on _SearchResultsPageState {
     }
 
     try {
-      final details = await HazukiSourceService.instance
-          .loadComicDetails(comicId)
-          .timeout(const Duration(seconds: 25));
+      final details = await _resultsController.loadComicById(comicId);
       if (!mounted) {
         return true;
       }

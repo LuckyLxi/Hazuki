@@ -1,4 +1,4 @@
-package com.lxi.hazuki.comics
+package com.lxi.hazuki
 
 import android.content.Context
 import android.graphics.Color

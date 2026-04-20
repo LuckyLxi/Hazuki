@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../app/app.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/hazuki_models.dart';
+import 'search_history_service.dart';
 
 const searchLoadTimeout = Duration(seconds: 25);
 const searchAppBarRevealOffset = 68.0;
@@ -75,61 +76,5 @@ Future<String> normalizeSubmittedKeyword(
 }
 
 Future<void> addSearchHistory(String keyword) async {
-  if (keyword.isEmpty) {
-    return;
-  }
-  final prefs = await SharedPreferences.getInstance();
-  final history = prefs.getStringList('search_history') ?? const <String>[];
-  final newHistory = [keyword, ...history.where((e) => e != keyword)];
-  if (newHistory.length > 50) {
-    newHistory.removeRange(50, newHistory.length);
-  }
-  await prefs.setStringList('search_history', newHistory);
-}
-
-Widget buildAnimatedSearchActionButton({
-  required bool showClearAction,
-  required String clearKey,
-  required String submitKey,
-  required String clearTooltip,
-  required String submitTooltip,
-  required VoidCallback onClear,
-  required VoidCallback onSubmit,
-}) {
-  return IconButton(
-    tooltip: showClearAction ? clearTooltip : submitTooltip,
-    onPressed: showClearAction ? onClear : onSubmit,
-    icon: SizedBox(
-      // 固定容器尺寸，防止 AnimatedSwitcher 过渡期间 Stack 大小变化
-      // 导致键盘收起时触发 layout 重建而产生位置跳动
-      width: 24,
-      height: 24,
-      child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 180),
-        layoutBuilder: (currentChild, previousChildren) {
-          return Stack(
-            alignment: Alignment.center,
-            children: <Widget>[
-              ...previousChildren,
-              if (currentChild case final Widget child) child,
-            ],
-          );
-        },
-        transitionBuilder: (child, animation) {
-          return ScaleTransition(
-            scale: CurvedAnimation(
-              parent: animation,
-              curve: Curves.easeOutBack,
-              reverseCurve: Curves.easeInCubic,
-            ),
-            child: FadeTransition(opacity: animation, child: child),
-          );
-        },
-        child: Icon(
-          showClearAction ? Icons.close : Icons.arrow_forward,
-          key: ValueKey<String>(showClearAction ? clearKey : submitKey),
-        ),
-      ),
-    ),
-  );
+  await SearchHistoryService().add(keyword);
 }

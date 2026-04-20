@@ -58,3 +58,5 @@ third_party/**/.cxx/
 third_party/**/build/
 
 **/.gradle/
+# Test coverage
+coverage/

@@ -423,7 +423,13 @@ class CloudSyncService {
       if (_alwaysSkippedSettings.contains(key)) {
         continue;
       }
-      settingsMap[key] = prefs.get(key);
+      final value = prefs.get(key);
+      // 对 source_data_* 键进行净化：账号凭证属于敏感信息，不应上传至云端。
+      if (key.startsWith('source_data_') && value is String) {
+        settingsMap[key] = _stripAccountFromSourceData(value);
+      } else {
+        settingsMap[key] = value;
+      }
     }
     final settingsJson = jsonEncode({
       'version': 2,
@@ -574,12 +580,18 @@ class CloudSyncService {
         return value;
       }
       final sanitized = Map<String, dynamic>.from(decoded);
+      // 账号凭证属于敏感会话数据，不应从备份恢复，
+      // 先无条件移除备份中携带的 account 字段。
+      sanitized.remove('account');
+      // 若本地设备已有登录账号，则将其写回，保持本地状态不变。
       final existingRaw = prefs.getString(normalizedKey);
       if (existingRaw != null && existingRaw.trim().isNotEmpty) {
-        final existingDecoded = jsonDecode(existingRaw);
-        if (existingDecoded is Map && existingDecoded['account'] != null) {
-          sanitized['account'] = existingDecoded['account'];
-        }
+        try {
+          final existingDecoded = jsonDecode(existingRaw);
+          if (existingDecoded is Map && existingDecoded['account'] != null) {
+            sanitized['account'] = existingDecoded['account'];
+          }
+        } catch (_) {}
       }
       return jsonEncode(sanitized);
     } catch (_) {
@@ -698,6 +710,23 @@ class CloudSyncService {
       return;
     }
     await prefs.setString(key, value.toString());
+  }
+
+  /// 从 source_data_* 的 JSON 字符串中剔除 account 字段。
+  /// 账号凭证属于敏感会话数据，不应出现在云端备份中。
+  String _stripAccountFromSourceData(String raw) {
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) {
+        return raw;
+      }
+      final sanitized = Map<String, dynamic>.from(decoded);
+      sanitized.remove('account');
+      return jsonEncode(sanitized);
+    } catch (_) {
+      // 解析失败时原样保留，避免破坏其他数据
+      return raw;
+    }
   }
 }
 

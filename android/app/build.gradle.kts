@@ -16,12 +16,12 @@ if (hasReleaseKey) {
 }
 
 android {
-    namespace = "com.lxi.hazuki.comics"
+    namespace = "com.lxi.hazuki"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
     defaultConfig {
-        applicationId = "com.lxi.hazuki.comics"
+        applicationId = "com.lxi.hazuki"
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
