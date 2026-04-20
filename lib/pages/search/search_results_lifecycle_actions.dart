@@ -17,6 +17,7 @@ extension _SearchResultsLifecycleActionsExtension on _SearchResultsPageState {
       _focusCoordinator.attachRouteAutoFocus(
         context,
         showKeyboard: _showKeyboardOnEnter,
+        forceShowKeyboard: true,
       );
       unawaited(_submitSearch());
     });

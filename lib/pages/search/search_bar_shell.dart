@@ -15,6 +15,7 @@ class SearchBarShell extends StatelessWidget {
     this.onChanged,
     this.onSubmitted,
     this.compact = false,
+    this.autofocus = false,
   });
 
   final TextEditingController controller;
@@ -26,6 +27,7 @@ class SearchBarShell extends StatelessWidget {
   final ValueChanged<String>? onChanged;
   final ValueChanged<String>? onSubmitted;
   final bool compact;
+  final bool autofocus;
 
   @override
   Widget build(BuildContext context) {
@@ -34,6 +36,7 @@ class SearchBarShell extends StatelessWidget {
       focusNode: focusNode,
       controller: controller,
       hintText: strings.searchHint,
+      autoFocus: autofocus,
       elevation: const WidgetStatePropertyAll(0),
       backgroundColor: WidgetStatePropertyAll(
         Theme.of(context).colorScheme.surfaceContainerHigh,

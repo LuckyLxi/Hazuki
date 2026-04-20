@@ -279,6 +279,7 @@ extension _SearchResultsShellWidgetsExtension on _SearchResultsPageState {
     final orderLabels = searchOrderLabels(context);
     return hazukiFrostedAppBar(
       context: context,
+      enableBlur: false,
       title: _buildSearchResultsAppBarTitle(),
       actions: [
         PopupMenuButton<String>(

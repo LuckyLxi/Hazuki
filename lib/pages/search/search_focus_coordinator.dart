@@ -123,11 +123,13 @@ class SearchFocusCoordinator extends ChangeNotifier {
   void attachRouteAutoFocus(
     BuildContext context, {
     required bool showKeyboard,
+    bool forceShowKeyboard = false,
   }) {
     if (_routeAutoFocusAttached || !showKeyboard || !_isMounted()) {
       return;
     }
     _routeAutoFocusAttached = true;
+    _routeAutoFocusCancelled = false;
     _routeAutoFocusContext = context;
     final animation = ModalRoute.of(context)?.animation;
     if (animation == null || animation.isCompleted) {
@@ -136,7 +138,12 @@ class SearchFocusCoordinator extends ChangeNotifier {
           return;
         }
         unawaited(
-          requestPrimarySearchFocus(context, showKeyboard: showKeyboard),
+          requestPrimarySearchFocus(
+            context,
+            showKeyboard: showKeyboard,
+            cancelPendingRouteAutoFocus: false,
+            forceShowKeyboard: forceShowKeyboard,
+          ),
         );
       });
       return;
@@ -154,7 +161,13 @@ class SearchFocusCoordinator extends ChangeNotifier {
     _routeAnimation = null;
     final context = _routeAutoFocusContext;
     if (context != null && _canRunScheduledAction()) {
-      unawaited(requestPrimarySearchFocus(context));
+      unawaited(
+        requestPrimarySearchFocus(
+          context,
+          cancelPendingRouteAutoFocus: false,
+          forceShowKeyboard: true,
+        ),
+      );
     }
   }
 
@@ -165,8 +178,12 @@ class SearchFocusCoordinator extends ChangeNotifier {
   Future<void> requestPrimarySearchFocus(
     BuildContext context, {
     bool showKeyboard = true,
+    bool cancelPendingRouteAutoFocus = true,
+    bool forceShowKeyboard = false,
   }) async {
-    cancelPendingAutoFocus();
+    if (cancelPendingRouteAutoFocus) {
+      cancelPendingAutoFocus();
+    }
     if (!_isMounted()) {
       return;
     }
@@ -174,8 +191,8 @@ class SearchFocusCoordinator extends ChangeNotifier {
     if (!showKeyboard) {
       return;
     }
-    await Future<void>.delayed(const Duration(milliseconds: 180));
-    if (!_isMounted() || !primaryFocusNode.hasFocus) {
+    await Future<void>.delayed(const Duration(milliseconds: 16));
+    if (!forceShowKeyboard || !_isMounted() || !primaryFocusNode.hasFocus) {
       return;
     }
     await SystemChannels.textInput.invokeMethod<void>('TextInput.show');
@@ -191,12 +208,19 @@ class SearchFocusCoordinator extends ChangeNotifier {
     _routeAutoFocusContext = null;
   }
 
-  void dismissKeyboard(BuildContext context, {bool parkOnPage = false}) {
+  Future<void> dismissKeyboard(
+    BuildContext context, {
+    bool parkOnPage = false,
+  }) async {
     cancelPendingAutoFocus();
+    primaryFocusNode.unfocus();
+    collapsedFocusNode.unfocus();
     FocusManager.instance.primaryFocus?.unfocus();
     if (parkOnPage) {
       pageFocusNode.requestFocus();
     }
+    await SystemChannels.textInput.invokeMethod<void>('TextInput.hide');
+    syncKeyboardVisibility();
   }
 
   void enterCollapsedMode(BuildContext context) {

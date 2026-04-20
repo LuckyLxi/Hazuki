@@ -36,6 +36,10 @@ extension _SearchResultsSearchActionsExtension on _SearchResultsPageState {
       if (!mounted) {
         return true;
       }
+      await _focusCoordinator.dismissKeyboard(context);
+      if (!mounted) {
+        return true;
+      }
       await openComicDetail(
         context,
         comic: comic,
