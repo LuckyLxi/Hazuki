@@ -1,7 +1,16 @@
-part of 'comic_detail_page.dart';
+import 'dart:async';
 
-class _ComicDetailLoadingView extends StatelessWidget {
-  const _ComicDetailLoadingView();
+import 'package:flutter/material.dart';
+
+import 'package:hazuki/app/app.dart';
+import 'package:hazuki/l10n/l10n.dart';
+import 'package:hazuki/models/hazuki_models.dart';
+import 'package:hazuki/widgets/widgets.dart';
+
+import 'comic_detail_view_primitives.dart';
+
+class ComicDetailLoadingView extends StatelessWidget {
+  const ComicDetailLoadingView({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -18,8 +27,9 @@ class _ComicDetailLoadingView extends StatelessWidget {
   }
 }
 
-class _ComicDetailInfoTab extends StatefulWidget {
-  const _ComicDetailInfoTab({
+class ComicDetailInfoTab extends StatefulWidget {
+  const ComicDetailInfoTab({
+    super.key,
     required this.details,
     required this.skeletonColor,
     required this.metaSectionBuilder,
@@ -34,10 +44,10 @@ class _ComicDetailInfoTab extends StatefulWidget {
   final bool shouldAnimateResolvedContent;
 
   @override
-  State<_ComicDetailInfoTab> createState() => _ComicDetailInfoTabState();
+  State<ComicDetailInfoTab> createState() => _ComicDetailInfoTabState();
 }
 
-class _ComicDetailInfoTabState extends State<_ComicDetailInfoTab> {
+class _ComicDetailInfoTabState extends State<ComicDetailInfoTab> {
   // Tracks whether the entrance animation has already played once.
   // Survives tab switches because Flutter preserves State objects as long as
   // the widget type and position in the tree are unchanged.
@@ -86,7 +96,7 @@ class _ComicDetailInfoTabState extends State<_ComicDetailInfoTab> {
         SliverPadding(
           padding: const EdgeInsets.all(16),
           sliver: SliverToBoxAdapter(
-            child: _ComicDetailEntranceReveal(
+            child: ComicDetailEntranceReveal(
               key: ValueKey<String>('comic-detail-info-${details.id}'),
               beginOffset: const Offset(0, 20),
               enabled: shouldAnimate,
@@ -130,23 +140,23 @@ class _ComicDetailInfoSkeleton extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _ComicDetailSkeletonBlock(
+        ComicDetailSkeletonBlock(
           color: skeletonColor,
           width: 92,
           height: 18,
           radius: 9,
         ),
         const SizedBox(height: 14),
-        _ComicDetailSkeletonBlock(color: skeletonColor, height: 16, radius: 8),
+        ComicDetailSkeletonBlock(color: skeletonColor, height: 16, radius: 8),
         const SizedBox(height: 10),
-        _ComicDetailSkeletonBlock(
+        ComicDetailSkeletonBlock(
           color: skeletonColor,
           width: MediaQuery.sizeOf(context).width * 0.72,
           height: 16,
           radius: 8,
         ),
         const SizedBox(height: 10),
-        _ComicDetailSkeletonBlock(
+        ComicDetailSkeletonBlock(
           color: skeletonColor,
           width: MediaQuery.sizeOf(context).width * 0.54,
           height: 16,
@@ -157,7 +167,7 @@ class _ComicDetailInfoSkeleton extends StatelessWidget {
           4,
           (index) => Padding(
             padding: EdgeInsets.only(bottom: index == 3 ? 0 : 10),
-            child: _ComicDetailSkeletonBlock(
+            child: ComicDetailSkeletonBlock(
               color: skeletonColor,
               width:
                   MediaQuery.sizeOf(context).width *
@@ -172,13 +182,15 @@ class _ComicDetailInfoSkeleton extends StatelessWidget {
   }
 }
 
-class _ComicDetailRelatedTab extends StatefulWidget {
-  const _ComicDetailRelatedTab({
+class ComicDetailRelatedTab extends StatefulWidget {
+  const ComicDetailRelatedTab({
+    super.key,
     required this.details,
     required this.heroTagPrefix,
     required this.isActiveInTabView,
     required this.isDesktopPanel,
     required this.onCloseRequested,
+    required this.pageBuilder,
   });
 
   final ComicDetailsData? details;
@@ -186,12 +198,13 @@ class _ComicDetailRelatedTab extends StatefulWidget {
   final bool isActiveInTabView;
   final bool isDesktopPanel;
   final VoidCallback? onCloseRequested;
+  final Widget Function(ExploreComic comic, String heroTag) pageBuilder;
 
   @override
-  State<_ComicDetailRelatedTab> createState() => _ComicDetailRelatedTabState();
+  State<ComicDetailRelatedTab> createState() => _ComicDetailRelatedTabState();
 }
 
-class _ComicDetailRelatedTabState extends State<_ComicDetailRelatedTab>
+class _ComicDetailRelatedTabState extends State<ComicDetailRelatedTab>
     with AutomaticKeepAliveClientMixin {
   @override
   bool get wantKeepAlive => true;
@@ -212,7 +225,7 @@ class _ComicDetailRelatedTabState extends State<_ComicDetailRelatedTab>
         physics: const ClampingScrollPhysics(),
         slivers: [
           SliverOverlapInjector(handle: overlapHandle),
-          const SliverFillRemaining(child: _ComicDetailLoadingView()),
+          const SliverFillRemaining(child: ComicDetailLoadingView()),
         ],
       );
     }
@@ -265,20 +278,14 @@ class _ComicDetailRelatedTabState extends State<_ComicDetailRelatedTab>
                         context,
                         comic: comic,
                         heroTag: heroTag,
-                        pageBuilder: (comic, heroTag) => ComicDetailPage(
-                          comic: comic,
-                          heroTag: heroTag,
-                          isDesktopPanel: true,
-                          onCloseRequested: widget.onCloseRequested,
-                        ),
+                        pageBuilder: widget.pageBuilder,
                       ),
                     );
                     return;
                   }
                   Navigator.of(context).push(
                     MaterialPageRoute<void>(
-                      builder: (_) =>
-                          ComicDetailPage(comic: comic, heroTag: heroTag),
+                      builder: (_) => widget.pageBuilder(comic, heroTag),
                     ),
                   );
                 },

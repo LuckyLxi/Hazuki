@@ -1,7 +1,11 @@
-part of 'comic_detail_page.dart';
+import 'package:flutter/material.dart';
 
-class _HazukiTabBarDelegate extends SliverPersistentHeaderDelegate {
-  const _HazukiTabBarDelegate(
+import 'package:hazuki/app/chapter_title_resolver.dart';
+import 'package:hazuki/l10n/l10n.dart';
+import 'package:hazuki/models/hazuki_models.dart';
+
+class HazukiTabBarDelegate extends SliverPersistentHeaderDelegate {
+  const HazukiTabBarDelegate(
     this.tabBar,
     this.surfaceColor, {
     required this.detailsReady,
@@ -42,7 +46,7 @@ class _HazukiTabBarDelegate extends SliverPersistentHeaderDelegate {
   }
 
   @override
-  bool shouldRebuild(covariant _HazukiTabBarDelegate oldDelegate) {
+  bool shouldRebuild(covariant HazukiTabBarDelegate oldDelegate) {
     return tabBar != oldDelegate.tabBar ||
         surfaceColor != oldDelegate.surfaceColor ||
         detailsReady != oldDelegate.detailsReady ||

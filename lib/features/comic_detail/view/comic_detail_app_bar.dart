@@ -1,8 +1,11 @@
-part of 'comic_detail_page.dart';
+import 'package:flutter/material.dart';
 
-class _ComicDetailScrollAwareAppBar extends StatelessWidget
+import 'comic_detail_view_primitives.dart';
+
+class ComicDetailScrollAwareAppBar extends StatelessWidget
     implements PreferredSizeWidget {
-  const _ComicDetailScrollAwareAppBar({
+  const ComicDetailScrollAwareAppBar({
+    super.key,
     required this.collapsedTitleListenable,
     required this.appBarComicTitle,
     required this.appBarUpdateTime,
@@ -36,7 +39,7 @@ class _ComicDetailScrollAwareAppBar extends StatelessWidget
       title: ValueListenableBuilder<bool>(
         valueListenable: collapsedTitleListenable,
         builder: (context, showCollapsedComicTitle, _) {
-          return _ComicDetailAppBarTitle(
+          return ComicDetailAppBarTitle(
             showCollapsedComicTitle: showCollapsedComicTitle,
             appBarComicTitle: appBarComicTitle,
             appBarUpdateTime: appBarUpdateTime,
@@ -52,8 +55,9 @@ class _ComicDetailScrollAwareAppBar extends StatelessWidget
   }
 }
 
-class _ComicDetailTopSurfaceOverlay extends StatelessWidget {
-  const _ComicDetailTopSurfaceOverlay({
+class ComicDetailTopSurfaceOverlay extends StatelessWidget {
+  const ComicDetailTopSurfaceOverlay({
+    super.key,
     required this.progressListenable,
     required this.surface,
     required this.height,

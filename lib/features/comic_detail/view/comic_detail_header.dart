@@ -1,7 +1,15 @@
-part of 'comic_detail_page.dart';
+import 'package:flutter/material.dart';
 
-class _ComicDetailHeaderSection extends StatelessWidget {
-  const _ComicDetailHeaderSection({
+import 'package:hazuki/app/navigation_tags.dart';
+import 'package:hazuki/l10n/l10n.dart';
+import 'package:hazuki/models/hazuki_models.dart';
+import 'package:hazuki/widgets/widgets.dart';
+
+import 'comic_detail_view_primitives.dart';
+
+class ComicDetailHeaderSection extends StatelessWidget {
+  const ComicDetailHeaderSection({
+    super.key,
     required this.heroTag,
     required this.details,
     required this.skeletonColor,
@@ -153,7 +161,7 @@ class _ComicDetailHeaderSection extends StatelessWidget {
                       child: detailsReady
                           ? Align(
                               alignment: Alignment.centerLeft,
-                              child: _ComicDetailEntranceReveal(
+                              child: ComicDetailEntranceReveal(
                                 key: const ValueKey('comic-detail-stats'),
                                 beginOffset: const Offset(0, 12),
                                 enabled: shouldAnimateInitialDetailReveal,
@@ -169,13 +177,13 @@ class _ComicDetailHeaderSection extends StatelessWidget {
                               mainAxisAlignment: MainAxisAlignment.center,
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _ComicDetailSkeletonBlock(
+                                ComicDetailSkeletonBlock(
                                   color: skeletonColor,
                                   width: 112,
                                   height: 12,
                                 ),
                                 const SizedBox(height: 8),
-                                _ComicDetailSkeletonBlock(
+                                ComicDetailSkeletonBlock(
                                   color: skeletonColor,
                                   width: 84,
                                   height: 12,

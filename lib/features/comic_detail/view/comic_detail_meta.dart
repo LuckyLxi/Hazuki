@@ -1,9 +1,7 @@
-part of 'comic_detail_page.dart';
+import 'package:flutter/material.dart';
+import 'package:hazuki/models/hazuki_models.dart';
 
-List<String> _normalizeComicMetaValues(
-  List<String> rawValues, {
-  String? label,
-}) {
+List<String> normalizeComicMetaValues(List<String> rawValues, {String? label}) {
   final values = <String>[];
   final seen = <String>{};
 
@@ -37,7 +35,7 @@ List<String> _normalizeComicMetaValues(
   return values;
 }
 
-String _extractComicViewsText(ComicDetailsData details) {
+String extractComicViewsText(ComicDetailsData details) {
   final keys = details.tags.keys.toList();
   if (keys.isEmpty) {
     return '';
@@ -47,18 +45,18 @@ String _extractComicViewsText(ComicDetailsData details) {
   if (values.isEmpty) {
     return '';
   }
-  return _normalizeComicMetaValues(values).join(' ');
+  return normalizeComicMetaValues(values).join(' ');
 }
 
-bool _isComicAuthorKey(String key) {
+bool isComicAuthorKey(String key) {
   final normalized = key.trim().toLowerCase();
   return normalized == 'author' ||
       normalized == 'authors' ||
       key.trim() == '\u4f5c\u8005';
 }
 
-class _ComicDetailIdRow extends StatelessWidget {
-  const _ComicDetailIdRow({required this.id, required this.onCopy});
+class ComicDetailIdRow extends StatelessWidget {
+  const ComicDetailIdRow({super.key, required this.id, required this.onCopy});
 
   final String id;
   final VoidCallback onCopy;
@@ -93,8 +91,9 @@ class _ComicDetailIdRow extends StatelessWidget {
   }
 }
 
-class _ComicDetailMetaRow extends StatelessWidget {
-  const _ComicDetailMetaRow({
+class ComicDetailMetaRow extends StatelessWidget {
+  const ComicDetailMetaRow({
+    super.key,
     required this.label,
     required this.values,
     required this.onValuePressed,

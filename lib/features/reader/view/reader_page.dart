@@ -10,7 +10,7 @@ import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
-import 'package:hazuki/features/comic_detail/view/comic_detail_page.dart';
+import 'package:hazuki/features/comic_detail/view/comic_detail_panels.dart';
 import 'package:hazuki/features/reader/reader.dart';
 import 'package:hazuki/features/reader/support/reader_display_bridge.dart';
 import 'package:hazuki/features/reader/support/reader_diagnostics_support.dart';

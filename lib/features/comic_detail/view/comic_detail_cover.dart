@@ -1,6 +1,12 @@
-part of 'comic_detail_page.dart';
+import 'dart:async';
+import 'dart:typed_data';
+import 'dart:ui';
 
-// ignore_for_file: unused_element
+import 'package:flutter/material.dart';
+
+import 'package:hazuki/app/navigation_tags.dart';
+import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/widgets/widgets.dart';
 
 const int _comicStaticBlurredCoverCacheLimit = 24;
 final Map<String, Uint8List> _comicStaticBlurredCoverCache =
@@ -44,49 +50,18 @@ Uint8List? _takeBackgroundCoverBytes(String url) {
       takeHazukiWidgetImageMemory(normalizedUrl);
 }
 
-class _ComicCoverActionsSheet extends StatelessWidget {
-  const _ComicCoverActionsSheet({required this.onSavePressed});
-
-  final VoidCallback onSavePressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ListTile(
-            leading: const Icon(Icons.download_outlined),
-            title: Text(l10n(context).comicDetailSaveImage),
-            onTap: () {
-              Navigator.of(context).pop();
-              onSavePressed();
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.close),
-            title: Text(l10n(context).commonCancel),
-            onTap: () => Navigator.of(context).pop(),
-          ),
-          const SizedBox(height: 8),
-        ],
-      ),
-    );
-  }
-}
-
-class _ComicBlurredCoverBackground extends StatefulWidget {
-  const _ComicBlurredCoverBackground({required this.coverUrl});
+class ComicBlurredCoverBackground extends StatefulWidget {
+  const ComicBlurredCoverBackground({super.key, required this.coverUrl});
 
   final String coverUrl;
 
   @override
-  State<_ComicBlurredCoverBackground> createState() =>
+  State<ComicBlurredCoverBackground> createState() =>
       _ComicBlurredCoverBackgroundState();
 }
 
 class _ComicBlurredCoverBackgroundState
-    extends State<_ComicBlurredCoverBackground> {
+    extends State<ComicBlurredCoverBackground> {
   Uint8List? _coverBytes;
   bool _showBackground = false;
 
@@ -106,7 +81,7 @@ class _ComicBlurredCoverBackgroundState
   }
 
   @override
-  void didUpdateWidget(covariant _ComicBlurredCoverBackground oldWidget) {
+  void didUpdateWidget(covariant ComicBlurredCoverBackground oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.coverUrl == widget.coverUrl) {
       return;
@@ -232,8 +207,9 @@ class _ComicBlurredCoverBackgroundState
   }
 }
 
-class _ComicCoverPreviewPage extends StatelessWidget {
-  const _ComicCoverPreviewPage({
+class ComicCoverPreviewPage extends StatelessWidget {
+  const ComicCoverPreviewPage({
+    super.key,
     required this.imageUrl,
     required this.heroTag,
     required this.onLongPress,
