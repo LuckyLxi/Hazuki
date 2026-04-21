@@ -8,5 +8,9 @@
     "x64_zip": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.3/hazuki-windows-x64-v1.0.3.zip",
     "x64_msix": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.3/hazuki-windows-x64-v1.0.3.msix"
   },
-  "changelog": "feat(update): improve software update dialog adaptivity and interaction"
+  "changelog": "- 新增发现页轮播图及每日推荐功能
+- 重构底部导航栏样式与动画
+- 新增 Windows 平台自动更新支持
+- 优化云同步增量合并逻辑
+- 重构阅读器、搜索、漫画详情等多处 UI 组件"
 }
