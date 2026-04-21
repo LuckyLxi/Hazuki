@@ -1,13 +1,12 @@
 {
-  "version": "1.0.2",
-  "releaseUrl": "https://github.com/LuckyLxi/Hazuki/releases/tag/v1.0.2",
+  "version": "1.0.3",
+  "releaseUrl": "https://github.com/LuckyLxi/Hazuki/releases/tag/v1.0.3",
   "apkUrls": {
-    "arm64-v8a": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.2/app-arm64-v8a-release.apk",
-    "armeabi-v7a": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.2/app-armeabi-v7a-release.apk",
-    "x86_64": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.2/app-x86_64-release.apk"
+    "arm64-v8a": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.3/app-arm64-v8a-release.apk"
   },
   "windowsUrls": {
-    "x64": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.2/hazuki-windows-x64-v1.0.2.zip"
+    "x64_zip": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.3/hazuki-windows-x64-v1.0.3.zip",
+    "x64_msix": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.3/hazuki-windows-x64-v1.0.3.msix"
   },
-  "changelog": "- 优化主题切换动画"
+  "changelog": "feat(update): improve software update dialog adaptivity and interaction"
 }
