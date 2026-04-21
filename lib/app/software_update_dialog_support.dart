@@ -136,7 +136,7 @@ class SoftwareUpdateDialogSupport {
 
     return showGeneralDialog<SoftwareUpdateDialogAction>(
       context: effectiveDialogContext,
-      barrierDismissible: false,
+      barrierDismissible: true,
       barrierLabel: l10n(effectiveDialogContext).dialogBarrierLabel,
       barrierColor: Colors.black.withValues(alpha: 0.34),
       transitionDuration: const Duration(milliseconds: 280),
@@ -256,7 +256,7 @@ class _SoftwareUpdateDialogCardState extends State<_SoftwareUpdateDialogCard> {
         final failureMessage = _buildFailureMessage(strings);
 
         return PopScope(
-          canPop: !isDownloading && !isSuccess,
+          canPop: !isDownloading,
           child: SafeArea(
             minimum: const EdgeInsets.all(16),
             child: Center(
@@ -359,7 +359,8 @@ class _SoftwareUpdateDialogCardState extends State<_SoftwareUpdateDialogCard> {
         if (hasChangelog) ...[
           const SizedBox(height: 14),
           Container(
-            constraints: BoxConstraints(maxHeight: math.min(maxHeight, 280)),
+            width: double.infinity,
+            constraints: BoxConstraints(maxHeight: maxHeight * 0.6),
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
               color: colorScheme.surfaceContainerLow,
@@ -379,10 +380,7 @@ class _SoftwareUpdateDialogCardState extends State<_SoftwareUpdateDialogCard> {
                   ),
                 ),
                 const SizedBox(height: 10),
-                ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxHeight: math.min(maxHeight, 220),
-                  ),
+                Flexible(
                   child: SingleChildScrollView(
                     child: Text(
                       changelog,
