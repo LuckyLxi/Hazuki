@@ -6,10 +6,11 @@ import 'package:flutter/material.dart';
 import 'package:hazuki/app/app.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
+import 'package:hazuki/features/search/search.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
-import 'package:hazuki/pages/search/search.dart';
+
 import 'discover_daily_recommendation_carousel.dart';
 import 'discover_page_sections.dart';
 

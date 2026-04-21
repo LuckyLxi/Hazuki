@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'package:hazuki/features/comments/comments.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/pages/comments_page.dart';
 
 import 'comic_detail_header.dart';
 import 'comic_detail_panels.dart';

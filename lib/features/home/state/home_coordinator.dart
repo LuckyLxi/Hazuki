@@ -3,10 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'package:hazuki/features/favorite/favorite.dart';
+import 'package:hazuki/features/favorite/view/favorite_page.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
-import 'package:hazuki/pages/favorite_page.dart';
-import 'package:hazuki/pages/favorite/favorite.dart';
 import 'package:hazuki/features/home/state/home_profile_controller.dart';
 import 'package:hazuki/features/home/support/home_profile_flow.dart';
 import 'package:hazuki/features/home/state/home_shell_controller.dart';

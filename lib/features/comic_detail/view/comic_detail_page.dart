@@ -3,8 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'package:hazuki/features/search/search.dart';
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/pages/search/search.dart';
 
 import 'package:hazuki/features/comic_detail/support/comic_detail_actions_controller.dart';
 import 'package:hazuki/features/comic_detail/support/comic_detail_session_controller.dart';

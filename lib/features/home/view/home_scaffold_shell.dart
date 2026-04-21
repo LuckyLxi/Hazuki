@@ -3,14 +3,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/app/app.dart';
+import 'package:hazuki/features/favorite/favorite.dart';
+import 'package:hazuki/features/favorite/view/favorite_page.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:hazuki/widgets/windows_comic_detail_host.dart';
 import 'package:hazuki/features/discover/discover.dart';
-import 'package:hazuki/pages/favorite/favorite.dart';
-import 'package:hazuki/pages/favorite_page.dart';
+
 import 'home_app_bar_actions.dart';
 import 'home_bottom_navigation.dart';
 import 'home_content_stack.dart';

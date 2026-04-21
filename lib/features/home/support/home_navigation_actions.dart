@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 
 import 'package:hazuki/app/app.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_page.dart';
+import 'package:hazuki/features/downloads/downloads.dart';
+import 'package:hazuki/features/history/history.dart';
+import 'package:hazuki/features/search/search.dart';
+import 'package:hazuki/features/settings/settings.dart';
 import 'package:hazuki/features/home/view/home_drawer.dart';
 import 'package:hazuki/features/reader/view/reader_page.dart';
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/pages/downloads_page.dart';
-import 'package:hazuki/pages/history_page.dart';
 import 'package:hazuki/pages/ranking_page.dart';
-import 'package:hazuki/pages/search/search.dart';
-import 'package:hazuki/pages/settings/settings.dart';
 import 'package:hazuki/pages/tag_category_page.dart';
 
 class HomeNavigationActions {
