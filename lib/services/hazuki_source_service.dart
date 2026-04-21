@@ -54,17 +54,11 @@ part 'source/source_store_support.dart';
 part 'source/version_update_capability.dart';
 
 const _jmSourceUrls = [
-  'https://raw.githubusercontent.com/venera-app/venera-configs/main/jm.js',
-  'https://fastly.jsdelivr.net/gh/venera-app/venera-configs@main/jm.js',
-  'https://gcore.jsdelivr.net/gh/venera-app/venera-configs@main/jm.js',
   'https://cdn.jsdelivr.net/gh/venera-app/venera-configs@main/jm.js',
 ];
 
 const _sourceIndexUrls = [
   'https://cdn.jsdelivr.net/gh/venera-app/venera-configs@main/index.json',
-  'https://gcore.jsdelivr.net/gh/venera-app/venera-configs@main/index.json',
-  'https://fastly.jsdelivr.net/gh/venera-app/venera-configs@main/index.json',
-  'https://raw.githubusercontent.com/venera-app/venera-configs/main/index.json',
 ];
 
 const _bundledInitAssetPath = 'assets/init.js';

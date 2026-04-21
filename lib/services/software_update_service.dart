@@ -12,10 +12,7 @@ class SoftwareUpdateService {
   static final SoftwareUpdateService instance = SoftwareUpdateService._();
 
   static const _updateManifestUrls = [
-    'https://fastly.jsdelivr.net/gh/LuckyLxi/Hazuki@main/update.json',
-    'https://gcore.jsdelivr.net/gh/LuckyLxi/Hazuki@main/update.json',
     'https://cdn.jsdelivr.net/gh/LuckyLxi/Hazuki@main/update.json',
-    'https://raw.githubusercontent.com/LuckyLxi/Hazuki/main/update.json',
   ];
 
   static const _latestReleaseUrl =
