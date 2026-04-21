@@ -191,7 +191,7 @@ jobs:
 
           version="${RELEASE_TAG#v}"
           release_url="$(printf '%s' "${release_json}" | jq -r '.html_url')"
-          changelog="$(printf '%s' "${release_json}" | jq -r '.body // ""')"
+          changelog="$(git for-each-ref "refs/tags/${RELEASE_TAG}" --format='%(contents)')"
           arm64_url="$(printf '%s' "${release_json}" | jq -r '.assets[] | select(.name | test("arm64-v8a"; "i")) | .browser_download_url' | head -n 1)"
           armv7_url="$(printf '%s' "${release_json}" | jq -r '.assets[] | select(.name | test("armeabi-v7a"; "i")) | .browser_download_url' | head -n 1)"
           x64_url="$(printf '%s' "${release_json}" | jq -r '.assets[] | select(.name | test("x86_64"; "i")) | .browser_download_url' | head -n 1)"
