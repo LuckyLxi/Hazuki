@@ -323,7 +323,13 @@ class SoftwareUpdateService {
       fallback ??= url;
       for (final arch in _windowsArchPriority) {
         if (name.contains(arch)) {
-          candidates.putIfAbsent(arch, () => url);
+          if (name.endsWith('.msix') || name.endsWith('.msixbundle')) {
+            candidates.putIfAbsent('${arch}_msix', () => url);
+          } else if (name.endsWith('.zip')) {
+            candidates.putIfAbsent('${arch}_zip', () => url);
+          } else {
+            candidates.putIfAbsent(arch, () => url);
+          }
         }
       }
     }
@@ -357,9 +363,28 @@ class SoftwareUpdateService {
     return apkUrls['universal'];
   }
 
+  bool get _isWindowsMsix {
+    if (!Platform.isWindows) {
+      return false;
+    }
+    return Platform.resolvedExecutable.toLowerCase().contains('windowsapps');
+  }
+
   String? _selectBestWindowsUrlFromMap(Map<String, String> windowsUrls) {
     final currentArch = _resolveWindowsArch();
     if (currentArch != null) {
+      if (_isWindowsMsix) {
+        final msix = windowsUrls['${currentArch}_msix'];
+        if (msix != null && msix.isNotEmpty) {
+          return msix;
+        }
+      } else {
+        final zip = windowsUrls['${currentArch}_zip'];
+        if (zip != null && zip.isNotEmpty) {
+          return zip;
+        }
+      }
+
       final direct = windowsUrls[currentArch];
       if (direct != null && direct.isNotEmpty) {
         return direct;
@@ -367,6 +392,18 @@ class SoftwareUpdateService {
     }
 
     for (final arch in _windowsArchPriority) {
+      if (_isWindowsMsix) {
+        final msix = windowsUrls['${arch}_msix'];
+        if (msix != null && msix.isNotEmpty) {
+          return msix;
+        }
+      } else {
+        final zip = windowsUrls['${arch}_zip'];
+        if (zip != null && zip.isNotEmpty) {
+          return zip;
+        }
+      }
+
       final matched = windowsUrls[arch];
       if (matched != null && matched.isNotEmpty) {
         return matched;

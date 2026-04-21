@@ -183,6 +183,8 @@
   "softwareUpdateInstallerLaunchFailed": "The download finished, but the installer could not be opened.",
   "softwareUpdateAlreadyLatest": "You're already on the latest app version",
   "softwareUpdateCheckFailed": "Unable to check for app updates right now",
+  "softwareUpdateDownloadSuccessZipMessage": "The ZIP package has been downloaded to the system Downloads folder",
+  "softwareUpdateOpenFolder": "Open folder",
   "aboutFeedbackTitle": "Feedback",
   "aboutFeedbackSubtitle": "Report any issues you encounter while reading",
   "aboutOpenLinkFailed": "Unable to open the link",

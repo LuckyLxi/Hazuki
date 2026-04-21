@@ -9,7 +9,7 @@ import 'package:path_provider/path_provider.dart';
 
 import 'software_update_service.dart';
 
-enum SoftwareUpdateDownloadStage { idle, downloading, failed }
+enum SoftwareUpdateDownloadStage { idle, downloading, success, failed }
 
 enum SoftwareUpdateDownloadFailureKind {
   none,
@@ -49,6 +49,8 @@ class SoftwareUpdateDownloadService extends ChangeNotifier {
   String? _failureDetail;
   String? _targetVersion;
   String? _apkPath;
+  bool _isZipMode = false;
+  String? _downloadedDir;
   double _progress = 0;
   bool _indeterminate = true;
   double _speedBytesPerSecond = 0;
@@ -58,10 +60,13 @@ class SoftwareUpdateDownloadService extends ChangeNotifier {
   String? get failureDetail => _failureDetail;
   String? get targetVersion => _targetVersion;
   String? get apkPath => _apkPath;
+  bool get isZipMode => _isZipMode;
+  String? get downloadedDir => _downloadedDir;
   double get progress => _progress;
   bool get indeterminate => _indeterminate;
   double get speedBytesPerSecond => _speedBytesPerSecond;
   bool get isDownloading => _stage == SoftwareUpdateDownloadStage.downloading;
+  bool get isSuccess => _stage == SoftwareUpdateDownloadStage.success;
   bool get hasFailure => _stage == SoftwareUpdateDownloadStage.failed;
 
   Future<bool> startDownload(SoftwareUpdateCheckResult check) {
@@ -91,10 +96,12 @@ class SoftwareUpdateDownloadService extends ChangeNotifier {
   }
 
   Future<bool> _startDownload(SoftwareUpdateCheckResult check) async {
-    final apkUrl = check.apkUrl?.trim();
-    if (!Platform.isAndroid || apkUrl == null || apkUrl.isEmpty) {
+    final downloadUrl = Platform.isWindows
+        ? check.windowsUrl?.trim()
+        : check.apkUrl?.trim();
+    if (downloadUrl == null || downloadUrl.isEmpty) {
       _setFailure(
-        apkUrl == null || apkUrl.isEmpty
+        Platform.isAndroid
             ? SoftwareUpdateDownloadFailureKind.apkUnavailable
             : SoftwareUpdateDownloadFailureKind.downloadFailed,
       );
@@ -104,6 +111,9 @@ class SoftwareUpdateDownloadService extends ChangeNotifier {
     _cancelToken?.cancel();
     _cancelToken = CancelToken();
     _targetVersion = check.latestVersion;
+    _isZipMode =
+        Platform.isWindows && downloadUrl.toLowerCase().endsWith('.zip');
+    _downloadedDir = null;
     _failureKind = SoftwareUpdateDownloadFailureKind.none;
     _failureDetail = null;
     _progress = 0;
@@ -115,16 +125,19 @@ class SoftwareUpdateDownloadService extends ChangeNotifier {
     try {
       final targetFile = await _prepareTargetFile(
         latestVersion: check.latestVersion,
-        apkUrl: apkUrl,
+        downloadUrl: downloadUrl,
       );
       _apkPath = targetFile.path;
+      if (_isZipMode) {
+        _downloadedDir = targetFile.parent.path;
+      }
 
       final stopwatch = Stopwatch()..start();
       var lastTickMillis = 0;
       var lastReceivedBytes = 0;
 
       await _dio.download(
-        apkUrl,
+        downloadUrl,
         targetFile.path,
         cancelToken: _cancelToken,
         deleteOnError: true,
@@ -156,18 +169,24 @@ class SoftwareUpdateDownloadService extends ChangeNotifier {
       _speedBytesPerSecond = 0;
       notifyListeners();
 
-      final launchedInstaller =
-          await _mediaChannel.invokeMethod<bool>('installApk', {
-            'path': file.path,
-          }) ??
-          false;
+      if (Platform.isAndroid) {
+        final launchedInstaller =
+            await _mediaChannel.invokeMethod<bool>('installApk', {
+              'path': file.path,
+            }) ??
+            false;
 
-      if (!launchedInstaller) {
-        _setFailure(SoftwareUpdateDownloadFailureKind.installerLaunchFailed);
-        return false;
+        if (!launchedInstaller) {
+          _setFailure(SoftwareUpdateDownloadFailureKind.installerLaunchFailed);
+          return false;
+        }
+      } else if (Platform.isWindows && !_isZipMode) {
+        Process.run('explorer.exe', [file.path]);
       }
 
-      _stage = SoftwareUpdateDownloadStage.idle;
+      _stage = _isZipMode
+          ? SoftwareUpdateDownloadStage.success
+          : SoftwareUpdateDownloadStage.idle;
       _failureKind = SoftwareUpdateDownloadFailureKind.none;
       _failureDetail = null;
       notifyListeners();
@@ -189,28 +208,44 @@ class SoftwareUpdateDownloadService extends ChangeNotifier {
 
   Future<File> _prepareTargetFile({
     required String latestVersion,
-    required String apkUrl,
+    required String downloadUrl,
   }) async {
-    final cacheDir = await getTemporaryDirectory();
-    final updatesDir = Directory('${cacheDir.path}/software_updates');
-    if (!await updatesDir.exists()) {
-      await updatesDir.create(recursive: true);
+    final Directory baseDir;
+    if (_isZipMode && Platform.isWindows) {
+      baseDir =
+          await getDownloadsDirectory() ??
+          await getApplicationDocumentsDirectory();
+    } else {
+      final cacheDir = await getTemporaryDirectory();
+      baseDir = Directory('${cacheDir.path}/software_updates');
     }
 
-    final uri = Uri.tryParse(apkUrl);
+    if (!await baseDir.exists()) {
+      await baseDir.create(recursive: true);
+    }
+
+    final uri = Uri.tryParse(downloadUrl);
     var fileName = uri?.pathSegments.isNotEmpty == true
         ? uri!.pathSegments.last
-        : 'hazuki-$latestVersion.apk';
+        : 'hazuki-$latestVersion${_isZipMode ? ".zip" : (Platform.isWindows ? ".msix" : ".apk")}';
     fileName = fileName.trim();
     if (fileName.isEmpty) {
-      fileName = 'hazuki-$latestVersion.apk';
-    }
-    fileName = fileName.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
-    if (!fileName.toLowerCase().endsWith('.apk')) {
-      fileName = '$fileName.apk';
+      fileName =
+          'hazuki-$latestVersion${_isZipMode ? ".zip" : (Platform.isWindows ? ".msix" : ".apk")}';
     }
 
-    final file = File('${updatesDir.path}/$fileName');
+    // Windows allows some chars, but let's be safe.
+    if (!Platform.isWindows) {
+      fileName = fileName.replaceAll(RegExp(r'[^A-Za-z0-9._-]'), '_');
+      if (!fileName.toLowerCase().endsWith('.apk')) {
+        fileName = '$fileName.apk';
+      }
+    } else {
+      // Basic sanitization
+      fileName = fileName.replaceAll(RegExp(r'[<>:"/\\|?*]'), '_');
+    }
+
+    final file = File('${baseDir.path}/$fileName');
     if (await file.exists()) {
       await file.delete();
     }

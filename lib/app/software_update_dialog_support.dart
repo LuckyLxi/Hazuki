@@ -177,29 +177,12 @@ class _SoftwareUpdateDialogCardState extends State<_SoftwareUpdateDialogCard> {
 
   bool _downloadTriggerBusy = false;
 
-  Future<void> _openReleasePage() async {
-    final opened = await _openExternalUrl(widget.check.releaseUrl);
-    if (!opened && mounted) {
-      unawaited(
-        showHazukiPrompt(
-          context,
-          l10n(context).aboutOpenLinkFailed,
-          isError: true,
-        ),
-      );
-    }
-  }
-
   Future<bool> _openExternalUrl(String url) {
     return launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
   }
 
-  Future<void> _openDirectDownloadUrl() async {
-    final url = widget.check.windowsUrl?.trim();
-    if (url == null || url.isEmpty) {
-      return;
-    }
-    final opened = await _openExternalUrl(url);
+  Future<void> _openReleasePage() async {
+    final opened = await _openExternalUrl(widget.check.releaseUrl);
     if (!opened && mounted) {
       unawaited(
         showHazukiPrompt(
@@ -217,25 +200,20 @@ class _SoftwareUpdateDialogCardState extends State<_SoftwareUpdateDialogCard> {
     }
     _downloadService.clearFailure();
     setState(() => _downloadTriggerBusy = true);
-    final launchedInstaller = await _downloadService.startDownload(
-      widget.check,
-    );
+    final success = await _downloadService.startDownload(widget.check);
     if (!mounted) {
       return;
     }
     setState(() => _downloadTriggerBusy = false);
-    if (launchedInstaller) {
+    if (success && !_downloadService.isZipMode) {
       Navigator.of(context).pop();
     }
   }
 
   Future<void> _handlePrimaryAction() async {
-    if (Platform.isAndroid) {
+    if (Platform.isAndroid || Platform.isWindows) {
       await _startDownload();
       return;
-    }
-    if (Platform.isWindows) {
-      await _openDirectDownloadUrl();
     }
   }
 
@@ -266,6 +244,8 @@ class _SoftwareUpdateDialogCardState extends State<_SoftwareUpdateDialogCard> {
         final colorScheme = theme.colorScheme;
         final textTheme = theme.textTheme;
         final isDownloading = _downloadService.isDownloading;
+        final isSuccess = _downloadService.isSuccess;
+
         final canDownload =
             (Platform.isAndroid
                 ? widget.check.apkUrl?.trim().isNotEmpty == true
@@ -276,7 +256,7 @@ class _SoftwareUpdateDialogCardState extends State<_SoftwareUpdateDialogCard> {
         final failureMessage = _buildFailureMessage(strings);
 
         return PopScope(
-          canPop: !isDownloading,
+          canPop: !isDownloading && !isSuccess,
           child: SafeArea(
             minimum: const EdgeInsets.all(16),
             child: Center(
@@ -290,12 +270,13 @@ class _SoftwareUpdateDialogCardState extends State<_SoftwareUpdateDialogCard> {
                   duration: const Duration(milliseconds: 280),
                   curve: Curves.easeInOutCubic,
                   width: math.min(
-                    isDownloading ? 332.0 : 388.0,
+                    isDownloading || isSuccess ? 332.0 : 388.0,
                     mediaQuery.size.width - 32,
                   ),
-                  padding: isDownloading
+                  padding: isDownloading || isSuccess
                       ? const EdgeInsets.fromLTRB(18, 18, 18, 12)
                       : const EdgeInsets.fromLTRB(20, 20, 20, 18),
+
                   child: AnimatedSize(
                     duration: const Duration(milliseconds: 280),
                     curve: Curves.easeInOutCubic,
@@ -313,7 +294,13 @@ class _SoftwareUpdateDialogCardState extends State<_SoftwareUpdateDialogCard> {
                           ),
                         );
                       },
-                      child: isDownloading
+                      child: isSuccess
+                          ? _buildSuccessContent(
+                              strings: strings,
+                              textTheme: textTheme,
+                              colorScheme: colorScheme,
+                            )
+                          : isDownloading
                           ? _buildDownloadingContent(
                               strings: strings,
                               textTheme: textTheme,
@@ -481,6 +468,45 @@ class _SoftwareUpdateDialogCardState extends State<_SoftwareUpdateDialogCard> {
               ),
             ),
           ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSuccessContent({
+    required AppLocalizations strings,
+    required TextTheme textTheme,
+    required ColorScheme colorScheme,
+  }) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      key: const ValueKey('success'),
+      children: [
+        const SizedBox(height: 12),
+        Icon(Icons.check_circle_rounded, size: 48, color: colorScheme.primary),
+        const SizedBox(height: 16),
+        Text(
+          strings.softwareUpdateDownloadSuccessZipMessage,
+          textAlign: TextAlign.center,
+          style: textTheme.bodyMedium,
+        ),
+        const SizedBox(height: 24),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              final dir = _downloadService.downloadedDir;
+              if (dir != null) {
+                Process.run('explorer.exe', [dir]);
+              }
+            },
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+            ),
+            child: Text(strings.softwareUpdateOpenFolder),
+          ),
         ),
       ],
     );

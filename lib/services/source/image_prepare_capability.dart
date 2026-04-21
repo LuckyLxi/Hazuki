@@ -17,7 +17,16 @@ class PreparedChapterImageData {
 extension HazukiSourceServiceImagePrepareCapability on HazukiSourceService {
   bool isLocalImagePath(String value) {
     final normalized = value.trim();
-    return normalized.startsWith('/') || normalized.startsWith('file://');
+    if (normalized.startsWith('/') || normalized.startsWith('file://')) {
+      return true;
+    }
+    // Windows absolute paths: C:\... or C:/...
+    if (normalized.length >= 3 &&
+        normalized[1] == ':' &&
+        (normalized[2] == '\\' || normalized[2] == '/')) {
+      return true;
+    }
+    return false;
   }
 
   String normalizeLocalImagePath(String value) {
