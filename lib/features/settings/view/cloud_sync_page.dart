@@ -399,6 +399,11 @@ class _CloudSyncPageState extends State<CloudSyncPage> {
                         );
                       }
                     });
+                    unawaited(
+                      CloudSyncService.instance.saveConfig(
+                        _buildConfig().copyWith(enabled: value),
+                      ),
+                    );
                   },
                 ),
                 AnimatedSize(

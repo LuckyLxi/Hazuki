@@ -8,6 +8,9 @@ import 'package:hazuki/services/discover_daily_recommendation_service.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
+import '../support/discover_daily_recommendation_carousel_support.dart';
+import 'discover_daily_recommendation_carousel_widgets.dart';
+
 class DiscoverDailyRecommendationCarousel extends StatefulWidget {
   const DiscoverDailyRecommendationCarousel({
     super.key,
@@ -36,7 +39,7 @@ class _DiscoverDailyRecommendationCarouselState
   static const _heroCardMaxWidth = 300.0;
   static const _heroCardHeight = 213.0;
   static const _itemSpacing = 8.0;
-  static const Curve _autoPlayCurve = _AnimekoEmphasizedCurve();
+  static const Curve _autoPlayCurve = DiscoverCarouselAutoPlayCurve();
 
   late PageController _pageController;
   Timer? _autoPlayTimer;
@@ -70,35 +73,23 @@ class _DiscoverDailyRecommendationCarouselState
 
   bool get _isLooping => _recommendationCount > 1;
 
-  int get _loopedItemCount =>
-      _isLooping ? _recommendationCount + 5 : _recommendationCount;
+  DiscoverCarouselLoopMetrics get _loopMetrics =>
+      DiscoverCarouselLoopMetrics(recommendationCount: _recommendationCount);
 
-  int get _initialPhysicalPage => _isLooping ? 2 : 0;
+  int get _loopedItemCount => _loopMetrics.loopedItemCount;
+
+  int get _initialPhysicalPage => _loopMetrics.initialPhysicalPage;
 
   int _physicalPageForLogical(int logicalPage) {
-    if (!_isLooping) {
-      return logicalPage;
-    }
-    return logicalPage + 2;
+    return _loopMetrics.physicalPageForLogical(logicalPage);
   }
 
   int _logicalPageForPhysical(int physicalPage) {
-    if (_recommendationCount == 0) {
-      return 0;
-    }
-    if (!_isLooping) {
-      return physicalPage.clamp(0, _recommendationCount - 1);
-    }
-    final normalized = (physicalPage - 2) % _recommendationCount;
-    return normalized < 0 ? normalized + _recommendationCount : normalized;
+    return _loopMetrics.logicalPageForPhysical(physicalPage);
   }
 
   int _normalizeLogicalPage(int logicalPage) {
-    if (_recommendationCount == 0) {
-      return 0;
-    }
-    final normalized = logicalPage % _recommendationCount;
-    return normalized < 0 ? normalized + _recommendationCount : normalized;
+    return _loopMetrics.normalizeLogicalPage(logicalPage);
   }
 
   @override
@@ -318,12 +309,7 @@ class _DiscoverDailyRecommendationCarouselState
   }
 
   String _snapshotKey(List<DiscoverDailyRecommendationEntry> recommendations) {
-    return recommendations
-        .map(
-          (entry) =>
-              '${entry.author}|${entry.comic.id}|${entry.comic.title}|${entry.comic.cover}',
-        )
-        .join('||');
+    return discoverDailyRecommendationSnapshotKey(recommendations);
   }
 
   void _logCarouselEvent(
@@ -702,17 +688,7 @@ class _DiscoverDailyRecommendationCarouselState
   }
 
   List<int> _coverWarmUpOrder(int anchorLogicalPage) {
-    if (_recommendationCount == 0) {
-      return const <int>[];
-    }
-    final order = <int>[];
-    for (var offset = 0; offset < _recommendationCount; offset++) {
-      order.add(_normalizeLogicalPage(anchorLogicalPage + offset));
-      if (offset > 0) {
-        order.add(_normalizeLogicalPage(anchorLogicalPage - offset));
-      }
-    }
-    return order.toSet().toList(growable: false);
+    return _loopMetrics.coverWarmUpOrder(anchorLogicalPage);
   }
 
   void _warmUpRecommendationCovers(int anchorLogicalPage) {
@@ -759,113 +735,17 @@ class _DiscoverDailyRecommendationCarouselState
     return _displayedRecommendations[normalizedIndex];
   }
 
-  _CarouselCardLayoutMetrics _buildCardLayoutMetrics({
+  DiscoverCarouselCardLayoutMetrics _buildCardLayoutMetrics({
     required double delta,
     required double heroCardWidth,
     required double pageExtent,
   }) {
-    const narrowRatio = 0.29;
-    const incomingExpansionHold = 0.72;
-    const parallaxRatio = 0.035;
-    const trailingSmallRevealDelay = 0.42;
-
-    double clipScaleX;
-    double imageTranslateX;
-    double cardScale;
-    double cardOpacity;
-    double outerTranslateX;
-    final slotLeft = delta * pageExtent;
-    final narrowWidth = heroCardWidth * narrowRatio;
-
-    if (delta >= -1 && delta <= 0) {
-      final progress = (-delta).clamp(0.0, 1.0);
-      clipScaleX = _lerp(1.0, 0.0, progress);
-      imageTranslateX = heroCardWidth * parallaxRatio * progress;
-      cardScale = 1.0;
-      cardOpacity = clipScaleX <= 0.001 ? 0.0 : 1.0;
-      outerTranslateX = -slotLeft;
-    } else if (delta > 0 && delta <= 1) {
-      final progress = (1 - delta).clamp(0.0, 1.0);
-      final lockedRightLeft = _itemSpacing + narrowWidth;
-      double desiredLeft;
-
-      if (progress < incomingExpansionHold) {
-        final phase = progress / incomingExpansionHold;
-        clipScaleX = _lerp(narrowRatio, 1.0, phase);
-        desiredLeft = _lerp(
-          heroCardWidth + _itemSpacing,
-          lockedRightLeft,
-          phase,
-        );
-      } else {
-        final phase =
-            (progress - incomingExpansionHold) / (1.0 - incomingExpansionHold);
-        clipScaleX = 1.0;
-        desiredLeft = _lerp(lockedRightLeft, 0.0, phase);
-      }
-
-      imageTranslateX = heroCardWidth * parallaxRatio * (1.0 - progress);
-      cardScale = 1.0;
-      cardOpacity = clipScaleX <= 0.001 ? 0.0 : 1.0;
-      outerTranslateX = desiredLeft - slotLeft;
-    } else if (delta > 1 && delta <= 2) {
-      final progress = (2 - delta).clamp(0.0, 1.0);
-
-      final lockedRightLeft = _itemSpacing + narrowWidth;
-      double index1DesiredLeft;
-      double index1ClipScaleX;
-
-      if (progress < incomingExpansionHold) {
-        final phase = progress / incomingExpansionHold;
-        index1ClipScaleX = _lerp(narrowRatio, 1.0, phase);
-        index1DesiredLeft = _lerp(
-          heroCardWidth + _itemSpacing,
-          lockedRightLeft,
-          phase,
-        );
-      } else {
-        final phase =
-            (progress - incomingExpansionHold) / (1.0 - incomingExpansionHold);
-        index1ClipScaleX = 1.0;
-        index1DesiredLeft = _lerp(lockedRightLeft, 0.0, phase);
-      }
-
-      final index1ClippedWidth = (heroCardWidth * index1ClipScaleX).clamp(
-        0.0,
-        heroCardWidth,
-      );
-      final index1RightEdge = index1DesiredLeft + index1ClippedWidth;
-
-      final revealProgress =
-          ((progress - trailingSmallRevealDelay) /
-                  (1.0 - trailingSmallRevealDelay))
-              .clamp(0.0, 1.0);
-      clipScaleX = _lerp(0.0, narrowRatio, revealProgress);
-      imageTranslateX = heroCardWidth * parallaxRatio * delta;
-      cardScale = 1.0;
-      cardOpacity = clipScaleX <= 0.001 ? 0.0 : 1.0;
-
-      final currentX = index1RightEdge + _itemSpacing;
-      outerTranslateX = currentX - slotLeft;
-    } else {
-      clipScaleX = 0.0;
-      imageTranslateX = 0.0;
-      cardScale = 1.0;
-      cardOpacity = 0.0;
-      outerTranslateX = 0.0;
-    }
-
-    return _CarouselCardLayoutMetrics(
-      clipScaleX: clipScaleX,
-      imageTranslateX: imageTranslateX,
-      cardScale: cardScale,
-      cardOpacity: cardOpacity,
-      outerTranslateX: outerTranslateX,
+    return buildDiscoverCarouselCardLayoutMetrics(
+      delta: delta,
+      heroCardWidth: heroCardWidth,
+      pageExtent: pageExtent,
+      itemSpacing: _itemSpacing,
     );
-  }
-
-  double _lerp(double begin, double end, double t) {
-    return begin + (end - begin) * t;
   }
 
   String get _autoPlaySkipReason {
@@ -885,30 +765,11 @@ class _DiscoverDailyRecommendationCarouselState
   }
 
   double _roundTo(num value, int fractionDigits) {
-    return double.parse(value.toStringAsFixed(fractionDigits));
+    return roundDiscoverCarouselValue(value, fractionDigits);
   }
 
   String _shortUrl(String url) {
-    final normalized = url.trim();
-    if (normalized.isEmpty) {
-      return '';
-    }
-    final uri = Uri.tryParse(normalized);
-    if (uri == null) {
-      return normalized.length <= 120
-          ? normalized
-          : '${normalized.substring(0, 117)}...';
-    }
-    final host = uri.host;
-    final path = uri.pathSegments.isEmpty
-        ? uri.path
-        : uri.pathSegments
-              .skip(
-                uri.pathSegments.length > 2 ? uri.pathSegments.length - 2 : 0,
-              )
-              .join('/');
-    final compact = host.isEmpty ? normalized : '$host/$path';
-    return compact.length <= 120 ? compact : '${compact.substring(0, 117)}...';
+    return shortenDiscoverCarouselUrl(url);
   }
 
   String _describeCardPhase(
@@ -916,28 +777,7 @@ class _DiscoverDailyRecommendationCarouselState
     double clipScaleX,
     double cardOpacity,
   ) {
-    if (cardOpacity <= 0.001 || clipScaleX <= 0.001) {
-      return 'hidden';
-    }
-    if (delta >= -0.12 && delta <= 0.12) {
-      return 'active';
-    }
-    if (delta > 0 && clipScaleX <= 0.36) {
-      return 'incoming_thumbnail';
-    }
-    if (delta > 0 && clipScaleX < 0.98) {
-      return 'incoming_expand';
-    }
-    if (delta > 0 && clipScaleX >= 0.98) {
-      return 'incoming_full';
-    }
-    if (delta >= -1.0 && delta < 0) {
-      return 'outgoing';
-    }
-    if (delta > 1.0) {
-      return 'trailing_thumbnail';
-    }
-    return 'transitioning';
+    return describeDiscoverCarouselCardPhase(delta, clipScaleX, cardOpacity);
   }
 
   void _reportCardLayout({
@@ -1209,7 +1049,7 @@ class _DiscoverDailyRecommendationCarouselState
                     controller: _pageController,
                     clipBehavior: Clip.none,
                     padEnds: false,
-                    physics: const _AnimekoCarouselPagePhysics(),
+                    physics: const DiscoverCarouselPagePhysics(),
                     itemCount: _loopedItemCount,
                     onPageChanged: _handlePageChanged,
                     itemBuilder: (context, index) {
@@ -1288,77 +1128,21 @@ class _DiscoverDailyRecommendationCarouselState
                             );
                           }
 
-                          return Transform.translate(
-                            offset: Offset(metrics.outerTranslateX, 0),
-                            child: Align(
-                              alignment: Alignment.centerLeft,
-                              child: Opacity(
-                                opacity: metrics.cardOpacity.clamp(0.0, 1.0),
-                                child: Transform.scale(
-                                  scale: metrics.cardScale,
-                                  alignment: Alignment.centerLeft,
-                                  child: SizedBox(
-                                    key: ValueKey(
-                                      'discover_daily_recommendation_card_$index',
-                                    ),
-                                    width: clippedWidth,
-                                    height: _heroCardHeight,
-                                    child: Material(
-                                      color: Colors.transparent,
-                                      child: InkWell(
-                                        borderRadius: BorderRadius.circular(28),
-                                        onTap: () => unawaited(
-                                          _openRecommendation(
-                                            context,
-                                            entry,
-                                            heroTag,
-                                          ),
-                                        ),
-                                        child: ClipRRect(
-                                          borderRadius: BorderRadius.circular(
-                                            28,
-                                          ),
-                                          child: Stack(
-                                            fit: StackFit.expand,
-                                            children: [
-                                              Hero(
-                                                tag: heroTag,
-                                                flightShuttleBuilder:
-                                                    buildComicCoverHeroFlightShuttle,
-                                                placeholderBuilder:
-                                                    buildComicCoverHeroPlaceholder,
-                                                child: OverflowBox(
-                                                  alignment: Alignment.center,
-                                                  minWidth: heroCardWidth,
-                                                  maxWidth: heroCardWidth,
-                                                  child: Transform.translate(
-                                                    offset: Offset(
-                                                      metrics.imageTranslateX,
-                                                      0,
-                                                    ),
-                                                    child: SizedBox(
-                                                      width: heroCardWidth,
-                                                      height: _heroCardHeight,
-                                                      child: imageChild,
-                                                    ),
-                                                  ),
-                                                ),
-                                              ),
-                                              _CarouselCardOverlay(
-                                                entry: entry,
-                                                isHidden:
-                                                    _activeOverlayHeroTag ==
-                                                    heroTag,
-                                                heroTag: heroTag,
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
+                          return DiscoverDailyRecommendationCarouselCard(
+                            physicalIndex: index,
+                            entry: entry,
+                            heroTag: heroTag,
+                            heroCardWidth: heroCardWidth,
+                            heroCardHeight: _heroCardHeight,
+                            clippedWidth: clippedWidth,
+                            outerTranslateX: metrics.outerTranslateX,
+                            imageTranslateX: metrics.imageTranslateX,
+                            cardScale: metrics.cardScale,
+                            cardOpacity: metrics.cardOpacity,
+                            hideOverlay: _activeOverlayHeroTag == heroTag,
+                            imageChild: imageChild,
+                            onTap: () => unawaited(
+                              _openRecommendation(context, entry, heroTag),
                             ),
                           );
                         },
@@ -1371,186 +1155,11 @@ class _DiscoverDailyRecommendationCarouselState
           ),
         ),
         const SizedBox(height: 12),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            for (int index = 0; index < _recommendationCount; index++)
-              AnimatedContainer(
-                key: ValueKey('discover_daily_recommendation_indicator_$index'),
-                duration: const Duration(milliseconds: 220),
-                curve: Curves.easeOutCubic,
-                width: index == _currentPage ? 22 : 8,
-                height: 8,
-                margin: const EdgeInsets.symmetric(horizontal: 3),
-                decoration: BoxDecoration(
-                  color: index == _currentPage
-                      ? theme.colorScheme.primary
-                      : theme.colorScheme.outlineVariant,
-                  borderRadius: BorderRadius.circular(999),
-                ),
-              ),
-          ],
+        DiscoverDailyRecommendationIndicators(
+          count: _recommendationCount,
+          currentIndex: _currentPage,
         ),
       ],
     );
-  }
-}
-
-class _AnimekoCarouselPagePhysics extends PageScrollPhysics {
-  const _AnimekoCarouselPagePhysics({super.parent});
-
-  static const SpringDescription _mediumSnapSpring = SpringDescription(
-    mass: 1.0,
-    stiffness: 1500,
-    damping: 77.46,
-  );
-
-  @override
-  _AnimekoCarouselPagePhysics applyTo(ScrollPhysics? ancestor) {
-    return _AnimekoCarouselPagePhysics(parent: buildParent(ancestor));
-  }
-
-  @override
-  SpringDescription get spring => _mediumSnapSpring;
-}
-
-class _AnimekoEmphasizedCurve extends Curve {
-  const _AnimekoEmphasizedCurve();
-
-  static const Curve _segment1 = Cubic(0.3, 0.0, 0.8, 0.15);
-  static const Curve _segment2 = Cubic(0.05, 0.7, 0.1, 1.0);
-  static const double _split = 0.166666;
-
-  @override
-  double transformInternal(double t) {
-    if (t <= 0.0) {
-      return 0.0;
-    }
-    if (t >= 1.0) {
-      return 1.0;
-    }
-    if (t < _split) {
-      final localT = t / _split;
-      return _segment1.transform(localT) * 0.4;
-    }
-    final localT = (t - _split) / (1.0 - _split);
-    return 0.4 + (_segment2.transform(localT) * 0.6);
-  }
-}
-
-class _CarouselCardOverlay extends StatefulWidget {
-  const _CarouselCardOverlay({
-    required this.entry,
-    required this.isHidden,
-    required this.heroTag,
-  });
-
-  final DiscoverDailyRecommendationEntry entry;
-  final bool isHidden;
-  final String heroTag;
-
-  @override
-  State<_CarouselCardOverlay> createState() => _CarouselCardOverlayState();
-}
-
-class _CarouselCardOverlayState extends State<_CarouselCardOverlay> {
-  static const Duration _overlayRevealDuration = Duration(milliseconds: 280);
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isVisible = !widget.isHidden;
-    final revealDuration = isVisible ? _overlayRevealDuration : Duration.zero;
-    return AnimatedOpacity(
-      key: ValueKey('discover_daily_recommendation_overlay_${widget.heroTag}'),
-      opacity: isVisible ? 1.0 : 0.0,
-      duration: revealDuration,
-      curve: Curves.easeOutCubic,
-      child: AnimatedSlide(
-        offset: isVisible ? Offset.zero : const Offset(0, 0.05),
-        duration: revealDuration,
-        curve: Curves.easeOutCubic,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black.withValues(alpha: 0.06),
-                    Colors.black.withValues(alpha: 0.61),
-                  ],
-                ),
-              ),
-            ),
-            Positioned(
-              left: 16,
-              right: 16,
-              bottom: 16,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.entry.author,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      color: Colors.white.withValues(alpha: 0.92),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    widget.entry.comic.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _CarouselCardLayoutMetrics {
-  const _CarouselCardLayoutMetrics({
-    required this.clipScaleX,
-    required this.imageTranslateX,
-    required this.cardScale,
-    required this.cardOpacity,
-    required this.outerTranslateX,
-  });
-
-  final double clipScaleX;
-  final double imageTranslateX;
-  final double cardScale;
-  final double cardOpacity;
-  final double outerTranslateX;
-
-  double clippedWidth(double heroCardWidth) {
-    return (heroCardWidth * clipScaleX).clamp(0.0, heroCardWidth);
-  }
-
-  double visibleWidth({
-    required double heroCardWidth,
-    required double viewportWidth,
-  }) {
-    final width = clippedWidth(heroCardWidth);
-    if (width <= 0 || cardOpacity <= 0.001) {
-      return 0;
-    }
-    final left = outerTranslateX;
-    final right = left + width;
-    final visibleLeft = math.max(0.0, left);
-    final visibleRight = math.min(viewportWidth, right);
-    return math.max(0.0, visibleRight - visibleLeft);
   }
 }
