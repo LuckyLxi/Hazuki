@@ -80,6 +80,7 @@ class CloudSyncService {
   static const _urlKey = 'cloud_sync_url';
   static const _usernameKey = 'cloud_sync_username';
   static const _passwordKey = 'cloud_sync_password';
+  static const _lastSyncedRemoteTsKey = 'cloud_sync_last_synced_remote_ts';
   static const _downloadStateKey = 'manga_download_service_state_v2';
   static const _downloadsRootPathKey = 'manga_download_root_path_v1';
 
@@ -131,7 +132,35 @@ class CloudSyncService {
       if (!config.enabled || !config.isComplete) {
         return;
       }
+
+      final dio = _buildDio(config);
+      final rootUrl = _rootUrl(config.url);
+      final backupDirUrl = '$rootUrl/backup';
+      final prefs = await SharedPreferences.getInstance();
+
+      final remoteManifestText = await _tryGetString(
+        dio,
+        '$backupDirUrl/$_manifestFileName',
+      );
+
+      if (remoteManifestText != null) {
+        int remoteUpdatedAtMs = 0;
+        try {
+          final decoded = jsonDecode(remoteManifestText);
+          if (decoded is Map) {
+            remoteUpdatedAtMs = (decoded['updatedAtMs'] as num?)?.toInt() ?? 0;
+          }
+        } catch (_) {}
+
+        final lastSyncedRemoteTs = prefs.getInt(_lastSyncedRemoteTsKey) ?? 0;
+        if (remoteUpdatedAtMs > lastSyncedRemoteTs) {
+          await _mergeRemoteIntoLocal(dio, backupDirUrl);
+        }
+      }
+
+      final nowMs = DateTime.now().millisecondsSinceEpoch;
       await uploadBackup(configOverride: config);
+      await prefs.setInt(_lastSyncedRemoteTsKey, nowMs);
     } catch (_) {
       // Background best-effort sync should never interrupt app startup.
     } finally {
@@ -414,6 +443,289 @@ class CloudSyncService {
       return legacy;
     }
     throw Exception('cloud_sync_reading_missing');
+  }
+
+  Future<void> _mergeRemoteIntoLocal(Dio dio, String backupDirUrl) async {
+    final prefs = await SharedPreferences.getInstance();
+
+    final readingText = await _tryGetString(
+      dio,
+      '$backupDirUrl/$_readingFileName',
+    );
+    if (readingText != null) {
+      Map<String, dynamic>? readingMap;
+      try {
+        final decoded = jsonDecode(readingText);
+        if (decoded is Map) {
+          readingMap = Map<String, dynamic>.from(decoded);
+        }
+      } catch (_) {}
+
+      if (readingMap != null) {
+        // 合并阅读历史
+        final remoteHistoryRaw = readingMap['history'];
+        List<Map<String, dynamic>> remoteHistory = const [];
+        if (remoteHistoryRaw is List) {
+          remoteHistory = remoteHistoryRaw
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList();
+        }
+
+        List<Map<String, dynamic>> localHistory = const [];
+        final localHistoryRaw = prefs.getString('hazuki_read_history');
+        if (localHistoryRaw != null) {
+          try {
+            final decoded = jsonDecode(localHistoryRaw);
+            if (decoded is List) {
+              localHistory = decoded
+                  .whereType<Map>()
+                  .map((e) => Map<String, dynamic>.from(e))
+                  .toList();
+            }
+          } catch (_) {}
+        }
+
+        final mergedHistory = <String, Map<String, dynamic>>{};
+        for (final entry in [...localHistory, ...remoteHistory]) {
+          final comicId = (entry['comicId'] ?? '').toString().trim();
+          if (comicId.isEmpty) continue;
+          final ts = (entry['timestamp'] as num?)?.toInt() ?? 0;
+          final existing = mergedHistory[comicId];
+          final existingTs = (existing?['timestamp'] as num?)?.toInt() ?? 0;
+          if (existing == null || ts > existingTs) {
+            mergedHistory[comicId] = entry;
+          }
+        }
+        var historyList = mergedHistory.values.toList()
+          ..sort(
+            (a, b) => ((b['timestamp'] as num?)?.toInt() ?? 0).compareTo(
+              (a['timestamp'] as num?)?.toInt() ?? 0,
+            ),
+          );
+        if (historyList.length > 150) {
+          historyList = historyList.sublist(0, 150);
+        }
+        await prefs.setString('hazuki_read_history', jsonEncode(historyList));
+
+        // 合并阅读进度
+        final remoteProgressRaw = readingMap['progress'];
+        final remoteProgress = <String, Map<String, dynamic>>{};
+        if (remoteProgressRaw is List) {
+          for (final item in remoteProgressRaw) {
+            if (item is! Map) continue;
+            final entry = Map<String, dynamic>.from(item);
+            final comicId = (entry['comicId'] ?? '').toString().trim();
+            if (comicId.isEmpty) continue;
+            remoteProgress[comicId] = entry;
+          }
+        }
+
+        final localProgress = <String, Map<String, dynamic>>{};
+        for (final key in prefs.getKeys()) {
+          if (!key.startsWith('reading_progress_')) continue;
+          final comicId = key.substring('reading_progress_'.length);
+          final raw = prefs.getString(key);
+          if (raw == null) continue;
+          try {
+            final decoded = jsonDecode(raw);
+            if (decoded is Map) {
+              localProgress[comicId] = Map<String, dynamic>.from(decoded);
+            }
+          } catch (_) {}
+        }
+
+        final allComicIds = {...localProgress.keys, ...remoteProgress.keys};
+        for (final comicId in allComicIds) {
+          final local = localProgress[comicId];
+          final remote = remoteProgress[comicId];
+          final Map<String, dynamic> winner;
+          if (local == null) {
+            winner = remote!;
+          } else if (remote == null) {
+            continue; // 本地独有，不动
+          } else {
+            final localTs = (local['timestamp'] as num?)?.toInt() ?? 0;
+            final remoteTs = (remote['timestamp'] as num?)?.toInt() ?? 0;
+            if (remoteTs > localTs) {
+              winner = remote;
+            } else {
+              continue;
+            }
+          }
+          await prefs.setString(
+            'reading_progress_$comicId',
+            jsonEncode({
+              'epId': winner['epId'],
+              'title': winner['title'],
+              'index': winner['index'],
+              'timestamp': winner['timestamp'],
+            }),
+          );
+        }
+      }
+    }
+
+    // 合并搜索历史
+    final searchText = await _tryGetString(
+      dio,
+      '$backupDirUrl/$_searchHistoryFileName',
+    );
+    if (searchText != null) {
+      final remoteKeywords = <String>[];
+      for (final raw in searchText.split('\n')) {
+        final line = raw.trim();
+        if (line.isEmpty) continue;
+        try {
+          final decoded = jsonDecode(line);
+          if (decoded is Map) {
+            final keyword = (decoded['keyword'] ?? '').toString().trim();
+            if (keyword.isNotEmpty) remoteKeywords.add(keyword);
+          }
+        } catch (_) {}
+      }
+
+      final localKeywords = prefs.getStringList('search_history') ?? [];
+      final merged = <String>[];
+      final seen = <String>{};
+      for (final k in [...remoteKeywords, ...localKeywords]) {
+        if (seen.add(k)) merged.add(k);
+      }
+      await prefs.setStringList('search_history', merged);
+    }
+
+    // 合并本地收藏
+    final settingsText = await _tryGetString(
+      dio,
+      '$backupDirUrl/$_settingsFileName',
+    );
+    if (settingsText != null) {
+      try {
+        final settingsDecoded = jsonDecode(settingsText);
+        if (settingsDecoded is Map) {
+          final data = settingsDecoded['data'];
+          if (data is Map) {
+            await _mergeLocalFavorites(prefs, data);
+          }
+        }
+      } catch (_) {}
+    }
+  }
+
+  Future<void> _mergeLocalFavorites(
+    SharedPreferences prefs,
+    Map<dynamic, dynamic> remoteData,
+  ) async {
+    // 合并收藏夹：按 id 去重，同 id 保留本地名称，远端独有夹子追加
+    List<Map<String, dynamic>> localFolders = const [];
+    final localFoldersRaw = prefs.getString('local_favorite_folders_v1');
+    if (localFoldersRaw != null) {
+      try {
+        final decoded = jsonDecode(localFoldersRaw);
+        if (decoded is List) {
+          localFolders = decoded
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList();
+        }
+      } catch (_) {}
+    }
+
+    List<Map<String, dynamic>> remoteFolders = const [];
+    final remoteFoldersRaw = remoteData['local_favorite_folders_v1'];
+    if (remoteFoldersRaw is String && remoteFoldersRaw.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(remoteFoldersRaw);
+        if (decoded is List) {
+          remoteFolders = decoded
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList();
+        }
+      } catch (_) {}
+    }
+
+    final localFolderIds = {
+      for (final f in localFolders) f['id'].toString(): f,
+    };
+    final mergedFolders = List<Map<String, dynamic>>.from(localFolders);
+    for (final folder in remoteFolders) {
+      final id = folder['id']?.toString() ?? '';
+      if (id.isEmpty) continue;
+      if (!localFolderIds.containsKey(id)) {
+        mergedFolders.add(folder);
+      }
+      // 同 id 保留本地版本（夹名可能被用户改过）
+    }
+
+    // 合并收藏条目：按 comicId 去重，保留 savedAtMs 较大的，folderIds 取并集
+    List<Map<String, dynamic>> localEntries = const [];
+    final localEntriesRaw = prefs.getString('local_favorite_entries_v1');
+    if (localEntriesRaw != null) {
+      try {
+        final decoded = jsonDecode(localEntriesRaw);
+        if (decoded is List) {
+          localEntries = decoded
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList();
+        }
+      } catch (_) {}
+    }
+
+    List<Map<String, dynamic>> remoteEntries = const [];
+    final remoteEntriesRaw = remoteData['local_favorite_entries_v1'];
+    if (remoteEntriesRaw is String && remoteEntriesRaw.isNotEmpty) {
+      try {
+        final decoded = jsonDecode(remoteEntriesRaw);
+        if (decoded is List) {
+          remoteEntries = decoded
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList();
+        }
+      } catch (_) {}
+    }
+
+    final mergedEntries = <String, Map<String, dynamic>>{};
+    for (final entry in localEntries) {
+      final comicId = (entry['comicId'] ?? '').toString().trim();
+      if (comicId.isEmpty) continue;
+      mergedEntries[comicId] = entry;
+    }
+    for (final entry in remoteEntries) {
+      final comicId = (entry['comicId'] ?? '').toString().trim();
+      if (comicId.isEmpty) continue;
+      final existing = mergedEntries[comicId];
+      if (existing == null) {
+        mergedEntries[comicId] = entry;
+      } else {
+        final localTs = (existing['savedAtMs'] as num?)?.toInt() ?? 0;
+        final remoteTs = (entry['savedAtMs'] as num?)?.toInt() ?? 0;
+        final winner = remoteTs > localTs ? entry : existing;
+        // folderIds 取并集
+        final localIds = _toStringSet(existing['folderIds']);
+        final remoteIds = _toStringSet(entry['folderIds']);
+        final mergedIds = {...localIds, ...remoteIds}.toList();
+        mergedEntries[comicId] = {...winner, 'folderIds': mergedIds};
+      }
+    }
+
+    await prefs.setString(
+      'local_favorite_folders_v1',
+      jsonEncode(mergedFolders),
+    );
+    await prefs.setString(
+      'local_favorite_entries_v1',
+      jsonEncode(mergedEntries.values.toList()),
+    );
+  }
+
+  Set<String> _toStringSet(dynamic value) {
+    if (value is List) {
+      return value.map((e) => e.toString()).toSet();
+    }
+    return const {};
   }
 
   Future<_LocalSnapshot> _buildLocalSnapshotFiles() async {
