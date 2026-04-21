@@ -120,10 +120,10 @@ jobs:
       - name: Create Windows package
         shell: pwsh
         run: |
-          $packageName = "hazuki-windows-x64-${{ github.ref_name }}.zip"
-          Compress-Archive -Path "build/windows/x64/runner/Release/*" -DestinationPath $packageName -Force
           $msixName = "hazuki-windows-x64-${{ github.ref_name }}.msix"
           Move-Item -Path "build/windows/x64/runner/Release/hazuki.msix" -Destination $msixName
+          $packageName = "hazuki-windows-x64-${{ github.ref_name }}.zip"
+          Compress-Archive -Path "build/windows/x64/runner/Release/*" -DestinationPath $packageName -Force
           "WINDOWS_PACKAGE=$packageName" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "WINDOWS_MSIX=$msixName" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
