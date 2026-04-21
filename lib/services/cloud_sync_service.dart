@@ -158,11 +158,13 @@ class CloudSyncService {
         }
       }
 
+      // 统一时间戳：uploadBackup 使用同一个 nowMs 写入 manifest.updatedAtMs，
+      // 保证 lastSyncedRemoteTs 与云端记录完全一致，避免下次启动重复触发合并。
       final nowMs = DateTime.now().millisecondsSinceEpoch;
-      await uploadBackup(configOverride: config);
+      await uploadBackup(configOverride: config, uploadAtMs: nowMs);
       await prefs.setInt(_lastSyncedRemoteTsKey, nowMs);
     } catch (_) {
-      // Background best-effort sync should never interrupt app startup.
+      // 后台 best-effort 同步不应中断应用启动。
     } finally {
       _autoSyncRunning = false;
     }
@@ -204,7 +206,12 @@ class CloudSyncService {
     }
   }
 
-  Future<void> uploadBackup({CloudSyncConfig? configOverride}) async {
+  Future<void> uploadBackup({
+    CloudSyncConfig? configOverride,
+    // 允许调用方传入统一时间戳，确保 manifest.updatedAtMs 与外部记录的
+    // lastSyncedRemoteTs 完全一致，消除时间戳竞争条件。
+    int? uploadAtMs,
+  }) async {
     final config = configOverride ?? await loadConfig();
     if (!config.isComplete) {
       throw Exception('cloud_sync_config_incomplete');
@@ -240,7 +247,8 @@ class CloudSyncService {
       );
     }
 
-    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    // 优先使用调用方传入的时间戳，若未传则自己取当前时间。
+    final nowMs = uploadAtMs ?? DateTime.now().millisecondsSinceEpoch;
     final manifest = {
       'version': 2,
       'updatedAtMs': nowMs,
@@ -448,10 +456,34 @@ class CloudSyncService {
   Future<void> _mergeRemoteIntoLocal(Dio dio, String backupDirUrl) async {
     final prefs = await SharedPreferences.getInstance();
 
+    // 自动合并只做增量数据合并（历史、进度、搜索、收藏），
+    // 不覆盖外观/阅读器等用户偏好设置——那些设置是设备级的，
+    // 应由用户手动恢复，而不是每次启动都被远端静默覆盖。
+    final localHistorySnapshot = prefs.getString('hazuki_read_history');
+    final localProgressSnapshot = <String, String>{};
+    for (final key in prefs.getKeys()) {
+      if (!key.startsWith('reading_progress_')) continue;
+      final raw = prefs.getString(key);
+      if (raw != null) localProgressSnapshot[key] = raw;
+    }
+    final localSearchSnapshot = prefs.getStringList('search_history');
+    final localFoldersSnapshot = prefs.getString('local_favorite_folders_v1');
+    final localEntriesSnapshot = prefs.getString('local_favorite_entries_v1');
+
     final readingText = await _tryGetString(
       dio,
       '$backupDirUrl/$_readingFileName',
     );
+    final searchText = await _tryGetString(
+      dio,
+      '$backupDirUrl/$_searchHistoryFileName',
+    );
+    final settingsText = await _tryGetString(
+      dio,
+      '$backupDirUrl/$_settingsFileName',
+    );
+
+    // 合并阅读历史。
     if (readingText != null) {
       Map<String, dynamic>? readingMap;
       try {
@@ -462,7 +494,6 @@ class CloudSyncService {
       } catch (_) {}
 
       if (readingMap != null) {
-        // 合并阅读历史
         final remoteHistoryRaw = readingMap['history'];
         List<Map<String, dynamic>> remoteHistory = const [];
         if (remoteHistoryRaw is List) {
@@ -473,10 +504,9 @@ class CloudSyncService {
         }
 
         List<Map<String, dynamic>> localHistory = const [];
-        final localHistoryRaw = prefs.getString('hazuki_read_history');
-        if (localHistoryRaw != null) {
+        if (localHistorySnapshot != null) {
           try {
-            final decoded = jsonDecode(localHistoryRaw);
+            final decoded = jsonDecode(localHistorySnapshot);
             if (decoded is List) {
               localHistory = decoded
                   .whereType<Map>()
@@ -488,7 +518,6 @@ class CloudSyncService {
 
         final mergedHistory = <String, Map<String, dynamic>>{};
         for (final entry in [...localHistory, ...remoteHistory]) {
-          // 历史记录条目的 ID 字段名为 'id'（非 'comicId'）
           final comicId = (entry['id'] ?? '').toString().trim();
           if (comicId.isEmpty) continue;
           final ts = (entry['timestamp'] as num?)?.toInt() ?? 0;
@@ -509,7 +538,7 @@ class CloudSyncService {
         }
         await prefs.setString('hazuki_read_history', jsonEncode(historyList));
 
-        // 合并阅读进度
+        // 合并阅读进度（使用本地快照）。
         final remoteProgressRaw = readingMap['progress'];
         final remoteProgress = <String, Map<String, dynamic>>{};
         if (remoteProgressRaw is List) {
@@ -523,13 +552,10 @@ class CloudSyncService {
         }
 
         final localProgress = <String, Map<String, dynamic>>{};
-        for (final key in prefs.getKeys()) {
-          if (!key.startsWith('reading_progress_')) continue;
-          final comicId = key.substring('reading_progress_'.length);
-          final raw = prefs.getString(key);
-          if (raw == null) continue;
+        for (final entry in localProgressSnapshot.entries) {
+          final comicId = entry.key.substring('reading_progress_'.length);
           try {
-            final decoded = jsonDecode(raw);
+            final decoded = jsonDecode(entry.value);
             if (decoded is Map) {
               localProgress[comicId] = Map<String, dynamic>.from(decoded);
             }
@@ -567,26 +593,39 @@ class CloudSyncService {
       }
     }
 
-    // 合并搜索历史
-    final searchText = await _tryGetString(
-      dio,
-      '$backupDirUrl/$_searchHistoryFileName',
-    );
-    if (searchText != null) {
+    // 合并搜索历史（使用本地快照）。
+    // 无论 searchText 是否存在都必须执行，因为 _applySettingsJson 已经把远端
+    // 合并搜索历史。
+    {
       final remoteKeywords = <String>[];
-      for (final raw in searchText.split('\n')) {
-        final line = raw.trim();
-        if (line.isEmpty) continue;
+      if (searchText != null) {
+        for (final raw in searchText.split('\n')) {
+          final line = raw.trim();
+          if (line.isEmpty) continue;
+          try {
+            final decoded = jsonDecode(line);
+            if (decoded is Map) {
+              final keyword = (decoded['keyword'] ?? '').toString().trim();
+              if (keyword.isNotEmpty) remoteKeywords.add(keyword);
+            }
+          } catch (_) {}
+        }
+      } else if (settingsText != null) {
+        // jsonl 文件不存在时，从 settings.json 中提取远端搜索历史。
         try {
-          final decoded = jsonDecode(line);
+          final decoded = jsonDecode(settingsText);
           if (decoded is Map) {
-            final keyword = (decoded['keyword'] ?? '').toString().trim();
-            if (keyword.isNotEmpty) remoteKeywords.add(keyword);
+            final data = decoded['data'];
+            if (data is Map) {
+              final raw = data['search_history'];
+              if (raw is List) {
+                remoteKeywords.addAll(raw.map((e) => e.toString()));
+              }
+            }
           }
         } catch (_) {}
       }
-
-      final localKeywords = prefs.getStringList('search_history') ?? [];
+      final localKeywords = localSearchSnapshot ?? const <String>[];
       final merged = <String>[];
       final seen = <String>{};
       for (final k in [...remoteKeywords, ...localKeywords]) {
@@ -595,23 +634,19 @@ class CloudSyncService {
       await prefs.setStringList('search_history', merged);
     }
 
-    // 应用用户设置并合并本地收藏
-    final settingsText = await _tryGetString(
-      dio,
-      '$backupDirUrl/$_settingsFileName',
-    );
+    // 合并本地收藏（使用本地快照）。
     if (settingsText != null) {
-      try {
-        // 先将远端设置（外观、阅读器偏好等）写入本地，平台过滤逻辑与手动恢复一致。
-        await _applySettingsJson(settingsText);
-      } catch (_) {}
       try {
         final settingsDecoded = jsonDecode(settingsText);
         if (settingsDecoded is Map) {
           final data = settingsDecoded['data'];
           if (data is Map) {
-            // 收藏需要增量合并而非直接覆盖，在设置写入后再处理。
-            await _mergeLocalFavorites(prefs, data);
+            await _mergeLocalFavorites(
+              prefs,
+              data,
+              localFoldersSnapshot: localFoldersSnapshot,
+              localEntriesSnapshot: localEntriesSnapshot,
+            );
           }
         }
       } catch (_) {}
@@ -620,11 +655,14 @@ class CloudSyncService {
 
   Future<void> _mergeLocalFavorites(
     SharedPreferences prefs,
-    Map<dynamic, dynamic> remoteData,
-  ) async {
+    Map<dynamic, dynamic> remoteData, {
+    String? localFoldersSnapshot,
+    String? localEntriesSnapshot,
+  }) async {
     // 合并收藏夹：按 id 去重，同 id 保留本地名称，远端独有夹子追加
     List<Map<String, dynamic>> localFolders = const [];
-    final localFoldersRaw = prefs.getString('local_favorite_folders_v1');
+    final localFoldersRaw =
+        localFoldersSnapshot ?? prefs.getString('local_favorite_folders_v1');
     if (localFoldersRaw != null) {
       try {
         final decoded = jsonDecode(localFoldersRaw);
@@ -666,7 +704,8 @@ class CloudSyncService {
 
     // 合并收藏条目：按 comicId 去重，保留 savedAtMs 较大的，folderIds 取并集
     List<Map<String, dynamic>> localEntries = const [];
-    final localEntriesRaw = prefs.getString('local_favorite_entries_v1');
+    final localEntriesRaw =
+        localEntriesSnapshot ?? prefs.getString('local_favorite_entries_v1');
     if (localEntriesRaw != null) {
       try {
         final decoded = jsonDecode(localEntriesRaw);
