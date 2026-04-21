@@ -7,26 +7,14 @@ import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:hazuki/widgets/windows_comic_detail_host.dart';
-
-part 'favorite_back_to_top_button.dart';
-part 'favorite_content_section.dart';
-part 'favorite_comic_tile.dart';
+import 'favorite_comic_tile.dart';
+import 'favorite_view_support.dart';
 
 typedef FavoriteComicTapHandler =
     Future<void> Function(ExploreComic comic, String heroTag);
 
 AppLocalizations _strings(BuildContext context) =>
     AppLocalizations.of(context)!;
-
-String _favoriteComicHeroTag(ExploreComic comic, {String? salt}) {
-  final key = comic.id.isEmpty ? comic.title : comic.id;
-  if (salt == null || salt.isEmpty) {
-    return 'comic-cover-$key';
-  }
-  return 'comic-cover-$key-$salt';
-}
-
-enum FavoriteEntryAnimationStyle { none, staggered }
 
 class FavoritePage extends StatefulWidget {
   const FavoritePage({
@@ -447,7 +435,7 @@ class FavoritePageState extends State<FavoritePage>
                     onRetry: _handleRefresh,
                     onCreateLocalFolder: createFolder,
                     onComicTap: (comic) {
-                      final heroTag = _favoriteComicHeroTag(
+                      final heroTag = favoriteComicHeroTag(
                         comic,
                         salt: 'favorite',
                       );
@@ -469,5 +457,247 @@ class FavoritePageState extends State<FavoritePage>
         );
       },
     );
+  }
+}
+
+class _FavoriteBackToTopButton extends StatelessWidget {
+  const _FavoriteBackToTopButton({
+    required this.visible,
+    required this.onPressed,
+  });
+
+  final bool visible;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSlide(
+      offset: visible ? Offset.zero : const Offset(0, 0.24),
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+      child: AnimatedScale(
+        scale: visible ? 1 : 0.86,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        child: AnimatedOpacity(
+          opacity: visible ? 1 : 0,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOutCubic,
+          child: IgnorePointer(
+            ignoring: !visible,
+            child: FloatingActionButton(
+              heroTag: 'favorite_back_to_top',
+              onPressed: onPressed,
+              child: const Icon(Icons.vertical_align_top_rounded),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FavoriteContentSection extends StatelessWidget {
+  const _FavoriteContentSection({
+    required this.comics,
+    required this.comicAnimationStyles,
+    required this.errorMessage,
+    required this.initialLoading,
+    required this.refreshing,
+    required this.loadingMore,
+    required this.sourceRuntimeState,
+    required this.strings,
+    required this.onRetry,
+    required this.showCreateLocalFolderButton,
+    required this.onComicTap,
+    required this.mode,
+    this.onCreateLocalFolder,
+  });
+
+  final List<ExploreComic> comics;
+  final Map<String, FavoriteEntryAnimationStyle> comicAnimationStyles;
+  final String? errorMessage;
+  final bool initialLoading;
+  final bool refreshing;
+  final bool loadingMore;
+  final SourceRuntimeState sourceRuntimeState;
+  final AppLocalizations strings;
+  final Future<void> Function() onRetry;
+  final bool showCreateLocalFolderButton;
+  final ValueChanged<ExploreComic> onComicTap;
+  final FavoritePageMode mode;
+  final VoidCallback? onCreateLocalFolder;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 320),
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeOutCubic,
+          layoutBuilder: (currentChild, previousChildren) {
+            return Stack(
+              alignment: Alignment.topCenter,
+              children: <Widget>[
+                ...previousChildren,
+                ...<Widget?>[currentChild].whereType<Widget>(),
+              ],
+            );
+          },
+          child: _buildMainContent(context),
+        ),
+        _buildLoadMoreFooter(),
+      ],
+    );
+  }
+
+  Widget _buildMainContent(BuildContext context) {
+    final showBlockingLoading =
+        initialLoading || (refreshing && comics.isEmpty);
+    if (showBlockingLoading) {
+      if (shouldShowSourceRuntimeStatusCard(sourceRuntimeState)) {
+        return SourceRuntimeStatusCard(
+          key: const ValueKey('favorite-source-runtime-loading'),
+          state: sourceRuntimeState,
+          minHeight: 360,
+        );
+      }
+      return SizedBox(
+        key: const ValueKey('favorite-loading'),
+        height: 360,
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const HazukiSandyLoadingIndicator(size: 144),
+              const SizedBox(height: 10),
+              Text(strings.commonLoading),
+            ],
+          ),
+        ),
+      );
+    }
+    if (errorMessage != null && comics.isEmpty) {
+      if (shouldShowSourceRuntimeStatusCard(
+        sourceRuntimeState,
+        fallbackError: errorMessage,
+      )) {
+        return SourceRuntimeStatusCard(
+          key: const ValueKey('favorite-source-runtime-error'),
+          state: sourceRuntimeState,
+          fallbackError: errorMessage,
+          onRetry: onRetry,
+          minHeight: 360,
+        );
+      }
+      return SizedBox(
+        key: const ValueKey('favorite-error'),
+        height: 360,
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Text(errorMessage!, textAlign: TextAlign.center),
+              ),
+              const SizedBox(height: 12),
+              FilledButton(
+                onPressed: onRetry,
+                child: Text(strings.commonRetry),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    if (showCreateLocalFolderButton) {
+      final emptyStateHeight =
+          (MediaQuery.sizeOf(context).height -
+                  MediaQuery.paddingOf(context).top -
+                  kToolbarHeight -
+                  176)
+              .clamp(300.0, 560.0)
+              .toDouble();
+      final textTheme = Theme.of(context).textTheme;
+      final colorScheme = Theme.of(context).colorScheme;
+      return SizedBox(
+        key: const ValueKey('favorite-create-folder'),
+        height: emptyStateHeight,
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: colorScheme.secondaryContainer,
+                foregroundColor: colorScheme.onSecondaryContainer,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 28,
+                  vertical: 22,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                ),
+              ),
+              onPressed: onCreateLocalFolder,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.create_new_folder_rounded, size: 34),
+                  const SizedBox(height: 10),
+                  Text(
+                    strings.favoriteCreateLocalFolderAction,
+                    textAlign: TextAlign.center,
+                    style: textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+    if (comics.isEmpty) {
+      return SizedBox(
+        key: const ValueKey('favorite-empty'),
+        height: 220,
+        child: Center(child: Text(strings.favoriteEmpty)),
+      );
+    }
+
+    return ListView.separated(
+      key: const ValueKey('favorite-list'),
+      physics: const NeverScrollableScrollPhysics(),
+      shrinkWrap: true,
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      itemCount: comics.length,
+      separatorBuilder: (_, _) => const SizedBox(height: 10),
+      itemBuilder: (context, index) {
+        final comic = comics[index];
+        final heroTag = favoriteComicHeroTag(comic, salt: 'favorite');
+        return FavoriteComicTile(
+          key: ValueKey('${comic.id}-${mode.name}'),
+          comic: comic,
+          heroTag: heroTag,
+          animationStyle: comic.id.isEmpty
+              ? FavoriteEntryAnimationStyle.none
+              : (comicAnimationStyles[comic.id] ??
+                    FavoriteEntryAnimationStyle.none),
+          entryIndex: index,
+          onTap: () => onComicTap(comic),
+        );
+      },
+    );
+  }
+
+  Widget _buildLoadMoreFooter() {
+    if (!loadingMore) {
+      return const SizedBox(height: 4);
+    }
+
+    return const HazukiLoadMoreFooter();
   }
 }

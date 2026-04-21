@@ -595,17 +595,22 @@ class CloudSyncService {
       await prefs.setStringList('search_history', merged);
     }
 
-    // 合并本地收藏
+    // 应用用户设置并合并本地收藏
     final settingsText = await _tryGetString(
       dio,
       '$backupDirUrl/$_settingsFileName',
     );
     if (settingsText != null) {
       try {
+        // 先将远端设置（外观、阅读器偏好等）写入本地，平台过滤逻辑与手动恢复一致。
+        await _applySettingsJson(settingsText);
+      } catch (_) {}
+      try {
         final settingsDecoded = jsonDecode(settingsText);
         if (settingsDecoded is Map) {
           final data = settingsDecoded['data'];
           if (data is Map) {
+            // 收藏需要增量合并而非直接覆盖，在设置写入后再处理。
             await _mergeLocalFavorites(prefs, data);
           }
         }

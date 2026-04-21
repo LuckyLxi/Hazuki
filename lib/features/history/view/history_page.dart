@@ -1,22 +1,18 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:hazuki/app/app.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
-import 'package:hazuki/services/local_favorites_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:hazuki/widgets/windows_comic_detail_host.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:hazuki/features/comic_detail/comic_detail.dart';
 
-part '../support/history_actions.dart';
-part '../support/history_favorites_actions.dart';
-part 'history_widgets.dart';
+import '../support/history_actions.dart';
+import '../support/history_favorite_support.dart';
+import '../support/history_menu_support.dart';
+import 'history_comic_list_item.dart';
 
 class HistoryPage extends StatefulWidget {
   const HistoryPage({
@@ -133,6 +129,129 @@ class _HistoryPageState extends State<HistoryPage> {
       return;
     }
     setState(updater);
+  }
+
+  Future<void> _deleteSelected() async {
+    if (_selectedIds.isEmpty) {
+      return;
+    }
+
+    final confirm = await showDeleteSelectedHistoryDialog(
+      context,
+      selectedCount: _selectedIds.length,
+    );
+    if (confirm != true) {
+      return;
+    }
+
+    final newHistory = _history
+        .where((e) => !_selectedIds.contains(e.id))
+        .toList();
+    await _saveHistory(newHistory);
+    _updateHistoryState(() {
+      _history = newHistory;
+      _selectedIds.clear();
+      _selectionMode = false;
+    });
+  }
+
+  Future<void> _clearAll() async {
+    final confirm = await showClearHistoryDialog(context);
+    if (confirm != true) {
+      return;
+    }
+
+    await _saveHistory([]);
+    _updateHistoryState(() {
+      _history = [];
+      _selectionMode = false;
+      _selectedIds.clear();
+    });
+  }
+
+  Future<void> _handleCopyComicId(ExploreComic comic) async {
+    await copyHistoryComicId(context, comic.id);
+  }
+
+  Future<void> _handleDeleteHistoryItem(ExploreComic comic) async {
+    final newHistory = _history.where((e) => e.id != comic.id).toList();
+    await _saveHistory(newHistory);
+    _updateHistoryState(() {
+      _history = newHistory;
+    });
+  }
+
+  Future<void> _handleToggleFavoriteFromHistory(ExploreComic comic) async {
+    await toggleFavoriteFromHistory(context, comic);
+  }
+
+  Future<void> _showComicMenu(
+    ExploreComic comic,
+    Offset globalPosition,
+    BuildContext itemContext,
+  ) async {
+    final action = await showHistoryComicMenu(
+      context: context,
+      itemContext: itemContext,
+      globalPosition: globalPosition,
+    );
+
+    if (!mounted || action == null) {
+      return;
+    }
+
+    switch (action) {
+      case HistoryComicMenuAction.copy:
+        await _handleCopyComicId(comic);
+        break;
+      case HistoryComicMenuAction.favorite:
+        await _handleToggleFavoriteFromHistory(comic);
+        break;
+      case HistoryComicMenuAction.delete:
+        await _handleDeleteHistoryItem(comic);
+        break;
+    }
+  }
+
+  void _toggleSelection(String comicId, {bool? selected}) {
+    _updateHistoryState(() {
+      if (selected ?? !_selectedIds.contains(comicId)) {
+        _selectedIds.add(comicId);
+      } else {
+        _selectedIds.remove(comicId);
+      }
+    });
+  }
+
+  Widget _buildItem(ExploreComic comic, int index) {
+    final heroTag = widget.comicCoverHeroTagBuilder(comic, salt: 'history');
+    return HistoryComicListItem(
+      comic: comic,
+      index: index,
+      heroTag: heroTag,
+      selectionMode: _selectionMode,
+      selected: _selectedIds.contains(comic.id),
+      onShowMenu: (globalPosition, itemContext) =>
+          _showComicMenu(comic, globalPosition, itemContext),
+      onToggleSelection: (selected) =>
+          _toggleSelection(comic.id, selected: selected),
+      onTap: () async {
+        if (_selectionMode) {
+          _toggleSelection(comic.id);
+          return;
+        }
+        await openComicDetail(
+          context,
+          comic: comic,
+          heroTag: heroTag,
+          pageBuilder: widget.comicDetailPageBuilder,
+        );
+        if (!mounted) {
+          return;
+        }
+        await _loadHistory();
+      },
+    );
   }
 
   @override

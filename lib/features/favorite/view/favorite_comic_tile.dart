@@ -1,4 +1,9 @@
-part of 'favorite_page.dart';
+import 'package:flutter/material.dart';
+
+import 'package:hazuki/models/hazuki_models.dart';
+import 'package:hazuki/widgets/widgets.dart';
+
+import 'favorite_view_support.dart';
 
 class FavoriteComicTile extends StatefulWidget {
   const FavoriteComicTile({
