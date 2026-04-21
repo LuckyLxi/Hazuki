@@ -1,14 +1,17 @@
-part of 'source_editor_content.dart';
+import 'package:flutter/material.dart';
+import 'package:re_editor/re_editor.dart';
 
-class _SearchHighlightCodeLineController
+import 'source_editor_search_support.dart';
+
+class SourceSearchHighlightCodeLineController
     extends CodeLineEditingControllerDelegate {
-  _SearchHighlightCodeLineController({
+  SourceSearchHighlightCodeLineController({
     required super.delegate,
     required this.highlightGetter,
     required this.highlightOpacityGetter,
   });
 
-  final _SearchHighlight? Function() highlightGetter;
+  final SourceSearchHighlight? Function() highlightGetter;
   final double Function() highlightOpacityGetter;
 
   @override
@@ -144,15 +147,8 @@ class _SearchHighlightCodeLineController
   }
 }
 
-class _StyledTextSegment {
-  const _StyledTextSegment({required this.text, required this.style});
-
-  final String text;
-  final TextStyle? style;
-}
-
-class _SourceEditorToolbarController implements SelectionToolbarController {
-  const _SourceEditorToolbarController();
+class SourceEditorToolbarController implements SelectionToolbarController {
+  const SourceEditorToolbarController();
 
   @override
   void hide(BuildContext context) {}
@@ -175,9 +171,7 @@ class _SourceEditorToolbarController implements SelectionToolbarController {
         ),
       if (!controller.selection.isCollapsed)
         PopupMenuItem<void>(
-          onTap: () {
-            controller.copy();
-          },
+          onTap: controller.copy,
           child: Text(localizations.copyButtonLabel),
         ),
       PopupMenuItem<void>(
@@ -203,8 +197,8 @@ class _SourceEditorToolbarController implements SelectionToolbarController {
   }
 }
 
-class _SourceEditorInlineErrorCard extends StatelessWidget {
-  const _SourceEditorInlineErrorCard({required this.message});
+class SourceEditorInlineErrorCard extends StatelessWidget {
+  const SourceEditorInlineErrorCard({super.key, required this.message});
 
   final String message;
 
@@ -243,8 +237,8 @@ class _SourceEditorInlineErrorCard extends StatelessWidget {
   }
 }
 
-class _SourceEditorFileBadge extends StatelessWidget {
-  const _SourceEditorFileBadge({required this.fileBadge});
+class SourceEditorFileBadge extends StatelessWidget {
+  const SourceEditorFileBadge({super.key, required this.fileBadge});
 
   final String fileBadge;
 
@@ -275,4 +269,11 @@ class _SourceEditorFileBadge extends StatelessWidget {
       ),
     );
   }
+}
+
+class _StyledTextSegment {
+  const _StyledTextSegment({required this.text, required this.style});
+
+  final String text;
+  final TextStyle? style;
 }

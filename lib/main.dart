@@ -14,7 +14,7 @@ import 'app/hazuki_theme_controller.dart';
 import 'app/hazuki_theme_factory.dart';
 import 'app/software_update_dialog_support.dart';
 import 'app/source_runtime_coordinator.dart';
-import 'app/source_runtime_widgets.dart';
+import 'app/source_runtime_bootstrap_overlay.dart';
 import 'app/source_update_dialog_support.dart';
 import 'app/theme_reveal_support.dart';
 import 'app/ui_flags.dart';

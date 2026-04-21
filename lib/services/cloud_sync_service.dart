@@ -488,7 +488,8 @@ class CloudSyncService {
 
         final mergedHistory = <String, Map<String, dynamic>>{};
         for (final entry in [...localHistory, ...remoteHistory]) {
-          final comicId = (entry['comicId'] ?? '').toString().trim();
+          // 历史记录条目的 ID 字段名为 'id'（非 'comicId'）
+          final comicId = (entry['id'] ?? '').toString().trim();
           if (comicId.isEmpty) continue;
           final ts = (entry['timestamp'] as num?)?.toInt() ?? 0;
           final existing = mergedHistory[comicId];

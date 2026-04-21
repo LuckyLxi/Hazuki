@@ -1,4 +1,6 @@
-part of 'source_runtime_widgets.dart';
+import 'package:flutter/material.dart';
+
+import '../l10n/l10n.dart';
 
 class InitialSourceBootstrapOverlay extends StatelessWidget {
   const InitialSourceBootstrapOverlay({

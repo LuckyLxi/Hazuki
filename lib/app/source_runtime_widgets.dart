@@ -2,10 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../l10n/l10n.dart';
 import '../services/hazuki_source_service.dart';
-
-part 'source_runtime_bootstrap_overlay.dart';
-part 'source_runtime_dialog_actions.dart';
-part 'source_runtime_dialog_helpers.dart';
+import 'source_runtime_dialog_view_support.dart';
 
 enum SourceUpdateDialogAction { skipToday, cancel, downloaded }
 
@@ -95,7 +92,7 @@ class _SourceUpdateDialogCardState extends State<SourceUpdateDialogCard> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _buildHeader(
+                  buildSourceUpdateHeader(
                     colorScheme: colorScheme,
                     textTheme: textTheme,
                     icon: Icons.system_update_alt_rounded,
@@ -107,12 +104,12 @@ class _SourceUpdateDialogCardState extends State<SourceUpdateDialogCard> {
                     ),
                   ),
                   const SizedBox(height: 18),
-                  _buildPanel(
+                  buildSourceUpdatePanel(
                     colorScheme: colorScheme,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildVersionRow(
+                        buildSourceUpdateVersionRow(
                           colorScheme: colorScheme,
                           textTheme: textTheme,
                           icon: Icons.history_rounded,
@@ -129,7 +126,7 @@ class _SourceUpdateDialogCardState extends State<SourceUpdateDialogCard> {
                           ),
                         ),
                         const SizedBox(height: 12),
-                        _buildVersionRow(
+                        buildSourceUpdateVersionRow(
                           colorScheme: colorScheme,
                           textTheme: textTheme,
                           icon: Icons.cloud_download_outlined,
@@ -142,7 +139,7 @@ class _SourceUpdateDialogCardState extends State<SourceUpdateDialogCard> {
                   ),
                   if (_errorText != null) ...[
                     const SizedBox(height: 12),
-                    _buildErrorCard(
+                    buildSourceUpdateErrorCard(
                       colorScheme: colorScheme,
                       textTheme: textTheme,
                       message: _errorText!,
@@ -181,22 +178,26 @@ class _SourceUpdateDialogCardState extends State<SourceUpdateDialogCard> {
                   ),
                 ],
               ),
-              _SourceUpdateDialogPhase.downloading => _buildDownloadingScene(
-                colorScheme: colorScheme,
-                textTheme: textTheme,
-                title: strings.sourceUpdateDownloading,
-                subtitle: downloadingMessage,
-                badgeText: strings.sourceUpdateRemoteVersion(
-                  widget.check.remoteVersion,
+              _SourceUpdateDialogPhase.downloading =>
+                buildSourceUpdateDownloadingScene(
+                  context: context,
+                  colorScheme: colorScheme,
+                  textTheme: textTheme,
+                  title: strings.sourceUpdateDownloading,
+                  subtitle: downloadingMessage,
+                  badgeText: strings.sourceUpdateRemoteVersion(
+                    widget.check.remoteVersion,
+                  ),
+                  restartHint: restartHint,
+                  indeterminate: _indeterminate,
+                  progress: _progress,
                 ),
-                restartHint: restartHint,
-              ),
               _SourceUpdateDialogPhase.restartRequired => Column(
                 key: const ValueKey<String>('source-update-phase-restart'),
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  _buildHeader(
+                  buildSourceUpdateHeader(
                     colorScheme: colorScheme,
                     textTheme: textTheme,
                     icon: Icons.restart_alt_rounded,
@@ -208,12 +209,12 @@ class _SourceUpdateDialogCardState extends State<SourceUpdateDialogCard> {
                     ),
                   ),
                   const SizedBox(height: 18),
-                  _buildPanel(
+                  buildSourceUpdatePanel(
                     colorScheme: colorScheme,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildVersionRow(
+                        buildSourceUpdateVersionRow(
                           colorScheme: colorScheme,
                           textTheme: textTheme,
                           icon: Icons.cloud_done_rounded,
@@ -270,6 +271,50 @@ class _SourceUpdateDialogCardState extends State<SourceUpdateDialogCard> {
       return;
     }
     setState(updater);
+  }
+
+  Future<void> _downloadUpdate() async {
+    widget.dismissible.value = false;
+    _updateDialogState(() {
+      _phase = _SourceUpdateDialogPhase.downloading;
+      _errorText = null;
+      _progress = 0;
+      _indeterminate = true;
+    });
+
+    final ok = await HazukiSourceService.instance.downloadJmSourceAndReload(
+      onProgress: (received, total) {
+        _updateDialogState(() {
+          if (total > 0) {
+            _indeterminate = false;
+            _progress = (received / total).clamp(0.0, 1.0);
+          } else {
+            _indeterminate = true;
+          }
+        });
+      },
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    if (ok) {
+      widget.onDownloadCompleted();
+      widget.dismissible.value = true;
+      _updateDialogState(() {
+        _phase = _SourceUpdateDialogPhase.restartRequired;
+        _indeterminate = false;
+        _progress = 1;
+      });
+      return;
+    }
+
+    widget.dismissible.value = false;
+    _updateDialogState(() {
+      _phase = _SourceUpdateDialogPhase.available;
+      _errorText = l10n(context).sourceUpdateDownloadFailed;
+    });
   }
 }
 

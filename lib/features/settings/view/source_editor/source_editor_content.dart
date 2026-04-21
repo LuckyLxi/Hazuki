@@ -6,9 +6,8 @@ import 'package:re_highlight/languages/javascript.dart';
 import 'package:re_highlight/styles/atom-one-dark.dart';
 import 'package:re_highlight/styles/atom-one-light.dart';
 import 'source_editor_controller.dart';
-
-part 'source_editor_content_search.dart';
-part 'source_editor_content_support.dart';
+import 'source_editor_search_support.dart';
+import 'source_editor_view_support.dart';
 
 class SourceEditorContent extends StatefulWidget {
   const SourceEditorContent({
@@ -41,8 +40,8 @@ class _SourceEditorContentState extends State<SourceEditorContent>
 
   late final AnimationController _highlightAnimationController;
   late final Animation<double> _highlightOpacity;
-  late final _SearchHighlightCodeLineController _editorController;
-  _SearchHighlight? _activeHighlight;
+  late final SourceSearchHighlightCodeLineController _editorController;
+  SourceSearchHighlight? _activeHighlight;
 
   SourceCodeEditingController get _controller => widget.controller;
   AppLocalizations get _strings => widget.strings;
@@ -71,7 +70,7 @@ class _SourceEditorContentState extends State<SourceEditorContent>
         weight: 20,
       ),
     ]).animate(_highlightAnimationController);
-    _editorController = _SearchHighlightCodeLineController(
+    _editorController = SourceSearchHighlightCodeLineController(
       delegate: _controller,
       highlightGetter: () => _activeHighlight,
       highlightOpacityGetter: () => _highlightOpacity.value,
@@ -110,7 +109,7 @@ class _SourceEditorContentState extends State<SourceEditorContent>
     if (query.isEmpty) {
       return;
     }
-    final matches = _findMatches(query);
+    final matches = findSourceSearchMatches(_controller, query);
     if (!mounted) {
       return;
     }
@@ -122,13 +121,20 @@ class _SourceEditorContentState extends State<SourceEditorContent>
       );
       return;
     }
-    await _showSearchResults(matches, query);
+    await showSourceSearchResultsDialog(
+      context: context,
+      strings: _strings,
+      matches: matches,
+      query: query,
+      transitionDuration: _searchDialogAnimationDuration,
+      onSelected: _jumpToMatch,
+    );
   }
 
-  void _setTemporaryHighlight(_SourceSearchMatch highlight) {
+  void _setTemporaryHighlight(SourceSearchMatch highlight) {
     _highlightAnimationController.stop();
     setState(() {
-      _activeHighlight = _SearchHighlight(
+      _activeHighlight = SourceSearchHighlight(
         lineIndex: highlight.lineIndex,
         startOffset: highlight.columnIndex,
         endOffset: highlight.columnIndex + highlight.matchLength,
@@ -136,6 +142,19 @@ class _SourceEditorContentState extends State<SourceEditorContent>
     });
     _editorController.forceRepaint();
     _highlightAnimationController.forward(from: 0);
+  }
+
+  void _jumpToMatch(SourceSearchMatch match) {
+    final position = CodeLinePosition(
+      index: match.lineIndex,
+      offset: match.columnIndex,
+    );
+    _editorController.selection = CodeLineSelection.collapsed(
+      index: match.lineIndex,
+      offset: match.columnIndex,
+    );
+    _editorController.makePositionCenterIfInvisible(position);
+    _setTemporaryHighlight(match);
   }
 
   @override
@@ -208,7 +227,7 @@ class _SourceEditorContentState extends State<SourceEditorContent>
             builder: (context, _) {
               return Row(
                 children: [
-                  const _SourceEditorFileBadge(fileBadge: 'jm.js'),
+                  const SourceEditorFileBadge(fileBadge: 'jm.js'),
                   const SizedBox(width: 12),
                   Expanded(
                     child: ConstrainedBox(
@@ -269,7 +288,7 @@ class _SourceEditorContentState extends State<SourceEditorContent>
           ),
           if (widget.inlineErrorText != null) ...[
             const SizedBox(height: 12),
-            _SourceEditorInlineErrorCard(message: widget.inlineErrorText!),
+            SourceEditorInlineErrorCard(message: widget.inlineErrorText!),
           ],
           const SizedBox(height: 12),
           Expanded(
@@ -309,7 +328,7 @@ class _SourceEditorContentState extends State<SourceEditorContent>
                   width: 1,
                   color: colorScheme.outlineVariant.withValues(alpha: 0.28),
                 ),
-                toolbarController: const _SourceEditorToolbarController(),
+                toolbarController: const SourceEditorToolbarController(),
                 shortcutOverrideActions: shortcutOverrideActions,
               ),
             ),

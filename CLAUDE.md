@@ -39,11 +39,11 @@ All manga data (browse, search, favorites, chapters, images) flows through a Jav
 - **`HazukiAppSettingsStore`** — serializes/deserializes appearance and locale to `SharedPreferences`.
 - App-level preference keys live in `lib/app/app_preferences.dart`.
 
-### Page structure
+### Feature modules
 
-The app uses a bottom-nav shell (`HazukiHomePage` → `HomeCoordinator`). Pages are under `lib/pages/`:
+The app uses a bottom-nav shell (`HazukiHomePage` → `HomeCoordinator`). Features live under `lib/features/`, each with `view/`, `state/`, and `support/` subdirectories and a public barrel export (e.g. `home.dart`):
 
-| Directory | Purpose |
+| Feature | Purpose |
 |---|---|
 | `home/` | Shell, nav bar, drawer, profile flow |
 | `discover/` | Browse/explore from source |
@@ -55,6 +55,8 @@ The app uses a bottom-nav shell (`HazukiHomePage` → `HomeCoordinator`). Pages 
 | `downloads/` | Download queue/history |
 | `history/` | Read history |
 | `comments/` | Chapter comments |
+
+**State pattern**: feature controllers are `ChangeNotifier`s consumed via `ListenableBuilder` or `AnimatedBuilder`. `HomeCoordinator` owns `HomeShellController` (tab/app bar) and `HomeProfileController` (login/profile). Access services via static singletons: `HazukiSourceService.instance`, `MangaDownloadService.instance`, etc.
 
 ### Services
 
