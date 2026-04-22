@@ -1,12 +1,12 @@
 {
-  "version": "1.0.3",
-  "releaseUrl": "https://github.com/LuckyLxi/Hazuki/releases/tag/v1.0.3",
+  "version": "1.0.4",
+  "releaseUrl": "https://github.com/LuckyLxi/Hazuki/releases/tag/v1.0.4",
   "apkUrls": {
-    "arm64-v8a": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.3/app-arm64-v8a-release.apk"
+    "arm64-v8a": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.4/app-arm64-v8a-release.apk"
   },
   "windowsUrls": {
-    "x64_zip": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.3/hazuki-windows-x64-v1.0.3.zip",
-    "x64_msix": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.3/hazuki-windows-x64-v1.0.3.msix"
+    "x64_zip": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.4/hazuki-windows-x64-v1.0.4.zip",
+    "x64_msix": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.4/hazuki-windows-x64-v1.0.4.msix"
   },
-  "changelog": "- 新增发现页轮播图及每日推荐功能\n- 重构底部导航栏样式与动画\n- 新增 Windows 平台自动更新支持\n- 优化云同步增量合并逻辑\n- 重构阅读器、搜索、漫画详情等多处 UI 组件"
+  "changelog": "chore: bump version to 1.0.4+5"
 }
