@@ -160,18 +160,22 @@ class _CommentsPageState extends State<CommentsPage>
 
     if (widget.isTabView) {
       final isFocused = _commentFocusNode.hasFocus;
-      final bottomInset = _keyboardHeight;
+      final liveBottomInset = MediaQuery.viewInsetsOf(context).bottom;
+      final bottomInset = math.max(liveBottomInset, _keyboardHeight);
       final safeBottom = MediaQuery.paddingOf(context).bottom;
       final pillHoriz = isFocused ? 10.0 : 16.0;
       final pillMarginBottom = isFocused ? 2.0 : 4.0;
       final pillApproxHeight = _replyToComment == null ? 72.0 : 126.0;
       final listExtraBottom =
           pillApproxHeight + pillMarginBottom + safeBottom + bottomInset;
+      final composerPositionDuration = bottomInset > 0
+          ? Duration.zero
+          : const Duration(milliseconds: 220);
       return Stack(
         children: [
           _buildCommentsBodyList(extraBottomPadding: listExtraBottom),
           AnimatedPositioned(
-            duration: const Duration(milliseconds: 220),
+            duration: composerPositionDuration,
             curve: Curves.easeOutCubic,
             left: pillHoriz,
             right: pillHoriz,
