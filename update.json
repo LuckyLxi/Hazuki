@@ -8,5 +8,5 @@
     "x64_zip": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.3/hazuki-windows-x64-v1.0.3.zip",
     "x64_msix": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.3/hazuki-windows-x64-v1.0.3.msix"
   },
-  "changelog": "- 新增发现页轮播图及每日推荐功能\n- 重构底部导航栏样式与动画\n- 新增 Windows 平台自动更新支持\n- 优化云同步增量合并逻辑\n- 重构阅读器、搜索、漫画详情等多处 UI 组件"
+  "changelog": "- 修复评论区滚动干扰与焦点冲突问题\n- 修复评论输入框键盘弹出时定位延迟问题\n- 修复搜索页面焦点恢复异常\n- 修复云同步时间戳竞争导致启动时重复合并的问题\n- 优化图片加载管道，改进重试逻辑与缓存管理"
 }
