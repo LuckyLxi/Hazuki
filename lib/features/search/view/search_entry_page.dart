@@ -1,6 +1,4 @@
 import 'dart:async';
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:hazuki/app/app.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
@@ -49,7 +47,6 @@ class _SearchEntryPageState extends State<SearchEntryPage> {
   double _searchRevealProgress = 0;
 
   bool get _showCollapsedSearch => _revealSupport.showCollapsedSearch;
-  bool get _shouldAutofocusPrimarySearch => !Platform.isWindows;
 
   @override
   void initState() {
@@ -391,7 +388,7 @@ class _SearchEntryPageState extends State<SearchEntryPage> {
                     clearKey: 'entry-clear',
                     submitKey: 'entry-submit',
                     logTarget: 'primary',
-                    autofocus: _shouldAutofocusPrimarySearch,
+                    autofocus: false,
                   ),
                 ),
               ),

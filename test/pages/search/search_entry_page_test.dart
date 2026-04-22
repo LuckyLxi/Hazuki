@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/app/windows_comic_detail.dart';
@@ -16,9 +14,7 @@ void main() {
     WindowsComicDetailController.instance.close();
   });
 
-  testWidgets('search entry page applies platform autofocus behavior', (
-    tester,
-  ) async {
+  testWidgets('search entry page does not autofocus on entry', (tester) async {
     SharedPreferences.setMockInitialValues({
       'search_history': <String>['hazuki'],
     });
@@ -44,13 +40,8 @@ void main() {
 
     expect(scaffold.resizeToAvoidBottomInset, isTrue);
     expect(find.byType(FloatingActionButton), findsOneWidget);
-    if (Platform.isWindows) {
-      expect(editableText.focusNode.hasFocus, isFalse);
-      expect(tester.testTextInput.isVisible, isFalse);
-    } else {
-      expect(editableText.focusNode.hasFocus, isTrue);
-      expect(tester.testTextInput.isVisible, isTrue);
-    }
+    expect(editableText.focusNode.hasFocus, isFalse);
+    expect(tester.testTextInput.isVisible, isFalse);
   });
 
   testWidgets('search entry page single tap restores caret focus', (
