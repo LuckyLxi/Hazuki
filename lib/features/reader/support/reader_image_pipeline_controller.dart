@@ -28,6 +28,11 @@ class ReaderImagePipelineController {
     required String comicId,
     required String epId,
     required String Function(Object error) loadImagesErrorBuilder,
+    Future<ImageProvider> Function(String url, {bool useDiskCache})?
+    imageProviderBuilder,
+    void Function(Iterable<String>)? evictImageBytesFromMemory,
+    Future<void> Function(Iterable<String>)? evictImageCacheEntries,
+    Future<void> Function(ImageProvider provider)? precacheImageCallback,
   }) : _runtimeState = runtimeState,
        _pipelineState = pipelineState,
        _diagnosticsState = diagnosticsState,
@@ -41,7 +46,15 @@ class ReaderImagePipelineController {
        _noImageModeEnabled = noImageModeEnabled,
        _comicId = comicId,
        _epId = epId,
-       _loadImagesErrorBuilder = loadImagesErrorBuilder;
+       _loadImagesErrorBuilder = loadImagesErrorBuilder,
+       _imageProviderBuilder = imageProviderBuilder,
+       _evictImageBytesFromMemory =
+           evictImageBytesFromMemory ??
+           HazukiSourceService.instance.evictImageBytesFromMemory,
+       _evictImageCacheEntries =
+           evictImageCacheEntries ??
+           HazukiSourceService.instance.evictImageCacheEntries,
+       _precacheImageCallback = precacheImageCallback;
 
   static const int _maxUnscrambleConcurrency = 5;
   static const int _prefetchAroundCount = 10;
@@ -67,6 +80,11 @@ class ReaderImagePipelineController {
   final String _comicId;
   final String _epId;
   final String Function(Object error) _loadImagesErrorBuilder;
+  final Future<ImageProvider> Function(String url, {bool useDiskCache})?
+  _imageProviderBuilder;
+  final void Function(Iterable<String>) _evictImageBytesFromMemory;
+  final Future<void> Function(Iterable<String>) _evictImageCacheEntries;
+  final Future<void> Function(ImageProvider provider)? _precacheImageCallback;
 
   Map<String, ImageProvider> get providerCache => _pipelineState.providerCache;
   Map<String, Future<ImageProvider>> get providerFutureCache =>
@@ -202,17 +220,29 @@ class ReaderImagePipelineController {
   }
 
   Future<ImageProvider> getImageProvider(String url) {
+    return _getImageProvider(url, useDiskCache: true);
+  }
+
+  Future<ImageProvider> _getImageProvider(
+    String url, {
+    required bool useDiskCache,
+  }) {
     final existing = providerFutureCache[url];
     if (existing != null) {
       return existing;
     }
 
-    final created = _buildImageProvider(url)
+    final created = _buildImageProvider(url, useDiskCache: useDiskCache)
         .then((provider) async {
           providerCache[url] = provider;
           if (_isMounted()) {
             try {
-              await precacheImage(provider, _context());
+              final precacheImageCallback = _precacheImageCallback;
+              if (precacheImageCallback != null) {
+                await precacheImageCallback(provider);
+              } else {
+                await precacheImage(provider, _context());
+              }
             } catch (_) {}
           }
           return provider;
@@ -232,16 +262,41 @@ class ReaderImagePipelineController {
       return;
     }
 
+    _logEvent(
+      'Reader image retry started',
+      source: 'reader_data',
+      content: _logPayload({'imageUrl': normalized, 'useDiskCache': false}),
+    );
     _updateState(() {
       retryingImageUrls.add(normalized);
       providerCache.remove(normalized);
       providerFutureCache.remove(normalized);
     });
-    HazukiSourceService.instance.evictImageBytesFromMemory([normalized]);
+    _evictImageBytesFromMemory([normalized]);
+    await _evictImageCacheEntries([normalized]);
 
     try {
-      await getImageProvider(normalized);
-    } catch (_) {
+      await _getImageProvider(normalized, useDiskCache: false);
+      _logEvent(
+        'Reader image retry finished',
+        source: 'reader_data',
+        content: _logPayload({
+          'imageUrl': normalized,
+          'useDiskCache': false,
+          'success': true,
+        }),
+      );
+    } catch (error) {
+      _logEvent(
+        'Reader image retry failed',
+        level: 'error',
+        source: 'reader_data',
+        content: _logPayload({
+          'imageUrl': normalized,
+          'useDiskCache': false,
+          'error': '$error',
+        }),
+      );
       // Keep the error state visible so the user can retry again.
     } finally {
       if (_isMounted()) {
@@ -452,19 +507,19 @@ class ReaderImagePipelineController {
     }
   }
 
-  Future<void> _rememberAspectRatioFromBytes(
+  Future<bool> _rememberAspectRatioFromBytes(
     String url,
     Uint8List bytes,
   ) async {
     if (imageAspectRatioCache.containsKey(url)) {
-      return;
+      return true;
     }
     try {
       final codec = await instantiateImageCodec(bytes);
       final frame = await codec.getNextFrame();
       final image = frame.image;
       if (image.height <= 0) {
-        return;
+        return false;
       }
       final aspectRatio = image.width / image.height;
       imageAspectRatioCache[url] = aspectRatio;
@@ -488,7 +543,10 @@ class ReaderImagePipelineController {
           }),
         );
       }
-    } catch (_) {}
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   void _rememberAspectRatio(String url, double? aspectRatio) {
@@ -498,7 +556,14 @@ class ReaderImagePipelineController {
     imageAspectRatioCache[url] = aspectRatio;
   }
 
-  Future<ImageProvider> _buildImageProvider(String url) async {
+  Future<ImageProvider> _buildImageProvider(
+    String url, {
+    required bool useDiskCache,
+  }) async {
+    final overrideBuilder = _imageProviderBuilder;
+    if (overrideBuilder != null) {
+      return overrideBuilder(url, useDiskCache: useDiskCache);
+    }
     final sourceService = HazukiSourceService.instance;
     if (_noImageModeEnabled()) {
       throw StateError('no-image mode enabled');
@@ -519,11 +584,21 @@ class ReaderImagePipelineController {
         url,
         comicId: _comicId,
         epId: _epId,
-        useDiskCache: true,
+        useDiskCache: useDiskCache,
       );
       _rememberAspectRatio(url, prepared.aspectRatio);
-      if (!imageAspectRatioCache.containsKey(url)) {
-        await _rememberAspectRatioFromBytes(url, prepared.bytes);
+      final decoded = imageAspectRatioCache.containsKey(url)
+          ? true
+          : await _rememberAspectRatioFromBytes(url, prepared.bytes);
+      if (!decoded) {
+        if (!useDiskCache) {
+          throw StateError('reader_image_decode_failed');
+        }
+        _evictImageBytesFromMemory([url]);
+        await _evictImageCacheEntries([url]);
+        providerCache.remove(url);
+        providerFutureCache.remove(url);
+        return _buildImageProvider(url, useDiskCache: false);
       }
       return MemoryImage(prepared.bytes);
     } finally {

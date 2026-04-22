@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -6,12 +7,84 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/reader/support/reader_diagnostics_support.dart';
 import 'package:hazuki/features/reader/state/reader_image_pipeline_state.dart';
 import 'package:hazuki/features/reader/state/reader_mode.dart';
+import 'package:hazuki/features/reader/support/reader_image_pipeline_controller.dart';
 import 'package:hazuki/features/reader/support/reader_navigation_controller.dart';
 import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
 import 'package:hazuki/features/reader/state/reader_settings_store.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  final validPngBytes = Uint8List.fromList(const <int>[
+    0x89,
+    0x50,
+    0x4E,
+    0x47,
+    0x0D,
+    0x0A,
+    0x1A,
+    0x0A,
+    0x00,
+    0x00,
+    0x00,
+    0x0D,
+    0x49,
+    0x48,
+    0x44,
+    0x52,
+    0x00,
+    0x00,
+    0x00,
+    0x01,
+    0x00,
+    0x00,
+    0x00,
+    0x01,
+    0x08,
+    0x06,
+    0x00,
+    0x00,
+    0x00,
+    0x1F,
+    0x15,
+    0xC4,
+    0x89,
+    0x00,
+    0x00,
+    0x00,
+    0x0D,
+    0x49,
+    0x44,
+    0x41,
+    0x54,
+    0x78,
+    0x9C,
+    0x63,
+    0xF8,
+    0xCF,
+    0xC0,
+    0x00,
+    0x00,
+    0x03,
+    0x01,
+    0x01,
+    0x00,
+    0x18,
+    0xDD,
+    0x8D,
+    0xB1,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x49,
+    0x45,
+    0x4E,
+    0x44,
+    0xAE,
+    0x42,
+    0x60,
+    0x82,
+  ]);
 
   group('ReaderRuntimeState', () {
     test('applySettingsSnapshot updates settings and rebuilds spread keys', () {
@@ -102,6 +175,81 @@ void main() {
         expect(state.prefetchAheadRunning, isFalse);
         expect(state.queuedPrefetchAheadIndex, isNull);
         expect(state.imageIndexMap, {'a': 0, 'b': 1});
+      },
+    );
+  });
+
+  group('ReaderImagePipelineController', () {
+    testWidgets(
+      'retryImage clears caches and bypasses disk cache for the retried image',
+      (tester) async {
+        final runtimeState = ReaderRuntimeState()..applyImages(['retry-url']);
+        final pipelineState = ReaderImagePipelineState()
+          ..providerCache['retry-url'] = const AssetImage('old')
+          ..providerFutureCache['retry-url'] = Future.value(
+            const AssetImage('old'),
+          );
+        final diagnosticsState = ReaderDiagnosticsState();
+        final zoomController = TransformationController();
+        final useDiskCacheCalls = <bool>[];
+        final evictedMemoryUrls = <String>[];
+        final evictedDiskUrls = <String>[];
+        late ReaderImagePipelineController controller;
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Builder(
+              builder: (context) {
+                controller = ReaderImagePipelineController(
+                  runtimeState: runtimeState,
+                  pipelineState: pipelineState,
+                  diagnosticsState: diagnosticsState,
+                  zoomController: zoomController,
+                  context: () => context,
+                  isMounted: () => true,
+                  updateState: (update) => update(),
+                  logEvent:
+                      (
+                        title, {
+                        level = 'info',
+                        source = 'reader_ui',
+                        content,
+                      }) {},
+                  logPayload: ([extra]) => extra ?? <String, dynamic>{},
+                  logVisiblePageChange: ({required index, required trigger}) {},
+                  noImageModeEnabled: () => false,
+                  comicId: 'comic',
+                  epId: 'ep',
+                  loadImagesErrorBuilder: (error) => '$error',
+                  imageProviderBuilder:
+                      (url, {bool useDiskCache = true}) async {
+                        useDiskCacheCalls.add(useDiskCache);
+                        return MemoryImage(validPngBytes);
+                      },
+                  evictImageBytesFromMemory: (urls) {
+                    evictedMemoryUrls.addAll(urls);
+                  },
+                  evictImageCacheEntries: (urls) async {
+                    evictedDiskUrls.addAll(urls);
+                  },
+                  precacheImageCallback: (_) async {},
+                );
+
+                return const SizedBox.shrink();
+              },
+            ),
+          ),
+        );
+
+        await controller.retryImage('retry-url');
+        await tester.pump();
+
+        expect(evictedMemoryUrls, ['retry-url']);
+        expect(evictedDiskUrls, ['retry-url']);
+        expect(useDiskCacheCalls, [isFalse]);
+        expect(pipelineState.providerCache.keys, ['retry-url']);
+        expect(pipelineState.providerFutureCache.keys, ['retry-url']);
+        expect(pipelineState.retryingImageUrls, isEmpty);
       },
     );
   });

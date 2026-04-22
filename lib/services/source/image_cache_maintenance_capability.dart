@@ -180,4 +180,21 @@ extension HazukiSourceServiceImageCacheMaintenanceCapability
     }
     _imageBytesCache.clear();
   }
+
+  Future<void> evictImageCacheEntries(Iterable<String> urls) async {
+    for (final url in urls) {
+      final normalizedUrl = url.trim();
+      if (normalizedUrl.isEmpty) {
+        continue;
+      }
+      try {
+        final file = await _cacheFileForUrl(normalizedUrl);
+        if (await file.exists()) {
+          await file.delete();
+        }
+      } catch (_) {
+        continue;
+      }
+    }
+  }
 }
