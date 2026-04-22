@@ -131,6 +131,20 @@ class ComicDetailSessionController {
     }
   }
 
+  Map<String, Object?> buildCommentsTabDebugState() {
+    final hasClients = _scrollController.hasClients;
+    final position = hasClients ? _scrollController.position : null;
+    return {
+      'outerHasClients': hasClients,
+      'outerPixels': position?.pixels.round(),
+      'outerMinScrollExtent': position?.minScrollExtent.round(),
+      'outerMaxScrollExtent': position?.maxScrollExtent.round(),
+      'outerViewportDimension': position?.viewportDimension.round(),
+      'outerAnimatingCommentsFullscreen': _isAnimatingCommentsFullscreen,
+      'outerTabIndex': _tabController.index,
+    };
+  }
+
   void updateAppBarMetadata({
     required String title,
     required String updateTime,

@@ -33,6 +33,7 @@ class ComicDetailBody extends StatelessWidget {
     required this.onOpenReader,
     required this.onDetailsLoaded,
     required this.onRequestCommentsTabFullscreen,
+    required this.buildCommentsTabDebugState,
     required this.onDetailsResolved,
     required this.isDesktopPanel,
     required this.onCloseRequested,
@@ -66,6 +67,7 @@ class ComicDetailBody extends StatelessWidget {
   onOpenReader;
   final ValueChanged<ComicDetailsData> onDetailsLoaded;
   final Future<void> Function() onRequestCommentsTabFullscreen;
+  final Map<String, Object?> Function() buildCommentsTabDebugState;
   final void Function({required String title, required String updateTime})
   onDetailsResolved;
   final bool isDesktopPanel;
@@ -220,6 +222,8 @@ class ComicDetailBody extends StatelessWidget {
                               isActiveInTabView: shouldRender,
                               onRequestTabFullscreen:
                                   onRequestCommentsTabFullscreen,
+                              debugOuterScrollStateBuilder:
+                                  buildCommentsTabDebugState,
                             ),
                           )
                         : const ComicDetailLoadingView();

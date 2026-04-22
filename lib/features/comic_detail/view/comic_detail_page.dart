@@ -237,6 +237,8 @@ class _ComicDetailPageState extends State<ComicDetailPage>
                     _sessionController.markComicDetailRevealHandled,
                 onRequestCommentsTabFullscreen:
                     _sessionController.ensureCommentsTabFullscreen,
+                buildCommentsTabDebugState:
+                    _sessionController.buildCommentsTabDebugState,
                 onDetailsResolved: ({required title, required updateTime}) =>
                     _sessionController.updateAppBarMetadata(
                       title: title,

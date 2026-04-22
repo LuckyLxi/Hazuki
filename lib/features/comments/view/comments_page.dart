@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:hazuki/features/comments/support/comments_content_support.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
@@ -10,6 +11,41 @@ import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
 import 'comments_widgets.dart';
+
+class _CommentsTabClampingScrollPhysics extends ClampingScrollPhysics {
+  const _CommentsTabClampingScrollPhysics({super.parent});
+
+  @override
+  _CommentsTabClampingScrollPhysics applyTo(ScrollPhysics? ancestor) {
+    return _CommentsTabClampingScrollPhysics(parent: buildParent(ancestor));
+  }
+
+  @override
+  bool get allowImplicitScrolling => false;
+}
+
+class _SuppressShowOnScreen extends SingleChildRenderObjectWidget {
+  const _SuppressShowOnScreen({required super.child});
+
+  @override
+  RenderObject createRenderObject(BuildContext context) {
+    return _RenderSuppressShowOnScreen();
+  }
+}
+
+class _RenderSuppressShowOnScreen extends RenderProxyBox {
+  @override
+  void showOnScreen({
+    RenderObject? descendant,
+    Rect? rect,
+    Duration duration = Duration.zero,
+    Curve curve = Curves.ease,
+  }) {
+    // The composer is already pinned on screen, so suppress framework-driven
+    // focus reveal scrolling and let the detail-page fullscreen logic decide
+    // whether any outer scroll is needed.
+  }
+}
 
 class CommentsPage extends StatefulWidget {
   const CommentsPage({
@@ -19,6 +55,7 @@ class CommentsPage extends StatefulWidget {
     this.isTabView = false,
     this.isActiveInTabView = true,
     this.onRequestTabFullscreen,
+    this.debugOuterScrollStateBuilder,
   });
 
   final String comicId;
@@ -26,6 +63,7 @@ class CommentsPage extends StatefulWidget {
   final bool isTabView;
   final bool isActiveInTabView;
   final Future<void> Function()? onRequestTabFullscreen;
+  final Map<String, Object?> Function()? debugOuterScrollStateBuilder;
 
   @override
   State<CommentsPage> createState() => _CommentsPageState();
@@ -53,6 +91,10 @@ class _CommentsPageState extends State<CommentsPage>
   bool? _tabScrollAtTop;
   int _fullscreenRequestEpoch = 0;
   double _keyboardHeight = 0;
+  double? _lastInnerScrollPixels;
+  double? _lastInnerScrollMin;
+  double? _lastInnerScrollMax;
+  double? _lastInnerViewportDimension;
 
   @override
   bool get wantKeepAlive => true;
@@ -88,9 +130,13 @@ class _CommentsPageState extends State<CommentsPage>
       setState(() {
         _keyboardHeight = newKeyboardHeight;
       });
-    }
-    if (_commentFocusNode.hasFocus) {
-      _scheduleFullscreenSyncAttempts();
+      _logCommentsStateSnapshot(
+        'Comments metrics changed',
+        extra: {
+          'rawBottomInset': rawBottom.round(),
+          'newKeyboardHeight': newKeyboardHeight.round(),
+        },
+      );
     }
   }
 
@@ -98,9 +144,10 @@ class _CommentsPageState extends State<CommentsPage>
     if (!mounted) {
       return;
     }
-    if (_commentFocusNode.hasFocus) {
-      _scheduleFullscreenSyncAttempts();
-    }
+    _logCommentsStateSnapshot(
+      'Comment input focus changed',
+      extra: {'hasFocus': _commentFocusNode.hasFocus},
+    );
     setState(() {});
   }
 
@@ -136,6 +183,7 @@ class _CommentsPageState extends State<CommentsPage>
     if (!widget.isTabView || metrics.axis != Axis.vertical) {
       return;
     }
+    _rememberInnerScrollMetrics(metrics);
     final atTop = metrics.pixels <= metrics.minScrollExtent + 0.5;
     if (_tabScrollAtTop == atTop) {
       return;
@@ -147,6 +195,34 @@ class _CommentsPageState extends State<CommentsPage>
         'pixels': metrics.pixels.round(),
         'minScrollExtent': metrics.minScrollExtent.round(),
         'maxScrollExtent': metrics.maxScrollExtent.round(),
+      },
+    );
+  }
+
+  void _rememberInnerScrollMetrics(ScrollMetrics metrics) {
+    _lastInnerScrollPixels = metrics.pixels;
+    _lastInnerScrollMin = metrics.minScrollExtent;
+    _lastInnerScrollMax = metrics.maxScrollExtent;
+    _lastInnerViewportDimension = metrics.viewportDimension;
+  }
+
+  void _logCommentsStateSnapshot(String title, {Map<String, Object?>? extra}) {
+    final mediaQuery = MediaQuery.maybeOf(context);
+    final outerState = widget.debugOuterScrollStateBuilder?.call();
+    _logCommentsEvent(
+      title,
+      content: {
+        'hasFocus': _commentFocusNode.hasFocus,
+        'tabScrollAtTop': _tabScrollAtTop,
+        'keyboardHeight': _keyboardHeight.round(),
+        'liveViewInsetBottom': mediaQuery?.viewInsets.bottom.round(),
+        'safeBottom': mediaQuery?.padding.bottom.round(),
+        'innerPixels': _lastInnerScrollPixels?.round(),
+        'innerMinScrollExtent': _lastInnerScrollMin?.round(),
+        'innerMaxScrollExtent': _lastInnerScrollMax?.round(),
+        'innerViewportDimension': _lastInnerViewportDimension?.round(),
+        if (outerState != null) ...outerState,
+        if (extra != null) ...extra,
       },
     );
   }
@@ -208,6 +284,10 @@ class _CommentsPageState extends State<CommentsPage>
   }
 
   void _handleCommentInputTap() {
+    _logCommentsStateSnapshot(
+      'Comment input tapped',
+      extra: {'hadFocusBeforeTap': _commentFocusNode.hasFocus},
+    );
     _scheduleFullscreenSyncAttempts();
   }
 
@@ -218,11 +298,24 @@ class _CommentsPageState extends State<CommentsPage>
     final requestEpoch = ++_fullscreenRequestEpoch;
 
     void runIfStillNeeded() {
-      if (!mounted ||
-          !_commentFocusNode.hasFocus ||
-          requestEpoch != _fullscreenRequestEpoch) {
+      if (!mounted) {
         return;
       }
+      if (!_commentFocusNode.hasFocus ||
+          requestEpoch != _fullscreenRequestEpoch) {
+        _logCommentsStateSnapshot(
+          'Comments fullscreen sync skipped before request',
+          extra: {
+            'requestEpoch': requestEpoch,
+            'currentEpoch': _fullscreenRequestEpoch,
+          },
+        );
+        return;
+      }
+      _logCommentsStateSnapshot(
+        'Comments fullscreen sync requesting',
+        extra: {'requestEpoch': requestEpoch},
+      );
       unawaited(_requestTabFullscreenIfNeeded());
     }
 
@@ -243,15 +336,37 @@ class _CommentsPageState extends State<CommentsPage>
     if (!widget.isTabView) {
       return;
     }
-    final callback = widget.onRequestTabFullscreen;
-    if (callback == null) {
+    if (_tabScrollAtTop == false) {
+      _logCommentsStateSnapshot(
+        'Comments fullscreen request skipped',
+        extra: {'reason': 'inner_scroll_not_at_top'},
+      );
       return;
     }
+    final callback = widget.onRequestTabFullscreen;
+    if (callback == null) {
+      _logCommentsStateSnapshot(
+        'Comments fullscreen request skipped',
+        extra: {'reason': 'missing_callback'},
+      );
+      return;
+    }
+    _logCommentsStateSnapshot('Comments fullscreen request started');
     await callback();
+    _logCommentsStateSnapshot('Comments fullscreen request finished');
   }
 
   void _onScrollNotification(ScrollNotification notification) {
+    _rememberInnerScrollMetrics(notification.metrics);
     _logTabTopState(notification.metrics);
+    if (notification is ScrollStartNotification ||
+        notification is ScrollEndNotification) {
+      _logCommentsStateSnapshot(
+        notification is ScrollStartNotification
+            ? 'Comments inner scroll started'
+            : 'Comments inner scroll ended',
+      );
+    }
     if (notification is ScrollUpdateNotification) {
       final metrics = notification.metrics;
       if (metrics.maxScrollExtent > 0 &&
@@ -721,52 +836,55 @@ class _CommentsPageState extends State<CommentsPage>
                             ).colorScheme.outlineVariant.withAlpha(150),
                           ),
                         ),
-                        child: TextField(
-                          controller: _commentController,
-                          focusNode: _commentFocusNode,
-                          onTap: _handleCommentInputTap,
-                          onTapOutside: (_) => _commentFocusNode.unfocus(),
-                          minLines: 1,
-                          maxLines: 3,
-                          textInputAction: TextInputAction.send,
-                          onSubmitted: (_) => unawaited(_submitComment()),
-                          decoration: InputDecoration(
-                            hintText: hint,
-                            border: InputBorder.none,
-                            enabledBorder: InputBorder.none,
-                            focusedBorder: InputBorder.none,
-                            contentPadding: const EdgeInsets.only(
-                              left: 16,
-                              top: 10,
-                              bottom: 10,
-                              right: 4,
-                            ),
-                            isDense: true,
-                            suffixIcon: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 4,
-                                vertical: 4,
+                        child: _SuppressShowOnScreen(
+                          child: TextField(
+                            controller: _commentController,
+                            focusNode: _commentFocusNode,
+                            onTap: _handleCommentInputTap,
+                            onTapOutside: (_) => _commentFocusNode.unfocus(),
+                            scrollPadding: EdgeInsets.zero,
+                            minLines: 1,
+                            maxLines: 3,
+                            textInputAction: TextInputAction.send,
+                            onSubmitted: (_) => unawaited(_submitComment()),
+                            decoration: InputDecoration(
+                              hintText: hint,
+                              border: InputBorder.none,
+                              enabledBorder: InputBorder.none,
+                              focusedBorder: InputBorder.none,
+                              contentPadding: const EdgeInsets.only(
+                                left: 16,
+                                top: 10,
+                                bottom: 10,
+                                right: 4,
                               ),
-                              child: FilledButton(
-                                onPressed: _sendingComment
-                                    ? null
-                                    : _submitComment,
-                                style: FilledButton.styleFrom(
-                                  minimumSize: Size.zero,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 14,
-                                    vertical: 0,
-                                  ),
-                                  tapTargetSize:
-                                      MaterialTapTargetSize.shrinkWrap,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
+                              isDense: true,
+                              suffixIcon: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                  vertical: 4,
                                 ),
-                                child: Text(
-                                  _sendingComment
-                                      ? l10n(context).commentsSending
-                                      : l10n(context).commentsSend,
+                                child: FilledButton(
+                                  onPressed: _sendingComment
+                                      ? null
+                                      : _submitComment,
+                                  style: FilledButton.styleFrom(
+                                    minimumSize: Size.zero,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 0,
+                                    ),
+                                    tapTargetSize:
+                                        MaterialTapTargetSize.shrinkWrap,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    _sendingComment
+                                        ? l10n(context).commentsSending
+                                        : l10n(context).commentsSend,
+                                  ),
                                 ),
                               ),
                             ),
@@ -801,7 +919,7 @@ class _CommentsPageState extends State<CommentsPage>
         },
         child: CustomScrollView(
           key: const PageStorageKey<String>('comic-detail-comments-tab'),
-          physics: const ClampingScrollPhysics(),
+          physics: const _CommentsTabClampingScrollPhysics(),
           slivers: [
             SliverOverlapInjector(handle: overlapHandle),
             if (_comments.isNotEmpty)
