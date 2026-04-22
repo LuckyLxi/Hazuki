@@ -112,29 +112,11 @@ class HomeCoordinator extends ChangeNotifier {
   }
 
   Future<void> handleDestinationSelected(int index) async {
-    final previousIndex = currentIndex;
-    final previousSnapshot = _buildAppBarSnapshot(previousIndex);
-    if (previousIndex == index) {
-      _logHomeAppBarEvent(
-        'Home app bar tab switch ignored',
-        content: {
-          'requestedTabIndex': index,
-          'requestedTab': _tabLabel(index),
-          'reason': 'same_tab',
-          'snapshot': previousSnapshot,
-        },
-      );
+    if (currentIndex == index) {
       return;
     }
 
     await _shellController.handleDestinationSelected(index);
-    _logHomeAppBarEvent(
-      'Home app bar tab switched',
-      content: {
-        'from': previousSnapshot,
-        'to': _buildAppBarSnapshot(currentIndex),
-      },
-    );
   }
 
   Future<void> changeFavoriteSortOrder(String order) {
@@ -154,21 +136,7 @@ class HomeCoordinator extends ChangeNotifier {
   }
 
   void handleFavoriteAppBarActionsChanged(FavoriteAppBarActionsState state) {
-    final previousState = favoriteAppBarActions;
     _shellController.handleFavoriteAppBarActionsChanged(state);
-    if (currentIndex != 1 || previousState == state) {
-      return;
-    }
-    _logHomeAppBarEvent(
-      'Home favorite app bar actions changed',
-      content: {
-        'fromFavoriteActions': _buildFavoriteAppBarActionsSnapshot(
-          previousState,
-        ),
-        'toFavoriteActions': _buildFavoriteAppBarActionsSnapshot(state),
-        'snapshot': _buildAppBarSnapshot(currentIndex),
-      },
-    );
   }
 
   HomeProfileFlow createProfileFlow(
@@ -188,67 +156,6 @@ class HomeCoordinator extends ChangeNotifier {
     if (!_disposed) {
       notifyListeners();
     }
-  }
-
-  void _logHomeAppBarEvent(
-    String title, {
-    String level = 'info',
-    Map<String, Object?>? content,
-  }) {
-    HazukiSourceService.instance.addApplicationLog(
-      level: level,
-      title: title,
-      source: 'home_app_bar',
-      content: {
-        'currentTabIndex': currentIndex,
-        'currentTab': _tabLabel(currentIndex),
-        if (content != null) ...content,
-      },
-    );
-  }
-
-  Map<String, Object?> _buildAppBarSnapshot(int tabIndex) {
-    final pinnedDiscoverSearch = dailyRecommendationState.hasRecommendations;
-    final discoverSearchVisibleInAppBar =
-        tabIndex == 0 &&
-        (pinnedDiscoverSearch || discoverSearchMorphProgress >= 0.96);
-    return {
-      'tabIndex': tabIndex,
-      'tab': _tabLabel(tabIndex),
-      'blurEnabled': tabIndex != 0,
-      'visibleActionGroup': tabIndex == 0 ? 'discover' : 'favorite',
-      'pinnedDiscoverSearch': pinnedDiscoverSearch,
-      'discoverSearchMorphProgress': _roundTo3(discoverSearchMorphProgress),
-      'discoverSearchVisibleInAppBar': discoverSearchVisibleInAppBar,
-      if (tabIndex == 1)
-        'favoriteActions': _buildFavoriteAppBarActionsSnapshot(
-          favoriteAppBarActions,
-        ),
-    };
-  }
-
-  Map<String, Object?> _buildFavoriteAppBarActionsSnapshot(
-    FavoriteAppBarActionsState state,
-  ) {
-    return {
-      'showModeToggle': state.showModeToggle,
-      'currentMode': state.currentMode.name,
-      'showSort': state.showSort,
-      'currentSortOrder': state.currentSortOrder,
-      'showCreateFolder': state.showCreateFolder,
-    };
-  }
-
-  String _tabLabel(int index) {
-    return switch (index) {
-      0 => 'discover',
-      1 => 'favorite',
-      _ => 'unknown_$index',
-    };
-  }
-
-  double _roundTo3(double value) {
-    return (value * 1000).roundToDouble() / 1000;
   }
 
   Future<void> _prewarmSourceRuntime(BuildContext context) async {

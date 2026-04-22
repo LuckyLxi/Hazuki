@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/app/windows_comic_detail.dart';
@@ -14,7 +16,7 @@ void main() {
     WindowsComicDetailController.instance.close();
   });
 
-  testWidgets('search entry page autofocuses and shows keyboard', (
+  testWidgets('search entry page applies platform autofocus behavior', (
     tester,
   ) async {
     SharedPreferences.setMockInitialValues({
@@ -42,8 +44,54 @@ void main() {
 
     expect(scaffold.resizeToAvoidBottomInset, isTrue);
     expect(find.byType(FloatingActionButton), findsOneWidget);
+    if (Platform.isWindows) {
+      expect(editableText.focusNode.hasFocus, isFalse);
+      expect(tester.testTextInput.isVisible, isFalse);
+    } else {
+      expect(editableText.focusNode.hasFocus, isTrue);
+      expect(tester.testTextInput.isVisible, isTrue);
+    }
+  });
+
+  testWidgets('search entry page single tap restores caret focus', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'search_history': <String>['hazuki'],
+    });
+
+    await tester.pumpWidget(
+      _buildTestApp(
+        SearchEntryPage(
+          comicDetailPageBuilder: _comicDetailPageBuilder,
+          comicCoverHeroTagBuilder: (_, {String? salt}) => 'hero-$salt',
+          searchPageLoader: _fakeSearchPageLoader,
+        ),
+      ),
+    );
+    await _pumpSearchSettled(tester);
+
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump();
+
+    await tester.tap(
+      find.byKey(const ValueKey('search-entry-primary-search-bar')),
+    );
+    await _pumpSearchSettled(tester);
+
+    final editableText = tester.widget<EditableText>(
+      find.descendant(
+        of: find.byKey(const ValueKey('search-entry-primary-search-bar')),
+        matching: find.byType(EditableText),
+      ),
+    );
+
     expect(editableText.focusNode.hasFocus, isTrue);
-    expect(tester.testTextInput.isVisible, isTrue);
+    expect(editableText.controller.selection.isValid, isTrue);
+    expect(
+      editableText.controller.selection.baseOffset,
+      editableText.controller.text.length,
+    );
   });
 
   testWidgets('history selection opens results without showing keyboard', (

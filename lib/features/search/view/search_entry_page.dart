@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:hazuki/app/app.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:hazuki/widgets/windows_comic_detail_host.dart';
 
@@ -47,21 +49,34 @@ class _SearchEntryPageState extends State<SearchEntryPage> {
   double _searchRevealProgress = 0;
 
   bool get _showCollapsedSearch => _revealSupport.showCollapsedSearch;
+  bool get _shouldAutofocusPrimarySearch => !Platform.isWindows;
 
   @override
   void initState() {
     super.initState();
     unawaited(_loadHistory());
     _scrollController.addListener(_onScroll);
+    _focusCoordinator.primaryFocusNode.addListener(_handleSearchFocusChanged);
+    _focusCoordinator.collapsedFocusNode.addListener(_handleSearchFocusChanged);
   }
 
   @override
   void dispose() {
+    _focusCoordinator.primaryFocusNode.removeListener(
+      _handleSearchFocusChanged,
+    );
+    _focusCoordinator.collapsedFocusNode.removeListener(
+      _handleSearchFocusChanged,
+    );
     _revealSupport.dispose();
     _scrollController.removeListener(_onScroll);
     _focusCoordinator.dispose();
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _handleSearchFocusChanged() {
+    _logSearchEntryEvent('Search entry focus changed', stage: 'focus_listener');
   }
 
   void _syncSearchRevealProgress(bool force) {
@@ -243,6 +258,7 @@ class _SearchEntryPageState extends State<SearchEntryPage> {
     Key? key,
     required String clearKey,
     required String submitKey,
+    required String logTarget,
     FocusNode? focusNode,
     bool compact = false,
     bool autofocus = false,
@@ -255,6 +271,7 @@ class _SearchEntryPageState extends State<SearchEntryPage> {
       submitKey: submitKey,
       compact: compact,
       autofocus: autofocus,
+      onTap: () => _handleSearchBarTap(logTarget),
       onClear: () {
         _focusCoordinator.clearText();
         unawaited(_focusCoordinator.requestPrimarySearchFocus(context));
@@ -278,6 +295,80 @@ class _SearchEntryPageState extends State<SearchEntryPage> {
     );
   }
 
+  void _handleSearchBarTap(String target) {
+    _logSearchEntryEvent(
+      'Search entry bar tapped',
+      stage: 'tap_start',
+      target: target,
+    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      _logSearchEntryEvent(
+        'Search entry bar tapped',
+        stage: 'tap_post_frame',
+        target: target,
+      );
+    });
+    unawaited(_logSearchEntryTapDelayed(target));
+  }
+
+  Future<void> _logSearchEntryTapDelayed(String target) async {
+    await Future<void>.delayed(const Duration(milliseconds: 120));
+    if (!mounted) {
+      return;
+    }
+    _logSearchEntryEvent(
+      'Search entry bar tapped',
+      stage: 'tap_after_120ms',
+      target: target,
+    );
+  }
+
+  void _logSearchEntryEvent(
+    String title, {
+    required String stage,
+    String? target,
+  }) {
+    final view = WidgetsBinding.instance.platformDispatcher.views.isNotEmpty
+        ? WidgetsBinding.instance.platformDispatcher.views.first
+        : null;
+    final primarySelection = _focusCoordinator.primaryController.selection;
+    final collapsedSelection = _focusCoordinator.collapsedController.selection;
+    HazukiSourceService.instance.addApplicationLog(
+      level: 'info',
+      title: title,
+      source: 'search_entry_focus',
+      content: {
+        'stage': stage,
+        ...?target == null ? null : {'target': target},
+        'showCollapsedSearch': _showCollapsedSearch,
+        'keyboardVisible': _focusCoordinator.keyboardVisible,
+        'viewInsetsBottom': view?.viewInsets.bottom ?? 0,
+        'primaryHasFocus': _focusCoordinator.primaryFocusNode.hasFocus,
+        'collapsedHasFocus': _focusCoordinator.collapsedFocusNode.hasFocus,
+        'pageHasFocus': _focusCoordinator.pageFocusNode.hasFocus,
+        'primaryTextLength': _focusCoordinator.primaryController.text.length,
+        'collapsedTextLength':
+            _focusCoordinator.collapsedController.text.length,
+        'primarySelection': _selectionSnapshot(primarySelection),
+        'collapsedSelection': _selectionSnapshot(collapsedSelection),
+        'focusManagerPrimary':
+            FocusManager.instance.primaryFocus?.debugLabel ?? 'null',
+      },
+    );
+  }
+
+  Map<String, Object?> _selectionSnapshot(TextSelection selection) {
+    return {
+      'valid': selection.isValid,
+      'baseOffset': selection.baseOffset,
+      'extentOffset': selection.extentOffset,
+      'isCollapsed': selection.isCollapsed,
+    };
+  }
+
   Widget _buildTopSearchBox() {
     final hideProgress = Curves.easeOutCubic.transform(_searchRevealProgress);
     return Padding(
@@ -299,7 +390,8 @@ class _SearchEntryPageState extends State<SearchEntryPage> {
                     key: const ValueKey('search-entry-primary-search-bar'),
                     clearKey: 'entry-clear',
                     submitKey: 'entry-submit',
-                    autofocus: true,
+                    logTarget: 'primary',
+                    autofocus: _shouldAutofocusPrimarySearch,
                   ),
                 ),
               ),
@@ -347,6 +439,7 @@ class _SearchEntryPageState extends State<SearchEntryPage> {
                           ),
                           clearKey: 'entry-collapsed-clear',
                           submitKey: 'entry-collapsed-submit',
+                          logTarget: 'collapsed',
                           focusNode: _focusCoordinator.collapsedFocusNode,
                           compact: true,
                         ),

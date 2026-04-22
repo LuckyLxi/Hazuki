@@ -13,6 +13,7 @@ class SearchBarShell extends StatelessWidget {
     required this.onSubmit,
     this.onChanged,
     this.onSubmitted,
+    this.onTap,
     this.compact = false,
     this.autofocus = false,
   });
@@ -25,6 +26,7 @@ class SearchBarShell extends StatelessWidget {
   final VoidCallback onSubmit;
   final ValueChanged<String>? onChanged;
   final ValueChanged<String>? onSubmitted;
+  final VoidCallback? onTap;
   final bool compact;
   final bool autofocus;
 
@@ -36,6 +38,18 @@ class SearchBarShell extends StatelessWidget {
       controller: controller,
       hintText: strings.searchHint,
       autoFocus: autofocus,
+      onTap: () {
+        if (!focusNode.canRequestFocus) {
+          return;
+        }
+        onTap?.call();
+        focusNode.requestFocus();
+        final textLength = controller.text.length;
+        final selection = controller.selection;
+        if (!selection.isValid || selection.baseOffset > textLength) {
+          controller.selection = TextSelection.collapsed(offset: textLength);
+        }
+      },
       elevation: const WidgetStatePropertyAll(0),
       backgroundColor: WidgetStatePropertyAll(
         Theme.of(context).colorScheme.surfaceContainerHigh,
