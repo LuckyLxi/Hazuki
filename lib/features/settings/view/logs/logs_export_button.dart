@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:io';
 
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hazuki/l10n/l10n.dart';
@@ -37,10 +39,16 @@ class _LogsAppBarExportButtonState extends State<LogsAppBarExportButton> {
     required String prefix,
     required String content,
   }) async {
-    final savedUri = await _mediaChannel.invokeMethod<String>('saveTextFile', {
-      'suggestedFileName': _buildSuggestedFileName(prefix),
-      'content': content,
-    });
+    final suggestedFileName = _buildSuggestedFileName(prefix);
+    final savedUri = Platform.isWindows
+        ? await _saveLogsFileOnWindows(
+            suggestedFileName: suggestedFileName,
+            content: content,
+          )
+        : await _mediaChannel.invokeMethod<String>('saveTextFile', {
+            'suggestedFileName': suggestedFileName,
+            'content': content,
+          });
     if (!mounted) {
       return;
     }
@@ -49,6 +57,36 @@ class _LogsAppBarExportButtonState extends State<LogsAppBarExportButton> {
         showHazukiPrompt(context, l10n(context).logsApplicationExportSuccess),
       );
     }
+  }
+
+  Future<String?> _saveLogsFileOnWindows({
+    required String suggestedFileName,
+    required String content,
+  }) async {
+    final userProfile = Platform.environment['USERPROFILE']?.trim();
+    final initialDirectory = userProfile == null || userProfile.isEmpty
+        ? null
+        : '$userProfile/Downloads'.replaceAll('\\', '/');
+    const jsonTypeGroup = XTypeGroup(
+      label: 'JSON',
+      extensions: <String>['json'],
+    );
+    final saveLocation = await getSaveLocation(
+      acceptedTypeGroups: const <XTypeGroup>[jsonTypeGroup],
+      initialDirectory: initialDirectory,
+      suggestedName: suggestedFileName,
+    );
+    final savePath = saveLocation?.path;
+    if (savePath == null || savePath.trim().isEmpty) {
+      return null;
+    }
+    final file = File(savePath);
+    final parent = file.parent;
+    if (!await parent.exists()) {
+      await parent.create(recursive: true);
+    }
+    await file.writeAsString(content, flush: true);
+    return file.path;
   }
 
   Future<void> _exportApplicationLogs() async {

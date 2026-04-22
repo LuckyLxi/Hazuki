@@ -1,10 +1,11 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/hazuki_models.dart';
 
-class LocalFavoritesService {
+class LocalFavoritesService extends ChangeNotifier {
   LocalFavoritesService._();
 
   static final LocalFavoritesService instance = LocalFavoritesService._();
@@ -126,6 +127,7 @@ class LocalFavoritesService {
       ),
     );
     await _saveStore(store);
+    notifyListeners();
   }
 
   Future<void> renameFavoriteFolder({
@@ -156,6 +158,7 @@ class LocalFavoritesService {
       name: normalizedName,
     );
     await _saveStore(store);
+    notifyListeners();
   }
 
   Future<void> deleteFavoriteFolder(String folderId) async {
@@ -171,6 +174,7 @@ class LocalFavoritesService {
     }
     store.entries.removeWhere((entry) => entry.folderIds.isEmpty);
     await _saveStore(store);
+    notifyListeners();
   }
 
   Future<void> toggleFavorite({
@@ -225,6 +229,7 @@ class LocalFavoritesService {
     }
 
     await _saveStore(store);
+    notifyListeners();
   }
 
   Future<bool> isComicFavorited(String comicId) async {

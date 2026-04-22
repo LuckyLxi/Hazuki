@@ -14,20 +14,27 @@ class FavoritePageController extends ChangeNotifier {
   FavoritePageController({
     HazukiSourceService? sourceService,
     LocalFavoritesService? localFavoritesService,
-  }) : _cloudFlow = FavoriteCloudFlow(
+  }) : _localFavoritesService =
+           localFavoritesService ?? LocalFavoritesService.instance,
+       _cloudFlow = FavoriteCloudFlow(
          sourceService ?? HazukiSourceService.instance,
        ),
        _localFlow = FavoriteLocalFlow(
          localFavoritesService ?? LocalFavoritesService.instance,
-       );
+       ) {
+    _localFavoritesService.addListener(_handleLocalFavoritesChanged);
+  }
 
   static const favoriteLoadTimeout = Duration(seconds: 90);
 
   final FavoriteCloudFlow _cloudFlow;
   final FavoriteLocalFlow _localFlow;
+  final LocalFavoritesService _localFavoritesService;
   final FavoritePageState _state = FavoritePageState();
 
   bool _disposed = false;
+  bool _syncingExternalLocalChange = false;
+  bool _queuedExternalLocalChange = false;
   List<ExploreComic> get comics => _state.comics;
   List<FavoriteFolder> get folders => _state.folders;
   String get selectedFolderId => _state.selectedFolderId;
@@ -481,7 +488,19 @@ class FavoritePageController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _localFavoritesService.removeListener(_handleLocalFavoritesChanged);
     super.dispose();
+  }
+
+  void _handleLocalFavoritesChanged() {
+    if (_disposed || _state.mode != FavoritePageMode.local) {
+      return;
+    }
+    if (_syncingExternalLocalChange) {
+      _queuedExternalLocalChange = true;
+      return;
+    }
+    unawaited(_syncLocalFavoritesAfterExternalChange());
   }
 
   Future<void> _loadInitialLocal() async {
@@ -512,6 +531,48 @@ class FavoritePageController extends ChangeNotifier {
     _state.applyFirstPageResult(result);
     _state.initialLoading = false;
     _notify();
+  }
+
+  Future<void> _syncLocalFavoritesAfterExternalChange() async {
+    _syncingExternalLocalChange = true;
+    try {
+      do {
+        _queuedExternalLocalChange = false;
+        final requestVersion = ++_state.listRequestVersion;
+        await _reloadLocalFolders();
+        if (_disposed ||
+            _state.mode != FavoritePageMode.local ||
+            requestVersion != _state.listRequestVersion) {
+          continue;
+        }
+
+        final targetFolderId = _state.selectedLocalFolderId;
+        if (targetFolderId.isEmpty) {
+          _state.comics = const <ExploreComic>[];
+          _state.errorMessage = null;
+          _state.currentPage = 1;
+          _state.hasMore = false;
+          _notify();
+          continue;
+        }
+
+        final result = await _localFlow.loadPage(
+          page: 1,
+          folderId: targetFolderId,
+          sortOrder: _state.favoriteSortOrder,
+        );
+        if (_disposed ||
+            _state.mode != FavoritePageMode.local ||
+            requestVersion != _state.listRequestVersion) {
+          continue;
+        }
+
+        _state.applyFirstPageResult(result);
+        _notify();
+      } while (_queuedExternalLocalChange && !_disposed);
+    } finally {
+      _syncingExternalLocalChange = false;
+    }
   }
 
   Future<void> _reloadLocalFolders() async {
