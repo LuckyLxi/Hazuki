@@ -1,19 +1,59 @@
-part of 'reader_page.dart';
+import 'dart:async';
 
-extension _ReaderPageStateImageViews on _ReaderPageState {
-  ThemeData _resolveReaderTheme([BuildContext? buildContext]) {
+import 'package:flutter/material.dart';
+
+import 'package:hazuki/features/reader/reader.dart';
+import 'package:hazuki/features/reader/state/reader_image_pipeline_state.dart';
+import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
+import 'package:hazuki/features/reader/support/reader_image_pipeline_controller.dart';
+import 'package:hazuki/features/reader/support/reader_navigation_controller.dart';
+import 'package:hazuki/features/reader/support/reader_zoom_controller.dart';
+import 'package:hazuki/l10n/l10n.dart';
+
+class ReaderImageViews {
+  const ReaderImageViews({
+    required this.context,
+    required this.comicId,
+    required this.epId,
+    required this.comicTheme,
+    required this.runtimeState,
+    required this.imagePipelineState,
+    required this.zoomController,
+    required this.imagePipelineController,
+    required this.navigationController,
+    required this.scrollController,
+    required this.pageController,
+    required this.readerZoomController,
+    required this.wrapImageWidget,
+    required this.noImageModeEnabled,
+  });
+
+  final BuildContext context;
+  final String comicId;
+  final String epId;
+  final ThemeData? comicTheme;
+  final ReaderRuntimeState runtimeState;
+  final ReaderImagePipelineState imagePipelineState;
+  final TransformationController zoomController;
+  final ReaderImagePipelineController imagePipelineController;
+  final ReaderNavigationController navigationController;
+  final ScrollController scrollController;
+  final PageController pageController;
+  final ReaderZoomController readerZoomController;
+  final Widget Function(Widget imageWidget, String url) wrapImageWidget;
+  final bool noImageModeEnabled;
+
+  ThemeData resolveReaderTheme([BuildContext? buildContext]) {
     final targetContext = buildContext ?? context;
-    return widget.comicTheme ?? Theme.of(targetContext);
+    return comicTheme ?? Theme.of(targetContext);
   }
 
   Color _resolveReaderSurfaceColor([BuildContext? buildContext]) {
-    return _resolveReaderTheme(buildContext).colorScheme.surface;
+    return resolveReaderTheme(buildContext).colorScheme.surface;
   }
 
   Color _resolveReaderPlaceholderColor([BuildContext? buildContext]) {
-    return _resolveReaderTheme(
-      buildContext,
-    ).colorScheme.surfaceContainerHighest;
+    return resolveReaderTheme(buildContext).colorScheme.surfaceContainerHighest;
   }
 
   Widget _buildZoomableReader({
@@ -21,8 +61,8 @@ extension _ReaderPageStateImageViews on _ReaderPageState {
     bool constrained = true,
   }) {
     return InteractiveViewer(
-      transformationController: _zoomController,
-      panEnabled: _runtimeState.isZoomed || _runtimeState.zoomInteracting,
+      transformationController: zoomController,
+      panEnabled: runtimeState.isZoomed || runtimeState.zoomInteracting,
       scaleEnabled: true,
       panAxis: PanAxis.free,
       boundaryMargin: EdgeInsets.zero,
@@ -30,17 +70,17 @@ extension _ReaderPageStateImageViews on _ReaderPageState {
       clipBehavior: Clip.hardEdge,
       minScale: 1.0,
       maxScale: 5.0,
-      onInteractionStart: _readerZoomController.handleInteractionStart,
-      onInteractionUpdate: _readerZoomController.handleInteractionUpdate,
-      onInteractionEnd: _readerZoomController.handleInteractionEnd,
+      onInteractionStart: readerZoomController.handleInteractionStart,
+      onInteractionUpdate: readerZoomController.handleInteractionUpdate,
+      onInteractionEnd: readerZoomController.handleInteractionEnd,
       child: child,
     );
   }
 
   Widget _wrapPageWithPinchZoom({required int index, required Widget child}) {
-    if (!_runtimeState.pinchToZoom ||
-        _runtimeState.readerMode != ReaderMode.rightToLeft ||
-        index != _runtimeState.currentPageIndex) {
+    if (!runtimeState.pinchToZoom ||
+        runtimeState.readerMode != ReaderMode.rightToLeft ||
+        index != runtimeState.currentPageIndex) {
       return child;
     }
     return _buildZoomableReader(child: child);
@@ -48,35 +88,35 @@ extension _ReaderPageStateImageViews on _ReaderPageState {
 
   Widget _buildReaderListView() {
     return NotificationListener<ScrollNotification>(
-      onNotification: _navigationController.handleScrollNotification,
+      onNotification: navigationController.handleScrollNotification,
       child: ListView.builder(
         key: PageStorageKey<String>(
-          'reader-list-${widget.comicId}-${widget.epId}-${_runtimeState.readerSpreadSize}',
+          'reader-list-$comicId-$epId-${runtimeState.readerSpreadSize}',
         ),
         padding: EdgeInsets.zero,
-        cacheExtent: _imagePipelineController.readerListCacheExtent(context),
-        itemCount: _runtimeState.readerSpreadCount,
-        controller: _scrollController,
-        physics: _runtimeState.zoomGestureActive
+        cacheExtent: imagePipelineController.readerListCacheExtent(context),
+        itemCount: runtimeState.readerSpreadCount,
+        controller: scrollController,
+        physics: runtimeState.zoomGestureActive
             ? const NeverScrollableScrollPhysics()
-            : const _ReaderScrollPhysics(),
+            : const ReaderScrollPhysics(),
         itemBuilder: (context, index) => _buildReaderListItem(index),
       ),
     );
   }
 
   Widget _buildReaderPageImage(int imageIndex) {
-    final url = _runtimeState.images[imageIndex];
-    final cachedProvider = _imagePipelineController.cachedProviderFor(url);
+    final url = runtimeState.images[imageIndex];
+    final cachedProvider = imagePipelineController.cachedProviderFor(url);
     final readerSurfaceColor = _resolveReaderSurfaceColor(context);
     final readerPlaceholderColor = _resolveReaderPlaceholderColor(context);
 
-    if (_noImageModeEnabled) {
+    if (noImageModeEnabled) {
       return const SizedBox.expand();
     }
 
     Widget buildImage(ImageProvider provider) {
-      return _wrapImageWidget(
+      return wrapImageWidget(
         ColoredBox(
           color: readerSurfaceColor,
           child: Center(
@@ -113,7 +153,7 @@ extension _ReaderPageStateImageViews on _ReaderPageState {
 
     return FutureBuilder<ImageProvider>(
       key: ValueKey('reader-page-future-$url'),
-      future: _imagePipelineController.getImageProvider(url),
+      future: imagePipelineController.getImageProvider(url),
       builder: (context, snapshot) {
         if (snapshot.hasData) {
           return buildImage(snapshot.data!);
@@ -133,7 +173,7 @@ extension _ReaderPageStateImageViews on _ReaderPageState {
   }
 
   Widget _buildReaderPageSpread(int spreadIndex) {
-    final imageIndices = _runtimeState.spreadImageIndices(spreadIndex);
+    final imageIndices = runtimeState.spreadImageIndices(spreadIndex);
     if (imageIndices.isEmpty) {
       return const SizedBox.expand();
     }
@@ -150,41 +190,41 @@ extension _ReaderPageStateImageViews on _ReaderPageState {
     return _wrapPageWithPinchZoom(index: spreadIndex, child: spreadContent);
   }
 
-  Widget _buildReaderPageView() {
+  Widget buildReaderPageView() {
     return PageView.builder(
       key: PageStorageKey<String>(
-        'reader-page-${widget.comicId}-${widget.epId}-rtl-${_runtimeState.readerSpreadSize}',
+        'reader-page-$comicId-$epId-rtl-${runtimeState.readerSpreadSize}',
       ),
-      controller: _pageController,
+      controller: pageController,
       reverse: false,
       allowImplicitScrolling: true,
-      itemCount: _runtimeState.readerSpreadCount,
-      physics: _runtimeState.pageNavigationLocked
+      itemCount: runtimeState.readerSpreadCount,
+      physics: runtimeState.pageNavigationLocked
           ? const NeverScrollableScrollPhysics()
           : const PageScrollPhysics(),
-      onPageChanged: _navigationController.handlePageChanged,
+      onPageChanged: navigationController.handlePageChanged,
       itemBuilder: (context, index) {
         return _buildReaderPageSpread(index);
       },
     );
   }
 
-  Widget _buildTopToBottomReaderView() {
-    if (!_runtimeState.pinchToZoom ||
-        _runtimeState.readerMode != ReaderMode.topToBottom) {
+  Widget buildTopToBottomReaderView() {
+    if (!runtimeState.pinchToZoom ||
+        runtimeState.readerMode != ReaderMode.topToBottom) {
       return _buildReaderListView();
     }
     return _buildZoomableReader(child: _buildReaderListView());
   }
 
-  Widget _wrapReaderTapPaging(Widget child) {
+  Widget wrapReaderTapPaging(Widget child) {
     return LayoutBuilder(
       builder: (context, constraints) {
         return GestureDetector(
           behavior: HitTestBehavior.translucent,
           onTapUp: (details) {
             unawaited(
-              _navigationController.handleTapUp(details, constraints.maxWidth),
+              navigationController.handleTapUp(details, constraints.maxWidth),
             );
           },
           child: child,
@@ -194,13 +234,13 @@ extension _ReaderPageStateImageViews on _ReaderPageState {
   }
 
   Widget _buildReaderListItem(int spreadIndex) {
-    final imageIndices = _runtimeState.spreadImageIndices(spreadIndex);
+    final imageIndices = runtimeState.spreadImageIndices(spreadIndex);
     if (imageIndices.isEmpty) {
       return const SizedBox.shrink();
     }
     return Container(
-      key: spreadIndex < _runtimeState.itemKeys.length
-          ? _runtimeState.itemKeys[spreadIndex]
+      key: spreadIndex < runtimeState.itemKeys.length
+          ? runtimeState.itemKeys[spreadIndex]
           : null,
       child: imageIndices.length == 1
           ? _buildReaderListImage(imageIndices.first)
@@ -215,21 +255,21 @@ extension _ReaderPageStateImageViews on _ReaderPageState {
   }
 
   Widget _buildReaderListImage(int imageIndex) {
-    final url = _runtimeState.images[imageIndex];
-    final cachedProvider = _imagePipelineController.cachedProviderFor(url);
+    final url = runtimeState.images[imageIndex];
+    final cachedProvider = imagePipelineController.cachedProviderFor(url);
     final readerSurfaceColor = _resolveReaderSurfaceColor(context);
     final readerPlaceholderColor = _resolveReaderPlaceholderColor(context);
 
     double? currentResolvedAspectRatio() {
-      return _imagePipelineState.imageAspectRatioCache[url];
+      return imagePipelineState.imageAspectRatioCache[url];
     }
 
     double currentPlaceholderAspectRatio() {
       return currentResolvedAspectRatio() ??
-          _imagePipelineController.resolvePlaceholderAspectRatio(imageIndex);
+          imagePipelineController.resolvePlaceholderAspectRatio(imageIndex);
     }
 
-    if (_noImageModeEnabled) {
+    if (noImageModeEnabled) {
       return AspectRatio(
         aspectRatio: currentPlaceholderAspectRatio(),
         child: const SizedBox.expand(),
@@ -283,7 +323,7 @@ extension _ReaderPageStateImageViews on _ReaderPageState {
                 child: image,
               ),
             );
-      return _wrapImageWidget(stableImage, url);
+      return wrapImageWidget(stableImage, url);
     }
 
     if (cachedProvider != null) {
@@ -292,7 +332,7 @@ extension _ReaderPageStateImageViews on _ReaderPageState {
 
     return FutureBuilder<ImageProvider>(
       key: ValueKey(url),
-      future: _imagePipelineController.getImageProvider(url),
+      future: imagePipelineController.getImageProvider(url),
       builder: (context, snapshot) {
         if (snapshot.hasData) {
           return buildImage(snapshot.data!);
@@ -321,7 +361,7 @@ extension _ReaderPageStateImageViews on _ReaderPageState {
     bool compact = false,
     Color? backgroundColor,
   }) {
-    final isRetrying = _imagePipelineController.isRetrying(url);
+    final isRetrying = imagePipelineController.isRetrying(url);
     final theme = Theme.of(context);
     final surfaceColor = backgroundColor ?? _resolveReaderPlaceholderColor();
     final foregroundColor = theme.colorScheme.onSurfaceVariant;
@@ -349,7 +389,7 @@ extension _ReaderPageStateImageViews on _ReaderPageState {
                   onPressed: isRetrying
                       ? null
                       : () =>
-                            unawaited(_imagePipelineController.retryImage(url)),
+                            unawaited(imagePipelineController.retryImage(url)),
                   icon: isRetrying
                       ? SizedBox(
                           width: compact ? 14 : 16,
@@ -367,5 +407,14 @@ extension _ReaderPageStateImageViews on _ReaderPageState {
         ),
       ),
     );
+  }
+}
+
+class ReaderScrollPhysics extends ClampingScrollPhysics {
+  const ReaderScrollPhysics({super.parent});
+
+  @override
+  ReaderScrollPhysics applyTo(ScrollPhysics? ancestor) {
+    return ReaderScrollPhysics(parent: buildParent(ancestor));
   }
 }
