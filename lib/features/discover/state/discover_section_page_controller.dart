@@ -42,8 +42,9 @@ class DiscoverSectionPageController extends ChangeNotifier {
     }
 
     try {
-      final options = await _sourceService
-          .loadCategoryRankingOptionsByViewMore(viewMoreUrl: viewMoreUrl);
+      final options = await _sourceService.loadCategoryRankingOptionsByViewMore(
+        viewMoreUrl: viewMoreUrl,
+      );
       if (_disposed) return;
 
       _state.sortOptions = options;

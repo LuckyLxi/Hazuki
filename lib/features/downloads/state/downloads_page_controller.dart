@@ -112,8 +112,8 @@ class DownloadsPageController extends ChangeNotifier {
     if (_checkingIntegrity) return;
     _checkingIntegrity = true;
     try {
-      _comicsWithIntegrityIssues =
-          await _downloadService.checkDownloadedIntegrity();
+      _comicsWithIntegrityIssues = await _downloadService
+          .checkDownloadedIntegrity();
       _notify();
     } finally {
       _checkingIntegrity = false;

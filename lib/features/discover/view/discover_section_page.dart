@@ -259,12 +259,11 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
                                       ),
                                   itemBuilder: (context, index) {
                                     final comic = _controller.comics[index];
-                                    final heroTag =
-                                        widget.comicCoverHeroTagBuilder(
-                                          comic,
-                                          salt:
-                                              'discover-more-${widget.section.title}-$index',
-                                        );
+                                    final heroTag = widget.comicCoverHeroTagBuilder(
+                                      comic,
+                                      salt:
+                                          'discover-more-${widget.section.title}-$index',
+                                    );
                                     final entryKey = _comicEntryKey(
                                       comic,
                                       index,
@@ -324,9 +323,7 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
                               Flexible(
                                 child: Text(
                                   _controller.errorMessage!,
-                                  style: Theme.of(
-                                    context,
-                                  ).textTheme.bodySmall,
+                                  style: Theme.of(context).textTheme.bodySmall,
                                 ),
                               ),
                               const SizedBox(width: 8),

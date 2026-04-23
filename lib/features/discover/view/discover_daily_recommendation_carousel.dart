@@ -343,8 +343,7 @@ class _DiscoverDailyRecommendationCarouselState
         'detailOpen': _detailOpen,
         'isHovered': _isHovered,
         'isUserScrolling': _isUserScrolling,
-        'isNormalizingLoopBoundary':
-            _loopController.isNormalizingLoopBoundary,
+        'isNormalizingLoopBoundary': _loopController.isNormalizingLoopBoundary,
         'usingMixedSnapshots': _usingMixedSnapshots,
         'protectedVisibleItemCount': _protectedVisibleItems.length,
         'hasPendingRecommendations': _hasPendingRecommendations,

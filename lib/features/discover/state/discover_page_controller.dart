@@ -31,12 +31,10 @@ class DiscoverPageController extends ChangeNotifier {
     List<ExploreSection>? loadedSections;
     String? error;
     try {
-      loadedSections = await _sourceService
-          .loadExploreSections()
-          .timeout(
-            _discoverLoadTimeout,
-            onTimeout: () => throw Exception('discover_load_timeout'),
-          );
+      loadedSections = await _sourceService.loadExploreSections().timeout(
+        _discoverLoadTimeout,
+        onTimeout: () => throw Exception('discover_load_timeout'),
+      );
     } catch (e) {
       error = e.toString().contains('discover_load_timeout')
           ? timeoutMessage

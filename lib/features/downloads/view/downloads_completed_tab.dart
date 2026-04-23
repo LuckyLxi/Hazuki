@@ -47,8 +47,9 @@ class DownloadsCompletedTab extends StatelessWidget {
             itemBuilder: (context, index) {
               final comic = comics[index];
               final selected = selectedComicIds.contains(comic.comicId);
-              final hasIntegrityIssue =
-                  comicsWithIntegrityIssues.contains(comic.comicId);
+              final hasIntegrityIssue = comicsWithIntegrityIssues.contains(
+                comic.comicId,
+              );
               return AnimatedContainer(
                 duration: const Duration(milliseconds: 220),
                 curve: Curves.easeOutCubic,
@@ -120,10 +121,9 @@ class DownloadsCompletedTab extends StatelessWidget {
                                       l10n(context).downloadsChapterCount(
                                         '${comic.chapters.length}',
                                       ),
-                                      style:
-                                          theme.textTheme.bodySmall?.copyWith(
-                                            color:
-                                                colorScheme.onSurfaceVariant,
+                                      style: theme.textTheme.bodySmall
+                                          ?.copyWith(
+                                            color: colorScheme.onSurfaceVariant,
                                           ),
                                     ),
                                   ],
