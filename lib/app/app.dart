@@ -5,6 +5,7 @@ export 'chapter_title_resolver.dart';
 export 'display_mode.dart';
 export 'hazuki_theme_controller.dart';
 export 'hazuki_theme_factory.dart';
+export 'launch_shortcut_bridge.dart';
 export 'navigation_tags.dart';
 export 'ui_flags.dart';
 export 'windows_comic_detail.dart';

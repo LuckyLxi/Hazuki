@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="shortcut_search_short_label">搜索</string>
+    <string name="shortcut_search_long_label">打开搜索</string>
+</resources>

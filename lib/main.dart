@@ -12,6 +12,7 @@ import 'app/appearance_settings.dart';
 import 'app/hazuki_app_controller.dart';
 import 'app/hazuki_theme_controller.dart';
 import 'app/hazuki_theme_factory.dart';
+import 'app/launch_shortcut_bridge.dart';
 import 'app/software_update_dialog_support.dart';
 import 'app/source_runtime_coordinator.dart';
 import 'app/source_runtime_bootstrap_overlay.dart';
@@ -19,9 +20,12 @@ import 'app/source_update_dialog_support.dart';
 import 'app/theme_reveal_support.dart';
 import 'app/ui_flags.dart';
 import 'app/windows_title_bar_controller.dart';
+import 'features/comic_detail/view/comic_detail_page.dart';
 import 'l10n/app_localizations.dart';
 import 'l10n/l10n.dart';
 import 'package:hazuki/features/home/view/home_page.dart';
+import 'package:hazuki/features/search/search.dart';
+import 'package:hazuki/models/hazuki_models.dart';
 import 'services/cloud_sync_service.dart';
 import 'services/hazuki_source_service.dart';
 import 'services/manga_download_service.dart';
@@ -128,7 +132,11 @@ class _HazukiAppState extends State<HazukiApp>
   late final HazukiThemeRevealSupport _themeRevealSupport;
   late final HazukiAppStartupCoordinator _startupCoordinator;
   late final Listenable _appListenable;
+  final HazukiLaunchShortcutBridge _launchShortcutBridge =
+      const HazukiLaunchShortcutBridge();
   late Locale? _locale;
+  StreamSubscription<HazukiLaunchShortcutAction>? _launchShortcutSubscription;
+  bool _launchShortcutNavigationInFlight = false;
 
   @override
   void initState() {
@@ -168,7 +176,13 @@ class _HazukiAppState extends State<HazukiApp>
     );
     _appListenable = Listenable.merge([_themeController, _startupCoordinator]);
     _locale = widget.initialLocale;
+    _launchShortcutSubscription = _launchShortcutBridge.actions.listen((
+      action,
+    ) {
+      unawaited(_handleLaunchShortcutAction(action));
+    });
     _startupCoordinator.initialize();
+    unawaited(_consumeInitialLaunchShortcutAction());
     unawaited(CloudSyncService.instance.autoSyncOnce());
   }
 
@@ -182,6 +196,7 @@ class _HazukiAppState extends State<HazukiApp>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    unawaited(_launchShortcutSubscription?.cancel());
     _themeRevealSupport.dispose();
     _themeController.dispose();
     _startupCoordinator.dispose();
@@ -233,6 +248,58 @@ class _HazukiAppState extends State<HazukiApp>
       ThemeMode.system =>
         WidgetsBinding.instance.platformDispatcher.platformBrightness,
     };
+  }
+
+  Widget _buildRootComicDetailPage(ExploreComic comic, String heroTag) {
+    return ComicDetailPage(comic: comic, heroTag: heroTag);
+  }
+
+  Future<void> _consumeInitialLaunchShortcutAction() async {
+    final action = await _launchShortcutBridge.getInitialAction();
+    if (action == null || !mounted) {
+      return;
+    }
+    await _handleLaunchShortcutAction(action);
+  }
+
+  Future<void> _handleLaunchShortcutAction(
+    HazukiLaunchShortcutAction action,
+  ) async {
+    if (action != HazukiLaunchShortcutAction.search ||
+        _launchShortcutNavigationInFlight) {
+      return;
+    }
+    _launchShortcutNavigationInFlight = true;
+    try {
+      await _waitForNavigatorReady();
+      if (!mounted) {
+        return;
+      }
+      final navigator = _navigatorKey.currentState;
+      if (navigator == null) {
+        return;
+      }
+      await navigator.push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) =>
+              SearchPage(comicDetailPageBuilder: _buildRootComicDetailPage),
+        ),
+      );
+    } finally {
+      _launchShortcutNavigationInFlight = false;
+    }
+  }
+
+  Future<void> _waitForNavigatorReady() async {
+    for (var i = 0; i < 24; i++) {
+      if (!mounted) {
+        return;
+      }
+      if (_navigatorKey.currentState != null) {
+        return;
+      }
+      await WidgetsBinding.instance.endOfFrame;
+    }
   }
 
   void _logThemeEvent(

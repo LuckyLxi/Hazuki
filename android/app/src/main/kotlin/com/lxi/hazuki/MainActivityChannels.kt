@@ -18,6 +18,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.core.net.toUri
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
 
@@ -25,6 +26,8 @@ private const val PRIVACY_CHANNEL = "hazuki.comics/privacy"
 private const val DISPLAY_MODE_CHANNEL = "hazuki.comics/display_mode"
 private const val MEDIA_CHANNEL = "hazuki.comics/media"
 private const val READER_DISPLAY_CHANNEL = "hazuki.comics/reader_display"
+private const val LAUNCH_SHORTCUT_CHANNEL = "hazuki.comics/launch_shortcut"
+private const val LAUNCH_SHORTCUT_EVENTS = "hazuki.comics/launch_shortcut_events"
 
 class MainActivityChannels(
         private val activity: MainActivity,
@@ -39,6 +42,7 @@ class MainActivityChannels(
     private var pendingInstallApkPath: String? = null
     private var readerDisplayChannel: MethodChannel? = null
     private var volumeButtonPagingSessionId: String? = null
+    private var launchShortcutEventSink: EventChannel.EventSink? = null
 
     private val createJsonDocumentLauncher =
             activity.registerForActivityResult(
@@ -68,6 +72,11 @@ class MainActivityChannels(
         registerDisplayModeChannel(flutterEngine)
         registerMediaChannel(flutterEngine)
         registerReaderDisplayChannel(flutterEngine)
+        registerLaunchShortcutChannel(flutterEngine)
+    }
+
+    fun emitLaunchAction(action: String) {
+        launchShortcutEventSink?.success(action)
     }
 
     fun handleReaderVolumeButtonKeyEvent(event: KeyEvent): Boolean {
@@ -571,5 +580,27 @@ class MainActivityChannels(
                         else -> result.notImplemented()
                     }
                 }
+    }
+
+    private fun registerLaunchShortcutChannel(flutterEngine: FlutterEngine) {
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, LAUNCH_SHORTCUT_CHANNEL)
+                .setMethodCallHandler { call, result ->
+                    when (call.method) {
+                        "getInitialLaunchAction" -> result.success(activity.consumeInitialLaunchAction())
+                        else -> result.notImplemented()
+                    }
+                }
+        EventChannel(flutterEngine.dartExecutor.binaryMessenger, LAUNCH_SHORTCUT_EVENTS)
+                .setStreamHandler(
+                        object : EventChannel.StreamHandler {
+                            override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+                                launchShortcutEventSink = events
+                            }
+
+                            override fun onCancel(arguments: Any?) {
+                                launchShortcutEventSink = null
+                            }
+                        },
+                )
     }
 }
