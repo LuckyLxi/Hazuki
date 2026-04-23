@@ -12,9 +12,10 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
       return memoryCached;
     }
 
-    await ensureInitialized();
+    final facade = this.facade;
+    await facade.ensureInitialized();
 
-    final engine = _engine;
+    final engine = facade.js.engine;
     if (engine == null) {
       throw Exception('source_not_initialized');
     }
@@ -50,7 +51,7 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
           __chapterEntries: chapterEntries,
         };
       })()''', name: 'source_comic_detail.js');
-    final dynamic resolved = result is Future ? await result : result;
+    final dynamic resolved = await facade.js.resolve(result);
     if (resolved is! Map) {
       throw Exception('comic_details_invalid_response');
     }
@@ -71,7 +72,8 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
     required String comicId,
     required String epId,
   }) async {
-    final engine = _engine;
+    final facade = this.facade;
+    final engine = facade.js.engine;
     if (engine == null) {
       throw Exception('source_not_initialized');
     }
@@ -80,7 +82,7 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
       'this.__hazuki_source.comic.loadEp(${jsonEncode(comicId)}, ${jsonEncode(epId)})',
       name: 'source_chapter_images.js',
     );
-    final dynamic resolved = result is Future ? await result : result;
+    final dynamic resolved = await facade.js.resolve(result);
     if (resolved is! Map) {
       return const [];
     }

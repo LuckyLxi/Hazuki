@@ -7,7 +7,7 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
     Object? content,
     String source = 'app',
   }) {
-    if (!_softwareLogCaptureEnabled) {
+    if (!facade.softwareLogCaptureEnabled) {
       return;
     }
     _appendApplicationLog(
@@ -24,7 +24,7 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
     Object? content,
     String source = 'reader',
   }) {
-    if (!_softwareLogCaptureEnabled) {
+    if (!facade.softwareLogCaptureEnabled) {
       return;
     }
     _appendReaderLog(
@@ -41,6 +41,7 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
     Object? content,
     String source = 'reader',
   }) {
+    final recentReaderLogs = facade.debug.recentReaderLogs;
     final now = DateTime.now();
     final normalizedLevel = level.trim().isEmpty ? 'info' : level.trim();
     final titleText = title.trim().isEmpty ? 'Reader' : title.trim();
@@ -57,11 +58,11 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
       contentText,
     ].join('|');
 
-    final existingIndex = _recentReaderLogs.indexWhere(
+    final existingIndex = recentReaderLogs.indexWhere(
       (log) => log['dedupKey'] == dedupKey,
     );
     if (existingIndex >= 0) {
-      final existing = _recentReaderLogs[existingIndex];
+      final existing = recentReaderLogs[existingIndex];
       existing['mergedCount'] = (existing['mergedCount'] as int? ?? 1) + 1;
       existing['lastSeenAt'] = now.toIso8601String();
       existing['level'] = normalizedLevel;
@@ -71,7 +72,7 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
       return;
     }
 
-    _recentReaderLogs.add({
+    recentReaderLogs.add({
       'time': now.toIso8601String(),
       'lastSeenAt': now.toIso8601String(),
       'mergedCount': 1,
@@ -82,10 +83,10 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
       'content': safeContent,
       'contentPreview': _toBodyPreview(contentText),
     });
-    if (_recentReaderLogs.length > _debugMaxReaderLogsKept) {
-      _recentReaderLogs.removeRange(
+    if (recentReaderLogs.length > _debugMaxReaderLogsKept) {
+      recentReaderLogs.removeRange(
         0,
-        _recentReaderLogs.length - _debugMaxReaderLogsKept,
+        recentReaderLogs.length - _debugMaxReaderLogsKept,
       );
     }
   }
@@ -96,6 +97,7 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
     Object? content,
     String source = 'app',
   }) {
+    final recentApplicationLogs = facade.debug.recentApplicationLogs;
     final now = DateTime.now();
     final normalizedLevel = level.trim().isEmpty ? 'info' : level.trim();
     final titleText = title.trim().isEmpty ? 'Application' : title.trim();
@@ -113,11 +115,11 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
       contentText,
     ].join('|');
 
-    final existingIndex = _recentApplicationLogs.indexWhere(
+    final existingIndex = recentApplicationLogs.indexWhere(
       (log) => log['dedupKey'] == dedupKey,
     );
     if (existingIndex >= 0) {
-      final existing = _recentApplicationLogs[existingIndex];
+      final existing = recentApplicationLogs[existingIndex];
       existing['mergedCount'] = (existing['mergedCount'] as int? ?? 1) + 1;
       existing['lastSeenAt'] = now.toIso8601String();
       existing['level'] = normalizedLevel;
@@ -127,7 +129,7 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
       return;
     }
 
-    _recentApplicationLogs.add({
+    recentApplicationLogs.add({
       'time': now.toIso8601String(),
       'lastSeenAt': now.toIso8601String(),
       'mergedCount': 1,
@@ -138,10 +140,10 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
       'content': safeContent,
       'contentPreview': _toBodyPreview(contentText),
     });
-    if (_recentApplicationLogs.length > _debugMaxApplicationLogsKept) {
-      _recentApplicationLogs.removeRange(
+    if (recentApplicationLogs.length > _debugMaxApplicationLogsKept) {
+      recentApplicationLogs.removeRange(
         0,
-        _recentApplicationLogs.length - _debugMaxApplicationLogsKept,
+        recentApplicationLogs.length - _debugMaxApplicationLogsKept,
       );
     }
   }
@@ -159,9 +161,10 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
     Map<String, dynamic>? responseHeaders,
     Object? responseBody,
   }) {
-    if (!_softwareLogCaptureEnabled) {
+    if (!facade.softwareLogCaptureEnabled) {
       return;
     }
+    final recentNetworkLogs = facade.debug.recentNetworkLogs;
     final endedAt = DateTime.now();
     final durationMs = endedAt.difference(startedAt).inMilliseconds;
     if (_shouldSkipNetworkLogStorage(
@@ -234,11 +237,11 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
       responseBodyPreview ?? '',
     ].join('|');
 
-    final existingIndex = _recentNetworkLogs.indexWhere(
+    final existingIndex = recentNetworkLogs.indexWhere(
       (log) => log['dedupKey'] == dedupKey,
     );
     if (existingIndex >= 0) {
-      final existing = _recentNetworkLogs[existingIndex];
+      final existing = recentNetworkLogs[existingIndex];
       existing['mergedCount'] = (existing['mergedCount'] as int? ?? 1) + 1;
       existing['lastSeenAt'] = endedAt.toIso8601String();
       existing['durationMs'] = durationMs;
@@ -249,7 +252,7 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
       existing['responseHeaders'] = responseHeadersSafe;
       existing['requestData'] = requestDataSafe;
       existing['requestHeaders'] = requestHeadersSafe;
-      _networkLogDedupedCount++;
+      facade.debug.networkLogDedupedCount++;
       return;
     }
 
@@ -273,11 +276,11 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
     if (category != null) {
       logEntry['category'] = category;
     }
-    _recentNetworkLogs.add(logEntry);
-    if (_recentNetworkLogs.length > _debugMaxNetworkLogsKept) {
-      _recentNetworkLogs.removeRange(
+    recentNetworkLogs.add(logEntry);
+    if (recentNetworkLogs.length > _debugMaxNetworkLogsKept) {
+      recentNetworkLogs.removeRange(
         0,
-        _recentNetworkLogs.length - _debugMaxNetworkLogsKept,
+        recentNetworkLogs.length - _debugMaxNetworkLogsKept,
       );
     }
   }

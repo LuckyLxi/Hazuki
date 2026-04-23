@@ -181,38 +181,68 @@ class HazukiSourceService extends ChangeNotifier {
   static const Duration _discoverCacheTtl = Duration(days: 1);
   static const double _cacheOverflowTrimTargetRatio = 0.1;
 
-  FlutterQjs? _engine;
-  SharedPreferences? _prefs;
-  Future<void>? _initFuture;
+  final SourceRuntimeKernel _runtimeKernel = SourceRuntimeKernel();
+  final SourceSessionStore _sessionStore = SourceSessionStore();
+  final SourceCacheStore _cacheStore = SourceCacheStore();
+  final SourceDebugLogStore _debugLogStore = SourceDebugLogStore();
+  late final SourceJsBridge _jsBridge = SourceJsBridge._(this);
+  late final HazukiSourceFacade facade = HazukiSourceFacade._(
+    service: this,
+    runtime: _runtimeKernel,
+    session: _sessionStore,
+    cache: _cacheStore,
+    debug: _debugLogStore,
+    js: _jsBridge,
+  );
 
-  String _statusText = 'source_idle';
-  SourceRuntimeState _runtimeState = const SourceRuntimeState.idle();
-  SourceMeta? _sourceMeta;
-  Map<String, dynamic>? _favoritesDebugCache;
-  bool _isWarmingUpFavoritesDebug = false;
-  bool _isRefreshingSource = false;
-  bool _softwareLogCaptureEnabled = false;
-  final List<Map<String, dynamic>> _recentNetworkLogs = [];
-  final List<Map<String, dynamic>> _recentApplicationLogs = [];
-  final List<Map<String, dynamic>> _recentReaderLogs = [];
-  int _networkLogDedupedCount = 0;
-  Map<String, dynamic>? _lastLoginDebugInfoStorage;
-  Map<String, dynamic>? _lastSourceVersionDebugInfoStorage;
+  FlutterQjs? get _engine => _runtimeKernel.engine;
 
-  final LinkedHashMap<String, Uint8List> _imageBytesCache =
-      LinkedHashMap<String, Uint8List>();
-  final Map<String, Future<Uint8List>> _imageDownloadInFlight =
-      <String, Future<Uint8List>>{};
-  final LinkedHashMap<String, ComicDetailsData> _comicDetailsMemoryCache =
-      LinkedHashMap<String, ComicDetailsData>();
-  List<ExploreSection>? _exploreSectionsMemoryCache;
-  DateTime? _exploreSectionsMemoryCachedAt;
-  List<CategoryTagGroup>? _categoryTagGroupsMemoryCache;
-  DateTime? _categoryTagGroupsMemoryCachedAt;
-  Directory? _imageCacheDir;
-  Directory? _comicDetailsCacheDir;
-  Directory? _discoverCacheDir;
-  DateTime? _lastReloginAt;
+  String get _statusText => _runtimeKernel.statusText;
+
+  SourceRuntimeState get _runtimeState => _runtimeKernel.runtimeState;
+
+  SourceMeta? get _sourceMeta => _runtimeKernel.sourceMeta;
+
+  bool get _softwareLogCaptureEnabled =>
+      _debugLogStore.softwareLogCaptureEnabled;
+
+  Map<String, dynamic>? get _lastLoginDebugInfoStorage =>
+      _debugLogStore.lastLoginDebugInfoStorage;
+  set _lastLoginDebugInfoStorage(Map<String, dynamic>? value) =>
+      _debugLogStore.lastLoginDebugInfoStorage = value;
+
+  Map<String, dynamic>? get _lastSourceVersionDebugInfoStorage =>
+      _debugLogStore.lastSourceVersionDebugInfoStorage;
+  set _lastSourceVersionDebugInfoStorage(Map<String, dynamic>? value) =>
+      _debugLogStore.lastSourceVersionDebugInfoStorage = value;
+
+  LinkedHashMap<String, Uint8List> get _imageBytesCache =>
+      _cacheStore.imageBytesCache;
+  Map<String, Future<Uint8List>> get _imageDownloadInFlight =>
+      _cacheStore.imageDownloadInFlight;
+  LinkedHashMap<String, ComicDetailsData> get _comicDetailsMemoryCache =>
+      _cacheStore.comicDetailsMemoryCache;
+
+  List<ExploreSection>? get _exploreSectionsMemoryCache =>
+      _cacheStore.exploreSectionsMemoryCache;
+  set _exploreSectionsMemoryCache(List<ExploreSection>? value) =>
+      _cacheStore.exploreSectionsMemoryCache = value;
+
+  DateTime? get _exploreSectionsMemoryCachedAt =>
+      _cacheStore.exploreSectionsMemoryCachedAt;
+  set _exploreSectionsMemoryCachedAt(DateTime? value) =>
+      _cacheStore.exploreSectionsMemoryCachedAt = value;
+
+  Directory? get _imageCacheDir => _cacheStore.imageCacheDir;
+  set _imageCacheDir(Directory? value) => _cacheStore.imageCacheDir = value;
+
+  Directory? get _comicDetailsCacheDir => _cacheStore.comicDetailsCacheDir;
+  set _comicDetailsCacheDir(Directory? value) =>
+      _cacheStore.comicDetailsCacheDir = value;
+
+  Directory? get _discoverCacheDir => _cacheStore.discoverCacheDir;
+  set _discoverCacheDir(Directory? value) =>
+      _cacheStore.discoverCacheDir = value;
 
   Map<String, dynamic>? get _lastLoginDebugInfo =>
       _softwareLogCaptureEnabled ? _lastLoginDebugInfoStorage : null;
@@ -291,5 +321,423 @@ class HazukiSourceService extends ChangeNotifier {
     };
 
     return SearchComicsResult(comics: comics, maxPage: maxPage);
+  }
+}
+
+class SourceRuntimeKernel {
+  FlutterQjs? engine;
+  Future<void>? initFuture;
+  String statusText = 'source_idle';
+  SourceRuntimeState runtimeState = const SourceRuntimeState.idle();
+  SourceMeta? sourceMeta;
+  bool isRefreshingSource = false;
+  DateTime? lastReloginAt;
+
+  bool shouldSkipRelogin(Duration minInterval) {
+    final last = lastReloginAt;
+    if (last == null) {
+      return false;
+    }
+    return DateTime.now().difference(last) < minInterval;
+  }
+}
+
+class SourceSessionStore {
+  SharedPreferences? prefs;
+
+  Future<SharedPreferences> ensurePrefs() async {
+    return prefs ??= await SharedPreferences.getInstance();
+  }
+
+  Map<String, dynamic> loadSourceStore(String sourceKey) {
+    final currentPrefs = prefs;
+    if (currentPrefs == null || sourceKey.isEmpty) {
+      return {};
+    }
+
+    final raw = currentPrefs.getString('source_data_$sourceKey');
+    if (raw == null || raw.isEmpty) {
+      return {};
+    }
+
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) {
+        return Map<String, dynamic>.from(decoded);
+      }
+    } catch (_) {}
+    return {};
+  }
+
+  Future<void> saveSourceStore(
+    String sourceKey,
+    Map<String, dynamic> store,
+  ) async {
+    final currentPrefs = prefs;
+    if (currentPrefs == null || sourceKey.isEmpty) {
+      return;
+    }
+    await currentPrefs.setString('source_data_$sourceKey', jsonEncode(store));
+  }
+
+  dynamic loadSourceData(String sourceKey, String dataKey) {
+    if (sourceKey.isEmpty || dataKey.isEmpty) {
+      return null;
+    }
+    return loadSourceStore(sourceKey)[dataKey];
+  }
+
+  Future<void> saveSourceData(
+    String sourceKey,
+    String dataKey,
+    dynamic data,
+  ) async {
+    if (sourceKey.isEmpty || dataKey.isEmpty) {
+      return;
+    }
+    final store = loadSourceStore(sourceKey);
+    store[dataKey] = data;
+    await saveSourceStore(sourceKey, store);
+  }
+
+  Future<void> deleteSourceData(String sourceKey, String dataKey) async {
+    if (sourceKey.isEmpty || dataKey.isEmpty) {
+      return;
+    }
+    final store = loadSourceStore(sourceKey);
+    store.remove(dataKey);
+    await saveSourceStore(sourceKey, store);
+  }
+
+  dynamic loadSourceSetting({
+    required String sourceKey,
+    required String settingKey,
+    required SourceMeta? sourceMeta,
+  }) {
+    if (sourceKey.isEmpty || settingKey.isEmpty) {
+      return null;
+    }
+
+    final store = loadSourceStore(sourceKey);
+    final settings = store['settings'];
+    if (settings is Map && settings.containsKey(settingKey)) {
+      return settings[settingKey];
+    }
+
+    if (sourceMeta?.key == sourceKey) {
+      return sourceMeta?.settingsDefaults[settingKey];
+    }
+
+    return null;
+  }
+
+  Future<void> saveSourceSetting(
+    String sourceKey,
+    String settingKey,
+    dynamic value,
+  ) async {
+    if (sourceKey.isEmpty || settingKey.isEmpty) {
+      return;
+    }
+    final store = loadSourceStore(sourceKey);
+    final settingsRaw = store['settings'];
+    final settings = settingsRaw is Map
+        ? Map<String, dynamic>.from(settingsRaw)
+        : <String, dynamic>{};
+    settings[settingKey] = value;
+    store['settings'] = settings;
+    await saveSourceStore(sourceKey, store);
+  }
+
+  List<String>? loadAccountDataSync(SourceMeta? sourceMeta) {
+    final key = sourceMeta?.key;
+    if (key == null) {
+      return null;
+    }
+
+    final accountData = loadSourceData(key, 'account');
+    if (accountData is List && accountData.length >= 2) {
+      return [accountData[0].toString(), accountData[1].toString()];
+    }
+    return null;
+  }
+
+  List<_Cookie> _loadCookieStore() {
+    final currentPrefs = prefs;
+    if (currentPrefs == null) {
+      return [];
+    }
+
+    final raw = currentPrefs.getString('cookie_store_v1');
+    if (raw == null || raw.isEmpty) {
+      return [];
+    }
+
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is List) {
+        return decoded
+            .whereType<Map>()
+            .map((e) => _Cookie.fromMap(Map<String, dynamic>.from(e)))
+            .toList();
+      }
+    } catch (_) {}
+    return [];
+  }
+
+  Future<void> _saveCookieStore(List<_Cookie> cookies) async {
+    final currentPrefs = prefs;
+    if (currentPrefs == null) {
+      return;
+    }
+    await currentPrefs.setString(
+      'cookie_store_v1',
+      jsonEncode(cookies.map((e) => e.toMap()).toList()),
+    );
+  }
+}
+
+class SourceCacheStore {
+  final LinkedHashMap<String, Uint8List> imageBytesCache =
+      LinkedHashMap<String, Uint8List>();
+  final Map<String, Future<Uint8List>> imageDownloadInFlight =
+      <String, Future<Uint8List>>{};
+  final LinkedHashMap<String, ComicDetailsData> comicDetailsMemoryCache =
+      LinkedHashMap<String, ComicDetailsData>();
+  List<ExploreSection>? exploreSectionsMemoryCache;
+  DateTime? exploreSectionsMemoryCachedAt;
+  List<CategoryTagGroup>? categoryTagGroupsMemoryCache;
+  DateTime? categoryTagGroupsMemoryCachedAt;
+  Directory? imageCacheDir;
+  Directory? comicDetailsCacheDir;
+  Directory? discoverCacheDir;
+
+  Uint8List? touchImageBytes(String rawUrl) {
+    final normalizedUrl = rawUrl.trim();
+    if (normalizedUrl.isEmpty) {
+      return null;
+    }
+    final cached = imageBytesCache[normalizedUrl];
+    if (cached == null) {
+      return null;
+    }
+    imageBytesCache.remove(normalizedUrl);
+    imageBytesCache[normalizedUrl] = cached;
+    return cached;
+  }
+
+  void evictImageBytes(Iterable<String> urls) {
+    for (final url in urls) {
+      final normalizedUrl = url.trim();
+      if (normalizedUrl.isEmpty) {
+        continue;
+      }
+      imageBytesCache.remove(normalizedUrl);
+    }
+  }
+
+  void putImageBytes(String url, Uint8List bytes, {int maxEntries = 80}) {
+    imageBytesCache[url] = bytes;
+    while (imageBytesCache.length > maxEntries) {
+      imageBytesCache.remove(imageBytesCache.keys.first);
+    }
+  }
+
+  List<CategoryTagGroup>? getCategoryTagGroupsFromMemoryCache(Duration ttl) {
+    final groups = categoryTagGroupsMemoryCache;
+    final cachedAt = categoryTagGroupsMemoryCachedAt;
+    if (groups == null || cachedAt == null) {
+      return null;
+    }
+    if (DateTime.now().difference(cachedAt) > ttl) {
+      categoryTagGroupsMemoryCache = null;
+      categoryTagGroupsMemoryCachedAt = null;
+      return null;
+    }
+    return groups;
+  }
+
+  void clearCategoryTagGroupsMemoryCache() {
+    categoryTagGroupsMemoryCache = null;
+    categoryTagGroupsMemoryCachedAt = null;
+  }
+
+  void putCategoryTagGroupsInMemoryCache(List<CategoryTagGroup> groups) {
+    categoryTagGroupsMemoryCache = groups;
+    categoryTagGroupsMemoryCachedAt = DateTime.now();
+  }
+}
+
+class SourceDebugLogStore {
+  Map<String, dynamic>? favoritesDebugCache;
+  bool isWarmingUpFavoritesDebug = false;
+  bool softwareLogCaptureEnabled = false;
+  final List<Map<String, dynamic>> recentNetworkLogs = [];
+  final List<Map<String, dynamic>> recentApplicationLogs = [];
+  final List<Map<String, dynamic>> recentReaderLogs = [];
+  int networkLogDedupedCount = 0;
+  Map<String, dynamic>? lastLoginDebugInfoStorage;
+  Map<String, dynamic>? lastSourceVersionDebugInfoStorage;
+
+  void clearCapturedLogs() {
+    favoritesDebugCache = null;
+    recentNetworkLogs.clear();
+    recentApplicationLogs.clear();
+    recentReaderLogs.clear();
+    networkLogDedupedCount = 0;
+    lastLoginDebugInfoStorage = null;
+    lastSourceVersionDebugInfoStorage = null;
+  }
+}
+
+class SourceJsBridge {
+  SourceJsBridge._(this._service);
+
+  final HazukiSourceService _service;
+
+  FlutterQjs? get engine => _service._engine;
+
+  dynamic evaluate(String code, {String? name}) {
+    return engine?.evaluate(code, name: name);
+  }
+
+  Future<dynamic> resolve(dynamic value) {
+    return _awaitJsResult(value);
+  }
+
+  bool asBool(dynamic value) {
+    return _service._asBool(value);
+  }
+
+  String evaluateString(String code) {
+    return (evaluate(code) ?? '').toString().trim();
+  }
+}
+
+class HazukiSourceFacade {
+  HazukiSourceFacade._({
+    required HazukiSourceService service,
+    required this.runtime,
+    required this.session,
+    required this.cache,
+    required this.debug,
+    required this.js,
+  }) : _service = service;
+
+  final HazukiSourceService _service;
+  final SourceRuntimeKernel runtime;
+  final SourceSessionStore session;
+  final SourceCacheStore cache;
+  final SourceDebugLogStore debug;
+  final SourceJsBridge js;
+
+  Future<void> ensureInitialized() => _service.ensureInitialized();
+
+  Future<SharedPreferences> ensurePrefs() => session.ensurePrefs();
+
+  bool get isLogged => _service.isLogged;
+
+  SourceMeta? get sourceMeta => _service.sourceMeta;
+
+  bool get softwareLogCaptureEnabled => _service.softwareLogCaptureEnabled;
+
+  DateTime? get lastReloginAt => runtime.lastReloginAt;
+  set lastReloginAt(DateTime? value) => runtime.lastReloginAt = value;
+
+  bool get isRefreshingSource => runtime.isRefreshingSource;
+  set isRefreshingSource(bool value) => runtime.isRefreshingSource = value;
+
+  SourceRuntimeState get runtimeState => runtime.runtimeState;
+  set runtimeState(SourceRuntimeState value) => runtime.runtimeState = value;
+
+  String get statusText => runtime.statusText;
+  set statusText(String value) => runtime.statusText = value;
+
+  Future<void>? get initFuture => runtime.initFuture;
+  set initFuture(Future<void>? value) => runtime.initFuture = value;
+
+  void notifyRuntimeStateChanged() => _service._notifyRuntimeStateChanged();
+
+  Map<String, dynamic>? get favoritesDebugCache => debug.favoritesDebugCache;
+  set favoritesDebugCache(Map<String, dynamic>? value) =>
+      debug.favoritesDebugCache = value;
+
+  Map<String, dynamic>? get lastLoginDebugInfo => _service._lastLoginDebugInfo;
+  set lastLoginDebugInfo(Map<String, dynamic>? value) =>
+      _service._lastLoginDebugInfo = value;
+
+  Map<String, dynamic>? get lastSourceVersionDebugInfo =>
+      _service._lastSourceVersionDebugInfo;
+  set lastSourceVersionDebugInfo(Map<String, dynamic>? value) =>
+      _service._lastSourceVersionDebugInfo = value;
+
+  void clearCapturedLogs() => debug.clearCapturedLogs();
+
+  dynamic loadSourceData(String sourceKey, String dataKey) {
+    return session.loadSourceData(sourceKey, dataKey);
+  }
+
+  Future<void> saveSourceData(String sourceKey, String dataKey, dynamic data) {
+    return session.saveSourceData(sourceKey, dataKey, data);
+  }
+
+  Future<void> deleteSourceData(String sourceKey, String dataKey) {
+    return session.deleteSourceData(sourceKey, dataKey);
+  }
+
+  void addApplicationLog({
+    required String title,
+    String level = 'info',
+    String source = 'app',
+    Object? content,
+  }) {
+    _service.addApplicationLog(
+      title: title,
+      level: level,
+      source: source,
+      content: content,
+    );
+  }
+
+  Object? loadSourceSetting(String sourceKey, String settingKey) {
+    return session.loadSourceSetting(
+      sourceKey: sourceKey,
+      settingKey: settingKey,
+      sourceMeta: sourceMeta,
+    );
+  }
+
+  Future<void> saveSourceSetting(
+    String sourceKey,
+    String settingKey,
+    Object? value,
+  ) {
+    return session.saveSourceSetting(sourceKey, settingKey, value);
+  }
+
+  List<String>? loadAccountDataSync() =>
+      session.loadAccountDataSync(sourceMeta);
+
+  List<_Cookie> _loadCookieStore() => session._loadCookieStore();
+
+  Future<void> _saveCookieStore(List<_Cookie> cookies) {
+    return session._saveCookieStore(cookies);
+  }
+
+  Future<Directory> ensureImageCacheDir() => _service._ensureImageCacheDir();
+
+  Future<int> computeImageCacheSizeBytes() =>
+      _service._computeImageCacheSizeBytes();
+
+  Future<void> enforceImageCachePolicy({bool force = false}) {
+    return _service._enforceImageCachePolicy(force: force);
+  }
+
+  Uri resolveImageBaseUri(String imageUrl, Uri baseUri) {
+    final imageUri = Uri.tryParse(imageUrl);
+    if (imageUri != null && imageUri.hasScheme && imageUri.host.isNotEmpty) {
+      return imageUri;
+    }
+    return baseUri;
   }
 }

@@ -7,7 +7,7 @@ extension HazukiSourceServiceCategoryCapability on HazukiSourceService {
     Map<String, Object?>? content,
     String level = 'info',
   }) {
-    addApplicationLog(
+    facade.addApplicationLog(
       level: level,
       title: title,
       source: 'source_category_tags',
@@ -21,12 +21,15 @@ extension HazukiSourceServiceCategoryCapability on HazukiSourceService {
   Future<List<CategoryTagGroup>> loadCategoryTagGroups({
     bool forceRefresh = false,
   }) async {
-    await ensureInitialized();
+    final facade = this.facade;
+    await facade.ensureInitialized();
 
     final startedAt = DateTime.now();
 
     if (!forceRefresh) {
-      final memoryCached = _getCategoryTagGroupsFromMemoryCache();
+      final memoryCached = facade.cache.getCategoryTagGroupsFromMemoryCache(
+        HazukiSourceService._discoverCacheTtl,
+      );
       if (memoryCached != null) {
         _logCategoryTagTiming(
           'Source category tags loaded from memory cache',
@@ -42,11 +45,10 @@ extension HazukiSourceServiceCategoryCapability on HazukiSourceService {
         return memoryCached;
       }
     } else {
-      _categoryTagGroupsMemoryCache = null;
-      _categoryTagGroupsMemoryCachedAt = null;
+      facade.cache.clearCategoryTagGroupsMemoryCache();
     }
 
-    final engine = _engine;
+    final engine = facade.js.engine;
     if (engine == null) {
       _logCategoryTagTiming(
         'Source category tags load failed',
@@ -58,8 +60,8 @@ extension HazukiSourceServiceCategoryCapability on HazukiSourceService {
     }
 
     final hasCategoryEvaluateStartedAt = DateTime.now();
-    final hasCategory = _asBool(
-      engine.evaluate('!!this.__hazuki_source.category'),
+    final hasCategory = facade.js.asBool(
+      facade.js.evaluate('!!this.__hazuki_source.category'),
     );
     _logCategoryTagTiming(
       'Source category tags availability evaluate finished',
@@ -99,7 +101,7 @@ extension HazukiSourceServiceCategoryCapability on HazukiSourceService {
       startedAt: evaluateStartedAt,
     );
 
-    final dynamic resolved = await _awaitJsResult(result);
+    final dynamic resolved = await facade.js.resolve(result);
     if (resolved is! List) {
       _logCategoryTagTiming(
         'Source category tags loaded',
@@ -145,7 +147,7 @@ extension HazukiSourceServiceCategoryCapability on HazukiSourceService {
         ),
       ),
     );
-    _putCategoryTagGroupsInMemoryCache(cached);
+    facade.cache.putCategoryTagGroupsInMemoryCache(cached);
     _logCategoryTagTiming(
       'Source category tags loaded',
       startedAt: startedAt,
@@ -158,26 +160,6 @@ extension HazukiSourceServiceCategoryCapability on HazukiSourceService {
       },
     );
     return cached;
-  }
-
-  List<CategoryTagGroup>? _getCategoryTagGroupsFromMemoryCache() {
-    final groups = _categoryTagGroupsMemoryCache;
-    final cachedAt = _categoryTagGroupsMemoryCachedAt;
-    if (groups == null || cachedAt == null) {
-      return null;
-    }
-    if (DateTime.now().difference(cachedAt) >
-        HazukiSourceService._discoverCacheTtl) {
-      _categoryTagGroupsMemoryCache = null;
-      _categoryTagGroupsMemoryCachedAt = null;
-      return null;
-    }
-    return groups;
-  }
-
-  void _putCategoryTagGroupsInMemoryCache(List<CategoryTagGroup> groups) {
-    _categoryTagGroupsMemoryCache = groups;
-    _categoryTagGroupsMemoryCachedAt = DateTime.now();
   }
 
   ({String category, String? param}) _parseCategoryViewMoreUrl(String rawUrl) {

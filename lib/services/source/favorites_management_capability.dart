@@ -3,12 +3,13 @@ part of '../hazuki_source_service.dart';
 extension HazukiSourceServiceFavoritesManagementCapability
     on HazukiSourceService {
   Future<void> addFavoriteFolder(String name) async {
+    final facade = this.facade;
     await _runWithReloginRetry(() async {
-      final engine = _engine;
+      final engine = facade.js.engine;
       if (engine == null) {
         throw Exception('source_not_initialized');
       }
-      final hasApi = _asBool(
+      final hasApi = facade.js.asBool(
         engine.evaluate('!!this.__hazuki_source.favorites?.addFolder'),
       );
       if (!hasApi) {
@@ -18,17 +19,18 @@ extension HazukiSourceServiceFavoritesManagementCapability
         'this.__hazuki_source.favorites.addFolder(${jsonEncode(name)})',
         name: 'source_favorite_add_folder.js',
       );
-      await _awaitJsResult(result);
+      await facade.js.resolve(result);
     });
   }
 
   Future<void> deleteFavoriteFolder(String folderId) async {
+    final facade = this.facade;
     await _runWithReloginRetry(() async {
-      final engine = _engine;
+      final engine = facade.js.engine;
       if (engine == null) {
         throw Exception('source_not_initialized');
       }
-      final hasApi = _asBool(
+      final hasApi = facade.js.asBool(
         engine.evaluate('!!this.__hazuki_source.favorites?.deleteFolder'),
       );
       if (!hasApi) {
@@ -38,7 +40,7 @@ extension HazukiSourceServiceFavoritesManagementCapability
         'this.__hazuki_source.favorites.deleteFolder(${jsonEncode(folderId)})',
         name: 'source_favorite_delete_folder.js',
       );
-      await _awaitJsResult(result);
+      await facade.js.resolve(result);
     });
   }
 
@@ -48,20 +50,21 @@ extension HazukiSourceServiceFavoritesManagementCapability
     String folderId = '0',
     String? favoriteId,
   }) async {
+    final facade = this.facade;
     await _runWithReloginRetry(() async {
-      final engine = _engine;
+      final engine = facade.js.engine;
       if (engine == null) {
         throw Exception('source_not_initialized');
       }
 
-      final hasFavorites = _asBool(
+      final hasFavorites = facade.js.asBool(
         engine.evaluate('!!this.__hazuki_source.favorites'),
       );
       if (!hasFavorites) {
         throw Exception('favorites_not_supported');
       }
 
-      final hasAddOrDel = _asBool(
+      final hasAddOrDel = facade.js.asBool(
         engine.evaluate('!!this.__hazuki_source.favorites?.addOrDelFavorite'),
       );
       if (!hasAddOrDel) {
@@ -76,7 +79,7 @@ extension HazukiSourceServiceFavoritesManagementCapability
         name: 'source_toggle_favorite.js',
       );
 
-      await _awaitJsResult(result);
+      await facade.js.resolve(result);
     });
   }
 }

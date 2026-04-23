@@ -7,24 +7,25 @@ extension HazukiSourceServiceFavoritesCollectionCapability
     required String folderId,
   }) async {
     try {
+      final facade = this.facade;
       await _ensureFavoriteSessionReady();
       final result = await _runWithReloginRetry(() async {
-        final engine = _engine;
+        final engine = facade.js.engine;
         if (engine == null) {
           throw Exception('source_not_initialized');
         }
 
-        final hasFavorites = _asBool(
+        final hasFavorites = facade.js.asBool(
           engine.evaluate('!!this.__hazuki_source.favorites'),
         );
         if (!hasFavorites) {
           throw Exception('favorites_not_supported');
         }
 
-        final hasLoadComics = _asBool(
+        final hasLoadComics = facade.js.asBool(
           engine.evaluate('!!this.__hazuki_source.favorites?.loadComics'),
         );
-        final hasLoadNext = _asBool(
+        final hasLoadNext = facade.js.asBool(
           engine.evaluate('!!this.__hazuki_source.favorites?.loadNext'),
         );
 
@@ -46,7 +47,7 @@ extension HazukiSourceServiceFavoritesCollectionCapability
             'this.__hazuki_source.favorites.loadComics($page, $folderArg)',
             name: scriptName,
           );
-          final dynamic resolved = await _awaitJsResult(raw);
+          final dynamic resolved = await facade.js.resolve(raw);
           if (resolved is Map) {
             final map = Map<String, dynamic>.from(resolved);
             final comicsRaw = map['comics'];
@@ -113,7 +114,7 @@ extension HazukiSourceServiceFavoritesCollectionCapability
               allComics.addAll(loadedZero.$1);
               maxPage = loadedZero.$2;
             } else {
-              final hasLoadFolders = _asBool(
+              final hasLoadFolders = facade.js.asBool(
                 engine.evaluate(
                   '!!this.__hazuki_source.favorites?.loadFolders',
                 ),
@@ -123,7 +124,7 @@ extension HazukiSourceServiceFavoritesCollectionCapability
                   'this.__hazuki_source.favorites.loadFolders(null)',
                   name: 'source_favorite_folders_for_all.js',
                 );
-                final dynamic foldersResolved = await _awaitJsResult(
+                final dynamic foldersResolved = await facade.js.resolve(
                   foldersRaw,
                 );
                 final folderIds = <String>[];
@@ -163,7 +164,7 @@ extension HazukiSourceServiceFavoritesCollectionCapability
             'this.__hazuki_source.favorites.loadNext(null, $folderArg)',
             name: 'source_favorite_next.js',
           );
-          final dynamic resolved = await _awaitJsResult(raw);
+          final dynamic resolved = await facade.js.resolve(raw);
           if (resolved is Map) {
             final map = Map<String, dynamic>.from(resolved);
             final comicsRaw = map['comics'];
@@ -190,21 +191,22 @@ extension HazukiSourceServiceFavoritesCollectionCapability
 
   Future<FavoriteFoldersResult> loadFavoriteFolders({String? comicId}) async {
     try {
+      final facade = this.facade;
       await _ensureFavoriteSessionReady();
       final result = await _runWithReloginRetry(() async {
-        final engine = _engine;
+        final engine = facade.js.engine;
         if (engine == null) {
           throw Exception('source_not_initialized');
         }
 
-        final hasFavorites = _asBool(
+        final hasFavorites = facade.js.asBool(
           engine.evaluate('!!this.__hazuki_source.favorites'),
         );
         if (!hasFavorites) {
           throw Exception('favorites_not_supported');
         }
 
-        final hasLoadFolders = _asBool(
+        final hasLoadFolders = facade.js.asBool(
           engine.evaluate('!!this.__hazuki_source.favorites?.loadFolders'),
         );
         if (!hasLoadFolders) {
@@ -215,7 +217,7 @@ extension HazukiSourceServiceFavoritesCollectionCapability
           'this.__hazuki_source.favorites.loadFolders(${jsonEncode(comicId)})',
           name: 'source_favorite_folders.js',
         );
-        final dynamic resolved = await _awaitJsResult(raw);
+        final dynamic resolved = await facade.js.resolve(raw);
         if (resolved is! Map) {
           throw Exception('favorite_folders_invalid_response');
         }
@@ -287,11 +289,12 @@ extension HazukiSourceServiceFavoritesCollectionCapability
     required String comicId,
     required List<FavoriteFolder> folders,
   }) async {
+    final facade = this.facade;
     final normalizedComicId = comicId.trim();
     if (normalizedComicId.isEmpty) {
       return const <String>{};
     }
-    final hasLoadComics = _asBool(
+    final hasLoadComics = facade.js.asBool(
       engine.evaluate('!!this.__hazuki_source.favorites?.loadComics'),
     );
     if (!hasLoadComics) {
@@ -326,6 +329,7 @@ extension HazukiSourceServiceFavoritesCollectionCapability
     required String comicId,
     required String folderId,
   }) async {
+    final facade = this.facade;
     final normalizedComicId = comicId.trim();
     final normalizedFolderId = folderId.trim();
     if (normalizedComicId.isEmpty ||
@@ -346,7 +350,7 @@ extension HazukiSourceServiceFavoritesCollectionCapability
         'this.__hazuki_source.favorites.loadComics($page, ${jsonEncode(normalizedFolderId)})',
         name: 'source_favorite_folder_probe_${safeFolderId}_$page.js',
       );
-      final dynamic resolved = await _awaitJsResult(raw);
+      final dynamic resolved = await facade.js.resolve(raw);
       if (resolved is! Map) {
         return false;
       }

@@ -2,83 +2,89 @@ part of '../hazuki_source_service.dart';
 
 extension HazukiSourceServiceDebugReportCapability on HazukiSourceService {
   Future<Map<String, dynamic>> collectNetworkDebugInfo() async {
-    final approxBytes = _recentNetworkLogs.fold<int>(
+    final facade = this.facade;
+    final recentNetworkLogs = facade.debug.recentNetworkLogs;
+    final approxBytes = recentNetworkLogs.fold<int>(
       0,
       (sum, item) => sum + _estimatePayloadBytes(item),
     );
     return <String, dynamic>{
-      'statusText': _statusText,
-      'sourceRuntimeState': _runtimeState.toDebugMap(),
+      'statusText': facade.statusText,
+      'sourceRuntimeState': facade.runtimeState.toDebugMap(),
       'platform': Platform.operatingSystem,
       'sourceMeta': {
-        'name': _sourceMeta?.name,
-        'key': _sourceMeta?.key,
-        'version': _sourceMeta?.version,
+        'name': facade.sourceMeta?.name,
+        'key': facade.sourceMeta?.key,
+        'version': facade.sourceMeta?.version,
       },
-      'isLogged': isLogged,
+      'isLogged': facade.isLogged,
       'currentAccount': currentAccount,
       'generatedAt': DateTime.now().toIso8601String(),
-      'captureEnabled': _softwareLogCaptureEnabled,
+      'captureEnabled': facade.softwareLogCaptureEnabled,
       'networkLogStats': {
-        'keptCount': _recentNetworkLogs.length,
-        'dedupedCount': _networkLogDedupedCount,
+        'keptCount': recentNetworkLogs.length,
+        'dedupedCount': facade.debug.networkLogDedupedCount,
         'approxBytes': approxBytes,
       },
-      'lastLoginDebugInfo': _lastLoginDebugInfo,
-      'lastSourceVersionDebugInfo': _lastSourceVersionDebugInfo,
-      'recentNetworkLogs': _copyLogsWithoutDedupKey(_recentNetworkLogs),
+      'lastLoginDebugInfo': facade.lastLoginDebugInfo,
+      'lastSourceVersionDebugInfo': facade.lastSourceVersionDebugInfo,
+      'recentNetworkLogs': _copyLogsWithoutDedupKey(recentNetworkLogs),
     };
   }
 
   Future<Map<String, dynamic>> collectApplicationDebugInfo() async {
-    final approxBytes = _recentApplicationLogs.fold<int>(
+    final facade = this.facade;
+    final recentApplicationLogs = facade.debug.recentApplicationLogs;
+    final approxBytes = recentApplicationLogs.fold<int>(
       0,
       (sum, item) => sum + _estimatePayloadBytes(item),
     );
     return <String, dynamic>{
-      'statusText': _statusText,
-      'sourceRuntimeState': _runtimeState.toDebugMap(),
+      'statusText': facade.statusText,
+      'sourceRuntimeState': facade.runtimeState.toDebugMap(),
       'platform': Platform.operatingSystem,
       'sourceMeta': {
-        'name': _sourceMeta?.name,
-        'key': _sourceMeta?.key,
-        'version': _sourceMeta?.version,
+        'name': facade.sourceMeta?.name,
+        'key': facade.sourceMeta?.key,
+        'version': facade.sourceMeta?.version,
       },
-      'isLogged': isLogged,
+      'isLogged': facade.isLogged,
       'currentAccount': currentAccount,
       'generatedAt': DateTime.now().toIso8601String(),
-      'captureEnabled': _softwareLogCaptureEnabled,
+      'captureEnabled': facade.softwareLogCaptureEnabled,
       'applicationLogStats': {
-        'keptCount': _recentApplicationLogs.length,
+        'keptCount': recentApplicationLogs.length,
         'approxBytes': approxBytes,
       },
-      'recentApplicationLogs': _copyLogsWithoutDedupKey(_recentApplicationLogs),
+      'recentApplicationLogs': _copyLogsWithoutDedupKey(recentApplicationLogs),
     };
   }
 
   Future<Map<String, dynamic>> collectReaderDebugInfo() async {
-    final approxBytes = _recentReaderLogs.fold<int>(
+    final facade = this.facade;
+    final recentReaderLogs = facade.debug.recentReaderLogs;
+    final approxBytes = recentReaderLogs.fold<int>(
       0,
       (sum, item) => sum + _estimatePayloadBytes(item),
     );
     return <String, dynamic>{
-      'statusText': _statusText,
-      'sourceRuntimeState': _runtimeState.toDebugMap(),
+      'statusText': facade.statusText,
+      'sourceRuntimeState': facade.runtimeState.toDebugMap(),
       'platform': Platform.operatingSystem,
       'sourceMeta': {
-        'name': _sourceMeta?.name,
-        'key': _sourceMeta?.key,
-        'version': _sourceMeta?.version,
+        'name': facade.sourceMeta?.name,
+        'key': facade.sourceMeta?.key,
+        'version': facade.sourceMeta?.version,
       },
-      'isLogged': isLogged,
+      'isLogged': facade.isLogged,
       'currentAccount': currentAccount,
       'generatedAt': DateTime.now().toIso8601String(),
-      'captureEnabled': _softwareLogCaptureEnabled,
+      'captureEnabled': facade.softwareLogCaptureEnabled,
       'readerLogStats': {
-        'keptCount': _recentReaderLogs.length,
+        'keptCount': recentReaderLogs.length,
         'approxBytes': approxBytes,
       },
-      'recentReaderLogs': _copyLogsWithoutDedupKey(_recentReaderLogs),
+      'recentReaderLogs': _copyLogsWithoutDedupKey(recentReaderLogs),
     };
   }
 }

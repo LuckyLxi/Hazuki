@@ -20,15 +20,14 @@ extension HazukiSourceServiceAccountSessionRetrySupport on HazukiSourceService {
   }
 
   Future<void> _ensureFavoriteSessionReady() async {
-    await ensureInitialized();
+    final facade = this.facade;
+    await facade.ensureInitialized();
 
-    if (!isLogged) {
+    if (!facade.isLogged) {
       return;
     }
 
-    final now = DateTime.now();
-    final last = _lastReloginAt;
-    if (last != null && now.difference(last) < const Duration(minutes: 8)) {
+    if (facade.runtime.shouldSkipRelogin(const Duration(minutes: 8))) {
       return;
     }
 
@@ -45,22 +44,21 @@ extension HazukiSourceServiceAccountSessionRetrySupport on HazukiSourceService {
   }
 
   Future<bool> _tryReloginFromStoredAccount({bool force = false}) async {
-    final accountData = _loadAccountDataSync();
+    final facade = this.facade;
+    final accountData = facade.loadAccountDataSync();
     if (accountData == null || accountData.length < 2) {
       return false;
     }
 
     if (!force) {
-      final last = _lastReloginAt;
-      if (last != null &&
-          DateTime.now().difference(last) < const Duration(minutes: 8)) {
+      if (facade.runtime.shouldSkipRelogin(const Duration(minutes: 8))) {
         return true;
       }
     }
 
     try {
       await login(account: accountData[0], password: accountData[1]);
-      _lastReloginAt = DateTime.now();
+      facade.lastReloginAt = DateTime.now();
       return true;
     } catch (_) {
       return false;

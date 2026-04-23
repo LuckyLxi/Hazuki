@@ -2,22 +2,24 @@ part of '../hazuki_source_service.dart';
 
 extension SourceBootstrapSupport on HazukiSourceService {
   Future<bool> loadSoftwareLogCaptureEnabled() async {
-    final prefs = _prefs ??= await SharedPreferences.getInstance();
-    _softwareLogCaptureEnabled =
+    final facade = this.facade;
+    final prefs = await facade.ensurePrefs();
+    facade.debug.softwareLogCaptureEnabled =
         prefs.getBool(HazukiSourceService._softwareLogCaptureEnabledKey) ??
         false;
-    if (!_softwareLogCaptureEnabled) {
+    if (!facade.softwareLogCaptureEnabled) {
       _clearCapturedLogs();
     }
-    return _softwareLogCaptureEnabled;
+    return facade.softwareLogCaptureEnabled;
   }
 
   Future<void> setSoftwareLogCaptureEnabled(bool enabled) async {
-    _softwareLogCaptureEnabled = enabled;
+    final facade = this.facade;
+    facade.debug.softwareLogCaptureEnabled = enabled;
     if (!enabled) {
       _clearCapturedLogs();
     }
-    final prefs = _prefs ??= await SharedPreferences.getInstance();
+    final prefs = await facade.ensurePrefs();
     await prefs.setBool(
       HazukiSourceService._softwareLogCaptureEnabledKey,
       enabled,
@@ -25,20 +27,18 @@ extension SourceBootstrapSupport on HazukiSourceService {
   }
 
   void _clearCapturedLogs() {
-    _favoritesDebugCache = null;
-    _recentNetworkLogs.clear();
-    _recentApplicationLogs.clear();
-    _recentReaderLogs.clear();
-    _networkLogDedupedCount = 0;
-    _lastLoginDebugInfo = null;
-    _lastSourceVersionDebugInfo = null;
+    final facade = this.facade;
+    facade.clearCapturedLogs();
+    facade.lastLoginDebugInfo = null;
+    facade.lastSourceVersionDebugInfo = null;
   }
 
   Future<void> init({
     void Function(int received, int total)? onSourceDownloadProgress,
     bool prewarm = false,
   }) async {
-    final inFlight = _initFuture;
+    final facade = this.facade;
+    final inFlight = facade.initFuture;
     if (inFlight != null) {
       await inFlight;
       return;
@@ -48,22 +48,23 @@ extension SourceBootstrapSupport on HazukiSourceService {
       onSourceDownloadProgress: onSourceDownloadProgress,
       prewarm: prewarm,
     );
-    _initFuture = future;
+    facade.initFuture = future;
     try {
       await future;
     } finally {
-      if (identical(_initFuture, future)) {
-        _initFuture = null;
+      if (identical(facade.initFuture, future)) {
+        facade.initFuture = null;
       }
     }
   }
 
   Future<void> ensureInitialized() async {
+    final facade = this.facade;
     if (isInitialized) {
       return;
     }
 
-    final inFlight = _initFuture;
+    final inFlight = facade.initFuture;
     if (inFlight == null) {
       await init();
     } else {
@@ -74,11 +75,11 @@ extension SourceBootstrapSupport on HazukiSourceService {
       return;
     }
 
-    _initFuture = null;
+    facade.initFuture = null;
     await init();
 
     if (!isInitialized) {
-      throw Exception('source_not_initialized:$_statusText');
+      throw Exception('source_not_initialized:${facade.statusText}');
     }
   }
 
@@ -86,7 +87,8 @@ extension SourceBootstrapSupport on HazukiSourceService {
     void Function(int received, int total)? onSourceDownloadProgress,
     required bool prewarm,
   }) async {
-    final busyPhase = switch (_runtimeState.phase) {
+    final facade = this.facade;
+    final busyPhase = switch (facade.runtimeState.phase) {
       SourceRuntimePhase.failed => SourceRuntimePhase.retrying,
       _ when prewarm => SourceRuntimePhase.prewarming,
       _ => SourceRuntimePhase.loading,
@@ -99,9 +101,9 @@ extension SourceBootstrapSupport on HazukiSourceService {
         statusText: prewarm ? 'source_prewarming' : 'source_initializing',
         debugDetail: 'loading_cache',
       );
-      _prefs = await SharedPreferences.getInstance();
-      _softwareLogCaptureEnabled =
-          _prefs?.getBool(HazukiSourceService._softwareLogCaptureEnabledKey) ??
+      final prefs = await facade.ensurePrefs();
+      facade.debug.softwareLogCaptureEnabled =
+          prefs.getBool(HazukiSourceService._softwareLogCaptureEnabledKey) ??
           false;
       _configureDioCookieBridge();
       await _initImageCache();
@@ -120,7 +122,7 @@ extension SourceBootstrapSupport on HazukiSourceService {
         debugDetail: 'creating_engine',
       );
       final meta = await _loadSourceMetadata(result.initFile, result.jmFile);
-      _sourceMeta = meta;
+      facade.runtime.sourceMeta = meta;
       _setRuntimeReadyState(result: result, meta: meta);
     } catch (e) {
       _setRuntimeFailedState(e);

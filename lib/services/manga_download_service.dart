@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -73,39 +74,62 @@ class MangaDownloadService extends ChangeNotifier {
   void _logScan(String title, {Object? content, String level = 'info'}) {}
 
   void handleAppLifecycleState(AppLifecycleState state) {
-    final suspendDownloads = state != AppLifecycleState.resumed;
-    if (suspendDownloads == _downloadsSuspended &&
-        state != AppLifecycleState.resumed) {
+    if (state == AppLifecycleState.resumed) {
+      _downloadsSuspended = false;
+      _downloadResumeTimer?.cancel();
+      _downloadResumeTimer = null;
+      unawaited(_access.stopDownloadForegroundService());
+      _downloadResumeGraceDeadline = DateTime.now().add(
+        const Duration(seconds: 4),
+      );
+      _downloadResumeTimer = Timer(const Duration(milliseconds: 1200), () {
+        if (_downloadsSuspended) return;
+        unawaited(_queueExecutor.processQueue());
+      });
       return;
     }
 
-    _downloadsSuspended = suspendDownloads;
+    if (Platform.isAndroid) {
+      // Android: only suspend when the engine is fully detached (process dying).
+      // inactive/paused/hidden are all transient background states — keep downloads
+      // running and hold the process alive with a foreground service.
+      if (state == AppLifecycleState.paused && _hasActiveDownloads()) {
+        unawaited(_access.startDownloadForegroundService());
+      }
+      if (state != AppLifecycleState.detached) return;
+    }
+
+    if (_downloadsSuspended) return;
+    _downloadsSuspended = true;
     _downloadResumeTimer?.cancel();
     _downloadResumeTimer = null;
+    _downloadResumeGraceDeadline = null;
+  }
 
-    if (suspendDownloads) {
-      _downloadResumeGraceDeadline = null;
-      _logScan(
-        'Downloads suspended for app lifecycle',
-        level: 'warning',
-        content: {'state': state.name},
-      );
-      return;
-    }
+  bool _hasActiveDownloads() => _tasks.any(
+    (t) =>
+        t.status == MangaDownloadTaskStatus.queued ||
+        t.status == MangaDownloadTaskStatus.downloading,
+  );
 
-    _downloadResumeGraceDeadline = DateTime.now().add(
-      const Duration(seconds: 4),
-    );
-    _logScan(
-      'Downloads resume recovery scheduled',
-      content: {'state': state.name},
-    );
-    _downloadResumeTimer = Timer(const Duration(milliseconds: 1200), () {
-      if (_downloadsSuspended) {
-        return;
+  Future<Set<String>> checkDownloadedIntegrity() async {
+    final issueIds = <String>{};
+    for (final comic in _downloaded) {
+      bool hasIssue = false;
+      outer:
+      for (final chapter in comic.chapters) {
+        for (final imagePath in chapter.imagePaths) {
+          if (!await File(imagePath).exists()) {
+            hasIssue = true;
+            break outer;
+          }
+        }
       }
-      unawaited(_queueExecutor.processQueue());
-    });
+      if (hasIssue) {
+        issueIds.add(comic.comicId);
+      }
+    }
+    return issueIds;
   }
 
   Future<void> ensureInitialized() async {
@@ -385,6 +409,9 @@ class MangaDownloadService extends ChangeNotifier {
 
   Future<void> _flushState() async {
     await _persistState();
+    if (_tasks.isEmpty) {
+      unawaited(_access.stopDownloadForegroundService());
+    }
     notifyListeners();
   }
 

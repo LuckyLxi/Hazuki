@@ -4,9 +4,10 @@ extension HazukiSourceServiceCategoryViewMoreCapability on HazukiSourceService {
   Future<List<CategoryRankingOption>> loadCategoryRankingOptionsByViewMore({
     required String viewMoreUrl,
   }) async {
-    await ensureInitialized();
+    final facade = this.facade;
+    await facade.ensureInitialized();
 
-    final engine = _engine;
+    final engine = facade.js.engine;
     if (engine == null) {
       throw Exception('source_not_initialized');
     }
@@ -22,7 +23,7 @@ extension HazukiSourceServiceCategoryViewMoreCapability on HazukiSourceService {
         name: 'source_category_view_more_options.js',
       );
 
-      resolved = await _awaitJsResult(result);
+      resolved = await facade.js.resolve(result);
       if (resolved is! List) {
         return const [];
       }
@@ -54,9 +55,10 @@ extension HazukiSourceServiceCategoryViewMoreCapability on HazukiSourceService {
     required int page,
     String order = 'mr',
   }) async {
-    await ensureInitialized();
+    final facade = this.facade;
+    await facade.ensureInitialized();
 
-    final engine = _engine;
+    final engine = facade.js.engine;
     if (engine == null) {
       throw Exception('source_not_initialized');
     }
@@ -74,7 +76,7 @@ extension HazukiSourceServiceCategoryViewMoreCapability on HazukiSourceService {
         name: 'source_category_view_more_load.js',
       );
 
-      final dynamic resolved = await _awaitJsResult(result);
+      final dynamic resolved = await facade.js.resolve(result);
       if (resolved is! Map) {
         return const CategoryComicsResult(comics: [], maxPage: null);
       }

@@ -2,13 +2,14 @@ part of '../hazuki_source_service.dart';
 
 extension HazukiSourceServiceLineSettings on HazukiSourceService {
   Future<Map<String, dynamic>> getLineSettingsSnapshot() async {
-    final engine = _engine;
-    final sourceMeta = _sourceMeta;
+    final facade = this.facade;
+    final engine = facade.js.engine;
+    final sourceMeta = facade.sourceMeta;
     if (engine == null || sourceMeta == null) {
       throw Exception('source_not_initialized');
     }
 
-    final store = _loadSourceStore(sourceMeta.key);
+    final store = facade.session.loadSourceStore(sourceMeta.key);
     final settingsInStore = store['settings'];
     final settingsMap = settingsInStore is Map
         ? Map<String, dynamic>.from(settingsInStore)
@@ -32,7 +33,7 @@ extension HazukiSourceServiceLineSettings on HazukiSourceService {
     final dynamic domainsRaw = engine.evaluate(
       'Array.isArray(JM?.apiDomains) ? JM.apiDomains.slice() : []',
     );
-    final domainsResolved = await _awaitJsResult(domainsRaw);
+    final domainsResolved = await facade.js.resolve(domainsRaw);
     final apiDomains = <String>[];
     if (domainsResolved is List) {
       for (final item in domainsResolved) {
@@ -68,18 +69,19 @@ extension HazukiSourceServiceLineSettings on HazukiSourceService {
   }
 
   Future<void> updateLineSetting(String key, dynamic value) async {
-    final sourceMeta = _sourceMeta;
+    final sourceMeta = facade.sourceMeta;
     if (sourceMeta == null) {
       throw Exception('source_not_initialized');
     }
-    await _saveSourceSetting(sourceMeta.key, key, value);
+    await facade.saveSourceSetting(sourceMeta.key, key, value);
   }
 
   Future<void> refreshLines({
     bool refreshApiDomains = true,
     bool refreshImageHost = true,
   }) async {
-    final engine = _engine;
+    final facade = this.facade;
+    final engine = facade.js.engine;
     if (engine == null) {
       throw Exception('source_not_initialized');
     }
@@ -93,7 +95,7 @@ extension HazukiSourceServiceLineSettings on HazukiSourceService {
           'this.__hazuki_source.refreshApiDomains(false)',
           name: 'source_refresh_api_domains.js',
         );
-        await _awaitJsResult(result);
+        await facade.js.resolve(result);
       }
     }
 
@@ -106,7 +108,7 @@ extension HazukiSourceServiceLineSettings on HazukiSourceService {
           'this.__hazuki_source.refreshImgUrl(false)',
           name: 'source_refresh_image_host.js',
         );
-        await _awaitJsResult(result);
+        await facade.js.resolve(result);
       }
     }
   }

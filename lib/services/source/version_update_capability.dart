@@ -2,10 +2,11 @@ part of '../hazuki_source_service.dart';
 
 extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
   Future<SourceVersionCheckResult?> checkJmSourceVersionFromCloud() async {
+    final facade = this.facade;
     final sourceDir = await _getSourceStorageDirectory();
     final jmFile = File('${sourceDir.path}/jm.js');
     if (!await jmFile.exists()) {
-      _lastSourceVersionDebugInfo = {
+      facade.lastSourceVersionDebugInfo = {
         'checkedAt': DateTime.now().toIso8601String(),
         'sourceDir': sourceDir.path,
         'localJmExists': false,
@@ -18,7 +19,7 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
     final remoteVersionDirect = await _resolveRemoteJmVersion();
     if (remoteVersionDirect != null && remoteVersionDirect.isNotEmpty) {
       final hasUpdate = _isVersionGreater(remoteVersionDirect, localVersion);
-      _lastSourceVersionDebugInfo = {
+      facade.lastSourceVersionDebugInfo = {
         'checkedAt': DateTime.now().toIso8601String(),
         'sourceDir': sourceDir.path,
         'localJmExists': true,
@@ -26,7 +27,7 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
         'remoteVersion': remoteVersionDirect,
         'hasUpdate': hasUpdate,
         'remoteVersionSource':
-            _lastSourceVersionDebugInfo?['resolvedFrom'] ?? 'unknown',
+            facade.lastSourceVersionDebugInfo?['resolvedFrom'] ?? 'unknown',
         'outcome': hasUpdate ? 'update_available' : 'no_update',
       };
       return SourceVersionCheckResult(
@@ -38,7 +39,7 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
 
     final indexRaw = await _downloadFromUrls(_sourceIndexUrls);
     if (indexRaw == null || indexRaw.trim().isEmpty) {
-      _lastSourceVersionDebugInfo = {
+      facade.lastSourceVersionDebugInfo = {
         'checkedAt': DateTime.now().toIso8601String(),
         'sourceDir': sourceDir.path,
         'localJmExists': true,
@@ -52,7 +53,7 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
     try {
       decoded = jsonDecode(indexRaw);
     } catch (_) {
-      _lastSourceVersionDebugInfo = {
+      facade.lastSourceVersionDebugInfo = {
         'checkedAt': DateTime.now().toIso8601String(),
         'sourceDir': sourceDir.path,
         'localJmExists': true,
@@ -62,7 +63,7 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
       return null;
     }
     if (decoded is! List) {
-      _lastSourceVersionDebugInfo = {
+      facade.lastSourceVersionDebugInfo = {
         'checkedAt': DateTime.now().toIso8601String(),
         'sourceDir': sourceDir.path,
         'localJmExists': true,
@@ -90,7 +91,7 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
     }
 
     if (remoteVersion == null || remoteVersion.isEmpty) {
-      _lastSourceVersionDebugInfo = {
+      facade.lastSourceVersionDebugInfo = {
         'checkedAt': DateTime.now().toIso8601String(),
         'sourceDir': sourceDir.path,
         'localJmExists': true,
@@ -101,7 +102,7 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
     }
 
     final hasUpdate = _isVersionGreater(remoteVersion, localVersion);
-    _lastSourceVersionDebugInfo = {
+    facade.lastSourceVersionDebugInfo = {
       'checkedAt': DateTime.now().toIso8601String(),
       'sourceDir': sourceDir.path,
       'localJmExists': true,
@@ -122,6 +123,7 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
   Future<bool> downloadJmSourceAndReload({
     void Function(int received, int total)? onProgress,
   }) async {
+    final facade = this.facade;
     final sourceDir = await _getSourceStorageDirectory();
     if (!await sourceDir.exists()) {
       await sourceDir.create(recursive: true);
@@ -144,10 +146,10 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
 
     final downloadedVersion = _extractSourceVersion(jmScript);
     await jmFile.writeAsString(jmScript);
-    final prefs = _prefs ??= await SharedPreferences.getInstance();
+    final prefs = await facade.ensurePrefs();
     await prefs.setBool(HazukiSourceService._customEditedJmSourceKey, false);
 
-    _lastSourceVersionDebugInfo = {
+    facade.lastSourceVersionDebugInfo = {
       'checkedAt': DateTime.now().toIso8601String(),
       'resolvedFrom': 'downloaded_jm_script',
       'remoteVersion': downloadedVersion,
@@ -161,29 +163,29 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
   }
 
   Future<bool> refreshSourceOnNetworkRecovery() async {
-    if (_isRefreshingSource) {
+    final facade = this.facade;
+    if (facade.isRefreshingSource) {
       return false;
     }
-    _isRefreshingSource = true;
+    facade.isRefreshingSource = true;
     try {
       _setRuntimeBusyState(
-        _runtimeState.hasFailure
+        facade.runtimeState.hasFailure
             ? SourceRuntimePhase.retrying
             : SourceRuntimePhase.loading,
         SourceRuntimeStep.downloadingSource,
         statusText: 'source_refreshing_after_network_recovery',
         debugDetail: 'network_recovery',
       );
-      _lastReloginAt = null;
-      _favoritesDebugCache = null;
+      facade.lastReloginAt = null;
+      facade.favoritesDebugCache = null;
       _exploreSectionsMemoryCache = null;
       _exploreSectionsMemoryCachedAt = null;
-      _categoryTagGroupsMemoryCache = null;
-      _categoryTagGroupsMemoryCachedAt = null;
-      _sourceMeta = null;
+      facade.cache.clearCategoryTagGroupsMemoryCache();
+      facade.runtime.sourceMeta = null;
       final result = await _downloadOrLoadSourceFiles();
       final meta = await _loadSourceMetadata(result.initFile, result.jmFile);
-      _sourceMeta = meta;
+      facade.runtime.sourceMeta = meta;
       _setRuntimeReadyState(result: result, meta: meta);
       if (isLogged) {
         await _tryReloginFromStoredAccount(force: true);
@@ -193,7 +195,7 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
       _setRuntimeFailedState(e);
       return false;
     } finally {
-      _isRefreshingSource = false;
+      facade.isRefreshingSource = false;
     }
   }
 
@@ -223,7 +225,7 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
             }
             final version = map['version']?.toString().trim();
             if (version != null && version.isNotEmpty) {
-              _lastSourceVersionDebugInfo = {
+              facade.lastSourceVersionDebugInfo = {
                 'checkedAt': DateTime.now().toIso8601String(),
                 'resolvedFrom': 'index_json',
                 'matchedKey': key,
@@ -242,7 +244,7 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
       source: 'source_version_jm_script',
     );
     if (remoteScript == null || remoteScript.trim().isEmpty) {
-      _lastSourceVersionDebugInfo = {
+      facade.lastSourceVersionDebugInfo = {
         'checkedAt': DateTime.now().toIso8601String(),
         'resolvedFrom': 'failed',
         'outcome': 'remote_script_empty',
@@ -250,7 +252,7 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
       return null;
     }
     final version = _extractSourceVersion(remoteScript);
-    _lastSourceVersionDebugInfo = {
+    facade.lastSourceVersionDebugInfo = {
       'checkedAt': DateTime.now().toIso8601String(),
       'resolvedFrom': 'jm_script',
       'remoteVersion': version,

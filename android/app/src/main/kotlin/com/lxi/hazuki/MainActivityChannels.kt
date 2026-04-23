@@ -159,6 +159,26 @@ class MainActivityChannels(
                         "hasStorageAccess" -> result.success(hasStorageAccess())
                         "requestStorageAccess" -> requestStorageAccess(result)
                         "pickDownloadsDirectory" -> pickDownloadsDirectory(result)
+                        "startDownloadForegroundService" -> {
+                            val intent = Intent(
+                                activity,
+                                DownloadForegroundService::class.java,
+                            )
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                activity.startForegroundService(intent)
+                            } else {
+                                activity.startService(intent)
+                            }
+                            result.success(null)
+                        }
+                        "stopDownloadForegroundService" -> {
+                            val intent = Intent(
+                                activity,
+                                DownloadForegroundService::class.java,
+                            ).apply { action = DownloadForegroundService.ACTION_STOP }
+                            activity.startService(intent)
+                            result.success(null)
+                        }
                         "scanFile" -> {
                             val path = call.argument<String>("path")
                             if (path.isNullOrBlank()) {

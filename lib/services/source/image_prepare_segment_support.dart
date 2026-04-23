@@ -2,7 +2,7 @@ part of '../hazuki_source_service.dart';
 
 extension HazukiSourceServiceImagePrepareSegmentSupport on HazukiSourceService {
   int calculateJmImageSegments(String epId, String imageUrl) {
-    if ((_sourceMeta?.key ?? '').toLowerCase() != 'jm') {
+    if ((facade.sourceMeta?.key ?? '').toLowerCase() != 'jm') {
       return 0;
     }
 
@@ -46,7 +46,8 @@ extension HazukiSourceServiceImagePrepareSegmentSupport on HazukiSourceService {
     required String epId,
   }) async {
     try {
-      final engine = _engine;
+      final facade = this.facade;
+      final engine = facade.js.engine;
       if (engine == null) {
         return null;
       }
@@ -54,7 +55,7 @@ extension HazukiSourceServiceImagePrepareSegmentSupport on HazukiSourceService {
         'this.__hazuki_source.comic?.onImageLoad?.(${jsonEncode(imageUrl)}, ${jsonEncode(comicId)}, ${jsonEncode(epId)}) ?? {}',
         name: 'source_on_image_prepare.js',
       );
-      final dynamic config = await _awaitJsResult(configRaw);
+      final dynamic config = await facade.js.resolve(configRaw);
       if (config is! Map) {
         return null;
       }

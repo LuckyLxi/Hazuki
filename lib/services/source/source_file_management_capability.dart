@@ -22,11 +22,12 @@ extension HazukiSourceServiceSourceFileManagementCapability
   }
 
   Future<void> saveEditedJmSource(String content) async {
+    final facade = this.facade;
     final result = await _downloadOrLoadSourceFiles();
     await result.jmFile.writeAsString(content, flush: true);
-    final prefs = _prefs ??= await SharedPreferences.getInstance();
+    final prefs = await facade.ensurePrefs();
     await prefs.setBool(HazukiSourceService._customEditedJmSourceKey, true);
-    _lastSourceVersionDebugInfo = {
+    facade.lastSourceVersionDebugInfo = {
       'checkedAt': DateTime.now().toIso8601String(),
       'resolvedFrom': 'local_source_editor',
       'outcome': 'edited_waiting_for_restart',
@@ -44,15 +45,16 @@ extension HazukiSourceServiceSourceFileManagementCapability
   }
 
   Future<bool> hasCustomEditedJmSource() async {
-    final prefs = _prefs ??= await SharedPreferences.getInstance();
+    final prefs = await facade.ensurePrefs();
     return prefs.getBool(HazukiSourceService._customEditedJmSourceKey) ?? false;
   }
 
   Future<void> reloadFromLocalSourceFiles() async {
-    if (_isRefreshingSource) {
+    final facade = this.facade;
+    if (facade.isRefreshingSource) {
       throw Exception('source_reload_in_progress');
     }
-    _isRefreshingSource = true;
+    facade.isRefreshingSource = true;
     try {
       _setRuntimeBusyState(
         SourceRuntimePhase.loading,
@@ -60,12 +62,11 @@ extension HazukiSourceServiceSourceFileManagementCapability
         statusText: 'source_reloading_from_local_restore',
         debugDetail: 'cloud_sync_restore',
       );
-      _lastReloginAt = null;
-      _favoritesDebugCache = null;
+      facade.lastReloginAt = null;
+      facade.favoritesDebugCache = null;
       _exploreSectionsMemoryCache = null;
       _exploreSectionsMemoryCachedAt = null;
-      _categoryTagGroupsMemoryCache = null;
-      _categoryTagGroupsMemoryCachedAt = null;
+      facade.cache.clearCategoryTagGroupsMemoryCache();
       final result = await _ensureLocalSourceFiles();
       _setRuntimeBusyState(
         SourceRuntimePhase.loading,
@@ -73,13 +74,13 @@ extension HazukiSourceServiceSourceFileManagementCapability
         debugDetail: 'creating_engine',
       );
       final meta = await _loadSourceMetadata(result.initFile, result.jmFile);
-      _sourceMeta = meta;
+      facade.runtime.sourceMeta = meta;
       _setRuntimeReadyState(result: result, meta: meta);
       if (isLogged) {
         await _tryReloginFromStoredAccount(force: true);
       }
     } finally {
-      _isRefreshingSource = false;
+      facade.isRefreshingSource = false;
     }
   }
 

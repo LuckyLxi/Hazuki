@@ -960,6 +960,7 @@
     }
   },
   "downloadsScanTooltip": "扫描本地漫画",
+  "downloadsIntegrityWarning": "检测到有文件可能被移动或删除",
   "sourceUpdateRestartTitle": "请重新启动软件",
   "sourceUpdateRestartMessage": "漫画源已下载完成，请重新启动软件以应用更新。",
   "sourceUpdateLocalLabel": "本地版本",

@@ -12,12 +12,16 @@ class DownloadsPageController extends ChangeNotifier {
   final Set<String> _selectedComicIds = <String>{};
   bool _selectionEnabled = false;
   bool _scanningDownloaded = false;
+  bool _checkingIntegrity = false;
   bool _disposed = false;
+  Set<String> _comicsWithIntegrityIssues = const {};
 
   Set<String> get selectedComicIds =>
       Set<String>.unmodifiable(_selectedComicIds);
   int get selectedCount => _selectedComicIds.length;
   bool get scanningDownloaded => _scanningDownloaded;
+  Set<String> get comicsWithIntegrityIssues =>
+      Set<String>.unmodifiable(_comicsWithIntegrityIssues);
 
   bool selectionModeForTab(int tabIndex) =>
       tabIndex == 1 && (_selectionEnabled || _selectedComicIds.isNotEmpty);
@@ -102,6 +106,18 @@ class DownloadsPageController extends ChangeNotifier {
       return;
     }
     await _downloadService.deleteTask(comicId);
+  }
+
+  Future<void> runIntegrityCheck() async {
+    if (_checkingIntegrity) return;
+    _checkingIntegrity = true;
+    try {
+      _comicsWithIntegrityIssues =
+          await _downloadService.checkDownloadedIntegrity();
+      _notify();
+    } finally {
+      _checkingIntegrity = false;
+    }
   }
 
   Future<void> scanDownloadedComics(BuildContext context) async {

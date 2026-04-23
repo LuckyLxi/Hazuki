@@ -29,6 +29,9 @@ class _DownloadsPageState extends State<DownloadsPage>
   void initState() {
     super.initState();
     _initFuture = MangaDownloadService.instance.ensureInitialized();
+    _initFuture.then((_) {
+      if (mounted) unawaited(_controller.runIntegrityCheck());
+    });
     _tabController = TabController(length: 2, vsync: this);
     _controller = DownloadsPageController();
     _pageListenable = Listenable.merge([
@@ -97,6 +100,8 @@ class _DownloadsPageState extends State<DownloadsPage>
                             scanning: _controller.scanningDownloaded,
                             selectedCount: _controller.selectedCount,
                             selectedComicIds: _controller.selectedComicIds,
+                            comicsWithIntegrityIssues:
+                                _controller.comicsWithIntegrityIssues,
                             onToggleSelection: _controller.toggleSelection,
                             onToggleSelectionMode: () {
                               _controller.toggleSelectionMode(

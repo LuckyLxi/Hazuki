@@ -32,37 +32,11 @@ extension _CookieStoreSupport on HazukiSourceService {
   }
 
   List<_Cookie> _loadCookieStore() {
-    final prefs = _prefs;
-    if (prefs == null) {
-      return [];
-    }
-
-    final raw = prefs.getString('cookie_store_v1');
-    if (raw == null || raw.isEmpty) {
-      return [];
-    }
-
-    try {
-      final decoded = jsonDecode(raw);
-      if (decoded is List) {
-        return decoded
-            .whereType<Map>()
-            .map((e) => _Cookie.fromMap(Map<String, dynamic>.from(e)))
-            .toList();
-      }
-    } catch (_) {}
-    return [];
+    return facade._loadCookieStore();
   }
 
   Future<void> _saveCookieStore(List<_Cookie> cookies) async {
-    final prefs = _prefs;
-    if (prefs == null) {
-      return;
-    }
-    await prefs.setString(
-      'cookie_store_v1',
-      jsonEncode(cookies.map((e) => e.toMap()).toList()),
-    );
+    await facade._saveCookieStore(cookies);
   }
 
   List<_Cookie> _getCookies(String url) {

@@ -2,7 +2,7 @@ part of '../hazuki_source_service.dart';
 
 extension HazukiSourceServiceImageCacheCapability on HazukiSourceService {
   int get imageCacheMaxBytes {
-    final prefs = _prefs;
+    final prefs = facade.session.prefs;
     final value =
         prefs?.getInt(HazukiSourceService._cacheMaxBytesKey) ??
         HazukiSourceService._defaultCacheMaxBytes;
@@ -12,7 +12,7 @@ extension HazukiSourceServiceImageCacheCapability on HazukiSourceService {
   }
 
   Future<void> setImageCacheMaxBytes(int value) async {
-    final prefs = _prefs;
+    final prefs = facade.session.prefs;
     if (prefs == null) {
       return;
     }
@@ -20,11 +20,11 @@ extension HazukiSourceServiceImageCacheCapability on HazukiSourceService {
         ? HazukiSourceService._defaultCacheMaxBytes
         : value;
     await prefs.setInt(HazukiSourceService._cacheMaxBytesKey, normalized);
-    await _enforceImageCachePolicy();
+    await facade.enforceImageCachePolicy();
   }
 
   String get imageCacheAutoCleanMode {
-    final prefs = _prefs;
+    final prefs = facade.session.prefs;
     final mode = prefs?.getString(HazukiSourceService._cacheAutoCleanModeKey);
     if (mode == 'seven_days') {
       return mode!;
@@ -33,7 +33,7 @@ extension HazukiSourceServiceImageCacheCapability on HazukiSourceService {
   }
 
   Future<void> setImageCacheAutoCleanMode(String mode) async {
-    final prefs = _prefs;
+    final prefs = facade.session.prefs;
     if (prefs == null) {
       return;
     }
@@ -42,12 +42,12 @@ extension HazukiSourceServiceImageCacheCapability on HazukiSourceService {
       HazukiSourceService._cacheAutoCleanModeKey,
       normalized,
     );
-    await _enforceImageCachePolicy(force: true);
+    await facade.enforceImageCachePolicy(force: true);
   }
 
   Future<Map<String, dynamic>> getImageCacheStatus() async {
-    final dir = await _ensureImageCacheDir();
-    final bytes = await _computeImageCacheSizeBytes();
+    final dir = await facade.ensureImageCacheDir();
+    final bytes = await facade.computeImageCacheSizeBytes();
     return {
       'maxBytes': imageCacheMaxBytes,
       'usedBytes': bytes,
@@ -57,33 +57,14 @@ extension HazukiSourceServiceImageCacheCapability on HazukiSourceService {
   }
 
   Uint8List? peekImageBytesFromMemory(String url) {
-    final normalizedUrl = url.trim();
-    if (normalizedUrl.isEmpty) {
-      return null;
-    }
-    final cached = _imageBytesCache[normalizedUrl];
-    if (cached == null) {
-      return null;
-    }
-    _imageBytesCache.remove(normalizedUrl);
-    _imageBytesCache[normalizedUrl] = cached;
-    return cached;
+    return facade.cache.touchImageBytes(url);
   }
 
   void evictImageBytesFromMemory(Iterable<String> urls) {
-    for (final url in urls) {
-      final normalizedUrl = url.trim();
-      if (normalizedUrl.isEmpty) {
-        continue;
-      }
-      _imageBytesCache.remove(normalizedUrl);
-    }
+    facade.cache.evictImageBytes(urls);
   }
 
   void _putInMemoryCache(String url, Uint8List bytes) {
-    _imageBytesCache[url] = bytes;
-    while (_imageBytesCache.length > 80) {
-      _imageBytesCache.remove(_imageBytesCache.keys.first);
-    }
+    facade.cache.putImageBytes(url, bytes);
   }
 }

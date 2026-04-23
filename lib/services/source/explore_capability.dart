@@ -4,7 +4,8 @@ extension HazukiSourceServiceExploreCapability on HazukiSourceService {
   Future<List<ExploreSection>> loadExploreSections({
     bool forceRefresh = false,
   }) async {
-    await ensureInitialized();
+    final facade = this.facade;
+    await facade.ensureInitialized();
 
     if (!forceRefresh) {
       final memoryCached = _getExploreSectionsFromMemoryCache();
@@ -16,13 +17,13 @@ extension HazukiSourceServiceExploreCapability on HazukiSourceService {
       _exploreSectionsMemoryCachedAt = null;
     }
 
-    final engine = _engine;
+    final engine = facade.js.engine;
     if (engine == null) {
       throw Exception('source_not_initialized');
     }
 
-    final hasExplore = _asBool(
-      engine.evaluate('Array.isArray(this.__hazuki_source.explore)'),
+    final hasExplore = facade.js.asBool(
+      facade.js.evaluate('Array.isArray(this.__hazuki_source.explore)'),
     );
     if (!hasExplore) {
       return const [];
@@ -40,7 +41,7 @@ extension HazukiSourceServiceExploreCapability on HazukiSourceService {
       name: 'source_explore_load.js',
     );
 
-    final dynamic resolved = result is Future ? await result : result;
+    final dynamic resolved = await facade.js.resolve(result);
     if (resolved is! List) {
       return const [];
     }
@@ -98,8 +99,7 @@ extension HazukiSourceServiceExploreCapability on HazukiSourceService {
   Future<void> _initDiscoverCache() async {
     _exploreSectionsMemoryCache = null;
     _exploreSectionsMemoryCachedAt = null;
-    _categoryTagGroupsMemoryCache = null;
-    _categoryTagGroupsMemoryCachedAt = null;
+    facade.cache.clearCategoryTagGroupsMemoryCache();
     final dir = _discoverCacheDir;
     _discoverCacheDir = null;
     try {

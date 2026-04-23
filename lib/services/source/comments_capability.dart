@@ -8,7 +8,8 @@ extension HazukiSourceServiceCommentsCapability on HazukiSourceService {
     int pageSize = 16,
     String? replyTo,
   }) async {
-    final engine = _engine;
+    final facade = this.facade;
+    final engine = facade.js.engine;
     if (engine == null) {
       throw Exception('source_not_initialized');
     }
@@ -19,7 +20,7 @@ extension HazukiSourceServiceCommentsCapability on HazukiSourceService {
       'this.__hazuki_source.comic.loadComments(${jsonEncode(comicId)}, $subIdArg, $page, $replyToArg)',
       name: 'source_comments.js',
     );
-    final dynamic resolved = await _awaitJsResult(result);
+    final dynamic resolved = await facade.js.resolve(result);
     if (resolved is! Map) {
       return const ComicCommentsPageResult(comments: [], maxPage: null);
     }
@@ -81,7 +82,8 @@ extension HazukiSourceServiceCommentsCapability on HazukiSourceService {
     required String content,
     String? replyTo,
   }) async {
-    final engine = _engine;
+    final facade = this.facade;
+    final engine = facade.js.engine;
     if (engine == null) {
       throw Exception('source_not_initialized');
     }
@@ -99,7 +101,7 @@ extension HazukiSourceServiceCommentsCapability on HazukiSourceService {
         'this.__hazuki_source.comic.sendComment(${jsonEncode(comicId)}, $subIdArg, ${jsonEncode(text)}, $replyToArg)',
         name: 'source_send_comment.js',
       );
-      await _awaitJsResult(result);
+      await facade.js.resolve(result);
     });
   }
 }

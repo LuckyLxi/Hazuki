@@ -2,26 +2,28 @@ part of '../hazuki_source_service.dart';
 
 extension HazukiSourceServiceCheckInCapability on HazukiSourceService {
   Future<bool> isDailyCheckInCompletedToday() async {
-    await ensureInitialized();
+    final facade = this.facade;
+    await facade.ensureInitialized();
 
-    final sourceMeta = _sourceMeta;
+    final sourceMeta = facade.sourceMeta;
     if (sourceMeta == null || !isLogged) {
       return false;
     }
 
     final today = _dailyCheckInDateTag(DateTime.now());
     final cachedDate =
-        (_loadSourceData(sourceMeta.key, 'lastCheckInDate') ?? '')
+        (facade.loadSourceData(sourceMeta.key, 'lastCheckInDate') ?? '')
             .toString()
             .trim();
     return cachedDate == today;
   }
 
   Future<DailyCheckInResult> performDailyCheckIn() async {
-    await ensureInitialized();
+    final facade = this.facade;
+    await facade.ensureInitialized();
 
-    final engine = _engine;
-    final sourceMeta = _sourceMeta;
+    final engine = facade.js.engine;
+    final sourceMeta = facade.sourceMeta;
     if (engine == null || sourceMeta == null) {
       throw Exception('source_not_initialized');
     }
@@ -32,7 +34,7 @@ extension HazukiSourceServiceCheckInCapability on HazukiSourceService {
 
     final today = _dailyCheckInDateTag(DateTime.now());
     final cachedDate =
-        (_loadSourceData(sourceMeta.key, 'lastCheckInDate') ?? '')
+        (facade.loadSourceData(sourceMeta.key, 'lastCheckInDate') ?? '')
             .toString()
             .trim();
     if (cachedDate == today) {
@@ -40,7 +42,7 @@ extension HazukiSourceServiceCheckInCapability on HazukiSourceService {
     }
 
     final uidRaw = engine.evaluate('this.__hazuki_source.loadData("uid")');
-    final uid = (await _awaitJsResult(uidRaw) ?? '').toString().trim();
+    final uid = (await facade.js.resolve(uidRaw) ?? '').toString().trim();
     if (!RegExp(r'^\d+$').hasMatch(uid)) {
       throw Exception('invalid_uid');
     }
@@ -57,7 +59,7 @@ extension HazukiSourceServiceCheckInCapability on HazukiSourceService {
         'this.__hazuki_source.get(${jsonEncode('$baseUrl/daily?user_id=$uid')})',
         name: 'source_daily_check_record.js',
       );
-      return (await _awaitJsResult(result) ?? '').toString();
+      return (await facade.js.resolve(result) ?? '').toString();
     });
 
     final checkRecord = _parseDailyCheckInMap(checkRecordText);
@@ -71,7 +73,7 @@ extension HazukiSourceServiceCheckInCapability on HazukiSourceService {
         'this.__hazuki_source.post(${jsonEncode('$baseUrl/daily_chk')}, ${jsonEncode('user_id=$uid&daily_id=$dailyId')})',
         name: 'source_daily_check_submit.js',
       );
-      return (await _awaitJsResult(result) ?? '').toString();
+      return (await facade.js.resolve(result) ?? '').toString();
     });
 
     final checkResult = _parseDailyCheckInMap(checkResultText);
@@ -81,11 +83,11 @@ extension HazukiSourceServiceCheckInCapability on HazukiSourceService {
     }
 
     if (_looksLikeAlreadyCheckedInMessage(message)) {
-      await _saveSourceData(sourceMeta.key, 'lastCheckInDate', today);
+      await facade.saveSourceData(sourceMeta.key, 'lastCheckInDate', today);
       return DailyCheckInResult.alreadyCheckedIn(message);
     }
 
-    await _saveSourceData(sourceMeta.key, 'lastCheckInDate', today);
+    await facade.saveSourceData(sourceMeta.key, 'lastCheckInDate', today);
     return DailyCheckInResult.success(message);
   }
 

@@ -2,53 +2,56 @@ part of '../hazuki_source_service.dart';
 
 extension HazukiSourceServiceFavoritesDebugCapability on HazukiSourceService {
   Future<void> warmUpFavoritesDebugInfo() async {
-    if (!_softwareLogCaptureEnabled || !isLogged) {
+    final facade = this.facade;
+    if (!facade.softwareLogCaptureEnabled || !facade.isLogged) {
       return;
     }
-    if (_isWarmingUpFavoritesDebug) {
+    if (facade.debug.isWarmingUpFavoritesDebug) {
       return;
     }
-    _isWarmingUpFavoritesDebug = true;
+    facade.debug.isWarmingUpFavoritesDebug = true;
     try {
       await _collectFavoritesDebugInfoCore();
     } catch (_) {
-      // 静默预热，不向 UI 抛错。
+      // Ignore background warmup failures.
     } finally {
-      _isWarmingUpFavoritesDebug = false;
+      facade.debug.isWarmingUpFavoritesDebug = false;
     }
   }
 
   Future<Map<String, dynamic>> collectFavoritesDebugInfo({
     bool forceRefresh = true,
   }) async {
-    if (!_softwareLogCaptureEnabled) {
+    final facade = this.facade;
+    if (!facade.softwareLogCaptureEnabled) {
       return _buildDisabledFavoritesDebugInfo();
     }
-    if (!forceRefresh && _favoritesDebugCache != null) {
-      return _favoritesDebugCache!;
+    if (!forceRefresh && facade.favoritesDebugCache != null) {
+      return facade.favoritesDebugCache!;
     }
     return _collectFavoritesDebugInfoCore();
   }
 
   Future<Map<String, dynamic>> _collectFavoritesDebugInfoCore() async {
-    if (!_softwareLogCaptureEnabled) {
+    final facade = this.facade;
+    if (!facade.softwareLogCaptureEnabled) {
       return _buildDisabledFavoritesDebugInfo();
     }
-    final engine = _engine;
+    final engine = facade.js.engine;
     if (engine == null) {
-      throw Exception('漫画源尚未初始化完成');
+      throw Exception('婕敾婧愬皻鏈垵濮嬪寲瀹屾垚');
     }
 
     final info = <String, dynamic>{
-      'statusText': _statusText,
+      'statusText': facade.statusText,
       'platform': Platform.operatingSystem,
       'sourceMeta': {
-        'name': _sourceMeta?.name,
-        'key': _sourceMeta?.key,
-        'version': _sourceMeta?.version,
-        'supportsAccount': _sourceMeta?.supportsAccount,
+        'name': facade.sourceMeta?.name,
+        'key': facade.sourceMeta?.key,
+        'version': facade.sourceMeta?.version,
+        'supportsAccount': facade.sourceMeta?.supportsAccount,
       },
-      'isLogged': isLogged,
+      'isLogged': facade.isLogged,
       'currentAccount': currentAccount,
       'generatedAt': DateTime.now().toIso8601String(),
       'checks': <String, dynamic>{},
@@ -57,21 +60,23 @@ extension HazukiSourceServiceFavoritesDebugCapability on HazukiSourceService {
     };
 
     final checks = info['checks'] as Map<String, dynamic>;
-    checks['hasSource'] = _asBool(engine.evaluate('!!this.__hazuki_source'));
-    checks['hasFavorites'] = _asBool(
-      engine.evaluate('!!this.__hazuki_source?.favorites'),
+    checks['hasSource'] = facade.js.asBool(
+      facade.js.evaluate('!!this.__hazuki_source'),
+    );
+    checks['hasFavorites'] = facade.js.asBool(
+      facade.js.evaluate('!!this.__hazuki_source?.favorites'),
     );
     checks['multiFolder'] = _jsonSafe(
       engine.evaluate('this.__hazuki_source?.favorites?.multiFolder'),
     );
-    checks['hasLoadFolders'] = _asBool(
-      engine.evaluate('!!this.__hazuki_source?.favorites?.loadFolders'),
+    checks['hasLoadFolders'] = facade.js.asBool(
+      facade.js.evaluate('!!this.__hazuki_source?.favorites?.loadFolders'),
     );
-    checks['hasLoadComics'] = _asBool(
-      engine.evaluate('!!this.__hazuki_source?.favorites?.loadComics'),
+    checks['hasLoadComics'] = facade.js.asBool(
+      facade.js.evaluate('!!this.__hazuki_source?.favorites?.loadComics'),
     );
-    checks['hasLoadNext'] = _asBool(
-      engine.evaluate('!!this.__hazuki_source?.favorites?.loadNext'),
+    checks['hasLoadNext'] = facade.js.asBool(
+      facade.js.evaluate('!!this.__hazuki_source?.favorites?.loadNext'),
     );
 
     final calls = info['calls'] as Map<String, dynamic>;
@@ -108,21 +113,22 @@ extension HazukiSourceServiceFavoritesDebugCapability on HazukiSourceService {
         )
         .toList();
 
-    _favoritesDebugCache = info;
+    facade.favoritesDebugCache = info;
     return info;
   }
 
   Map<String, dynamic> _buildDisabledFavoritesDebugInfo() {
+    final facade = this.facade;
     return <String, dynamic>{
-      'statusText': _statusText,
+      'statusText': facade.statusText,
       'platform': Platform.operatingSystem,
       'sourceMeta': {
-        'name': _sourceMeta?.name,
-        'key': _sourceMeta?.key,
-        'version': _sourceMeta?.version,
-        'supportsAccount': _sourceMeta?.supportsAccount,
+        'name': facade.sourceMeta?.name,
+        'key': facade.sourceMeta?.key,
+        'version': facade.sourceMeta?.version,
+        'supportsAccount': facade.sourceMeta?.supportsAccount,
       },
-      'isLogged': isLogged,
+      'isLogged': facade.isLogged,
       'currentAccount': currentAccount,
       'generatedAt': DateTime.now().toIso8601String(),
       'captureEnabled': false,
@@ -137,16 +143,16 @@ extension HazukiSourceServiceFavoritesDebugCapability on HazukiSourceService {
     required String code,
     required String name,
   }) async {
-    final engine = _engine;
+    final engine = facade.js.engine;
     if (engine == null) {
       return {'ok': false, 'error': 'engine is null'};
     }
 
     try {
       final result = engine.evaluate(code, name: name);
-      final resolved = await _awaitJsResult(
-        result,
-      ).timeout(const Duration(seconds: 20));
+      final resolved = await facade.js
+          .resolve(result)
+          .timeout(const Duration(seconds: 20));
       return {'ok': true, 'data': _jsonSafe(resolved)};
     } catch (e) {
       return {'ok': false, 'error': e.toString()};

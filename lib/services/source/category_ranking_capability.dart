@@ -2,9 +2,10 @@ part of '../hazuki_source_service.dart';
 
 extension HazukiSourceServiceCategoryRankingCapability on HazukiSourceService {
   Future<List<CategoryRankingOption>> loadCategoryRankingOptions() async {
-    await ensureInitialized();
+    final facade = this.facade;
+    await facade.ensureInitialized();
 
-    final engine = _engine;
+    final engine = facade.js.engine;
     if (engine == null) {
       throw Exception('source_not_initialized');
     }
@@ -30,7 +31,7 @@ extension HazukiSourceServiceCategoryRankingCapability on HazukiSourceService {
         }).filter(Boolean);
       })()''', name: 'source_category_ranking_options.js');
 
-    final dynamic resolved = await _awaitJsResult(result);
+    final dynamic resolved = await facade.js.resolve(result);
     if (resolved is! List) {
       return const [];
     }
@@ -56,9 +57,10 @@ extension HazukiSourceServiceCategoryRankingCapability on HazukiSourceService {
     required String rankingOption,
     required int page,
   }) async {
-    await ensureInitialized();
+    final facade = this.facade;
+    await facade.ensureInitialized();
 
-    final engine = _engine;
+    final engine = facade.js.engine;
     if (engine == null) {
       throw Exception('漫画源尚未初始化完成');
     }
@@ -74,7 +76,7 @@ extension HazukiSourceServiceCategoryRankingCapability on HazukiSourceService {
       name: 'source_category_ranking_load.js',
     );
 
-    final dynamic resolved = await _awaitJsResult(result);
+    final dynamic resolved = await facade.js.resolve(result);
     if (resolved is! Map) {
       return const CategoryComicsResult(comics: [], maxPage: null);
     }

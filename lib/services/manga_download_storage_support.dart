@@ -290,4 +290,18 @@ class MangaDownloadAccess {
     }
     return dir;
   }
+
+  Future<void> startDownloadForegroundService() async {
+    if (!Platform.isAndroid) return;
+    try {
+      await _mediaChannel.invokeMethod<void>('startDownloadForegroundService');
+    } catch (_) {}
+  }
+
+  Future<void> stopDownloadForegroundService() async {
+    if (!Platform.isAndroid) return;
+    try {
+      await _mediaChannel.invokeMethod<void>('stopDownloadForegroundService');
+    } catch (_) {}
+  }
 }

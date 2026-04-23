@@ -2,21 +2,18 @@ part of '../hazuki_source_service.dart';
 
 extension HazukiSourceServiceCommentsAvatarSupport on HazukiSourceService {
   Future<String?> loadCurrentAvatarUrl() async {
-    if (!isLogged) {
+    final facade = this.facade;
+    if (!facade.isLogged) {
       return null;
     }
 
-    final engine = _engine;
+    final engine = facade.js.engine;
     if (engine == null) {
       return null;
     }
 
-    final baseUrl = (engine.evaluate('this.__hazuki_source.baseUrl') ?? '')
-        .toString()
-        .trim();
-    final imageUrl = (engine.evaluate('this.__hazuki_source.imageUrl') ?? '')
-        .toString()
-        .trim();
+    final baseUrl = facade.js.evaluateString('this.__hazuki_source.baseUrl');
+    final imageUrl = facade.js.evaluateString('this.__hazuki_source.imageUrl');
     if (baseUrl.isEmpty) {
       return null;
     }
@@ -26,13 +23,13 @@ extension HazukiSourceServiceCommentsAvatarSupport on HazukiSourceService {
       return null;
     }
 
-    final imageBaseUri = _resolveImageBaseUri(imageUrl, baseUri);
+    final imageBaseUri = facade.resolveImageBaseUri(imageUrl, baseUri);
 
     try {
-      final storedUidRaw = engine.evaluate(
+      final storedUidRaw = facade.js.evaluate(
         'this.__hazuki_source.loadData("uid")',
       );
-      final storedUid = (await _awaitJsResult(storedUidRaw) ?? '')
+      final storedUid = (await facade.js.resolve(storedUidRaw) ?? '')
           .toString()
           .trim();
       if (RegExp(r'^\d+$').hasMatch(storedUid)) {
@@ -41,13 +38,5 @@ extension HazukiSourceServiceCommentsAvatarSupport on HazukiSourceService {
     } catch (_) {}
 
     return null;
-  }
-
-  Uri _resolveImageBaseUri(String imageUrl, Uri baseUri) {
-    final imageUri = Uri.tryParse(imageUrl);
-    if (imageUri != null && imageUri.hasScheme && imageUri.host.isNotEmpty) {
-      return imageUri;
-    }
-    return baseUri;
   }
 }

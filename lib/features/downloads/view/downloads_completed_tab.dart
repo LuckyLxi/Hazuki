@@ -12,6 +12,7 @@ class DownloadsCompletedTab extends StatelessWidget {
     required this.scanning,
     required this.selectedCount,
     required this.selectedComicIds,
+    required this.comicsWithIntegrityIssues,
     required this.onToggleSelection,
     required this.onToggleSelectionMode,
     required this.onDeleteSelected,
@@ -25,6 +26,7 @@ class DownloadsCompletedTab extends StatelessWidget {
   final bool scanning;
   final int selectedCount;
   final Set<String> selectedComicIds;
+  final Set<String> comicsWithIntegrityIssues;
   final ValueChanged<String> onToggleSelection;
   final VoidCallback onToggleSelectionMode;
   final VoidCallback onDeleteSelected;
@@ -45,9 +47,12 @@ class DownloadsCompletedTab extends StatelessWidget {
             itemBuilder: (context, index) {
               final comic = comics[index];
               final selected = selectedComicIds.contains(comic.comicId);
+              final hasIntegrityIssue =
+                  comicsWithIntegrityIssues.contains(comic.comicId);
               return AnimatedContainer(
                 duration: const Duration(milliseconds: 220),
                 curve: Curves.easeOutCubic,
+                clipBehavior: Clip.antiAlias,
                 decoration: BoxDecoration(
                   color: selected
                       ? colorScheme.secondaryContainer.withValues(alpha: 0.96)
@@ -79,54 +84,65 @@ class DownloadsCompletedTab extends StatelessWidget {
                       }
                     },
                     onLongPress: () => onToggleSelection(comic.comicId),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Row(
-                        children: [
-                          DownloadedComicCover(
-                            comic: comic,
-                            heroTag: 'downloaded_cover_${comic.comicId}',
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  comic.title,
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: theme.textTheme.titleMedium,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Row(
+                            children: [
+                              DownloadedComicCover(
+                                comic: comic,
+                                heroTag: 'downloaded_cover_${comic.comicId}',
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      comic.title,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: theme.textTheme.titleMedium,
+                                    ),
+                                    if (comic.subTitle.isNotEmpty) ...[
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        comic.subTitle,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: theme.textTheme.bodySmall,
+                                      ),
+                                    ],
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      l10n(context).downloadsChapterCount(
+                                        '${comic.chapters.length}',
+                                      ),
+                                      style:
+                                          theme.textTheme.bodySmall?.copyWith(
+                                            color:
+                                                colorScheme.onSurfaceVariant,
+                                          ),
+                                    ),
+                                  ],
                                 ),
-                                if (comic.subTitle.isNotEmpty) ...[
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    comic.subTitle,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: theme.textTheme.bodySmall,
-                                  ),
-                                ],
-                                const SizedBox(height: 8),
-                                Text(
-                                  l10n(context).downloadsChapterCount(
-                                    '${comic.chapters.length}',
-                                  ),
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: colorScheme.onSurfaceVariant,
-                                  ),
-                                ),
-                              ],
-                            ),
+                              ),
+                              const SizedBox(width: 8),
+                              _DownloadedComicTrailingAction(
+                                selectionMode: selectionMode,
+                                selected: selected,
+                                onDelete: () => onDeleteComic(comic),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 8),
-                          _DownloadedComicTrailingAction(
-                            selectionMode: selectionMode,
-                            selected: selected,
-                            onDelete: () => onDeleteComic(comic),
+                        ),
+                        if (hasIntegrityIssue)
+                          _IntegrityWarningBanner(
+                            message: l10n(context).downloadsIntegrityWarning,
                           ),
-                        ],
-                      ),
+                      ],
                     ),
                   ),
                 ),
@@ -150,6 +166,41 @@ class DownloadsCompletedTab extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _IntegrityWarningBanner extends StatelessWidget {
+  const _IntegrityWarningBanner({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      color: const Color(0xFFB71C1C),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.warning_amber_rounded,
+            color: Colors.white,
+            size: 14,
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -38,7 +38,7 @@ extension HazukiSourceServiceImageCacheMaintenanceCapability
   }
 
   Future<void> _enforceImageCachePolicy({bool force = false}) async {
-    final prefs = _prefs;
+    final prefs = facade.session.prefs;
     if (prefs == null) {
       return;
     }

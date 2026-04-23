@@ -1,28 +1,32 @@
 part of '../hazuki_source_service.dart';
 
 extension HazukiSourceServiceSourceRuntimeSupport on HazukiSourceService {
-  SourceRuntimeState get runtimeState => _runtimeState;
+  SourceRuntimeState get runtimeState => facade.runtimeState;
 
   Future<void> prewarmInBackground() async {
     if (isInitialized) {
       return;
     }
-    final inFlight = _initFuture;
+    final facade = this.facade;
+    final inFlight = facade.initFuture;
     if (inFlight != null) {
       await inFlight;
       return;
     }
 
-    addApplicationLog(
+    facade.addApplicationLog(
       level: 'info',
       title: 'Source prewarm scheduled',
       source: 'source_runtime',
-      content: {'phase': _runtimeState.phase.name, 'statusText': _statusText},
+      content: {
+        'phase': facade.runtimeState.phase.name,
+        'statusText': facade.statusText,
+      },
     );
 
     await init(prewarm: true);
 
-    addApplicationLog(
+    facade.addApplicationLog(
       level: isInitialized ? 'info' : 'warning',
       title: isInitialized
           ? 'Source prewarm completed'
@@ -49,15 +53,16 @@ extension HazukiSourceServiceSourceRuntimeSupport on HazukiSourceService {
   }
 
   void logRuntimeRetryRequested(String source) {
-    addApplicationLog(
+    final facade = this.facade;
+    facade.addApplicationLog(
       level: 'info',
       title: 'Source retry requested',
       source: 'source_runtime',
       content: {
         'trigger': source,
-        'phase': _runtimeState.phase.name,
-        'step': _runtimeState.step.name,
-        'statusText': _statusText,
+        'phase': facade.runtimeState.phase.name,
+        'step': facade.runtimeState.step.name,
+        'statusText': facade.statusText,
       },
     );
   }
@@ -72,14 +77,14 @@ extension HazukiSourceServiceSourceRuntimeSupport on HazukiSourceService {
     final next = SourceRuntimeState(
       phase: phase,
       step: step,
-      statusText: statusText ?? _statusText,
+      statusText: statusText ?? facade.statusText,
       updatedAt: DateTime.now(),
       debugDetail: debugDetail,
       error: error?.toString(),
     );
-    _runtimeState = next;
-    _statusText = next.statusText;
-    _notifyRuntimeStateChanged();
+    facade.runtimeState = next;
+    facade.statusText = next.statusText;
+    facade.notifyRuntimeStateChanged();
   }
 
   void _setRuntimeBusyState(
@@ -109,7 +114,7 @@ extension HazukiSourceServiceSourceRuntimeSupport on HazukiSourceService {
   }
 
   void _setRuntimeFailedState(Object error, {SourceRuntimeStep? step}) {
-    final failedStep = step ?? _runtimeState.step;
+    final failedStep = step ?? facade.runtimeState.step;
     _setRuntimeState(
       phase: SourceRuntimePhase.failed,
       step: failedStep,
@@ -117,7 +122,7 @@ extension HazukiSourceServiceSourceRuntimeSupport on HazukiSourceService {
       debugDetail: failedStep.name,
       error: error,
     );
-    addApplicationLog(
+    facade.addApplicationLog(
       level: 'warning',
       title: 'Source runtime failed',
       source: 'source_runtime',
@@ -135,7 +140,7 @@ extension HazukiSourceServiceSourceRuntimeSupport on HazukiSourceService {
       statusText: statusText,
       debugDetail: debugDetail,
     );
-    addApplicationLog(
+    facade.addApplicationLog(
       level: 'info',
       title: 'Source runtime waiting for restart',
       source: 'source_runtime',

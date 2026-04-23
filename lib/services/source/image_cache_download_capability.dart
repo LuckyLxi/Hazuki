@@ -126,10 +126,11 @@ extension HazukiSourceServiceImageCacheDownloadCapability
     String? comicId,
     String? epId,
   }) async {
+    final facade = this.facade;
     final headers = <String, dynamic>{};
 
     try {
-      final engine = _engine;
+      final engine = facade.js.engine;
       if (engine != null) {
         final cid = jsonEncode(comicId ?? '');
         final eid = jsonEncode(epId ?? '');
@@ -137,7 +138,7 @@ extension HazukiSourceServiceImageCacheDownloadCapability
           'this.__hazuki_source.comic?.onImageLoad?.(${jsonEncode(url)}, $cid, $eid) ?? {}',
           name: 'source_on_image_load.js',
         );
-        final dynamic config = await _awaitJsResult(configRaw);
+        final dynamic config = await facade.js.resolve(configRaw);
         if (config is Map) {
           final cfg = Map<String, dynamic>.from(config);
           final h = cfg['headers'];

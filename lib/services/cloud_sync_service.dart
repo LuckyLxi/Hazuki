@@ -1,126 +1,39 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
-import 'package:dio/dio.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'cloud_sync/cloud_sync_config_store.dart';
+import 'cloud_sync/cloud_sync_models.dart';
+import 'cloud_sync/cloud_sync_remote_client.dart';
+import 'cloud_sync/cloud_sync_restore_applier.dart';
+import 'cloud_sync/cloud_sync_snapshot_codec.dart';
 
-import '../app/app_preferences.dart';
-import 'hazuki_source_service.dart';
-
-class CloudSyncConfig {
-  const CloudSyncConfig({
-    required this.enabled,
-    required this.url,
-    required this.username,
-    required this.password,
-  });
-
-  final bool enabled;
-  final String url;
-  final String username;
-  final String password;
-
-  bool get isComplete =>
-      url.trim().isNotEmpty &&
-      username.trim().isNotEmpty &&
-      password.trim().isNotEmpty;
-
-  CloudSyncConfig copyWith({
-    bool? enabled,
-    String? url,
-    String? username,
-    String? password,
-  }) {
-    return CloudSyncConfig(
-      enabled: enabled ?? this.enabled,
-      url: url ?? this.url,
-      username: username ?? this.username,
-      password: password ?? this.password,
-    );
-  }
-}
-
-class CloudSyncConnectionStatus {
-  const CloudSyncConnectionStatus({
-    required this.ok,
-    required this.message,
-    required this.checkedAt,
-  });
-
-  final bool ok;
-  final String message;
-  final DateTime checkedAt;
-}
-
-class CloudSyncRestoreResult {
-  const CloudSyncRestoreResult({
-    required this.restoredSettings,
-    required this.restoredReading,
-    required this.restoredSearchHistory,
-    required this.restoredSourceFile,
-    required this.appliedPlatformFilteredKeys,
-    required this.skippedKeys,
-  });
-
-  final bool restoredSettings;
-  final bool restoredReading;
-  final bool restoredSearchHistory;
-  final bool restoredSourceFile;
-  final List<String> appliedPlatformFilteredKeys;
-  final List<String> skippedKeys;
-}
+export 'cloud_sync/cloud_sync_models.dart';
 
 class CloudSyncService {
   CloudSyncService._();
 
   static final CloudSyncService instance = CloudSyncService._();
 
-  static const _enabledKey = 'cloud_sync_enabled';
-  static const _urlKey = 'cloud_sync_url';
-  static const _usernameKey = 'cloud_sync_username';
-  static const _passwordKey = 'cloud_sync_password';
-  static const _lastSyncedRemoteTsKey = 'cloud_sync_last_synced_remote_ts';
-  static const _downloadStateKey = 'manga_download_service_state_v2';
-  static const _downloadsRootPathKey = 'manga_download_root_path_v1';
-
-  static const _settingsFileName = 'settings.json';
-  static const _readingFileName = 'reading.json';
-  static const _legacyReadingFileName = 'reading.sqlite';
-  static const _searchHistoryFileName = 'search_history.jsonl';
-  static const _manifestFileName = 'manifest.json';
-  static const _sourceDirName = 'source';
-  static const _sourceFileName = 'jm.js';
-
-  static const Set<String> _alwaysSkippedSettings = {
-    'cookie_store_v1',
-    _downloadStateKey,
-    _downloadsRootPathKey,
-  };
-  static const Set<String> _windowsOnlySettings = {
-    hazukiUseSystemTitleBarPreferenceKey,
-  };
-  static const Set<String> _androidOnlySettings = {'appearance_display_mode'};
+  final CloudSyncConfigStore _configStore = CloudSyncConfigStore();
+  late final CloudSyncSnapshotCodec _snapshotCodec = CloudSyncSnapshotCodec(
+    configStore: _configStore,
+  );
+  late final CloudSyncRestoreApplier _restoreApplier =
+      CloudSyncRestoreApplier();
+  late final CloudSyncFacade facade = CloudSyncFacade._(
+    configStore: _configStore,
+    snapshotCodec: _snapshotCodec,
+    restoreApplier: _restoreApplier,
+    remoteClientFactory: (config) =>
+        CloudSyncRemoteClient(config, configStore: _configStore),
+  );
 
   bool _autoSyncRunning = false;
 
-  Future<CloudSyncConfig> loadConfig() async {
-    final prefs = await SharedPreferences.getInstance();
-    return CloudSyncConfig(
-      enabled: prefs.getBool(_enabledKey) ?? false,
-      url: prefs.getString(_urlKey) ?? '',
-      username: prefs.getString(_usernameKey) ?? '',
-      password: prefs.getString(_passwordKey) ?? '',
-    );
-  }
+  Future<CloudSyncConfig> loadConfig() => _configStore.loadConfig();
 
-  Future<void> saveConfig(CloudSyncConfig config) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_enabledKey, config.enabled);
-    await prefs.setString(_urlKey, config.url.trim());
-    await prefs.setString(_usernameKey, config.username.trim());
-    await prefs.setString(_passwordKey, config.password);
-  }
+  Future<void> saveConfig(CloudSyncConfig config) =>
+      _configStore.saveConfig(config);
 
   Future<void> autoSyncOnce() async {
     if (_autoSyncRunning) {
@@ -133,14 +46,9 @@ class CloudSyncService {
         return;
       }
 
-      final dio = _buildDio(config);
-      final rootUrl = _rootUrl(config.url);
-      final backupDirUrl = '$rootUrl/backup';
-      final prefs = await SharedPreferences.getInstance();
-
-      final remoteManifestText = await _tryGetString(
-        dio,
-        '$backupDirUrl/$_manifestFileName',
+      final client = facade.remoteClient(config);
+      final remoteManifestText = await client.tryGetBackupFile(
+        CloudSyncConfigStore.manifestFileName,
       );
 
       if (remoteManifestText != null) {
@@ -152,19 +60,17 @@ class CloudSyncService {
           }
         } catch (_) {}
 
-        final lastSyncedRemoteTs = prefs.getInt(_lastSyncedRemoteTsKey) ?? 0;
+        final lastSyncedRemoteTs = await _configStore.loadLastSyncedRemoteTs();
         if (remoteUpdatedAtMs > lastSyncedRemoteTs) {
-          await _mergeRemoteIntoLocal(dio, backupDirUrl);
+          await _snapshotCodec.mergeRemoteIntoLocal(client);
         }
       }
 
-      // 统一时间戳：uploadBackup 使用同一个 nowMs 写入 manifest.updatedAtMs，
-      // 保证 lastSyncedRemoteTs 与云端记录完全一致，避免下次启动重复触发合并。
       final nowMs = DateTime.now().millisecondsSinceEpoch;
       await uploadBackup(configOverride: config, uploadAtMs: nowMs);
-      await prefs.setInt(_lastSyncedRemoteTsKey, nowMs);
+      await _configStore.saveLastSyncedRemoteTs(nowMs);
     } catch (_) {
-      // 后台 best-effort 同步不应中断应用启动。
+      // Background sync is best-effort and should not interrupt app startup.
     } finally {
       _autoSyncRunning = false;
     }
@@ -181,35 +87,11 @@ class CloudSyncService {
         checkedAt: DateTime.now(),
       );
     }
-    final dio = _buildDio(config);
-    final rootUrl = _rootUrl(config.url);
-    try {
-      await _ensureDir(dio, rootUrl);
-      final probeUrl = '$rootUrl/.connectivity_probe';
-      await _putString(
-        dio,
-        probeUrl,
-        jsonEncode({'time': DateTime.now().toIso8601String()}),
-      );
-      await _deleteIfExists(dio, probeUrl);
-      return CloudSyncConnectionStatus(
-        ok: true,
-        message: 'cloud_sync_connected',
-        checkedAt: DateTime.now(),
-      );
-    } catch (e) {
-      return CloudSyncConnectionStatus(
-        ok: false,
-        message: 'cloud_sync_connection_failed:$e',
-        checkedAt: DateTime.now(),
-      );
-    }
+    return facade.remoteClient(config).testConnection();
   }
 
   Future<void> uploadBackup({
     CloudSyncConfig? configOverride,
-    // 允许调用方传入统一时间戳，确保 manifest.updatedAtMs 与外部记录的
-    // lastSyncedRemoteTs 完全一致，消除时间戳竞争条件。
     int? uploadAtMs,
   }) async {
     final config = configOverride ?? await loadConfig();
@@ -217,37 +99,31 @@ class CloudSyncService {
       throw Exception('cloud_sync_config_incomplete');
     }
 
-    final dio = _buildDio(config);
-    final rootUrl = _rootUrl(config.url);
-    await _ensureDir(dio, rootUrl);
+    final client = facade.remoteClient(config);
+    await client.ensureRootDir();
+    await client.ensureBackupDirs();
 
-    final backupDirUrl = '$rootUrl/backup';
-    await _ensureDir(dio, backupDirUrl);
-    final sourceDirUrl = '$backupDirUrl/$_sourceDirName';
-    await _ensureDir(dio, sourceDirUrl);
-
-    final snapshot = await _buildLocalSnapshotFiles();
-    await _putString(
-      dio,
-      '$backupDirUrl/$_settingsFileName',
+    final snapshot = await _snapshotCodec.buildLocalSnapshotFiles();
+    await client.putBackupFile(
+      CloudSyncConfigStore.settingsFileName,
       snapshot.settings,
     );
-    await _putString(dio, '$backupDirUrl/$_readingFileName', snapshot.reading);
-    await _putString(
-      dio,
-      '$backupDirUrl/$_searchHistoryFileName',
+    await client.putBackupFile(
+      CloudSyncConfigStore.readingFileName,
+      snapshot.reading,
+    );
+    await client.putBackupFile(
+      CloudSyncConfigStore.searchHistoryFileName,
       snapshot.searchHistoryJsonl,
     );
 
     if (snapshot.jmSource != null && snapshot.jmSource!.trim().isNotEmpty) {
-      await _putString(
-        dio,
-        '$sourceDirUrl/$_sourceFileName',
+      await client.putSourceFile(
+        CloudSyncConfigStore.sourceFileName,
         snapshot.jmSource!,
       );
     }
 
-    // 优先使用调用方传入的时间戳，若未传则自己取当前时间。
     final nowMs = uploadAtMs ?? DateTime.now().millisecondsSinceEpoch;
     final manifest = {
       'version': 2,
@@ -255,12 +131,11 @@ class CloudSyncService {
       'historyCount': snapshot.historyCount,
       'progressCount': snapshot.progressCount,
       'searchCount': snapshot.searchCount,
-      'sourcePlatform': _currentPlatformName,
+      'sourcePlatform': _configStore.currentPlatformName,
       'hasSourceFile': snapshot.jmSource?.trim().isNotEmpty == true,
     };
-    await _putString(
-      dio,
-      '$backupDirUrl/$_manifestFileName',
+    await client.putBackupFile(
+      CloudSyncConfigStore.manifestFileName,
       jsonEncode(manifest),
     );
   }
@@ -273,36 +148,29 @@ class CloudSyncService {
       throw Exception('cloud_sync_config_incomplete');
     }
 
-    final dio = _buildDio(config);
-    final rootUrl = _rootUrl(config.url);
-    final backupDirUrl = '$rootUrl/backup';
-    final manifest = await _loadManifest(dio, backupDirUrl);
-    final settingsText = await _getString(
-      dio,
-      '$backupDirUrl/$_settingsFileName',
+    final client = facade.remoteClient(config);
+    final manifest = await client.loadManifest();
+    final settingsText = await client.getBackupFile(
+      CloudSyncConfigStore.settingsFileName,
     );
-    final readingText = await _loadReadingSnapshotText(dio, backupDirUrl);
-    final searchHistoryText = await _getString(
-      dio,
-      '$backupDirUrl/$_searchHistoryFileName',
+    final readingText = await client.loadReadingSnapshotText();
+    final searchHistoryText = await client.getBackupFile(
+      CloudSyncConfigStore.searchHistoryFileName,
     );
-    final sourceText = await _tryGetString(
-      dio,
-      '$backupDirUrl/$_sourceDirName/$_sourceFileName',
+    final sourceText = await client.tryGetSourceFile(
+      CloudSyncConfigStore.sourceFileName,
     );
 
-    final settingsResult = await _applySettingsJson(settingsText);
-    await _applyReadingSnapshot(readingText);
-    await _applySearchHistoryJsonl(searchHistoryText);
+    final settingsResult = await _restoreApplier.applySettingsJson(
+      settingsText,
+    );
+    await _restoreApplier.applyReadingSnapshot(readingText);
+    await _restoreApplier.applySearchHistoryJsonl(searchHistoryText);
 
-    var restoredSourceFile = false;
-    final manifestHasSource = manifest['hasSourceFile'] == true;
-    if (sourceText != null && sourceText.trim().isNotEmpty) {
-      await HazukiSourceService.instance.writeLocalJmSource(sourceText);
-      restoredSourceFile = true;
-    } else if (manifestHasSource) {
-      throw Exception('cloud_sync_source_missing');
-    }
+    final restoredSourceFile = await _restoreApplier.applySourceFile(
+      sourceText: sourceText,
+      manifestHasSource: manifest['hasSourceFile'] == true,
+    );
 
     return CloudSyncRestoreResult(
       restoredSettings: true,
@@ -313,806 +181,24 @@ class CloudSyncService {
       skippedKeys: settingsResult.skippedKeys,
     );
   }
-
-  Dio _buildDio(CloudSyncConfig config) {
-    final auth = base64Encode(
-      utf8.encode('${config.username.trim()}:${config.password}'),
-    );
-    return Dio(
-      BaseOptions(
-        connectTimeout: const Duration(seconds: 25),
-        receiveTimeout: const Duration(seconds: 40),
-        sendTimeout: const Duration(seconds: 40),
-        validateStatus: (status) => true,
-        headers: {'authorization': 'Basic $auth'},
-      ),
-    );
-  }
-
-  String _rootUrl(String raw) {
-    final trimmed = raw.trim();
-    if (trimmed.isEmpty) {
-      return '';
-    }
-    final normalized = trimmed.endsWith('/')
-        ? trimmed.substring(0, trimmed.length - 1)
-        : trimmed;
-    return '$normalized/HazukiSync';
-  }
-
-  String get _currentPlatformName {
-    if (Platform.isWindows) {
-      return 'windows';
-    }
-    if (Platform.isAndroid) {
-      return 'android';
-    }
-    return 'unknown';
-  }
-
-  Future<void> _ensureDir(Dio dio, String url) async {
-    final response = await dio.request<dynamic>(
-      url,
-      options: Options(method: 'MKCOL'),
-    );
-    final code = response.statusCode ?? 0;
-    if (code == 201 || code == 301 || code == 302 || code == 405) {
-      return;
-    }
-    if (code >= 200 && code < 300) {
-      return;
-    }
-    throw Exception('cloud_sync_directory_create_failed:$code');
-  }
-
-  Future<void> _putString(Dio dio, String url, String content) async {
-    final response = await dio.put<dynamic>(
-      url,
-      data: utf8.encode(content),
-      options: Options(headers: {'content-type': 'application/octet-stream'}),
-    );
-    final code = response.statusCode ?? 0;
-    if (code < 200 || code >= 300) {
-      throw Exception('cloud_sync_upload_failed:$code');
-    }
-  }
-
-  Future<void> _deleteIfExists(Dio dio, String url) async {
-    final response = await dio.delete<dynamic>(url);
-    final code = response.statusCode ?? 0;
-    if (code == 404 || code == 405) {
-      return;
-    }
-    if (code >= 200 && code < 300) {
-      return;
-    }
-    throw Exception('cloud_sync_delete_failed:$code');
-  }
-
-  Future<String> _getString(Dio dio, String url) async {
-    final response = await dio.get<List<int>>(
-      url,
-      options: Options(responseType: ResponseType.bytes),
-    );
-    final code = response.statusCode ?? 0;
-    if (code < 200 || code >= 300) {
-      throw Exception('cloud_sync_download_failed:$code');
-    }
-    final bytes = response.data ?? const <int>[];
-    return utf8.decode(bytes);
-  }
-
-  Future<String?> _tryGetString(Dio dio, String url) async {
-    final response = await dio.get<List<int>>(
-      url,
-      options: Options(responseType: ResponseType.bytes),
-    );
-    final code = response.statusCode ?? 0;
-    if (code == 404) {
-      return null;
-    }
-    if (code < 200 || code >= 300) {
-      throw Exception('cloud_sync_download_failed:$code');
-    }
-    final bytes = response.data ?? const <int>[];
-    return utf8.decode(bytes);
-  }
-
-  Future<Map<String, dynamic>> _loadManifest(
-    Dio dio,
-    String backupDirUrl,
-  ) async {
-    final manifestText = await _tryGetString(
-      dio,
-      '$backupDirUrl/$_manifestFileName',
-    );
-    if (manifestText == null || manifestText.trim().isEmpty) {
-      return const {'version': 1};
-    }
-    try {
-      final decoded = jsonDecode(manifestText);
-      if (decoded is Map) {
-        return Map<String, dynamic>.from(decoded);
-      }
-    } catch (_) {}
-    return const {'version': 1};
-  }
-
-  Future<String> _loadReadingSnapshotText(Dio dio, String backupDirUrl) async {
-    final current = await _tryGetString(dio, '$backupDirUrl/$_readingFileName');
-    if (current != null) {
-      return current;
-    }
-    final legacy = await _tryGetString(
-      dio,
-      '$backupDirUrl/$_legacyReadingFileName',
-    );
-    if (legacy != null) {
-      return legacy;
-    }
-    throw Exception('cloud_sync_reading_missing');
-  }
-
-  Future<void> _mergeRemoteIntoLocal(Dio dio, String backupDirUrl) async {
-    final prefs = await SharedPreferences.getInstance();
-
-    // 自动合并只做增量数据合并（历史、进度、搜索、收藏），
-    // 不覆盖外观/阅读器等用户偏好设置——那些设置是设备级的，
-    // 应由用户手动恢复，而不是每次启动都被远端静默覆盖。
-    final localHistorySnapshot = prefs.getString('hazuki_read_history');
-    final localProgressSnapshot = <String, String>{};
-    for (final key in prefs.getKeys()) {
-      if (!key.startsWith('reading_progress_')) continue;
-      final raw = prefs.getString(key);
-      if (raw != null) localProgressSnapshot[key] = raw;
-    }
-    final localSearchSnapshot = prefs.getStringList('search_history');
-    final localFoldersSnapshot = prefs.getString('local_favorite_folders_v1');
-    final localEntriesSnapshot = prefs.getString('local_favorite_entries_v1');
-
-    final readingText = await _tryGetString(
-      dio,
-      '$backupDirUrl/$_readingFileName',
-    );
-    final searchText = await _tryGetString(
-      dio,
-      '$backupDirUrl/$_searchHistoryFileName',
-    );
-    final settingsText = await _tryGetString(
-      dio,
-      '$backupDirUrl/$_settingsFileName',
-    );
-
-    // 合并阅读历史。
-    if (readingText != null) {
-      Map<String, dynamic>? readingMap;
-      try {
-        final decoded = jsonDecode(readingText);
-        if (decoded is Map) {
-          readingMap = Map<String, dynamic>.from(decoded);
-        }
-      } catch (_) {}
-
-      if (readingMap != null) {
-        final remoteHistoryRaw = readingMap['history'];
-        List<Map<String, dynamic>> remoteHistory = const [];
-        if (remoteHistoryRaw is List) {
-          remoteHistory = remoteHistoryRaw
-              .whereType<Map>()
-              .map((e) => Map<String, dynamic>.from(e))
-              .toList();
-        }
-
-        List<Map<String, dynamic>> localHistory = const [];
-        if (localHistorySnapshot != null) {
-          try {
-            final decoded = jsonDecode(localHistorySnapshot);
-            if (decoded is List) {
-              localHistory = decoded
-                  .whereType<Map>()
-                  .map((e) => Map<String, dynamic>.from(e))
-                  .toList();
-            }
-          } catch (_) {}
-        }
-
-        final mergedHistory = <String, Map<String, dynamic>>{};
-        for (final entry in [...localHistory, ...remoteHistory]) {
-          final comicId = (entry['id'] ?? '').toString().trim();
-          if (comicId.isEmpty) continue;
-          final ts = (entry['timestamp'] as num?)?.toInt() ?? 0;
-          final existing = mergedHistory[comicId];
-          final existingTs = (existing?['timestamp'] as num?)?.toInt() ?? 0;
-          if (existing == null || ts > existingTs) {
-            mergedHistory[comicId] = entry;
-          }
-        }
-        var historyList = mergedHistory.values.toList()
-          ..sort(
-            (a, b) => ((b['timestamp'] as num?)?.toInt() ?? 0).compareTo(
-              (a['timestamp'] as num?)?.toInt() ?? 0,
-            ),
-          );
-        if (historyList.length > 150) {
-          historyList = historyList.sublist(0, 150);
-        }
-        await prefs.setString('hazuki_read_history', jsonEncode(historyList));
-
-        // 合并阅读进度（使用本地快照）。
-        final remoteProgressRaw = readingMap['progress'];
-        final remoteProgress = <String, Map<String, dynamic>>{};
-        if (remoteProgressRaw is List) {
-          for (final item in remoteProgressRaw) {
-            if (item is! Map) continue;
-            final entry = Map<String, dynamic>.from(item);
-            final comicId = (entry['comicId'] ?? '').toString().trim();
-            if (comicId.isEmpty) continue;
-            remoteProgress[comicId] = entry;
-          }
-        }
-
-        final localProgress = <String, Map<String, dynamic>>{};
-        for (final entry in localProgressSnapshot.entries) {
-          final comicId = entry.key.substring('reading_progress_'.length);
-          try {
-            final decoded = jsonDecode(entry.value);
-            if (decoded is Map) {
-              localProgress[comicId] = Map<String, dynamic>.from(decoded);
-            }
-          } catch (_) {}
-        }
-
-        final allComicIds = {...localProgress.keys, ...remoteProgress.keys};
-        for (final comicId in allComicIds) {
-          final local = localProgress[comicId];
-          final remote = remoteProgress[comicId];
-          final Map<String, dynamic> winner;
-          if (local == null) {
-            winner = remote!;
-          } else if (remote == null) {
-            continue; // 本地独有，不动
-          } else {
-            final localTs = (local['timestamp'] as num?)?.toInt() ?? 0;
-            final remoteTs = (remote['timestamp'] as num?)?.toInt() ?? 0;
-            if (remoteTs > localTs) {
-              winner = remote;
-            } else {
-              continue;
-            }
-          }
-          await prefs.setString(
-            'reading_progress_$comicId',
-            jsonEncode({
-              'epId': winner['epId'],
-              'title': winner['title'],
-              'index': winner['index'],
-              'timestamp': winner['timestamp'],
-            }),
-          );
-        }
-      }
-    }
-
-    // 合并搜索历史（使用本地快照）。
-    // 无论 searchText 是否存在都必须执行，因为 _applySettingsJson 已经把远端
-    // 合并搜索历史。
-    {
-      final remoteKeywords = <String>[];
-      if (searchText != null) {
-        for (final raw in searchText.split('\n')) {
-          final line = raw.trim();
-          if (line.isEmpty) continue;
-          try {
-            final decoded = jsonDecode(line);
-            if (decoded is Map) {
-              final keyword = (decoded['keyword'] ?? '').toString().trim();
-              if (keyword.isNotEmpty) remoteKeywords.add(keyword);
-            }
-          } catch (_) {}
-        }
-      } else if (settingsText != null) {
-        // jsonl 文件不存在时，从 settings.json 中提取远端搜索历史。
-        try {
-          final decoded = jsonDecode(settingsText);
-          if (decoded is Map) {
-            final data = decoded['data'];
-            if (data is Map) {
-              final raw = data['search_history'];
-              if (raw is List) {
-                remoteKeywords.addAll(raw.map((e) => e.toString()));
-              }
-            }
-          }
-        } catch (_) {}
-      }
-      final localKeywords = localSearchSnapshot ?? const <String>[];
-      final merged = <String>[];
-      final seen = <String>{};
-      for (final k in [...remoteKeywords, ...localKeywords]) {
-        if (seen.add(k)) merged.add(k);
-      }
-      await prefs.setStringList('search_history', merged);
-    }
-
-    // 合并本地收藏（使用本地快照）。
-    if (settingsText != null) {
-      try {
-        final settingsDecoded = jsonDecode(settingsText);
-        if (settingsDecoded is Map) {
-          final data = settingsDecoded['data'];
-          if (data is Map) {
-            await _mergeLocalFavorites(
-              prefs,
-              data,
-              localFoldersSnapshot: localFoldersSnapshot,
-              localEntriesSnapshot: localEntriesSnapshot,
-            );
-          }
-        }
-      } catch (_) {}
-    }
-  }
-
-  Future<void> _mergeLocalFavorites(
-    SharedPreferences prefs,
-    Map<dynamic, dynamic> remoteData, {
-    String? localFoldersSnapshot,
-    String? localEntriesSnapshot,
-  }) async {
-    // 合并收藏夹：按 id 去重，同 id 保留本地名称，远端独有夹子追加
-    List<Map<String, dynamic>> localFolders = const [];
-    final localFoldersRaw =
-        localFoldersSnapshot ?? prefs.getString('local_favorite_folders_v1');
-    if (localFoldersRaw != null) {
-      try {
-        final decoded = jsonDecode(localFoldersRaw);
-        if (decoded is List) {
-          localFolders = decoded
-              .whereType<Map>()
-              .map((e) => Map<String, dynamic>.from(e))
-              .toList();
-        }
-      } catch (_) {}
-    }
-
-    List<Map<String, dynamic>> remoteFolders = const [];
-    final remoteFoldersRaw = remoteData['local_favorite_folders_v1'];
-    if (remoteFoldersRaw is String && remoteFoldersRaw.isNotEmpty) {
-      try {
-        final decoded = jsonDecode(remoteFoldersRaw);
-        if (decoded is List) {
-          remoteFolders = decoded
-              .whereType<Map>()
-              .map((e) => Map<String, dynamic>.from(e))
-              .toList();
-        }
-      } catch (_) {}
-    }
-
-    final localFolderIds = {
-      for (final f in localFolders) f['id'].toString(): f,
-    };
-    final mergedFolders = List<Map<String, dynamic>>.from(localFolders);
-    for (final folder in remoteFolders) {
-      final id = folder['id']?.toString() ?? '';
-      if (id.isEmpty) continue;
-      if (!localFolderIds.containsKey(id)) {
-        mergedFolders.add(folder);
-      }
-      // 同 id 保留本地版本（夹名可能被用户改过）
-    }
-
-    // 合并收藏条目：按 comicId 去重，保留 savedAtMs 较大的，folderIds 取并集
-    List<Map<String, dynamic>> localEntries = const [];
-    final localEntriesRaw =
-        localEntriesSnapshot ?? prefs.getString('local_favorite_entries_v1');
-    if (localEntriesRaw != null) {
-      try {
-        final decoded = jsonDecode(localEntriesRaw);
-        if (decoded is List) {
-          localEntries = decoded
-              .whereType<Map>()
-              .map((e) => Map<String, dynamic>.from(e))
-              .toList();
-        }
-      } catch (_) {}
-    }
-
-    List<Map<String, dynamic>> remoteEntries = const [];
-    final remoteEntriesRaw = remoteData['local_favorite_entries_v1'];
-    if (remoteEntriesRaw is String && remoteEntriesRaw.isNotEmpty) {
-      try {
-        final decoded = jsonDecode(remoteEntriesRaw);
-        if (decoded is List) {
-          remoteEntries = decoded
-              .whereType<Map>()
-              .map((e) => Map<String, dynamic>.from(e))
-              .toList();
-        }
-      } catch (_) {}
-    }
-
-    final mergedEntries = <String, Map<String, dynamic>>{};
-    for (final entry in localEntries) {
-      final comicId = (entry['comicId'] ?? '').toString().trim();
-      if (comicId.isEmpty) continue;
-      mergedEntries[comicId] = entry;
-    }
-    for (final entry in remoteEntries) {
-      final comicId = (entry['comicId'] ?? '').toString().trim();
-      if (comicId.isEmpty) continue;
-      final existing = mergedEntries[comicId];
-      if (existing == null) {
-        mergedEntries[comicId] = entry;
-      } else {
-        final localTs = (existing['savedAtMs'] as num?)?.toInt() ?? 0;
-        final remoteTs = (entry['savedAtMs'] as num?)?.toInt() ?? 0;
-        final winner = remoteTs > localTs ? entry : existing;
-        // folderIds 取并集
-        final localIds = _toStringSet(existing['folderIds']);
-        final remoteIds = _toStringSet(entry['folderIds']);
-        final mergedIds = {...localIds, ...remoteIds}.toList();
-        mergedEntries[comicId] = {...winner, 'folderIds': mergedIds};
-      }
-    }
-
-    await prefs.setString(
-      'local_favorite_folders_v1',
-      jsonEncode(mergedFolders),
-    );
-    await prefs.setString(
-      'local_favorite_entries_v1',
-      jsonEncode(mergedEntries.values.toList()),
-    );
-  }
-
-  Set<String> _toStringSet(dynamic value) {
-    if (value is List) {
-      return value.map((e) => e.toString()).toSet();
-    }
-    return const {};
-  }
-
-  Future<_LocalSnapshot> _buildLocalSnapshotFiles() async {
-    final prefs = await SharedPreferences.getInstance();
-    final settingsMap = <String, dynamic>{};
-    for (final key in prefs.getKeys()) {
-      if (_alwaysSkippedSettings.contains(key)) {
-        continue;
-      }
-      final value = prefs.get(key);
-      // 对 source_data_* 键进行净化：账号凭证属于敏感信息，不应上传至云端。
-      if (key.startsWith('source_data_') && value is String) {
-        settingsMap[key] = _stripAccountFromSourceData(value);
-      } else {
-        settingsMap[key] = value;
-      }
-    }
-    final settingsJson = jsonEncode({
-      'version': 2,
-      'updatedAtMs': DateTime.now().millisecondsSinceEpoch,
-      'data': settingsMap,
-    });
-
-    final historyRaw = prefs.getString('hazuki_read_history');
-    List<Map<String, dynamic>> history = const [];
-    if (historyRaw != null && historyRaw.trim().isNotEmpty) {
-      try {
-        final decoded = jsonDecode(historyRaw);
-        if (decoded is List) {
-          history = decoded
-              .whereType<Map>()
-              .map((e) => Map<String, dynamic>.from(e))
-              .toList();
-        }
-      } catch (_) {}
-    }
-    if (history.length > 150) {
-      history = history.sublist(0, 150);
-    }
-
-    final progress = <Map<String, dynamic>>[];
-    for (final key in prefs.getKeys()) {
-      if (!key.startsWith('reading_progress_')) {
-        continue;
-      }
-      final comicId = key.substring('reading_progress_'.length);
-      final raw = prefs.getString(key);
-      if (raw == null || raw.trim().isEmpty) {
-        continue;
-      }
-      try {
-        final decoded = jsonDecode(raw);
-        if (decoded is Map) {
-          final map = Map<String, dynamic>.from(decoded);
-          progress.add({
-            'comicId': comicId,
-            'epId': map['epId'],
-            'title': map['title'],
-            'index': map['index'],
-            'timestamp': map['timestamp'],
-          });
-        }
-      } catch (_) {}
-    }
-
-    final readingJson = jsonEncode({
-      'version': 1,
-      'updatedAtMs': DateTime.now().millisecondsSinceEpoch,
-      'history': history,
-      'progress': progress,
-    });
-
-    final search = prefs.getStringList('search_history') ?? const <String>[];
-    final lines = search
-        .map((keyword) => jsonEncode({'keyword': keyword}))
-        .join('\n');
-
-    return _LocalSnapshot(
-      settings: settingsJson,
-      reading: readingJson,
-      searchHistoryJsonl: lines,
-      historyCount: history.length,
-      progressCount: progress.length,
-      searchCount: search.length,
-      jmSource: await HazukiSourceService.instance.readLocalJmSourceIfExists(),
-    );
-  }
-
-  Future<_ApplySettingsResult> _applySettingsJson(String content) async {
-    dynamic decoded;
-    try {
-      decoded = jsonDecode(content);
-    } catch (e) {
-      throw Exception('cloud_sync_settings_parse_failed:$e');
-    }
-    if (decoded is! Map) {
-      throw Exception('cloud_sync_settings_invalid_format');
-    }
-    final dataRaw = decoded['data'];
-    if (dataRaw is! Map) {
-      throw Exception('cloud_sync_settings_missing_data');
-    }
-    final data = Map<String, dynamic>.from(dataRaw);
-    final prefs = await SharedPreferences.getInstance();
-    final appliedPlatformFilteredKeys = <String>[];
-    final skippedKeys = <String>[];
-    for (final entry in data.entries) {
-      final sanitized = _sanitizeRestoredSetting(
-        prefs,
-        entry.key,
-        entry.value,
-        skippedKeys: skippedKeys,
-        appliedPlatformFilteredKeys: appliedPlatformFilteredKeys,
-      );
-      if (sanitized == null) {
-        continue;
-      }
-      await _setPrefValue(prefs, entry.key, sanitized);
-    }
-    return _ApplySettingsResult(
-      appliedPlatformFilteredKeys: appliedPlatformFilteredKeys,
-      skippedKeys: skippedKeys,
-    );
-  }
-
-  dynamic _sanitizeRestoredSetting(
-    SharedPreferences prefs,
-    String key,
-    dynamic value, {
-    required List<String> skippedKeys,
-    required List<String> appliedPlatformFilteredKeys,
-  }) {
-    final normalizedKey = key.trim();
-    if (normalizedKey.isEmpty) {
-      return null;
-    }
-    if (_alwaysSkippedSettings.contains(normalizedKey)) {
-      skippedKeys.add(normalizedKey);
-      return null;
-    }
-    if (_windowsOnlySettings.contains(normalizedKey)) {
-      if (!Platform.isWindows) {
-        skippedKeys.add(normalizedKey);
-        return null;
-      }
-      appliedPlatformFilteredKeys.add(normalizedKey);
-    }
-    if (_androidOnlySettings.contains(normalizedKey)) {
-      if (!Platform.isAndroid) {
-        skippedKeys.add(normalizedKey);
-        return null;
-      }
-      appliedPlatformFilteredKeys.add(normalizedKey);
-    }
-    if (!normalizedKey.startsWith('source_data_')) {
-      return value;
-    }
-    if (value is! String || value.trim().isEmpty) {
-      return value;
-    }
-    try {
-      final decoded = jsonDecode(value);
-      if (decoded is! Map) {
-        return value;
-      }
-      final sanitized = Map<String, dynamic>.from(decoded);
-      // 账号凭证属于敏感会话数据，不应从备份恢复，
-      // 先无条件移除备份中携带的 account 字段。
-      sanitized.remove('account');
-      // 若本地设备已有登录账号，则将其写回，保持本地状态不变。
-      final existingRaw = prefs.getString(normalizedKey);
-      if (existingRaw != null && existingRaw.trim().isNotEmpty) {
-        try {
-          final existingDecoded = jsonDecode(existingRaw);
-          if (existingDecoded is Map && existingDecoded['account'] != null) {
-            sanitized['account'] = existingDecoded['account'];
-          }
-        } catch (_) {}
-      }
-      return jsonEncode(sanitized);
-    } catch (_) {
-      return value;
-    }
-  }
-
-  Future<void> _applyReadingSnapshot(String content) async {
-    dynamic decoded;
-    try {
-      decoded = jsonDecode(content);
-    } catch (e) {
-      throw Exception('cloud_sync_reading_parse_failed:$e');
-    }
-    if (decoded is! Map) {
-      throw Exception('cloud_sync_reading_invalid_format');
-    }
-    final map = Map<String, dynamic>.from(decoded);
-    final prefs = await SharedPreferences.getInstance();
-
-    final historyRaw = map['history'];
-    if (historyRaw is List) {
-      final history = historyRaw
-          .whereType<Map>()
-          .map((e) => Map<String, dynamic>.from(e))
-          .toList();
-      final trimmed = history.length > 150 ? history.sublist(0, 150) : history;
-      await prefs.setString('hazuki_read_history', jsonEncode(trimmed));
-    }
-
-    for (final key in prefs.getKeys().toList()) {
-      if (key.startsWith('reading_progress_')) {
-        await prefs.remove(key);
-      }
-    }
-
-    final progressRaw = map['progress'];
-    if (progressRaw is List) {
-      for (final item in progressRaw) {
-        if (item is! Map) {
-          continue;
-        }
-        final progress = Map<String, dynamic>.from(item);
-        final comicId = (progress['comicId'] ?? '').toString().trim();
-        if (comicId.isEmpty) {
-          continue;
-        }
-        final store = <String, dynamic>{
-          'epId': progress['epId'],
-          'title': progress['title'],
-          'index': progress['index'],
-          'timestamp': progress['timestamp'],
-        };
-        await prefs.setString('reading_progress_$comicId', jsonEncode(store));
-      }
-    }
-  }
-
-  Future<void> _applySearchHistoryJsonl(String content) async {
-    final lines = content.split('\n');
-    final list = <String>[];
-    for (final raw in lines) {
-      final line = raw.trim();
-      if (line.isEmpty) {
-        continue;
-      }
-      try {
-        final decoded = jsonDecode(line);
-        if (decoded is Map) {
-          final keyword = (decoded['keyword'] ?? '').toString().trim();
-          if (keyword.isNotEmpty) {
-            list.add(keyword);
-          }
-        }
-      } catch (_) {}
-    }
-    final deduped = <String>[];
-    final seen = <String>{};
-    for (final keyword in list) {
-      if (seen.add(keyword)) {
-        deduped.add(keyword);
-      }
-    }
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList('search_history', deduped);
-  }
-
-  Future<void> _setPrefValue(
-    SharedPreferences prefs,
-    String key,
-    dynamic value,
-  ) async {
-    if (value == null) {
-      await prefs.remove(key);
-      return;
-    }
-    if (value is bool) {
-      await prefs.setBool(key, value);
-      return;
-    }
-    if (value is int) {
-      await prefs.setInt(key, value);
-      return;
-    }
-    if (value is double) {
-      await prefs.setDouble(key, value);
-      return;
-    }
-    if (value is String) {
-      await prefs.setString(key, value);
-      return;
-    }
-    if (value is List) {
-      final asStrings = value.map((e) => e.toString()).toList();
-      await prefs.setStringList(key, asStrings);
-      return;
-    }
-    await prefs.setString(key, value.toString());
-  }
-
-  /// 从 source_data_* 的 JSON 字符串中剔除 account 字段。
-  /// 账号凭证属于敏感会话数据，不应出现在云端备份中。
-  String _stripAccountFromSourceData(String raw) {
-    try {
-      final decoded = jsonDecode(raw);
-      if (decoded is! Map) {
-        return raw;
-      }
-      final sanitized = Map<String, dynamic>.from(decoded);
-      sanitized.remove('account');
-      return jsonEncode(sanitized);
-    } catch (_) {
-      // 解析失败时原样保留，避免破坏其他数据
-      return raw;
-    }
-  }
 }
 
-class _LocalSnapshot {
-  const _LocalSnapshot({
-    required this.settings,
-    required this.reading,
-    required this.searchHistoryJsonl,
-    required this.historyCount,
-    required this.progressCount,
-    required this.searchCount,
-    required this.jmSource,
-  });
+class CloudSyncFacade {
+  CloudSyncFacade._({
+    required this.configStore,
+    required this.snapshotCodec,
+    required this.restoreApplier,
+    required CloudSyncRemoteClient Function(CloudSyncConfig config)
+    remoteClientFactory,
+  }) : _remoteClientFactory = remoteClientFactory;
 
-  final String settings;
-  final String reading;
-  final String searchHistoryJsonl;
-  final int historyCount;
-  final int progressCount;
-  final int searchCount;
-  final String? jmSource;
-}
+  final CloudSyncConfigStore configStore;
+  final CloudSyncSnapshotCodec snapshotCodec;
+  final CloudSyncRestoreApplier restoreApplier;
+  final CloudSyncRemoteClient Function(CloudSyncConfig config)
+  _remoteClientFactory;
 
-class _ApplySettingsResult {
-  const _ApplySettingsResult({
-    required this.appliedPlatformFilteredKeys,
-    required this.skippedKeys,
-  });
-
-  final List<String> appliedPlatformFilteredKeys;
-  final List<String> skippedKeys;
+  CloudSyncRemoteClient remoteClient(CloudSyncConfig config) {
+    return _remoteClientFactory(config);
+  }
 }

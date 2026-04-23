@@ -60,6 +60,7 @@ extension HazukiSourceServiceSourceLoaderCapability on HazukiSourceService {
   }
 
   Future<SourceMeta> _loadSourceMetadata(File initFile, File jmFile) async {
+    final facade = this.facade;
     final initScript = await initFile.readAsString();
     final jmScript = await jmFile.readAsString();
     final className = _extractSourceClassName(jmScript);
@@ -108,12 +109,12 @@ extension HazukiSourceServiceSourceLoaderCapability on HazukiSourceService {
       );
 
       _setRuntimeBusyState(
-        _runtimeState.phase,
+        facade.runtimeState.phase,
         SourceRuntimeStep.runningSourceInit,
         debugDetail: 'running_source_init',
       );
-      final oldMeta = _sourceMeta;
-      _sourceMeta = meta;
+      final oldMeta = facade.sourceMeta;
+      facade.runtime.sourceMeta = meta;
       try {
         final initResult = engine.evaluate(
           'this.__hazuki_source.init?.()',
@@ -123,11 +124,11 @@ extension HazukiSourceServiceSourceLoaderCapability on HazukiSourceService {
           await initResult;
         }
       } catch (_) {
-        _sourceMeta = oldMeta;
+        facade.runtime.sourceMeta = oldMeta;
         rethrow;
       }
-      final oldEngine = _engine;
-      _engine = engine;
+      final oldEngine = facade.runtime.engine;
+      facade.runtime.engine = engine;
       oldEngine?.close();
       return meta;
     } catch (_) {

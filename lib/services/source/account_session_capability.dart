@@ -2,7 +2,7 @@ part of '../hazuki_source_service.dart';
 
 extension HazukiSourceServiceAccountSessionCapability on HazukiSourceService {
   String? get currentAccount {
-    final accountData = _loadAccountDataSync();
+    final accountData = facade.loadAccountDataSync();
     if (accountData == null || accountData.isEmpty) {
       return null;
     }
@@ -15,16 +15,17 @@ extension HazukiSourceServiceAccountSessionCapability on HazukiSourceService {
     required String account,
     required String password,
   }) async {
-    await ensureInitialized();
+    final facade = this.facade;
+    await facade.ensureInitialized();
 
-    final engine = _engine;
-    final sourceMeta = _sourceMeta;
+    final engine = facade.js.engine;
+    final sourceMeta = facade.sourceMeta;
     if (engine == null || sourceMeta == null) {
       throw Exception('source_not_initialized');
     }
 
-    final supportsAccount = _asBool(
-      engine.evaluate('!!this.__hazuki_source.account?.login'),
+    final supportsAccount = facade.js.asBool(
+      facade.js.evaluate('!!this.__hazuki_source.account?.login'),
     );
     if (!supportsAccount) {
       throw Exception('account_login_not_supported');
@@ -37,8 +38,8 @@ extension HazukiSourceServiceAccountSessionCapability on HazukiSourceService {
 
     try {
       final result = engine.evaluate(script, name: 'source_login.js');
-      resolvedResult = await _awaitJsResult(result);
-      _lastLoginDebugInfo = {
+      resolvedResult = await facade.js.resolve(result);
+      facade.lastLoginDebugInfo = {
         'time': DateTime.now().toIso8601String(),
         'ok': true,
         'account': account,
@@ -57,9 +58,12 @@ extension HazukiSourceServiceAccountSessionCapability on HazukiSourceService {
         responseHeaders: const {},
         responseBody: _jsonSafe(resolvedResult),
       );
-      await _saveSourceData(sourceMeta.key, 'account', [account, password]);
+      await facade.saveSourceData(sourceMeta.key, 'account', [
+        account,
+        password,
+      ]);
     } catch (e) {
-      _lastLoginDebugInfo = {
+      facade.lastLoginDebugInfo = {
         'time': DateTime.now().toIso8601String(),
         'ok': false,
         'account': account,
@@ -84,14 +88,15 @@ extension HazukiSourceServiceAccountSessionCapability on HazukiSourceService {
   }
 
   Future<void> logout() async {
-    final engine = _engine;
-    final sourceMeta = _sourceMeta;
+    final facade = this.facade;
+    final engine = facade.js.engine;
+    final sourceMeta = facade.sourceMeta;
     if (engine == null || sourceMeta == null) {
       return;
     }
 
-    final hasLogout = _asBool(
-      engine.evaluate('!!this.__hazuki_source.account?.logout'),
+    final hasLogout = facade.js.asBool(
+      facade.js.evaluate('!!this.__hazuki_source.account?.logout'),
     );
 
     if (hasLogout) {
@@ -100,12 +105,10 @@ extension HazukiSourceServiceAccountSessionCapability on HazukiSourceService {
           'this.__hazuki_source.account.logout()',
           name: 'source_logout.js',
         );
-        if (result is Future) {
-          await result;
-        }
+        await facade.js.resolve(result);
       } catch (_) {}
     }
 
-    await _deleteSourceData(sourceMeta.key, 'account');
+    await facade.deleteSourceData(sourceMeta.key, 'account');
   }
 }

@@ -960,6 +960,7 @@
     }
   },
   "downloadsScanTooltip": "Scan local comics",
+  "downloadsIntegrityWarning": "Some files may have been moved or deleted",
   "sourceUpdateRestartTitle": "Please restart the app",
   "sourceUpdateRestartMessage": "The source update has finished downloading. Please restart the app to apply the update.",
   "sourceUpdateLocalLabel": "Local",
