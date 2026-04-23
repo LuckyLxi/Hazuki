@@ -3,8 +3,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/app/windows_comic_detail.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/pages/search/search.dart';
-import 'package:hazuki/pages/search/search_entry_page.dart';
+import 'package:hazuki/features/search/search.dart';
+import 'package:hazuki/features/search/view/search_entry_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {

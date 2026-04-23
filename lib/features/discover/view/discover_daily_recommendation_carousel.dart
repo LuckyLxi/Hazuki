@@ -9,6 +9,7 @@ import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
 import '../support/discover_daily_recommendation_carousel_support.dart';
+import 'discover_daily_recommendation_carousel_controllers.dart';
 import 'discover_daily_recommendation_carousel_widgets.dart';
 
 class DiscoverDailyRecommendationCarousel extends StatefulWidget {
@@ -41,8 +42,8 @@ class _DiscoverDailyRecommendationCarouselState
   static const _itemSpacing = 8.0;
   static const Curve _autoPlayCurve = DiscoverCarouselAutoPlayCurve();
 
-  late PageController _pageController;
-  Timer? _autoPlayTimer;
+  late final CarouselAutoPlayController _autoPlay;
+  late final CarouselLoopPageController _loopController;
   late final String _carouselSessionId;
   late List<DiscoverDailyRecommendationEntry> _displayedRecommendations;
   List<DiscoverDailyRecommendationEntry> _pendingRecommendations =
@@ -58,7 +59,6 @@ class _DiscoverDailyRecommendationCarouselState
   Timer? _overlayRevealTimer;
   bool _isHovered = false;
   bool _isUserScrolling = false;
-  bool _isNormalizingLoopBoundary = false;
   bool _usingMixedSnapshots = false;
   bool _pendingActivationScheduled = false;
   double? _lastHeroCardWidth;
@@ -92,9 +92,17 @@ class _DiscoverDailyRecommendationCarouselState
     return _loopMetrics.normalizeLogicalPage(logicalPage);
   }
 
+  PageController get _pageController => _loopController.pageController;
+
   @override
   void initState() {
     super.initState();
+    _autoPlay = CarouselAutoPlayController();
+    _loopController = CarouselLoopPageController(
+      onBoundaryJumpApplied: () =>
+          _scheduleProtectedItemRelease(trigger: 'loop_boundary_jump'),
+      onLog: (title, {content}) => _logCarouselEvent(title, content: content),
+    );
     if (useWindowsComicDetailPanel) {
       WindowsComicDetailController.instance.addListener(
         _handleWindowsDetailControllerChanged,
@@ -113,7 +121,7 @@ class _DiscoverDailyRecommendationCarouselState
       _pendingSnapshotKey = _snapshotKey(_pendingRecommendations);
     }
     _carouselSessionId = DateTime.now().microsecondsSinceEpoch.toString();
-    _pageController = PageController(
+    _loopController.initPageController(
       initialPage: _initialPhysicalPage,
       viewportFraction: 0.84,
     );
@@ -197,6 +205,7 @@ class _DiscoverDailyRecommendationCarouselState
   @override
   void dispose() {
     _cancelAutoPlay(trigger: 'dispose');
+    _autoPlay.dispose();
     _overlayRevealTimer?.cancel();
     _detachRouteAnimation();
     if (useWindowsComicDetailPanel) {
@@ -211,7 +220,7 @@ class _DiscoverDailyRecommendationCarouselState
         'reportedImageCount': _reportedImageStates.length,
       },
     );
-    _pageController.dispose();
+    _loopController.dispose();
     super.dispose();
   }
 
@@ -334,7 +343,8 @@ class _DiscoverDailyRecommendationCarouselState
         'detailOpen': _detailOpen,
         'isHovered': _isHovered,
         'isUserScrolling': _isUserScrolling,
-        'isNormalizingLoopBoundary': _isNormalizingLoopBoundary,
+        'isNormalizingLoopBoundary':
+            _loopController.isNormalizingLoopBoundary,
         'usingMixedSnapshots': _usingMixedSnapshots,
         'protectedVisibleItemCount': _protectedVisibleItems.length,
         'hasPendingRecommendations': _hasPendingRecommendations,
@@ -344,12 +354,10 @@ class _DiscoverDailyRecommendationCarouselState
   }
 
   void _cancelAutoPlay({required String trigger, String? reason}) {
-    final hadTimer = _autoPlayTimer != null;
-    _autoPlayTimer?.cancel();
-    _autoPlayTimer = null;
-    if (!hadTimer) {
+    if (!_autoPlay.isArmed) {
       return;
     }
+    _autoPlay.cancel();
     final content = <String, Object?>{'trigger': trigger};
     if (reason != null) {
       content['reason'] = reason;
@@ -374,37 +382,40 @@ class _DiscoverDailyRecommendationCarouselState
         'animationDurationMs': _autoPlayAnimationDuration.inMilliseconds,
       },
     );
-    _autoPlayTimer = Timer.periodic(_autoPlayInterval, (_) {
-      if (!mounted || !_pageController.hasClients) {
+    _autoPlay.arm(
+      interval: _autoPlayInterval,
+      onTick: () {
+        if (!mounted || !_pageController.hasClients) {
+          _logCarouselEvent(
+            'Discover carousel autoplay tick skipped',
+            content: {
+              'trigger': 'timer_tick',
+              'mounted': mounted,
+              'hasClients': _pageController.hasClients,
+            },
+          );
+          return;
+        }
+        final currentPhysicalPage =
+            _pageController.page?.round() ??
+            _physicalPageForLogical(_currentPage);
+        final targetPhysicalPage = currentPhysicalPage + 1;
         _logCarouselEvent(
-          'Discover carousel autoplay tick skipped',
+          'Discover carousel autoplay tick',
           content: {
-            'trigger': 'timer_tick',
-            'mounted': mounted,
-            'hasClients': _pageController.hasClients,
+            'fromPhysicalPage': currentPhysicalPage,
+            'toPhysicalPage': targetPhysicalPage,
+            'fromLogicalPage': _logicalPageForPhysical(currentPhysicalPage),
+            'toLogicalPage': _logicalPageForPhysical(targetPhysicalPage),
           },
         );
-        return;
-      }
-      final currentPhysicalPage =
-          _pageController.page?.round() ??
-          _physicalPageForLogical(_currentPage);
-      final targetPhysicalPage = currentPhysicalPage + 1;
-      _logCarouselEvent(
-        'Discover carousel autoplay tick',
-        content: {
-          'fromPhysicalPage': currentPhysicalPage,
-          'toPhysicalPage': targetPhysicalPage,
-          'fromLogicalPage': _logicalPageForPhysical(currentPhysicalPage),
-          'toLogicalPage': _logicalPageForPhysical(targetPhysicalPage),
-        },
-      );
-      _pageController.animateToPage(
-        targetPhysicalPage,
-        duration: _autoPlayAnimationDuration,
-        curve: _autoPlayCurve,
-      );
-    });
+        _pageController.animateToPage(
+          targetPhysicalPage,
+          duration: _autoPlayAnimationDuration,
+          curve: _autoPlayCurve,
+        );
+      },
+    );
   }
 
   void _handlePageChanged(int page) {
@@ -431,80 +442,9 @@ class _DiscoverDailyRecommendationCarouselState
   }
 
   void _normalizeLoopBoundary() {
-    if (!_isLooping ||
-        !_pageController.hasClients ||
-        _isNormalizingLoopBoundary) {
-      return;
-    }
-    final settledPage = _pageController.page?.round();
-    if (settledPage == null) {
-      return;
-    }
-    final itemCount = _recommendationCount;
-    if (settledPage <= 1) {
-      _logCarouselEvent(
-        'Discover carousel loop boundary detected',
-        content: {
-          'settledPhysicalPage': settledPage,
-          'jumpTargetPhysicalPage': settledPage + itemCount,
-          'settledLogicalPage': _logicalPageForPhysical(settledPage),
-          'jumpTargetLogicalPage': _logicalPageForPhysical(
-            settledPage + itemCount,
-          ),
-        },
-      );
-      _scheduleLoopBoundaryJump(settledPage + itemCount);
-      return;
-    }
-    if (settledPage >= itemCount + 2) {
-      _logCarouselEvent(
-        'Discover carousel loop boundary detected',
-        content: {
-          'settledPhysicalPage': settledPage,
-          'jumpTargetPhysicalPage': settledPage - itemCount,
-          'settledLogicalPage': _logicalPageForPhysical(settledPage),
-          'jumpTargetLogicalPage': _logicalPageForPhysical(
-            settledPage - itemCount,
-          ),
-        },
-      );
-      _scheduleLoopBoundaryJump(settledPage - itemCount);
-    }
-  }
-
-  void _scheduleLoopBoundaryJump(int targetPage) {
-    _isNormalizingLoopBoundary = true;
-    _logCarouselEvent(
-      'Discover carousel loop boundary jump scheduled',
-      content: {
-        'targetPhysicalPage': targetPage,
-        'targetLogicalPage': _logicalPageForPhysical(targetPage),
-      },
+    _loopController.normalizeLoopBoundary(
+      recommendationCount: _recommendationCount,
     );
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || !_pageController.hasClients) {
-        _isNormalizingLoopBoundary = false;
-        _logCarouselEvent(
-          'Discover carousel loop boundary jump aborted',
-          content: {
-            'targetPhysicalPage': targetPage,
-            'mounted': mounted,
-            'hasClients': _pageController.hasClients,
-          },
-        );
-        return;
-      }
-      _pageController.jumpToPage(targetPage);
-      _isNormalizingLoopBoundary = false;
-      _scheduleProtectedItemRelease(trigger: 'loop_boundary_jump');
-      _logCarouselEvent(
-        'Discover carousel loop boundary jump applied',
-        content: {
-          'targetPhysicalPage': targetPage,
-          'targetLogicalPage': _logicalPageForPhysical(targetPage),
-        },
-      );
-    });
   }
 
   bool _handleScrollNotification(ScrollNotification notification) {
@@ -997,9 +937,8 @@ class _DiscoverDailyRecommendationCarouselState
                       ? (_pageController.page?.round() ??
                             _physicalPageForLogical(_currentPage))
                       : _physicalPageForLogical(_currentPage);
-                  _pageController.dispose();
-                  _pageController = PageController(
-                    initialPage: currentPage,
+                  _loopController.rebuildPageController(
+                    currentPage: currentPage,
                     viewportFraction: viewportFraction,
                   );
                   _scheduleProtectedItemRelease(trigger: 'controller_rebuilt');

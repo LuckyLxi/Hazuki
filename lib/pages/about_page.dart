@@ -7,8 +7,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../app/software_update_dialog_support.dart';
 import '../l10n/app_localizations.dart';
 import '../services/software_update_service.dart';
+import '../features/settings/view/settings_group.dart';
 import '../widgets/widgets.dart';
-import 'settings/settings_group.dart';
 
 class AboutPage extends StatefulWidget {
   const AboutPage({super.key});

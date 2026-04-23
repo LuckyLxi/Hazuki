@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/app/app.dart';
@@ -7,6 +5,7 @@ import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
+import 'discover_comic_tile.dart';
 import 'discover_section_page.dart';
 
 class DiscoverTopSearchBox extends StatelessWidget {
@@ -230,76 +229,16 @@ class DiscoverSectionBlock extends StatelessWidget {
                 );
                 return SizedBox(
                   width: 130,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(8),
-                    onTap: () {
-                      unawaited(
-                        openComicDetail(
-                          context,
-                          comic: comic,
-                          heroTag: heroTag,
-                          pageBuilder: comicDetailPageBuilder,
-                        ),
-                      );
-                    },
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: Hero(
-                            tag: heroTag,
-                            child: ClipRRect(
-                              clipBehavior: Clip.hardEdge,
-                              borderRadius: BorderRadius.circular(8),
-                              child: comic.cover.isEmpty
-                                  ? ColoredBox(
-                                      color: placeholderColor,
-                                      child: const Center(
-                                        child: Icon(
-                                          Icons.image_not_supported_outlined,
-                                        ),
-                                      ),
-                                    )
-                                  : HazukiCachedImage(
-                                      url: comic.cover,
-                                      fit: BoxFit.cover,
-                                      width: 130,
-                                      cacheWidth: coverCacheWidth,
-                                      animateOnLoad: true,
-                                      filterQuality: FilterQuality.low,
-                                      deferLoadingWhileScrolling: true,
-                                      loading: SizedBox.expand(
-                                        child: ColoredBox(
-                                          color: placeholderColor,
-                                        ),
-                                      ),
-                                      error: ColoredBox(
-                                        color: placeholderColor,
-                                        child: const Center(
-                                          child: Icon(
-                                            Icons.broken_image_outlined,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          comic.title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodyMedium,
-                        ),
-                        if (comic.subTitle.isNotEmpty)
-                          Text(
-                            comic.subTitle,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.bodySmall,
-                          ),
-                      ],
+                  child: DiscoverComicCoverTile(
+                    comic: comic,
+                    heroTag: heroTag,
+                    coverCacheWidth: coverCacheWidth,
+                    placeholderColor: placeholderColor,
+                    onTap: () => openComicDetail(
+                      context,
+                      comic: comic,
+                      heroTag: heroTag,
+                      pageBuilder: comicDetailPageBuilder,
                     ),
                   ),
                 );
