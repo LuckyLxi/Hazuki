@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:hazuki/app/chapter_title_resolver.dart';
+import 'package:hazuki/app/windows_title_bar_controller.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/manga_download_service.dart';
@@ -196,22 +197,30 @@ class ComicDetailActionsController extends ChangeNotifier {
           : initialEntry.value,
     );
 
-    await Navigator.of(context)
-        .push(
-          MaterialPageRoute<void>(
-            builder: (_) => _readerPageBuilder(
-              details: details,
-              chapterTitle: initialChapterTitle,
-              epId: initialEntry!.key,
-              chapterIndex: finalIndex,
-              comicTheme: _detailThemeApplier(Theme.of(context)),
-            ),
+    final titleBarController = Platform.isWindows
+        ? HazukiWindowsTitleBarScope.of(context)
+        : null;
+    final titleBarSuppressionOwner = Object();
+    titleBarController?.suppressCustomTitleBar(titleBarSuppressionOwner);
+    try {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => _readerPageBuilder(
+            details: details,
+            chapterTitle: initialChapterTitle,
+            epId: initialEntry!.key,
+            chapterIndex: finalIndex,
+            comicTheme: _detailThemeApplier(Theme.of(context)),
           ),
-        )
-        .then((_) {
-          FocusManager.instance.primaryFocus?.unfocus();
-          if (!_disposed) unawaited(_reloadReadingProgress());
-        });
+        ),
+      );
+    } finally {
+      titleBarController?.releaseCustomTitleBarSuppression(
+        titleBarSuppressionOwner,
+      );
+      FocusManager.instance.primaryFocus?.unfocus();
+      if (!_disposed) unawaited(_reloadReadingProgress());
+    }
   }
 
   Future<void> copyComicId(BuildContext context, String id) async {
@@ -226,9 +235,7 @@ class ComicDetailActionsController extends ChangeNotifier {
     final trimmedValue = value.trim();
     if (trimmedValue.isEmpty) return;
     Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => _searchPageBuilder(trimmedValue),
-      ),
+      MaterialPageRoute<void>(builder: (_) => _searchPageBuilder(trimmedValue)),
     );
   }
 
@@ -256,8 +263,7 @@ class ComicDetailActionsController extends ChangeNotifier {
       final lastSegment = uri?.pathSegments.isNotEmpty == true
           ? uri!.pathSegments.last
           : '';
-      final defaultName =
-          'hazuki_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final defaultName = 'hazuki_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final fileName = lastSegment.isEmpty
           ? defaultName
           : lastSegment.split('?').first;
@@ -366,9 +372,7 @@ class ComicDetailActionsController extends ChangeNotifier {
     if (targets.isEmpty) return;
     await _repository.enqueueDownload(
       details: details,
-      coverUrl: details.cover.trim().isNotEmpty
-          ? details.cover
-          : _comic.cover,
+      coverUrl: details.cover.trim().isNotEmpty ? details.cover : _comic.cover,
       description: details.description,
       chapters: targets,
     );

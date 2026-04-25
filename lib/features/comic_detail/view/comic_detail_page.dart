@@ -113,12 +113,15 @@ class _ComicDetailPageState extends State<ComicDetailPage>
                 onLongPress: onLongPress,
               ),
       chaptersPanelBuilder:
-          ({required details, required onDownloadConfirm, required onChapterTap}) =>
-              ChaptersPanelSheet(
-                details: details,
-                onDownloadConfirm: onDownloadConfirm,
-                onChapterTap: onChapterTap,
-              ),
+          ({
+            required details,
+            required onDownloadConfirm,
+            required onChapterTap,
+          }) => ChaptersPanelSheet(
+            details: details,
+            onDownloadConfirm: onDownloadConfirm,
+            onChapterTap: onChapterTap,
+          ),
       readerPageBuilder:
           ({
             required details,
@@ -153,8 +156,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
           widget.shouldAnimateInitialRevealOverride,
       vsync: this,
       scrollController: _scrollController,
-      applyInitialFavoriteOverrides:
-          _favoriteController.applyInitialOverrides,
+      applyInitialFavoriteOverrides: _favoriteController.applyInitialOverrides,
     );
   }
 
@@ -178,8 +180,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
           extendBodyBehindAppBar: true,
           resizeToAvoidBottomInset: false,
           appBar: ComicDetailScrollAwareAppBar(
-            collapsedTitleListenable:
-                _sessionController.collapsedTitleNotifier,
+            collapsedTitleListenable: _sessionController.collapsedTitleNotifier,
             appBarComicTitle: _sessionController.appBarComicTitle,
             appBarUpdateTime: _sessionController.appBarUpdateTime,
             theme: theme,

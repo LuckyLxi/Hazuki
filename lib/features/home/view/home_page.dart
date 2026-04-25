@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 
@@ -73,15 +74,23 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
         final navigation = HomeNavigationActions(
           context: context,
           scaffoldKey: _coordinator.scaffoldKey,
-          drawerTransitionContent: HomeDrawerContent(
-            isLogged: isLogged,
-            avatarUrl: _coordinator.avatarUrl,
-            username: _coordinator.username,
-            autoCheckInEnabled: _coordinator.autoCheckInEnabled,
-            checkInBusy: _coordinator.checkInBusy,
-            checkedInToday: _coordinator.checkedInToday,
-            selectedDestination: _selectedDrawerDestination,
-          ),
+          drawerTransitionContentBuilder: () => Platform.isWindows
+              ? HomeWindowsSidebar(
+                  isLogged: _coordinator.isLogged,
+                  avatarUrl: _coordinator.avatarUrl,
+                  username: _coordinator.username,
+                  currentIndex: _coordinator.currentIndex,
+                  selectedDestination: _selectedDrawerDestination,
+                )
+              : HomeDrawerContent(
+                  isLogged: _coordinator.isLogged,
+                  avatarUrl: _coordinator.avatarUrl,
+                  username: _coordinator.username,
+                  autoCheckInEnabled: _coordinator.autoCheckInEnabled,
+                  checkInBusy: _coordinator.checkInBusy,
+                  checkedInToday: _coordinator.checkedInToday,
+                  selectedDestination: _selectedDrawerDestination,
+                ),
           appearanceSettings: widget.appearanceSettings,
           onAppearanceChanged: widget.onAppearanceChanged,
           locale: widget.locale,
@@ -184,6 +193,9 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
               _coordinator.handleFavoriteAppBarActionsChanged,
           onRequestLogin: profileFlow.showLoginDialog,
           onDestinationSelected: (index) {
+            setState(() {
+              _selectedDrawerDestination = null;
+            });
             unawaited(_coordinator.handleDestinationSelected(index));
           },
           comicDetailPageBuilder: navigation.buildComicDetailPage,

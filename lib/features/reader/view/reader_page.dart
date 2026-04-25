@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:hazuki/app/app.dart';
+import 'package:hazuki/app/windows_title_bar_controller.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_panels.dart';
 import 'package:hazuki/features/reader/reader.dart';
 import 'package:hazuki/features/reader/state/reader_image_pipeline_state.dart';
@@ -140,6 +141,7 @@ class _ReaderPageState extends State<ReaderPage>
 
   ComicDetailsData? _chapterDetailsCache;
   bool _chapterPanelLoading = false;
+  HazukiWindowsTitleBarController? _windowsTitleBarController;
 
   bool get _noImageModeEnabled => hazukiNoImageModeNotifier.value;
 
@@ -174,7 +176,22 @@ class _ReaderPageState extends State<ReaderPage>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!Platform.isWindows) {
+      return;
+    }
+    final nextController = HazukiWindowsTitleBarScope.of(context);
+    if (_windowsTitleBarController == nextController) {
+      return;
+    }
+    _windowsTitleBarController?.releaseCustomTitleBarSuppression(this);
+    _windowsTitleBarController = nextController..suppressCustomTitleBar(this);
+  }
+
+  @override
   void dispose() {
+    _windowsTitleBarController?.releaseCustomTitleBarSuppression(this);
     _resetAnimController.dispose();
     _sessionController.dispose();
     super.dispose();

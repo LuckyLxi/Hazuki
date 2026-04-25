@@ -21,8 +21,8 @@ class ComicDetailScope extends InheritedWidget {
   final ComicDetailFavoriteController favorite;
 
   static ComicDetailScope of(BuildContext context) {
-    final scope =
-        context.dependOnInheritedWidgetOfExactType<ComicDetailScope>();
+    final scope = context
+        .dependOnInheritedWidgetOfExactType<ComicDetailScope>();
     assert(scope != null, 'No ComicDetailScope found in widget tree');
     return scope!;
   }

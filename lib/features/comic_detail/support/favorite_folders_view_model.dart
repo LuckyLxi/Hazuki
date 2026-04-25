@@ -42,7 +42,8 @@ class FavoriteFoldersViewModel extends ChangeNotifier {
   List<FavoriteFolder> get cloudFolders => _cloudFolders;
   List<FavoriteFolder> get localFolders => _localFolders;
   Set<String> get selected => Set<String>.unmodifiable(_selected);
-  Set<String> get initialFavorited => Set<String>.unmodifiable(_initialFavorited);
+  Set<String> get initialFavorited =>
+      Set<String>.unmodifiable(_initialFavorited);
   bool get singleFolderOnly => _singleFolderOnly;
 
   bool get canCreateCloudFolder =>
@@ -134,14 +135,17 @@ class FavoriteFoldersViewModel extends ChangeNotifier {
       _localFolders = localFolders;
 
       if (preserveSelection) {
-        _initialFavorited = previousInitialFavorited.intersection(availableKeys);
+        _initialFavorited = previousInitialFavorited.intersection(
+          availableKeys,
+        );
         _selected = previousSelected.intersection(availableKeys);
       } else {
         _initialFavorited = nextInitialFavorited;
         _selected = Set<String>.from(nextInitialFavorited);
       }
 
-      _loadError = (cloudResult.errorMessage != null &&
+      _loadError =
+          (cloudResult.errorMessage != null &&
               _cloudFolders.isEmpty &&
               _localFolders.length <= 1)
           ? cloudResult.errorMessage

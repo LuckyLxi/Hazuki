@@ -285,16 +285,21 @@ class HazukiWindowFrame extends StatelessWidget {
         if (!titleBarController.shouldShowCustomTitleBar) {
           return effectiveChild;
         }
-        return Column(
+        return Stack(
+          fit: StackFit.expand,
           children: [
-            TextSelectionTheme(
-              data: const TextSelectionThemeData(
-                selectionColor: Colors.transparent,
-                selectionHandleColor: Colors.transparent,
+            effectiveChild,
+            Positioned(
+              top: 0,
+              right: 0,
+              child: TextSelectionTheme(
+                data: const TextSelectionThemeData(
+                  selectionColor: Colors.transparent,
+                  selectionHandleColor: Colors.transparent,
+                ),
+                child: const HazukiWindowsCustomTitleBar(),
               ),
-              child: const HazukiWindowsCustomTitleBar(),
             ),
-            Expanded(child: effectiveChild),
           ],
         );
       },

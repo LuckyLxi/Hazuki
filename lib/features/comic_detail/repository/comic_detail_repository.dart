@@ -145,8 +145,9 @@ class ComicDetailRepository {
       }
 
       final comicId = details.id.trim().isNotEmpty ? details.id : comic.id;
-      final coverUrl =
-          details.cover.trim().isNotEmpty ? details.cover : comic.cover;
+      final coverUrl = details.cover.trim().isNotEmpty
+          ? details.cover
+          : comic.cover;
 
       history.removeWhere((e) => e['id'] == comicId);
       history.insert(0, {

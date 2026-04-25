@@ -24,6 +24,8 @@ double resolveHomeDrawerWidth(BuildContext context) {
   return math.min(304.0, math.max(0.0, screenWidth - 56.0));
 }
 
+double resolveHomeWindowsSidebarWidth(BuildContext context) => 80.0;
+
 class HomeDrawer extends StatelessWidget {
   const HomeDrawer({
     super.key,
@@ -81,6 +83,232 @@ class HomeDrawer extends StatelessWidget {
         onOpenSettings: onOpenSettings,
         onOpenLines: onOpenLines,
         selectedDestination: selectedDestination,
+      ),
+    );
+  }
+}
+
+class HomeWindowsSidebar extends StatelessWidget {
+  const HomeWindowsSidebar({
+    super.key,
+    required this.isLogged,
+    required this.avatarUrl,
+    required this.username,
+    required this.currentIndex,
+    required this.selectedDestination,
+    this.onProfileTap,
+    this.onSelectDiscover,
+    this.onSelectFavorite,
+    this.onOpenHistory,
+    this.onOpenCategories,
+    this.onOpenRanking,
+    this.onOpenDownloads,
+    this.onOpenLines,
+    this.onOpenSettings,
+  });
+
+  final bool isLogged;
+  final String? avatarUrl;
+  final String username;
+  final int currentIndex;
+  final HomeDrawerDestination? selectedDestination;
+  final VoidCallback? onProfileTap;
+  final VoidCallback? onSelectDiscover;
+  final VoidCallback? onSelectFavorite;
+  final VoidCallback? onOpenHistory;
+  final VoidCallback? onOpenCategories;
+  final VoidCallback? onOpenRanking;
+  final VoidCallback? onOpenDownloads;
+  final VoidCallback? onOpenLines;
+  final VoidCallback? onOpenSettings;
+
+  Widget _buildAvatar(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Tooltip(
+      message: username,
+      child: InkWell(
+        onTap: onProfileTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          width: 56,
+          height: 56,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.70),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: (!isLogged && (avatarUrl ?? '').trim().isEmpty)
+              ? ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: Image.asset(
+                    'assets/avatars/guest_avatar.png',
+                    width: 52,
+                    height: 52,
+                    fit: BoxFit.cover,
+                  ),
+                )
+              : ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: HazukiCachedImage(
+                    url: avatarUrl ?? '',
+                    width: 52,
+                    height: 52,
+                    fit: BoxFit.cover,
+                    error: Icon(
+                      Icons.person,
+                      size: 28,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                    loading: Icon(
+                      Icons.person,
+                      size: 28,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                    ignoreNoImageMode: true,
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildButton(
+    BuildContext context, {
+    required IconData icon,
+    required String tooltip,
+    required bool selected,
+    VoidCallback? onTap,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final foreground = selected
+        ? colorScheme.onPrimaryContainer
+        : colorScheme.onSurfaceVariant;
+    final background = selected
+        ? colorScheme.primaryContainer.withValues(alpha: 0.86)
+        : Colors.transparent;
+
+    return Tooltip(
+      message: tooltip,
+      waitDuration: const Duration(milliseconds: 500),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 5),
+        child: Material(
+          color: background,
+          borderRadius: BorderRadius.circular(28),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTap,
+            child: SizedBox(
+              width: 56,
+              height: 44,
+              child: Icon(icon, color: foreground, size: 24),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final topPadding = MediaQuery.paddingOf(context).top;
+    final bottomPadding = MediaQuery.paddingOf(context).bottom;
+    final background = colorScheme.surface.withValues(
+      alpha: Theme.of(context).brightness == Brightness.dark ? 0.96 : 0.98,
+    );
+
+    return Material(
+      color: background,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          border: Border(
+            right: BorderSide(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.26),
+            ),
+          ),
+        ),
+        child: SafeArea(
+          top: false,
+          bottom: false,
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              12,
+              topPadding + 18,
+              12,
+              bottomPadding + 18,
+            ),
+            child: Column(
+              children: [
+                _buildAvatar(context),
+                const SizedBox(height: 28),
+                _buildButton(
+                  context,
+                  icon: Icons.explore_outlined,
+                  tooltip: l10n(context).homeTabDiscover,
+                  selected: selectedDestination == null && currentIndex == 0,
+                  onTap: onSelectDiscover,
+                ),
+                _buildButton(
+                  context,
+                  icon: Icons.favorite_border,
+                  tooltip: l10n(context).homeTabFavorite,
+                  selected: selectedDestination == null && currentIndex == 1,
+                  onTap: onSelectFavorite,
+                ),
+                const SizedBox(height: 16),
+                _buildButton(
+                  context,
+                  icon: Icons.history_outlined,
+                  tooltip: l10n(context).homeMenuHistory,
+                  selected:
+                      selectedDestination == HomeDrawerDestination.history,
+                  onTap: onOpenHistory,
+                ),
+                _buildButton(
+                  context,
+                  icon: Icons.category_outlined,
+                  tooltip: l10n(context).homeMenuCategories,
+                  selected:
+                      selectedDestination == HomeDrawerDestination.categories,
+                  onTap: onOpenCategories,
+                ),
+                _buildButton(
+                  context,
+                  icon: Icons.leaderboard_outlined,
+                  tooltip: l10n(context).homeMenuRanking,
+                  selected:
+                      selectedDestination == HomeDrawerDestination.ranking,
+                  onTap: onOpenRanking,
+                ),
+                _buildButton(
+                  context,
+                  icon: Icons.download_outlined,
+                  tooltip: l10n(context).homeMenuDownloads,
+                  selected:
+                      selectedDestination == HomeDrawerDestination.downloads,
+                  onTap: onOpenDownloads,
+                ),
+                const SizedBox(height: 16),
+                _buildButton(
+                  context,
+                  icon: Icons.alt_route_outlined,
+                  tooltip: l10n(context).homeMenuLines,
+                  selected: selectedDestination == HomeDrawerDestination.lines,
+                  onTap: onOpenLines,
+                ),
+                _buildButton(
+                  context,
+                  icon: Icons.settings_outlined,
+                  tooltip: l10n(context).settingsTitle,
+                  selected:
+                      selectedDestination == HomeDrawerDestination.settings,
+                  onTap: onOpenSettings,
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

@@ -49,13 +49,15 @@ class FavoritePageController extends ChangeNotifier {
   bool get loadingFolders => _state.loadingFolders;
   FavoritePageMode get mode => _state.mode;
   bool get isLogged => _cloudFlow.isLogged;
-  SourceRuntimeState get sourceRuntimeState => _sourceService.sourceRuntimeState;
+  SourceRuntimeState get sourceRuntimeState =>
+      _sourceService.sourceRuntimeState;
 
   void retrySourceRuntime() {
     if (_sourceService.sourceRuntimeState.canRetry) {
       _sourceService.logRuntimeRetryRequested('favorite_page');
     }
   }
+
   bool get showLoginRequired =>
       _state.mode == FavoritePageMode.cloud && !_cloudFlow.isLogged;
 
@@ -588,7 +590,9 @@ class FavoritePageController extends ChangeNotifier {
 
         _state.applyFirstPageResult(result);
         _notify();
-      } while (_queuedExternalLocalChange && !_disposed && retries < _maxExternalSyncRetries);
+      } while (_queuedExternalLocalChange &&
+          !_disposed &&
+          retries < _maxExternalSyncRetries);
     } finally {
       _syncingExternalLocalChange = false;
     }

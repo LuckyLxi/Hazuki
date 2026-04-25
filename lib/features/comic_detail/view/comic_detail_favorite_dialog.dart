@@ -89,9 +89,7 @@ class _FavoriteFoldersMorphDialogState
                 leading: const Icon(Icons.folder_copy_outlined),
                 title: Text(strings.favoriteCreateFolderTargetLocal),
                 onTap: () =>
-                    Navigator.of(
-                      dialogContext,
-                    ).pop(FavoriteFolderSource.local),
+                    Navigator.of(dialogContext).pop(FavoriteFolderSource.local),
               ),
             ],
           ),
@@ -168,9 +166,9 @@ class _FavoriteFoldersMorphDialogState
       unawaited(
         showHazukiPrompt(
           context,
-          AppLocalizations.of(context)!.comicDetailCreateFavoriteFolderFailed(
-            '$e',
-          ),
+          AppLocalizations.of(
+            context,
+          )!.comicDetailCreateFavoriteFolderFailed('$e'),
           isError: true,
         ),
       );
@@ -481,7 +479,9 @@ class _FavoriteFoldersMorphDialogState
     final strings = AppLocalizations.of(context)!;
     return SizedBox(
       key: ValueKey<String>(
-        _vm.loadError == null ? 'favorite_dialog_loaded' : 'favorite_dialog_error',
+        _vm.loadError == null
+            ? 'favorite_dialog_loaded'
+            : 'favorite_dialog_error',
       ),
       width: double.infinity,
       child: Column(
@@ -506,8 +506,9 @@ class _FavoriteFoldersMorphDialogState
                 ),
               IconButton(
                 tooltip: strings.commonClose,
-                onPressed:
-                    _vm.isBusy ? null : () => Navigator.of(context).pop(),
+                onPressed: _vm.isBusy
+                    ? null
+                    : () => Navigator.of(context).pop(),
                 icon: const Icon(Icons.close_rounded),
               ),
             ],
@@ -527,8 +528,9 @@ class _FavoriteFoldersMorphDialogState
             children: [
               Expanded(
                 child: OutlinedButton(
-                  onPressed:
-                      _vm.isBusy ? null : () => Navigator.of(context).pop(),
+                  onPressed: _vm.isBusy
+                      ? null
+                      : () => Navigator.of(context).pop(),
                   child: Text(strings.commonClose),
                 ),
               ),
@@ -609,8 +611,9 @@ class _FavoriteFoldersMorphDialogState
                   width: dialogWidth,
                   constraints: BoxConstraints(
                     minHeight: expanded ? 0 : 196,
-                    maxHeight:
-                        expanded ? math.min(size.height * 0.78, 520) : 220,
+                    maxHeight: expanded
+                        ? math.min(size.height * 0.78, 520)
+                        : 220,
                   ),
                   clipBehavior: Clip.antiAlias,
                   decoration: BoxDecoration(

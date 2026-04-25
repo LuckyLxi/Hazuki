@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
+const double hazukiWindowsCaptionButtonsWidth = 138;
+
 class HazukiWindowsCustomTitleBar extends StatefulWidget {
   const HazukiWindowsCustomTitleBar({super.key, this.title = 'Hazuki'});
 
@@ -60,90 +62,38 @@ class _HazukiWindowsCustomTitleBarState
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final brightness = theme.brightness;
-    return Material(
-      color: colorScheme.surface,
-      child: Container(
-        height: kWindowCaptionHeight,
-        decoration: BoxDecoration(
-          border: Border(
-            bottom: BorderSide(
-              color: colorScheme.outlineVariant.withValues(alpha: 0.45),
-            ),
+    final brightness = Theme.of(context).brightness;
+    return SizedBox(
+      width: hazukiWindowsCaptionButtonsWidth,
+      height: kWindowCaptionHeight,
+      child: Row(
+        children: [
+          WindowCaptionButton.minimize(
+            brightness: brightness,
+            onPressed: () {
+              windowManager.minimize();
+            },
           ),
-        ),
-        child: Row(
-          children: [
-            Expanded(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onDoubleTap: _toggleMaximize,
-                child: DragToMoveArea(
-                  child: Padding(
-                    padding: const EdgeInsetsDirectional.only(
-                      start: 14,
-                      end: 8,
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          width: 18,
-                          height: 18,
-                          decoration: BoxDecoration(
-                            color: colorScheme.primary,
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            'H',
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: colorScheme.onPrimary,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Text(
-                          widget.title,
-                          style: theme.textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+          _isMaximized
+              ? WindowCaptionButton.unmaximize(
+                  brightness: brightness,
+                  onPressed: () {
+                    _toggleMaximize();
+                  },
+                )
+              : WindowCaptionButton.maximize(
+                  brightness: brightness,
+                  onPressed: () {
+                    _toggleMaximize();
+                  },
                 ),
-              ),
-            ),
-            WindowCaptionButton.minimize(
-              brightness: brightness,
-              onPressed: () {
-                windowManager.minimize();
-              },
-            ),
-            _isMaximized
-                ? WindowCaptionButton.unmaximize(
-                    brightness: brightness,
-                    onPressed: () {
-                      _toggleMaximize();
-                    },
-                  )
-                : WindowCaptionButton.maximize(
-                    brightness: brightness,
-                    onPressed: () {
-                      _toggleMaximize();
-                    },
-                  ),
-            WindowCaptionButton.close(
-              brightness: brightness,
-              onPressed: () {
-                windowManager.close();
-              },
-            ),
-          ],
-        ),
+          WindowCaptionButton.close(
+            brightness: brightness,
+            onPressed: () {
+              windowManager.close();
+            },
+          ),
+        ],
       ),
     );
   }

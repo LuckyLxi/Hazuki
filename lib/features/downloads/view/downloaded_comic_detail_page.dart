@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:hazuki/app/chapter_title_resolver.dart';
+import 'package:hazuki/app/windows_title_bar_controller.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/manga_download_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
@@ -118,12 +121,25 @@ class DownloadedComicDetailPage extends StatelessWidget {
                   ),
                 ),
                 trailing: const Icon(Icons.menu_book_outlined),
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => readerPageBuilder(comic, chapter),
-                    ),
+                onTap: () async {
+                  final titleBarController = Platform.isWindows
+                      ? HazukiWindowsTitleBarScope.of(context)
+                      : null;
+                  final titleBarSuppressionOwner = Object();
+                  titleBarController?.suppressCustomTitleBar(
+                    titleBarSuppressionOwner,
                   );
+                  try {
+                    await Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => readerPageBuilder(comic, chapter),
+                      ),
+                    );
+                  } finally {
+                    titleBarController?.releaseCustomTitleBarSuppression(
+                      titleBarSuppressionOwner,
+                    );
+                  }
                 },
               ),
             );

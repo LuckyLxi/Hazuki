@@ -4,7 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:hazuki/features/favorite/favorite.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/services/hazuki_source_service.dart' show SourceRuntimeState;
+import 'package:hazuki/services/hazuki_source_service.dart'
+    show SourceRuntimeState;
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:hazuki/widgets/windows_comic_detail_host.dart';
 import 'favorite_comic_tile.dart';

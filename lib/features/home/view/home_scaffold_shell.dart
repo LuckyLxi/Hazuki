@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 
@@ -15,6 +16,7 @@ import 'package:hazuki/features/discover/discover.dart';
 import 'home_app_bar_actions.dart';
 import 'home_bottom_navigation.dart';
 import 'home_content_stack.dart';
+import 'discover_app_bar_actions.dart';
 import 'package:hazuki/features/home/view/home_drawer.dart';
 
 class HomeScaffoldShell extends StatelessWidget {
@@ -97,6 +99,92 @@ class HomeScaffoldShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final homeContent = HomeContentStack(
+      currentIndex: currentIndex,
+      discoverChild: DiscoverPage(
+        comicDetailPageBuilder: comicDetailPageBuilder,
+        usePinnedSearchInAppBar: usePinnedDiscoverSearch,
+        dailyRecommendationState: dailyRecommendationState,
+        allowInitialLoad: allowDiscoverInitialLoad,
+        hideLoadingUntilInitialLoadAllowed: hideDiscoverLoadingUntilAllowed,
+        onSearchMorphProgressChanged: onDiscoverSearchMorphProgressChanged,
+      ),
+      favoriteChild: FavoritePage(
+        key: favoritePageKey,
+        authVersion: authVersion,
+        onAppBarActionsChanged: onFavoriteAppBarActionsChanged,
+        onRequestLogin: onRequestLogin,
+        onComicTap: favoriteComicTapHandler,
+      ),
+    );
+    final drawerContent = HomeDrawerContent(
+      isLogged: isLogged,
+      avatarUrl: avatarUrl,
+      username: username,
+      autoCheckInEnabled: autoCheckInEnabled,
+      checkInBusy: checkInBusy,
+      checkedInToday: checkedInToday,
+      onProfileTap:
+          HazukiSourceService.instance.sourceMeta?.supportsAccount == true
+          ? onProfileTap
+          : null,
+      onCheckInPressed: onCheckInPressed,
+      onOpenHistory: onOpenHistory,
+      onOpenCategories: onOpenCategories,
+      onOpenRanking: onOpenRanking,
+      onOpenDownloads: onOpenDownloads,
+      onOpenSettings: onOpenSettings,
+      onOpenLines: onOpenLines,
+      selectedDestination: selectedDrawerDestination,
+    );
+    final body = Platform.isWindows
+        ? Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                width: resolveHomeWindowsSidebarWidth(context),
+                child: HomeWindowsSidebar(
+                  isLogged: isLogged,
+                  avatarUrl: avatarUrl,
+                  username: username,
+                  currentIndex: currentIndex,
+                  selectedDestination: selectedDrawerDestination,
+                  onProfileTap:
+                      HazukiSourceService
+                              .instance
+                              .sourceMeta
+                              ?.supportsAccount ==
+                          true
+                      ? onProfileTap
+                      : null,
+                  onSelectDiscover: () => onDestinationSelected(0),
+                  onSelectFavorite: () => onDestinationSelected(1),
+                  onOpenHistory: onOpenHistory,
+                  onOpenCategories: onOpenCategories,
+                  onOpenRanking: onOpenRanking,
+                  onOpenDownloads: onOpenDownloads,
+                  onOpenLines: onOpenLines,
+                  onOpenSettings: onOpenSettings,
+                ),
+              ),
+              Expanded(
+                child: ClipRRect(
+                  borderRadius: const BorderRadius.horizontal(
+                    left: Radius.circular(22),
+                  ),
+                  child: ColoredBox(
+                    color: Theme.of(context).colorScheme.surface,
+                    child: HazukiDesktopPageContainer(child: homeContent),
+                  ),
+                ),
+              ),
+            ],
+          )
+        : HazukiDesktopPageContainer(child: homeContent);
+
+    final useWindowsCenteredDiscoverSearch =
+        Platform.isWindows && currentIndex == 0;
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
@@ -117,69 +205,49 @@ class HomeScaffoldShell extends StatelessWidget {
           extendBody: true,
           appBar: hazukiFrostedAppBar(
             context: context,
-            title: const Text('Hazuki'),
+            title: useWindowsCenteredDiscoverSearch
+                ? DiscoverAppBarActions(
+                    isActiveTab: true,
+                    morphProgress: discoverSearchMorphProgress,
+                    forceInAppBar: usePinnedDiscoverSearch,
+                    onOpenSearch: onOpenSearch,
+                    searchWidth: 320,
+                    trailingSpacing: 0,
+                  )
+                : Platform.isWindows
+                ? const SizedBox.shrink()
+                : const Text('Hazuki'),
+            centerTitle: useWindowsCenteredDiscoverSearch,
             enableBlur: currentIndex != 0,
             actions: [
-              HomeAppBarActions(
-                currentIndex: currentIndex,
-                discoverSearchMorphProgress: discoverSearchMorphProgress,
-                forceDiscoverSearchInAppBar: usePinnedDiscoverSearch,
-                favoriteAppBarActions: favoriteAppBarActions,
-                onOpenSearch: onOpenSearch,
-                onFavoriteSortSelected: onFavoriteSortSelected,
-                onFavoriteCreateFolderPressed: onFavoriteCreateFolderPressed,
-                onFavoriteModeTogglePressed: onFavoriteModeTogglePressed,
-              ),
+              if (!useWindowsCenteredDiscoverSearch)
+                HomeAppBarActions(
+                  currentIndex: currentIndex,
+                  discoverSearchMorphProgress: discoverSearchMorphProgress,
+                  forceDiscoverSearchInAppBar: usePinnedDiscoverSearch,
+                  favoriteAppBarActions: favoriteAppBarActions,
+                  onOpenSearch: onOpenSearch,
+                  onFavoriteSortSelected: onFavoriteSortSelected,
+                  onFavoriteCreateFolderPressed: onFavoriteCreateFolderPressed,
+                  onFavoriteModeTogglePressed: onFavoriteModeTogglePressed,
+                ),
             ],
           ),
-          drawer: HomeDrawer(
-            isLogged: isLogged,
-            avatarUrl: avatarUrl,
-            username: username,
-            autoCheckInEnabled: autoCheckInEnabled,
-            checkInBusy: checkInBusy,
-            checkedInToday: checkedInToday,
-            onProfileTap:
-                HazukiSourceService.instance.sourceMeta?.supportsAccount == true
-                ? onProfileTap
-                : null,
-            onCheckInPressed: onCheckInPressed,
-            onOpenHistory: onOpenHistory,
-            onOpenCategories: onOpenCategories,
-            onOpenRanking: onOpenRanking,
-            onOpenDownloads: onOpenDownloads,
-            onOpenSettings: onOpenSettings,
-            onOpenLines: onOpenLines,
-            selectedDestination: selectedDrawerDestination,
-          ),
-          body: HazukiDesktopPageContainer(
-            child: HomeContentStack(
-              currentIndex: currentIndex,
-              discoverChild: DiscoverPage(
-                comicDetailPageBuilder: comicDetailPageBuilder,
-                usePinnedSearchInAppBar: usePinnedDiscoverSearch,
-                dailyRecommendationState: dailyRecommendationState,
-                allowInitialLoad: allowDiscoverInitialLoad,
-                hideLoadingUntilInitialLoadAllowed:
-                    hideDiscoverLoadingUntilAllowed,
-                onSearchMorphProgressChanged:
-                    onDiscoverSearchMorphProgressChanged,
-              ),
-              favoriteChild: FavoritePage(
-                key: favoritePageKey,
-                authVersion: authVersion,
-                onAppBarActionsChanged: onFavoriteAppBarActionsChanged,
-                onRequestLogin: onRequestLogin,
-                onComicTap: favoriteComicTapHandler,
-              ),
-            ),
-          ),
-          bottomNavigationBar: HomeBottomNavigation(
-            currentIndex: currentIndex,
-            onDestinationSelected: onDestinationSelected,
-            discoverLabel: l10n(context).homeTabDiscover,
-            favoriteLabel: l10n(context).homeTabFavorite,
-          ),
+          drawer: Platform.isWindows
+              ? null
+              : Drawer(
+                  width: resolveHomeDrawerWidth(context),
+                  child: drawerContent,
+                ),
+          body: body,
+          bottomNavigationBar: Platform.isWindows
+              ? null
+              : HomeBottomNavigation(
+                  currentIndex: currentIndex,
+                  onDestinationSelected: onDestinationSelected,
+                  discoverLabel: l10n(context).homeTabDiscover,
+                  favoriteLabel: l10n(context).homeTabFavorite,
+                ),
         ),
       ),
     );

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/app/app.dart';
@@ -16,7 +18,7 @@ class HomeNavigationActions {
   const HomeNavigationActions({
     required this.context,
     required this.scaffoldKey,
-    required this.drawerTransitionContent,
+    required this.drawerTransitionContentBuilder,
     required this.appearanceSettings,
     required this.onAppearanceChanged,
     required this.locale,
@@ -25,7 +27,7 @@ class HomeNavigationActions {
 
   final BuildContext context;
   final GlobalKey<ScaffoldState> scaffoldKey;
-  final Widget drawerTransitionContent;
+  final Widget Function() drawerTransitionContentBuilder;
   final AppearanceSettingsData appearanceSettings;
   final AppearanceSettingsApplyCallback onAppearanceChanged;
   final Locale? locale;
@@ -130,7 +132,9 @@ class HomeNavigationActions {
     if (!navigator.mounted) {
       return;
     }
-    final drawerWidth = resolveHomeDrawerWidth(context);
+    final drawerWidth = Platform.isWindows
+        ? resolveHomeWindowsSidebarWidth(context)
+        : resolveHomeDrawerWidth(context);
     final drawerColor =
         DrawerTheme.of(context).backgroundColor ??
         Theme.of(context).drawerTheme.backgroundColor ??
@@ -140,7 +144,7 @@ class HomeNavigationActions {
       builder: builder,
       drawerWidth: drawerWidth,
       drawerColor: drawerColor,
-      drawerContent: drawerTransitionContent,
+      drawerContent: drawerTransitionContentBuilder(),
       reservedTrailingWidthFactor: 0,
     );
 

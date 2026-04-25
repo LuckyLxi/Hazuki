@@ -76,16 +76,17 @@ class ComicDetailFavoriteController extends ChangeNotifier {
           curve: Curves.easeOutCubic,
           reverseCurve: Curves.easeInCubic,
         );
-        final slide = Tween<Offset>(
-          begin: const Offset(0, 0.04),
-          end: Offset.zero,
-        ).animate(
-          CurvedAnimation(
-            parent: animation,
-            curve: Curves.easeOutCubic,
-            reverseCurve: Curves.easeInCubic,
-          ),
-        );
+        final slide =
+            Tween<Offset>(
+              begin: const Offset(0, 0.04),
+              end: Offset.zero,
+            ).animate(
+              CurvedAnimation(
+                parent: animation,
+                curve: Curves.easeOutCubic,
+                reverseCurve: Curves.easeInCubic,
+              ),
+            );
         return FadeTransition(
           opacity: opacity,
           child: SlideTransition(
@@ -243,10 +244,7 @@ class ComicDetailFavoriteController extends ChangeNotifier {
     Set<FavoriteFolderHandle> handles,
     FavoriteFolderSource source,
   ) {
-    return handles
-        .where((h) => h.source == source)
-        .map((h) => h.id)
-        .toSet();
+    return handles.where((h) => h.source == source).map((h) => h.id).toSet();
   }
 
   bool _setContentsEqual(Set<String> left, Set<String> right) {

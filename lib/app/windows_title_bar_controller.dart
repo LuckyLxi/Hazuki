@@ -13,12 +13,31 @@ class HazukiWindowsTitleBarController extends ChangeNotifier {
        _useSystemTitleBar = initialUseSystemTitleBar;
 
   final HazukiAppSettingsStore _settingsStore;
+  final Set<Object> _customTitleBarSuppressors = <Object>{};
 
   bool _useSystemTitleBar;
 
   bool get useSystemTitleBar => _useSystemTitleBar;
   bool get shouldShowCustomTitleBar =>
-      Platform.isWindows && !_useSystemTitleBar;
+      Platform.isWindows &&
+      !_useSystemTitleBar &&
+      _customTitleBarSuppressors.isEmpty;
+
+  void suppressCustomTitleBar(Object owner) {
+    final wasShowing = shouldShowCustomTitleBar;
+    _customTitleBarSuppressors.add(owner);
+    if (wasShowing != shouldShowCustomTitleBar) {
+      notifyListeners();
+    }
+  }
+
+  void releaseCustomTitleBarSuppression(Object owner) {
+    final wasShowing = shouldShowCustomTitleBar;
+    _customTitleBarSuppressors.remove(owner);
+    if (wasShowing != shouldShowCustomTitleBar) {
+      notifyListeners();
+    }
+  }
 
   Future<void> updateUseSystemTitleBar(bool value) async {
     await _applyUseSystemTitleBar(value, persist: true);

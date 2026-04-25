@@ -203,22 +203,19 @@ class ComicDetailHeaderSection extends StatelessWidget {
                         onPressed: () {
                           if (detailsReady) {
                             unawaited(
-                              favorite.showFoldersDialog(
-                                context,
-                                details!,
-                                (vm) {
-                                  final themedData =
-                                      scope.theme.buildDetailTheme(
-                                        Theme.of(context),
-                                      );
-                                  return Theme(
-                                    data: themedData,
-                                    child: FavoriteFoldersMorphDialog(
-                                      viewModel: vm,
-                                    ),
-                                  );
-                                },
-                              ),
+                              favorite.showFoldersDialog(context, details!, (
+                                vm,
+                              ) {
+                                final themedData = scope.theme.buildDetailTheme(
+                                  Theme.of(context),
+                                );
+                                return Theme(
+                                  data: themedData,
+                                  child: FavoriteFoldersMorphDialog(
+                                    viewModel: vm,
+                                  ),
+                                );
+                              }),
                             );
                           }
                         },
@@ -314,4 +311,3 @@ class ComicDetailHeaderSection extends StatelessWidget {
     return l10n(context).comicDetailRead;
   }
 }
-

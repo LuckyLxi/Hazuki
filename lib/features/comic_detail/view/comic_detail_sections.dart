@@ -59,8 +59,7 @@ class _ComicDetailInfoTabState extends State<ComicDetailInfoTab> {
       details: details,
       onCopyId: (id) => unawaited(actions.copyComicId(context, id)),
       onMetaValuePressed: (v) => actions.openSearchForKeyword(context, v),
-      onMetaValueLongPress: (v) =>
-          unawaited(actions.copyMetaValue(context, v)),
+      onMetaValueLongPress: (v) => unawaited(actions.copyMetaValue(context, v)),
     );
   }
 

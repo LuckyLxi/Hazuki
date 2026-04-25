@@ -33,7 +33,8 @@ class ComicDetailBody extends StatelessWidget {
   final GlobalKey actionButtonsKey;
   final bool isDesktopPanel;
   final VoidCallback? onCloseRequested;
-  final Widget Function(ExploreComic comic, String heroTag) buildComicDetailPage;
+  final Widget Function(ExploreComic comic, String heroTag)
+  buildComicDetailPage;
 
   @override
   Widget build(BuildContext context) {

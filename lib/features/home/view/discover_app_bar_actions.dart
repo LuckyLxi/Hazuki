@@ -10,12 +10,16 @@ class DiscoverAppBarActions extends StatefulWidget {
     required this.morphProgress,
     required this.forceInAppBar,
     required this.onOpenSearch,
+    this.searchWidth = 180,
+    this.trailingSpacing = 12,
   });
 
   final bool isActiveTab;
   final double morphProgress;
   final bool forceInAppBar;
   final VoidCallback onOpenSearch;
+  final double searchWidth;
+  final double trailingSpacing;
 
   @override
   State<DiscoverAppBarActions> createState() => _DiscoverAppBarActionsState();
@@ -73,7 +77,7 @@ class _DiscoverAppBarActionsState extends State<DiscoverAppBarActions> {
               child: AnimatedContainer(
                 duration: _duration(220),
                 curve: Curves.easeOutCubic,
-                width: showCollapsedSearch ? 180 : 0,
+                width: showCollapsedSearch ? widget.searchWidth : 0,
                 child: Align(
                   alignment: Alignment.centerLeft,
                   child: AnimatedSlide(
@@ -147,7 +151,7 @@ class _DiscoverAppBarActionsState extends State<DiscoverAppBarActions> {
         AnimatedContainer(
           duration: _duration(220),
           curve: Curves.easeOutCubic,
-          width: showCollapsedSearch ? 12 : 0,
+          width: showCollapsedSearch ? widget.trailingSpacing : 0,
         ),
       ],
     );
