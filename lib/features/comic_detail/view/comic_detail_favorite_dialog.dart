@@ -2,30 +2,18 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
-import 'package:hazuki/services/local_favorites_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
+
+import '../support/favorite_folders_view_model.dart';
 import 'comic_detail_morph_loader.dart';
 
-enum _FavoriteDialogPhase { loading, result }
-
 class FavoriteFoldersMorphDialog extends StatefulWidget {
-  const FavoriteFoldersMorphDialog({
-    super.key,
-    required this.details,
-    required this.singleFolderOnly,
-    required this.cloudFavoriteOverride,
-    required this.initialIsFavorite,
-  });
+  const FavoriteFoldersMorphDialog({super.key, required this.viewModel});
 
-  final ComicDetailsData details;
-  final bool singleFolderOnly;
-  final bool? cloudFavoriteOverride;
-  final bool initialIsFavorite;
+  final FavoriteFoldersViewModel viewModel;
 
   @override
   State<FavoriteFoldersMorphDialog> createState() =>
@@ -34,30 +22,13 @@ class FavoriteFoldersMorphDialog extends StatefulWidget {
 
 class _FavoriteFoldersMorphDialogState
     extends State<FavoriteFoldersMorphDialog> {
-  final HazukiSourceService _service = HazukiSourceService.instance;
-  final LocalFavoritesService _localService = LocalFavoritesService.instance;
+  FavoriteFoldersViewModel get _vm => widget.viewModel;
 
-  _FavoriteDialogPhase _phase = _FavoriteDialogPhase.loading;
-  bool _busy = false;
-  String? _loadError;
-  List<FavoriteFolder> _cloudFolders = <FavoriteFolder>[];
-  List<FavoriteFolder> _localFolders = <FavoriteFolder>[];
-  Set<String> _selected = <String>{};
-  Set<String> _initialFavorited = <String>{};
-
-  bool get _showExpandedDialog => _phase == _FavoriteDialogPhase.result;
-
-  bool get _canLoadCloudFolders =>
-      _service.isLogged && _service.supportFavoriteFolderLoad;
-
-  bool get _canCreateCloudFolder =>
-      _service.isLogged && _service.supportFavoriteFolderAdd;
-
-  bool get _canDeleteCloudFolder =>
-      _service.isLogged && _service.supportFavoriteFolderDelete;
-
-  bool get _canUseCloudDefaultFavoriteFallback =>
-      _service.isLogged && _service.supportFavoriteToggle;
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_vm.load(initialLoad: true));
+  }
 
   Future<T?> _showAnimatedDialog<T>({required WidgetBuilder builder}) {
     return showGeneralDialog<T>(
@@ -90,151 +61,14 @@ class _FavoriteFoldersMorphDialogState
     );
   }
 
-  @override
-  void initState() {
-    super.initState();
-    unawaited(_loadFolders(initialLoad: true));
-  }
-
-  Future<void> _loadFolders({
-    bool initialLoad = false,
-    bool preserveSelection = false,
-  }) async {
-    if (!mounted) {
-      return;
-    }
-
-    final previousSelected = Set<String>.from(_selected);
-    final previousInitialFavorited = Set<String>.from(_initialFavorited);
-
-    setState(() {
-      if (initialLoad) {
-        _phase = _FavoriteDialogPhase.loading;
-      } else {
-        _busy = true;
-      }
-      _loadError = null;
-    });
-
-    try {
-      final localResult = await _localService.loadFavoriteFolders(
-        comicId: widget.details.id,
-      );
-      final cloudResult = _canLoadCloudFolders
-          ? await _service.loadFavoriteFolders(comicId: widget.details.id)
-          : const FavoriteFoldersResult.success(
-              folders: <FavoriteFolder>[],
-              favoritedFolderIds: <String>{},
-            );
-      if (!mounted) {
-        return;
-      }
-
-      final cloudFolders = List<FavoriteFolder>.from(cloudResult.folders);
-      if (cloudFolders.isEmpty && _canUseCloudDefaultFavoriteFallback) {
-        cloudFolders.add(
-          const FavoriteFolder(
-            id: '0',
-            name: '__favorite_all__',
-            source: FavoriteFolderSource.cloud,
-          ),
-        );
-      }
-      final localFolders = List<FavoriteFolder>.from(localResult.folders);
-      final nextInitialFavorited = <String>{
-        ..._toStorageKeys(
-          favoritedFolderIds: cloudResult.favoritedFolderIds,
-          source: FavoriteFolderSource.cloud,
-        ),
-        ..._toStorageKeys(
-          favoritedFolderIds: localResult.favoritedFolderIds,
-          source: FavoriteFolderSource.local,
-        ),
-      };
-      final hasCloudSelection = nextInitialFavorited.any((storageKey) {
-        final handle = favoriteFolderHandleFromStorageKey(storageKey);
-        return handle?.source == FavoriteFolderSource.cloud;
-      });
-
-      if (!hasCloudSelection &&
-          widget.singleFolderOnly &&
-          (widget.cloudFavoriteOverride ?? widget.initialIsFavorite) &&
-          _canUseCloudDefaultFavoriteFallback &&
-          cloudFolders.isNotEmpty) {
-        nextInitialFavorited.add(
-          const FavoriteFolderHandle(
-            source: FavoriteFolderSource.cloud,
-            id: '0',
-          ).storageKey,
-        );
-      }
-
-      final availableKeys = <String>{
-        ...cloudFolders.map((folder) => folder.storageKey),
-        ...localFolders.map((folder) => folder.storageKey),
-      };
-
-      setState(() {
-        _phase = _FavoriteDialogPhase.result;
-        _busy = false;
-        _cloudFolders = cloudFolders;
-        _localFolders = localFolders;
-
-        if (preserveSelection) {
-          _initialFavorited = previousInitialFavorited.intersection(
-            availableKeys,
-          );
-          _selected = previousSelected.intersection(availableKeys);
-        } else {
-          _initialFavorited = nextInitialFavorited;
-          _selected = Set<String>.from(nextInitialFavorited);
-        }
-
-        if (cloudResult.errorMessage != null &&
-            _cloudFolders.isEmpty &&
-            _localFolders.length <= 1) {
-          _loadError = cloudResult.errorMessage;
-        } else {
-          _loadError = null;
-        }
-      });
-      if (initialLoad) {
-        unawaited(HapticFeedback.selectionClick());
-      }
-    } catch (e) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _phase = _FavoriteDialogPhase.result;
-        _busy = false;
-        _loadError = e.toString();
-      });
-      if (initialLoad) {
-        unawaited(HapticFeedback.selectionClick());
-      }
-    }
-  }
-
-  Set<String> _toStorageKeys({
-    required Set<String> favoritedFolderIds,
-    required FavoriteFolderSource source,
-  }) {
-    return favoritedFolderIds
-        .map((id) => FavoriteFolderHandle(source: source, id: id).storageKey)
-        .toSet();
-  }
-
-  Future<FavoriteFolderSource?> _pickCreateFolderTarget() async {
+  Future<FavoriteFolderSource?> _pickCreateFolderTarget() {
     final availableTargets = <FavoriteFolderSource>[
-      if (_canCreateCloudFolder) FavoriteFolderSource.cloud,
+      if (_vm.canCreateCloudFolder) FavoriteFolderSource.cloud,
       FavoriteFolderSource.local,
     ];
-    if (availableTargets.isEmpty) {
-      return null;
-    }
+    if (availableTargets.isEmpty) return Future.value(null);
     if (availableTargets.length == 1) {
-      return availableTargets.first;
+      return Future.value(availableTargets.first);
     }
 
     return _showAnimatedDialog<FavoriteFolderSource>(
@@ -255,7 +89,9 @@ class _FavoriteFoldersMorphDialogState
                 leading: const Icon(Icons.folder_copy_outlined),
                 title: Text(strings.favoriteCreateFolderTargetLocal),
                 onTap: () =>
-                    Navigator.of(dialogContext).pop(FavoriteFolderSource.local),
+                    Navigator.of(
+                      dialogContext,
+                    ).pop(FavoriteFolderSource.local),
               ),
             ],
           ),
@@ -320,41 +156,21 @@ class _FavoriteFoldersMorphDialogState
 
   Future<void> _addFolder() async {
     final target = await _pickCreateFolderTarget();
-    if (target == null || !mounted) {
-      return;
-    }
+    if (target == null || !mounted) return;
 
     final name = await _promptFolderName(target);
-    if (name == null || name.isEmpty || !mounted) {
-      return;
-    }
+    if (name == null || name.isEmpty || !mounted) return;
 
-    setState(() {
-      _busy = true;
-    });
     try {
-      if (target == FavoriteFolderSource.local) {
-        await _localService.addFavoriteFolder(name);
-      } else {
-        await _service.addFavoriteFolder(name);
-      }
-      if (!mounted) {
-        return;
-      }
-      await _loadFolders(preserveSelection: true);
+      await _vm.createFolder(name, target);
     } catch (e) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _busy = false;
-      });
+      if (!mounted) return;
       unawaited(
         showHazukiPrompt(
           context,
-          AppLocalizations.of(
-            context,
-          )!.comicDetailCreateFavoriteFolderFailed('$e'),
+          AppLocalizations.of(context)!.comicDetailCreateFavoriteFolderFailed(
+            '$e',
+          ),
           isError: true,
         ),
       );
@@ -381,30 +197,12 @@ class _FavoriteFoldersMorphDialogState
         );
       },
     );
-    if (ok != true || !mounted) {
-      return;
-    }
+    if (ok != true || !mounted) return;
 
-    setState(() {
-      _busy = true;
-    });
     try {
-      if (folder.source == FavoriteFolderSource.local) {
-        await _localService.deleteFavoriteFolder(folder.id);
-      } else {
-        await _service.deleteFavoriteFolder(folder.id);
-      }
-      if (!mounted) {
-        return;
-      }
-      await _loadFolders(preserveSelection: true);
+      await _vm.deleteFolder(folder);
     } catch (e) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _busy = false;
-      });
+      if (!mounted) return;
       unawaited(
         showHazukiPrompt(
           context,
@@ -415,36 +213,9 @@ class _FavoriteFoldersMorphDialogState
     }
   }
 
-  void _toggleFolder(FavoriteFolder folder, {bool? value}) {
-    if (_busy) {
-      return;
-    }
-    final folderKey = folder.storageKey;
-    final checked = _selected.contains(folderKey);
-    final enable = value ?? !checked;
-    setState(() {
-      final nextSelected = Set<String>.from(_selected);
-      if (enable) {
-        if (folder.source == FavoriteFolderSource.cloud &&
-            widget.singleFolderOnly) {
-          nextSelected.removeWhere((storageKey) {
-            final handle = favoriteFolderHandleFromStorageKey(storageKey);
-            return handle?.source == FavoriteFolderSource.cloud;
-          });
-        }
-        nextSelected.add(folderKey);
-      } else {
-        nextSelected.remove(folderKey);
-      }
-      _selected = nextSelected;
-    });
-  }
-
   void _handleSave() {
-    if (_busy || _loadError != null) {
-      return;
-    }
-    if (_selected.isEmpty && _initialFavorited.isEmpty) {
+    if (_vm.isBusy || _vm.loadError != null) return;
+    if (_vm.selected.isEmpty && _vm.initialFavorited.isEmpty) {
       unawaited(
         showHazukiPrompt(
           context,
@@ -454,10 +225,7 @@ class _FavoriteFoldersMorphDialogState
       );
       return;
     }
-    Navigator.of(context).pop(<String, Set<String>>{
-      'selected': Set<String>.from(_selected),
-      'initial': Set<String>.from(_initialFavorited),
-    });
+    Navigator.of(context).pop(_vm.buildSaveResult());
   }
 
   String _folderSourceLabel(BuildContext context, FavoriteFolderSource source) {
@@ -536,7 +304,7 @@ class _FavoriteFoldersMorphDialogState
   }) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final checked = _selected.contains(folder.storageKey);
+    final checked = _vm.selected.contains(folder.storageKey);
     final title = folder.isAllFolder
         ? AppLocalizations.of(context)!.favoriteAllFolder
         : folder.name;
@@ -593,11 +361,11 @@ class _FavoriteFoldersMorphDialogState
                   tooltip: AppLocalizations.of(
                     context,
                   )!.comicDetailDeleteFavoriteFolderTooltip,
-                  onPressed: _busy ? null : () => _deleteFolder(folder),
+                  onPressed: _vm.isBusy ? null : () => _deleteFolder(folder),
                   icon: const Icon(Icons.delete_outline_rounded),
                 )
               : null,
-          onTap: () => _toggleFolder(folder),
+          onTap: () => _vm.toggleFolder(folder),
         ),
       ),
     );
@@ -650,13 +418,16 @@ class _FavoriteFoldersMorphDialogState
 
   Widget _buildDialogBody(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final hasFolders = _cloudFolders.isNotEmpty || _localFolders.isNotEmpty;
-    if (_loadError != null && !hasFolders) {
+    final strings = AppLocalizations.of(context)!;
+    final hasFolders =
+        _vm.cloudFolders.isNotEmpty || _vm.localFolders.isNotEmpty;
+
+    if (_vm.loadError != null && !hasFolders) {
       return _buildStateCard(
         icon: Icon(Icons.error_outline_rounded, size: 28, color: cs.error),
-        message: AppLocalizations.of(
-          context,
-        )!.comicDetailFavoriteFoldersLoadFailed('$_loadError'),
+        message: strings.comicDetailFavoriteFoldersLoadFailed(
+          '${_vm.loadError}',
+        ),
         backgroundColor: cs.errorContainer.withValues(alpha: 0.32),
       );
     }
@@ -668,7 +439,7 @@ class _FavoriteFoldersMorphDialogState
           size: 28,
           color: cs.onSurfaceVariant,
         ),
-        message: AppLocalizations.of(context)!.comicDetailNoFavoriteFolders,
+        message: strings.comicDetailNoFavoriteFolders,
         backgroundColor: cs.surfaceContainerLow.withValues(alpha: 0.72),
       );
     }
@@ -681,22 +452,22 @@ class _FavoriteFoldersMorphDialogState
         shrinkWrap: true,
         padding: EdgeInsets.zero,
         children: [
-          if (_cloudFolders.isNotEmpty)
+          if (_vm.cloudFolders.isNotEmpty)
             _buildSectionContent(
               context,
-              title: AppLocalizations.of(context)!.favoriteFolderGroupCloud,
+              title: strings.favoriteFolderGroupCloud,
               icon: Icons.cloud_outlined,
-              folders: _cloudFolders,
-              allowDelete: _canDeleteCloudFolder,
+              folders: _vm.cloudFolders,
+              allowDelete: _vm.canDeleteCloudFolder,
             ),
-          if (_cloudFolders.isNotEmpty && _localFolders.isNotEmpty)
+          if (_vm.cloudFolders.isNotEmpty && _vm.localFolders.isNotEmpty)
             const SizedBox(height: 12),
-          if (_localFolders.isNotEmpty)
+          if (_vm.localFolders.isNotEmpty)
             _buildSectionContent(
               context,
-              title: AppLocalizations.of(context)!.favoriteFolderGroupLocal,
+              title: strings.favoriteFolderGroupLocal,
               icon: Icons.folder_copy_outlined,
-              folders: _localFolders,
+              folders: _vm.localFolders,
               allowDelete: true,
             ),
         ],
@@ -707,9 +478,10 @@ class _FavoriteFoldersMorphDialogState
   Widget _buildExpandedContent(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final strings = AppLocalizations.of(context)!;
     return SizedBox(
       key: ValueKey<String>(
-        _loadError == null ? 'favorite_dialog_loaded' : 'favorite_dialog_error',
+        _vm.loadError == null ? 'favorite_dialog_loaded' : 'favorite_dialog_error',
       ),
       width: double.infinity,
       child: Column(
@@ -720,31 +492,30 @@ class _FavoriteFoldersMorphDialogState
             children: [
               Expanded(
                 child: Text(
-                  AppLocalizations.of(context)!.comicDetailManageFavorites,
+                  strings.comicDetailManageFavorites,
                   style: theme.textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
-              if (_loadError == null)
+              if (_vm.loadError == null)
                 IconButton(
-                  tooltip: AppLocalizations.of(
-                    context,
-                  )!.comicDetailCreateFavoriteFolderTooltip,
-                  onPressed: _busy ? null : _addFolder,
+                  tooltip: strings.comicDetailCreateFavoriteFolderTooltip,
+                  onPressed: _vm.isBusy ? null : _addFolder,
                   icon: const Icon(Icons.create_new_folder_outlined),
                 ),
               IconButton(
-                tooltip: AppLocalizations.of(context)!.commonClose,
-                onPressed: _busy ? null : () => Navigator.of(context).pop(),
+                tooltip: strings.commonClose,
+                onPressed:
+                    _vm.isBusy ? null : () => Navigator.of(context).pop(),
                 icon: const Icon(Icons.close_rounded),
               ),
             ],
           ),
           Text(
-            widget.singleFolderOnly
-                ? AppLocalizations.of(context)!.comicDetailSingleFolderHint
-                : AppLocalizations.of(context)!.comicDetailMultipleFoldersHint,
+            _vm.singleFolderOnly
+                ? strings.comicDetailSingleFolderHint
+                : strings.comicDetailMultipleFoldersHint,
             style: theme.textTheme.bodySmall?.copyWith(
               color: cs.onSurfaceVariant,
             ),
@@ -756,22 +527,23 @@ class _FavoriteFoldersMorphDialogState
             children: [
               Expanded(
                 child: OutlinedButton(
-                  onPressed: _busy ? null : () => Navigator.of(context).pop(),
-                  child: Text(AppLocalizations.of(context)!.commonClose),
+                  onPressed:
+                      _vm.isBusy ? null : () => Navigator.of(context).pop(),
+                  child: Text(strings.commonClose),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: FilledButton(
-                  onPressed: _busy
+                  onPressed: _vm.isBusy
                       ? null
-                      : _loadError != null
-                      ? () => unawaited(_loadFolders())
+                      : _vm.loadError != null
+                      ? () => unawaited(_vm.load())
                       : _handleSave,
                   child: Text(
-                    _loadError != null
-                        ? AppLocalizations.of(context)!.commonRetry
-                        : AppLocalizations.of(context)!.commonSave,
+                    _vm.loadError != null
+                        ? strings.commonRetry
+                        : strings.commonSave,
                   ),
                 ),
               ),
@@ -811,89 +583,98 @@ class _FavoriteFoldersMorphDialogState
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    final size = MediaQuery.sizeOf(context);
-    final expanded = _showExpandedDialog;
-    final dialogWidth = expanded
-        ? math.min(size.width * 0.9, 460.0)
-        : math.min(size.width * 0.78, 320.0);
+    return ListenableBuilder(
+      listenable: _vm,
+      builder: (context, _) {
+        final expanded = !_vm.isLoading;
+        final theme = Theme.of(context);
+        final cs = theme.colorScheme;
+        final size = MediaQuery.sizeOf(context);
+        final dialogWidth = expanded
+            ? math.min(size.width * 0.9, 460.0)
+            : math.min(size.width * 0.78, 320.0);
 
-    return SafeArea(
-      child: Material(
-        type: MaterialType.transparency,
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 24),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 460),
-              curve: Curves.easeInOutCubicEmphasized,
-              width: dialogWidth,
-              constraints: BoxConstraints(
-                minHeight: expanded ? 0 : 196,
-                maxHeight: expanded ? math.min(size.height * 0.78, 520) : 220,
-              ),
-              clipBehavior: Clip.antiAlias,
-              decoration: BoxDecoration(
-                color: cs.surface,
-                borderRadius: BorderRadius.circular(expanded ? 32 : 28),
-                border: Border.all(
-                  color: cs.outlineVariant.withValues(
-                    alpha: expanded ? 0.24 : 0.16,
-                  ),
+        return SafeArea(
+          child: Material(
+            type: MaterialType.transparency,
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 24,
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.18),
-                    blurRadius: expanded ? 30 : 22,
-                    spreadRadius: -6,
-                    offset: const Offset(0, 18),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 460),
+                  curve: Curves.easeInOutCubicEmphasized,
+                  width: dialogWidth,
+                  constraints: BoxConstraints(
+                    minHeight: expanded ? 0 : 196,
+                    maxHeight:
+                        expanded ? math.min(size.height * 0.78, 520) : 220,
                   ),
-                ],
-              ),
-              child: Stack(
-                children: [
-                  Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      24,
-                      expanded ? 20 : 24,
-                      24,
-                      expanded ? 20 : 24,
-                    ),
-                    child: AnimatedSize(
-                      duration: const Duration(milliseconds: 460),
-                      curve: Curves.easeInOutCubicEmphasized,
-                      alignment: Alignment.center,
-                      child: AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 280),
-                        switchInCurve: Curves.easeOutCubic,
-                        switchOutCurve: Curves.easeInCubic,
-                        transitionBuilder: (child, animation) {
-                          final slide = Tween<Offset>(
-                            begin: const Offset(0, 0.08),
-                            end: Offset.zero,
-                          ).animate(animation);
-                          return FadeTransition(
-                            opacity: animation,
-                            child: SlideTransition(
-                              position: slide,
-                              child: child,
-                            ),
-                          );
-                        },
-                        child: expanded
-                            ? _buildExpandedContent(context)
-                            : _buildLoadingContent(context),
+                  clipBehavior: Clip.antiAlias,
+                  decoration: BoxDecoration(
+                    color: cs.surface,
+                    borderRadius: BorderRadius.circular(expanded ? 32 : 28),
+                    border: Border.all(
+                      color: cs.outlineVariant.withValues(
+                        alpha: expanded ? 0.24 : 0.16,
                       ),
                     ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.18),
+                        blurRadius: expanded ? 30 : 22,
+                        spreadRadius: -6,
+                        offset: const Offset(0, 18),
+                      ),
+                    ],
                   ),
-                  if (_busy && expanded) _buildBusyOverlay(context),
-                ],
+                  child: Stack(
+                    children: [
+                      Padding(
+                        padding: EdgeInsets.fromLTRB(
+                          24,
+                          expanded ? 20 : 24,
+                          24,
+                          expanded ? 20 : 24,
+                        ),
+                        child: AnimatedSize(
+                          duration: const Duration(milliseconds: 460),
+                          curve: Curves.easeInOutCubicEmphasized,
+                          alignment: Alignment.center,
+                          child: AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 280),
+                            switchInCurve: Curves.easeOutCubic,
+                            switchOutCurve: Curves.easeInCubic,
+                            transitionBuilder: (child, animation) {
+                              final slide = Tween<Offset>(
+                                begin: const Offset(0, 0.08),
+                                end: Offset.zero,
+                              ).animate(animation);
+                              return FadeTransition(
+                                opacity: animation,
+                                child: SlideTransition(
+                                  position: slide,
+                                  child: child,
+                                ),
+                              );
+                            },
+                            child: expanded
+                                ? _buildExpandedContent(context)
+                                : _buildLoadingContent(context),
+                          ),
+                        ),
+                      ),
+                      if (_vm.isBusy && expanded) _buildBusyOverlay(context),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

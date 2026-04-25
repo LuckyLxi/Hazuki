@@ -14,7 +14,8 @@ class FavoritePageController extends ChangeNotifier {
   FavoritePageController({
     HazukiSourceService? sourceService,
     LocalFavoritesService? localFavoritesService,
-  }) : _localFavoritesService =
+  }) : _sourceService = sourceService ?? HazukiSourceService.instance,
+       _localFavoritesService =
            localFavoritesService ?? LocalFavoritesService.instance,
        _cloudFlow = FavoriteCloudFlow(
          sourceService ?? HazukiSourceService.instance,
@@ -23,10 +24,12 @@ class FavoritePageController extends ChangeNotifier {
          localFavoritesService ?? LocalFavoritesService.instance,
        ) {
     _localFavoritesService.addListener(_handleLocalFavoritesChanged);
+    _sourceService.addListener(_handleSourceServiceChanged);
   }
 
   static const favoriteLoadTimeout = Duration(seconds: 90);
 
+  final HazukiSourceService _sourceService;
   final FavoriteCloudFlow _cloudFlow;
   final FavoriteLocalFlow _localFlow;
   final LocalFavoritesService _localFavoritesService;
@@ -46,6 +49,13 @@ class FavoritePageController extends ChangeNotifier {
   bool get loadingFolders => _state.loadingFolders;
   FavoritePageMode get mode => _state.mode;
   bool get isLogged => _cloudFlow.isLogged;
+  SourceRuntimeState get sourceRuntimeState => _sourceService.sourceRuntimeState;
+
+  void retrySourceRuntime() {
+    if (_sourceService.sourceRuntimeState.canRetry) {
+      _sourceService.logRuntimeRetryRequested('favorite_page');
+    }
+  }
   bool get showLoginRequired =>
       _state.mode == FavoritePageMode.cloud && !_cloudFlow.isLogged;
 
@@ -152,7 +162,7 @@ class FavoritePageController extends ChangeNotifier {
           ? FavoritePageMode.local
           : FavoritePageMode.cloud,
     );
-    unawaited(_localFlow.saveFavoritePageMode(_state.mode));
+    await _localFlow.saveFavoritePageMode(_state.mode);
     _state.resetForModeChange();
     _notify();
 
@@ -489,7 +499,12 @@ class FavoritePageController extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _localFavoritesService.removeListener(_handleLocalFavoritesChanged);
+    _sourceService.removeListener(_handleSourceServiceChanged);
     super.dispose();
+  }
+
+  void _handleSourceServiceChanged() {
+    _notify();
   }
 
   void _handleLocalFavoritesChanged() {
@@ -533,10 +548,14 @@ class FavoritePageController extends ChangeNotifier {
     _notify();
   }
 
+  static const _maxExternalSyncRetries = 5;
+
   Future<void> _syncLocalFavoritesAfterExternalChange() async {
     _syncingExternalLocalChange = true;
+    var retries = 0;
     try {
       do {
+        retries++;
         _queuedExternalLocalChange = false;
         final requestVersion = ++_state.listRequestVersion;
         await _reloadLocalFolders();
@@ -569,7 +588,7 @@ class FavoritePageController extends ChangeNotifier {
 
         _state.applyFirstPageResult(result);
         _notify();
-      } while (_queuedExternalLocalChange && !_disposed);
+      } while (_queuedExternalLocalChange && !_disposed && retries < _maxExternalSyncRetries);
     } finally {
       _syncingExternalLocalChange = false;
     }

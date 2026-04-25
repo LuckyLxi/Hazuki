@@ -7,6 +7,8 @@ import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
+import '../support/comic_detail_scope.dart';
+import 'comic_detail_meta.dart';
 import 'comic_detail_view_primitives.dart';
 
 class ComicDetailLoadingView extends StatelessWidget {
@@ -32,14 +34,12 @@ class ComicDetailInfoTab extends StatefulWidget {
     super.key,
     required this.details,
     required this.skeletonColor,
-    required this.metaSectionBuilder,
     required this.isActiveInTabView,
     required this.shouldAnimateResolvedContent,
   });
 
   final ComicDetailsData? details;
   final Color skeletonColor;
-  final Widget Function(ComicDetailsData details) metaSectionBuilder;
   final bool isActiveInTabView;
   final bool shouldAnimateResolvedContent;
 
@@ -52,6 +52,17 @@ class _ComicDetailInfoTabState extends State<ComicDetailInfoTab> {
   // Survives tab switches because Flutter preserves State objects as long as
   // the widget type and position in the tree are unchanged.
   bool _hasAnimated = false;
+
+  Widget _buildMetaSection(BuildContext context, ComicDetailsData details) {
+    final actions = ComicDetailScope.of(context).actions;
+    return ComicDetailMetaSection(
+      details: details,
+      onCopyId: (id) => unawaited(actions.copyComicId(context, id)),
+      onMetaValuePressed: (v) => actions.openSearchForKeyword(context, v),
+      onMetaValueLongPress: (v) =>
+          unawaited(actions.copyMetaValue(context, v)),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -114,7 +125,7 @@ class _ComicDetailInfoTabState extends State<ComicDetailInfoTab> {
                   if (details.id.trim().isNotEmpty ||
                       details.tags.isNotEmpty) ...[
                     const SizedBox(height: 12),
-                    widget.metaSectionBuilder(details),
+                    _buildMetaSection(context, details),
                   ],
                 ],
               ),

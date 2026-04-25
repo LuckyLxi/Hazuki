@@ -3,12 +3,11 @@ import 'dart:typed_data';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:hazuki/app/app.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/models/hazuki_models.dart';
 
-import 'comic_detail_controller_support.dart';
+import '../repository/comic_detail_repository.dart';
 
 const int _comicDynamicColorSchemeCacheLimit = 24;
 final Map<String, _ComicDynamicColorCacheEntry> _comicDynamicColorSchemeCache =
@@ -29,13 +28,9 @@ class _ComicDynamicColorCacheEntry {
 
 _ComicDynamicColorCacheEntry? _takeComicDynamicColorScheme(String url) {
   final normalizedUrl = url.trim();
-  if (normalizedUrl.isEmpty) {
-    return null;
-  }
+  if (normalizedUrl.isEmpty) return null;
   final entry = _comicDynamicColorSchemeCache.remove(normalizedUrl);
-  if (entry == null) {
-    return null;
-  }
+  if (entry == null) return null;
   _comicDynamicColorSchemeCache[normalizedUrl] = entry;
   return entry;
 }
@@ -45,9 +40,7 @@ void _putComicDynamicColorScheme(
   _ComicDynamicColorCacheEntry entry,
 ) {
   final normalizedUrl = url.trim();
-  if (normalizedUrl.isEmpty) {
-    return;
-  }
+  if (normalizedUrl.isEmpty) return;
   _comicDynamicColorSchemeCache.remove(normalizedUrl);
   _comicDynamicColorSchemeCache[normalizedUrl] = entry;
   while (_comicDynamicColorSchemeCache.length >
@@ -58,25 +51,23 @@ void _putComicDynamicColorScheme(
   }
 }
 
-class ComicDetailThemeController {
+class ComicDetailThemeController extends ChangeNotifier {
   ComicDetailThemeController({
+    required ComicDetailRepository repository,
     required String comicCoverUrl,
-    required ComicDetailContextGetter contextGetter,
-    required ComicDetailIsMounted isMounted,
-    required ComicDetailStateUpdate updateState,
-    required ComicDetailDetailsFutureGetter detailsFutureGetter,
-  }) : _comicCoverUrl = comicCoverUrl,
+    required BuildContext Function() contextGetter,
+    required Future<ComicDetailsData> Function() detailsFutureGetter,
+  }) : _repository = repository,
+       _comicCoverUrl = comicCoverUrl,
        _contextGetter = contextGetter,
-       _isMounted = isMounted,
-       _updateState = updateState,
        _detailsFutureGetter = detailsFutureGetter;
 
+  final ComicDetailRepository _repository;
   final String _comicCoverUrl;
-  final ComicDetailContextGetter _contextGetter;
-  final ComicDetailIsMounted _isMounted;
-  final ComicDetailStateUpdate _updateState;
-  final ComicDetailDetailsFutureGetter _detailsFutureGetter;
+  final BuildContext Function() _contextGetter;
+  final Future<ComicDetailsData> Function() _detailsFutureGetter;
 
+  bool _disposed = false;
   bool _comicDynamicColorEnabled = false;
   bool _didBindComicDynamicColorSetting = false;
   bool? _observedComicDynamicColorEnabled;
@@ -84,18 +75,13 @@ class ComicDetailThemeController {
   ColorScheme? _darkComicScheme;
 
   ThemeData buildDetailTheme(ThemeData baseTheme) {
-    var theme = baseTheme;
-    if (!_comicDynamicColorEnabled) {
-      return theme;
-    }
-    var scheme = theme.brightness == Brightness.light
+    if (!_comicDynamicColorEnabled) return baseTheme;
+    var scheme = baseTheme.brightness == Brightness.light
         ? _lightComicScheme
         : _darkComicScheme;
-    if (scheme == null) {
-      return theme;
-    }
-    if (theme.brightness == Brightness.dark &&
-        theme.scaffoldBackgroundColor == Colors.black) {
+    if (scheme == null) return baseTheme;
+    if (baseTheme.brightness == Brightness.dark &&
+        baseTheme.scaffoldBackgroundColor == Colors.black) {
       scheme = scheme.copyWith(
         surface: Colors.black,
         surfaceContainer: Colors.black,
@@ -104,7 +90,7 @@ class ComicDetailThemeController {
         surfaceContainerHigh: Colors.black,
         surfaceContainerHighest: Colors.black,
       );
-      return theme.copyWith(
+      return baseTheme.copyWith(
         scaffoldBackgroundColor: Colors.black,
         canvasColor: Colors.black,
         cardColor: Colors.black,
@@ -116,7 +102,7 @@ class ComicDetailThemeController {
         ),
       );
     }
-    return theme.copyWith(
+    return baseTheme.copyWith(
       colorScheme: scheme,
       textSelectionTheme: TextSelectionThemeData(
         selectionColor: scheme.primary.withValues(alpha: 0.38),
@@ -129,9 +115,7 @@ class ComicDetailThemeController {
   void syncComicDynamicColorSettingFromScope() {
     final controller = HazukiThemeControllerScope.maybeOf(_contextGetter());
     if (controller == null) {
-      if (_didBindComicDynamicColorSetting) {
-        return;
-      }
+      if (_didBindComicDynamicColorSetting) return;
       _didBindComicDynamicColorSetting = true;
       unawaited(_loadDynamicColorSetting());
       return;
@@ -140,17 +124,13 @@ class ComicDetailThemeController {
     final enabled = controller.settings.comicDetailDynamicColor;
     final hasBound = _didBindComicDynamicColorSetting;
     _didBindComicDynamicColorSetting = true;
-    if (hasBound && _observedComicDynamicColorEnabled == enabled) {
-      return;
-    }
+    if (hasBound && _observedComicDynamicColorEnabled == enabled) return;
     _observedComicDynamicColorEnabled = enabled;
     unawaited(_applyComicDynamicColorSetting(enabled, immediate: hasBound));
   }
 
   Future<void> _loadDynamicColorSetting() async {
-    final prefs = await SharedPreferences.getInstance();
-    final enabled =
-        prefs.getBool('appearance_comic_detail_dynamic_color') ?? false;
+    final enabled = await _repository.loadComicDynamicColorEnabled();
     await _applyComicDynamicColorSetting(enabled, immediate: false);
   }
 
@@ -158,83 +138,61 @@ class ComicDetailThemeController {
     bool enabled, {
     required bool immediate,
   }) async {
-    if (!_isMounted()) {
-      return;
-    }
+    if (_disposed) return;
     if (!enabled) {
-      _updateState(() {
-        _comicDynamicColorEnabled = false;
-        _lightComicScheme = null;
-        _darkComicScheme = null;
-      });
+      _comicDynamicColorEnabled = false;
+      _lightComicScheme = null;
+      _darkComicScheme = null;
+      notifyListeners();
       return;
     }
 
     if (!_comicDynamicColorEnabled) {
-      _updateState(() {
-        _comicDynamicColorEnabled = true;
-      });
+      _comicDynamicColorEnabled = true;
+      notifyListeners();
     }
 
-    if (_applyCachedDynamicColorScheme(_comicCoverUrl)) {
-      return;
-    }
+    if (_applyCachedDynamicColorScheme(_comicCoverUrl)) return;
 
     if (!immediate) {
       unawaited(_scheduleDynamicColorExtraction());
       return;
     }
 
-    if (hazukiNoImageModeNotifier.value) {
-      return;
-    }
+    if (hazukiNoImageModeNotifier.value) return;
     final coverUrl = await _resolveDynamicColorCoverUrl();
-    if (!_isMounted() || !_comicDynamicColorEnabled || coverUrl.isEmpty) {
-      return;
-    }
-    if (_applyCachedDynamicColorScheme(coverUrl)) {
-      return;
-    }
+    if (_disposed || !_comicDynamicColorEnabled || coverUrl.isEmpty) return;
+    if (_applyCachedDynamicColorScheme(coverUrl)) return;
     unawaited(_extractColorScheme(coverUrl));
   }
 
   Future<void> _scheduleDynamicColorExtraction() async {
-    await Future.delayed(const Duration(milliseconds: 620));
-    if (!_isMounted() ||
+    await Future<void>.delayed(const Duration(milliseconds: 620));
+    if (_disposed ||
         !_comicDynamicColorEnabled ||
         hazukiNoImageModeNotifier.value) {
       return;
     }
     final coverUrl = await _resolveDynamicColorCoverUrl();
-    if (coverUrl.isEmpty || !_isMounted()) {
-      return;
-    }
-    if (_applyCachedDynamicColorScheme(coverUrl)) {
-      return;
-    }
+    if (coverUrl.isEmpty || _disposed) return;
+    if (_applyCachedDynamicColorScheme(coverUrl)) return;
     unawaited(_extractColorScheme(coverUrl));
   }
 
   Future<String> _resolveDynamicColorCoverUrl() async {
     final coverUrl = _comicCoverUrl.trim();
-    if (coverUrl.isNotEmpty) {
-      return coverUrl;
-    }
+    if (coverUrl.isNotEmpty) return coverUrl;
     try {
       final details = await _detailsFutureGetter();
       final dCoverUrl = details.cover.trim();
-      if (dCoverUrl.isNotEmpty) {
-        return dCoverUrl;
-      }
+      if (dCoverUrl.isNotEmpty) return dCoverUrl;
     } catch (_) {}
     return _comicCoverUrl.trim();
   }
 
   Future<Color> _buildNeutralComicSeed(Uint8List bytes) async {
     final averageLuminance = await _estimateCoverAverageLuminance(bytes);
-    if (averageLuminance == null) {
-      return const Color(0xff7a7a7a);
-    }
+    if (averageLuminance == null) return const Color(0xff7a7a7a);
     final tone = (92 + (averageLuminance * 72)).round().clamp(92, 164).toInt();
     return Color.fromARGB(255, tone, tone, tone);
   }
@@ -251,26 +209,20 @@ class ComicDetailThemeController {
         format: ImageByteFormat.rawRgba,
       );
       final rgbaBytes = rgbaData?.buffer.asUint8List();
-      if (rgbaBytes == null) {
-        return null;
-      }
+      if (rgbaBytes == null) return null;
 
       double totalLuminance = 0;
       var sampleCount = 0;
       for (var index = 0; index <= rgbaBytes.length - 4; index += 16) {
         final alpha = rgbaBytes[index + 3];
-        if (alpha < 24) {
-          continue;
-        }
+        if (alpha < 24) continue;
         final red = rgbaBytes[index] / 255;
         final green = rgbaBytes[index + 1] / 255;
         final blue = rgbaBytes[index + 2] / 255;
         totalLuminance += 0.2126 * red + 0.7152 * green + 0.0722 * blue;
         sampleCount++;
       }
-      if (sampleCount == 0) {
-        return null;
-      }
+      if (sampleCount == 0) return null;
       return totalLuminance / sampleCount;
     } catch (_) {
       return null;
@@ -288,9 +240,7 @@ class ComicDetailThemeController {
   Future<void> _extractColorScheme(String url) async {
     try {
       final normalizedUrl = url.trim();
-      if (normalizedUrl.isEmpty) {
-        return;
-      }
+      if (normalizedUrl.isEmpty) return;
       final cachedEntry = _takeComicDynamicColorScheme(normalizedUrl);
       if (cachedEntry != null) {
         _applyDynamicColorSchemeEntry(cachedEntry);
@@ -305,7 +255,7 @@ class ComicDetailThemeController {
         createdFuture = false;
       } else {
         future = () async {
-          final bytes = await HazukiSourceService.instance.downloadImageBytes(
+          final bytes = await _repository.downloadImageBytes(
             normalizedUrl,
             keepInMemory: true,
           );
@@ -314,7 +264,6 @@ class ComicDetailThemeController {
             provider: imgProvider,
             brightness: Brightness.light,
           );
-
           final fallbackLight = ColorScheme.fromSeed(
             seedColor: const Color(0xff4285F4),
             brightness: Brightness.light,
@@ -338,7 +287,6 @@ class ComicDetailThemeController {
               brightness: Brightness.dark,
             );
           }
-
           return _ComicDynamicColorCacheEntry(
             lightScheme: resolvedLight,
             darkScheme: resolvedDark,
@@ -362,20 +310,21 @@ class ComicDetailThemeController {
 
   bool _applyCachedDynamicColorScheme(String url) {
     final entry = _takeComicDynamicColorScheme(url);
-    if (entry == null) {
-      return false;
-    }
+    if (entry == null) return false;
     _applyDynamicColorSchemeEntry(entry);
     return true;
   }
 
   void _applyDynamicColorSchemeEntry(_ComicDynamicColorCacheEntry entry) {
-    if (!_isMounted()) {
-      return;
-    }
-    _updateState(() {
-      _lightComicScheme = entry.lightScheme;
-      _darkComicScheme = entry.darkScheme;
-    });
+    if (_disposed) return;
+    _lightComicScheme = entry.lightScheme;
+    _darkComicScheme = entry.darkScheme;
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
 }

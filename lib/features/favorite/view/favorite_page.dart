@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:hazuki/features/favorite/favorite.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/hazuki_source_service.dart' show SourceRuntimeState;
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:hazuki/widgets/windows_comic_detail_host.dart';
 import 'favorite_comic_tile.dart';
@@ -75,7 +75,7 @@ class FavoritePageState extends State<FavoritePage>
       if (_controller.mode == FavoritePageMode.local) {
         return;
       }
-      if (HazukiSourceService.instance.isLogged) {
+      if (_controller.isLogged) {
         _pendingFreshListEntryAnimation = true;
         _controller.resetForReload();
         _notifyAppBarActions();
@@ -277,9 +277,7 @@ class FavoritePageState extends State<FavoritePage>
   }
 
   Future<void> _handleRefresh() {
-    if (HazukiSourceService.instance.sourceRuntimeState.canRetry) {
-      HazukiSourceService.instance.logRuntimeRetryRequested('favorite_page');
-    }
+    _controller.retrySourceRuntime();
     _pendingFreshListEntryAnimation = true;
     _clearEntryAnimationTargets();
     return _controller.refresh(
@@ -387,7 +385,7 @@ class FavoritePageState extends State<FavoritePage>
     super.build(context);
 
     return AnimatedBuilder(
-      animation: Listenable.merge([_controller, HazukiSourceService.instance]),
+      animation: _controller,
       builder: (context, _) {
         if (_controller.showLoginRequired) {
           return FavoriteLoginRequiredView(
@@ -425,8 +423,7 @@ class FavoritePageState extends State<FavoritePage>
                     initialLoading: _controller.initialLoading,
                     refreshing: _controller.refreshing,
                     loadingMore: _controller.loadingMore,
-                    sourceRuntimeState:
-                        HazukiSourceService.instance.sourceRuntimeState,
+                    sourceRuntimeState: _controller.sourceRuntimeState,
                     strings: _strings(context),
                     mode: _controller.mode,
                     showCreateLocalFolderButton:

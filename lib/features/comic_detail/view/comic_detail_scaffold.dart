@@ -4,7 +4,9 @@ import 'package:hazuki/features/comments/comments.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 
+import '../support/comic_detail_scope.dart';
 import 'comic_detail_header.dart';
+import 'comic_detail_meta.dart';
 import 'comic_detail_panels.dart';
 import 'comic_detail_sections.dart';
 import 'comic_detail_view_primitives.dart';
@@ -12,73 +14,35 @@ import 'comic_detail_view_primitives.dart';
 class ComicDetailBody extends StatelessWidget {
   const ComicDetailBody({
     super.key,
-    required this.tabController,
-    required this.future,
     required this.scrollController,
-    required this.surface,
     required this.heroTag,
     required this.comic,
     required this.headerTitleKey,
     required this.favoriteRowKey,
     required this.actionButtonsKey,
-    required this.favoriteBusy,
-    required this.favoriteOverride,
-    required this.lastReadProgress,
-    required this.shouldAnimateInitialDetailReveal,
-    required this.buildViewsText,
-    required this.buildMetaSection,
-    required this.onShowCoverPreview,
-    required this.onFavoriteTap,
-    required this.onShowChapters,
-    required this.onOpenReader,
-    required this.onDetailsLoaded,
-    required this.onRequestCommentsTabFullscreen,
-    required this.buildCommentsTabDebugState,
-    required this.onDetailsResolved,
     required this.isDesktopPanel,
     required this.onCloseRequested,
     required this.buildComicDetailPage,
   });
 
-  final TabController tabController;
-  final Future<ComicDetailsData> future;
   final ScrollController scrollController;
-  final Color surface;
   final String heroTag;
   final ExploreComic comic;
   final GlobalKey headerTitleKey;
   final GlobalKey favoriteRowKey;
   final GlobalKey actionButtonsKey;
-  final bool favoriteBusy;
-  final bool? favoriteOverride;
-  final Map<String, dynamic>? lastReadProgress;
-  final bool shouldAnimateInitialDetailReveal;
-  final String Function(ComicDetailsData details) buildViewsText;
-  final Widget Function(ComicDetailsData details) buildMetaSection;
-  final ValueChanged<String> onShowCoverPreview;
-  final ValueChanged<ComicDetailsData> onFavoriteTap;
-  final ValueChanged<ComicDetailsData> onShowChapters;
-  final Future<void> Function(
-    ComicDetailsData details, {
-    String? epId,
-    String? chapterTitle,
-    int? chapterIndex,
-  })
-  onOpenReader;
-  final ValueChanged<ComicDetailsData> onDetailsLoaded;
-  final Future<void> Function() onRequestCommentsTabFullscreen;
-  final Map<String, Object?> Function() buildCommentsTabDebugState;
-  final void Function({required String title, required String updateTime})
-  onDetailsResolved;
   final bool isDesktopPanel;
   final VoidCallback? onCloseRequested;
-  final Widget Function(ExploreComic comic, String heroTag)
-  buildComicDetailPage;
+  final Widget Function(ExploreComic comic, String heroTag) buildComicDetailPage;
 
   @override
   Widget build(BuildContext context) {
+    final scope = ComicDetailScope.of(context);
+    final session = scope.session;
+    final surface = Theme.of(context).colorScheme.surface;
+
     return FutureBuilder<ComicDetailsData>(
-      future: future,
+      future: session.future,
       builder: (context, snapshot) {
         final details = snapshot.data;
         final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -92,15 +56,17 @@ class ComicDetailBody extends StatelessWidget {
         final displayCoverUrl = listCoverUrl.isNotEmpty
             ? listCoverUrl
             : (details?.cover.trim() ?? '');
+        final shouldAnimateInitialDetailReveal =
+            session.shouldAnimateInitialDetailReveal;
         final shouldAnimateResolvedContent =
             shouldAnimateInitialDetailReveal && details != null;
 
-        onDetailsResolved(
+        session.updateAppBarMetadata(
           title: displayTitle,
           updateTime: details?.updateTime ?? '',
         );
         if (details != null) {
-          onDetailsLoaded(details);
+          session.markComicDetailRevealHandled(details);
         }
 
         return NestedScrollView(
@@ -125,22 +91,13 @@ class ComicDetailBody extends StatelessWidget {
                         displaySubTitle: displaySubTitle,
                         displayCoverUrl: displayCoverUrl,
                         viewsText: details != null
-                            ? buildViewsText(details)
+                            ? extractComicViewsText(details)
                             : '',
                         headerTitleKey: headerTitleKey,
                         favoriteRowKey: favoriteRowKey,
                         actionButtonsKey: actionButtonsKey,
-                        favoriteBusy: favoriteBusy,
-                        favoriteOverride: favoriteOverride,
-                        lastReadProgress: lastReadProgress,
                         shouldAnimateInitialDetailReveal:
                             shouldAnimateInitialDetailReveal,
-                        onCoverTap: displayCoverUrl.isEmpty
-                            ? null
-                            : () => onShowCoverPreview(displayCoverUrl),
-                        onFavoriteTap: onFavoriteTap,
-                        onShowChapters: onShowChapters,
-                        onOpenReader: onOpenReader,
                       ),
                     ),
                   ),
@@ -154,7 +111,7 @@ class ComicDetailBody extends StatelessWidget {
                   pinned: true,
                   delegate: HazukiTabBarDelegate(
                     TabBar(
-                      controller: tabController,
+                      controller: session.tabController,
                       onTap: (_) =>
                           FocusManager.instance.primaryFocus?.unfocus(),
                       isScrollable: true,
@@ -188,18 +145,17 @@ class ComicDetailBody extends StatelessWidget {
           body: ColoredBox(
             color: surface,
             child: TabBarView(
-              controller: tabController,
+              controller: session.tabController,
               physics: const ClampingScrollPhysics(),
               children: [
                 ComicDetailTabTickerScope(
-                  tabController: tabController,
+                  tabController: session.tabController,
                   tabIndex: 0,
                   builder: (context, shouldRender, _) {
                     return RepaintBoundary(
                       child: ComicDetailInfoTab(
                         details: details,
                         skeletonColor: skeletonColor,
-                        metaSectionBuilder: buildMetaSection,
                         isActiveInTabView: shouldRender,
                         shouldAnimateResolvedContent:
                             shouldAnimateResolvedContent,
@@ -208,7 +164,7 @@ class ComicDetailBody extends StatelessWidget {
                   },
                 ),
                 ComicDetailTabTickerScope(
-                  tabController: tabController,
+                  tabController: session.tabController,
                   tabIndex: 1,
                   builder: (context, shouldRender, _) {
                     return details != null
@@ -221,16 +177,16 @@ class ComicDetailBody extends StatelessWidget {
                               isTabView: true,
                               isActiveInTabView: shouldRender,
                               onRequestTabFullscreen:
-                                  onRequestCommentsTabFullscreen,
+                                  session.ensureCommentsTabFullscreen,
                               debugOuterScrollStateBuilder:
-                                  buildCommentsTabDebugState,
+                                  session.buildCommentsTabDebugState,
                             ),
                           )
                         : const ComicDetailLoadingView();
                   },
                 ),
                 ComicDetailTabTickerScope(
-                  tabController: tabController,
+                  tabController: session.tabController,
                   tabIndex: 2,
                   builder: (context, shouldRender, _) {
                     return RepaintBoundary(

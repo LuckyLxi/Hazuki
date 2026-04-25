@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/app/navigation_tags.dart';
@@ -5,6 +7,9 @@ import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
+import '../support/comic_detail_scope.dart';
+import '../support/comic_detail_session_controller.dart';
+import 'comic_detail_favorite_dialog.dart';
 import 'comic_detail_view_primitives.dart';
 
 class ComicDetailHeaderSection extends StatelessWidget {
@@ -20,14 +25,7 @@ class ComicDetailHeaderSection extends StatelessWidget {
     required this.headerTitleKey,
     required this.favoriteRowKey,
     required this.actionButtonsKey,
-    required this.favoriteBusy,
-    required this.favoriteOverride,
-    required this.lastReadProgress,
     required this.shouldAnimateInitialDetailReveal,
-    required this.onCoverTap,
-    required this.onFavoriteTap,
-    required this.onShowChapters,
-    required this.onOpenReader,
   });
 
   final String heroTag;
@@ -40,17 +38,15 @@ class ComicDetailHeaderSection extends StatelessWidget {
   final GlobalKey headerTitleKey;
   final GlobalKey favoriteRowKey;
   final GlobalKey actionButtonsKey;
-  final bool favoriteBusy;
-  final bool? favoriteOverride;
-  final Map<String, dynamic>? lastReadProgress;
   final bool shouldAnimateInitialDetailReveal;
-  final VoidCallback? onCoverTap;
-  final ValueChanged<ComicDetailsData> onFavoriteTap;
-  final ValueChanged<ComicDetailsData> onShowChapters;
-  final ValueChanged<ComicDetailsData> onOpenReader;
 
   @override
   Widget build(BuildContext context) {
+    final scope = ComicDetailScope.of(context);
+    final session = scope.session;
+    final actions = scope.actions;
+    final favorite = scope.favorite;
+
     final detailsReady = details != null;
     final theme = Theme.of(context);
     final coverBorderRadius = comicCoverHeroBorderRadius(heroTag, fallback: 10);
@@ -74,6 +70,9 @@ class ComicDetailHeaderSection extends StatelessWidget {
       registerComicCoverHeroUrl(heroTag, displayCoverUrl);
     }
 
+    final favoriteActive =
+        favorite.favoriteOverride ?? details?.isFavorite ?? false;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -86,7 +85,11 @@ class ComicDetailHeaderSection extends StatelessWidget {
                 height: 190,
                 child: InkWell(
                   borderRadius: BorderRadius.circular(coverBorderRadius),
-                  onTap: displayCoverUrl.isEmpty ? null : onCoverTap,
+                  onTap: displayCoverUrl.isEmpty
+                      ? null
+                      : () => unawaited(
+                          actions.showCoverPreview(context, displayCoverUrl),
+                        ),
                   child: Hero(
                     tag: heroTag,
                     flightShuttleBuilder: buildComicCoverHeroFlightShuttle,
@@ -195,30 +198,45 @@ class ComicDetailHeaderSection extends StatelessWidget {
                   SizedBox(
                     width: favoriteButtonWidth,
                     child: AbsorbPointer(
-                      absorbing: !detailsReady || favoriteBusy,
+                      absorbing: !detailsReady || favorite.isBusy,
                       child: FilledButton.icon(
                         onPressed: () {
                           if (detailsReady) {
-                            onFavoriteTap(details!);
+                            unawaited(
+                              favorite.showFoldersDialog(
+                                context,
+                                details!,
+                                (vm) {
+                                  final themedData =
+                                      scope.theme.buildDetailTheme(
+                                        Theme.of(context),
+                                      );
+                                  return Theme(
+                                    data: themedData,
+                                    child: FavoriteFoldersMorphDialog(
+                                      viewModel: vm,
+                                    ),
+                                  );
+                                },
+                              ),
+                            );
                           }
                         },
                         icon: Icon(
-                          (favoriteOverride ?? details?.isFavorite ?? false)
+                          favoriteActive
                               ? Icons.favorite
                               : Icons.favorite_border,
                         ),
                         label: Text(
-                          (favoriteOverride ?? details?.isFavorite ?? false)
+                          favoriteActive
                               ? l10n(context).comicDetailUnfavorite
                               : l10n(context).comicDetailFavorite,
                         ),
                         style: FilledButton.styleFrom(
-                          backgroundColor:
-                              (favoriteOverride ?? details?.isFavorite ?? false)
+                          backgroundColor: favoriteActive
                               ? theme.colorScheme.primaryContainer
                               : null,
-                          foregroundColor:
-                              (favoriteOverride ?? details?.isFavorite ?? false)
+                          foregroundColor: favoriteActive
                               ? theme.colorScheme.onPrimaryContainer
                               : null,
                         ),
@@ -250,7 +268,7 @@ class ComicDetailHeaderSection extends StatelessWidget {
                     tooltip: l10n(context).comicDetailChapters,
                     onPressed: () {
                       if (detailsReady) {
-                        onShowChapters(details!);
+                        actions.showChaptersPanel(context, details!);
                       }
                     },
                     icon: const Icon(Icons.format_list_bulleted_rounded),
@@ -263,11 +281,11 @@ class ComicDetailHeaderSection extends StatelessWidget {
                     child: FilledButton.icon(
                       onPressed: () {
                         if (detailsReady) {
-                          onOpenReader(details!);
+                          unawaited(actions.openReader(context, details!));
                         }
                       },
                       icon: const Icon(Icons.menu_book_outlined),
-                      label: Text(_buildReaderButtonLabel(context)),
+                      label: Text(_buildReaderButtonLabel(context, session)),
                     ),
                   ),
                 ),
@@ -280,17 +298,20 @@ class ComicDetailHeaderSection extends StatelessWidget {
     );
   }
 
-  String _buildReaderButtonLabel(BuildContext context) {
-    if (details == null) {
-      return l10n(context).comicDetailRead;
-    }
+  String _buildReaderButtonLabel(
+    BuildContext context,
+    ComicDetailSessionController session,
+  ) {
+    if (details == null) return l10n(context).comicDetailRead;
+    final lastReadProgress = session.lastReadProgress;
     if (lastReadProgress != null &&
         details!.chapters.length > 1 &&
-        (lastReadProgress!['index'] as int) >= 1 &&
-        details!.chapters.containsKey(lastReadProgress!['epId'])) {
-      final title = lastReadProgress!['title'] as String;
+        (lastReadProgress['index'] as int) >= 1 &&
+        details!.chapters.containsKey(lastReadProgress['epId'])) {
+      final title = lastReadProgress['title'] as String;
       return l10n(context).comicDetailContinueReading(title);
     }
     return l10n(context).comicDetailRead;
   }
 }
+

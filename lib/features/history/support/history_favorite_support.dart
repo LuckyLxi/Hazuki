@@ -40,8 +40,15 @@ Future<void> _showFavoriteFoldersPanelFromHistory(
   BuildContext context,
   ComicDetailsData details,
 ) async {
-  final service = HazukiSourceService.instance;
-  final singleFolderOnly = service.favoriteSingleFolderForSingleComic;
+  final repository = const ComicDetailRepository();
+  final singleFolderOnly = repository.favoriteSingleFolderForSingleComic;
+  final viewModel = FavoriteFoldersViewModel(
+    repository: repository,
+    details: details,
+    cloudFavoriteOverride: null,
+    initialIsFavorite: details.isFavorite,
+    singleFolderOnly: singleFolderOnly,
+  );
 
   final changed = await showGeneralDialog<Map<String, Set<String>>>(
     context: context,
@@ -50,16 +57,7 @@ Future<void> _showFavoriteFoldersPanelFromHistory(
     barrierColor: Colors.black.withValues(alpha: 0.46),
     transitionDuration: const Duration(milliseconds: 420),
     pageBuilder: (dialogContext, animation, secondaryAnimation) {
-      final themedData = Theme.of(context);
-      return Theme(
-        data: themedData,
-        child: FavoriteFoldersMorphDialog(
-          details: details,
-          singleFolderOnly: singleFolderOnly,
-          cloudFavoriteOverride: null,
-          initialIsFavorite: details.isFavorite,
-        ),
-      );
+      return FavoriteFoldersMorphDialog(viewModel: viewModel);
     },
     transitionBuilder: (dialogContext, animation, secondaryAnimation, child) {
       final scale = CurvedAnimation(
@@ -92,6 +90,8 @@ Future<void> _showFavoriteFoldersPanelFromHistory(
       );
     },
   );
+
+  viewModel.dispose();
 
   if (changed == null || !context.mounted) {
     return;
