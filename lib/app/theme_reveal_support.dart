@@ -291,7 +291,9 @@ class HazukiWindowFrame extends StatelessWidget {
             effectiveChild,
             Positioned(
               top: 0,
+              left: 0,
               right: 0,
+              height: hazukiWindowsTitleBarHeight,
               child: TextSelectionTheme(
                 data: const TextSelectionThemeData(
                   selectionColor: Colors.transparent,

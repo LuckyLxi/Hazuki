@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
 const double hazukiWindowsCaptionButtonsWidth = 138;
+const double hazukiWindowsTitleBarHeight = kWindowCaptionHeight;
 
 class HazukiWindowsCustomTitleBar extends StatefulWidget {
   const HazukiWindowsCustomTitleBar({super.key, this.title = 'Hazuki'});
@@ -64,34 +65,42 @@ class _HazukiWindowsCustomTitleBarState
   Widget build(BuildContext context) {
     final brightness = Theme.of(context).brightness;
     return SizedBox(
-      width: hazukiWindowsCaptionButtonsWidth,
       height: kWindowCaptionHeight,
       child: Row(
         children: [
-          WindowCaptionButton.minimize(
-            brightness: brightness,
-            onPressed: () {
-              windowManager.minimize();
-            },
-          ),
-          _isMaximized
-              ? WindowCaptionButton.unmaximize(
+          const Expanded(child: DragToMoveArea(child: SizedBox.expand())),
+          SizedBox(
+            width: hazukiWindowsCaptionButtonsWidth,
+            height: kWindowCaptionHeight,
+            child: Row(
+              children: [
+                WindowCaptionButton.minimize(
                   brightness: brightness,
                   onPressed: () {
-                    _toggleMaximize();
-                  },
-                )
-              : WindowCaptionButton.maximize(
-                  brightness: brightness,
-                  onPressed: () {
-                    _toggleMaximize();
+                    windowManager.minimize();
                   },
                 ),
-          WindowCaptionButton.close(
-            brightness: brightness,
-            onPressed: () {
-              windowManager.close();
-            },
+                _isMaximized
+                    ? WindowCaptionButton.unmaximize(
+                        brightness: brightness,
+                        onPressed: () {
+                          _toggleMaximize();
+                        },
+                      )
+                    : WindowCaptionButton.maximize(
+                        brightness: brightness,
+                        onPressed: () {
+                          _toggleMaximize();
+                        },
+                      ),
+                WindowCaptionButton.close(
+                  brightness: brightness,
+                  onPressed: () {
+                    windowManager.close();
+                  },
+                ),
+              ],
+            ),
           ),
         ],
       ),
