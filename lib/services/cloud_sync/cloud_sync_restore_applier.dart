@@ -31,6 +31,7 @@ class CloudSyncRestoreApplier {
     final prefs = await SharedPreferences.getInstance();
     final appliedPlatformFilteredKeys = <String>[];
     final skippedKeys = <String>[];
+    await _restoreManualRestoreSpecialSettings(prefs, data);
     for (final entry in data.entries) {
       final sanitized = _sanitizeRestoredSetting(
         prefs,
@@ -48,6 +49,19 @@ class CloudSyncRestoreApplier {
       appliedPlatformFilteredKeys: appliedPlatformFilteredKeys,
       skippedKeys: skippedKeys,
     );
+  }
+
+  Future<void> _restoreManualRestoreSpecialSettings(
+    SharedPreferences prefs,
+    Map<String, dynamic> data,
+  ) async {
+    for (final key in CloudSyncConfigStore.restoreSkippedSettings) {
+      if (data.containsKey(key)) {
+        await _setPrefValue(prefs, key, data[key]);
+      } else {
+        await prefs.remove(key);
+      }
+    }
   }
 
   Future<void> applyReadingSnapshot(String content) async {
@@ -156,6 +170,10 @@ class CloudSyncRestoreApplier {
       return null;
     }
     if (CloudSyncConfigStore.alwaysSkippedSettings.contains(normalizedKey)) {
+      skippedKeys.add(normalizedKey);
+      return null;
+    }
+    if (CloudSyncConfigStore.restoreSkippedSettings.contains(normalizedKey)) {
       skippedKeys.add(normalizedKey);
       return null;
     }

@@ -234,12 +234,13 @@ class ComicDetailSessionController extends ChangeNotifier {
     if (hazukiNoImageModeNotifier.value) return;
     try {
       final details = await _future;
-      if (details.chapters.isEmpty) return;
+      if (_disposed || details.chapters.isEmpty) return;
       final first = details.chapters.entries.first;
       final images = await _repository.loadChapterImages(
         comicId: details.id,
         epId: first.key,
       );
+      if (_disposed) return;
       await _repository.prefetchComicImages(
         comicId: details.id,
         epId: first.key,

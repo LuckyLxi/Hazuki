@@ -198,34 +198,42 @@ class ComicDetailThemeController extends ChangeNotifier {
   }
 
   Future<double?> _estimateCoverAverageLuminance(Uint8List bytes) async {
+    Codec? codec;
     try {
-      final codec = await instantiateImageCodec(
+      codec = await instantiateImageCodec(
         bytes,
         targetWidth: 36,
         targetHeight: 36,
       );
       final frame = await codec.getNextFrame();
-      final rgbaData = await frame.image.toByteData(
-        format: ImageByteFormat.rawRgba,
-      );
-      final rgbaBytes = rgbaData?.buffer.asUint8List();
-      if (rgbaBytes == null) return null;
+      final image = frame.image;
+      try {
+        final rgbaData = await image.toByteData(
+          format: ImageByteFormat.rawRgba,
+        );
+        final rgbaBytes = rgbaData?.buffer.asUint8List();
+        if (rgbaBytes == null) return null;
 
-      double totalLuminance = 0;
-      var sampleCount = 0;
-      for (var index = 0; index <= rgbaBytes.length - 4; index += 16) {
-        final alpha = rgbaBytes[index + 3];
-        if (alpha < 24) continue;
-        final red = rgbaBytes[index] / 255;
-        final green = rgbaBytes[index + 1] / 255;
-        final blue = rgbaBytes[index + 2] / 255;
-        totalLuminance += 0.2126 * red + 0.7152 * green + 0.0722 * blue;
-        sampleCount++;
+        double totalLuminance = 0;
+        var sampleCount = 0;
+        for (var index = 0; index <= rgbaBytes.length - 4; index += 16) {
+          final alpha = rgbaBytes[index + 3];
+          if (alpha < 24) continue;
+          final red = rgbaBytes[index] / 255;
+          final green = rgbaBytes[index + 1] / 255;
+          final blue = rgbaBytes[index + 2] / 255;
+          totalLuminance += 0.2126 * red + 0.7152 * green + 0.0722 * blue;
+          sampleCount++;
+        }
+        if (sampleCount == 0) return null;
+        return totalLuminance / sampleCount;
+      } finally {
+        image.dispose();
       }
-      if (sampleCount == 0) return null;
-      return totalLuminance / sampleCount;
     } catch (_) {
       return null;
+    } finally {
+      codec?.dispose();
     }
   }
 

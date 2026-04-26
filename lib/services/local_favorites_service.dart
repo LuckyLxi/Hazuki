@@ -12,8 +12,13 @@ class LocalFavoritesService extends ChangeNotifier {
 
   static const String _foldersKey = 'local_favorite_folders_v1';
   static const String _entriesKey = 'local_favorite_entries_v1';
+  static const String _folderTombstonesKey =
+      'local_favorite_folder_tombstones_v1';
+  static const String _entryTombstonesKey =
+      'local_favorite_entry_tombstones_v1';
   static const String _sortOrderKey = 'local_favorite_sort_order_v1';
   static const String _pageModeKey = 'favorite_page_mode_v1';
+  static const int _tombstoneTtlMs = 90 * 24 * 60 * 60 * 1000;
   static const int _pageSize = 24;
 
   Future<String> loadSortOrder() async {
@@ -174,6 +179,7 @@ class LocalFavoritesService extends ChangeNotifier {
     }
     store.entries.removeWhere((entry) => entry.folderIds.isEmpty);
     await _saveStore(store);
+    await _appendFolderTombstone(normalizedFolderId);
     notifyListeners();
   }
 
@@ -225,6 +231,10 @@ class LocalFavoritesService extends ChangeNotifier {
       record.folderIds.remove(normalizedFolderId);
       if (record.folderIds.isEmpty) {
         store.entries.removeAt(existingIndex);
+        await _saveStore(store);
+        await _appendEntryTombstone(normalizedComicId);
+        notifyListeners();
+        return;
       }
     }
 
@@ -240,6 +250,46 @@ class LocalFavoritesService extends ChangeNotifier {
     final store = await _loadStore();
     final entry = store.findEntry(normalizedComicId);
     return entry != null && entry.folderIds.isNotEmpty;
+  }
+
+  Future<void> _appendFolderTombstone(String folderId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final tombstones = _decodeTombstones(prefs.getString(_folderTombstonesKey));
+    tombstones.removeWhere((t) => t['id'] == folderId);
+    tombstones.add({'id': folderId, 'deletedAtMs': now});
+    final cutoff = now - _tombstoneTtlMs;
+    tombstones.removeWhere(
+      (t) => ((t['deletedAtMs'] as num?)?.toInt() ?? 0) < cutoff,
+    );
+    await prefs.setString(_folderTombstonesKey, jsonEncode(tombstones));
+  }
+
+  Future<void> _appendEntryTombstone(String comicId) async {
+    final prefs = await SharedPreferences.getInstance();
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final tombstones = _decodeTombstones(prefs.getString(_entryTombstonesKey));
+    tombstones.removeWhere((t) => t['comicId'] == comicId);
+    tombstones.add({'comicId': comicId, 'deletedAtMs': now});
+    final cutoff = now - _tombstoneTtlMs;
+    tombstones.removeWhere(
+      (t) => ((t['deletedAtMs'] as num?)?.toInt() ?? 0) < cutoff,
+    );
+    await prefs.setString(_entryTombstonesKey, jsonEncode(tombstones));
+  }
+
+  List<Map<String, dynamic>> _decodeTombstones(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return [];
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is List) {
+        return decoded
+            .whereType<Map>()
+            .map((e) => Map<String, dynamic>.from(e))
+            .toList();
+      }
+    } catch (_) {}
+    return [];
   }
 
   Future<_LocalFavoritesStore> _loadStore() async {

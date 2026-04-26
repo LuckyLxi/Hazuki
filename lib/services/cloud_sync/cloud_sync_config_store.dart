@@ -22,10 +22,20 @@ class CloudSyncConfigStore {
   static const sourceDirName = 'source';
   static const sourceFileName = 'jm.js';
 
+  static const folderTombstonesKey = 'local_favorite_folder_tombstones_v1';
+  static const entryTombstonesKey = 'local_favorite_entry_tombstones_v1';
+
   static const Set<String> alwaysSkippedSettings = {
     'cookie_store_v1',
     downloadStateKey,
     downloadsRootPathKey,
+  };
+
+  /// Keys that bypass the generic settings-restore loop and are restored
+  /// specially during manual full restore so missing keys clear local state.
+  static const Set<String> restoreSkippedSettings = {
+    folderTombstonesKey,
+    entryTombstonesKey,
   };
   static const Set<String> windowsOnlySettings = {
     hazukiUseSystemTitleBarPreferenceKey,

@@ -16,6 +16,19 @@ class CloudSyncSnapshotCodec {
   final HazukiSourceService _sourceService;
 
   Future<void> mergeRemoteIntoLocal(CloudSyncRemoteClient client) async {
+    // Fetch remote files first, then snapshot local state — this ensures any
+    // user actions during the network round-trip are captured in the snapshot
+    // and won't be silently overwritten by the merge result.
+    final readingText = await client.tryGetBackupFile(
+      CloudSyncConfigStore.readingFileName,
+    );
+    final searchText = await client.tryGetBackupFile(
+      CloudSyncConfigStore.searchHistoryFileName,
+    );
+    final settingsText = await client.tryGetBackupFile(
+      CloudSyncConfigStore.settingsFileName,
+    );
+
     final prefs = await SharedPreferences.getInstance();
 
     final localHistorySnapshot = prefs.getString('hazuki_read_history');
@@ -28,16 +41,6 @@ class CloudSyncSnapshotCodec {
     final localSearchSnapshot = prefs.getStringList('search_history');
     final localFoldersSnapshot = prefs.getString('local_favorite_folders_v1');
     final localEntriesSnapshot = prefs.getString('local_favorite_entries_v1');
-
-    final readingText = await client.tryGetBackupFile(
-      CloudSyncConfigStore.readingFileName,
-    );
-    final searchText = await client.tryGetBackupFile(
-      CloudSyncConfigStore.searchHistoryFileName,
-    );
-    final settingsText = await client.tryGetBackupFile(
-      CloudSyncConfigStore.settingsFileName,
-    );
 
     if (readingText != null) {
       Map<String, dynamic>? readingMap;
@@ -291,6 +294,37 @@ class CloudSyncSnapshotCodec {
     String? localFoldersSnapshot,
     String? localEntriesSnapshot,
   }) async {
+    final nowMs = DateTime.now().millisecondsSinceEpoch;
+    final tombstoneCutoff = nowMs - (90 * 24 * 60 * 60 * 1000);
+
+    // Merge folder tombstones from both sides
+    final folderTombstones = _mergeTombstoneMaps(
+      _decodeTombstoneMap(
+        prefs.getString(CloudSyncConfigStore.folderTombstonesKey),
+        'id',
+      ),
+      _decodeTombstoneMap(
+        remoteData[CloudSyncConfigStore.folderTombstonesKey] is String
+            ? remoteData[CloudSyncConfigStore.folderTombstonesKey] as String
+            : null,
+        'id',
+      ),
+    );
+
+    // Merge entry tombstones from both sides
+    final entryTombstones = _mergeTombstoneMaps(
+      _decodeTombstoneMap(
+        prefs.getString(CloudSyncConfigStore.entryTombstonesKey),
+        'comicId',
+      ),
+      _decodeTombstoneMap(
+        remoteData[CloudSyncConfigStore.entryTombstonesKey] is String
+            ? remoteData[CloudSyncConfigStore.entryTombstonesKey] as String
+            : null,
+        'comicId',
+      ),
+    );
+
     List<Map<String, dynamic>> localFolders = const [];
     final localFoldersRaw =
         localFoldersSnapshot ?? prefs.getString('local_favorite_folders_v1');
@@ -320,16 +354,30 @@ class CloudSyncSnapshotCodec {
       } catch (_) {}
     }
 
-    final localFolderIds = {
-      for (final folder in localFolders) folder['id'].toString(): folder,
-    };
-    final mergedFolders = List<Map<String, dynamic>>.from(localFolders);
+    // Merge folders, skipping any covered by a tombstone.
+    // Folder IDs are microsecondsSinceEpoch strings; convert to ms for
+    // comparison with tombstone's deletedAtMs (millisecondsSinceEpoch).
+    bool isFolderTombstoned(String id) {
+      final deletedAtMs = folderTombstones[id];
+      if (deletedAtMs == null) return false;
+      final createdAtMs = (int.tryParse(id) ?? 0) ~/ 1000;
+      return deletedAtMs > createdAtMs;
+    }
+
+    final mergedFolders = <Map<String, dynamic>>[];
+    final mergedFolderIds = <String>{};
+    for (final folder in localFolders) {
+      final id = folder['id']?.toString() ?? '';
+      if (id.isEmpty || isFolderTombstoned(id)) continue;
+      mergedFolders.add(folder);
+      mergedFolderIds.add(id);
+    }
     for (final folder in remoteFolders) {
       final id = folder['id']?.toString() ?? '';
-      if (id.isEmpty) continue;
-      if (!localFolderIds.containsKey(id)) {
-        mergedFolders.add(folder);
-      }
+      if (id.isEmpty || mergedFolderIds.contains(id)) continue;
+      if (isFolderTombstoned(id)) continue;
+      mergedFolders.add(folder);
+      mergedFolderIds.add(id);
     }
 
     List<Map<String, dynamic>> localEntries = const [];
@@ -361,21 +409,31 @@ class CloudSyncSnapshotCodec {
       } catch (_) {}
     }
 
+    bool isEntryTombstoned(String comicId, int savedAtMs) {
+      final deletedAtMs = entryTombstones[comicId];
+      if (deletedAtMs == null) return false;
+      return deletedAtMs > savedAtMs;
+    }
+
     final mergedEntries = <String, Map<String, dynamic>>{};
     for (final entry in localEntries) {
       final comicId = (entry['comicId'] ?? '').toString().trim();
       if (comicId.isEmpty) continue;
+      final savedAtMs = (entry['savedAtMs'] as num?)?.toInt() ?? 0;
+      if (isEntryTombstoned(comicId, savedAtMs)) continue;
       mergedEntries[comicId] = entry;
     }
     for (final entry in remoteEntries) {
       final comicId = (entry['comicId'] ?? '').toString().trim();
       if (comicId.isEmpty) continue;
+      final savedAtMs = (entry['savedAtMs'] as num?)?.toInt() ?? 0;
+      if (isEntryTombstoned(comicId, savedAtMs)) continue;
       final existing = mergedEntries[comicId];
       if (existing == null) {
         mergedEntries[comicId] = entry;
       } else {
         final localTs = (existing['savedAtMs'] as num?)?.toInt() ?? 0;
-        final remoteTs = (entry['savedAtMs'] as num?)?.toInt() ?? 0;
+        final remoteTs = savedAtMs;
         final winner = remoteTs > localTs ? entry : existing;
         final localIds = _toStringSet(existing['folderIds']);
         final remoteIds = _toStringSet(entry['folderIds']);
@@ -383,6 +441,20 @@ class CloudSyncSnapshotCodec {
           ...winner,
           'folderIds': {...localIds, ...remoteIds}.toList(),
         };
+      }
+    }
+
+    // Filter each entry's folderIds to only include folders that actually exist
+    // after the merge, then drop entries that end up with no valid folder.
+    for (final comicId in mergedEntries.keys.toList()) {
+      final entry = mergedEntries[comicId]!;
+      final validIds = _toStringSet(
+        entry['folderIds'],
+      ).intersection(mergedFolderIds);
+      if (validIds.isEmpty) {
+        mergedEntries.remove(comicId);
+      } else {
+        mergedEntries[comicId] = {...entry, 'folderIds': validIds.toList()};
       }
     }
 
@@ -394,6 +466,16 @@ class CloudSyncSnapshotCodec {
       'local_favorite_entries_v1',
       jsonEncode(mergedEntries.values.toList()),
     );
+
+    // Persist merged tombstones (pruned to 90 days)
+    await prefs.setString(
+      CloudSyncConfigStore.folderTombstonesKey,
+      _encodeTombstoneMap(folderTombstones, 'id', tombstoneCutoff),
+    );
+    await prefs.setString(
+      CloudSyncConfigStore.entryTombstonesKey,
+      _encodeTombstoneMap(entryTombstones, 'comicId', tombstoneCutoff),
+    );
   }
 
   Set<String> _toStringSet(dynamic value) {
@@ -401,6 +483,43 @@ class CloudSyncSnapshotCodec {
       return value.map((e) => e.toString()).toSet();
     }
     return const {};
+  }
+
+  /// Decodes a tombstone JSON string into a map of id → deletedAtMs.
+  Map<String, int> _decodeTombstoneMap(String? raw, String idField) {
+    if (raw == null || raw.trim().isEmpty) return {};
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return {};
+      final result = <String, int>{};
+      for (final item in decoded.whereType<Map>()) {
+        final id = (item[idField] ?? '').toString().trim();
+        final ts = (item['deletedAtMs'] as num?)?.toInt() ?? 0;
+        if (id.isNotEmpty && ts > 0) result[id] = ts;
+      }
+      return result;
+    } catch (_) {
+      return {};
+    }
+  }
+
+  /// Merges two tombstone maps, keeping the latest deletedAtMs per id.
+  Map<String, int> _mergeTombstoneMaps(Map<String, int> a, Map<String, int> b) {
+    final merged = Map<String, int>.from(a);
+    for (final e in b.entries) {
+      final existing = merged[e.key];
+      if (existing == null || e.value > existing) merged[e.key] = e.value;
+    }
+    return merged;
+  }
+
+  /// Encodes a tombstone map to JSON, pruning entries older than [cutoff].
+  String _encodeTombstoneMap(Map<String, int> map, String idField, int cutoff) {
+    final pruned = map.entries
+        .where((e) => e.value >= cutoff)
+        .map((e) => {idField: e.key, 'deletedAtMs': e.value})
+        .toList();
+    return jsonEncode(pruned);
   }
 
   String _stripAccountFromSourceData(String raw) {

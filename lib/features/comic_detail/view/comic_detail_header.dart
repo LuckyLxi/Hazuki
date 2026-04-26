@@ -303,9 +303,10 @@ class ComicDetailHeaderSection extends StatelessWidget {
     final lastReadProgress = session.lastReadProgress;
     if (lastReadProgress != null &&
         details!.chapters.length > 1 &&
+        lastReadProgress['index'] is int &&
         (lastReadProgress['index'] as int) >= 1 &&
         details!.chapters.containsKey(lastReadProgress['epId'])) {
-      final title = lastReadProgress['title'] as String;
+      final title = lastReadProgress['title'] as String? ?? '';
       return l10n(context).comicDetailContinueReading(title);
     }
     return l10n(context).comicDetailRead;

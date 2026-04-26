@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
+
 import 'cloud_sync/cloud_sync_config_store.dart';
 import 'cloud_sync/cloud_sync_models.dart';
 import 'cloud_sync/cloud_sync_remote_client.dart';
@@ -69,8 +71,9 @@ class CloudSyncService {
       final nowMs = DateTime.now().millisecondsSinceEpoch;
       await uploadBackup(configOverride: config, uploadAtMs: nowMs);
       await _configStore.saveLastSyncedRemoteTs(nowMs);
-    } catch (_) {
+    } catch (e, st) {
       // Background sync is best-effort and should not interrupt app startup.
+      debugPrint('autoSyncOnce error: $e\n$st');
     } finally {
       _autoSyncRunning = false;
     }
