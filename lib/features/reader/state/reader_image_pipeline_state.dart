@@ -14,6 +14,7 @@ class ReaderImagePipelineState {
   int activeUnscrambleTasks = 0;
   bool prefetchAheadRunning = false;
   int? queuedPrefetchAheadIndex;
+  bool disposed = false;
 
   void resetForImages(List<String> images) {
     clearProviderCaches();
@@ -50,6 +51,7 @@ class ReaderImagePipelineState {
   }
 
   void dispose() {
+    disposed = true;
     clearProviderCaches();
     imageAspectRatioCache.clear();
     retryingImageUrls.clear();

@@ -30,55 +30,69 @@ extension HazukiSourceServiceImagePrepareUnscrambleSupport
     final width = image.width;
     final height = image.height;
     final aspectRatio = height > 0 ? width / height : null;
-    final src = await image.toByteData(format: ImageByteFormat.rawRgba);
-    if (src == null) {
-      return (
-        bytes: data,
-        extension: fallbackExtension,
-        aspectRatio: aspectRatio,
-      );
-    }
-
-    final blockSize = height ~/ segments;
-    final remainder = height % segments;
-    final srcBytes = src.buffer.asUint8List();
-    final dstBytes = Uint8List(srcBytes.length);
-
-    var destY = 0;
-    for (var i = segments - 1; i >= 0; i--) {
-      final startY = i * blockSize;
-      final currentHeight = blockSize + (i == segments - 1 ? remainder : 0);
-      final rowBytes = width * 4;
-      for (var y = 0; y < currentHeight; y++) {
-        final srcOffset = ((startY + y) * width) * 4;
-        final dstOffset = ((destY + y) * width) * 4;
-        dstBytes.setRange(dstOffset, dstOffset + rowBytes, srcBytes, srcOffset);
+    try {
+      final src = await image.toByteData(format: ImageByteFormat.rawRgba);
+      if (src == null) {
+        return (
+          bytes: data,
+          extension: fallbackExtension,
+          aspectRatio: aspectRatio,
+        );
       }
-      destY += currentHeight;
-    }
 
-    final buffer = await ImmutableBuffer.fromUint8List(dstBytes);
-    final descriptor = ImageDescriptor.raw(
-      buffer,
-      width: width,
-      height: height,
-      pixelFormat: PixelFormat.rgba8888,
-      rowBytes: width * 4,
-    );
-    final outCodec = await descriptor.instantiateCodec();
-    final outFrame = await outCodec.getNextFrame();
-    final png = await outFrame.image.toByteData(format: ImageByteFormat.png);
-    if (png == null) {
-      return (
-        bytes: data,
-        extension: fallbackExtension,
-        aspectRatio: aspectRatio,
+      final blockSize = height ~/ segments;
+      final remainder = height % segments;
+      final srcBytes = src.buffer.asUint8List();
+      final dstBytes = Uint8List(srcBytes.length);
+
+      var destY = 0;
+      for (var i = segments - 1; i >= 0; i--) {
+        final startY = i * blockSize;
+        final currentHeight = blockSize + (i == segments - 1 ? remainder : 0);
+        final rowBytes = width * 4;
+        for (var y = 0; y < currentHeight; y++) {
+          final srcOffset = ((startY + y) * width) * 4;
+          final dstOffset = ((destY + y) * width) * 4;
+          dstBytes.setRange(
+            dstOffset,
+            dstOffset + rowBytes,
+            srcBytes,
+            srcOffset,
+          );
+        }
+        destY += currentHeight;
+      }
+
+      final buffer = await ImmutableBuffer.fromUint8List(dstBytes);
+      final descriptor = ImageDescriptor.raw(
+        buffer,
+        width: width,
+        height: height,
+        pixelFormat: PixelFormat.rgba8888,
+        rowBytes: width * 4,
       );
+      final outCodec = await descriptor.instantiateCodec();
+      final outFrame = await outCodec.getNextFrame();
+      final outImage = outFrame.image;
+      try {
+        final png = await outImage.toByteData(format: ImageByteFormat.png);
+        if (png == null) {
+          return (
+            bytes: data,
+            extension: fallbackExtension,
+            aspectRatio: aspectRatio,
+          );
+        }
+        return (
+          bytes: png.buffer.asUint8List(),
+          extension: 'png',
+          aspectRatio: aspectRatio,
+        );
+      } finally {
+        outImage.dispose();
+      }
+    } finally {
+      image.dispose();
     }
-    return (
-      bytes: png.buffer.asUint8List(),
-      extension: 'png',
-      aspectRatio: aspectRatio,
-    );
   }
 }

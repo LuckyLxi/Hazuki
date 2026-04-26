@@ -491,6 +491,7 @@ class ReaderImagePipelineController {
     final waiter = Completer<void>();
     _pipelineState.decodeWaiters.add(waiter);
     await waiter.future;
+    if (_pipelineState.disposed) return;
     _pipelineState.activeUnscrambleTasks++;
   }
 
@@ -518,32 +519,38 @@ class ReaderImagePipelineController {
       final codec = await instantiateImageCodec(bytes);
       final frame = await codec.getNextFrame();
       final image = frame.image;
-      if (image.height <= 0) {
-        return false;
+      try {
+        if (image.height <= 0) {
+          return false;
+        }
+        final aspectRatio = image.width / image.height;
+        imageAspectRatioCache[url] = aspectRatio;
+        final index = _pipelineState.imageIndexMap[url];
+        if (index != null &&
+            _runtimeState.readerMode == ReaderMode.topToBottom &&
+            index <
+                _runtimeState.spreadStartIndex(
+                  _runtimeState.currentPageIndex,
+                ) &&
+            index >=
+                _runtimeState.spreadStartIndex(_runtimeState.currentPageIndex) -
+                    4) {
+          _logEvent(
+            'Reader upstream page aspect ratio resolved',
+            source: 'reader_position',
+            content: _logPayload({
+              'trigger': 'image_aspect_ratio_resolved',
+              'resolvedPageIndex': index,
+              'resolvedPage': index + 1,
+              'aspectRatio': normalizeReaderLogDouble(aspectRatio),
+              'isBeforeCurrentPage': true,
+            }),
+          );
+        }
+        return true;
+      } finally {
+        image.dispose();
       }
-      final aspectRatio = image.width / image.height;
-      imageAspectRatioCache[url] = aspectRatio;
-      final index = _pipelineState.imageIndexMap[url];
-      if (index != null &&
-          _runtimeState.readerMode == ReaderMode.topToBottom &&
-          index <
-              _runtimeState.spreadStartIndex(_runtimeState.currentPageIndex) &&
-          index >=
-              _runtimeState.spreadStartIndex(_runtimeState.currentPageIndex) -
-                  4) {
-        _logEvent(
-          'Reader upstream page aspect ratio resolved',
-          source: 'reader_position',
-          content: _logPayload({
-            'trigger': 'image_aspect_ratio_resolved',
-            'resolvedPageIndex': index,
-            'resolvedPage': index + 1,
-            'aspectRatio': normalizeReaderLogDouble(aspectRatio),
-            'isBeforeCurrentPage': true,
-          }),
-        );
-      }
-      return true;
     } catch (_) {
       return false;
     }
