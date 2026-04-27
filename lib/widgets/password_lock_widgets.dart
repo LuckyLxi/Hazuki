@@ -8,14 +8,18 @@ import 'package:lottie/lottie.dart';
 import '../l10n/l10n.dart';
 import '../services/password_lock_service.dart';
 
-const String passwordProtectedAnimationAsset =
+// ─────────────────────────────────────────────────────────────────────────────
+// Lottie header (设置密码页使用)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const String _passwordProtectedAnimationAsset =
     'assets/animations/password_protected.json';
 
 class PasswordLockAnimationCache {
   PasswordLockAnimationCache._();
 
   static final AssetLottie _provider = AssetLottie(
-    passwordProtectedAnimationAsset,
+    _passwordProtectedAnimationAsset,
   );
   static LottieComposition? _composition;
   static Future<LottieComposition>? _loadFuture;
@@ -24,13 +28,10 @@ class PasswordLockAnimationCache {
 
   static Future<LottieComposition> ensureLoaded({BuildContext? context}) {
     final composition = _composition;
-    if (composition != null) {
-      return Future<LottieComposition>.value(composition);
-    }
-    return _loadFuture ??= _provider.load(context: context).then((composition) {
-      _composition = composition;
-      return composition;
-    });
+    if (composition != null) return Future.value(composition);
+    return _loadFuture ??= _provider
+        .load(context: context)
+        .then((c) => _composition = c);
   }
 }
 
@@ -56,46 +57,29 @@ class _PasswordLockAnimationHeaderState
   @override
   void initState() {
     super.initState();
-    final cachedComposition = PasswordLockAnimationCache.cachedComposition;
-    if (cachedComposition != null) {
-      _composition = cachedComposition;
-    }
+    final cached = PasswordLockAnimationCache.cachedComposition;
+    if (cached != null) _composition = cached;
     unawaited(_loadComposition());
   }
 
   Future<void> _loadComposition() async {
     final composition = await PasswordLockAnimationCache.ensureLoaded();
-    if (!mounted) {
-      return;
-    }
-    final startProgress = _progressForFrame(composition, _visibleStartFrame);
-    final holdProgress = _progressForFrame(composition, _holdFrame);
-    final animationSpan = math.max(holdProgress - startProgress, 0.0);
-    final holdDuration = Duration(
-      milliseconds: (composition.duration.inMilliseconds * animationSpan)
-          .round(),
+    if (!mounted) return;
+    final start = _progressForFrame(composition, _visibleStartFrame);
+    final hold = _progressForFrame(composition, _holdFrame);
+    final span = math.max(hold - start, 0.0);
+    final dur = Duration(
+      milliseconds: (composition.duration.inMilliseconds * span).round(),
     );
-    _controller.value = startProgress;
-    setState(() {
-      _composition = composition;
-    });
-    await _controller.animateTo(
-      holdProgress,
-      duration: holdDuration,
-      curve: Curves.linear,
-    );
+    _controller.value = start;
+    setState(() => _composition = composition);
+    await _controller.animateTo(hold, duration: dur, curve: Curves.linear);
   }
 
-  double _progressForFrame(LottieComposition composition, double frame) {
-    final targetFrame = math.max(
-      composition.startFrame,
-      math.min(frame, composition.endFrame - 1),
-    );
-    final durationFrames = composition.durationFrames;
-    if (durationFrames <= 0) {
-      return 1;
-    }
-    return (targetFrame - composition.startFrame) / durationFrames;
+  double _progressForFrame(LottieComposition c, double frame) {
+    final f = math.max(c.startFrame, math.min(frame, c.endFrame - 1));
+    final d = c.durationFrames;
+    return d <= 0 ? 1.0 : (f - c.startFrame) / d;
   }
 
   @override
@@ -106,8 +90,7 @@ class _PasswordLockAnimationHeaderState
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final colorScheme = Theme.of(context).colorScheme;
     return RepaintBoundary(
       child: SizedBox(
         width: widget.size,
@@ -148,6 +131,420 @@ class _PasswordLockAnimationHeaderState
     );
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Vector lock painter (解锁遮罩使用)
+//
+// Canvas layout (normalised 0–1):
+//   Shackle occupies top ~55 %, body occupies bottom ~58 %,
+//   they overlap ~13 % so the shackle legs disappear into the body.
+//
+//   Body : left=0.18  right=0.82  top=0.46  bottom=0.92
+//          → width≈64 %  height≈46 %  (square-ish at typical sizes)
+//
+//   Shackle: left=0.32  right=0.68  (36 % wide = narrower than body)
+//            shackleRadius ≈ 18 % of canvas
+//            strokeWidth ≈ 8 % of canvas
+//            top (closed) ≈ 14 % from canvas top
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _LockPainter extends CustomPainter {
+  const _LockPainter({
+    required this.shackleOpenFraction,
+    required this.bodyColor,
+    required this.shackleColor,
+    required this.shimmerColor,
+    required this.shimmerOpacity,
+    required this.offsetX,
+    required this.offsetY,
+    required this.scale,
+  });
+
+  final double shackleOpenFraction;
+  final Color bodyColor;
+  final Color shackleColor;
+  final Color shimmerColor;
+  final double shimmerOpacity;
+  final double offsetX;
+  final double offsetY;
+  final double scale;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.save();
+    // Apply offset + scale around canvas center
+    final cx = size.width / 2 + offsetX;
+    final cy = size.height / 2 + offsetY;
+    canvas.translate(cx, cy);
+    canvas.scale(scale);
+    canvas.translate(-size.width / 2, -size.height / 2);
+
+    final w = size.width;
+    final h = size.height;
+
+    // ── Body ──────────────────────────────────────────────────────────────────
+    final bodyLeft = w * 0.18;
+    final bodyTop = h * 0.44;
+    final bodyRight = w * 0.82;
+    final bodyBottom = h * 0.93;
+    final bodyW = bodyRight - bodyLeft;
+    final bodyRadius = bodyW * 0.18;
+
+    final bodyRRect = RRect.fromLTRBR(
+      bodyLeft,
+      bodyTop,
+      bodyRight,
+      bodyBottom,
+      Radius.circular(bodyRadius),
+    );
+
+    // ── Shackle ───────────────────────────────────────────────────────────────
+    final shackleStroke = w * 0.085;
+    final shackleLeft = w * 0.335;
+    final shackleRight = w * 0.665;
+    final shackleRadius = (shackleRight - shackleLeft) / 2; // ~16.5 % of w
+
+    // Where the legs enter the body (inner bottom of shackle)
+    final legBottom = h * 0.515;
+
+    // Top of the U arc (closed / open)
+    final arcTopClosed = h * 0.115;
+    final arcTopOpen = h * 0.01 - shackleStroke;
+    final arcTop =
+        arcTopClosed + (arcTopOpen - arcTopClosed) * shackleOpenFraction;
+
+    // Right leg: rises when open (simulates pivot)
+    final rightLegBottomOpen = h * 0.30;
+    final rightLegBottom =
+        legBottom + (rightLegBottomOpen - legBottom) * shackleOpenFraction;
+
+    final shacklePaint = Paint()
+      ..color = shackleColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = shackleStroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final shacklePath = Path()
+      ..moveTo(shackleLeft, legBottom)
+      ..lineTo(shackleLeft, arcTop + shackleRadius)
+      ..arcToPoint(
+        Offset(shackleRight, arcTop + shackleRadius),
+        radius: Radius.circular(shackleRadius),
+        clockwise: true,
+      )
+      ..lineTo(shackleRight, rightLegBottom);
+
+    canvas.drawPath(shacklePath, shacklePaint);
+
+    // ── Body fill (drawn after shackle so it covers leg ends) ─────────────────
+    canvas.drawRRect(bodyRRect, Paint()..color = bodyColor);
+
+    // ── Keyhole ───────────────────────────────────────────────────────────────
+    final khX = w / 2;
+    final khY = (bodyTop + bodyBottom) / 2;
+    final khR = bodyW * 0.10;
+
+    canvas.drawCircle(
+      Offset(khX, khY - khR * 0.15),
+      khR,
+      Paint()
+        ..color = shackleColor.withValues(alpha: 0.22)
+        ..style = PaintingStyle.fill,
+    );
+    canvas.drawLine(
+      Offset(khX, khY + khR * 0.65),
+      Offset(khX, khY + khR * 1.75),
+      Paint()
+        ..color = shackleColor.withValues(alpha: 0.22)
+        ..strokeWidth = khR * 0.82
+        ..strokeCap = StrokeCap.round
+        ..style = PaintingStyle.stroke,
+    );
+
+    // ── Shimmer overlay ───────────────────────────────────────────────────────
+    if (shimmerOpacity > 0) {
+      canvas.drawRRect(
+        bodyRRect,
+        Paint()
+          ..color = shimmerColor.withValues(alpha: shimmerOpacity)
+          ..style = PaintingStyle.fill,
+      );
+    }
+
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_LockPainter old) =>
+      old.shackleOpenFraction != shackleOpenFraction ||
+      old.bodyColor != bodyColor ||
+      old.shackleColor != shackleColor ||
+      old.shimmerColor != shimmerColor ||
+      old.shimmerOpacity != shimmerOpacity ||
+      old.offsetX != offsetX ||
+      old.offsetY != offsetY ||
+      old.scale != scale;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Gate animation header (解锁遮罩)
+// ─────────────────────────────────────────────────────────────────────────────
+
+enum LockGateState { idle, digit, error, lockout, success }
+
+class LockGateAnimationHeader extends StatefulWidget {
+  const LockGateAnimationHeader({
+    super.key,
+    this.size = 180,
+    required this.state,
+    required this.digitVersion,
+  });
+
+  final double size;
+  final LockGateState state;
+  final int digitVersion;
+
+  @override
+  State<LockGateAnimationHeader> createState() =>
+      _LockGateAnimationHeaderState();
+}
+
+class _LockGateAnimationHeaderState extends State<LockGateAnimationHeader>
+    with TickerProviderStateMixin {
+  late final AnimationController _bounceCtrl;
+  late final AnimationController _shakeCtrl;
+  late final AnimationController _successCtrl;
+
+  late Animation<double> _bounceY;
+  late Animation<double> _bounceScale;
+  late Animation<double> _shakeX;
+  late Animation<double> _successShackle;
+  late Animation<double> _successScale;
+
+  int _prevDigitVersion = 0;
+  LockGateState _prevState = LockGateState.idle;
+
+  void _resetBounce() {
+    _bounceCtrl.stop();
+    _bounceCtrl.value = 0;
+  }
+
+  void _resetShake() {
+    _shakeCtrl.stop();
+    _shakeCtrl.value = 0;
+  }
+
+  void _resetSuccess() {
+    _successCtrl.stop();
+    _successCtrl.value = 0;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+
+    _bounceCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 350),
+    );
+    _shakeCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 420),
+    );
+    _successCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 520),
+    );
+
+    _bounceY = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween<double>(begin: 0, end: 7), weight: 28),
+      TweenSequenceItem(tween: Tween<double>(begin: 7, end: -3.5), weight: 36),
+      TweenSequenceItem(tween: Tween<double>(begin: -3.5, end: 0), weight: 36),
+    ]).animate(_bounceCtrl);
+
+    _bounceScale = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 1.0, end: 0.92),
+        weight: 28,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 0.92, end: 1.05),
+        weight: 36,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 1.05, end: 1.0),
+        weight: 36,
+      ),
+    ]).animate(_bounceCtrl);
+
+    _shakeX = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 0.0, end: -11.0),
+        weight: 15,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: -11.0, end: 11.0),
+        weight: 25,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 11.0, end: -8.0),
+        weight: 20,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: -8.0, end: 8.0),
+        weight: 20,
+      ),
+      TweenSequenceItem(tween: Tween<double>(begin: 8.0, end: 0.0), weight: 20),
+    ]).animate(CurvedAnimation(parent: _shakeCtrl, curve: Curves.easeOut));
+
+    _successShackle = Tween<double>(
+      begin: 0,
+      end: 0.9,
+    ).animate(CurvedAnimation(parent: _successCtrl, curve: Curves.easeOutBack));
+
+    _successScale = TweenSequence<double>(
+      [
+        TweenSequenceItem(
+          tween: Tween<double>(begin: 1.0, end: 1.12),
+          weight: 35,
+        ),
+        TweenSequenceItem(
+          tween: Tween<double>(begin: 1.12, end: 0.0),
+          weight: 65,
+        ),
+      ],
+    ).animate(CurvedAnimation(parent: _successCtrl, curve: Curves.easeInCubic));
+  }
+
+  @override
+  void didUpdateWidget(covariant LockGateAnimationHeader oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    if (widget.state == LockGateState.success &&
+        _prevState != LockGateState.success) {
+      _resetBounce();
+      _resetShake();
+      _successCtrl.forward(from: 0);
+    } else if (widget.state == LockGateState.error &&
+        _prevState != LockGateState.error) {
+      _resetBounce();
+      _resetSuccess();
+      _shakeCtrl.forward(from: 0);
+    } else if (widget.state == LockGateState.lockout &&
+        _prevState != LockGateState.lockout) {
+      _resetBounce();
+      _resetShake();
+      _resetSuccess();
+    } else if (widget.state == LockGateState.idle &&
+        _prevState != LockGateState.idle) {
+      _resetBounce();
+      _resetShake();
+      _resetSuccess();
+    } else if (widget.digitVersion != _prevDigitVersion &&
+        widget.state == LockGateState.digit) {
+      _resetShake();
+      _resetSuccess();
+      _bounceCtrl.forward(from: 0);
+    }
+
+    _prevDigitVersion = widget.digitVersion;
+    _prevState = widget.state;
+  }
+
+  @override
+  void dispose() {
+    _bounceCtrl.dispose();
+    _shakeCtrl.dispose();
+    _successCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: Listenable.merge([_bounceCtrl, _shakeCtrl, _successCtrl]),
+        builder: (context, _) {
+          final isSuccess =
+              _successCtrl.isAnimating || _successCtrl.isCompleted;
+          final isError = widget.state == LockGateState.error;
+          final isLockout = widget.state == LockGateState.lockout;
+
+          double shackle = 0;
+          double scale = 1.0;
+          double offsetX = 0;
+          double offsetY = 0;
+          Color bodyColor;
+          Color shackleColor;
+
+          if (isSuccess) {
+            shackle = _successShackle.value;
+            scale = _successScale.value;
+            final t = math.min(_successCtrl.value * 2.5, 1.0);
+            bodyColor = Color.lerp(
+              colorScheme.primaryContainer,
+              Colors.green.shade400,
+              t,
+            )!;
+            shackleColor = Color.lerp(
+              colorScheme.primary,
+              Colors.green.shade600,
+              t,
+            )!;
+          } else if (isError && _shakeCtrl.isAnimating) {
+            offsetX = _shakeX.value;
+            final t = _shakeCtrl.value < 0.5
+                ? _shakeCtrl.value * 2
+                : (1 - _shakeCtrl.value) * 2;
+            bodyColor = Color.lerp(
+              colorScheme.primaryContainer,
+              colorScheme.errorContainer,
+              t,
+            )!;
+            shackleColor = Color.lerp(
+              colorScheme.primary,
+              colorScheme.error,
+              t,
+            )!;
+          } else if (isLockout) {
+            bodyColor = colorScheme.errorContainer;
+            shackleColor = colorScheme.error;
+          } else {
+            offsetY = _bounceY.value;
+            scale = _bounceScale.value;
+            bodyColor = colorScheme.primaryContainer;
+            shackleColor = colorScheme.primary;
+          }
+
+          // Extra top padding so shackle is never clipped
+          return SizedBox(
+            width: widget.size,
+            height: widget.size + widget.size * 0.08,
+            child: CustomPaint(
+              painter: _LockPainter(
+                shackleOpenFraction: shackle,
+                bodyColor: bodyColor,
+                shackleColor: shackleColor,
+                shimmerColor: Colors.transparent,
+                shimmerOpacity: 0,
+                offsetX: offsetX,
+                offsetY: offsetY + widget.size * 0.04,
+                scale: scale,
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Filled boxes indicator
+// ─────────────────────────────────────────────────────────────────────────────
 
 class PasswordLockFilledBoxes extends StatelessWidget {
   const PasswordLockFilledBoxes({
@@ -216,6 +613,10 @@ class PasswordLockFilledBoxes extends StatelessWidget {
     );
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Numeric keypad
+// ─────────────────────────────────────────────────────────────────────────────
 
 class PasswordLockNumericKeypad extends StatelessWidget {
   const PasswordLockNumericKeypad({
@@ -334,6 +735,10 @@ class PasswordLockNumericKeypad extends StatelessWidget {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Gate overlay
+// ─────────────────────────────────────────────────────────────────────────────
+
 class PasswordLockGateOverlay extends StatefulWidget {
   const PasswordLockGateOverlay({super.key, required this.controller});
 
@@ -347,6 +752,8 @@ class PasswordLockGateOverlay extends StatefulWidget {
 class _PasswordLockGateOverlayState extends State<PasswordLockGateOverlay> {
   String? _feedback;
   bool _errorHighlight = false;
+  LockGateState _lockState = LockGateState.idle;
+  int _digitVersion = 0;
 
   PasswordLockService get _controller => widget.controller;
 
@@ -358,68 +765,74 @@ class _PasswordLockGateOverlayState extends State<PasswordLockGateOverlay> {
         _errorHighlight) {
       _errorHighlight = false;
     }
+    if (!_controller.shouldBlockApp) {
+      _lockState = LockGateState.idle;
+      _digitVersion = 0;
+      _feedback = null;
+      _errorHighlight = false;
+      return;
+    }
+    if (!_controller.isLockedOut && _lockState == LockGateState.lockout) {
+      _lockState = LockGateState.idle;
+      _feedback = null;
+      _errorHighlight = false;
+    }
   }
 
   Future<void> _handleDigitPressed(String digit) async {
-    if (!_controller.shouldBlockApp || _controller.isLockedOut) {
-      return;
-    }
+    if (!_controller.shouldBlockApp || _controller.isLockedOut) return;
     await HapticFeedback.mediumImpact();
+    setState(() {
+      _lockState = LockGateState.digit;
+      _digitVersion++;
+    });
     final result = await _controller.appendDigit(digit);
-    if (!mounted) {
-      return;
-    }
+    if (!mounted) return;
     switch (result) {
       case PasswordVerificationResult.incomplete:
         setState(() {
           _feedback = null;
           _errorHighlight = false;
         });
-        break;
       case PasswordVerificationResult.success:
         setState(() {
           _feedback = null;
           _errorHighlight = false;
+          _lockState = LockGateState.success;
         });
-        break;
       case PasswordVerificationResult.failed:
         setState(() {
           _feedback = l10n(
             context,
           ).passwordLockWrongPin(_controller.remainingAttempts.toString());
           _errorHighlight = true;
+          _lockState = LockGateState.error;
         });
-        break;
       case PasswordVerificationResult.lockedOut:
         setState(() {
           _feedback = l10n(context).passwordLockLockedForMinutes;
           _errorHighlight = true;
+          _lockState = LockGateState.lockout;
         });
-        break;
     }
   }
 
   Future<void> _handleBackspacePressed() async {
-    if (_controller.isLockedOut) {
-      return;
-    }
+    if (_controller.isLockedOut) return;
     await HapticFeedback.lightImpact();
     _controller.removeLastDigit();
-    if (!mounted) {
-      return;
-    }
+    if (!mounted) return;
     setState(() {
       _feedback = null;
       _errorHighlight = false;
+      _lockState = LockGateState.idle;
     });
   }
 
   Future<void> _handleBiometricPressed() async {
     await HapticFeedback.mediumImpact();
     final success = await _controller.authenticateWithBiometric();
-    if (!mounted || success) {
-      return;
-    }
+    if (!mounted || success) return;
     setState(() {
       _feedback = l10n(context).passwordLockBiometricFailed;
     });
@@ -463,12 +876,14 @@ class _PasswordLockGateOverlayState extends State<PasswordLockGateOverlay> {
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(
-                                  Icons.lock_rounded,
-                                  size: 44,
-                                  color: colorScheme.primary,
+                                LockGateAnimationHeader(
+                                  size: 148,
+                                  state: controller.isLockedOut
+                                      ? LockGateState.lockout
+                                      : _lockState,
+                                  digitVersion: _digitVersion,
                                 ),
-                                const SizedBox(height: 18),
+                                const SizedBox(height: 8),
                                 Text(
                                   l10n(context).passwordLockUnlockTitle,
                                   style: theme.textTheme.headlineSmall
@@ -542,6 +957,10 @@ class _PasswordLockGateOverlayState extends State<PasswordLockGateOverlay> {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Private button widgets
+// ─────────────────────────────────────────────────────────────────────────────
+
 class _PasswordDigitButton extends StatelessWidget {
   const _PasswordDigitButton({
     required this.digit,
@@ -566,10 +985,6 @@ class _PasswordDigitButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final backgroundColor = colorScheme.surfaceContainerHigh;
-    final borderColor = colorScheme.outlineVariant.withValues(alpha: 0.7);
-    final digitColor = colorScheme.onSurface;
-    final lettersColor = colorScheme.onSurfaceVariant;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -578,9 +993,11 @@ class _PasswordDigitButton extends StatelessWidget {
         child: Ink(
           height: buttonHeight,
           decoration: BoxDecoration(
-            color: backgroundColor,
+            color: colorScheme.surfaceContainerHigh,
             borderRadius: BorderRadius.circular(borderRadius),
-            border: Border.all(color: borderColor),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.7),
+            ),
           ),
           child: Center(
             child: Column(
@@ -589,7 +1006,7 @@ class _PasswordDigitButton extends StatelessWidget {
                 Text(
                   digit,
                   style: TextStyle(
-                    color: digitColor,
+                    color: colorScheme.onSurface,
                     fontSize: digitFontSize,
                     fontWeight: FontWeight.w500,
                     height: 1,
@@ -600,7 +1017,7 @@ class _PasswordDigitButton extends StatelessWidget {
                   Text(
                     letters,
                     style: TextStyle(
-                      color: lettersColor,
+                      color: colorScheme.onSurfaceVariant,
                       fontSize: letterFontSize,
                       fontWeight: FontWeight.w500,
                       letterSpacing: 1.2,
@@ -633,9 +1050,6 @@ class _PasswordKeyButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final backgroundColor = colorScheme.surfaceContainerHigh;
-    final borderColor = colorScheme.outlineVariant.withValues(alpha: 0.7);
-    final iconColor = colorScheme.onSurfaceVariant;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -644,11 +1058,15 @@ class _PasswordKeyButton extends StatelessWidget {
         child: Ink(
           height: buttonHeight,
           decoration: BoxDecoration(
-            color: backgroundColor,
+            color: colorScheme.surfaceContainerHigh,
             borderRadius: BorderRadius.circular(borderRadius),
-            border: Border.all(color: borderColor),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.7),
+            ),
           ),
-          child: Center(child: Icon(icon, color: iconColor, size: 28)),
+          child: Center(
+            child: Icon(icon, color: colorScheme.onSurfaceVariant, size: 28),
+          ),
         ),
       ),
     );

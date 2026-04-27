@@ -61,7 +61,6 @@ Future<void> _ensureNoMediaFile(String dirPath) async {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  unawaited(PasswordLockAnimationCache.ensureLoaded());
   await loadHazukiUiFlags();
   await HazukiSourceService.instance.loadSoftwareLogCaptureEnabled();
   await _ensureAndroidNoMediaMarker();

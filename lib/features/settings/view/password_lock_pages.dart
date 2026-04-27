@@ -16,12 +16,6 @@ class PasswordLockIntroPage extends StatefulWidget {
 
 class _PasswordLockIntroPageState extends State<PasswordLockIntroPage> {
   @override
-  void initState() {
-    super.initState();
-    unawaited(PasswordLockAnimationCache.ensureLoaded());
-  }
-
-  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;

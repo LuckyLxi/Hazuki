@@ -148,6 +148,9 @@ class SearchResultsController extends ChangeNotifier {
 
     _searchKeyword = normalized;
     _searchErrorMessage = null;
+    if (!isLoadMore) {
+      _searchLoadingMore = false;
+    }
     if (!isLoadMore && !silentRefresh) {
       _searchPage = 1;
       _searchMaxPage = null;

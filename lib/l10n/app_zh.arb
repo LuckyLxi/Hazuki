@@ -115,7 +115,7 @@
   "otherAutoSoftwareUpdateSubtitle": "每次启动软件时检查一次软件新版本",
   "otherAutoSoftwareUpdateUpdated": "已更新软件检查更新设置",
   "otherDiscoverDailyRecommendationTitle": "发现页每日推荐",
-  "otherDiscoverDailyRecommendationSubtitle": "开启后在发现页可用推荐时将搜索框固定到应用栏，并显示 5 部漫画的作者推荐轮播图",
+  "otherDiscoverDailyRecommendationSubtitle": "发现页将随机展示一位作者，并以轮播图形式推荐该作者的 7 部漫画",
   "otherUseSystemTitleBarTitle": "使用系统标题栏",
   "otherUseSystemTitleBarSubtitle": "开启后恢复 Windows 原生标题栏，关闭时使用应用自定义标题栏",
   "otherMangaDownloadPathTitle": "漫画下载保存路径",
@@ -147,7 +147,7 @@
       "version": {}
     }
   },
-  "aboutDescription": "JMComic第三方",
+  "aboutDescription": "JMComic第三方客户端",
   "aboutProjectTitle": "项目地址",
   "aboutProjectSubtitle": "GitHub (https://github.com/LuckyLxi/Hazuki)",
   "aboutCheckUpdateTitle": "检查更新",
