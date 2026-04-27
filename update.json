@@ -1,12 +1,12 @@
 {
-  "version": "1.0.4",
-  "releaseUrl": "https://github.com/LuckyLxi/Hazuki/releases/tag/v1.0.4",
+  "version": "1.0.5",
+  "releaseUrl": "https://github.com/LuckyLxi/Hazuki/releases/tag/v1.0.5",
   "apkUrls": {
-    "arm64-v8a": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.4/app-arm64-v8a-release.apk"
+    "arm64-v8a": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.5/app-arm64-v8a-release.apk"
   },
   "windowsUrls": {
-    "x64_zip": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.4/hazuki-windows-x64-v1.0.4.zip",
-    "x64_msix": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.4/hazuki-windows-x64-v1.0.4.msix"
+    "x64_zip": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.5/hazuki-windows-x64-v1.0.5.zip",
+    "x64_msix": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.5/hazuki-windows-x64-v1.0.5.msix"
   },
-  "changelog": "- 修复评论区滚动干扰与焦点冲突问题\n- 修复评论输入框键盘弹出时定位延迟问题\n- 修复搜索页面焦点恢复异常\n- 修复云同步时间戳竞争导致启动时重复合并的问题\n- 优化图片加载管道，改进重试逻辑与缓存管理"
+  "changelog": "- 优化探索、阅读器及搜索功能的逻辑与界面\n- 重构阅读器图片管道与会话管理\n- 实现评论页面状态管理\n- 增加探索与搜索功能的自动化测试"
 }
