@@ -8,5 +8,5 @@
     "x64_zip": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.5/hazuki-windows-x64-v1.0.5.zip",
     "x64_msix": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.5/hazuki-windows-x64-v1.0.5.msix"
   },
-  "changelog": "chore: bump version to 1.0.5+6 and update changelog"
+  "changelog": "- 优化探索、阅读器及搜索功能的逻辑与界面\n- 重构阅读器图片管道与会话管理\n- 实现评论页面状态管理\n- 增加探索与搜索功能的自动化测试"
 }
