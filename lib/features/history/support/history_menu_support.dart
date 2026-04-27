@@ -125,21 +125,52 @@ Future<HistoryComicMenuAction?> showHistoryComicMenu({
       );
     },
     transitionBuilder: (dialogContext, animation, secondaryAnimation, child) {
-      final scaleCurve = CurvedAnimation(
-        parent: animation,
-        curve: Curves.easeOutBack,
-        reverseCurve: Curves.easeInCubic,
-      );
-      final opacityCurve = CurvedAnimation(
+      final enterOpacity = CurvedAnimation(
         parent: animation,
         curve: Curves.easeOutCubic,
-        reverseCurve: Curves.easeInCubic,
       );
-      final scale = Tween<double>(begin: 0.5, end: 1.0).animate(scaleCurve);
+      final enterScale = TweenSequence<double>([
+        TweenSequenceItem(
+          tween: Tween<double>(
+            begin: 0.82,
+            end: 1.04,
+          ).chain(CurveTween(curve: Curves.easeOutCubic)),
+          weight: 68,
+        ),
+        TweenSequenceItem(
+          tween: Tween<double>(
+            begin: 1.04,
+            end: 1.0,
+          ).chain(CurveTween(curve: Curves.easeOut)),
+          weight: 32,
+        ),
+      ]).animate(animation);
       final align = Alignment(originX, originY);
-      return FadeTransition(
-        opacity: opacityCurve,
-        child: ScaleTransition(alignment: align, scale: scale, child: child),
+      return AnimatedBuilder(
+        animation: animation,
+        child: child,
+        builder: (context, transitionChild) {
+          final isReversing = animation.status == AnimationStatus.reverse;
+          final exitProgress = (animation.value / 0.55).clamp(0.0, 1.0);
+          final opacity = isReversing
+              ? Curves.easeOutCubic.transform(exitProgress)
+              : enterOpacity.value;
+          final scale = isReversing
+              ? ui.lerpDouble(
+                  0.992,
+                  1.0,
+                  Curves.easeOutCubic.transform(exitProgress),
+                )!
+              : enterScale.value;
+          return Opacity(
+            opacity: opacity,
+            child: Transform.scale(
+              alignment: align,
+              scale: scale,
+              child: transitionChild,
+            ),
+          );
+        },
       );
     },
   );

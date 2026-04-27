@@ -417,44 +417,46 @@ class CloudSyncSnapshotCodec {
 
     final mergedEntries = <String, Map<String, dynamic>>{};
     for (final entry in localEntries) {
-      final comicId = (entry['comicId'] ?? '').toString().trim();
-      if (comicId.isEmpty) continue;
-      final savedAtMs = (entry['savedAtMs'] as num?)?.toInt() ?? 0;
+      final normalizedEntry = _normalizeLocalFavoriteEntry(entry);
+      if (normalizedEntry == null) continue;
+      final comicId = normalizedEntry['comicId'] as String;
+      final savedAtMs = _localFavoriteEntrySavedAtMs(normalizedEntry);
       if (isEntryTombstoned(comicId, savedAtMs)) continue;
-      mergedEntries[comicId] = entry;
+      mergedEntries[comicId] = normalizedEntry;
     }
     for (final entry in remoteEntries) {
-      final comicId = (entry['comicId'] ?? '').toString().trim();
-      if (comicId.isEmpty) continue;
-      final savedAtMs = (entry['savedAtMs'] as num?)?.toInt() ?? 0;
+      final normalizedEntry = _normalizeLocalFavoriteEntry(entry);
+      if (normalizedEntry == null) continue;
+      final comicId = normalizedEntry['comicId'] as String;
+      final savedAtMs = _localFavoriteEntrySavedAtMs(normalizedEntry);
       if (isEntryTombstoned(comicId, savedAtMs)) continue;
       final existing = mergedEntries[comicId];
       if (existing == null) {
-        mergedEntries[comicId] = entry;
+        mergedEntries[comicId] = normalizedEntry;
       } else {
-        final localTs = (existing['savedAtMs'] as num?)?.toInt() ?? 0;
+        final localTs = _localFavoriteEntrySavedAtMs(existing);
         final remoteTs = savedAtMs;
-        final winner = remoteTs > localTs ? entry : existing;
-        final localIds = _toStringSet(existing['folderIds']);
-        final remoteIds = _toStringSet(entry['folderIds']);
-        mergedEntries[comicId] = {
-          ...winner,
-          'folderIds': {...localIds, ...remoteIds}.toList(),
-        };
+        final winner = remoteTs > localTs ? normalizedEntry : existing;
+        mergedEntries[comicId] = _withNormalizedLocalFavoriteEntry(
+          winner,
+          folderSavedAtMs: _mergeFolderSavedAtMs(existing, normalizedEntry),
+        );
       }
     }
 
-    // Filter each entry's folderIds to only include folders that actually exist
+    // Filter each entry's folder ids to only include folders that actually exist
     // after the merge, then drop entries that end up with no valid folder.
     for (final comicId in mergedEntries.keys.toList()) {
       final entry = mergedEntries[comicId]!;
-      final validIds = _toStringSet(
-        entry['folderIds'],
-      ).intersection(mergedFolderIds);
-      if (validIds.isEmpty) {
+      final folderSavedAtMs = _decodeFolderSavedAtMs(entry)
+        ..removeWhere((folderId, _) => !mergedFolderIds.contains(folderId));
+      if (folderSavedAtMs.isEmpty) {
         mergedEntries.remove(comicId);
       } else {
-        mergedEntries[comicId] = {...entry, 'folderIds': validIds.toList()};
+        mergedEntries[comicId] = _withNormalizedLocalFavoriteEntry(
+          entry,
+          folderSavedAtMs: folderSavedAtMs,
+        );
       }
     }
 
@@ -520,6 +522,94 @@ class CloudSyncSnapshotCodec {
         .map((e) => {idField: e.key, 'deletedAtMs': e.value})
         .toList();
     return jsonEncode(pruned);
+  }
+
+  Map<String, int> _decodeFolderSavedAtMs(Map<String, dynamic> entry) {
+    final folderSavedAtMs = <String, int>{};
+
+    final folderSavedAtMsRaw = entry['folderSavedAtMs'];
+    if (folderSavedAtMsRaw is Map) {
+      for (final mapEntry in folderSavedAtMsRaw.entries) {
+        final folderId = mapEntry.key.toString().trim();
+        if (folderId.isEmpty) continue;
+        final savedAtMs = (mapEntry.value as num?)?.toInt();
+        if (savedAtMs == null) continue;
+        folderSavedAtMs[folderId] = savedAtMs;
+      }
+    }
+
+    if (folderSavedAtMs.isNotEmpty) {
+      return folderSavedAtMs;
+    }
+
+    final fallbackSavedAtMs = (entry['savedAtMs'] as num?)?.toInt() ?? 0;
+    for (final folderId in _toStringSet(entry['folderIds'])) {
+      folderSavedAtMs[folderId] = fallbackSavedAtMs;
+    }
+    return folderSavedAtMs;
+  }
+
+  int _localFavoriteEntrySavedAtMs(Map<String, dynamic> entry) {
+    var latest = 0;
+    for (final savedAtMs in _decodeFolderSavedAtMs(entry).values) {
+      if (savedAtMs > latest) {
+        latest = savedAtMs;
+      }
+    }
+    if (latest > 0) {
+      return latest;
+    }
+    return (entry['savedAtMs'] as num?)?.toInt() ?? 0;
+  }
+
+  Map<String, dynamic>? _normalizeLocalFavoriteEntry(
+    Map<String, dynamic> entry,
+  ) {
+    final comicId = (entry['comicId'] ?? '').toString().trim();
+    if (comicId.isEmpty) {
+      return null;
+    }
+    return _withNormalizedLocalFavoriteEntry(
+      entry,
+      comicId: comicId,
+      folderSavedAtMs: _decodeFolderSavedAtMs(entry),
+    );
+  }
+
+  Map<String, int> _mergeFolderSavedAtMs(
+    Map<String, dynamic> first,
+    Map<String, dynamic> second,
+  ) {
+    final merged = _decodeFolderSavedAtMs(first);
+    for (final mapEntry in _decodeFolderSavedAtMs(second).entries) {
+      final existingSavedAtMs = merged[mapEntry.key] ?? 0;
+      if (mapEntry.value > existingSavedAtMs) {
+        merged[mapEntry.key] = mapEntry.value;
+      }
+    }
+    return merged;
+  }
+
+  Map<String, dynamic> _withNormalizedLocalFavoriteEntry(
+    Map<String, dynamic> entry, {
+    String? comicId,
+    required Map<String, int> folderSavedAtMs,
+  }) {
+    final normalizedComicId =
+        comicId ?? (entry['comicId'] ?? '').toString().trim();
+    var latest = 0;
+    for (final savedAtMs in folderSavedAtMs.values) {
+      if (savedAtMs > latest) {
+        latest = savedAtMs;
+      }
+    }
+    return {
+      ...entry,
+      'comicId': normalizedComicId,
+      'savedAtMs': latest,
+      'folderIds': folderSavedAtMs.keys.toList(growable: false),
+      'folderSavedAtMs': folderSavedAtMs,
+    };
   }
 
   String _stripAccountFromSourceData(String raw) {

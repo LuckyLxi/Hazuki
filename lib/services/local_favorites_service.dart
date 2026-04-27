@@ -98,7 +98,9 @@ class LocalFavoritesService extends ChangeNotifier {
           return updateCompare;
         }
       }
-      return b.savedAtMs.compareTo(a.savedAtMs);
+      final aMs = a.folderSavedAtMs[normalizedFolderId] ?? 0;
+      final bMs = b.folderSavedAtMs[normalizedFolderId] ?? 0;
+      return bMs.compareTo(aMs);
     });
 
     final totalCount = filteredEntries.length;
@@ -175,7 +177,7 @@ class LocalFavoritesService extends ChangeNotifier {
     final store = await _loadStore();
     store.folders.removeWhere((folder) => folder.id == normalizedFolderId);
     for (final entry in store.entries) {
-      entry.folderIds.remove(normalizedFolderId);
+      entry.folderSavedAtMs.remove(normalizedFolderId);
     }
     store.entries.removeWhere((entry) => entry.folderIds.isEmpty);
     await _saveStore(store);
@@ -211,8 +213,7 @@ class LocalFavoritesService extends ChangeNotifier {
               subTitle: details.subTitle.trim(),
               cover: details.cover.trim(),
               updateTime: details.updateTime.trim(),
-              savedAtMs: DateTime.now().millisecondsSinceEpoch,
-              folderIds: <String>{},
+              folderSavedAtMs: <String, int>{},
             );
 
       record
@@ -220,16 +221,18 @@ class LocalFavoritesService extends ChangeNotifier {
         ..subTitle = details.subTitle.trim()
         ..cover = details.cover.trim()
         ..updateTime = details.updateTime.trim()
-        ..savedAtMs = DateTime.now().millisecondsSinceEpoch
-        ..folderIds.add(normalizedFolderId);
+        ..folderSavedAtMs.putIfAbsent(
+          normalizedFolderId,
+          () => DateTime.now().millisecondsSinceEpoch,
+        );
 
       if (existingIndex < 0) {
         store.entries.add(record);
       }
     } else if (existingIndex >= 0) {
       final record = store.entries[existingIndex];
-      record.folderIds.remove(normalizedFolderId);
-      if (record.folderIds.isEmpty) {
+      record.folderSavedAtMs.remove(normalizedFolderId);
+      if (record.folderSavedAtMs.isEmpty) {
         store.entries.removeAt(existingIndex);
         await _saveStore(store);
         await _appendEntryTombstone(normalizedComicId);
@@ -400,31 +403,47 @@ class _LocalFavoriteComicRecord {
     required this.subTitle,
     required this.cover,
     required this.updateTime,
-    required this.savedAtMs,
-    required Set<String> folderIds,
-  }) : folderIds = Set<String>.from(folderIds);
+    required Map<String, int> folderSavedAtMs,
+  }) : folderSavedAtMs = Map<String, int>.from(folderSavedAtMs);
 
   factory _LocalFavoriteComicRecord.fromJson(Map<String, dynamic> json) {
-    final folderIds = <String>{};
-    final folderIdsRaw = json['folderIds'];
-    if (folderIdsRaw is List) {
-      for (final item in folderIdsRaw) {
-        final id = item?.toString().trim() ?? '';
+    final folderSavedAtMs = <String, int>{};
+
+    final folderSavedAtMsRaw = json['folderSavedAtMs'];
+    if (folderSavedAtMsRaw is Map) {
+      for (final entry in folderSavedAtMsRaw.entries) {
+        final id = entry.key?.toString().trim() ?? '';
         if (id.isNotEmpty) {
-          folderIds.add(id);
+          folderSavedAtMs[id] =
+              (entry.value as num?)?.toInt() ??
+              DateTime.now().millisecondsSinceEpoch;
         }
       }
     }
+
+    // 旧格式迁移：folderIds 列表 + savedAtMs 全局时间戳
+    if (folderSavedAtMs.isEmpty) {
+      final fallbackMs =
+          (json['savedAtMs'] as num?)?.toInt() ??
+          DateTime.now().millisecondsSinceEpoch;
+      final folderIdsRaw = json['folderIds'];
+      if (folderIdsRaw is List) {
+        for (final item in folderIdsRaw) {
+          final id = item?.toString().trim() ?? '';
+          if (id.isNotEmpty) {
+            folderSavedAtMs[id] = fallbackMs;
+          }
+        }
+      }
+    }
+
     return _LocalFavoriteComicRecord(
       comicId: (json['comicId'] ?? '').toString().trim(),
       title: (json['title'] ?? '').toString(),
       subTitle: (json['subTitle'] ?? '').toString(),
       cover: (json['cover'] ?? '').toString(),
       updateTime: (json['updateTime'] ?? '').toString(),
-      savedAtMs:
-          (json['savedAtMs'] as num?)?.toInt() ??
-          DateTime.now().millisecondsSinceEpoch,
-      folderIds: folderIds,
+      folderSavedAtMs: folderSavedAtMs,
     );
   }
 
@@ -433,8 +452,19 @@ class _LocalFavoriteComicRecord {
   String subTitle;
   String cover;
   String updateTime;
-  int savedAtMs;
-  final Set<String> folderIds;
+  final Map<String, int> folderSavedAtMs;
+
+  int get savedAtMs {
+    var latest = 0;
+    for (final savedAtMs in folderSavedAtMs.values) {
+      if (savedAtMs > latest) {
+        latest = savedAtMs;
+      }
+    }
+    return latest;
+  }
+
+  Set<String> get folderIds => folderSavedAtMs.keys.toSet();
 
   ExploreComic toExploreComic() {
     return ExploreComic(
@@ -453,5 +483,6 @@ class _LocalFavoriteComicRecord {
     'updateTime': updateTime,
     'savedAtMs': savedAtMs,
     'folderIds': folderIds.toList(growable: false),
+    'folderSavedAtMs': folderSavedAtMs,
   };
 }
