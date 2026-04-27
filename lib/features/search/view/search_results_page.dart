@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:hazuki/app/app.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:hazuki/widgets/windows_comic_detail_host.dart';
 
@@ -95,11 +94,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
   Widget build(BuildContext context) {
     return WindowsComicDetailHost(
       child: ListenableBuilder(
-        listenable: Listenable.merge([
-          _resultsController,
-          _focusCoordinator,
-          HazukiSourceService.instance,
-        ]),
+        listenable: Listenable.merge([_resultsController, _focusCoordinator]),
         builder: (context, _) => PopScope(
           canPop: !_focusCoordinator.collapsedSearchExpanded,
           onPopInvokedWithResult: _handlePopInvoked,
@@ -541,12 +536,10 @@ class _SearchResultsPageState extends State<SearchResultsPage>
       searchLoading: _searchLoading,
       searchComics: _searchComics,
       searchErrorMessage: _searchErrorMessage,
-      sourceRuntimeState: HazukiSourceService.instance.sourceRuntimeState,
+      sourceRuntimeState: _resultsController.sourceRuntimeState,
       onRetry: () {
-        if (HazukiSourceService.instance.sourceRuntimeState.canRetry) {
-          HazukiSourceService.instance.logRuntimeRetryRequested(
-            'search_results_page',
-          );
+        if (_resultsController.canRetry) {
+          _resultsController.logRuntimeRetryRequested('search_results_page');
         }
         return _resultsController.search(
           context,

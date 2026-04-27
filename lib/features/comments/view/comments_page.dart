@@ -4,10 +4,10 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:hazuki/features/comments/state/comments_page_controller.dart';
 import 'package:hazuki/features/comments/support/comments_content_support.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
 import 'comments_widgets.dart';
@@ -74,6 +74,7 @@ class _CommentsPageState extends State<CommentsPage>
   static const _commentsLoadTimeout = Duration(seconds: 20);
   static const _pageSize = 16;
 
+  late final CommentsPageController _controller;
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _commentController = TextEditingController();
   final FocusNode _commentFocusNode = FocusNode();
@@ -102,6 +103,7 @@ class _CommentsPageState extends State<CommentsPage>
   @override
   void initState() {
     super.initState();
+    _controller = CommentsPageController();
     WidgetsBinding.instance.addObserver(this);
     _commentFocusNode.addListener(_handleCommentFocusChanged);
     unawaited(_loadInitial());
@@ -163,9 +165,9 @@ class _CommentsPageState extends State<CommentsPage>
     String level = 'info',
     Map<String, Object?>? content,
   }) {
-    HazukiSourceService.instance.addApplicationLog(
+    _controller.log(
+      title,
       level: level,
-      title: title,
       content: {
         'comicId': widget.comicId,
         'subId': widget.subId,
@@ -377,14 +379,13 @@ class _CommentsPageState extends State<CommentsPage>
   }
 
   Future<ComicCommentsPageResult> _loadCommentsPage(int page) {
-    return HazukiSourceService.instance
-        .loadCommentsPage(
-          comicId: widget.comicId,
-          subId: widget.subId,
-          page: page,
-          pageSize: _pageSize,
-        )
-        .timeout(_commentsLoadTimeout);
+    return _controller.loadCommentsPage(
+      comicId: widget.comicId,
+      subId: widget.subId,
+      page: page,
+      pageSize: _pageSize,
+      timeout: _commentsLoadTimeout,
+    );
   }
 
   List<ComicCommentData> _mergeComments(
@@ -562,7 +563,7 @@ class _CommentsPageState extends State<CommentsPage>
       return;
     }
 
-    if (!HazukiSourceService.instance.isLogged) {
+    if (!_controller.isLogged) {
       unawaited(
         showHazukiPrompt(
           context,
@@ -573,7 +574,7 @@ class _CommentsPageState extends State<CommentsPage>
       return;
     }
 
-    if (!HazukiSourceService.instance.supportCommentSend) {
+    if (!_controller.supportCommentSend) {
       unawaited(
         showHazukiPrompt(
           context,
@@ -591,7 +592,7 @@ class _CommentsPageState extends State<CommentsPage>
     });
 
     try {
-      await HazukiSourceService.instance.sendComment(
+      await _controller.sendComment(
         comicId: widget.comicId,
         subId: widget.subId,
         content: text,

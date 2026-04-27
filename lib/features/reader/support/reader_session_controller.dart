@@ -10,6 +10,8 @@ import 'package:hazuki/features/reader/support/reader_display_bridge.dart';
 import 'package:hazuki/features/reader/support/reader_image_pipeline_controller.dart';
 import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
 import 'package:hazuki/features/reader/state/reader_settings_store.dart';
+import 'package:hazuki/models/hazuki_models.dart';
+import 'package:hazuki/services/hazuki_source_service.dart';
 
 class ReaderSessionController {
   ReaderSessionController({
@@ -32,6 +34,7 @@ class ReaderSessionController {
     required String chapterTitle,
     required int chapterIndex,
     required List<String> widgetImages,
+    HazukiSourceService? sourceService,
   }) : _runtimeState = runtimeState,
        _displayBridge = displayBridge,
        _settingsStore = settingsStore,
@@ -50,7 +53,8 @@ class ReaderSessionController {
        _epId = epId,
        _chapterTitle = chapterTitle,
        _chapterIndex = chapterIndex,
-       _widgetImages = widgetImages;
+       _widgetImages = widgetImages,
+       _sourceService = sourceService ?? HazukiSourceService.instance;
 
   final ReaderRuntimeState _runtimeState;
   final ReaderDisplayBridge _displayBridge;
@@ -71,6 +75,39 @@ class ReaderSessionController {
   final String _chapterTitle;
   final int _chapterIndex;
   final List<String> _widgetImages;
+  final HazukiSourceService _sourceService;
+
+  Future<ComicDetailsData> loadComicDetails(String comicId) =>
+      _sourceService.loadComicDetails(comicId);
+
+  Future<PreparedChapterImageData> prepareImageForSave(
+    String imageUrl, {
+    required String comicId,
+    required String epId,
+  }) => _sourceService.prepareChapterImageData(
+    imageUrl,
+    comicId: comicId,
+    epId: epId,
+  );
+
+  bool isLocalImagePath(String value) => _sourceService.isLocalImagePath(value);
+
+  String normalizeLocalImagePath(String value) =>
+      _sourceService.normalizeLocalImagePath(value);
+
+  void log(
+    String title, {
+    String level = 'info',
+    String source = 'reader_ui',
+    Object? content,
+  }) {
+    _sourceService.addReaderLog(
+      level: level,
+      title: title,
+      source: source,
+      content: content,
+    );
+  }
 
   void initialize() {
     _displayBridge.attach();

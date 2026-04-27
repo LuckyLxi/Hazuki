@@ -33,6 +33,7 @@ class ReaderImagePipelineController {
     void Function(Iterable<String>)? evictImageBytesFromMemory,
     Future<void> Function(Iterable<String>)? evictImageCacheEntries,
     Future<void> Function(ImageProvider provider)? precacheImageCallback,
+    HazukiSourceService? sourceService,
   }) : _runtimeState = runtimeState,
        _pipelineState = pipelineState,
        _diagnosticsState = diagnosticsState,
@@ -48,12 +49,15 @@ class ReaderImagePipelineController {
        _epId = epId,
        _loadImagesErrorBuilder = loadImagesErrorBuilder,
        _imageProviderBuilder = imageProviderBuilder,
+       _sourceService = sourceService ?? HazukiSourceService.instance,
        _evictImageBytesFromMemory =
            evictImageBytesFromMemory ??
-           HazukiSourceService.instance.evictImageBytesFromMemory,
+           (sourceService ?? HazukiSourceService.instance)
+               .evictImageBytesFromMemory,
        _evictImageCacheEntries =
            evictImageCacheEntries ??
-           HazukiSourceService.instance.evictImageCacheEntries,
+           (sourceService ?? HazukiSourceService.instance)
+               .evictImageCacheEntries,
        _precacheImageCallback = precacheImageCallback;
 
   static const int _maxUnscrambleConcurrency = 5;
@@ -82,6 +86,7 @@ class ReaderImagePipelineController {
   final String Function(Object error) _loadImagesErrorBuilder;
   final Future<ImageProvider> Function(String url, {bool useDiskCache})?
   _imageProviderBuilder;
+  final HazukiSourceService _sourceService;
   final void Function(Iterable<String>) _evictImageBytesFromMemory;
   final Future<void> Function(Iterable<String>) _evictImageCacheEntries;
   final Future<void> Function(ImageProvider provider)? _precacheImageCallback;
@@ -124,7 +129,7 @@ class ReaderImagePipelineController {
       content: _logPayload({'trigger': trigger}),
     );
     try {
-      final images = await HazukiSourceService.instance.loadChapterImages(
+      final images = await _sourceService.loadChapterImages(
         comicId: _comicId,
         epId: _epId,
       );
@@ -402,7 +407,7 @@ class ReaderImagePipelineController {
       }
     }
     if (staleByteUrls.isNotEmpty) {
-      HazukiSourceService.instance.evictImageBytesFromMemory(staleByteUrls);
+      _evictImageBytesFromMemory(staleByteUrls);
     }
   }
 
@@ -458,13 +463,13 @@ class ReaderImagePipelineController {
         continue;
       }
 
-      if (HazukiSourceService.instance.isLocalImagePath(url)) {
+      if (_sourceService.isLocalImagePath(url)) {
         unawaited(getImageProvider(url));
         continue;
       }
 
       futures.add(
-        HazukiSourceService.instance
+        _sourceService
             .downloadImageBytes(
               url,
               comicId: _comicId,
@@ -571,13 +576,12 @@ class ReaderImagePipelineController {
     if (overrideBuilder != null) {
       return overrideBuilder(url, useDiskCache: useDiskCache);
     }
-    final sourceService = HazukiSourceService.instance;
     if (_noImageModeEnabled()) {
       throw StateError('no-image mode enabled');
     }
 
-    if (sourceService.isLocalImagePath(url)) {
-      final file = File(sourceService.normalizeLocalImagePath(url));
+    if (_sourceService.isLocalImagePath(url)) {
+      final file = File(_sourceService.normalizeLocalImagePath(url));
       try {
         final bytes = await file.readAsBytes();
         await _rememberAspectRatioFromBytes(url, bytes);
@@ -587,7 +591,7 @@ class ReaderImagePipelineController {
 
     await _acquireUnscramblePermit();
     try {
-      final prepared = await sourceService.prepareChapterImageData(
+      final prepared = await _sourceService.prepareChapterImageData(
         url,
         comicId: _comicId,
         epId: _epId,

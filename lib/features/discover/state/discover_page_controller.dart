@@ -8,7 +8,9 @@ import 'discover_page_state.dart';
 
 class DiscoverPageController extends ChangeNotifier {
   DiscoverPageController({HazukiSourceService? sourceService})
-    : _sourceService = sourceService ?? HazukiSourceService.instance;
+    : _sourceService = sourceService ?? HazukiSourceService.instance {
+    _sourceService.addListener(_onSourceChanged);
+  }
 
   static const _discoverLoadTimeout = Duration(seconds: 20);
   static const _initialVisibleSectionCount = 1;
@@ -17,6 +19,11 @@ class DiscoverPageController extends ChangeNotifier {
   final HazukiSourceService _sourceService;
   final DiscoverPageState _state = DiscoverPageState();
   bool _disposed = false;
+
+  SourceRuntimeState get sourceRuntimeState =>
+      _sourceService.sourceRuntimeState;
+
+  void _onSourceChanged() => _notify();
 
   List<ExploreSection> get sections => _state.sections;
   String? get errorMessage => _state.errorMessage;
@@ -141,6 +148,7 @@ class DiscoverPageController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _sourceService.removeListener(_onSourceChanged);
     super.dispose();
   }
 }

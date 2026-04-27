@@ -23,7 +23,6 @@ import 'package:hazuki/features/reader/view/reader_overlay_builders.dart';
 import 'package:hazuki/features/reader/view/reader_state_views.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
 class ReaderPage extends StatefulWidget {
@@ -641,7 +640,7 @@ class _ReaderPageState extends State<ReaderPage>
     try {
       final details =
           _chapterDetailsCache ??
-          await HazukiSourceService.instance.loadComicDetails(widget.comicId);
+          await _sessionController.loadComicDetails(widget.comicId);
       _chapterDetailsCache ??= details;
       if (!mounted) {
         return;
@@ -769,7 +768,7 @@ class _ReaderPageState extends State<ReaderPage>
     try {
       final details =
           _chapterDetailsCache ??
-          await HazukiSourceService.instance.loadComicDetails(widget.comicId);
+          await _sessionController.loadComicDetails(widget.comicId);
       _chapterDetailsCache ??= details;
       final chapterEntries = details.chapters.entries.toList(growable: false);
       if (chapterEntries.isEmpty) {
@@ -922,12 +921,11 @@ class _ReaderPageState extends State<ReaderPage>
       content: _readerLogPayload({'imageUrl': imageUrl}),
     );
     try {
-      final sourceService = HazukiSourceService.instance;
       Uint8List bytes;
       String outputExtension = 'png';
 
-      if (sourceService.isLocalImagePath(imageUrl)) {
-        final file = File(sourceService.normalizeLocalImagePath(imageUrl));
+      if (_sessionController.isLocalImagePath(imageUrl)) {
+        final file = File(_sessionController.normalizeLocalImagePath(imageUrl));
         bytes = await file.readAsBytes();
         final localExtMatch = RegExp(
           r'\.([a-zA-Z0-9]+)$',
@@ -938,7 +936,7 @@ class _ReaderPageState extends State<ReaderPage>
             ? localExtMatch!.group(1)!.toLowerCase()
             : 'jpg';
       } else {
-        final prepared = await sourceService.prepareChapterImageData(
+        final prepared = await _sessionController.prepareImageForSave(
           imageUrl,
           comicId: widget.comicId,
           epId: widget.epId,
@@ -1111,9 +1109,9 @@ class _ReaderPageState extends State<ReaderPage>
     String source = 'reader_ui',
     Object? content,
   }) {
-    HazukiSourceService.instance.addReaderLog(
+    _sessionController.log(
+      title,
       level: level,
-      title: title,
       source: source,
       content: content ?? _readerLogPayload(),
     );

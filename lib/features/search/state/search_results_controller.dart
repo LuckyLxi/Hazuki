@@ -11,12 +11,17 @@ class SearchResultsController extends ChangeNotifier {
   SearchResultsController({
     required String initialOrder,
     SearchPageLoader? searchPageLoader,
-  }) : _searchPageLoader = searchPageLoader ?? _defaultSearchPageLoader,
+    HazukiSourceService? sourceService,
+  }) : _searchPageLoader = searchPageLoader,
        _searchOrder = searchOrderKeys.contains(initialOrder)
            ? initialOrder
-           : 'mr';
+           : 'mr',
+       _sourceService = sourceService ?? HazukiSourceService.instance {
+    _sourceService.addListener(_onSourceChanged);
+  }
 
-  final SearchPageLoader _searchPageLoader;
+  final SearchPageLoader? _searchPageLoader;
+  final HazukiSourceService _sourceService;
 
   String _searchKeyword = '';
   String? _searchErrorMessage;
@@ -39,6 +44,15 @@ class SearchResultsController extends ChangeNotifier {
   int get searchPage => _searchPage;
   int? get searchMaxPage => _searchMaxPage;
   String get searchOrder => _searchOrder;
+
+  SourceRuntimeState get sourceRuntimeState =>
+      _sourceService.sourceRuntimeState;
+  bool get canRetry => sourceRuntimeState.canRetry;
+
+  void logRuntimeRetryRequested(String source) =>
+      _sourceService.logRuntimeRetryRequested(source);
+
+  void _onSourceChanged() => _notify();
 
   void clearSearchData() {
     _searchRequestToken++;
@@ -78,9 +92,7 @@ class SearchResultsController extends ChangeNotifier {
   bool isCurrentRequest(int token) => token == _searchRequestToken;
 
   Future<ComicDetailsData> loadComicById(String comicId) {
-    return HazukiSourceService.instance
-        .loadComicDetails(comicId)
-        .timeout(searchLoadTimeout);
+    return _sourceService.loadComicDetails(comicId).timeout(searchLoadTimeout);
   }
 
   void finishDirectIdLookup(int token) {
@@ -97,22 +109,17 @@ class SearchResultsController extends ChangeNotifier {
     required int page,
     required String order,
   }) {
-    return _searchPageLoader(
-      context,
-      keyword: keyword,
-      page: page,
-      order: order,
-    );
-  }
-
-  static Future<SearchComicsResult> _defaultSearchPageLoader(
-    BuildContext context, {
-    required String keyword,
-    required int page,
-    required String order,
-  }) {
+    final overrideLoader = _searchPageLoader;
+    if (overrideLoader != null) {
+      return overrideLoader(
+        context,
+        keyword: keyword,
+        page: page,
+        order: order,
+      );
+    }
     final timeoutMessage = AppLocalizations.of(context)!.searchTimeout;
-    return HazukiSourceService.instance
+    return _sourceService
         .searchComics(keyword: keyword, page: page, order: order)
         .timeout(
           searchLoadTimeout,
@@ -269,6 +276,7 @@ class SearchResultsController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _sourceService.removeListener(_onSourceChanged);
     super.dispose();
   }
 }

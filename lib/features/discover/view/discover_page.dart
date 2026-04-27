@@ -7,7 +7,6 @@ import 'package:hazuki/app/app.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/features/search/search.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
 import '../state/discover_page_controller.dart';
@@ -182,7 +181,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: Listenable.merge([_controller, HazukiSourceService.instance]),
+      listenable: _controller,
       builder: (context, _) {
         final visibleSectionCount = math.min(
           _controller.visibleSectionCount,
@@ -212,6 +211,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
                   refreshing: _controller.refreshing,
                   sections: _controller.sections,
                   errorMessage: _controller.errorMessage,
+                  sourceRuntimeState: _controller.sourceRuntimeState,
                   allowInitialLoad: widget.allowInitialLoad,
                   hideLoadingUntilInitialLoadAllowed:
                       widget.hideLoadingUntilInitialLoadAllowed,

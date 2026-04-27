@@ -51,6 +51,7 @@ class DiscoverStateView extends StatelessWidget {
     required this.refreshing,
     required this.sections,
     required this.errorMessage,
+    required this.sourceRuntimeState,
     required this.allowInitialLoad,
     required this.hideLoadingUntilInitialLoadAllowed,
     required this.onRetry,
@@ -60,6 +61,7 @@ class DiscoverStateView extends StatelessWidget {
   final bool refreshing;
   final List<ExploreSection> sections;
   final String? errorMessage;
+  final SourceRuntimeState sourceRuntimeState;
   final bool allowInitialLoad;
   final bool hideLoadingUntilInitialLoadAllowed;
   final Future<void> Function() onRetry;
@@ -67,7 +69,6 @@ class DiscoverStateView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final strings = AppLocalizations.of(context)!;
-    final sourceRuntimeState = HazukiSourceService.instance.sourceRuntimeState;
     final showBlockingLoading =
         initialLoading || (refreshing && sections.isEmpty);
     late final Widget child;
