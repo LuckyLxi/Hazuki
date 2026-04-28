@@ -1,12 +1,12 @@
 {
-  "version": "1.0.5",
-  "releaseUrl": "https://github.com/LuckyLxi/Hazuki/releases/tag/v1.0.5",
+  "version": "1.0.6",
+  "releaseUrl": "https://github.com/LuckyLxi/Hazuki/releases/tag/v1.0.6",
   "apkUrls": {
-    "arm64-v8a": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.5/app-arm64-v8a-release.apk"
+    "arm64-v8a": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.6/app-arm64-v8a-release.apk"
   },
   "windowsUrls": {
-    "x64_zip": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.5/hazuki-windows-x64-v1.0.5.zip",
-    "x64_msix": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.5/hazuki-windows-x64-v1.0.5.msix"
+    "x64_zip": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.6/hazuki-windows-x64-v1.0.6.zip",
+    "x64_msix": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.6/hazuki-windows-x64-v1.0.6.msix"
   },
-  "changelog": "- 优化探索、阅读器及搜索功能的逻辑与界面\n- 重构阅读器图片管道与会话管理\n- 实现评论页面状态管理\n- 增加探索与搜索功能的自动化测试"
+  "changelog": "- 优化 Discover 分区页面与控制器\n- 优化发现页和排行页的排序选项 UI\n- 添加启动快捷方式桥接与协调器\n- Windows MSIX 证书签名支持，init.js 始终从 bundle 加载"
 }
