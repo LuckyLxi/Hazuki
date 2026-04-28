@@ -39,6 +39,7 @@ class _RankingPageState extends State<RankingPage> {
   bool _rankingLoading = false;
   bool _rankingLoadingMore = false;
   bool _showBackToTop = false;
+  bool _rankingOptionsIntroPlayed = false;
 
   int _rankingPage = 1;
   bool _rankingHasMore = true;
@@ -492,6 +493,15 @@ class _RankingPageState extends State<RankingPage> {
                             ) {
                               final index = entry.key;
                               final option = entry.value;
+                              final chip = ChoiceChip(
+                                label: Text(option.label),
+                                selected: _selectedRankingValue == option.value,
+                                onSelected: (_) =>
+                                    _onSelectRankingOption(option.value),
+                              );
+                              if (_rankingOptionsIntroPlayed) {
+                                return chip;
+                              }
                               // 为每个分类按钮添加从左向右滑入并渐显的交错动画
                               return TweenAnimationBuilder<double>(
                                 tween: Tween<double>(begin: 0.0, end: 1.0),
@@ -499,6 +509,17 @@ class _RankingPageState extends State<RankingPage> {
                                   milliseconds: 300 + (index * 50),
                                 ),
                                 curve: Curves.easeOutCubic,
+                                onEnd: index == _rankingOptions.length - 1
+                                    ? () {
+                                        if (!mounted ||
+                                            _rankingOptionsIntroPlayed) {
+                                          return;
+                                        }
+                                        setState(() {
+                                          _rankingOptionsIntroPlayed = true;
+                                        });
+                                      }
+                                    : null,
                                 builder: (context, value, child) {
                                   return Transform.translate(
                                     offset: Offset(
@@ -512,13 +533,7 @@ class _RankingPageState extends State<RankingPage> {
                                     ),
                                   );
                                 },
-                                child: ChoiceChip(
-                                  label: Text(option.label),
-                                  selected:
-                                      _selectedRankingValue == option.value,
-                                  onSelected: (_) =>
-                                      _onSelectRankingOption(option.value),
-                                ),
+                                child: chip,
                               );
                             }).toList(),
                           ),

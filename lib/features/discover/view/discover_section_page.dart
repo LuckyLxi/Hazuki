@@ -162,49 +162,30 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
               children: [
                 Column(
                   children: [
-                    if (_controller.sortLoading ||
-                        _controller.sortOptions.isNotEmpty)
+                    if (_controller.sortOptions.isNotEmpty)
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
                         child: Align(
                           alignment: Alignment.centerLeft,
-                          child: _controller.sortLoading
-                              ? const SizedBox(
-                                  height: 30,
-                                  child: Center(
-                                    child: SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                for (final option in _controller.sortOptions)
+                                  Padding(
+                                    padding: const EdgeInsets.only(right: 8),
+                                    child: ChoiceChip(
+                                      label: Text(option.label),
+                                      selected:
+                                          _controller.selectedSortValue ==
+                                          option.value,
+                                      onSelected: (_) =>
+                                          _onSelectSortOption(option.value),
                                     ),
                                   ),
-                                )
-                              : SingleChildScrollView(
-                                  scrollDirection: Axis.horizontal,
-                                  child: Row(
-                                    children: [
-                                      for (final option
-                                          in _controller.sortOptions)
-                                        Padding(
-                                          padding: const EdgeInsets.only(
-                                            right: 8,
-                                          ),
-                                          child: ChoiceChip(
-                                            label: Text(option.label),
-                                            selected:
-                                                _controller.selectedSortValue ==
-                                                option.value,
-                                            onSelected: (_) =>
-                                                _onSelectSortOption(
-                                                  option.value,
-                                                ),
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                ),
+                              ],
+                            ),
+                          ),
                         ),
                       ),
                     Expanded(

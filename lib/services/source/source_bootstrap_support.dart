@@ -281,10 +281,7 @@ extension SourceBootstrapSupport on HazukiSourceService {
 }
 
 class _SourceLoadResult {
-  const _SourceLoadResult({
-    required this.jmFile,
-    required this.message,
-  });
+  const _SourceLoadResult({required this.jmFile, required this.message});
 
   final File jmFile;
   final String message;
