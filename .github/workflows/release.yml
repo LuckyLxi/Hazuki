@@ -27,7 +27,7 @@ jobs:
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: "17"
+          java-version: "21"
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -123,7 +123,7 @@ jobs:
 
       - name: Build Windows MSIX
         shell: pwsh
-        run: flutter pub run msix:create --certificate_path hazuki_cert.pfx --certificate_password "${{ secrets.WINDOWS_CERT_PASSWORD }}"
+        run: flutter pub run msix:create --certificate-path hazuki_cert.pfx --certificate-password "${{ secrets.WINDOWS_CERT_PASSWORD }}"
 
       - name: Create Windows package
         shell: pwsh
