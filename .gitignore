@@ -60,3 +60,7 @@ third_party/**/build/
 **/.gradle/
 # Test coverage
 coverage/
+
+# Windows signing artifacts
+*.cer
+*.pfx
