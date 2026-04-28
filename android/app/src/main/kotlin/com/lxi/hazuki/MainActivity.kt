@@ -7,6 +7,7 @@ import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 
 private const val SEARCH_SHORTCUT_URI = "hazuki://shortcut/search"
+private const val SEARCH_SHORTCUT_ACTION = "search"
 
 class MainActivity : FlutterFragmentActivity() {
     private lateinit var displayModeManager: DisplayModeManager
@@ -30,10 +31,9 @@ class MainActivity : FlutterFragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         applyLaunchThemeFromAppearance()
         pendingInitialLaunchAction = resolveLaunchAction(intent)
-        super.onCreate(savedInstanceState)
-
         displayModeManager = DisplayModeManager(this)
         privacyManager = PrivacyManager(this)
+        super.onCreate(savedInstanceState)
 
         displayModeManager.applyHighRefreshRateMode()
         privacyManager.onActivityCreated()
@@ -99,7 +99,7 @@ class MainActivity : FlutterFragmentActivity() {
     private fun resolveLaunchAction(intent: Intent?): String? {
         val data = intent?.dataString ?: return null
         return when (data) {
-            SEARCH_SHORTCUT_URI -> "search"
+            SEARCH_SHORTCUT_URI -> SEARCH_SHORTCUT_ACTION
             else -> null
         }
     }
