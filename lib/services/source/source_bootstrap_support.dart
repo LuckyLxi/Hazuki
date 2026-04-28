@@ -121,7 +121,7 @@ extension SourceBootstrapSupport on HazukiSourceService {
         SourceRuntimeStep.creatingEngine,
         debugDetail: 'creating_engine',
       );
-      final meta = await _loadSourceMetadata(result.initFile, result.jmFile);
+      final meta = await _loadSourceMetadata(result.jmFile);
       facade.runtime.sourceMeta = meta;
       _setRuntimeReadyState(result: result, meta: meta);
     } catch (e) {
@@ -282,12 +282,10 @@ extension SourceBootstrapSupport on HazukiSourceService {
 
 class _SourceLoadResult {
   const _SourceLoadResult({
-    required this.initFile,
     required this.jmFile,
     required this.message,
   });
 
-  final File initFile;
   final File jmFile;
   final String message;
 }

@@ -128,13 +128,7 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
     if (!await sourceDir.exists()) {
       await sourceDir.create(recursive: true);
     }
-    final initFile = File('${sourceDir.path}/init.js');
     final jmFile = File('${sourceDir.path}/jm.js');
-
-    if (!await initFile.exists()) {
-      final bundledInit = await rootBundle.loadString(_bundledInitAssetPath);
-      await initFile.writeAsString(bundledInit);
-    }
 
     final jmScript = await _downloadFromUrlsWithProgress(
       _jmSourceUrls,
@@ -184,7 +178,7 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
       facade.cache.clearCategoryTagGroupsMemoryCache();
       facade.runtime.sourceMeta = null;
       final result = await _downloadOrLoadSourceFiles();
-      final meta = await _loadSourceMetadata(result.initFile, result.jmFile);
+      final meta = await _loadSourceMetadata(result.jmFile);
       facade.runtime.sourceMeta = meta;
       _setRuntimeReadyState(result: result, meta: meta);
       if (isLogged) {

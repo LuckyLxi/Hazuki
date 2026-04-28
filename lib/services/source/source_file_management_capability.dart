@@ -73,7 +73,7 @@ extension HazukiSourceServiceSourceFileManagementCapability
         SourceRuntimeStep.creatingEngine,
         debugDetail: 'creating_engine',
       );
-      final meta = await _loadSourceMetadata(result.initFile, result.jmFile);
+      final meta = await _loadSourceMetadata(result.jmFile);
       facade.runtime.sourceMeta = meta;
       _setRuntimeReadyState(result: result, meta: meta);
       if (isLogged) {

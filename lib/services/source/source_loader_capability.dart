@@ -9,20 +9,13 @@ extension HazukiSourceServiceSourceLoaderCapability on HazukiSourceService {
       await sourceDir.create(recursive: true);
     }
 
-    final initFile = File('${sourceDir.path}/init.js');
     final jmFile = File('${sourceDir.path}/jm.js');
-
-    if (!await initFile.exists()) {
-      final bundledInit = await rootBundle.loadString(_bundledInitAssetPath);
-      await initFile.writeAsString(bundledInit);
-    }
 
     if (requireJmFile && !await jmFile.exists()) {
       throw Exception('source_local_jm_missing');
     }
 
     return _SourceLoadResult(
-      initFile: initFile,
       jmFile: jmFile,
       message: 'source_loaded_from_local_cache',
     );
@@ -32,12 +25,10 @@ extension HazukiSourceServiceSourceLoaderCapability on HazukiSourceService {
     void Function(int received, int total)? onProgress,
   }) async {
     final localFiles = await _ensureLocalSourceFiles(requireJmFile: false);
-    final initFile = localFiles.initFile;
     final jmFile = localFiles.jmFile;
 
     if (await jmFile.exists()) {
       return _SourceLoadResult(
-        initFile: initFile,
         jmFile: jmFile,
         message: 'source_loaded_from_local_cache',
       );
@@ -50,7 +41,6 @@ extension HazukiSourceServiceSourceLoaderCapability on HazukiSourceService {
     if (jmScript != null && jmScript.trim().isNotEmpty) {
       await jmFile.writeAsString(jmScript);
       return _SourceLoadResult(
-        initFile: initFile,
         jmFile: jmFile,
         message: 'source_downloaded_on_first_launch',
       );
@@ -59,9 +49,9 @@ extension HazukiSourceServiceSourceLoaderCapability on HazukiSourceService {
     throw Exception('source_download_failed_without_cache');
   }
 
-  Future<SourceMeta> _loadSourceMetadata(File initFile, File jmFile) async {
+  Future<SourceMeta> _loadSourceMetadata(File jmFile) async {
     final facade = this.facade;
-    final initScript = await initFile.readAsString();
+    final initScript = await rootBundle.loadString(_bundledInitAssetPath);
     final jmScript = await jmFile.readAsString();
     final className = _extractSourceClassName(jmScript);
 
