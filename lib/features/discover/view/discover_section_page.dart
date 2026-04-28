@@ -42,6 +42,7 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
   void initState() {
     super.initState();
     _controller = DiscoverSectionPageController(
+      viewMoreUrl: widget.section.viewMoreUrl,
       initialComics: widget.section.viewMoreUrl == null
           ? widget.section.comics
           : null,
@@ -67,36 +68,19 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
   }
 
   Future<void> _triggerLoadSortOptionsAndInitial() async {
-    final viewMoreUrl = widget.section.viewMoreUrl;
-    if (viewMoreUrl == null) return;
+    if (widget.section.viewMoreUrl == null) return;
     final strings = AppLocalizations.of(context)!;
     await _controller.loadSortOptionsAndInitial(
-      viewMoreUrl: viewMoreUrl,
       loadFailedMessage: strings.discoverSectionLoadFailed,
     );
   }
 
   Future<void> _triggerLoadMore() async {
-    final viewMoreUrl = widget.section.viewMoreUrl;
-    if (viewMoreUrl == null) return;
-    final strings = AppLocalizations.of(context)!;
-    await _controller.loadMore(
-      viewMoreUrl: viewMoreUrl,
-      loadFailedMessage: strings.discoverSectionLoadFailed,
-    );
+    await _controller.loadMore();
   }
 
   void _onSelectSortOption(String value) {
-    final viewMoreUrl = widget.section.viewMoreUrl;
-    if (viewMoreUrl == null) return;
-    final strings = AppLocalizations.of(context)!;
-    unawaited(
-      _controller.selectSortOption(
-        value: value,
-        viewMoreUrl: viewMoreUrl,
-        loadFailedMessage: strings.discoverSectionLoadFailed,
-      ),
-    );
+    unawaited(_controller.selectSortOption(value: value));
   }
 
   void _onScroll() {

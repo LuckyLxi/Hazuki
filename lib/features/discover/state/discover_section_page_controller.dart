@@ -6,9 +6,11 @@ import 'discover_section_page_state.dart';
 
 class DiscoverSectionPageController extends ChangeNotifier {
   DiscoverSectionPageController({
+    String? viewMoreUrl,
     HazukiSourceService? sourceService,
     List<ExploreComic>? initialComics,
-  }) : _sourceService = sourceService ?? HazukiSourceService.instance {
+  }) : _viewMoreUrl = viewMoreUrl,
+       _sourceService = sourceService ?? HazukiSourceService.instance {
     if (initialComics != null) {
       _state.comics = List<ExploreComic>.of(initialComics);
       _state.hasMore = false;
@@ -17,6 +19,8 @@ class DiscoverSectionPageController extends ChangeNotifier {
   }
 
   final HazukiSourceService _sourceService;
+  final String? _viewMoreUrl;
+  String Function(String)? _loadFailedMessage;
   final DiscoverSectionPageState _state = DiscoverSectionPageState();
   bool _disposed = false;
 
@@ -31,11 +35,14 @@ class DiscoverSectionPageController extends ChangeNotifier {
   bool get showLoadMoreFooter => _state.showLoadMoreFooter;
 
   /// Loads sort options then triggers the first page load.
-  /// On sort option failure, sets default sort value but does not load.
+  /// On sort option failure, sets default sort value and still attempts to load.
   Future<void> loadSortOptionsAndInitial({
-    required String viewMoreUrl,
     required String Function(String) loadFailedMessage,
   }) async {
+    _loadFailedMessage = loadFailedMessage;
+    final url = _viewMoreUrl;
+    if (url == null) return;
+
     if (!_state.sortLoading) {
       _state.sortLoading = true;
       _notify();
@@ -43,7 +50,7 @@ class DiscoverSectionPageController extends ChangeNotifier {
 
     try {
       final options = await _sourceService.loadCategoryRankingOptionsByViewMore(
-        viewMoreUrl: viewMoreUrl,
+        viewMoreUrl: url,
       );
       if (_disposed) return;
 
@@ -54,15 +61,13 @@ class DiscoverSectionPageController extends ChangeNotifier {
       _state.errorMessage = null;
       _notify();
 
-      await _loadPage(
-        viewMoreUrl: viewMoreUrl,
-        loadFailedMessage: loadFailedMessage,
-      );
+      await _loadPage();
     } catch (_) {
       if (_disposed) return;
       _state.sortOptions = const <CategoryRankingOption>[];
       _state.selectedSortValue = 'mr';
       _notify();
+      await _loadPage();
     } finally {
       if (!_disposed) {
         _state.sortLoading = false;
@@ -71,22 +76,12 @@ class DiscoverSectionPageController extends ChangeNotifier {
     }
   }
 
-  Future<void> loadMore({
-    required String viewMoreUrl,
-    required String Function(String) loadFailedMessage,
-  }) async {
+  Future<void> loadMore() async {
     if (_state.loadingMore || !_state.hasMore) return;
-    await _loadPage(
-      viewMoreUrl: viewMoreUrl,
-      loadFailedMessage: loadFailedMessage,
-    );
+    await _loadPage();
   }
 
-  Future<void> selectSortOption({
-    required String value,
-    required String viewMoreUrl,
-    required String Function(String) loadFailedMessage,
-  }) async {
+  Future<void> selectSortOption({required String value}) async {
     if (_state.selectedSortValue == value || _state.loadingMore) return;
 
     _state.selectedSortValue = value;
@@ -97,10 +92,7 @@ class DiscoverSectionPageController extends ChangeNotifier {
     _state.comics.clear();
     _notify();
 
-    await _loadPage(
-      viewMoreUrl: viewMoreUrl,
-      loadFailedMessage: loadFailedMessage,
-    );
+    await _loadPage();
   }
 
   void revealLoadMoreFooter() {
@@ -110,10 +102,11 @@ class DiscoverSectionPageController extends ChangeNotifier {
     }
   }
 
-  Future<void> _loadPage({
-    required String viewMoreUrl,
-    required String Function(String) loadFailedMessage,
-  }) async {
+  Future<void> _loadPage() async {
+    final url = _viewMoreUrl;
+    final failedMsg = _loadFailedMessage;
+    if (url == null || failedMsg == null) return;
+
     final nextPage = _state.currentPage + 1;
     final showFooter = nextPage > 1 && _state.comics.isNotEmpty;
     final requestVersion = ++_state.requestVersion;
@@ -125,7 +118,7 @@ class DiscoverSectionPageController extends ChangeNotifier {
 
     try {
       final result = await _sourceService.loadCategoryComicsByViewMore(
-        viewMoreUrl: viewMoreUrl,
+        viewMoreUrl: url,
         page: nextPage,
         order: _state.selectedSortValue ?? 'mr',
       );
@@ -137,7 +130,10 @@ class DiscoverSectionPageController extends ChangeNotifier {
           ..clear()
           ..addAll(result.comics);
       } else {
-        final existedIds = _state.comics.map((e) => e.id).toSet();
+        final existedIds = _state.comics
+            .map((e) => e.id)
+            .where((id) => id.isNotEmpty)
+            .toSet();
         final incoming = result.comics
             .where((e) => e.id.isEmpty || !existedIds.contains(e.id))
             .toList();
@@ -150,7 +146,7 @@ class DiscoverSectionPageController extends ChangeNotifier {
       _notify();
     } catch (e) {
       if (_disposed || requestVersion != _state.requestVersion) return;
-      _state.errorMessage = loadFailedMessage('$e');
+      _state.errorMessage = failedMsg('$e');
       _notify();
     } finally {
       if (!_disposed && requestVersion == _state.requestVersion) {
