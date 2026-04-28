@@ -144,5 +144,5 @@ msix_config:
   publisher_display_name: LuckyLxi
   identity_name: com.luckylxi.hazuki
   publisher: CN=LuckyLxi
-  msix_version: 1.0.5.0
+  msix_version: 1.0.6.0
   install_certificate: false # GitHub Actions 这种 CI 环境通常跳过证书安装

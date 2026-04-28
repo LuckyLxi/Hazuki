@@ -57,25 +57,22 @@ jobs:
       - name: Build Android APKs
         run: flutter build apk --release --split-per-abi --target-platform android-arm64
 
-      - name: Upload APK artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: hazuki-android-split-apks
-          path: build/app/outputs/flutter-apk/app-*-release.apk
-          if-no-files-found: error
-
       - name: Resolve release notes from tag annotation
         id: release_notes
         if: startsWith(github.ref, 'refs/tags/v')
         env:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          tag_message="$(git for-each-ref "refs/tags/${RELEASE_TAG}" --format='%(contents)')"
-          {
-            echo "body<<EOF"
-            printf '%s\n' "${tag_message}"
-            echo "EOF"
-          } >> "${GITHUB_OUTPUT}"
+          git fetch --force origin "refs/tags/${RELEASE_TAG}:refs/tags/${RELEASE_TAG}"
+
+          tag_type="$(git cat-file -t "refs/tags/${RELEASE_TAG}")"
+          if [ "${tag_type}" != "tag" ]; then
+            echo "::error::${RELEASE_TAG} is a lightweight tag. Create it as an annotated tag so the release notes come from the tag message."
+            echo "::error::Example: git tag -a ${RELEASE_TAG} -F RELEASE_NOTES.md && git push origin ${RELEASE_TAG}"
+            exit 1
+          fi
+
+          git tag -l "${RELEASE_TAG}" --format='%(contents)' > RELEASE_NOTES.md
 
       - name: Release Android assets to GitHub Releases
         if: startsWith(github.ref, 'refs/tags/v')
@@ -83,7 +80,7 @@ jobs:
         with:
           files: build/app/outputs/flutter-apk/app-*-release.apk
           name: ${{ github.ref_name }}
-          body: ${{ steps.release_notes.outputs.body }}
+          body_path: RELEASE_NOTES.md
           generate_release_notes: false
           draft: false
           prerelease: false
@@ -138,16 +135,6 @@ jobs:
           "WINDOWS_PACKAGE=$packageName" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
           "WINDOWS_MSIX=$msixName" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
-      - name: Upload Windows artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: hazuki-windows-x64
-          path: |
-            ${{ env.WINDOWS_PACKAGE }}
-            ${{ env.WINDOWS_MSIX }}
-            hazuki-publisher.cer
-          if-no-files-found: error
-
       - name: Resolve release notes from tag annotation
         id: release_notes
         if: startsWith(github.ref, 'refs/tags/v')
@@ -155,14 +142,18 @@ jobs:
         env:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          tag_message="$(git for-each-ref "refs/tags/${RELEASE_TAG}" --format='%(contents)')"
-          {
-            echo "body<<EOF"
-            printf '%s\n' "${tag_message}"
-            echo "EOF"
-          } >> "${GITHUB_OUTPUT}"
+          git fetch --force origin "refs/tags/${RELEASE_TAG}:refs/tags/${RELEASE_TAG}"
 
-      - name: Release Windows asset to GitHub Releases
+          tag_type="$(git cat-file -t "refs/tags/${RELEASE_TAG}")"
+          if [ "${tag_type}" != "tag" ]; then
+            echo "::error::${RELEASE_TAG} is a lightweight tag. Create it as an annotated tag so the release notes come from the tag message."
+            echo "::error::Example: git tag -a ${RELEASE_TAG} -F RELEASE_NOTES.md && git push origin ${RELEASE_TAG}"
+            exit 1
+          fi
+
+          git tag -l "${RELEASE_TAG}" --format='%(contents)' > RELEASE_NOTES.md
+
+      - name: Release Windows assets to GitHub Releases
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
@@ -171,7 +162,7 @@ jobs:
             ${{ env.WINDOWS_MSIX }}
             hazuki-publisher.cer
           name: ${{ github.ref_name }}
-          body: ${{ steps.release_notes.outputs.body }}
+          body_path: RELEASE_NOTES.md
           generate_release_notes: false
           draft: false
           prerelease: false
@@ -204,7 +195,16 @@ jobs:
 
           version="${RELEASE_TAG#v}"
           release_url="$(printf '%s' "${release_json}" | jq -r '.html_url')"
-          changelog="$(git for-each-ref "refs/tags/${RELEASE_TAG}" --format='%(contents)')"
+          git fetch --force origin "refs/tags/${RELEASE_TAG}:refs/tags/${RELEASE_TAG}"
+
+          tag_type="$(git cat-file -t "refs/tags/${RELEASE_TAG}")"
+          if [ "${tag_type}" != "tag" ]; then
+            echo "::error::${RELEASE_TAG} is a lightweight tag. Create it as an annotated tag so the changelog comes from the tag message."
+            echo "::error::Example: git tag -a ${RELEASE_TAG} -F RELEASE_NOTES.md && git push origin ${RELEASE_TAG}"
+            exit 1
+          fi
+
+          changelog="$(git tag -l "${RELEASE_TAG}" --format='%(contents)')"
           arm64_url="$(printf '%s' "${release_json}" | jq -r '.assets[] | select(.name | test("arm64-v8a"; "i")) | .browser_download_url' | head -n 1)"
           armv7_url="$(printf '%s' "${release_json}" | jq -r '.assets[] | select(.name | test("armeabi-v7a"; "i")) | .browser_download_url' | head -n 1)"
           x64_url="$(printf '%s' "${release_json}" | jq -r '.assets[] | select(.name | test("x86_64"; "i")) | .browser_download_url' | head -n 1)"
