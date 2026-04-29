@@ -64,3 +64,7 @@ coverage/
 # Windows signing artifacts
 *.cer
 *.pfx
+
+# Git hooks
+.githooks/
+
