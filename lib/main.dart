@@ -28,6 +28,7 @@ import 'l10n/l10n.dart';
 import 'package:hazuki/features/home/view/home_page.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'services/cloud_sync_service.dart';
+import 'services/comment_filter_service.dart';
 import 'services/hazuki_source_service.dart';
 import 'services/manga_download_service.dart';
 import 'services/manga_download_storage_support.dart';
@@ -67,6 +68,7 @@ Future<void> main() async {
   await _ensureAndroidNoMediaMarker();
   await MangaDownloadService.instance.ensureInitialized();
   await PasswordLockService.instance.ensureInitialized();
+  await CommentFilterService.instance.load();
   const settingsStore = HazukiAppSettingsStore();
   final initialAppearance = await settingsStore.loadAppearance();
   final initialLocale = await settingsStore.loadLocalePreference();

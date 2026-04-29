@@ -8,3 +8,5 @@ const hazukiDiscoverDailyRecommendationEnabledPreferenceKey =
 const hazukiUseSystemTitleBarPreferenceKey = 'other_use_system_title_bar';
 const hazukiComicIdSearchEnhancePreferenceKey =
     'advanced_comic_id_search_enhance';
+const hazukiCommentFilterKeywordsKey = 'comment_filter_keywords';
+const hazukiCommentFilterModeKey = 'comment_filter_mode';

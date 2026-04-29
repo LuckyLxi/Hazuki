@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'package:hazuki/app/app.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_page.dart';
@@ -264,6 +265,19 @@ class _DrawerExpandPageRoute<T> extends MaterialPageRoute<T> {
           end: -28,
         ).evaluate(drawerFadeCurve);
 
+        final statusBarHeight = MediaQuery.paddingOf(context).top;
+        final statusBarIconBrightness =
+            ThemeData.estimateBrightnessForColor(drawerColor) == Brightness.dark
+            ? Brightness.light
+            : Brightness.dark;
+        final statusBarOverlayStyle = SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: statusBarIconBrightness,
+          statusBarBrightness: statusBarIconBrightness == Brightness.light
+              ? Brightness.dark
+              : Brightness.light,
+        );
+
         return Stack(
           fit: StackFit.expand,
           children: [
@@ -281,7 +295,7 @@ class _DrawerExpandPageRoute<T> extends MaterialPageRoute<T> {
                           opacity: drawerOpacity,
                           child: Transform.translate(
                             offset: Offset(drawerOffset, 0),
-                            child: SafeArea(child: drawerContent),
+                            child: drawerContent,
                           ),
                         ),
                       ),
@@ -309,6 +323,17 @@ class _DrawerExpandPageRoute<T> extends MaterialPageRoute<T> {
                 ),
               ),
             ),
+            if (statusBarHeight > 0)
+              Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                height: statusBarHeight,
+                child: AnnotatedRegion<SystemUiOverlayStyle>(
+                  value: statusBarOverlayStyle,
+                  child: const IgnorePointer(child: SizedBox.expand()),
+                ),
+              ),
           ],
         );
       },

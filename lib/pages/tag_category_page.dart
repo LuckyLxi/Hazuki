@@ -199,14 +199,7 @@ class _TagCategoryPageState extends State<TagCategoryPage> {
         _visibleGroupCount = tagGroups.isEmpty ? 0 : 1;
       });
       if (tagGroups.length > 1) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) {
-            return;
-          }
-          setState(() {
-            _visibleGroupCount = tagGroups.length;
-          });
-        });
+        _revealGroupsIncrementally(tagGroups);
       }
       _logTagCategoryEvent(
         'Tag category load succeeded',
@@ -238,6 +231,16 @@ class _TagCategoryPageState extends State<TagCategoryPage> {
         },
       );
     }
+  }
+
+  void _revealGroupsIncrementally(List<CategoryTagGroup> tagGroups) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _visibleGroupCount >= tagGroups.length) return;
+      setState(() {
+        _visibleGroupCount++;
+      });
+      _revealGroupsIncrementally(tagGroups);
+    });
   }
 
   void _openSearchByTag(String tag) {

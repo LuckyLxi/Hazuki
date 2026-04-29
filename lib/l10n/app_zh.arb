@@ -131,6 +131,27 @@
       "error": {}
     }
   },
+  "otherCommentFilterTitle": "评论过滤",
+  "otherCommentFilterSubtitle": "过滤垃圾评论和违规内容",
+  "commentFilterDialogTitle": "评论过滤",
+  "commentFilterModeLabel": "过滤方式",
+  "commentFilterModeCollapse": "折叠",
+  "commentFilterModeHide": "隐藏",
+  "commentFilterUserKeywordsLabel": "自定义屏蔽词",
+  "commentFilterAddHint": "输入屏蔽词后按回车添加",
+  "commentFilterNoUserKeywords": "暂无自定义屏蔽词",
+  "commentFilterPreviewHint": "点击上方区域查看或编辑完整列表",
+  "commentFilterEditKeywordTitle": "编辑关键词",
+  "commentFilterBackTooltip": "返回",
+  "commentFilterKeywordListTitle": "已添加的关键词",
+  "commentFilteredCollapsedLabel": "此评论已被过滤",
+  "commentFilteredExpandLabel": "点击展开",
+  "commentFilterHiddenBanner": "已隐藏 {count} 条评论",
+  "@commentFilterHiddenBanner": {
+    "placeholders": {
+      "count": {}
+    }
+  },
   "sourceBootstrapDownloading": "正在下载漫画源",
   "sourceBootstrapPreparing": "正在准备源文件...",
   "sourceBootstrapProgress": "已下载 {progress}%",

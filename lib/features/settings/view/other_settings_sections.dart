@@ -17,6 +17,7 @@ class OtherSettingsGeneralSection extends StatelessWidget {
     required this.onDiscoverDailyRecommendationChanged,
     required this.onUseSystemTitleBarChanged,
     required this.onEditMangaDownloadPath,
+    required this.onCommentFilter,
   });
 
   final bool autoCheckInEnabled;
@@ -32,6 +33,7 @@ class OtherSettingsGeneralSection extends StatelessWidget {
   final ValueChanged<bool> onDiscoverDailyRecommendationChanged;
   final ValueChanged<bool> onUseSystemTitleBarChanged;
   final VoidCallback onEditMangaDownloadPath;
+  final VoidCallback onCommentFilter;
 
   @override
   Widget build(BuildContext context) {
@@ -80,6 +82,13 @@ class OtherSettingsGeneralSection extends StatelessWidget {
           subtitle: Text(mangaDownloadsRootPath),
           trailing: const Icon(Icons.chevron_right_rounded),
           onTap: onEditMangaDownloadPath,
+        ),
+        ListTile(
+          leading: const Icon(Icons.filter_alt_outlined),
+          title: Text(strings.otherCommentFilterTitle),
+          subtitle: Text(strings.otherCommentFilterSubtitle),
+          trailing: const Icon(Icons.chevron_right_rounded),
+          onTap: onCommentFilter,
         ),
       ],
     );

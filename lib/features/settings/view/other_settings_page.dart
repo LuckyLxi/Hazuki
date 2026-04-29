@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/widgets/widgets.dart';
+import 'comment_filter_dialog.dart';
 import 'other_settings_sections.dart';
 import 'settings_group.dart';
 import '../support/other_settings_actions.dart';
@@ -90,6 +91,10 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
     await widget.onUseSystemTitleBarChanged?.call(value);
   }
 
+  Future<void> _openCommentFilter() {
+    return showCommentFilterDialog(context);
+  }
+
   Future<void> _editMangaDownloadPath() async {
     final nextPath = await OtherSettingsActions.editMangaDownloadPath(
       context,
@@ -137,6 +142,7 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
                     onUseSystemTitleBarChanged: _toggleUseSystemTitleBar,
                     onEditMangaDownloadPath: () =>
                         unawaited(_editMangaDownloadPath()),
+                    onCommentFilter: () => unawaited(_openCommentFilter()),
                   ),
                 ],
               ),

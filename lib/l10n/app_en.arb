@@ -131,6 +131,27 @@
       "error": {}
     }
   },
+  "otherCommentFilterTitle": "Comment Filter",
+  "otherCommentFilterSubtitle": "Filter spam and inappropriate comments",
+  "commentFilterDialogTitle": "Comment Filter",
+  "commentFilterModeLabel": "Filter mode",
+  "commentFilterModeCollapse": "Collapse",
+  "commentFilterModeHide": "Hide",
+  "commentFilterUserKeywordsLabel": "Custom block list",
+  "commentFilterAddHint": "Type a keyword and press Enter to add",
+  "commentFilterNoUserKeywords": "No custom keywords yet",
+  "commentFilterPreviewHint": "Tap the area above to view or edit the full list",
+  "commentFilterEditKeywordTitle": "Edit keyword",
+  "commentFilterBackTooltip": "Back",
+  "commentFilterKeywordListTitle": "Added keywords",
+  "commentFilteredCollapsedLabel": "This comment was filtered",
+  "commentFilteredExpandLabel": "Tap to expand",
+  "commentFilterHiddenBanner": "{count} comment(s) hidden",
+  "@commentFilterHiddenBanner": {
+    "placeholders": {
+      "count": {}
+    }
+  },
   "sourceBootstrapDownloading": "Downloading comic source",
   "sourceBootstrapPreparing": "Preparing source files...",
   "sourceBootstrapProgress": "Downloaded {progress}%",

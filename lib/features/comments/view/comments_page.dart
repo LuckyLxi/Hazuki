@@ -6,8 +6,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:hazuki/features/comments/state/comments_page_controller.dart';
 import 'package:hazuki/features/comments/support/comments_content_support.dart';
+import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
+import 'package:hazuki/services/comment_filter_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
 import 'comments_widgets.dart';
@@ -86,6 +88,7 @@ class _CommentsPageState extends State<CommentsPage>
   bool _loadingMore = false;
   bool _hasMore = true;
   bool _sendingComment = false;
+  bool _hideFilterLoadMoreQueued = false;
   int _currentPage = 1;
   int? _maxPage;
   ComicCommentData? _replyToComment;
@@ -628,6 +631,33 @@ class _CommentsPageState extends State<CommentsPage>
   }
 
   Widget _buildCommentTile(ComicCommentData comment, int index) {
+    final filter = CommentFilterService.instance;
+    if (filter.mode == CommentFilterMode.collapse &&
+        filter.isFiltered(comment.content)) {
+      final key =
+          comment.id ??
+          '${comment.userName}|${comment.time}|${comment.content}';
+      return _FilteredCommentTile(
+        key: ValueKey('filtered_$key'),
+        expandedBuilder: (context, onCollapse) => _buildCommentTileContent(
+          comment,
+          index,
+          animateIntro: false,
+          filteredCollapseButton: _buildFilteredCommentCollapseButton(
+            onCollapse,
+          ),
+        ),
+      );
+    }
+    return _buildCommentTileContent(comment, index);
+  }
+
+  Widget _buildCommentTileContent(
+    ComicCommentData comment,
+    int index, {
+    bool animateIntro = true,
+    Widget? filteredCollapseButton,
+  }) {
     final theme = Theme.of(context);
     final hasReply = (comment.replyCount ?? 0) > 0;
     final bodyStyle = theme.textTheme.bodyMedium;
@@ -679,6 +709,7 @@ class _CommentsPageState extends State<CommentsPage>
                           ),
                           icon: const Icon(Icons.reply_outlined, size: 20),
                         ),
+                      ?filteredCollapseButton,
                     ],
                   ),
                   if (comment.time.isNotEmpty || hasReply) ...[
@@ -714,7 +745,7 @@ class _CommentsPageState extends State<CommentsPage>
       ),
     );
 
-    if (!shouldAnimate) {
+    if (!animateIntro || !shouldAnimate) {
       return item;
     }
 
@@ -733,6 +764,22 @@ class _CommentsPageState extends State<CommentsPage>
         );
       },
       child: item,
+    );
+  }
+
+  Widget _buildFilteredCommentCollapseButton(VoidCallback onCollapse) {
+    final theme = Theme.of(context);
+    return IconButton(
+      tooltip: l10n(context).comicDetailCollapse,
+      onPressed: onCollapse,
+      padding: EdgeInsets.zero,
+      visualDensity: VisualDensity.compact,
+      constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+      icon: Icon(
+        Icons.keyboard_arrow_up,
+        size: 22,
+        color: theme.colorScheme.primary,
+      ),
     );
   }
 
@@ -903,11 +950,59 @@ class _CommentsPageState extends State<CommentsPage>
     );
   }
 
+  Widget _buildHiddenCountBanner(int count) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      child: Text(
+        l10n(context).commentFilterHiddenBanner('$count'),
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
+
+  void _maybeLoadMoreForHiddenFilter(int visibleCount, int hiddenCount) {
+    if (hiddenCount <= 0 ||
+        visibleCount >= _pageSize ||
+        _initialLoading ||
+        _loadingMore ||
+        !_hasMore ||
+        _hideFilterLoadMoreQueued) {
+      return;
+    }
+    _hideFilterLoadMoreQueued = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _hideFilterLoadMoreQueued = false;
+      if (!mounted || _initialLoading || _loadingMore || !_hasMore) {
+        return;
+      }
+      final filter = CommentFilterService.instance;
+      if (filter.mode != CommentFilterMode.hide) {
+        return;
+      }
+      final currentVisibleCount = _comments
+          .where((c) => !filter.isFiltered(c.content))
+          .length;
+      if (currentVisibleCount < _pageSize) {
+        unawaited(_loadMore());
+      }
+    });
+  }
+
   Widget _buildCommentsBodyList({double extraBottomPadding = 0}) {
     final loadMoreFooter = _loadingMore
         ? const HazukiLoadMoreFooter()
         : const SizedBox(height: 4);
     final listBottomPadding = EdgeInsets.only(bottom: 10 + extraBottomPadding);
+    final filter = CommentFilterService.instance;
+    final visibleComments = filter.mode == CommentFilterMode.hide
+        ? _comments.where((c) => !filter.isFiltered(c.content)).toList()
+        : _comments;
+    final hiddenCount = _comments.length - visibleComments.length;
+    if (filter.mode == CommentFilterMode.hide) {
+      _maybeLoadMoreForHiddenFilter(visibleComments.length, hiddenCount);
+    }
 
     if (widget.isTabView) {
       final overlapHandle = NestedScrollView.sliverOverlapAbsorberHandleFor(
@@ -923,23 +1018,25 @@ class _CommentsPageState extends State<CommentsPage>
           physics: const _CommentsTabClampingScrollPhysics(),
           slivers: [
             SliverOverlapInjector(handle: overlapHandle),
+            if (hiddenCount > 0)
+              SliverToBoxAdapter(child: _buildHiddenCountBanner(hiddenCount)),
             if (_comments.isNotEmpty)
               SliverPadding(
                 padding: listBottomPadding,
                 sliver: SliverList(
                   delegate: SliverChildBuilderDelegate((context, index) {
-                    if (index == _comments.length) {
+                    if (index == visibleComments.length) {
                       return loadMoreFooter;
                     }
-                    final isLastComment = index == _comments.length - 1;
+                    final isLastComment = index == visibleComments.length - 1;
                     return Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        _buildCommentTile(_comments[index], index),
+                        _buildCommentTile(visibleComments[index], index),
                         if (!isLastComment) const Divider(height: 1),
                       ],
                     );
-                  }, childCount: _comments.length + 1),
+                  }, childCount: visibleComments.length + 1),
                 ),
               )
             else ...[
@@ -979,22 +1076,26 @@ class _CommentsPageState extends State<CommentsPage>
               controller: _scrollController,
               physics: const AlwaysScrollableScrollPhysics(),
               slivers: [
+                if (hiddenCount > 0)
+                  SliverToBoxAdapter(
+                    child: _buildHiddenCountBanner(hiddenCount),
+                  ),
                 SliverPadding(
                   padding: listBottomPadding,
                   sliver: SliverList(
                     delegate: SliverChildBuilderDelegate((context, index) {
-                      if (index == _comments.length) {
+                      if (index == visibleComments.length) {
                         return loadMoreFooter;
                       }
-                      final isLastComment = index == _comments.length - 1;
+                      final isLastComment = index == visibleComments.length - 1;
                       return Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          _buildCommentTile(_comments[index], index),
+                          _buildCommentTile(visibleComments[index], index),
                           if (!isLastComment) const Divider(height: 1),
                         ],
                       );
-                    }, childCount: _comments.length + 1),
+                    }, childCount: visibleComments.length + 1),
                   ),
                 ),
               ],
@@ -1081,6 +1182,96 @@ class _CommentsPageState extends State<CommentsPage>
       separatorBuilder: (_, _) => const Divider(height: 1),
       itemBuilder: (context, index) =>
           _buildCommentTile(_comments[index], index),
+    );
+  }
+}
+
+class _FilteredCommentTile extends StatefulWidget {
+  const _FilteredCommentTile({super.key, required this.expandedBuilder});
+
+  final Widget Function(BuildContext context, VoidCallback onCollapse)
+  expandedBuilder;
+
+  @override
+  State<_FilteredCommentTile> createState() => _FilteredCommentTileState();
+}
+
+class _FilteredCommentTileState extends State<_FilteredCommentTile> {
+  static const _animationDuration = Duration(milliseconds: 260);
+
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context)!;
+    return AnimatedSize(
+      duration: _animationDuration,
+      curve: Curves.easeOutCubic,
+      alignment: Alignment.topCenter,
+      clipBehavior: Clip.hardEdge,
+      child: AnimatedSwitcher(
+        duration: _animationDuration,
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        transitionBuilder: (child, animation) {
+          return FadeTransition(
+            opacity: animation,
+            child: SizeTransition(
+              sizeFactor: animation,
+              axisAlignment: -1,
+              child: child,
+            ),
+          );
+        },
+        child: _expanded
+            ? KeyedSubtree(
+                key: const ValueKey<String>('filtered-comment-expanded'),
+                child: widget.expandedBuilder(
+                  context,
+                  () => setState(() => _expanded = false),
+                ),
+              )
+            : _FilteredCommentCollapsedTile(
+                key: const ValueKey<String>('filtered-comment-collapsed'),
+                label: strings.commentFilteredCollapsedLabel,
+                expandLabel: strings.commentFilteredExpandLabel,
+                onTap: () => setState(() => _expanded = true),
+              ),
+      ),
+    );
+  }
+}
+
+class _FilteredCommentCollapsedTile extends StatelessWidget {
+  const _FilteredCommentCollapsedTile({
+    super.key,
+    required this.label,
+    required this.expandLabel,
+    required this.onTap,
+  });
+
+  final String label;
+  final String expandLabel;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return ListTile(
+      dense: true,
+      title: Text(
+        label,
+        style: theme.textTheme.bodyMedium?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+      ),
+      trailing: Text(
+        expandLabel,
+        style: theme.textTheme.labelSmall?.copyWith(
+          color: theme.colorScheme.primary,
+        ),
+      ),
+      onTap: onTap,
     );
   }
 }
