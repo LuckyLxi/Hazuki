@@ -8,5 +8,5 @@
     "x64_zip": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.6/hazuki-windows-x64-v1.0.6.zip",
     "x64_msix": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.6/hazuki-windows-x64-v1.0.6.msix"
   },
-  "changelog": "- 优化 Discover 分区页面与控制器\n- 优化发现页和排行页的排序选项 UI\n- 添加启动快捷方式桥接与协调器\n- Windows MSIX 证书签名支持，init.js 始终从 bundle 加载"
+  "changelog": "v1.0.6\n\n- 优化 Discover 分区页面与控制器\n- 优化发现页和排行页的排序选项 UI\n- 添加启动快捷方式桥接与协调器\n- Windows MSIX 证书签名支持，init.js 始终从 bundle 加载"
 }
