@@ -114,6 +114,9 @@ Widget buildComicCoverHeroFlightShuttle(
     }
   }
 
-  // fallback：bytes 不可用时使用 fromHero.child
-  return fromHero.child;
+  // fallback：bytes 不可用时使用 fromHero.child，但保持和 bytes 路径一致的裁剪。
+  return ClipRRect(
+    borderRadius: BorderRadius.circular(borderRadius),
+    child: SizedBox.expand(child: fromHero.child),
+  );
 }
