@@ -8,6 +8,7 @@ import 'cloud_sync/cloud_sync_models.dart';
 import 'cloud_sync/cloud_sync_remote_client.dart';
 import 'cloud_sync/cloud_sync_restore_applier.dart';
 import 'cloud_sync/cloud_sync_snapshot_codec.dart';
+import 'local_favorites_service.dart';
 
 export 'cloud_sync/cloud_sync_models.dart';
 
@@ -65,6 +66,7 @@ class CloudSyncService {
         final lastSyncedRemoteTs = await _configStore.loadLastSyncedRemoteTs();
         if (remoteUpdatedAtMs > lastSyncedRemoteTs) {
           await _snapshotCodec.mergeRemoteIntoLocal(client);
+          LocalFavoritesService.instance.onExternalDataChanged();
         }
       }
 

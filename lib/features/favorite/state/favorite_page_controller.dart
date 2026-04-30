@@ -550,14 +550,10 @@ class FavoritePageController extends ChangeNotifier {
     _notify();
   }
 
-  static const _maxExternalSyncRetries = 5;
-
   Future<void> _syncLocalFavoritesAfterExternalChange() async {
     _syncingExternalLocalChange = true;
-    var retries = 0;
     try {
       do {
-        retries++;
         _queuedExternalLocalChange = false;
         final requestVersion = ++_state.listRequestVersion;
         await _reloadLocalFolders();
@@ -590,9 +586,7 @@ class FavoritePageController extends ChangeNotifier {
 
         _state.applyFirstPageResult(result);
         _notify();
-      } while (_queuedExternalLocalChange &&
-          !_disposed &&
-          retries < _maxExternalSyncRetries);
+      } while (_queuedExternalLocalChange && !_disposed);
     } finally {
       _syncingExternalLocalChange = false;
     }

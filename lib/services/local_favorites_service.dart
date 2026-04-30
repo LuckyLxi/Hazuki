@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -10,6 +11,20 @@ class LocalFavoritesService extends ChangeNotifier {
 
   static final LocalFavoritesService instance = LocalFavoritesService._();
 
+  Future<void> _opQueue = Future.value();
+
+  Future<T> _serialized<T>(Future<T> Function() fn) {
+    final completer = Completer<T>();
+    _opQueue = _opQueue.whenComplete(() async {
+      try {
+        completer.complete(await fn());
+      } catch (e, st) {
+        completer.completeError(e, st);
+      }
+    });
+    return completer.future;
+  }
+
   static const String _foldersKey = 'local_favorite_folders_v1';
   static const String _entriesKey = 'local_favorite_entries_v1';
   static const String _folderTombstonesKey =
@@ -20,6 +35,10 @@ class LocalFavoritesService extends ChangeNotifier {
   static const String _pageModeKey = 'favorite_page_mode_v1';
   static const int _tombstoneTtlMs = 90 * 24 * 60 * 60 * 1000;
   static const int _pageSize = 24;
+
+  void onExternalDataChanged() {
+    notifyListeners();
+  }
 
   Future<String> loadSortOrder() async {
     final prefs = await SharedPreferences.getInstance();
@@ -120,129 +139,132 @@ class LocalFavoritesService extends ChangeNotifier {
     return FavoriteComicsResult.success(comics, maxPage: maxPage);
   }
 
-  Future<void> addFavoriteFolder(String name) async {
+  Future<void> addFavoriteFolder(String name) {
     final normalizedName = name.trim();
     if (normalizedName.isEmpty) {
       throw Exception('favorite_folder_name_required');
     }
-
-    final store = await _loadStore();
-    store.folders.add(
-      _LocalFavoriteFolderRecord(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
-        name: normalizedName,
-      ),
-    );
-    await _saveStore(store);
-    notifyListeners();
+    return _serialized(() async {
+      final store = await _loadStore();
+      store.folders.add(
+        _LocalFavoriteFolderRecord(
+          id: DateTime.now().microsecondsSinceEpoch.toString(),
+          name: normalizedName,
+        ),
+      );
+      await _saveStore(store);
+      notifyListeners();
+    });
   }
 
   Future<void> renameFavoriteFolder({
     required String folderId,
     required String name,
-  }) async {
+  }) {
     final normalizedFolderId = folderId.trim();
     if (normalizedFolderId.isEmpty) {
       throw Exception('favorite_folder_id_required');
     }
-
     final normalizedName = name.trim();
     if (normalizedName.isEmpty) {
       throw Exception('favorite_folder_name_required');
     }
-
-    final store = await _loadStore();
-    final folderIndex = store.folders.indexWhere(
-      (folder) => folder.id == normalizedFolderId,
-    );
-    if (folderIndex < 0) {
-      throw Exception('favorite_folder_not_found');
-    }
-
-    final current = store.folders[folderIndex];
-    store.folders[folderIndex] = _LocalFavoriteFolderRecord(
-      id: current.id,
-      name: normalizedName,
-    );
-    await _saveStore(store);
-    notifyListeners();
+    return _serialized(() async {
+      final store = await _loadStore();
+      final folderIndex = store.folders.indexWhere(
+        (folder) => folder.id == normalizedFolderId,
+      );
+      if (folderIndex < 0) {
+        throw Exception('favorite_folder_not_found');
+      }
+      final current = store.folders[folderIndex];
+      store.folders[folderIndex] = _LocalFavoriteFolderRecord(
+        id: current.id,
+        name: normalizedName,
+      );
+      await _saveStore(store);
+      notifyListeners();
+    });
   }
 
-  Future<void> deleteFavoriteFolder(String folderId) async {
+  Future<void> deleteFavoriteFolder(String folderId) {
     final normalizedFolderId = folderId.trim();
     if (normalizedFolderId.isEmpty) {
-      return;
+      return Future.value();
     }
-
-    final store = await _loadStore();
-    store.folders.removeWhere((folder) => folder.id == normalizedFolderId);
-    for (final entry in store.entries) {
-      entry.folderSavedAtMs.remove(normalizedFolderId);
-    }
-    store.entries.removeWhere((entry) => entry.folderIds.isEmpty);
-    await _saveStore(store);
-    await _appendFolderTombstone(normalizedFolderId);
-    notifyListeners();
+    return _serialized(() async {
+      final store = await _loadStore();
+      store.folders.removeWhere((folder) => folder.id == normalizedFolderId);
+      for (final entry in store.entries) {
+        entry.folderSavedAtMs.remove(normalizedFolderId);
+      }
+      store.entries.removeWhere((entry) => entry.folderIds.isEmpty);
+      await _saveStore(store);
+      await _appendFolderTombstone(normalizedFolderId);
+      notifyListeners();
+    });
   }
 
   Future<void> toggleFavorite({
     required ComicDetailsData details,
     required bool isAdding,
     required String folderId,
-  }) async {
+  }) {
     final normalizedFolderId = folderId.trim();
     if (normalizedFolderId.isEmpty) {
       throw Exception('favorite_local_folder_required');
     }
-    final store = await _loadStore();
     final normalizedComicId = details.id.trim();
     if (normalizedComicId.isEmpty) {
       throw Exception('favorite_comic_id_required');
     }
+    return _serialized(() async {
+      final store = await _loadStore();
 
-    final existingIndex = store.entries.indexWhere(
-      (entry) => entry.comicId == normalizedComicId,
-    );
+      final existingIndex = store.entries.indexWhere(
+        (entry) => entry.comicId == normalizedComicId,
+      );
 
-    if (isAdding) {
-      final record = existingIndex >= 0
-          ? store.entries[existingIndex]
-          : _LocalFavoriteComicRecord(
-              comicId: normalizedComicId,
-              title: details.title.trim(),
-              subTitle: details.subTitle.trim(),
-              cover: details.cover.trim(),
-              updateTime: details.updateTime.trim(),
-              folderSavedAtMs: <String, int>{},
-            );
+      if (isAdding) {
+        final record = existingIndex >= 0
+            ? store.entries[existingIndex]
+            : _LocalFavoriteComicRecord(
+                comicId: normalizedComicId,
+                title: details.title.trim(),
+                subTitle: details.subTitle.trim(),
+                cover: details.cover.trim(),
+                updateTime: details.updateTime.trim(),
+                folderSavedAtMs: <String, int>{},
+              );
 
-      record
-        ..title = details.title.trim()
-        ..subTitle = details.subTitle.trim()
-        ..cover = details.cover.trim()
-        ..updateTime = details.updateTime.trim()
-        ..folderSavedAtMs.putIfAbsent(
-          normalizedFolderId,
-          () => DateTime.now().millisecondsSinceEpoch,
-        );
+        record
+          ..title = details.title.trim()
+          ..subTitle = details.subTitle.trim()
+          ..cover = details.cover.trim()
+          ..updateTime = details.updateTime.trim()
+          ..folderSavedAtMs.putIfAbsent(
+            normalizedFolderId,
+            () => DateTime.now().millisecondsSinceEpoch,
+          );
 
-      if (existingIndex < 0) {
-        store.entries.add(record);
+        if (existingIndex < 0) {
+          store.entries.add(record);
+        }
+      } else if (existingIndex >= 0) {
+        final record = store.entries[existingIndex];
+        record.folderSavedAtMs.remove(normalizedFolderId);
+        if (record.folderSavedAtMs.isEmpty) {
+          store.entries.removeAt(existingIndex);
+          await _saveStore(store);
+          await _appendEntryTombstone(normalizedComicId);
+          notifyListeners();
+          return;
+        }
       }
-    } else if (existingIndex >= 0) {
-      final record = store.entries[existingIndex];
-      record.folderSavedAtMs.remove(normalizedFolderId);
-      if (record.folderSavedAtMs.isEmpty) {
-        store.entries.removeAt(existingIndex);
-        await _saveStore(store);
-        await _appendEntryTombstone(normalizedComicId);
-        notifyListeners();
-        return;
-      }
-    }
 
-    await _saveStore(store);
-    notifyListeners();
+      await _saveStore(store);
+      notifyListeners();
+    });
   }
 
   Future<bool> isComicFavorited(String comicId) async {
