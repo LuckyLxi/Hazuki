@@ -1059,13 +1059,6 @@ class _DiscoverDailyRecommendationCarouselState
                                   },
                                 );
 
-                          if (entry.comic.cover.trim().isNotEmpty) {
-                            registerComicCoverHeroUrl(
-                              heroTag,
-                              entry.comic.cover,
-                            );
-                          }
-
                           return DiscoverDailyRecommendationCarouselCard(
                             physicalIndex: index,
                             entry: entry,

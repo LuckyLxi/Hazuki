@@ -66,10 +66,6 @@ class ComicDetailHeaderSection extends StatelessWidget {
       if (viewsText.isNotEmpty) l10n(context).comicDetailViewsCount(viewsText),
     ].join(' / ');
 
-    if (displayCoverUrl.isNotEmpty) {
-      registerComicCoverHeroUrl(heroTag, displayCoverUrl);
-    }
-
     final favoriteActive =
         favorite.favoriteOverride ?? details?.isFavorite ?? false;
 

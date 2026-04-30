@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/models/hazuki_models.dart';
+import 'package:hazuki/app/navigation_tags.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
 /// Shared comic cover tile used in both the discover section horizontal list
@@ -36,6 +37,8 @@ class DiscoverComicCoverTile extends StatelessWidget {
           Expanded(
             child: Hero(
               tag: heroTag,
+              flightShuttleBuilder: buildComicCoverHeroFlightShuttle,
+              placeholderBuilder: buildComicCoverHeroPlaceholder,
               child: ClipRRect(
                 clipBehavior: Clip.hardEdge,
                 borderRadius: BorderRadius.circular(8),
