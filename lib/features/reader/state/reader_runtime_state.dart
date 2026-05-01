@@ -111,9 +111,11 @@ class ReaderRuntimeState {
   }
 
   void rebuildSpreadItemKeys() {
+    final needed = readerSpreadCount;
+    if (itemKeys.length == needed) return;
     itemKeys
       ..clear()
-      ..addAll(List<GlobalKey>.generate(readerSpreadCount, (_) => GlobalKey()));
+      ..addAll(List<GlobalKey>.generate(needed, (_) => GlobalKey()));
   }
 
   void setDisplayedPageIndex(int index) {

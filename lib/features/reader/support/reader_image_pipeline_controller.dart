@@ -207,7 +207,7 @@ class ReaderImagePipelineController {
           providerFutureCache.containsKey(url)) {
         continue;
       }
-      unawaited(getImageProvider(url));
+      _prefetchImageProvider(url);
     }
 
     _trimProviderCachesAround(anchorImageIndex);
@@ -228,6 +228,17 @@ class ReaderImagePipelineController {
     return _getImageProvider(url, useDiskCache: true);
   }
 
+  void _prefetchImageProvider(String url) {
+    unawaited(() async {
+      try {
+        await getImageProvider(url);
+      } catch (_) {
+        // Prefetch is best-effort; visible image builders and retries surface
+        // load failures through their own awaited futures.
+      }
+    }());
+  }
+
   Future<ImageProvider> _getImageProvider(
     String url, {
     required bool useDiskCache,
@@ -239,6 +250,7 @@ class ReaderImagePipelineController {
 
     final created = _buildImageProvider(url, useDiskCache: useDiskCache)
         .then((provider) async {
+          if (_pipelineState.disposed) return provider;
           providerCache[url] = provider;
           if (_isMounted()) {
             try {
@@ -464,7 +476,7 @@ class ReaderImagePipelineController {
       }
 
       if (_sourceService.isLocalImagePath(url)) {
-        unawaited(getImageProvider(url));
+        _prefetchImageProvider(url);
         continue;
       }
 
@@ -480,7 +492,7 @@ class ReaderImagePipelineController {
             .then((_) {})
             .catchError((_) {}),
       );
-      unawaited(getImageProvider(url));
+      _prefetchImageProvider(url);
     }
 
     if (futures.isNotEmpty) {
@@ -488,16 +500,17 @@ class ReaderImagePipelineController {
     }
   }
 
-  Future<void> _acquireUnscramblePermit() async {
+  Future<bool> _acquireUnscramblePermit() async {
     if (_pipelineState.activeUnscrambleTasks < _maxUnscrambleConcurrency) {
       _pipelineState.activeUnscrambleTasks++;
-      return;
+      return true;
     }
     final waiter = Completer<void>();
     _pipelineState.decodeWaiters.add(waiter);
     await waiter.future;
-    if (_pipelineState.disposed) return;
+    if (_pipelineState.disposed) return false;
     _pipelineState.activeUnscrambleTasks++;
+    return true;
   }
 
   void _releaseUnscramblePermit() {
@@ -589,7 +602,9 @@ class ReaderImagePipelineController {
       return FileImage(file);
     }
 
-    await _acquireUnscramblePermit();
+    if (!await _acquireUnscramblePermit()) {
+      throw StateError('reader_disposed');
+    }
     try {
       final prepared = await _sourceService.prepareChapterImageData(
         url,
