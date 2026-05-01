@@ -35,6 +35,11 @@ All manga data (browse, search, favorites, chapters, images) flows through a Jav
 
 ### State & settings
 
+No external state management library (no Provider, GetX, Riverpod). Pattern:
+
+- Feature controllers extend `ChangeNotifier`, hold a private `_state` snapshot, and call `notifyListeners()`.
+- Controllers accept **callbacks** injected at construction (e.g. `ReaderStateUpdate`, `ReaderLogEvent`), which keeps them testable without widget dependencies.
+- Consumed via `ListenableBuilder` or `AnimatedBuilder` in views.
 - **`HazukiThemeController`** — `ChangeNotifier` holding current `AppearanceSettingsData`; consumed via `HazukiThemeControllerScope` (InheritedWidget).
 - **`HazukiAppSettingsStore`** — serializes/deserializes appearance and locale to `SharedPreferences`.
 - App-level preference keys live in `lib/app/app_preferences.dart`.
@@ -44,7 +49,7 @@ All manga data (browse, search, favorites, chapters, images) flows through a Jav
 The app uses a bottom-nav shell (`HazukiHomePage` → `HomeCoordinator`). Features live under `lib/features/`, each with `view/`, `state/`, and `support/` subdirectories and a public barrel export (e.g. `home.dart`):
 
 | Feature | Purpose |
-|---|---|
+| --- | --- |
 | `home/` | Shell, nav bar, drawer, profile flow |
 | `discover/` | Browse/explore from source |
 | `favorite/` | Cloud + local favorites |
@@ -56,7 +61,25 @@ The app uses a bottom-nav shell (`HazukiHomePage` → `HomeCoordinator`). Featur
 | `history/` | Read history |
 | `comments/` | Chapter comments |
 
+Each feature's `support/` subdirectory contains controllers, async action flows, and utilities factored out of views. E.g. the `reader` feature has 7 support controllers (session, navigation, zoom, image pipeline, display bridge, diagnostics).
+
 **State pattern**: feature controllers are `ChangeNotifier`s consumed via `ListenableBuilder` or `AnimatedBuilder`. `HomeCoordinator` owns `HomeShellController` (tab/app bar) and `HomeProfileController` (login/profile). Access services via static singletons: `HazukiSourceService.instance`, `MangaDownloadService.instance`, etc.
+
+### Shared code
+
+- `lib/models/` — shared data models used across features.
+- `lib/widgets/` — shared UI widgets (not feature-specific).
+- `lib/pages/` — standalone pages (about, ranking, tag_category) that don't belong to a feature module.
+
+### Navigation
+
+Navigation uses hero animations for comic cover transitions. Key helpers in `lib/app/navigation_tags.dart`:
+
+- `comicCoverHeroTag()` — generates the hero tag for a comic cover.
+- `buildComicCoverHeroFlightShuttle()` — custom flight shuttle widget.
+- `comicCoverHeroBorderRadius()` — animates border radius during flight.
+
+Platform adaptation: Android uses a bottom drawer; Windows gets a sidebar navigation layout.
 
 ### Services
 
@@ -64,6 +87,8 @@ The app uses a bottom-nav shell (`HazukiHomePage` → `HomeCoordinator`). Featur
 - **`CloudSyncService`** — syncs favorites/history with the source account.
 - **`PasswordLockService`** — app-level PIN lock (blocks the whole UI via an overlay).
 - **`SoftwareUpdateService`** / **`SoftwareUpdateDownloadService`** — self-update from `update.json`.
+- **`LocalFavoritesService`** — local (on-device) favorites storage separate from cloud sync.
+- **`DiscoverDailyRecommendationService`** — caches daily recommendation results.
 
 ### Theme switching
 
@@ -72,3 +97,10 @@ Light/dark switching uses a circular reveal animation (`_ThemeRevealOverlay` in 
 ### Localization
 
 ARB files live in `lib/l10n/`. Helper: `l10n(context)` from `lib/l10n/l10n.dart` returns `AppLocalizations.of(context)!`.
+
+### Tests
+
+Tests live under `test/`, mirroring the `lib/` structure. Two main patterns:
+
+- **Smoke tests** — instantiate controllers/pages to verify no crash at construction.
+- **Controller unit tests** — test state transitions directly on the `ChangeNotifier` controller without Flutter widgets.

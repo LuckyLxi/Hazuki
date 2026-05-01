@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 import 'dart:ui';
 
@@ -180,6 +181,74 @@ void main() {
   });
 
   group('ReaderImagePipelineController', () {
+    testWidgets(
+      'getImageProvider publishes provider cache only after precache finishes',
+      (tester) async {
+        final runtimeState = ReaderRuntimeState()..applyImages(['image-url']);
+        final pipelineState = ReaderImagePipelineState();
+        final diagnosticsState = ReaderDiagnosticsState();
+        final zoomController = TransformationController();
+        final precacheCompleter = Completer<void>();
+        var updateCount = 0;
+        late ReaderImagePipelineController controller;
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Builder(
+              builder: (context) {
+                controller = ReaderImagePipelineController(
+                  runtimeState: runtimeState,
+                  pipelineState: pipelineState,
+                  diagnosticsState: diagnosticsState,
+                  zoomController: zoomController,
+                  context: () => context,
+                  isMounted: () => true,
+                  updateState: (update) {
+                    updateCount++;
+                    update();
+                  },
+                  logEvent:
+                      (
+                        title, {
+                        level = 'info',
+                        source = 'reader_ui',
+                        content,
+                      }) {},
+                  logPayload: ([extra]) => extra ?? <String, dynamic>{},
+                  logVisiblePageChange: ({required index, required trigger}) {},
+                  noImageModeEnabled: () => false,
+                  comicId: 'comic',
+                  epId: 'ep',
+                  loadImagesErrorBuilder: (error) => '$error',
+                  imageProviderBuilder:
+                      (url, {bool useDiskCache = true}) async {
+                        return MemoryImage(validPngBytes);
+                      },
+                  precacheImageCallback: (_) => precacheCompleter.future,
+                );
+
+                return const SizedBox.shrink();
+              },
+            ),
+          ),
+        );
+
+        final providerFuture = controller.getImageProvider('image-url');
+        await tester.pump();
+
+        expect(pipelineState.providerCache, isEmpty);
+        expect(controller.cachedProviderFor('image-url'), isNull);
+
+        precacheCompleter.complete();
+        await providerFuture;
+        await tester.pump();
+
+        expect(pipelineState.providerCache.keys, ['image-url']);
+        expect(controller.cachedProviderFor('image-url'), isNotNull);
+        expect(updateCount, 1);
+      },
+    );
+
     testWidgets(
       'retryImage clears caches and bypasses disk cache for the retried image',
       (tester) async {

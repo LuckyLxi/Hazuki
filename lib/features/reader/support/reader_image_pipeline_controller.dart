@@ -251,7 +251,6 @@ class ReaderImagePipelineController {
     final created = _buildImageProvider(url, useDiskCache: useDiskCache)
         .then((provider) async {
           if (_pipelineState.disposed) return provider;
-          providerCache[url] = provider;
           if (_isMounted()) {
             try {
               final precacheImageCallback = _precacheImageCallback;
@@ -261,6 +260,11 @@ class ReaderImagePipelineController {
                 await precacheImage(provider, _context());
               }
             } catch (_) {}
+          }
+          if (_pipelineState.disposed) return provider;
+          providerCache[url] = provider;
+          if (_isMounted()) {
+            _updateState(() {});
           }
           return provider;
         })

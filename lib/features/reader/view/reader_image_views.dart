@@ -127,7 +127,7 @@ class ReaderImageViews {
               width: double.infinity,
               height: double.infinity,
               filterQuality: FilterQuality.medium,
-              gaplessPlayback: true,
+              gaplessPlayback: false,
               frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
                 if (wasSynchronouslyLoaded || frame != null) {
                   return child;
@@ -303,7 +303,7 @@ class ReaderImageViews {
         width: double.infinity,
         height: resolvedAspectRatio != null ? double.infinity : null,
         filterQuality: FilterQuality.medium,
-        gaplessPlayback: true,
+        gaplessPlayback: false,
         frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
           if (wasSynchronouslyLoaded || frame != null) {
             return child;
