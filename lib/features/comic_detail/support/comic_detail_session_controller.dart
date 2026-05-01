@@ -7,7 +7,16 @@ import 'package:hazuki/models/hazuki_models.dart';
 
 import '../repository/comic_detail_repository.dart';
 
+const int _animatedComicDetailIdsLimit = 200;
 final Set<String> _animatedComicDetailIds = <String>{};
+
+void _addAnimatedComicDetailId(String id) {
+  if (id.isEmpty) return;
+  _animatedComicDetailIds.add(id);
+  while (_animatedComicDetailIds.length > _animatedComicDetailIdsLimit) {
+    _animatedComicDetailIds.remove(_animatedComicDetailIds.first);
+  }
+}
 
 class ComicDetailSessionController extends ChangeNotifier {
   ComicDetailSessionController({
@@ -158,8 +167,8 @@ class ComicDetailSessionController extends ChangeNotifier {
   void markComicDetailRevealHandled(ComicDetailsData details) {
     final primaryId = _comic.id.trim();
     final resolvedId = details.id.trim();
-    if (primaryId.isNotEmpty) _animatedComicDetailIds.add(primaryId);
-    if (resolvedId.isNotEmpty) _animatedComicDetailIds.add(resolvedId);
+    _addAnimatedComicDetailId(primaryId);
+    _addAnimatedComicDetailId(resolvedId);
   }
 
   Future<void> loadReadingProgress() async {

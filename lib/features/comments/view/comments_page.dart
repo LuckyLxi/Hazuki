@@ -86,6 +86,7 @@ class _CommentsPageState extends State<CommentsPage>
   String? _errorMessage;
   bool _initialLoading = true;
   bool _loadingMore = false;
+  int _loadEpoch = 0;
   bool _hasMore = true;
   bool _sendingComment = false;
   bool _hideFilterLoadMoreQueued = false;
@@ -94,6 +95,7 @@ class _CommentsPageState extends State<CommentsPage>
   ComicCommentData? _replyToComment;
   bool? _tabScrollAtTop;
   int _fullscreenRequestEpoch = 0;
+  final List<Timer> _fullscreenSyncTimers = [];
   double _keyboardHeight = 0;
   double? _lastInnerScrollPixels;
   double? _lastInnerScrollMin;
@@ -114,6 +116,10 @@ class _CommentsPageState extends State<CommentsPage>
 
   @override
   void dispose() {
+    for (final t in _fullscreenSyncTimers) {
+      t.cancel();
+    }
+    _fullscreenSyncTimers.clear();
     WidgetsBinding.instance.removeObserver(this);
     _scrollController.dispose();
     _commentFocusNode
@@ -324,17 +330,20 @@ class _CommentsPageState extends State<CommentsPage>
       unawaited(_requestTabFullscreenIfNeeded());
     }
 
+    for (final t in _fullscreenSyncTimers) {
+      t.cancel();
+    }
+    _fullscreenSyncTimers
+      ..clear()
+      ..addAll([
+        Timer(const Duration(milliseconds: 120), runIfStillNeeded),
+        Timer(const Duration(milliseconds: 260), runIfStillNeeded),
+        Timer(const Duration(milliseconds: 420), runIfStillNeeded),
+      ]);
     runIfStillNeeded();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       runIfStillNeeded();
     });
-    for (final delay in const [
-      Duration(milliseconds: 120),
-      Duration(milliseconds: 260),
-      Duration(milliseconds: 420),
-    ]) {
-      Future<void>.delayed(delay, runIfStillNeeded);
-    }
   }
 
   Future<void> _requestTabFullscreenIfNeeded() async {
@@ -419,11 +428,16 @@ class _CommentsPageState extends State<CommentsPage>
   }
 
   Future<void> _loadInitial() async {
+    final epoch = ++_loadEpoch;
+    _updateCommentsState(() {
+      _initialLoading = true;
+      _loadingMore = false;
+    });
     final startedAt = DateTime.now();
     _logCommentsEvent('Comments load started', content: {'page': 1});
     try {
       final pageResult = await _loadCommentsPage(1);
-      if (!mounted) {
+      if (!mounted || _loadEpoch != epoch) {
         return;
       }
       _updateCommentsState(() {
@@ -463,7 +477,7 @@ class _CommentsPageState extends State<CommentsPage>
         },
       );
     } finally {
-      if (mounted) {
+      if (mounted && _loadEpoch == epoch) {
         _updateCommentsState(() {
           _initialLoading = false;
         });
@@ -476,6 +490,7 @@ class _CommentsPageState extends State<CommentsPage>
       return;
     }
 
+    final epoch = _loadEpoch;
     final nextPage = _currentPage + 1;
     final startedAt = DateTime.now();
     _logCommentsEvent(
@@ -496,7 +511,7 @@ class _CommentsPageState extends State<CommentsPage>
 
     try {
       final pageResult = await _loadCommentsPage(nextPage);
-      if (!mounted) {
+      if (!mounted || _loadEpoch != epoch) {
         return;
       }
 

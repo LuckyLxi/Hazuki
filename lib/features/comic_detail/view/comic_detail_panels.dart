@@ -382,6 +382,7 @@ class _ChaptersPanelSheetState extends State<ChaptersPanelSheet> {
   }
 
   Widget _buildChapterGrid(Map<String, String> chapters) {
+    final chapterEntries = chapters.entries.toList();
     return GridView.builder(
       key: const ValueKey('chapter-grid'),
       padding: const EdgeInsets.all(14),
@@ -391,9 +392,9 @@ class _ChaptersPanelSheetState extends State<ChaptersPanelSheet> {
         crossAxisSpacing: 8,
         childAspectRatio: 2.8,
       ),
-      itemCount: chapters.length,
+      itemCount: chapterEntries.length,
       itemBuilder: (context, index) {
-        final entry = chapters.entries.elementAt(index);
+        final entry = chapterEntries[index];
         final displayTitle = resolveHazukiChapterTitle(context, entry.value);
         final chip = _ChapterChip(
           label: displayTitle,
