@@ -26,14 +26,14 @@ class _DartFunction extends JSInvokable {
 
   @override
   invoke(List args, [thisVal]) {
-    /// wrap this into function
     final passThis =
-        RegExp('{.*thisVal.*}').hasMatch(_func.runtimeType.toString());
-    final ret =
-        Function.apply(_func, args, passThis ? {#thisVal: thisVal} : null);
-    JSRef.freeRecursive(args);
-    JSRef.freeRecursive(thisVal);
-    return ret;
+        RegExp(r'\{[^}]*\bthisVal\b').hasMatch(_func.runtimeType.toString());
+    try {
+      return Function.apply(_func, args, passThis ? {#thisVal: thisVal} : null);
+    } finally {
+      JSRef.freeRecursive(args);
+      JSRef.freeRecursive(thisVal);
+    }
   }
 
   @override

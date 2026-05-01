@@ -53,9 +53,9 @@ Future testEvaluate(qjs) async {
     name: '<testThis>',
   );
   final funcRet = await testThis.invoke([myFunction, 'arg'], {'name': 'this'});
-  testThis.free();
   expect(funcRet[0]['name'], 'this', reason: 'js function this');
   expect(funcRet[1], 'arg', reason: 'js function argument');
+  testThis.free();
   List promises = await testWrap.invoke([
     await qjs.evaluate(
       '[Promise.reject("reject"), Promise.resolve("resolve"), new Promise(() => {})]',
@@ -184,6 +184,36 @@ void main() async {
     await testEvaluate(qjs);
     qjs.close();
   });
+  test('dart callback NoSuchMethodError is not retried', () async {
+    final qjs = FlutterQjs(
+      hostPromiseRejectionHandler: (_) {},
+    );
+    qjs.dispatch();
+    final testThis = qjs.evaluate(
+      '(function (func, arg) { return func.call(this, arg) })',
+      name: '<testThis>',
+    );
+    var noSuchMethodCalls = 0;
+    dynamic noSuchMethodCallback(String arg, {thisVal}) {
+      noSuchMethodCalls++;
+      dynamic target;
+      target.missingMethod();
+    }
+
+    try {
+      await testThis.invoke([
+        noSuchMethodCallback,
+        'arg',
+      ], {
+        'name': 'this'
+      });
+      throw 'NoSuchMethodError not throw';
+    } catch (e) {
+      expect(noSuchMethodCalls, 1, reason: 'callback should not be retried');
+    }
+    testThis.free();
+    qjs.close();
+  });
   test('isolate conversion', () async {
     final qjs = IsolateQjs(
       hostPromiseRejectionHandler: (_) {},
@@ -248,5 +278,20 @@ void main() async {
     expect(await completer.future, 'unhandle',
         reason: 'host promise rejection');
     qjs.close();
+  });
+  test('close drains pending promise rejection before freeing context',
+      () async {
+    final completer = Completer();
+    final qjs = FlutterQjs(
+      hostPromiseRejectionHandler: (reason) {
+        completer.complete(reason);
+      },
+    );
+    qjs.evaluate(
+        '(() => { Promise.resolve().then(() => { throw "close-unhandle" }) })()',
+        name: '<eval>');
+    qjs.close();
+    expect(await completer.future, 'close-unhandle',
+        reason: 'close drains pending promise jobs');
   });
 }

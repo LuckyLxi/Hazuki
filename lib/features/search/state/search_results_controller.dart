@@ -178,9 +178,9 @@ class SearchResultsController extends ChangeNotifier {
             append: append,
             silentRefresh: silentRefresh,
           )
-          ? 2
+          ? 5
           : 1;
-      late final SearchComicsResult result;
+      late SearchComicsResult result;
 
       for (var attempt = 0; attempt < maxAttempts; attempt++) {
         try {
@@ -190,7 +190,14 @@ class SearchResultsController extends ChangeNotifier {
             page: page,
             order: _searchOrder,
           );
-          break;
+          final hasRemainingAttempt = attempt + 1 < maxAttempts;
+          if (result.comics.isNotEmpty || !hasRemainingAttempt) {
+            break;
+          }
+          await Future<void>.delayed(_initialSearchRetryDelay);
+          if (!isCurrentRequest(requestToken)) {
+            return;
+          }
         } catch (error) {
           final hasRemainingAttempt = attempt + 1 < maxAttempts;
           if (!hasRemainingAttempt) {

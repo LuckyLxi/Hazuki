@@ -81,9 +81,9 @@ Pointer<JSValue> _dartToJs(Pointer<JSContext> ctx, dynamic val,
     res.free();
     rej.free();
     val.then((value) {
-      res.invoke([value]);
+      if (res._ctx != null) res.invoke([value]);
     }, onError: (e) {
-      rej.invoke([e]);
+      if (rej._ctx != null) rej.invoke([e]);
     }).whenComplete(() {
       refRes.free();
       refRej.free();
@@ -209,6 +209,7 @@ dynamic _jsToDart(Pointer<JSContext> ctx, Pointer<JSValue> val,
       } else if (jsIsArray(ctx, val) != 0) {
         final jslength = _jsGetPropertyValue(ctx, val, 'length');
         final length = jsToInt64(ctx, jslength);
+        jsFreeValue(ctx, jslength);
         final ret = [];
         cache[valptr] = ret;
         for (var i = 0; i < length; ++i) {

@@ -127,9 +127,9 @@ class FlutterQjs {
     final ctx = _ctx;
     _rt = null;
     _ctx = null;
-    if (ctx != null) jsFreeContext(ctx);
     if (rt == null) return;
-    _executePendingJob();
+    _executePendingJob(rt, ctx);
+    if (ctx != null) jsFreeContext(ctx);
     try {
       jsFreeRuntime(rt);
     } on String catch (e) {
@@ -137,9 +137,12 @@ class FlutterQjs {
     }
   }
 
-  void _executePendingJob() {
-    final rt = _rt;
-    final ctx = _ctx;
+  void _executePendingJob([
+    Pointer<JSRuntime>? rt,
+    Pointer<JSContext>? ctx,
+  ]) {
+    rt ??= _rt;
+    ctx ??= _ctx;
     if (rt == null || ctx == null) return;
     while (true) {
       int err = jsExecutePendingJob(rt);
