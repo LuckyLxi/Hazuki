@@ -461,7 +461,7 @@ class _CommentsPageState extends State<CommentsPage>
         },
       );
     } catch (e) {
-      if (!mounted) {
+      if (!mounted || _loadEpoch != epoch) {
         return;
       }
       _updateCommentsState(() {
