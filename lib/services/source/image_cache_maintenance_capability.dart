@@ -1,5 +1,7 @@
 part of '../hazuki_source_service.dart';
 
+Future<void>? _enforceCachePolicyInFlight;
+
 extension HazukiSourceServiceImageCacheMaintenanceCapability
     on HazukiSourceService {
   Future<void> _initImageCache() async {
@@ -37,7 +39,23 @@ extension HazukiSourceServiceImageCacheMaintenanceCapability
     return File('${dir.path}/${_cacheFileNameForUrl(url)}');
   }
 
-  Future<void> _enforceImageCachePolicy({bool force = false}) async {
+  Future<void> _enforceImageCachePolicy({bool force = false}) {
+    if (!force) {
+      final inFlight = _enforceCachePolicyInFlight;
+      if (inFlight != null) {
+        return inFlight;
+      }
+    }
+    final future = _enforceImageCachePolicyInternal(force: force);
+    _enforceCachePolicyInFlight = future;
+    return future.whenComplete(() {
+      if (identical(_enforceCachePolicyInFlight, future)) {
+        _enforceCachePolicyInFlight = null;
+      }
+    });
+  }
+
+  Future<void> _enforceImageCachePolicyInternal({bool force = false}) async {
     final prefs = facade.session.prefs;
     if (prefs == null) {
       return;

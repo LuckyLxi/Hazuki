@@ -179,7 +179,7 @@ class HazukiSourceService extends ChangeNotifier {
   static const int _defaultCacheMaxBytes = 400 * 1024 * 1024;
   static const String _defaultAutoCleanMode = 'size_overflow';
   static const Duration _discoverCacheTtl = Duration(days: 1);
-  static const double _cacheOverflowTrimTargetRatio = 0.1;
+  static const double _cacheOverflowTrimTargetRatio = 0.75;
 
   final SourceRuntimeKernel _runtimeKernel = SourceRuntimeKernel();
   final SourceSessionStore _sessionStore = SourceSessionStore();
@@ -504,6 +504,8 @@ class SourceCacheStore {
       <String, Future<Uint8List>>{};
   final LinkedHashMap<String, ComicDetailsData> comicDetailsMemoryCache =
       LinkedHashMap<String, ComicDetailsData>();
+  final Map<String, Future<ComicDetailsData>> comicDetailsInFlight =
+      <String, Future<ComicDetailsData>>{};
   List<ExploreSection>? exploreSectionsMemoryCache;
   DateTime? exploreSectionsMemoryCachedAt;
   List<CategoryTagGroup>? categoryTagGroupsMemoryCache;
@@ -537,6 +539,7 @@ class SourceCacheStore {
   }
 
   void putImageBytes(String url, Uint8List bytes, {int maxEntries = 80}) {
+    imageBytesCache.remove(url);
     imageBytesCache[url] = bytes;
     while (imageBytesCache.length > maxEntries) {
       imageBytesCache.remove(imageBytesCache.keys.first);

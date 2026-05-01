@@ -35,6 +35,7 @@ extension HazukiSourceServiceComicDetailsCacheSupport on HazukiSourceService {
   }
 
   void _putComicDetailsInMemoryCache(String comicId, ComicDetailsData details) {
+    _comicDetailsMemoryCache.remove(comicId);
     _comicDetailsMemoryCache[comicId] = details;
     while (_comicDetailsMemoryCache.length > 120) {
       _comicDetailsMemoryCache.remove(_comicDetailsMemoryCache.keys.first);

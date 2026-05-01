@@ -13,6 +13,25 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
     }
 
     final facade = this.facade;
+
+    final inFlight = facade.cache.comicDetailsInFlight[normalizedComicId];
+    if (inFlight != null) {
+      return inFlight;
+    }
+
+    final future = _loadComicDetailsFromSource(normalizedComicId, facade);
+    facade.cache.comicDetailsInFlight[normalizedComicId] = future;
+    try {
+      return await future;
+    } finally {
+      facade.cache.comicDetailsInFlight.remove(normalizedComicId);
+    }
+  }
+
+  Future<ComicDetailsData> _loadComicDetailsFromSource(
+    String normalizedComicId,
+    HazukiSourceFacade facade,
+  ) async {
     await facade.ensureInitialized();
 
     final engine = facade.js.engine;
