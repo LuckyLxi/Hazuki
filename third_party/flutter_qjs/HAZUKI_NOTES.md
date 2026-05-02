@@ -1,32 +1,47 @@
 # Hazuki Notes
 
-This vendored `flutter_qjs` copy is maintained for Hazuki and currently uses a
-split QuickJS strategy:
+This vendored `flutter_qjs` copy is maintained for Hazuki. All platforms
+(Android, Windows/MSVC, and others) now share a single QuickJS snapshot:
 
-- `cxx/quickjs`: upstream QuickJS `2025-09-13` for Android and other non-MSVC
-  toolchains.
-- `cxx/quickjs_msvc`: legacy QuickJS `2021-03-27` kept only for MSVC builds.
+- `cxx/quickjs`: upstream QuickJS `2025-09-13` — used by all toolchains.
 
-As of April 18, 2026, the official QuickJS site still lists `2025-09-13` as
-the latest upstream release. Hazuki is therefore already current on the
-shipping Android/non-MSVC runtime, and the maintenance focus is keeping the
-bridge layer and build split explicit and testable.
+The legacy `cxx/quickjs_msvc/` directory (QuickJS `2021-03-27`) is retained
+for reference but is no longer included in any build.
 
-## Why two snapshots exist
+As of May 2, 2026, the official QuickJS site still lists `2025-09-13` as the
+latest upstream release.
 
-The current upstream QuickJS snapshot does not build cleanly with MSVC in this
-plugin layout, while Hazuki still needs Windows-side development and plugin
-tests to keep working. The plugin therefore selects the legacy snapshot only on
-MSVC in [cxx/quickjs.cmake](/d:/Project/Hazuki/third_party/flutter_qjs/cxx/quickjs.cmake:6).
+## MSVC compatibility patches in cxx/quickjs/
 
-This keeps the Android shipping path on a modern QuickJS release without
-breaking Windows development workflows.
+The upstream `2025-09-13` snapshot was patched with minimal `#ifdef _MSC_VER`
+guards so it compiles cleanly with MSVC:
+
+- **`cutils.h`**: Added `_MSC_VER` block for `likely/unlikely`, `force_inline`,
+  `no_inline`, `__maybe_unused`, `__attribute__(...)` macros; replaced
+  `__builtin_clz/ctz` with `_BitScanReverse/Forward` intrinsics; replaced
+  `struct __attribute__((packed))` with `#pragma pack(push,1)` / `pop`.
+- **`quickjs.c`**: Added `gettimeofday` implementation for MSVC via
+  `WinSock2.h`; disabled `DIRECT_DISPATCH` on MSVC (computed-goto not
+  supported); disabled `CONFIG_ATOMICS` on MSVC (`<stdatomic.h>` unavailable);
+  replaced `__builtin_frame_address(0)` with a volatile local variable address
+  for accurate current-RSP measurement; replaced `1.0/0.0` with `INFINITY`
+  (C2124 compile-time divide-by-zero); removed all `(JSValue)` / `(JSValueConst)`
+  identity struct casts (C2440 not allowed on aggregate types in MSVC C mode).
+- **`quickjs.h`**: Added MSVC inline-function replacements for `JS_MKVAL`,
+  `JS_MKPTR`, `JS_NAN` (C99 compound literals not valid in C++ mode via
+  ffi.cpp); fixed `return (JSValue)v` in `JS_DupValue`/`JS_DupValueRT`; fixed
+  designated initializer in `JS_NewCFunctionMagic` (requires C++20 in MSVC);
+  added `#include <math.h>` for `NAN`; reduced `JS_DEFAULT_STACK_SIZE` to 256KB
+  on MSVC to leave C-frame headroom (new QuickJS uses larger alloca frames than
+  2021 version; 1MB consumed the entire OS stack before overflow was detected).
+- **`cutils.h`**: Added `#define __attribute(...)` (single-pair underscores)
+  alongside `__attribute__(...)` to handle GCC's alternative attribute syntax.
+- **`dtoa.c`**: Guarded `#include <sys/time.h>` with `#ifndef _MSC_VER`
+  (used only by the disabled `JS_DTOA_DUMP_STATS` path).
 
 ## Maintenance boundary
 
-- Treat `cxx/quickjs` as the source of truth for Android and non-MSVC builds.
-- Treat `cxx/quickjs_msvc` as a compatibility fallback only. Do not update it
-  unless the Windows/MSVC build is being intentionally revalidated.
+- Treat `cxx/quickjs` as the source of truth for all builds.
 - Keep exported FFI symbol names stable so Hazuki's Dart layer does not need
   API changes when the runtime is refreshed.
 - Prefer compatibility shims in `cxx/ffi.cpp` over Dart API changes when

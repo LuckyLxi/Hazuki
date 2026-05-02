@@ -226,7 +226,7 @@ extern "C"
 
   DLLEXPORT JSValue *jsNewString(JSContext *ctx, const char *str)
   {
-    return new JSValue(JS_NewString(ctx, str));
+    return new JSValue(JS_NewStringLen(ctx, str, strlen(str)));
   }
 
   DLLEXPORT JSValue *jsNewArrayBufferCopy(JSContext *ctx, const uint8_t *buf, size_t len)
@@ -312,11 +312,7 @@ extern "C"
 
   DLLEXPORT int32_t jsIsPromise(JSContext *ctx, JSValueConst *val)
   {
-#ifdef _MSC_VER
-    return JS_IsPromise(ctx, *val);
-#else
     return JS_PromiseState(ctx, *val) >= 0;
-#endif
   }
 
   DLLEXPORT int32_t jsIsArray(JSContext *ctx, JSValueConst *val)

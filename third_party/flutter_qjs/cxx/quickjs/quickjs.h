@@ -241,12 +241,35 @@ typedef struct JSValue {
 #define JS_VALUE_GET_SHORT_BIG_INT(v) ((v).u.short_big_int)
 #define JS_VALUE_GET_PTR(v) ((v).u.ptr)
 
+#ifdef _MSC_VER
+#include <math.h>
+static __forceinline JSValue JS_MKVAL(int tag, int32_t val) {
+    JSValue v;
+    v.u.int32 = val;
+    v.tag = tag;
+    return v;
+}
+static __forceinline JSValue JS_MKPTR(int tag, void *p) {
+    JSValue v;
+    v.u.ptr = p;
+    v.tag = tag;
+    return v;
+}
+static __forceinline JSValue __JS_NAN_val(void) {
+    JSValue v;
+    v.u.float64 = JS_FLOAT64_NAN;
+    v.tag = JS_TAG_FLOAT64;
+    return v;
+}
+#define JS_NAN (__JS_NAN_val())
+#else
 #define JS_MKVAL(tag, val) (JSValue){ (JSValueUnion){ .int32 = val }, tag }
 #define JS_MKPTR(tag, p) (JSValue){ (JSValueUnion){ .ptr = p }, tag }
 
-#define JS_TAG_IS_FLOAT64(tag) ((unsigned)(tag) == JS_TAG_FLOAT64)
-
 #define JS_NAN (JSValue){ .u.float64 = JS_FLOAT64_NAN, JS_TAG_FLOAT64 }
+#endif
+
+#define JS_TAG_IS_FLOAT64(tag) ((unsigned)(tag) == JS_TAG_FLOAT64)
 
 static inline JSValue __JS_NewFloat64(JSContext *ctx, double d)
 {
@@ -272,7 +295,11 @@ static inline JSValue __JS_NewShortBigInt(JSContext *ctx, int64_t d)
 {
     JSValue v;
     v.tag = JS_TAG_SHORT_BIG_INT;
+#if JS_SHORT_BIG_INT_BITS == 32
+    v.u.short_big_int = (int32_t)d;
+#else
     v.u.short_big_int = d;
+#endif
     return v;
 }
 
@@ -323,7 +350,12 @@ static inline JSValue __JS_NewShortBigInt(JSContext *ctx, int64_t d)
 #define JS_PROP_NO_EXOTIC        (1 << 17) /* internal use */
 
 #ifndef JS_DEFAULT_STACK_SIZE
+#ifdef _MSC_VER
+/* Use a smaller default to leave headroom for C frames on Windows */
+#define JS_DEFAULT_STACK_SIZE (256 * 1024)
+#else
 #define JS_DEFAULT_STACK_SIZE (1024 * 1024)
+#endif
 #endif
 
 /* JS_Eval() flags */
@@ -569,9 +601,9 @@ static js_force_inline JSValue JS_NewInt64(JSContext *ctx, int64_t val)
 {
     JSValue v;
     if (val == (int32_t)val) {
-        v = JS_NewInt32(ctx, val);
+        v = JS_NewInt32(ctx, (int32_t)val);
     } else {
-        v = __JS_NewFloat64(ctx, val);
+        v = __JS_NewFloat64(ctx, (double)val);
     }
     return v;
 }
@@ -702,7 +734,7 @@ static inline JSValue JS_DupValue(JSContext *ctx, JSValueConst v)
         JSRefCountHeader *p = (JSRefCountHeader *)JS_VALUE_GET_PTR(v);
         p->ref_count++;
     }
-    return (JSValue)v;
+    return v;
 }
 
 static inline JSValue JS_DupValueRT(JSRuntime *rt, JSValueConst v)
@@ -711,7 +743,7 @@ static inline JSValue JS_DupValueRT(JSRuntime *rt, JSValueConst v)
         JSRefCountHeader *p = (JSRefCountHeader *)JS_VALUE_GET_PTR(v);
         p->ref_count++;
     }
-    return (JSValue)v;
+    return v;
 }
 
 JS_BOOL JS_StrictEq(JSContext *ctx, JSValueConst op1, JSValueConst op2);
@@ -1050,7 +1082,12 @@ static inline JSValue JS_NewCFunctionMagic(JSContext *ctx, JSCFunctionMagic *fun
                                            int length, JSCFunctionEnum cproto, int magic)
 {
     /* Used to squelch a -Wcast-function-type warning. */
+#ifdef _MSC_VER
+    JSCFunctionType ft;
+    ft.generic_magic = func;
+#else
     JSCFunctionType ft = { .generic_magic = func };
+#endif
     return JS_NewCFunction2(ctx, ft.generic, name, length, cproto, magic);
 }
 void JS_SetConstructor(JSContext *ctx, JSValueConst func_obj,

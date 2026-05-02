@@ -1,8 +1,4 @@
-#ifdef _MSC_VER
-#include "quickjs_msvc/quickjs.h"
-#else
 #include "quickjs/quickjs.h"
-#endif
 
 #ifdef _MSC_VER
 #define DLLEXPORT __declspec(dllexport)
