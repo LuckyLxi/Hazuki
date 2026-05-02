@@ -101,6 +101,12 @@ class FavoritePageController extends ChangeNotifier {
     if (_state.isFirstLoad) {
       _state.isFirstLoad = false;
       final savedMode = await _localFlow.loadFavoritePageMode();
+      _state.selectedCloudFolderId = await _localFlow.loadSelectedFolderId(
+        FavoritePageMode.cloud,
+      );
+      _state.selectedLocalFolderId = await _localFlow.loadSelectedFolderId(
+        FavoritePageMode.local,
+      );
       if (savedMode != _state.mode) {
         _state.setMode(savedMode);
         _state.folders = _state.mode == FavoritePageMode.local
@@ -136,13 +142,12 @@ class FavoritePageController extends ChangeNotifier {
     }
 
     final requestVersion = ++_state.listRequestVersion;
-    final targetFolderId = _state.selectedCloudFolderId;
 
     await reloadFolders(onError: onFolderLoadError);
 
     final result = await _cloudFlow.loadPage(
       page: 1,
-      folderId: targetFolderId,
+      folderId: _state.selectedCloudFolderId,
       timeoutMessage: timeoutMessage,
       timeout: favoriteLoadTimeout,
     );
@@ -183,6 +188,7 @@ class FavoritePageController extends ChangeNotifier {
     if (!_cloudFlow.supportsFolderLoad) {
       _state.folders = const <FavoriteFolder>[defaultCloudFavoriteFolder];
       _state.selectedCloudFolderId = '0';
+      await _saveSelectedFolderId(FavoritePageMode.cloud, '0');
       _notify();
       return;
     }
@@ -210,6 +216,10 @@ class FavoritePageController extends ChangeNotifier {
     _state.folders = folders;
     if (!selectedExists) {
       _state.selectedCloudFolderId = folders.first.id;
+      await _saveSelectedFolderId(
+        FavoritePageMode.cloud,
+        _state.selectedCloudFolderId,
+      );
     }
     _state.loadingFolders = false;
     _notify();
@@ -281,7 +291,6 @@ class FavoritePageController extends ChangeNotifier {
     }
 
     final requestVersion = ++_state.listRequestVersion;
-    final targetFolderId = selectedFolderId;
 
     _state.refreshing = true;
     _state.loadingMore = false;
@@ -300,12 +309,12 @@ class FavoritePageController extends ChangeNotifier {
       final result = _state.mode == FavoritePageMode.local
           ? await _localFlow.loadPage(
               page: 1,
-              folderId: targetFolderId,
+              folderId: selectedFolderId,
               sortOrder: _state.favoriteSortOrder,
             )
           : await _cloudFlow.loadPage(
               page: 1,
-              folderId: targetFolderId,
+              folderId: selectedFolderId,
               timeoutMessage: timeoutMessage,
               timeout: favoriteLoadTimeout,
             );
@@ -338,6 +347,7 @@ class FavoritePageController extends ChangeNotifier {
 
     final requestVersion = ++_state.listRequestVersion;
     _state.setSelectedFolderId(folderId);
+    await _saveSelectedFolderId(_state.mode, folderId);
     _state.initialLoading = true;
     _state.errorMessage = null;
     _state.comics = const <ExploreComic>[];
@@ -471,6 +481,7 @@ class FavoritePageController extends ChangeNotifier {
       if (_state.mode == FavoritePageMode.local) {
         await _localFlow.deleteFolder(currentId);
         _state.selectedLocalFolderId = '';
+        await _saveSelectedFolderId(FavoritePageMode.local, '');
         await _reloadLocalFolders();
       } else {
         await _cloudFlow.deleteFolder(currentId);
@@ -481,6 +492,7 @@ class FavoritePageController extends ChangeNotifier {
             ? const [defaultCloudFavoriteFolder]
             : updatedFolders;
         _state.selectedCloudFolderId = '0';
+        await _saveSelectedFolderId(FavoritePageMode.cloud, '0');
         _notify();
         unawaited(reloadFolders());
       }
@@ -608,6 +620,10 @@ class FavoritePageController extends ChangeNotifier {
     _state.folders = folders;
     if (!selectedExists) {
       _state.selectedLocalFolderId = folders.isEmpty ? '' : folders.first.id;
+      await _saveSelectedFolderId(
+        FavoritePageMode.local,
+        _state.selectedLocalFolderId,
+      );
     }
     if (folders.isEmpty) {
       _state.comics = const <ExploreComic>[];
@@ -623,5 +639,12 @@ class FavoritePageController extends ChangeNotifier {
     if (!_disposed) {
       notifyListeners();
     }
+  }
+
+  Future<void> _saveSelectedFolderId(
+    FavoritePageMode mode,
+    String folderId,
+  ) async {
+    await _localFlow.saveSelectedFolderId(mode, folderId);
   }
 }

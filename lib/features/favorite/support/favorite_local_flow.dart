@@ -22,6 +22,14 @@ class FavoriteLocalFlow {
     return localFavoritesService.saveFavoritePageMode(mode);
   }
 
+  Future<String> loadSelectedFolderId(FavoritePageMode mode) {
+    return localFavoritesService.loadSelectedFavoriteFolderId(mode);
+  }
+
+  Future<void> saveSelectedFolderId(FavoritePageMode mode, String folderId) {
+    return localFavoritesService.saveSelectedFavoriteFolderId(mode, folderId);
+  }
+
   Future<FavoriteFoldersResult> loadFolders() {
     return localFavoritesService.loadFavoriteFolders();
   }

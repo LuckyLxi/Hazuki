@@ -33,6 +33,10 @@ class LocalFavoritesService extends ChangeNotifier {
       'local_favorite_entry_tombstones_v1';
   static const String _sortOrderKey = 'local_favorite_sort_order_v1';
   static const String _pageModeKey = 'favorite_page_mode_v1';
+  static const String _selectedCloudFolderKey =
+      'favorite_selected_cloud_folder_v1';
+  static const String _selectedLocalFolderKey =
+      'favorite_selected_local_folder_v1';
   static const int _tombstoneTtlMs = 90 * 24 * 60 * 60 * 1000;
   static const int _pageSize = 24;
 
@@ -63,6 +67,37 @@ class LocalFavoritesService extends ChangeNotifier {
     await prefs.setString(
       _pageModeKey,
       mode == FavoritePageMode.local ? 'local' : 'cloud',
+    );
+  }
+
+  Future<String> loadSelectedFavoriteFolderId(FavoritePageMode mode) async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = mode == FavoritePageMode.local
+        ? _selectedLocalFolderKey
+        : _selectedCloudFolderKey;
+    final raw = prefs.getString(key)?.trim() ?? '';
+    if (mode == FavoritePageMode.cloud && raw.isEmpty) {
+      return '0';
+    }
+    return raw;
+  }
+
+  Future<void> saveSelectedFavoriteFolderId(
+    FavoritePageMode mode,
+    String folderId,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = mode == FavoritePageMode.local
+        ? _selectedLocalFolderKey
+        : _selectedCloudFolderKey;
+    final normalized = folderId.trim();
+    if (mode == FavoritePageMode.local && normalized.isEmpty) {
+      await prefs.remove(key);
+      return;
+    }
+    await prefs.setString(
+      key,
+      mode == FavoritePageMode.cloud && normalized.isEmpty ? '0' : normalized,
     );
   }
 
