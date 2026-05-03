@@ -91,6 +91,8 @@ class MangaDownloadQueueExecutor {
   final MangaDownloadSuspendCheck _shouldSuspendDownloads;
   final MangaDownloadTransientRecoveryCheck _shouldRecoverTransientNetworkError;
 
+  static const int _maxTransientRetries = 5;
+
   bool _processing = false;
 
   Future<void> processQueue() async {
@@ -307,11 +309,17 @@ class MangaDownloadQueueExecutor {
           task,
           reason: 'transient_network_error',
           error: e,
+          countAsRetry: true,
         );
         return;
       }
       final latest = _latestTask(task.comicId);
       if (latest == null) {
+        _logDownload(
+          'Download task vanished during error handling',
+          level: 'warning',
+          content: {'comicId': task.comicId, 'error': e.toString()},
+        );
         return;
       }
       _replaceTask(
@@ -323,6 +331,7 @@ class MangaDownloadQueueExecutor {
           currentImageIndex: 0,
           currentImageTotal: 0,
           errorMessage: e.toString(),
+          retryCount: 0,
         ),
       );
       await _flushState();
@@ -333,6 +342,7 @@ class MangaDownloadQueueExecutor {
     MangaDownloadTask task, {
     required String reason,
     Object? error,
+    bool countAsRetry = false,
   }) async {
     final latest = _latestTask(task.comicId);
     if (latest == null) {
@@ -348,13 +358,41 @@ class MangaDownloadQueueExecutor {
         if (error != null) 'error': error.toString(),
       },
     );
-    _replaceTask(
-      task.comicId,
-      latest.copyWith(
-        status: MangaDownloadTaskStatus.queued,
-        clearErrorMessage: true,
-      ),
-    );
+    if (countAsRetry) {
+      final newRetryCount = latest.retryCount + 1;
+      if (newRetryCount >= _maxTransientRetries) {
+        _replaceTask(
+          task.comicId,
+          latest.copyWith(
+            status: MangaDownloadTaskStatus.failed,
+            clearCurrentChapterEpId: true,
+            clearCurrentChapterTitle: true,
+            currentImageIndex: 0,
+            currentImageTotal: 0,
+            errorMessage: error?.toString() ?? reason,
+            retryCount: 0,
+          ),
+        );
+        await _flushState();
+        return;
+      }
+      _replaceTask(
+        task.comicId,
+        latest.copyWith(
+          status: MangaDownloadTaskStatus.queued,
+          clearErrorMessage: true,
+          retryCount: newRetryCount,
+        ),
+      );
+    } else {
+      _replaceTask(
+        task.comicId,
+        latest.copyWith(
+          status: MangaDownloadTaskStatus.queued,
+          clearErrorMessage: true,
+        ),
+      );
+    }
     await _flushState();
   }
 

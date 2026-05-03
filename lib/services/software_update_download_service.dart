@@ -211,7 +211,7 @@ class SoftwareUpdateDownloadService extends ChangeNotifier {
     required String downloadUrl,
   }) async {
     final Directory baseDir;
-    if (_isZipMode && Platform.isWindows) {
+    if (Platform.isWindows) {
       baseDir =
           await getDownloadsDirectory() ??
           await getApplicationDocumentsDirectory();

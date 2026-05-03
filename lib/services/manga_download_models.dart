@@ -52,6 +52,7 @@ class MangaDownloadTask {
     this.currentImageIndex = 0,
     this.currentImageTotal = 0,
     this.errorMessage,
+    this.retryCount = 0,
   });
 
   final String comicId;
@@ -69,6 +70,7 @@ class MangaDownloadTask {
   final int currentImageIndex;
   final int currentImageTotal;
   final String? errorMessage;
+  final int retryCount;
 
   int get totalCount => targets.length;
   int get completedCount => completedEpIds.length;
@@ -92,6 +94,7 @@ class MangaDownloadTask {
     int? currentImageIndex,
     int? currentImageTotal,
     String? errorMessage,
+    int? retryCount,
     bool clearCurrentChapterEpId = false,
     bool clearCurrentChapterTitle = false,
     bool clearErrorMessage = false,
@@ -118,6 +121,7 @@ class MangaDownloadTask {
       errorMessage: clearErrorMessage
           ? null
           : (errorMessage ?? this.errorMessage),
+      retryCount: retryCount ?? this.retryCount,
     );
   }
 
@@ -137,6 +141,7 @@ class MangaDownloadTask {
     'currentImageIndex': currentImageIndex,
     'currentImageTotal': currentImageTotal,
     'errorMessage': errorMessage,
+    'retryCount': retryCount,
   };
 
   factory MangaDownloadTask.fromJson(Map<String, dynamic> map) {
@@ -183,6 +188,7 @@ class MangaDownloadTask {
       currentImageIndex: (map['currentImageIndex'] as num?)?.toInt() ?? 0,
       currentImageTotal: (map['currentImageTotal'] as num?)?.toInt() ?? 0,
       errorMessage: map['errorMessage']?.toString(),
+      retryCount: (map['retryCount'] as num?)?.toInt() ?? 0,
     );
   }
 }

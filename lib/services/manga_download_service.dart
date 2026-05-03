@@ -231,6 +231,7 @@ class MangaDownloadService extends ChangeNotifier {
         targets: merged,
         status: MangaDownloadTaskStatus.queued,
         clearErrorMessage: true,
+        retryCount: 0,
       );
     } else {
       final now = DateTime.now().millisecondsSinceEpoch;
@@ -307,6 +308,7 @@ class MangaDownloadService extends ChangeNotifier {
     _tasks[index] = _tasks[index].copyWith(
       status: MangaDownloadTaskStatus.queued,
       clearErrorMessage: true,
+      retryCount: 0,
     );
     await _persistState();
     notifyListeners();
@@ -429,11 +431,21 @@ class MangaDownloadService extends ChangeNotifier {
 
   void _sanitizeRestoredDownloadedState() {
     final sanitized = <DownloadedMangaComic>[];
+    final droppedIds = <String>[];
     for (final comic in _downloaded) {
       final normalized = _recoveryScanner.sanitizeDownloadedComicState(comic);
       if (normalized != null) {
         sanitized.add(normalized);
+      } else {
+        droppedIds.add(comic.comicId);
       }
+    }
+    if (droppedIds.isNotEmpty) {
+      _logScan(
+        'Dropped invalid downloaded comic entries on restore',
+        level: 'warning',
+        content: {'droppedIds': droppedIds},
+      );
     }
     _downloaded
       ..clear()

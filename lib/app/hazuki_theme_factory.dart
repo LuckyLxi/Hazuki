@@ -17,7 +17,7 @@ class HazukiThemeFactory {
         Brightness.light,
         dynamicColorScheme,
       ),
-      fontFamily: _resolvePlatformFontFamily(),
+      fontFamily: _resolveFontFamily(settings),
       useMaterial3: true,
     );
   }
@@ -32,7 +32,7 @@ class HazukiThemeFactory {
         Brightness.dark,
         dynamicColorScheme,
       ),
-      fontFamily: _resolvePlatformFontFamily(),
+      fontFamily: _resolveFontFamily(settings),
       useMaterial3: true,
     );
 
@@ -78,7 +78,10 @@ class HazukiThemeFactory {
     );
   }
 
-  static String? _resolvePlatformFontFamily() {
+  static String? _resolveFontFamily(AppearanceSettingsData settings) {
+    if (!settings.useSystemFont) {
+      return 'NotoSansSC';
+    }
     return switch (defaultTargetPlatform) {
       TargetPlatform.windows => 'Microsoft YaHei UI',
       _ => null,

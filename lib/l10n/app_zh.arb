@@ -46,6 +46,8 @@
       "id": {}
     }
   },
+  "displaySystemFontTitle": "使用系统字体",
+  "displaySystemFontSubtitle": "关闭后使用内置 Noto Sans SC 字体",
   "displayPureBlackTitle": "纯黑模式",
   "displayPureBlackSubtitle": "深色模式下使用纯黑背景",
   "displayDynamicColorTitle": "动态取色",

@@ -16,6 +16,7 @@ class AppearanceSettingsData {
     required this.presetIndex,
     required this.displayModeRaw,
     required this.comicDetailDynamicColor,
+    required this.useSystemFont,
   });
 
   final ThemeMode themeMode;
@@ -24,6 +25,7 @@ class AppearanceSettingsData {
   final int presetIndex;
   final String displayModeRaw;
   final bool comicDetailDynamicColor;
+  final bool useSystemFont;
 
   static ThemeMode decodeThemeMode(String? raw) {
     return switch (raw) {
@@ -48,6 +50,7 @@ class AppearanceSettingsData {
     int? presetIndex,
     String? displayModeRaw,
     bool? comicDetailDynamicColor,
+    bool? useSystemFont,
   }) {
     return AppearanceSettingsData(
       themeMode: themeMode ?? this.themeMode,
@@ -57,6 +60,7 @@ class AppearanceSettingsData {
       displayModeRaw: displayModeRaw ?? this.displayModeRaw,
       comicDetailDynamicColor:
           comicDetailDynamicColor ?? this.comicDetailDynamicColor,
+      useSystemFont: useSystemFont ?? this.useSystemFont,
     );
   }
 
@@ -71,7 +75,8 @@ class AppearanceSettingsData {
         other.dynamicColor == dynamicColor &&
         other.presetIndex == presetIndex &&
         other.displayModeRaw == displayModeRaw &&
-        other.comicDetailDynamicColor == comicDetailDynamicColor;
+        other.comicDetailDynamicColor == comicDetailDynamicColor &&
+        other.useSystemFont == useSystemFont;
   }
 
   @override
@@ -82,6 +87,7 @@ class AppearanceSettingsData {
     presetIndex,
     displayModeRaw,
     comicDetailDynamicColor,
+    useSystemFont,
   );
 }
 

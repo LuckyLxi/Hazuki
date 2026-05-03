@@ -252,6 +252,19 @@ class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
             ),
             const Divider(height: 1, indent: 16, endIndent: 16),
             SwitchListTile(
+              value: widget.settings.useSystemFont,
+              title: Text(strings.displaySystemFontTitle),
+              subtitle: Text(strings.displaySystemFontSubtitle),
+              onChanged: (value) {
+                unawaited(
+                  widget.onApply(
+                    widget.settings.copyWith(useSystemFont: value),
+                  ),
+                );
+              },
+            ),
+            const Divider(height: 1, indent: 16, endIndent: 16),
+            SwitchListTile(
               value: widget.settings.oledPureBlack,
               title: Text(strings.displayPureBlackTitle),
               subtitle: Text(strings.displayPureBlackSubtitle),

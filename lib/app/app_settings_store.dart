@@ -15,6 +15,7 @@ class HazukiAppSettingsStore {
   static const String _displayModeKey = 'appearance_display_mode';
   static const String _comicDetailDynamicColorKey =
       'appearance_comic_detail_dynamic_color';
+  static const String _useSystemFontKey = 'appearance_use_system_font';
   static const String _localeKey = 'app_locale';
 
   Future<AppearanceSettingsData> loadAppearance() async {
@@ -39,6 +40,7 @@ class HazukiAppSettingsStore {
       displayModeRaw: displayModeRaw,
       comicDetailDynamicColor:
           prefs.getBool(_comicDetailDynamicColorKey) ?? false,
+      useSystemFont: prefs.getBool(_useSystemFontKey) ?? true,
     );
   }
 
@@ -54,6 +56,7 @@ class HazukiAppSettingsStore {
       _comicDetailDynamicColorKey,
       next.comicDetailDynamicColor,
     );
+    await prefs.setBool(_useSystemFontKey, next.useSystemFont);
   }
 
   Future<Locale?> loadLocalePreference() async {

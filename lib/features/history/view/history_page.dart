@@ -99,7 +99,9 @@ class _HistoryPageState extends State<HistoryPage> {
           });
         }
         return;
-      } catch (_) {}
+      } catch (e, st) {
+        debugPrint('history: failed to parse history JSON: $e\n$st');
+      }
     }
     if (mounted) {
       setState(() {
@@ -111,15 +113,31 @@ class _HistoryPageState extends State<HistoryPage> {
 
   Future<void> _saveHistory(List<ExploreComic> history) async {
     final prefs = await SharedPreferences.getInstance();
+    // 读取原始JSON以保留timestamp等额外字段，避免云同步合并时丢失时序信息
+    final existingStr = prefs.getString('hazuki_read_history');
+    final existingById = <String, Map<String, dynamic>>{};
+    if (existingStr != null) {
+      try {
+        final List<dynamic> existing = jsonDecode(existingStr);
+        for (final e in existing) {
+          final id = (e['id'] as String?) ?? '';
+          if (id.isNotEmpty) {
+            existingById[id] = Map<String, dynamic>.from(e as Map);
+          }
+        }
+      } catch (_) {}
+    }
     final jsonList = history
-        .map(
-          (e) => {
+        .map((e) {
+          final base = existingById[e.id] ?? <String, dynamic>{};
+          return <String, dynamic>{
+            ...base,
             'id': e.id,
             'title': e.title,
             'cover': e.cover,
             'subTitle': e.subTitle,
-          },
-        )
+          };
+        })
         .toList();
     await prefs.setString('hazuki_read_history', jsonEncode(jsonList));
   }
@@ -226,6 +244,7 @@ class _HistoryPageState extends State<HistoryPage> {
   Widget _buildItem(ExploreComic comic, int index) {
     final heroTag = widget.comicCoverHeroTagBuilder(comic, salt: 'history');
     return HistoryComicListItem(
+      key: ValueKey(comic.id),
       comic: comic,
       index: index,
       heroTag: heroTag,

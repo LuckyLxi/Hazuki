@@ -39,6 +39,7 @@ class ReaderPage extends StatefulWidget {
     required this.chapterIndex,
     required this.images,
     this.comicTheme,
+    this.favoriteController,
   });
 
   final String title;
@@ -48,6 +49,7 @@ class ReaderPage extends StatefulWidget {
   final int chapterIndex;
   final List<String> images;
   final ThemeData? comicTheme;
+  final ComicDetailFavoriteController? favoriteController;
 
   @override
   State<ReaderPage> createState() => _ReaderPageState();
@@ -66,8 +68,12 @@ class _ReaderPageState extends State<ReaderPage>
   final ReaderRuntimeState _runtimeState = ReaderRuntimeState();
   final ReaderImagePipelineState _imagePipelineState =
       ReaderImagePipelineState();
-  final ComicDetailFavoriteController _favoriteController =
+
+  late final ComicDetailFavoriteController _favoriteController =
+      widget.favoriteController ??
       ComicDetailFavoriteController(repository: const ComicDetailRepository());
+
+  bool get _ownsFavoriteController => widget.favoriteController == null;
 
   late final AnimationController _resetAnimController = AnimationController(
     vsync: this,
@@ -129,7 +135,9 @@ class _ReaderPageState extends State<ReaderPage>
         pageController: _pageController,
         readerKeyFocusNode: _readerKeyFocusNode,
         zoomController: _zoomController,
-        imagePipelineController: _imagePipelineController,
+        applyInitialImages: _imagePipelineController.applyInitialImages,
+        loadChapterImages: _imagePipelineController.loadChapterImages,
+        onNoImageModeChanged: _imagePipelineController.handleNoImageModeChanged,
         isMounted: () => mounted,
         updateState: _updateReaderState,
         logEvent: _logReaderEvent,
@@ -199,7 +207,10 @@ class _ReaderPageState extends State<ReaderPage>
     _windowsTitleBarController?.releaseCustomTitleBarSuppression(this);
     _resetAnimController.dispose();
     _sessionController.dispose();
-    _favoriteController.dispose();
+    _imagePipelineController.dispose();
+    if (_ownsFavoriteController) {
+      _favoriteController.dispose();
+    }
     super.dispose();
   }
 

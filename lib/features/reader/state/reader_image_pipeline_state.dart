@@ -23,6 +23,7 @@ class ReaderImagePipelineState {
     activeUnscrambleTasks = 0;
     prefetchAheadRunning = false;
     queuedPrefetchAheadIndex = null;
+    completeDecodeWaiters();
     rebuildImageIndexMap(images);
   }
 

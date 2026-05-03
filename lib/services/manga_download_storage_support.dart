@@ -111,6 +111,10 @@ class MangaDownloadStateStore {
     required List<DownloadedMangaComic> downloaded,
   }) async {
     if (prefs == null) {
+      _logScan(
+        'Skipping download state persist: SharedPreferences not available',
+        level: 'warning',
+      );
       return;
     }
     final payload = {

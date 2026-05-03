@@ -7,7 +7,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hazuki/app/app.dart';
 import 'package:hazuki/features/reader/support/reader_controller_support.dart';
 import 'package:hazuki/features/reader/support/reader_display_bridge.dart';
-import 'package:hazuki/features/reader/support/reader_image_pipeline_controller.dart';
 import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
 import 'package:hazuki/features/reader/state/reader_settings_store.dart';
 import 'package:hazuki/models/hazuki_models.dart';
@@ -22,7 +21,10 @@ class ReaderSessionController {
     required PageController pageController,
     required FocusNode readerKeyFocusNode,
     required TransformationController zoomController,
-    required ReaderImagePipelineController imagePipelineController,
+    required void Function(List<String> images, {required String trigger})
+    applyInitialImages,
+    required Future<void> Function({String trigger}) loadChapterImages,
+    required VoidCallback onNoImageModeChanged,
     required ReaderIsMounted isMounted,
     required ReaderStateUpdate updateState,
     required ReaderLogEvent logEvent,
@@ -42,7 +44,9 @@ class ReaderSessionController {
        _pageController = pageController,
        _readerKeyFocusNode = readerKeyFocusNode,
        _zoomController = zoomController,
-       _imagePipelineController = imagePipelineController,
+       _applyInitialImages = applyInitialImages,
+       _loadChapterImages = loadChapterImages,
+       _onNoImageModeChanged = onNoImageModeChanged,
        _isMounted = isMounted,
        _updateState = updateState,
        _logEvent = logEvent,
@@ -63,7 +67,10 @@ class ReaderSessionController {
   final PageController _pageController;
   final FocusNode _readerKeyFocusNode;
   final TransformationController _zoomController;
-  final ReaderImagePipelineController _imagePipelineController;
+  final void Function(List<String> images, {required String trigger})
+  _applyInitialImages;
+  final Future<void> Function({String trigger}) _loadChapterImages;
+  final VoidCallback _onNoImageModeChanged;
   final ReaderIsMounted _isMounted;
   final ReaderStateUpdate _updateState;
   final ReaderLogEvent _logEvent;
@@ -111,9 +118,7 @@ class ReaderSessionController {
 
   void initialize() {
     _displayBridge.attach();
-    hazukiNoImageModeNotifier.addListener(
-      _imagePipelineController.handleNoImageModeChanged,
-    );
+    hazukiNoImageModeNotifier.addListener(_onNoImageModeChanged);
     _scrollController.addListener(_onScrollPositionChanged);
     _zoomController.addListener(_onZoomChanged);
     unawaited(loadReadingSettings());
@@ -136,22 +141,16 @@ class ReaderSessionController {
       }),
     );
     if (initialImages.isNotEmpty) {
-      _imagePipelineController.applyInitialImages(
-        initialImages,
-        trigger: 'constructor_images',
-      );
+      _applyInitialImages(initialImages, trigger: 'constructor_images');
       return;
     }
-    unawaited(
-      _imagePipelineController.loadChapterImages(trigger: 'initial_load'),
-    );
+    unawaited(_loadChapterImages(trigger: 'initial_load'));
   }
 
   void dispose() {
+    final lastVisiblePageIndex = _runtimeState.pageIndexNotifier.value;
     _displayBridge.detach();
-    hazukiNoImageModeNotifier.removeListener(
-      _imagePipelineController.handleNoImageModeChanged,
-    );
+    hazukiNoImageModeNotifier.removeListener(_onNoImageModeChanged);
     _scrollController.removeListener(_onScrollPositionChanged);
     _scrollController.dispose();
     _pageController.dispose();
@@ -159,15 +158,14 @@ class ReaderSessionController {
     _zoomController.removeListener(_onZoomChanged);
     _zoomController.dispose();
     _runtimeState.pageIndexNotifier.dispose();
-    _imagePipelineController.dispose();
     _logEvent(
       'Reader session closed',
       source: 'reader_lifecycle',
       content: _logPayload({
-        'lastVisiblePageIndex': _runtimeState.pageIndexNotifier.value,
+        'lastVisiblePageIndex': lastVisiblePageIndex,
         'lastVisiblePage': _runtimeState.readerSpreadCount <= 0
             ? 0
-            : _runtimeState.pageIndexNotifier.value + 1,
+            : lastVisiblePageIndex + 1,
       }),
     );
     unawaited(restoreReaderDisplay());

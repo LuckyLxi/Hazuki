@@ -46,6 +46,8 @@
       "id": {}
     }
   },
+  "displaySystemFontTitle": "Use system font",
+  "displaySystemFontSubtitle": "When off, uses the built-in Noto Sans SC font",
   "displayPureBlackTitle": "Pure black mode",
   "displayPureBlackSubtitle": "Use a pure black background in dark mode",
   "displayDynamicColorTitle": "Dynamic color",
