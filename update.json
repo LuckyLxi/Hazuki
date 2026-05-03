@@ -1,12 +1,12 @@
 {
-  "version": "1.0.7",
-  "releaseUrl": "https://github.com/LuckyLxi/Hazuki/releases/tag/v1.0.7",
+  "version": "1.0.8",
+  "releaseUrl": "https://github.com/LuckyLxi/Hazuki/releases/tag/v1.0.8",
   "apkUrls": {
-    "arm64-v8a": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.7/app-arm64-v8a-release.apk"
+    "arm64-v8a": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.8/app-arm64-v8a-release.apk"
   },
   "windowsUrls": {
-    "x64_zip": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.7/hazuki-windows-x64-v1.0.7.zip",
-    "x64_msix": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.7/hazuki-windows-x64-v1.0.7.msix"
+    "x64_zip": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.8/hazuki-windows-x64-v1.0.8.zip",
+    "x64_exe": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.8/hazuki-windows-x64-v1.0.8-setup.exe"
   },
-  "changelog": "v1.0.7\n\n- 重构日志系统，引入类型化日志与全新日志界面\n- 优化阅读器图片流水线与视图渲染\n- 升级 QuickJS 至 2025-09-13 版本（Windows/MSVC）\n- 实现本地收藏夹序列化操作队列，修复并发问题\n- 持久化已选收藏夹文件夹 ID\n- 修复评论加载状态管理与竞争条件、内存泄漏\n- 优化阅读器 key 重生成与图片预取安全性\n- 修复缓存 LRU 排序、裁剪比例及详情去重\n- 增强搜索重试机制，提升 flutter_qjs 稳定性\n- 修复 Hero 过渡闪烁与布局畸变\n- 实现评论过滤功能"
+  "changelog": "v1.0.8\n\n- 新增内置 Noto Sans SC 字体\n- 阅读器界面新增收藏/评论入口"
 }
