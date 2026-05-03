@@ -113,27 +113,26 @@ jobs:
       - name: Build Windows app
         run: flutter build windows --release
 
-      - name: Decode certificate
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup -y --no-progress
+
+      - name: Build Windows installer
         shell: pwsh
         run: |
-          [IO.File]::WriteAllBytes("hazuki_cert.pfx", [Convert]::FromBase64String("${{ secrets.WINDOWS_CERT_PFX }}"))
-          $password = ConvertTo-SecureString -String "${{ secrets.WINDOWS_CERT_PASSWORD }}" -Force -AsPlainText
-          $cert = Import-PfxCertificate -FilePath "hazuki_cert.pfx" -CertStoreLocation "Cert:\CurrentUser\My" -Password $password
-          Export-Certificate -Cert $cert -FilePath "hazuki-publisher.cer"
-
-      - name: Build Windows MSIX
-        shell: pwsh
-        run: flutter pub run msix:create --certificate-path hazuki_cert.pfx --certificate-password "${{ secrets.WINDOWS_CERT_PASSWORD }}"
+          $version = "${{ github.ref_name }}" -replace '^v', ''
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAppVersion=$version windows\installer.iss
 
       - name: Create Windows package
         shell: pwsh
         run: |
-          $msixName = "hazuki-windows-x64-${{ github.ref_name }}.msix"
-          Move-Item -Path "build/windows/x64/runner/Release/hazuki.msix" -Destination $msixName
+          $version = "${{ github.ref_name }}" -replace '^v', ''
+          $exeName = "hazuki-windows-x64-${{ github.ref_name }}-setup.exe"
+          Move-Item -Path "windows\hazuki-windows-x64-${version}-setup.exe" -Destination $exeName
           $packageName = "hazuki-windows-x64-${{ github.ref_name }}.zip"
           Compress-Archive -Path "build/windows/x64/runner/Release/*" -DestinationPath $packageName -Force
           "WINDOWS_PACKAGE=$packageName" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-          "WINDOWS_MSIX=$msixName" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          "WINDOWS_EXE=$exeName" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
 
       - name: Resolve release notes from tag annotation
         id: release_notes
@@ -159,8 +158,7 @@ jobs:
         with:
           files: |
             ${{ env.WINDOWS_PACKAGE }}
-            ${{ env.WINDOWS_MSIX }}
-            hazuki-publisher.cer
+            ${{ env.WINDOWS_EXE }}
           name: ${{ github.ref_name }}
           body_path: RELEASE_NOTES.md
           generate_release_notes: false
@@ -210,7 +208,7 @@ jobs:
           x64_url="$(printf '%s' "${release_json}" | jq -r '.assets[] | select(.name | test("x86_64"; "i")) | .browser_download_url' | head -n 1)"
           x86_url="$(printf '%s' "${release_json}" | jq -r '.assets[] | select(.name | test("(^|[^0-9])x86([^0-9]|$)"; "i")) | .browser_download_url' | head -n 1)"
           windows_x64_url="$(printf '%s' "${release_json}" | jq -r '.assets[] | select(.name | test("hazuki-windows-x64.*\\.zip$"; "i")) | .browser_download_url' | head -n 1)"
-          windows_msix_url="$(printf '%s' "${release_json}" | jq -r '.assets[] | select(.name | test("hazuki-windows-x64.*\\.msix$"; "i")) | .browser_download_url' | head -n 1)"
+          windows_exe_url="$(printf '%s' "${release_json}" | jq -r '.assets[] | select(.name | test("hazuki-windows-x64.*-setup\\.exe$"; "i")) | .browser_download_url' | head -n 1)"
 
           jq -n \
             --arg version "${version}" \
@@ -220,7 +218,7 @@ jobs:
             --arg x64 "${x64_url}" \
             --arg x86 "${x86_url}" \
             --arg windowsX64 "${windows_x64_url}" \
-            --arg windowsMsix "${windows_msix_url}" \
+            --arg windowsExe "${windows_exe_url}" \
             --arg changelog "${changelog}" \
             '{
               version: $version,
@@ -233,11 +231,11 @@ jobs:
                 + (if $x86 != "" then {"x86": $x86} else {} end)
               )
             }
-            + (if ($windowsX64 != "" or $windowsMsix != "") then
+            + (if ($windowsX64 != "" or $windowsExe != "") then
                 {windowsUrls: (
                   {}
                   + (if $windowsX64 != "" then {"x64_zip": $windowsX64} else {} end)
-                  + (if $windowsMsix != "" then {"x64_msix": $windowsMsix} else {} end)
+                  + (if $windowsExe != "" then {"x64_exe": $windowsExe} else {} end)
                 )}
                else {} end)
             + (if $changelog != "" then {changelog: $changelog} else {} end)' > update.json

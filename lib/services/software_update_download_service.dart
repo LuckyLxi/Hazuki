@@ -227,11 +227,11 @@ class SoftwareUpdateDownloadService extends ChangeNotifier {
     final uri = Uri.tryParse(downloadUrl);
     var fileName = uri?.pathSegments.isNotEmpty == true
         ? uri!.pathSegments.last
-        : 'hazuki-$latestVersion${_isZipMode ? ".zip" : (Platform.isWindows ? ".msix" : ".apk")}';
+        : 'hazuki-$latestVersion${_isZipMode ? ".zip" : (Platform.isWindows ? ".exe" : ".apk")}';
     fileName = fileName.trim();
     if (fileName.isEmpty) {
       fileName =
-          'hazuki-$latestVersion${_isZipMode ? ".zip" : (Platform.isWindows ? ".msix" : ".apk")}';
+          'hazuki-$latestVersion${_isZipMode ? ".zip" : (Platform.isWindows ? ".exe" : ".apk")}';
     }
 
     // Windows allows some chars, but let's be safe.

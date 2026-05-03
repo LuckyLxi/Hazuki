@@ -65,7 +65,6 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
-  msix: ^3.16.13
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -139,10 +138,3 @@ flutter:
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
 
-msix_config:
-  display_name: Hazuki
-  publisher_display_name: LuckyLxi
-  identity_name: com.luckylxi.hazuki
-  publisher: CN=LuckyLxi
-  msix_version: 1.0.7.0
-  install_certificate: false # GitHub Actions 这种 CI 环境通常跳过证书安装

@@ -123,7 +123,8 @@ class SoftwareUpdateService {
       manifest,
       supportedAbis: supportedAbis,
     );
-    final windowsUrl = _resolveManifestWindowsUrl(manifest);
+    final windowsExeUrl = _resolveManifestWindowsExeUrl(manifest);
+    final windowsZipUrl = _resolveManifestWindowsZipUrl(manifest);
     final changelog = _normalizeChangelog(manifest['changelog']?.toString());
 
     if (latestVersionRaw == null ||
@@ -139,9 +140,9 @@ class SoftwareUpdateService {
       latestVersion: latestVersion,
       releaseUrl: releaseUrl,
       apkUrl: apkUrl != null && apkUrl.isNotEmpty ? apkUrl : null,
-      windowsUrl: windowsUrl != null && windowsUrl.isNotEmpty
-          ? windowsUrl
-          : null,
+      windowsUrl: windowsExeUrl ?? windowsZipUrl,
+      windowsExeUrl: windowsExeUrl,
+      windowsZipUrl: windowsZipUrl,
       changelog: changelog,
       hasUpdate: _isVersionGreater(latestVersion, currentVersion),
     );
@@ -161,13 +162,15 @@ class SoftwareUpdateService {
     final assets = release['assets'];
 
     String? apkUrl;
-    String? windowsUrl;
+    String? windowsExeUrl;
+    String? windowsZipUrl;
     if (assets is List) {
       apkUrl = _selectBestApkUrlFromAssets(
         assets,
         supportedAbis: supportedAbis,
       );
-      windowsUrl = _selectBestWindowsUrlFromAssets(assets);
+      windowsExeUrl = _selectWindowsExeUrlFromAssets(assets);
+      windowsZipUrl = _selectWindowsZipUrlFromAssets(assets);
     }
 
     if (latestVersionRaw == null ||
@@ -183,7 +186,9 @@ class SoftwareUpdateService {
       latestVersion: latestVersion,
       releaseUrl: releaseUrl,
       apkUrl: apkUrl,
-      windowsUrl: windowsUrl,
+      windowsUrl: windowsExeUrl ?? windowsZipUrl,
+      windowsExeUrl: windowsExeUrl,
+      windowsZipUrl: windowsZipUrl,
       changelog: changelog,
       hasUpdate: _isVersionGreater(latestVersion, currentVersion),
     );
@@ -246,26 +251,49 @@ class SoftwareUpdateService {
         : null;
   }
 
-  String? _resolveManifestWindowsUrl(Map<String, dynamic> manifest) {
+  Map<String, String> _parseManifestWindowsUrls(Map<String, dynamic> manifest) {
     final windowsUrlsRaw = manifest['windowsUrls'];
-    if (windowsUrlsRaw is! Map) {
-      final legacyWindowsUrl = manifest['windowsUrl']?.toString().trim();
-      return legacyWindowsUrl != null && legacyWindowsUrl.isNotEmpty
-          ? legacyWindowsUrl
-          : null;
-    }
-
-    final windowsUrls = <String, String>{};
+    if (windowsUrlsRaw is! Map) return {};
+    final result = <String, String>{};
     for (final entry in windowsUrlsRaw.entries) {
       final key = entry.key.toString().trim().toLowerCase();
       final value = entry.value?.toString().trim() ?? '';
-      if (key.isEmpty || value.isEmpty) {
-        continue;
-      }
-      windowsUrls[key] = value;
+      if (key.isNotEmpty && value.isNotEmpty) result[key] = value;
     }
+    return result;
+  }
 
-    return _selectBestWindowsUrlFromMap(windowsUrls);
+  String? _resolveManifestWindowsExeUrl(Map<String, dynamic> manifest) {
+    final urls = _parseManifestWindowsUrls(manifest);
+    if (urls.isEmpty) return null;
+    final arch = _resolveWindowsArch();
+    if (arch != null) {
+      final url = urls['${arch}_exe'];
+      if (url != null && url.isNotEmpty) return url;
+    }
+    for (final a in _windowsArchPriority) {
+      final url = urls['${a}_exe'];
+      if (url != null && url.isNotEmpty) return url;
+    }
+    return null;
+  }
+
+  String? _resolveManifestWindowsZipUrl(Map<String, dynamic> manifest) {
+    final urls = _parseManifestWindowsUrls(manifest);
+    if (urls.isEmpty) {
+      final legacy = manifest['windowsUrl']?.toString().trim();
+      return legacy != null && legacy.isNotEmpty ? legacy : null;
+    }
+    final arch = _resolveWindowsArch();
+    if (arch != null) {
+      final url = urls['${arch}_zip'];
+      if (url != null && url.isNotEmpty) return url;
+    }
+    for (final a in _windowsArchPriority) {
+      final url = urls['${a}_zip'];
+      if (url != null && url.isNotEmpty) return url;
+    }
+    return null;
   }
 
   String? _selectBestApkUrlFromAssets(
@@ -298,39 +326,32 @@ class SoftwareUpdateService {
         fallback;
   }
 
-  String? _selectBestWindowsUrlFromAssets(List assets) {
-    final candidates = <String, String>{};
-    String? fallback;
-    for (final asset in assets) {
-      if (asset is! Map) {
-        continue;
-      }
-      final map = Map<String, dynamic>.from(asset);
-      final name = map['name']?.toString().trim().toLowerCase() ?? '';
-      final url = map['browser_download_url']?.toString().trim();
-      final isWindowsPackage =
-          name.endsWith('.zip') ||
-          name.endsWith('.msi') ||
-          name.endsWith('.exe') ||
-          name.endsWith('.msix') ||
-          name.endsWith('.msixbundle');
-      if (!isWindowsPackage || url == null || url.isEmpty) {
-        continue;
-      }
-      fallback ??= url;
-      for (final arch in _windowsArchPriority) {
-        if (name.contains(arch)) {
-          if (name.endsWith('.msix') || name.endsWith('.msixbundle')) {
-            candidates.putIfAbsent('${arch}_msix', () => url);
-          } else if (name.endsWith('.zip')) {
-            candidates.putIfAbsent('${arch}_zip', () => url);
-          } else {
-            candidates.putIfAbsent(arch, () => url);
-          }
-        }
+  String? _selectWindowsExeUrlFromAssets(List assets) {
+    for (final arch in _windowsArchPriority) {
+      for (final asset in assets) {
+        if (asset is! Map) continue;
+        final map = Map<String, dynamic>.from(asset);
+        final name = map['name']?.toString().trim().toLowerCase() ?? '';
+        final url = map['browser_download_url']?.toString().trim();
+        if (url == null || url.isEmpty) continue;
+        if (name.endsWith('.exe') && name.contains(arch)) return url;
       }
     }
-    return _selectBestWindowsUrlFromMap(candidates) ?? fallback;
+    return null;
+  }
+
+  String? _selectWindowsZipUrlFromAssets(List assets) {
+    for (final arch in _windowsArchPriority) {
+      for (final asset in assets) {
+        if (asset is! Map) continue;
+        final map = Map<String, dynamic>.from(asset);
+        final name = map['name']?.toString().trim().toLowerCase() ?? '';
+        final url = map['browser_download_url']?.toString().trim();
+        if (url == null || url.isEmpty) continue;
+        if (name.endsWith('.zip') && name.contains(arch)) return url;
+      }
+    }
+    return null;
   }
 
   String? _selectBestApkUrlFromMap(
@@ -358,55 +379,6 @@ class SoftwareUpdateService {
       }
     }
     return apkUrls['universal'];
-  }
-
-  bool get _isWindowsMsix {
-    if (!Platform.isWindows) {
-      return false;
-    }
-    return Platform.resolvedExecutable.toLowerCase().contains('windowsapps');
-  }
-
-  String? _selectBestWindowsUrlFromMap(Map<String, String> windowsUrls) {
-    final currentArch = _resolveWindowsArch();
-    if (currentArch != null) {
-      if (_isWindowsMsix) {
-        final msix = windowsUrls['${currentArch}_msix'];
-        if (msix != null && msix.isNotEmpty) {
-          return msix;
-        }
-      } else {
-        final zip = windowsUrls['${currentArch}_zip'];
-        if (zip != null && zip.isNotEmpty) {
-          return zip;
-        }
-      }
-
-      final direct = windowsUrls[currentArch];
-      if (direct != null && direct.isNotEmpty) {
-        return direct;
-      }
-    }
-
-    for (final arch in _windowsArchPriority) {
-      if (_isWindowsMsix) {
-        final msix = windowsUrls['${arch}_msix'];
-        if (msix != null && msix.isNotEmpty) {
-          return msix;
-        }
-      } else {
-        final zip = windowsUrls['${arch}_zip'];
-        if (zip != null && zip.isNotEmpty) {
-          return zip;
-        }
-      }
-
-      final matched = windowsUrls[arch];
-      if (matched != null && matched.isNotEmpty) {
-        return matched;
-      }
-    }
-    return null;
   }
 
   String? _resolveWindowsArch() {
@@ -482,6 +454,8 @@ class SoftwareUpdateCheckResult {
     required this.hasUpdate,
     this.apkUrl,
     this.windowsUrl,
+    this.windowsExeUrl,
+    this.windowsZipUrl,
     this.changelog,
   });
 
@@ -490,6 +464,8 @@ class SoftwareUpdateCheckResult {
   final String releaseUrl;
   final String? apkUrl;
   final String? windowsUrl;
+  final String? windowsExeUrl;
+  final String? windowsZipUrl;
   final String? changelog;
   final bool hasUpdate;
 
@@ -499,6 +475,8 @@ class SoftwareUpdateCheckResult {
     String? releaseUrl,
     String? apkUrl,
     String? windowsUrl,
+    String? windowsExeUrl,
+    String? windowsZipUrl,
     String? changelog,
     bool? hasUpdate,
   }) {
@@ -508,6 +486,8 @@ class SoftwareUpdateCheckResult {
       releaseUrl: releaseUrl ?? this.releaseUrl,
       apkUrl: apkUrl ?? this.apkUrl,
       windowsUrl: windowsUrl ?? this.windowsUrl,
+      windowsExeUrl: windowsExeUrl ?? this.windowsExeUrl,
+      windowsZipUrl: windowsZipUrl ?? this.windowsZipUrl,
       changelog: changelog ?? this.changelog,
       hasUpdate: hasUpdate ?? this.hasUpdate,
     );

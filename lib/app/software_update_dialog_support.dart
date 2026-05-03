@@ -176,6 +176,13 @@ class _SoftwareUpdateDialogCardState extends State<_SoftwareUpdateDialogCard> {
       SoftwareUpdateDownloadService.instance;
 
   bool _downloadTriggerBusy = false;
+  String? _selectedWindowsUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedWindowsUrl = widget.check.windowsExeUrl ?? widget.check.windowsUrl;
+  }
 
   Future<bool> _openExternalUrl(String url) {
     return launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
@@ -200,7 +207,10 @@ class _SoftwareUpdateDialogCardState extends State<_SoftwareUpdateDialogCard> {
     }
     _downloadService.clearFailure();
     setState(() => _downloadTriggerBusy = true);
-    final success = await _downloadService.startDownload(widget.check);
+    final effectiveCheck = _selectedWindowsUrl != null
+        ? widget.check.copyWith(windowsUrl: _selectedWindowsUrl)
+        : widget.check;
+    final success = await _downloadService.startDownload(effectiveCheck);
     if (!mounted) {
       return;
     }
@@ -246,11 +256,13 @@ class _SoftwareUpdateDialogCardState extends State<_SoftwareUpdateDialogCard> {
         final isDownloading = _downloadService.isDownloading;
         final isSuccess = _downloadService.isSuccess;
 
+        final effectiveWindowsUrl =
+            _selectedWindowsUrl ?? widget.check.windowsUrl;
         final canDownload =
             (Platform.isAndroid
                 ? widget.check.apkUrl?.trim().isNotEmpty == true
                 : Platform.isWindows
-                ? widget.check.windowsUrl?.trim().isNotEmpty == true
+                ? effectiveWindowsUrl?.trim().isNotEmpty == true
                 : false) &&
             !_downloadTriggerBusy;
         final failureMessage = _buildFailureMessage(strings);
@@ -392,6 +404,12 @@ class _SoftwareUpdateDialogCardState extends State<_SoftwareUpdateDialogCard> {
             ),
           ),
         ],
+        if (Platform.isWindows) ...[
+          _buildWindowsPackageSelector(
+            colorScheme: colorScheme,
+            textTheme: textTheme,
+          ),
+        ],
         if (failureMessage != null) ...[
           const SizedBox(height: 14),
           Container(
@@ -468,6 +486,83 @@ class _SoftwareUpdateDialogCardState extends State<_SoftwareUpdateDialogCard> {
           ],
         ),
       ],
+    );
+  }
+
+  Widget _buildWindowsPackageSelector({
+    required ColorScheme colorScheme,
+    required TextTheme textTheme,
+  }) {
+    final exeUrl = widget.check.windowsExeUrl;
+    final zipUrl = widget.check.windowsZipUrl;
+    if (exeUrl == null && zipUrl == null) return const SizedBox.shrink();
+
+    String filename(String url) {
+      final seg = Uri.tryParse(url)?.pathSegments;
+      final name = seg != null && seg.isNotEmpty ? seg.last : url;
+      return Uri.decodeComponent(name);
+    }
+
+    Widget tile(String url) {
+      final selected = (_selectedWindowsUrl ?? exeUrl) == url;
+      return InkWell(
+        onTap: () => setState(() => _selectedWindowsUrl = url),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+          child: Row(
+            children: [
+              Icon(
+                selected
+                    ? Icons.radio_button_checked_rounded
+                    : Icons.radio_button_off_rounded,
+                size: 18,
+                color: selected
+                    ? colorScheme.primary
+                    : colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  filename(url),
+                  style: textTheme.bodySmall?.copyWith(
+                    color: selected
+                        ? colorScheme.onSurface
+                        : colorScheme.onSurfaceVariant,
+                    fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    final tiles = [
+      if (exeUrl != null) tile(exeUrl),
+      if (exeUrl != null && zipUrl != null)
+        Divider(
+          height: 1,
+          indent: 14,
+          endIndent: 14,
+          color: colorScheme.outlineVariant.withValues(alpha: 0.36),
+        ),
+      if (zipUrl != null) tile(zipUrl),
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 14),
+      child: Container(
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.36),
+          ),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(mainAxisSize: MainAxisSize.min, children: tiles),
+      ),
     );
   }
 
