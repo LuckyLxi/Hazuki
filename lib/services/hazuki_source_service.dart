@@ -578,7 +578,12 @@ class SourceDebugLogStore {
   final List<Map<String, dynamic>> recentNetworkLogs = [];
   final List<Map<String, dynamic>> recentApplicationLogs = [];
   final List<Map<String, dynamic>> recentReaderLogs = [];
+  final List<Map<String, dynamic>> recentErrorLogs = [];
+  final List<Map<String, dynamic>> recentActionLogs = [];
+  final List<Map<String, dynamic>> recentSystemLogs = [];
+  final List<Map<String, dynamic>> recentPerformanceLogs = [];
   int networkLogDedupedCount = 0;
+  DateTime? _lastAgeCleanupAt;
   Map<String, dynamic>? lastLoginDebugInfoStorage;
   Map<String, dynamic>? lastSourceVersionDebugInfoStorage;
 
@@ -587,6 +592,10 @@ class SourceDebugLogStore {
     recentNetworkLogs.clear();
     recentApplicationLogs.clear();
     recentReaderLogs.clear();
+    recentErrorLogs.clear();
+    recentActionLogs.clear();
+    recentSystemLogs.clear();
+    recentPerformanceLogs.clear();
     networkLogDedupedCount = 0;
     lastLoginDebugInfoStorage = null;
     lastSourceVersionDebugInfoStorage = null;

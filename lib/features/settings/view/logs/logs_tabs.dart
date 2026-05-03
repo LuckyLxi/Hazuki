@@ -2,28 +2,77 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
-import 'package:hazuki/widgets/widgets.dart';
 import 'logs_cards.dart';
-import 'network_logs_formatter.dart';
 
-class NetworkLogsTab extends StatefulWidget {
-  const NetworkLogsTab({super.key});
+class LogsTabSpec {
+  const LogsTabSpec({
+    required this.type,
+    required this.icon,
+    required this.titleBuilder,
+  });
 
-  @override
-  State<NetworkLogsTab> createState() => _NetworkLogsTabState();
+  final String type;
+  final IconData icon;
+  final String Function(BuildContext context) titleBuilder;
 }
 
-class _NetworkLogsTabState extends State<NetworkLogsTab>
-    with AutomaticKeepAliveClientMixin<NetworkLogsTab> {
-  String _debugText = '';
+const logsTabSpecs = <LogsTabSpec>[
+  LogsTabSpec(
+    type: debugLogTypeError,
+    icon: Icons.error_outline_rounded,
+    titleBuilder: _errorLogsTitle,
+  ),
+  LogsTabSpec(
+    type: debugLogTypeAction,
+    icon: Icons.touch_app_outlined,
+    titleBuilder: _actionLogsTitle,
+  ),
+  LogsTabSpec(
+    type: debugLogTypeSystem,
+    icon: Icons.settings_suggest_outlined,
+    titleBuilder: _systemLogsTitle,
+  ),
+  LogsTabSpec(
+    type: debugLogTypePerformance,
+    icon: Icons.speed_rounded,
+    titleBuilder: _performanceLogsTitle,
+  ),
+];
+
+String _errorLogsTitle(BuildContext context) => l10n(context).logsErrorTitle;
+String _actionLogsTitle(BuildContext context) => l10n(context).logsActionTitle;
+String _systemLogsTitle(BuildContext context) => l10n(context).logsSystemTitle;
+String _performanceLogsTitle(BuildContext context) =>
+    l10n(context).logsPerformanceTitle;
+
+Future<Map<String, dynamic>> collectVisibleLogsForIndex(int index) {
+  final clampedIndex = index.clamp(0, logsTabSpecs.length - 1).toInt();
+  final spec = logsTabSpecs[clampedIndex];
+  return HazukiSourceService.instance.collectTypedDebugInfo(spec.type);
+}
+
+String formatVisibleLogs(Map<String, dynamic> debugInfo) {
+  return const JsonEncoder.withIndent('  ').convert(debugInfo);
+}
+
+class DebugLogsTab extends StatefulWidget {
+  const DebugLogsTab({super.key, required this.spec});
+
+  final LogsTabSpec spec;
+
+  @override
+  State<DebugLogsTab> createState() => _DebugLogsTabState();
+}
+
+class _DebugLogsTabState extends State<DebugLogsTab>
+    with AutomaticKeepAliveClientMixin<DebugLogsTab> {
+  Map<String, dynamic>? _debugInfo;
   String? _errorText;
   bool _loading = true;
-  bool _fullLoading = false;
-  bool _importantOnly = true;
-  Map<String, dynamic>? _rawDebugInfo;
+  String _searchQuery = '';
+  String? _selectedSource;
 
   @override
   bool get wantKeepAlive => true;
@@ -31,39 +80,31 @@ class _NetworkLogsTabState extends State<NetworkLogsTab>
   @override
   void initState() {
     super.initState();
-    unawaited(_loadNetworkDebugInfo());
+    unawaited(_loadLogs());
   }
 
-  Future<void> _copyDebugText() async {
-    final text = _rawDebugInfo == null
-        ? _debugText
-        : _buildCopyTextFromRaw(_rawDebugInfo!);
-    if (text.isEmpty) {
-      return;
+  @override
+  void didUpdateWidget(DebugLogsTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.spec.type != widget.spec.type) {
+      unawaited(_loadLogs());
     }
-    await Clipboard.setData(ClipboardData(text: text));
-    if (!mounted) {
-      return;
-    }
-    unawaited(showHazukiPrompt(context, l10n(context).favoritesDebugCopied));
   }
 
-  Future<void> _loadNetworkDebugInfo() async {
+  Future<void> _loadLogs() async {
     setState(() {
       _loading = true;
       _errorText = null;
     });
-
     try {
       final debugInfo = await HazukiSourceService.instance
-          .collectNetworkDebugInfo()
+          .collectTypedDebugInfo(widget.spec.type)
           .timeout(const Duration(seconds: 10));
       if (!mounted) {
         return;
       }
       setState(() {
-        _rawDebugInfo = Map<String, dynamic>.from(debugInfo);
-        _debugText = _buildDebugTextFromRaw(_rawDebugInfo!);
+        _debugInfo = debugInfo;
       });
     } catch (e) {
       if (!mounted) {
@@ -81,120 +122,45 @@ class _NetworkLogsTabState extends State<NetworkLogsTab>
     }
   }
 
-  Future<void> _loadFullDebugInfo() async {
-    setState(() {
-      _fullLoading = true;
-    });
-
-    try {
-      final debugInfo = await HazukiSourceService.instance
-          .collectFavoritesDebugInfo(forceRefresh: true)
-          .timeout(const Duration(seconds: 90));
-      final prettyText = const JsonEncoder.withIndent('  ').convert(debugInfo);
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _rawDebugInfo = null;
-        _debugText = prettyText;
-      });
-    } catch (e) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _errorText = e.toString();
-      });
-    } finally {
-      if (mounted) {
-        setState(() {
-          _fullLoading = false;
-        });
-      }
+  List<Map<String, dynamic>> _rawLogs() {
+    final logs = _debugInfo?['logs'];
+    if (logs is! List) {
+      return const <Map<String, dynamic>>[];
     }
+    return logs
+        .whereType<Map>()
+        .map((entry) => Map<String, dynamic>.from(entry))
+        .toList(growable: false);
   }
 
-  NetworkLogsFormatter get _formatter => NetworkLogsFormatter(context);
-
-  String _buildDebugTextFromRaw(Map<String, dynamic> source) {
-    return _formatter.buildPrettyText(
-      source: source,
-      importantOnly: _importantOnly,
-    );
+  List<Map<String, dynamic>> _filteredLogs() {
+    final raw = _rawLogs();
+    if (_searchQuery.isEmpty && _selectedSource == null) return raw;
+    return raw.where((log) {
+      if (_selectedSource != null && log['source'] != _selectedSource) {
+        return false;
+      }
+      if (_searchQuery.isNotEmpty) {
+        final q = _searchQuery.toLowerCase();
+        final title = (log['title'] as String? ?? '').toLowerCase();
+        final preview = (log['contentPreview'] as String? ?? '').toLowerCase();
+        if (!title.contains(q) && !preview.contains(q)) return false;
+      }
+      return true;
+    }).toList();
   }
 
-  String _buildCopyTextFromRaw(Map<String, dynamic> source) {
-    return _formatter.buildCopyText(
-      source: source,
-      importantOnly: _importantOnly,
-    );
-  }
-
-  Widget _buildActionBar(BuildContext context) {
-    final strings = l10n(context);
-    final disabled = _loading || _fullLoading;
-    final buttons = <Widget>[
-      FilledButton.tonalIcon(
-        onPressed: disabled
-            ? null
-            : () {
-                setState(() {
-                  _importantOnly = !_importantOnly;
-                  if (_rawDebugInfo != null) {
-                    _debugText = _buildDebugTextFromRaw(_rawDebugInfo!);
-                  }
-                });
-              },
-        icon: Icon(
-          _importantOnly ? Icons.filter_alt : Icons.filter_alt_outlined,
-        ),
-        label: Text(strings.favoritesDebugFilterImportantTooltip),
-      ),
-      OutlinedButton.icon(
-        onPressed: disabled ? null : _copyDebugText,
-        icon: const Icon(Icons.copy_outlined),
-        label: Text(strings.favoritesDebugCopyTooltip),
-      ),
-      OutlinedButton.icon(
-        onPressed: disabled ? null : _loadNetworkDebugInfo,
-        icon: const Icon(Icons.refresh_rounded),
-        label: Text(strings.favoritesDebugRefreshTooltip),
-      ),
-      FilledButton.tonalIcon(
-        onPressed: _fullLoading ? null : _loadFullDebugInfo,
-        icon: _fullLoading
-            ? const SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : const Icon(Icons.science_outlined),
-        label: Text(strings.favoritesDebugFullFetchButton),
-      ),
-    ];
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final useTwoColumns = constraints.maxWidth >= 320;
-        final itemWidth = useTwoColumns
-            ? (constraints.maxWidth - 12) / 2
-            : constraints.maxWidth;
-        return Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: [
-            for (final button in buttons)
-              SizedBox(width: itemWidth, child: button),
-          ],
-        );
-      },
-    );
+  Set<String> _allSources() {
+    return _rawLogs()
+        .map((l) => l['source'] as String? ?? '')
+        .where((s) => s.isNotEmpty)
+        .toSet();
   }
 
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    final strings = l10n(context);
+    final title = widget.spec.titleBuilder(context);
     if (_loading) {
       return const Center(child: CircularProgressIndicator());
     }
@@ -203,300 +169,212 @@ class _NetworkLogsTabState extends State<NetworkLogsTab>
         padding: const EdgeInsets.all(16),
         children: [
           LogsErrorCard(
-            icon: Icons.wifi_tethering_error_rounded,
-            title: strings.logsNetworkTitle,
-            message: strings.favoritesDebugLoadFailed(_errorText!),
-            onRetry: _loadNetworkDebugInfo,
+            icon: widget.spec.icon,
+            title: title,
+            message: l10n(context).logsLoadFailed(_errorText!),
+            onRetry: _loadLogs,
           ),
         ],
       );
     }
-    return ListView(
-      physics: const ClampingScrollPhysics(),
-      padding: const EdgeInsets.all(16),
-      children: [
-        _buildActionBar(context),
-        const SizedBox(height: 12),
-        LogsTextCard(
-          icon: Icons.wifi_tethering_rounded,
-          title: strings.logsNetworkTitle,
-          text: _debugText,
-        ),
-      ],
-    );
-  }
-}
 
-class ApplicationLogsTab extends StatefulWidget {
-  const ApplicationLogsTab({super.key});
-
-  @override
-  State<ApplicationLogsTab> createState() => _ApplicationLogsTabState();
-}
-
-class _ApplicationLogsTabState extends State<ApplicationLogsTab>
-    with AutomaticKeepAliveClientMixin<ApplicationLogsTab> {
-  String _debugText = '';
-  String? _errorText;
-  bool _loading = true;
-  Map<String, dynamic>? _rawDebugInfo;
-
-  @override
-  bool get wantKeepAlive => true;
-
-  @override
-  void initState() {
-    super.initState();
-    unawaited(_loadApplicationDebugInfo());
-  }
-
-  Future<void> _copyDebugText() async {
-    if (_debugText.isEmpty) {
-      return;
-    }
-    await Clipboard.setData(ClipboardData(text: _debugText));
-    if (!mounted) {
-      return;
-    }
-    unawaited(showHazukiPrompt(context, l10n(context).logsApplicationCopied));
-  }
-
-  Future<void> _loadApplicationDebugInfo() async {
-    setState(() {
-      _loading = true;
-      _errorText = null;
-    });
-
-    try {
-      final debugInfo = await HazukiSourceService.instance
-          .collectApplicationDebugInfo()
-          .timeout(const Duration(seconds: 10));
-      final prettyText = const JsonEncoder.withIndent('  ').convert(debugInfo);
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _rawDebugInfo = Map<String, dynamic>.from(debugInfo);
-        _debugText = prettyText;
-      });
-    } catch (e) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _errorText = e.toString();
-      });
-    } finally {
-      if (mounted) {
-        setState(() {
-          _loading = false;
-        });
-      }
-    }
-  }
-
-  bool _hasLogs() {
-    final logs = _rawDebugInfo?['recentApplicationLogs'];
-    return logs is List && logs.isNotEmpty;
-  }
-
-  Widget _buildActionBar(BuildContext context) {
-    final strings = l10n(context);
-    return Wrap(
-      spacing: 12,
-      runSpacing: 12,
-      children: [
-        OutlinedButton.icon(
-          onPressed: _loading ? null : _copyDebugText,
-          icon: const Icon(Icons.copy_outlined),
-          label: Text(strings.favoritesDebugCopyTooltip),
-        ),
-        OutlinedButton.icon(
-          onPressed: _loading ? null : _loadApplicationDebugInfo,
-          icon: const Icon(Icons.refresh_rounded),
-          label: Text(strings.logsApplicationRefreshTooltip),
-        ),
-      ],
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    super.build(context);
-    final strings = l10n(context);
-    if (_loading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    if (_errorText != null) {
+    final rawLogs = _rawLogs();
+    if (rawLogs.isEmpty) {
       return ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          LogsErrorCard(
-            icon: Icons.description_outlined,
-            title: strings.logsApplicationTitle,
-            message: strings.logsApplicationLoadFailed(_errorText!),
-            onRetry: _loadApplicationDebugInfo,
-          ),
-        ],
-      );
-    }
-    return ListView(
-      physics: const ClampingScrollPhysics(),
-      padding: const EdgeInsets.all(16),
-      children: [
-        _buildActionBar(context),
-        const SizedBox(height: 12),
-        if (!_hasLogs()) ...[
           LogsEmptyCard(
-            icon: Icons.inbox_outlined,
-            title: strings.logsApplicationTitle,
-            message: strings.logsApplicationEmpty,
-          ),
-          const SizedBox(height: 12),
-        ],
-        LogsTextCard(
-          icon: Icons.description_outlined,
-          title: strings.logsApplicationTitle,
-          text: _debugText,
-        ),
-      ],
-    );
-  }
-}
-
-class ReaderLogsTab extends StatefulWidget {
-  const ReaderLogsTab({super.key});
-
-  @override
-  State<ReaderLogsTab> createState() => _ReaderLogsTabState();
-}
-
-class _ReaderLogsTabState extends State<ReaderLogsTab>
-    with AutomaticKeepAliveClientMixin<ReaderLogsTab> {
-  String _debugText = '';
-  String? _errorText;
-  bool _loading = true;
-  Map<String, dynamic>? _rawDebugInfo;
-
-  @override
-  bool get wantKeepAlive => true;
-
-  @override
-  void initState() {
-    super.initState();
-    unawaited(_loadReaderDebugInfo());
-  }
-
-  Future<void> _copyDebugText() async {
-    if (_debugText.isEmpty) {
-      return;
-    }
-    await Clipboard.setData(ClipboardData(text: _debugText));
-    if (!mounted) {
-      return;
-    }
-    unawaited(showHazukiPrompt(context, l10n(context).logsReaderCopied));
-  }
-
-  Future<void> _loadReaderDebugInfo() async {
-    setState(() {
-      _loading = true;
-      _errorText = null;
-    });
-
-    try {
-      final debugInfo = await HazukiSourceService.instance
-          .collectReaderDebugInfo()
-          .timeout(const Duration(seconds: 10));
-      final prettyText = const JsonEncoder.withIndent('  ').convert(debugInfo);
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _rawDebugInfo = Map<String, dynamic>.from(debugInfo);
-        _debugText = prettyText;
-      });
-    } catch (e) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _errorText = e.toString();
-      });
-    } finally {
-      if (mounted) {
-        setState(() {
-          _loading = false;
-        });
-      }
-    }
-  }
-
-  bool _hasLogs() {
-    final logs = _rawDebugInfo?['recentReaderLogs'];
-    return logs is List && logs.isNotEmpty;
-  }
-
-  Widget _buildActionBar(BuildContext context) {
-    final strings = l10n(context);
-    return Wrap(
-      spacing: 12,
-      runSpacing: 12,
-      children: [
-        OutlinedButton.icon(
-          onPressed: _loading ? null : _copyDebugText,
-          icon: const Icon(Icons.copy_outlined),
-          label: Text(strings.favoritesDebugCopyTooltip),
-        ),
-        OutlinedButton.icon(
-          onPressed: _loading ? null : _loadReaderDebugInfo,
-          icon: const Icon(Icons.refresh_rounded),
-          label: Text(strings.logsReaderRefreshTooltip),
-        ),
-      ],
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    super.build(context);
-    final strings = l10n(context);
-    if (_loading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    if (_errorText != null) {
-      return ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          LogsErrorCard(
-            icon: Icons.chrome_reader_mode_outlined,
-            title: strings.logsReaderTitle,
-            message: strings.logsReaderLoadFailed(_errorText!),
-            onRetry: _loadReaderDebugInfo,
+            icon: widget.spec.icon,
+            title: title,
+            message: l10n(context).logsEmpty,
           ),
         ],
       );
     }
-    return ListView(
-      physics: const ClampingScrollPhysics(),
-      padding: const EdgeInsets.all(16),
+
+    final sources = _allSources();
+    final logs = _filteredLogs();
+
+    return Column(
       children: [
-        _buildActionBar(context),
-        const SizedBox(height: 12),
-        if (!_hasLogs()) ...[
-          LogsEmptyCard(
-            icon: Icons.inbox_outlined,
-            title: strings.logsReaderTitle,
-            message: strings.logsReaderEmpty,
+        _LogsSearchBar(
+          query: _searchQuery,
+          onChanged: (v) => setState(() {
+            _searchQuery = v;
+          }),
+          onClear: () => setState(() {
+            _searchQuery = '';
+          }),
+        ),
+        if (sources.length > 1)
+          _SourceFilterChips(
+            sources: sources,
+            selected: _selectedSource,
+            onSelected: (s) => setState(() {
+              _selectedSource = s;
+            }),
           ),
-          const SizedBox(height: 12),
-        ],
-        LogsTextCard(
-          icon: Icons.chrome_reader_mode_outlined,
-          title: strings.logsReaderTitle,
-          text: _debugText,
+        Expanded(
+          child: logs.isEmpty
+              ? ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    LogsEmptyCard(
+                      icon: Icons.search_off_rounded,
+                      title: title,
+                      message: l10n(context).logsFilterNoResults,
+                    ),
+                  ],
+                )
+              : ListView.separated(
+                  physics: const ClampingScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+                  itemBuilder: (context, index) {
+                    return DebugLogEntryCard(log: logs[index]);
+                  },
+                  separatorBuilder: (context, index) =>
+                      const SizedBox(height: 12),
+                  itemCount: logs.length,
+                ),
         ),
       ],
+    );
+  }
+}
+
+class _LogsSearchBar extends StatefulWidget {
+  const _LogsSearchBar({
+    required this.query,
+    required this.onChanged,
+    required this.onClear,
+  });
+
+  final String query;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClear;
+
+  @override
+  State<_LogsSearchBar> createState() => _LogsSearchBarState();
+}
+
+class _LogsSearchBarState extends State<_LogsSearchBar> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.query);
+  }
+
+  @override
+  void didUpdateWidget(_LogsSearchBar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.query != _controller.text) {
+      _controller.text = widget.query;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: TextField(
+        controller: _controller,
+        onChanged: widget.onChanged,
+        style: const TextStyle(fontSize: 14),
+        decoration: InputDecoration(
+          hintText: l10n(context).logsSearchHint,
+          hintStyle: TextStyle(
+            fontSize: 14,
+            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+          ),
+          prefixIcon: Icon(
+            Icons.search_rounded,
+            size: 20,
+            color: colorScheme.onSurfaceVariant,
+          ),
+          suffixIcon: widget.query.isNotEmpty
+              ? IconButton(
+                  iconSize: 18,
+                  icon: const Icon(Icons.close_rounded),
+                  onPressed: () {
+                    _controller.clear();
+                    widget.onClear();
+                  },
+                )
+              : null,
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(vertical: 10),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(24),
+            borderSide: BorderSide.none,
+          ),
+          filled: true,
+          fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        ),
+      ),
+    );
+  }
+}
+
+class _SourceFilterChips extends StatelessWidget {
+  const _SourceFilterChips({
+    required this.sources,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final Set<String> sources;
+  final String? selected;
+  final ValueChanged<String?> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final allSources = ['', ...sources.toList()..sort()];
+    return SizedBox(
+      height: 40,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+        itemCount: allSources.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 6),
+        itemBuilder: (context, index) {
+          final source = allSources[index];
+          final isAll = source.isEmpty;
+          final isSelected = isAll ? selected == null : selected == source;
+          final label = isAll ? l10n(context).logsSourceAll : source;
+          return FilterChip(
+            label: Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: isSelected
+                    ? colorScheme.onSecondaryContainer
+                    : colorScheme.onSurfaceVariant,
+              ),
+            ),
+            selected: isSelected,
+            onSelected: (_) => onSelected(isAll ? null : source),
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            visualDensity: VisualDensity.compact,
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            showCheckmark: false,
+            selectedColor: colorScheme.secondaryContainer,
+            backgroundColor: colorScheme.surfaceContainerHighest.withValues(
+              alpha: 0.4,
+            ),
+            side: BorderSide.none,
+          );
+        },
+      ),
     );
   }
 }

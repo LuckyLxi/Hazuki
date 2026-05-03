@@ -760,6 +760,33 @@
     }
   },
   "logsReaderEmpty": "No reader logs yet",
+  "logsErrorTitle": "Error logs",
+  "logsActionTitle": "Action logs",
+  "logsSystemTitle": "System logs",
+  "logsPerformanceTitle": "Performance logs",
+  "logsFilterTitle": "Filter logs",
+  "logsMoreTooltip": "More options",
+  "logsCopied": "Logs copied",
+  "logsCopyFailed": "Failed to copy logs: {error}",
+  "@logsCopyFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "logsLoadFailed": "Failed to load logs: {error}",
+  "@logsLoadFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "logsEmpty": "No logs yet",
+  "logsSearchHint": "Search logs",
+  "logsFilterNoResults": "No matching logs",
+  "logsSourceAll": "All",
+  "logsClearTitle": "Clear logs",
+  "logsClearContent": "Are you sure you want to clear all captured logs? This action cannot be undone.",
+  "logsClearConfirm": "Clear",
+  "logsCleared": "Logs cleared",
   "tagCategoryLoadTimeout": "Tag categories timed out while loading. Please try again later.",
   "tagCategoryLoadFailed": "Failed to load tag categories: {error}",
   "@tagCategoryLoadFailed": {
@@ -916,9 +943,9 @@
   "labTitle": "Lab",
   "advancedTitle": "Advanced",
   "advancedDebugTitle": "Logs",
-  "advancedDebugSubtitle": "Network, application, and reader logs",
+  "advancedDebugSubtitle": "Error, action, system, and performance logs",
   "advancedSoftwareLogCaptureTitle": "Record software logs",
-  "advancedSoftwareLogCaptureSubtitle": "When turned off, network, application, and reader logs will no longer be captured",
+  "advancedSoftwareLogCaptureSubtitle": "When turned off, error, action, system, and performance logs will no longer be captured",
   "advancedComicIdSearchTitle": "Comic ID search optimization",
   "advancedComicIdSearchSubtitle": "Automatically remove non-digit characters on search submission and keep only Arabic numerals as the keyword",
   "advancedNoImageModeTitle": "No-image mode",

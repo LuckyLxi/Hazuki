@@ -1,6 +1,30 @@
 part of '../hazuki_source_service.dart';
 
 extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
+  void addDebugLog({
+    required String type,
+    required String level,
+    required String title,
+    Object? content,
+    String source = 'app',
+  }) {
+    if (!facade.softwareLogCaptureEnabled) {
+      return;
+    }
+    _appendTypedDebugLog(
+      type: _normalizeDebugLogType(type),
+      level: level,
+      title: title,
+      content: _compactGenericLogValue(
+        _jsonSafe(content),
+        maxStringLength: _debugApplicationStringKeep,
+        maxItems: 24,
+        maxDepth: 4,
+      ),
+      source: source,
+    );
+  }
+
   void addApplicationLog({
     required String level,
     required String title,
@@ -14,6 +38,23 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
       level: level,
       title: title,
       content: content,
+      source: source,
+    );
+    _appendTypedDebugLog(
+      type: _resolveGenericDebugLogType(
+        level: level,
+        title: title,
+        content: content,
+        source: source,
+      ),
+      level: level,
+      title: title,
+      content: _compactGenericLogValue(
+        _jsonSafe(content),
+        maxStringLength: _debugApplicationStringKeep,
+        maxItems: 24,
+        maxDepth: 4,
+      ),
       source: source,
     );
   }
@@ -33,6 +74,223 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
       content: content,
       source: source,
     );
+    _appendTypedDebugLog(
+      type: _resolveGenericDebugLogType(
+        level: level,
+        title: title,
+        content: content,
+        source: source,
+      ),
+      level: level,
+      title: title,
+      content: _compactReaderLogContent(
+        _jsonSafe(content),
+        source: source,
+        level: level,
+      ),
+      source: source,
+    );
+  }
+
+  void _pruneByAgeIfNeeded() {
+    final now = DateTime.now();
+    if (facade.debug._lastAgeCleanupAt != null &&
+        now.difference(facade.debug._lastAgeCleanupAt!) <
+            const Duration(hours: 1)) {
+      return;
+    }
+    facade.debug._lastAgeCleanupAt = now;
+    final cutoff = now.subtract(_debugLogMaxAge);
+    _pruneListByAge(facade.debug.recentNetworkLogs, cutoff);
+    _pruneListByAge(facade.debug.recentApplicationLogs, cutoff);
+    _pruneListByAge(facade.debug.recentReaderLogs, cutoff);
+    _pruneListByAge(facade.debug.recentErrorLogs, cutoff);
+    _pruneListByAge(facade.debug.recentActionLogs, cutoff);
+    _pruneListByAge(facade.debug.recentSystemLogs, cutoff);
+    _pruneListByAge(facade.debug.recentPerformanceLogs, cutoff);
+  }
+
+  void _pruneListByAge(List<Map<String, dynamic>> logs, DateTime cutoff) {
+    logs.removeWhere((log) {
+      final t = DateTime.tryParse(log['time'] as String? ?? '');
+      return t != null && t.isBefore(cutoff);
+    });
+  }
+
+  void _appendTypedDebugLog({
+    required String type,
+    required String level,
+    required String title,
+    required Object? content,
+    required String source,
+  }) {
+    _pruneByAgeIfNeeded();
+    final targetLogs = _typedDebugLogsFor(type);
+    final now = DateTime.now();
+    final normalizedType = _normalizeDebugLogType(type);
+    final normalizedLevel = _normalizeDebugLevel(level);
+    final sourceText = source.trim().isEmpty ? 'app' : source.trim();
+    final titleText = title.trim().isEmpty ? 'Log' : title.trim();
+    final safeContent = _jsonSafe(content);
+    final contentText = _toBodyFull(safeContent) ?? 'null';
+    final dedupKey = [
+      normalizedType,
+      sourceText,
+      normalizedLevel,
+      titleText,
+      contentText,
+    ].join('|');
+
+    final existingIndex = targetLogs.indexWhere(
+      (log) => log['dedupKey'] == dedupKey,
+    );
+    if (existingIndex >= 0) {
+      final existing = targetLogs[existingIndex];
+      existing['mergedCount'] = (existing['mergedCount'] as int? ?? 1) + 1;
+      existing['lastSeenAt'] = now.toIso8601String();
+      existing['level'] = normalizedLevel;
+      existing['content'] = safeContent;
+      existing['contentPreview'] = _toBodyPreview(contentText, keep: 320);
+      return;
+    }
+
+    targetLogs.add({
+      'type': normalizedType,
+      'time': now.toIso8601String(),
+      'lastSeenAt': now.toIso8601String(),
+      'mergedCount': 1,
+      'dedupKey': dedupKey,
+      'source': sourceText,
+      'level': normalizedLevel,
+      'title': titleText,
+      'content': safeContent,
+      'contentPreview': _toBodyPreview(contentText, keep: 320),
+    });
+    if (targetLogs.length > _debugMaxTypedLogsKept) {
+      targetLogs.removeRange(0, targetLogs.length - _debugMaxTypedLogsKept);
+    }
+  }
+
+  List<Map<String, dynamic>> _typedDebugLogsFor(String type) {
+    return switch (_normalizeDebugLogType(type)) {
+      debugLogTypeError => facade.debug.recentErrorLogs,
+      debugLogTypeAction => facade.debug.recentActionLogs,
+      debugLogTypeSystem => facade.debug.recentSystemLogs,
+      debugLogTypePerformance => facade.debug.recentPerformanceLogs,
+      _ => facade.debug.recentActionLogs,
+    };
+  }
+
+  String _normalizeDebugLogType(String type) {
+    final normalized = type.trim().toLowerCase();
+    if (debugLogTypes.contains(normalized)) {
+      return normalized;
+    }
+    return debugLogTypeAction;
+  }
+
+  String _normalizeDebugLevel(String level) {
+    final normalized = level.trim().toLowerCase();
+    return switch (normalized) {
+      'error' => 'error',
+      'warn' || 'warning' => 'warn',
+      _ => 'info',
+    };
+  }
+
+  String _resolveGenericDebugLogType({
+    required String level,
+    required String title,
+    required Object? content,
+    required String source,
+  }) {
+    final normalizedLevel = _normalizeDebugLevel(level);
+    if (normalizedLevel == 'error') {
+      return debugLogTypeError;
+    }
+
+    final sourceText = source.toLowerCase();
+    final titleText = title.toLowerCase();
+    final contentText = (_toBodyFull(_jsonSafe(content)) ?? '').toLowerCase();
+    final combined = '$sourceText\n$titleText\n$contentText';
+
+    const errorKeywords = [
+      'error',
+      'exception',
+      'failed',
+      'failure',
+      'timeout',
+      'unauthorized',
+      'forbidden',
+    ];
+    if (errorKeywords.any(combined.contains)) {
+      return debugLogTypeError;
+    }
+
+    const performanceKeywords = [
+      'jank',
+      'slow',
+      'frame',
+      'duration',
+      'latency',
+      'reader_position',
+      'performance',
+    ];
+    if (performanceKeywords.any(combined.contains)) {
+      return debugLogTypePerformance;
+    }
+
+    const systemSources = [
+      'source_',
+      'source_runtime',
+      'source_version',
+      'source_category',
+      'js_',
+      'dio_',
+      'network',
+      'bootstrap',
+    ];
+    if (systemSources.any(sourceText.contains)) {
+      return debugLogTypeSystem;
+    }
+
+    return debugLogTypeAction;
+  }
+
+  String _resolveNetworkDebugLogType({
+    required int? statusCode,
+    required String? error,
+    required int durationMs,
+  }) {
+    final normalizedError = (error ?? '').trim().toLowerCase();
+    if (normalizedError.isNotEmpty && normalizedError != 'null') {
+      return debugLogTypeError;
+    }
+    if (statusCode != null && statusCode >= 400) {
+      return debugLogTypeError;
+    }
+    if (durationMs >= 2500) {
+      return debugLogTypePerformance;
+    }
+    return debugLogTypeSystem;
+  }
+
+  String _networkDebugLevel({
+    required int? statusCode,
+    required String? error,
+    required int durationMs,
+  }) {
+    final normalizedError = (error ?? '').trim().toLowerCase();
+    if (normalizedError.isNotEmpty && normalizedError != 'null') {
+      return 'error';
+    }
+    if (statusCode != null && statusCode >= 400) {
+      return 'error';
+    }
+    if ((statusCode != null && statusCode >= 300) || durationMs >= 2500) {
+      return 'warn';
+    }
+    return 'info';
   }
 
   void _appendReaderLog({
@@ -206,14 +464,14 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
         ? _compactNetworkHeaders(_jsonSafe(responseHeaders))
         : null;
     final responseBodyFull = keepResponseDetails
-        ? _truncateBody(
+        ? _toBodyPreview(
             _toBodyFull(responseBody),
             keep: _debugNetworkFullBodyKeep,
           )
         : null;
     final responseBodyPreviewSource = keepResponseDetails
         ? responseBodyFull
-        : _truncateBody(
+        : _toBodyPreview(
             _toBodyFull(responseBody),
             keep: _debugNetworkPreviewKeep,
           );
@@ -231,9 +489,9 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
       url,
       statusCode?.toString() ?? 'null',
       error ?? '',
-      requestHeadersSafe?.toString() ?? '',
-      requestDataSafe?.toString() ?? '',
-      responseHeadersSafe?.toString() ?? '',
+      requestHeadersSafe != null ? jsonEncode(requestHeadersSafe) : '',
+      requestDataSafe != null ? jsonEncode(requestDataSafe) : '',
+      responseHeadersSafe != null ? jsonEncode(responseHeadersSafe) : '',
       responseBodyPreview ?? '',
     ].join('|');
 
@@ -253,6 +511,37 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
       existing['requestData'] = requestDataSafe;
       existing['requestHeaders'] = requestHeadersSafe;
       facade.debug.networkLogDedupedCount++;
+      final typedContent = <String, dynamic>{
+        'method': method,
+        'url': url,
+        'statusCode': statusCode,
+        'durationMs': durationMs,
+        'error': error,
+      };
+      if (category != null) {
+        typedContent['category'] = category;
+      }
+      if (requestDataSafe != null) {
+        typedContent['requestData'] = requestDataSafe;
+      }
+      if (responseBodyPreview != null) {
+        typedContent['responseBodyPreview'] = responseBodyPreview;
+      }
+      _appendTypedDebugLog(
+        type: _resolveNetworkDebugLogType(
+          statusCode: statusCode,
+          error: error,
+          durationMs: durationMs,
+        ),
+        level: _networkDebugLevel(
+          statusCode: statusCode,
+          error: error,
+          durationMs: durationMs,
+        ),
+        title: '$method ${statusCode ?? 'ERR'}',
+        source: source,
+        content: typedContent,
+      );
       return;
     }
 
@@ -277,6 +566,37 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
       logEntry['category'] = category;
     }
     recentNetworkLogs.add(logEntry);
+    final typedContent = <String, dynamic>{
+      'method': method,
+      'url': url,
+      'statusCode': statusCode,
+      'durationMs': durationMs,
+      'error': error,
+    };
+    if (category != null) {
+      typedContent['category'] = category;
+    }
+    if (requestDataSafe != null) {
+      typedContent['requestData'] = requestDataSafe;
+    }
+    if (responseBodyPreview != null) {
+      typedContent['responseBodyPreview'] = responseBodyPreview;
+    }
+    _appendTypedDebugLog(
+      type: _resolveNetworkDebugLogType(
+        statusCode: statusCode,
+        error: error,
+        durationMs: durationMs,
+      ),
+      level: _networkDebugLevel(
+        statusCode: statusCode,
+        error: error,
+        durationMs: durationMs,
+      ),
+      title: '$method ${statusCode ?? 'ERR'}',
+      source: source,
+      content: typedContent,
+    );
     if (recentNetworkLogs.length > _debugMaxNetworkLogsKept) {
       recentNetworkLogs.removeRange(
         0,
@@ -619,7 +939,7 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
       }
     }
     if (value is String) {
-      return _truncateBody(value, keep: maxStringLength);
+      return _toBodyPreview(value, keep: maxStringLength);
     }
     if (value is num || value is bool) {
       return value;
@@ -666,6 +986,6 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
       }
       return limited;
     }
-    return _truncateBody(value.toString(), keep: maxStringLength);
+    return _toBodyPreview(value.toString(), keep: maxStringLength);
   }
 }

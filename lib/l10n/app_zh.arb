@@ -760,6 +760,33 @@
     }
   },
   "logsReaderEmpty": "暂无阅读器日志",
+  "logsErrorTitle": "错误日志",
+  "logsActionTitle": "操作日志",
+  "logsSystemTitle": "系统日志",
+  "logsPerformanceTitle": "性能日志",
+  "logsFilterTitle": "筛选日志",
+  "logsMoreTooltip": "更多选项",
+  "logsCopied": "已复制日志",
+  "logsCopyFailed": "复制日志失败：{error}",
+  "@logsCopyFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "logsLoadFailed": "日志加载失败：{error}",
+  "@logsLoadFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "logsEmpty": "暂无日志",
+  "logsSearchHint": "搜索日志",
+  "logsFilterNoResults": "没有匹配的日志",
+  "logsSourceAll": "全部",
+  "logsClearTitle": "清空日志",
+  "logsClearContent": "确定要清空所有已捕获的日志吗？此操作无法撤销。",
+  "logsClearConfirm": "清空",
+  "logsCleared": "日志已清空",
   "tagCategoryLoadTimeout": "标签分类加载超时，请稍后重试",
   "tagCategoryLoadFailed": "标签分类加载失败：{error}",
   "@tagCategoryLoadFailed": {
@@ -916,9 +943,9 @@
   "labTitle": "实验室",
   "advancedTitle": "高级",
   "advancedDebugTitle": "日志",
-  "advancedDebugSubtitle": "网络日志、应用日志与阅读器日志",
+  "advancedDebugSubtitle": "错误日志、操作日志、系统日志与性能日志",
   "advancedSoftwareLogCaptureTitle": "记录软件日志",
-  "advancedSoftwareLogCaptureSubtitle": "关闭后将不再抓取网络日志、应用日志与阅读器日志",
+  "advancedSoftwareLogCaptureSubtitle": "关闭后将不再抓取错误、操作、系统与性能日志",
   "advancedComicIdSearchTitle": "漫画 ID 搜索优化",
   "advancedComicIdSearchSubtitle": "提交搜索时自动过滤非数字字符，仅保留阿拉伯数字作为关键词",
   "advancedNoImageModeTitle": "无图模式",

@@ -6,9 +6,8 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hazuki/l10n/l10n.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
-import 'network_logs_formatter.dart';
+import 'logs_tabs.dart';
 
 class LogsAppBarExportButton extends StatefulWidget {
   const LogsAppBarExportButton({super.key});
@@ -89,35 +88,6 @@ class _LogsAppBarExportButtonState extends State<LogsAppBarExportButton> {
     return file.path;
   }
 
-  Future<void> _exportApplicationLogs() async {
-    final debugInfo = await HazukiSourceService.instance
-        .collectApplicationDebugInfo()
-        .timeout(const Duration(seconds: 10));
-    final prettyText = const JsonEncoder.withIndent('  ').convert(debugInfo);
-    await _saveLogsFile(prefix: 'application', content: prettyText);
-  }
-
-  Future<void> _exportReaderLogs() async {
-    final debugInfo = await HazukiSourceService.instance
-        .collectReaderDebugInfo()
-        .timeout(const Duration(seconds: 10));
-    final prettyText = const JsonEncoder.withIndent('  ').convert(debugInfo);
-    await _saveLogsFile(prefix: 'reader', content: prettyText);
-  }
-
-  Future<void> _exportNetworkLogs() async {
-    final debugInfo = await HazukiSourceService.instance
-        .collectNetworkDebugInfo()
-        .timeout(const Duration(seconds: 10));
-    if (!mounted) {
-      return;
-    }
-    final prettyText = NetworkLogsFormatter(
-      context,
-    ).buildExportText(source: debugInfo);
-    await _saveLogsFile(prefix: 'network', content: prettyText);
-  }
-
   Future<void> _handleExport({required int tabIndex}) async {
     if (_exporting) {
       return;
@@ -127,18 +97,12 @@ class _LogsAppBarExportButtonState extends State<LogsAppBarExportButton> {
     });
     final strings = l10n(context);
     try {
-      switch (tabIndex) {
-        case 0:
-          await _exportNetworkLogs();
-          break;
-        case 2:
-          await _exportReaderLogs();
-          break;
-        case 1:
-        default:
-          await _exportApplicationLogs();
-          break;
-      }
+      final debugInfo = await collectVisibleLogsForIndex(
+        tabIndex,
+      ).timeout(const Duration(seconds: 10));
+      final content = const JsonEncoder.withIndent('  ').convert(debugInfo);
+      final type = (debugInfo['type'] ?? 'logs').toString();
+      await _saveLogsFile(prefix: type, content: content);
     } catch (e) {
       if (!mounted) {
         return;
@@ -166,12 +130,7 @@ class _LogsAppBarExportButtonState extends State<LogsAppBarExportButton> {
       animation: controller,
       builder: (context, _) {
         final tabIndex = controller.index;
-        final exportKey = switch (tabIndex) {
-          0 => 'network_logs_export_visible',
-          1 => 'app_logs_export_visible',
-          2 => 'reader_logs_export_visible',
-          _ => 'logs_export_visible',
-        };
+        final exportKey = 'logs_export_visible_$tabIndex';
         return IconButton(
           key: ValueKey<String>(exportKey),
           tooltip: strings.logsApplicationExportTooltip,
