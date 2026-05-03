@@ -117,18 +117,53 @@ jobs:
         shell: pwsh
         run: choco install innosetup -y --no-progress
 
+      - name: Install Inno Setup Chinese language
+        shell: pwsh
+        run: |
+          $langDir = Join-Path "${env:ProgramFiles(x86)}" "Inno Setup 6\Languages"
+          $langFile = Join-Path $langDir "ChineseSimplified.isl"
+
+          if (-not (Test-Path $langFile)) {
+            $url = "https://raw.githubusercontent.com/jrsoftware/issrc/8043fe6ba56caa22484658b232373a1c28435723/Files/Languages/Unofficial/ChineseSimplified.isl"
+            $expectedHash = "7d544b9bb1d142cfa11f2e5d3cc8abe2e55f8e066c5124e3772675aa236e1278"
+
+            New-Item -ItemType Directory -Path $langDir -Force | Out-Null
+            Invoke-WebRequest -Uri $url -OutFile $langFile
+
+            $actualHash = (Get-FileHash -Algorithm SHA256 $langFile).Hash.ToLowerInvariant()
+            if ($actualHash -ne $expectedHash) {
+              throw "Downloaded ChineseSimplified.isl hash mismatch: $actualHash"
+            }
+          }
+
+      - name: Resolve Windows package version
+        shell: pwsh
+        run: |
+          $refName = "${{ github.ref_name }}"
+          if ($refName -match '^v(.+)$') {
+            $version = $Matches[1]
+          } else {
+            $pubspecVersion = (Select-String -Path "pubspec.yaml" -Pattern '^version:\s*(.+)$').Matches[0].Groups[1].Value.Trim()
+            $version = ($pubspecVersion -split '\+')[0]
+          }
+
+          if ($version -notmatch '^\d+(\.\d+){0,3}$') {
+            throw "Windows installer version '$version' is not a numeric dotted version."
+          }
+
+          "WINDOWS_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
       - name: Build Windows installer
         shell: pwsh
         run: |
-          $version = "${{ github.ref_name }}" -replace '^v', ''
-          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DAppVersion=$version windows\installer.iss
+          $appVersionArg = "/DAppVersion=$env:WINDOWS_VERSION"
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" $appVersionArg windows\installer.iss
 
       - name: Create Windows package
         shell: pwsh
         run: |
-          $version = "${{ github.ref_name }}" -replace '^v', ''
           $exeName = "hazuki-windows-x64-${{ github.ref_name }}-setup.exe"
-          Move-Item -Path "windows\hazuki-windows-x64-${version}-setup.exe" -Destination $exeName
+          Move-Item -Path "windows\hazuki-windows-x64-$env:WINDOWS_VERSION-setup.exe" -Destination $exeName
           $packageName = "hazuki-windows-x64-${{ github.ref_name }}.zip"
           Compress-Archive -Path "build/windows/x64/runner/Release/*" -DestinationPath $packageName -Force
           "WINDOWS_PACKAGE=$packageName" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
