@@ -56,6 +56,8 @@ class CommentsPage extends StatefulWidget {
     this.subId,
     this.isTabView = false,
     this.isActiveInTabView = true,
+    this.showAppBar = true,
+    this.scrollController,
     this.onRequestTabFullscreen,
     this.debugOuterScrollStateBuilder,
   });
@@ -64,6 +66,8 @@ class CommentsPage extends StatefulWidget {
   final String? subId;
   final bool isTabView;
   final bool isActiveInTabView;
+  final bool showAppBar;
+  final ScrollController? scrollController;
   final Future<void> Function()? onRequestTabFullscreen;
   final Map<String, Object?> Function()? debugOuterScrollStateBuilder;
 
@@ -77,7 +81,8 @@ class _CommentsPageState extends State<CommentsPage>
   static const _pageSize = 16;
 
   late final CommentsPageController _controller;
-  final ScrollController _scrollController = ScrollController();
+  late final ScrollController _scrollController;
+  late final bool _ownsScrollController;
   final TextEditingController _commentController = TextEditingController();
   final FocusNode _commentFocusNode = FocusNode();
   final Set<String> _animatedCommentKeys = <String>{};
@@ -108,6 +113,8 @@ class _CommentsPageState extends State<CommentsPage>
   @override
   void initState() {
     super.initState();
+    _ownsScrollController = widget.scrollController == null;
+    _scrollController = widget.scrollController ?? ScrollController();
     _controller = CommentsPageController();
     WidgetsBinding.instance.addObserver(this);
     _commentFocusNode.addListener(_handleCommentFocusChanged);
@@ -121,7 +128,9 @@ class _CommentsPageState extends State<CommentsPage>
     }
     _fullscreenSyncTimers.clear();
     WidgetsBinding.instance.removeObserver(this);
-    _scrollController.dispose();
+    if (_ownsScrollController) {
+      _scrollController.dispose();
+    }
     _commentFocusNode
       ..removeListener(_handleCommentFocusChanged)
       ..dispose();
@@ -273,24 +282,46 @@ class _CommentsPageState extends State<CommentsPage>
       );
     }
 
+    final isFocused = _commentFocusNode.hasFocus;
+    final liveBottomInset = MediaQuery.viewInsetsOf(context).bottom;
+    final bottomInset = !widget.showAppBar
+        ? math.max(liveBottomInset, _keyboardHeight)
+        : 0.0;
     final safeBottom = MediaQuery.paddingOf(context).bottom;
+    final pillHoriz = !widget.showAppBar && isFocused ? 10.0 : 16.0;
+    final pillMarginBottom = !widget.showAppBar && isFocused ? 2.0 : 6.0;
+    final pillApproxHeight = _replyToComment == null ? 72.0 : 126.0;
+    final listExtraBottom = !widget.showAppBar
+        ? pillApproxHeight + pillMarginBottom + safeBottom + bottomInset
+        : 80.0;
+    final composerPositionDuration = bottomInset > 0
+        ? Duration.zero
+        : const Duration(milliseconds: 220);
+    final body = Stack(
+      children: [
+        _buildCommentsBodyList(extraBottomPadding: listExtraBottom),
+        AnimatedPositioned(
+          duration: composerPositionDuration,
+          curve: Curves.easeOutCubic,
+          left: pillHoriz,
+          right: pillHoriz,
+          bottom: safeBottom + pillMarginBottom + bottomInset,
+          child: _buildBottomComposer(),
+        ),
+      ],
+    );
+
+    if (!widget.showAppBar) {
+      return body;
+    }
+
     return Scaffold(
       appBar: hazukiFrostedAppBar(
         context: context,
         title: Text(l10n(context).commentsTitle),
       ),
       resizeToAvoidBottomInset: true,
-      body: Stack(
-        children: [
-          _buildCommentsBodyList(extraBottomPadding: 80),
-          Positioned(
-            left: 16,
-            right: 16,
-            bottom: safeBottom + 6,
-            child: _buildBottomComposer(),
-          ),
-        ],
-      ),
+      body: body,
     );
   }
 
@@ -303,7 +334,7 @@ class _CommentsPageState extends State<CommentsPage>
   }
 
   void _scheduleFullscreenSyncAttempts() {
-    if (!widget.isTabView) {
+    if (widget.onRequestTabFullscreen == null) {
       return;
     }
     final requestEpoch = ++_fullscreenRequestEpoch;
@@ -347,10 +378,7 @@ class _CommentsPageState extends State<CommentsPage>
   }
 
   Future<void> _requestTabFullscreenIfNeeded() async {
-    if (!widget.isTabView) {
-      return;
-    }
-    if (_tabScrollAtTop == false) {
+    if (widget.isTabView && _tabScrollAtTop == false) {
       _logCommentsStateSnapshot(
         'Comments fullscreen request skipped',
         extra: {'reason': 'inner_scroll_not_at_top'},

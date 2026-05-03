@@ -10,7 +10,9 @@ import 'package:hazuki/widgets/widgets.dart';
 import 'logs_tabs.dart';
 
 class LogsAppBarExportButton extends StatefulWidget {
-  const LogsAppBarExportButton({super.key});
+  const LogsAppBarExportButton({super.key, this.collectDebugInfo});
+
+  final Future<Map<String, dynamic>> Function(int tabIndex)? collectDebugInfo;
 
   @override
   State<LogsAppBarExportButton> createState() => _LogsAppBarExportButtonState();
@@ -96,7 +98,8 @@ class _LogsAppBarExportButtonState extends State<LogsAppBarExportButton> {
     });
     final strings = l10n(context);
     try {
-      final debugInfo = await collectVisibleLogsForIndex(
+      final collector = widget.collectDebugInfo ?? collectVisibleLogsForIndex;
+      final debugInfo = await collector(
         tabIndex,
       ).timeout(const Duration(seconds: 10));
       final content = const JsonEncoder.withIndent('  ').convert(debugInfo);

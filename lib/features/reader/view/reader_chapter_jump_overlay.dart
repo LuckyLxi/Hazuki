@@ -5,15 +5,23 @@ class ReaderChapterJumpOverlay extends StatelessWidget {
     super.key,
     required this.controlsVisible,
     required this.onPreviousChapter,
+    required this.onFavorite,
+    required this.onComments,
     required this.onNextChapter,
     required this.previousTooltip,
+    required this.favoriteTooltip,
+    required this.commentsTooltip,
     required this.nextTooltip,
   });
 
   final bool controlsVisible;
   final VoidCallback onPreviousChapter;
+  final VoidCallback onFavorite;
+  final VoidCallback onComments;
   final VoidCallback onNextChapter;
   final String previousTooltip;
+  final String favoriteTooltip;
+  final String commentsTooltip;
   final String nextTooltip;
 
   @override
@@ -58,6 +66,22 @@ class ReaderChapterJumpOverlay extends StatelessWidget {
                           onPressed: onPreviousChapter,
                           icon: const Icon(
                             Icons.skip_previous_rounded,
+                            color: Colors.white,
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: favoriteTooltip,
+                          onPressed: onFavorite,
+                          icon: const Icon(
+                            Icons.favorite_border_rounded,
+                            color: Colors.white,
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: commentsTooltip,
+                          onPressed: onComments,
+                          icon: const Icon(
+                            Icons.mode_comment_outlined,
                             color: Colors.white,
                           ),
                         ),

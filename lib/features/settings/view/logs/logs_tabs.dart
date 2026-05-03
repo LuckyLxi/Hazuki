@@ -53,14 +53,27 @@ Future<Map<String, dynamic>> collectVisibleLogsForIndex(int index) {
   return HazukiSourceService.instance.collectTypedDebugInfo(spec.type);
 }
 
+Map<String, dynamic>? debugInfoForVisibleIndex(
+  Map<String, Map<String, dynamic>>? logsByType,
+  int index,
+) {
+  if (logsByType == null) {
+    return null;
+  }
+  final clampedIndex = index.clamp(0, logsTabSpecs.length - 1).toInt();
+  final spec = logsTabSpecs[clampedIndex];
+  return logsByType[spec.type];
+}
+
 String formatVisibleLogs(Map<String, dynamic> debugInfo) {
   return const JsonEncoder.withIndent('  ').convert(debugInfo);
 }
 
 class DebugLogsTab extends StatefulWidget {
-  const DebugLogsTab({super.key, required this.spec});
+  const DebugLogsTab({super.key, required this.spec, this.debugInfoOverride});
 
   final LogsTabSpec spec;
+  final Map<String, dynamic>? debugInfoOverride;
 
   @override
   State<DebugLogsTab> createState() => _DebugLogsTabState();
@@ -73,6 +86,7 @@ class _DebugLogsTabState extends State<DebugLogsTab>
   bool _loading = true;
   String _searchQuery = '';
   String? _selectedSource;
+  String _selectedMinLevel = 'warn';
 
   @override
   bool get wantKeepAlive => true;
@@ -80,13 +94,32 @@ class _DebugLogsTabState extends State<DebugLogsTab>
   @override
   void initState() {
     super.initState();
-    unawaited(_loadLogs());
+    final override = widget.debugInfoOverride;
+    if (override != null) {
+      _debugInfo = override;
+      _loading = false;
+    } else {
+      unawaited(_loadLogs());
+    }
   }
 
   @override
   void didUpdateWidget(DebugLogsTab oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.spec.type != widget.spec.type) {
+    if (oldWidget.debugInfoOverride != widget.debugInfoOverride) {
+      final override = widget.debugInfoOverride;
+      setState(() {
+        _debugInfo = override;
+        _errorText = null;
+        _loading = override == null;
+      });
+      if (override == null) {
+        unawaited(_loadLogs());
+      }
+      return;
+    }
+    if (widget.debugInfoOverride == null &&
+        oldWidget.spec.type != widget.spec.type) {
       unawaited(_loadLogs());
     }
   }
@@ -133,10 +166,20 @@ class _DebugLogsTabState extends State<DebugLogsTab>
         .toList(growable: false);
   }
 
+  static int _levelRank(String level) => switch (level) {
+    'error' => 2,
+    'warn' || 'warning' => 1,
+    _ => 0,
+  };
+
   List<Map<String, dynamic>> _filteredLogs() {
     final raw = _rawLogs();
-    if (_searchQuery.isEmpty && _selectedSource == null) return raw;
     return raw.where((log) {
+      if (_selectedMinLevel != 'all') {
+        final minRank = _levelRank(_selectedMinLevel);
+        final logLevel = (log['level'] as String? ?? 'info').toLowerCase();
+        if (_levelRank(logLevel) < minRank) return false;
+      }
       if (_selectedSource != null && log['source'] != _selectedSource) {
         return false;
       }
@@ -206,6 +249,12 @@ class _DebugLogsTabState extends State<DebugLogsTab>
             _searchQuery = '';
           }),
         ),
+        _LevelFilterChips(
+          selected: _selectedMinLevel,
+          onSelected: (v) => setState(() {
+            _selectedMinLevel = v;
+          }),
+        ),
         if (sources.length > 1)
           _SourceFilterChips(
             sources: sources,
@@ -238,6 +287,59 @@ class _DebugLogsTabState extends State<DebugLogsTab>
                 ),
         ),
       ],
+    );
+  }
+}
+
+class _LevelFilterChips extends StatelessWidget {
+  const _LevelFilterChips({required this.selected, required this.onSelected});
+
+  final String selected;
+  final ValueChanged<String> onSelected;
+
+  static const _levels = [
+    ('warn', 'Warn+'),
+    ('error', 'Error'),
+    ('all', 'All'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return SizedBox(
+      height: 40,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
+        itemCount: _levels.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 6),
+        itemBuilder: (context, index) {
+          final (key, label) = _levels[index];
+          final isSelected = selected == key;
+          return FilterChip(
+            label: Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                color: isSelected
+                    ? colorScheme.onSecondaryContainer
+                    : colorScheme.onSurfaceVariant,
+              ),
+            ),
+            selected: isSelected,
+            onSelected: (_) => onSelected(key),
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            visualDensity: VisualDensity.compact,
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            showCheckmark: false,
+            selectedColor: colorScheme.secondaryContainer,
+            backgroundColor: colorScheme.surfaceContainerHighest.withValues(
+              alpha: 0.4,
+            ),
+            side: BorderSide.none,
+          );
+        },
+      ),
     );
   }
 }

@@ -7,7 +7,11 @@ import 'package:flutter/services.dart';
 
 import 'package:hazuki/app/app.dart';
 import 'package:hazuki/app/windows_title_bar_controller.dart';
+import 'package:hazuki/features/comic_detail/repository/comic_detail_repository.dart';
+import 'package:hazuki/features/comic_detail/support/comic_detail_favorite_controller.dart';
+import 'package:hazuki/features/comic_detail/view/comic_detail_favorite_dialog.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_panels.dart';
+import 'package:hazuki/features/comments/comments.dart';
 import 'package:hazuki/features/reader/reader.dart';
 import 'package:hazuki/features/reader/state/reader_image_pipeline_state.dart';
 import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
@@ -62,6 +66,8 @@ class _ReaderPageState extends State<ReaderPage>
   final ReaderRuntimeState _runtimeState = ReaderRuntimeState();
   final ReaderImagePipelineState _imagePipelineState =
       ReaderImagePipelineState();
+  final ComicDetailFavoriteController _favoriteController =
+      ComicDetailFavoriteController(repository: const ComicDetailRepository());
 
   late final AnimationController _resetAnimController = AnimationController(
     vsync: this,
@@ -193,6 +199,7 @@ class _ReaderPageState extends State<ReaderPage>
     _windowsTitleBarController?.releaseCustomTitleBarSuppression(this);
     _resetAnimController.dispose();
     _sessionController.dispose();
+    _favoriteController.dispose();
     super.dispose();
   }
 
@@ -386,6 +393,12 @@ class _ReaderPageState extends State<ReaderPage>
       runtimeState: _runtimeState,
       onPreviousChapter: () {
         unawaited(_jumpToAdjacentChapter(-1));
+      },
+      onFavorite: () {
+        unawaited(_openFavoriteDialog());
+      },
+      onComments: () {
+        unawaited(_openCommentsSheet());
       },
       onNextChapter: () {
         unawaited(_jumpToAdjacentChapter(1));
@@ -622,6 +635,86 @@ class _ReaderPageState extends State<ReaderPage>
     _scaffoldKey.currentState?.openEndDrawer();
   }
 
+  Future<ComicDetailsData> _loadReaderComicDetails() async {
+    final details =
+        _chapterDetailsCache ??
+        await _sessionController.loadComicDetails(widget.comicId);
+    _chapterDetailsCache ??= details;
+    return details;
+  }
+
+  Future<void> _openFavoriteDialog() async {
+    _logReaderEvent('Reader favorite dialog requested', source: 'reader_ui');
+    try {
+      final details = await _loadReaderComicDetails();
+      if (!mounted) {
+        return;
+      }
+      await _favoriteController.showFoldersDialog(context, details, (vm) {
+        final themedData = widget.comicTheme ?? Theme.of(context);
+        return Theme(
+          data: themedData,
+          child: FavoriteFoldersMorphDialog(viewModel: vm),
+        );
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      unawaited(
+        showHazukiPrompt(
+          context,
+          l10n(context).comicDetailFavoriteSettingsUpdateFailed('$error'),
+          isError: true,
+        ),
+      );
+    }
+  }
+
+  Future<void> _openCommentsSheet() async {
+    _logReaderEvent('Reader comments sheet requested', source: 'reader_ui');
+    try {
+      final details = await _loadReaderComicDetails();
+      if (!mounted) {
+        return;
+      }
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        isDismissible: true,
+        enableDrag: false,
+        useSafeArea: false,
+        backgroundColor: Colors.transparent,
+        barrierColor: Colors.black.withValues(alpha: 0.46),
+        sheetAnimationStyle: const AnimationStyle(
+          duration: Duration(milliseconds: 360),
+          reverseDuration: Duration(milliseconds: 260),
+        ),
+        builder: (routeContext) {
+          final themedData = widget.comicTheme ?? Theme.of(routeContext);
+          return Theme(
+            data: themedData,
+            child: _ReaderCommentsSheet(
+              comicId: details.id,
+              subId: details.subId.isEmpty ? null : details.subId,
+            ),
+          );
+        },
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      unawaited(
+        showHazukiPrompt(
+          context,
+          l10n(context).commentsLoadFailed('$error'),
+          isError: true,
+        ),
+      );
+    }
+  }
+
   Future<void> _openChaptersPanel() async {
     if (_chapterPanelLoading) {
       return;
@@ -638,10 +731,7 @@ class _ReaderPageState extends State<ReaderPage>
       }),
     );
     try {
-      final details =
-          _chapterDetailsCache ??
-          await _sessionController.loadComicDetails(widget.comicId);
-      _chapterDetailsCache ??= details;
+      final details = await _loadReaderComicDetails();
       if (!mounted) {
         return;
       }
@@ -766,10 +856,7 @@ class _ReaderPageState extends State<ReaderPage>
     final navigator = Navigator.of(context);
     final strings = l10n(context);
     try {
-      final details =
-          _chapterDetailsCache ??
-          await _sessionController.loadComicDetails(widget.comicId);
-      _chapterDetailsCache ??= details;
+      final details = await _loadReaderComicDetails();
       final chapterEntries = details.chapters.entries.toList(growable: false);
       if (chapterEntries.isEmpty) {
         return;
@@ -1141,6 +1228,145 @@ class _ReaderPageState extends State<ReaderPage>
         if (_runtimeState.readerMode == ReaderMode.topToBottom)
           'nearbyRenderedItems': _captureRenderedItemsAround(safeIndex),
       }),
+    );
+  }
+}
+
+class _ReaderCommentsSheet extends StatefulWidget {
+  const _ReaderCommentsSheet({required this.comicId, required this.subId});
+
+  final String comicId;
+  final String? subId;
+
+  @override
+  State<_ReaderCommentsSheet> createState() => _ReaderCommentsSheetState();
+}
+
+class _ReaderCommentsSheetState extends State<_ReaderCommentsSheet> {
+  final DraggableScrollableController _sheetController =
+      DraggableScrollableController();
+  bool _sheetAtFullHeight = false;
+
+  @override
+  void dispose() {
+    _sheetController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _expandToFullscreen() async {
+    if (!_sheetController.isAttached) {
+      return;
+    }
+    await _sheetController.animateTo(
+      1,
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    return NotificationListener<DraggableScrollableNotification>(
+      onNotification: (notification) {
+        final nextAtFullHeight = notification.extent >= 0.98;
+        if (nextAtFullHeight != _sheetAtFullHeight) {
+          setState(() {
+            _sheetAtFullHeight = nextAtFullHeight;
+          });
+        }
+        return false;
+      },
+      child: DraggableScrollableSheet(
+        controller: _sheetController,
+        initialChildSize: 0.64,
+        minChildSize: 0.64,
+        maxChildSize: 1,
+        shouldCloseOnMinExtent: false,
+        expand: false,
+        builder: (context, scrollController) {
+          return DecoratedBox(
+            decoration: BoxDecoration(
+              color: cs.surface,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(24),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.24),
+                  blurRadius: 28,
+                  offset: const Offset(0, -8),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(24),
+              ),
+              child: SafeArea(
+                top: _sheetAtFullHeight,
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 8, 4),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Center(
+                                  child: Container(
+                                    width: 38,
+                                    height: 4,
+                                    margin: const EdgeInsets.only(bottom: 12),
+                                    decoration: BoxDecoration(
+                                      color: cs.onSurfaceVariant.withValues(
+                                        alpha: 0.28,
+                                      ),
+                                      borderRadius: BorderRadius.circular(999),
+                                    ),
+                                  ),
+                                ),
+                                Text(
+                                  l10n(context).commentsTitle,
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: l10n(context).commonClose,
+                            onPressed: () => Navigator.of(context).pop(),
+                            icon: const Icon(Icons.close_rounded),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Divider(
+                      height: 1,
+                      color: cs.outlineVariant.withValues(alpha: 0.48),
+                    ),
+                    Expanded(
+                      child: CommentsPage(
+                        comicId: widget.comicId,
+                        subId: widget.subId,
+                        showAppBar: false,
+                        scrollController: scrollController,
+                        onRequestTabFullscreen: _expandToFullscreen,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 }

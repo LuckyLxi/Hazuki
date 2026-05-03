@@ -171,13 +171,19 @@ Widget buildReaderChapterJumpOverlay({
   required BuildContext context,
   required ReaderRuntimeState runtimeState,
   required VoidCallback onPreviousChapter,
+  required VoidCallback onFavorite,
+  required VoidCallback onComments,
   required VoidCallback onNextChapter,
 }) {
   return ReaderChapterJumpOverlay(
     controlsVisible: runtimeState.controlsVisible,
     onPreviousChapter: onPreviousChapter,
+    onFavorite: onFavorite,
+    onComments: onComments,
     onNextChapter: onNextChapter,
     previousTooltip: l10n(context).readerPreviousChapter,
+    favoriteTooltip: l10n(context).comicDetailFavorite,
+    commentsTooltip: l10n(context).commentsTitle,
     nextTooltip: l10n(context).readerNextChapter,
   );
 }
