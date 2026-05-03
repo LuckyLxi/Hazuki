@@ -25,13 +25,12 @@ class _LogsAppBarExportButtonState extends State<LogsAppBarExportButton> {
 
   String _buildSuggestedFileName(String prefix) {
     final now = DateTime.now();
-    final yyyy = now.year.toString().padLeft(4, '0');
     final mm = now.month.toString().padLeft(2, '0');
     final dd = now.day.toString().padLeft(2, '0');
     final hh = now.hour.toString().padLeft(2, '0');
     final mi = now.minute.toString().padLeft(2, '0');
     final ss = now.second.toString().padLeft(2, '0');
-    return 'hazuki_${prefix}_logs_$yyyy$mm${dd}_$hh$mi$ss.json';
+    return 'hz-$prefix-$mm$dd-$hh$mi$ss.json';
   }
 
   Future<void> _saveLogsFile({

@@ -161,6 +161,9 @@
     }
   },
   "dialogBarrierLabel": "Dialog",
+  "windowsAdaptationNoticeTitle": "Notice",
+  "windowsAdaptationNoticeMessage": "The Windows version is still being adapted. Some features and interactions may not feel fully polished yet. Improvements will continue in future updates.",
+  "windowsAdaptationNoticeAccept": "Got it",
   "aboutTitle": "About",
   "aboutVersion": "Version {version}",
   "@aboutVersion": {

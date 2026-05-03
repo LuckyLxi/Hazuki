@@ -8,6 +8,7 @@ import 'software_update_dialog_support.dart';
 import 'source_runtime_coordinator.dart';
 import 'source_runtime_widgets.dart';
 import 'source_update_dialog_support.dart';
+import 'windows_adaptation_notice_dialog_support.dart';
 
 class HazukiAppStartupCoordinator extends ChangeNotifier {
   HazukiAppStartupCoordinator({
@@ -15,11 +16,15 @@ class HazukiAppStartupCoordinator extends ChangeNotifier {
     required SourceRuntimeCoordinator sourceRuntimeCoordinator,
     required SourceUpdateDialogSupport sourceUpdateDialogSupport,
     required SoftwareUpdateDialogSupport softwareUpdateDialogSupport,
+    WindowsAdaptationNoticeDialogSupport windowsAdaptationNoticeDialogSupport =
+        const WindowsAdaptationNoticeDialogSupport(),
     required bool Function() isMounted,
   }) : _navigatorKey = navigatorKey,
        _sourceRuntimeCoordinator = sourceRuntimeCoordinator,
        _sourceUpdateDialogSupport = sourceUpdateDialogSupport,
        _softwareUpdateDialogSupport = softwareUpdateDialogSupport,
+       _windowsAdaptationNoticeDialogSupport =
+           windowsAdaptationNoticeDialogSupport,
        _isMounted = isMounted;
 
   static const _sourceUpdateSkipDateKey = 'source_update_skip_date';
@@ -29,6 +34,8 @@ class HazukiAppStartupCoordinator extends ChangeNotifier {
   final SourceRuntimeCoordinator _sourceRuntimeCoordinator;
   final SourceUpdateDialogSupport _sourceUpdateDialogSupport;
   final SoftwareUpdateDialogSupport _softwareUpdateDialogSupport;
+  final WindowsAdaptationNoticeDialogSupport
+  _windowsAdaptationNoticeDialogSupport;
   final bool Function() _isMounted;
 
   int _homeRefreshTick = 0;
@@ -163,6 +170,17 @@ class HazukiAppStartupCoordinator extends ChangeNotifier {
     _allowDiscoverInitialLoad = true;
     _homeRefreshTick++;
     notifyListeners();
+    unawaited(_showWindowsAdaptationNoticeThenCheckSoftwareUpdate());
+  }
+
+  Future<void> _showWindowsAdaptationNoticeThenCheckSoftwareUpdate() async {
+    await _windowsAdaptationNoticeDialogSupport.showIfNeeded(
+      navigatorKey: _navigatorKey,
+      isMounted: _isMounted,
+    );
+    if (!_isMounted()) {
+      return;
+    }
     _scheduleAutomaticSoftwareUpdateCheck();
   }
 

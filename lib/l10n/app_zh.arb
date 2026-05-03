@@ -161,6 +161,9 @@
     }
   },
   "dialogBarrierLabel": "对话框",
+  "windowsAdaptationNoticeTitle": "提示",
+  "windowsAdaptationNoticeMessage": "Windows 版本目前仍在适配中，部分功能和交互体验可能还不够完善。后续会继续优化。",
+  "windowsAdaptationNoticeAccept": "知道了",
   "aboutTitle": "关于",
   "aboutVersion": "版本 {version}",
   "@aboutVersion": {
