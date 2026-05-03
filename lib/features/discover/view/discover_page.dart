@@ -65,11 +65,13 @@ class _DiscoverPageState extends State<DiscoverPage> {
   void didUpdateWidget(covariant DiscoverPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.onSearchMorphProgressChanged !=
-        widget.onSearchMorphProgressChanged) {
-      widget.onSearchMorphProgressChanged?.call(_effectiveSearchMorphProgress);
-    }
-    if (oldWidget.usePinnedSearchInAppBar != widget.usePinnedSearchInAppBar) {
-      widget.onSearchMorphProgressChanged?.call(_effectiveSearchMorphProgress);
+            widget.onSearchMorphProgressChanged ||
+        oldWidget.usePinnedSearchInAppBar != widget.usePinnedSearchInAppBar) {
+      final progress = _effectiveSearchMorphProgress;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        widget.onSearchMorphProgressChanged?.call(progress);
+      });
     }
     if (!oldWidget.allowInitialLoad &&
         widget.allowInitialLoad &&

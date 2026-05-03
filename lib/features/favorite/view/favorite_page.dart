@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:hazuki/features/favorite/favorite.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
@@ -180,7 +181,15 @@ class FavoritePageState extends State<FavoritePage>
       return;
     }
     _lastReportedAppBarActionsState = nextState;
-    widget.onAppBarActionsChanged?.call(nextState);
+    if (SchedulerBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        widget.onAppBarActionsChanged?.call(nextState);
+      });
+    } else {
+      widget.onAppBarActionsChanged?.call(nextState);
+    }
   }
 
   void _onScroll() {

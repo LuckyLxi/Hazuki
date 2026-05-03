@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
 import 'package:hazuki/features/favorite/favorite.dart';
@@ -153,7 +154,14 @@ class HomeCoordinator extends ChangeNotifier {
   }
 
   void _relayChange() {
-    if (!_disposed) {
+    if (_disposed) return;
+
+    if (SchedulerBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        if (!_disposed) notifyListeners();
+      });
+    } else {
       notifyListeners();
     }
   }
