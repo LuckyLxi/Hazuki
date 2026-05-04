@@ -118,6 +118,7 @@ class _CommentsPageState extends State<CommentsPage>
     _controller = CommentsPageController();
     WidgetsBinding.instance.addObserver(this);
     _commentFocusNode.addListener(_handleCommentFocusChanged);
+    CommentFilterService.instance.addListener(_onFilterChanged);
     unawaited(_loadInitial());
   }
 
@@ -131,11 +132,19 @@ class _CommentsPageState extends State<CommentsPage>
     if (_ownsScrollController) {
       _scrollController.dispose();
     }
+    CommentFilterService.instance.removeListener(_onFilterChanged);
     _commentFocusNode
       ..removeListener(_handleCommentFocusChanged)
       ..dispose();
     _commentController.dispose();
     super.dispose();
+  }
+
+  void _onFilterChanged() {
+    if (mounted) {
+      setState(() {});
+      _maybeLoadMoreForHiddenFilter();
+    }
   }
 
   @override
@@ -434,11 +443,15 @@ class _CommentsPageState extends State<CommentsPage>
   ) {
     final merged = <String, ComicCommentData>{};
     for (final comment in existing) {
-      final key = '${comment.userName}|${comment.time}|${comment.content}';
+      final key =
+          comment.id ??
+          '${comment.userName}|${comment.time}|${comment.content}';
       merged[key] = comment;
     }
     for (final comment in incoming) {
-      final key = '${comment.userName}|${comment.time}|${comment.content}';
+      final key =
+          comment.id ??
+          '${comment.userName}|${comment.time}|${comment.content}';
       merged[key] = comment;
     }
     return merged.values.toList();
@@ -460,6 +473,7 @@ class _CommentsPageState extends State<CommentsPage>
     _updateCommentsState(() {
       _initialLoading = true;
       _loadingMore = false;
+      _animatedCommentKeys.clear();
     });
     final startedAt = DateTime.now();
     _logCommentsEvent('Comments load started', content: {'page': 1});
@@ -509,6 +523,7 @@ class _CommentsPageState extends State<CommentsPage>
         _updateCommentsState(() {
           _initialLoading = false;
         });
+        _maybeLoadMoreForHiddenFilter();
       }
     }
   }
@@ -568,6 +583,7 @@ class _CommentsPageState extends State<CommentsPage>
           'maxPage': pageResult.maxPage ?? _maxPage,
         },
       );
+      _maybeLoadMoreForHiddenFilter();
     } catch (_) {
       if (mounted) {
         _updateCommentsState(() {
@@ -676,7 +692,7 @@ class _CommentsPageState extends State<CommentsPage>
   Widget _buildCommentTile(ComicCommentData comment, int index) {
     final filter = CommentFilterService.instance;
     if (filter.mode == CommentFilterMode.collapse &&
-        filter.isFiltered(comment.content)) {
+        filter.isFiltered(normalizeCommentText(comment.content))) {
       final key =
           comment.id ??
           '${comment.userName}|${comment.time}|${comment.content}';
@@ -1005,32 +1021,41 @@ class _CommentsPageState extends State<CommentsPage>
     );
   }
 
-  void _maybeLoadMoreForHiddenFilter(int visibleCount, int hiddenCount) {
-    if (hiddenCount <= 0 ||
-        visibleCount >= _pageSize ||
-        _initialLoading ||
+  void _maybeLoadMoreForHiddenFilter() {
+    final filter = CommentFilterService.instance;
+    if (filter.mode != CommentFilterMode.hide) return;
+    if (_initialLoading ||
         _loadingMore ||
         !_hasMore ||
         _hideFilterLoadMoreQueued) {
       return;
     }
+    final visibleCount = _comments
+        .where((c) => !filter.isFiltered(normalizeCommentText(c.content)))
+        .length;
+    if (visibleCount >= _pageSize || visibleCount == _comments.length) return;
+
     _hideFilterLoadMoreQueued = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    unawaited(_doHiddenFilterLoadMore());
+  }
+
+  Future<void> _doHiddenFilterLoadMore() async {
+    try {
+      while (mounted && _hasMore && !_initialLoading) {
+        final previousPage = _currentPage;
+        await _loadMore();
+        if (!mounted) return;
+        if (_currentPage == previousPage) return;
+        final filter = CommentFilterService.instance;
+        if (filter.mode != CommentFilterMode.hide) return;
+        final visibleCount = _comments
+            .where((c) => !filter.isFiltered(normalizeCommentText(c.content)))
+            .length;
+        if (visibleCount >= _pageSize) return;
+      }
+    } finally {
       _hideFilterLoadMoreQueued = false;
-      if (!mounted || _initialLoading || _loadingMore || !_hasMore) {
-        return;
-      }
-      final filter = CommentFilterService.instance;
-      if (filter.mode != CommentFilterMode.hide) {
-        return;
-      }
-      final currentVisibleCount = _comments
-          .where((c) => !filter.isFiltered(c.content))
-          .length;
-      if (currentVisibleCount < _pageSize) {
-        unawaited(_loadMore());
-      }
-    });
+    }
   }
 
   Widget _buildCommentsBodyList({double extraBottomPadding = 0}) {
@@ -1040,12 +1065,11 @@ class _CommentsPageState extends State<CommentsPage>
     final listBottomPadding = EdgeInsets.only(bottom: 10 + extraBottomPadding);
     final filter = CommentFilterService.instance;
     final visibleComments = filter.mode == CommentFilterMode.hide
-        ? _comments.where((c) => !filter.isFiltered(c.content)).toList()
+        ? _comments
+              .where((c) => !filter.isFiltered(normalizeCommentText(c.content)))
+              .toList()
         : _comments;
     final hiddenCount = _comments.length - visibleComments.length;
-    if (filter.mode == CommentFilterMode.hide) {
-      _maybeLoadMoreForHiddenFilter(visibleComments.length, hiddenCount);
-    }
 
     if (widget.isTabView) {
       final overlapHandle = NestedScrollView.sliverOverlapAbsorberHandleFor(

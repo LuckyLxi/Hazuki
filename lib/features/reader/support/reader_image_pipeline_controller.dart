@@ -320,7 +320,7 @@ class ReaderImagePipelineController {
       );
       // Keep the error state visible so the user can retry again.
     } finally {
-      if (_isMounted()) {
+      if (!_pipelineState.disposed && _isMounted()) {
         _updateState(() {
           retryingImageUrls.remove(normalized);
         });
@@ -440,17 +440,19 @@ class ReaderImagePipelineController {
           break;
         }
         await _prefetchAheadFrom(currentIndex);
+        if (_pipelineState.disposed) break;
       }
     } finally {
       _pipelineState.prefetchAheadRunning = false;
-      if (_pipelineState.queuedPrefetchAheadIndex != null) {
+      if (!_pipelineState.disposed &&
+          _pipelineState.queuedPrefetchAheadIndex != null) {
         unawaited(_drainPrefetchAheadQueue());
       }
     }
   }
 
   Future<void> _prefetchAheadFrom(int currentSpreadIndex) async {
-    if (_runtimeState.images.isEmpty) {
+    if (_pipelineState.disposed || _runtimeState.images.isEmpty) {
       return;
     }
     var start =

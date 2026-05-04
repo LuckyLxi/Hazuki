@@ -122,7 +122,6 @@ class ReaderSessionController {
     _scrollController.addListener(_onScrollPositionChanged);
     _zoomController.addListener(_onZoomChanged);
     unawaited(loadReadingSettings());
-    unawaited(_recordReadingProgress());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_isMounted()) {
         _readerKeyFocusNode.requestFocus();
@@ -168,6 +167,7 @@ class ReaderSessionController {
             : lastVisiblePageIndex + 1,
       }),
     );
+    unawaited(_recordReadingProgress(lastPageIndex: lastVisiblePageIndex));
     unawaited(restoreReaderDisplay());
   }
 
@@ -210,13 +210,14 @@ class ReaderSessionController {
     );
   }
 
-  Future<void> _recordReadingProgress() async {
+  Future<void> _recordReadingProgress({int lastPageIndex = 0}) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final progress = {
         'epId': _epId,
         'title': _chapterTitle,
         'index': _chapterIndex,
+        'pageIndex': lastPageIndex,
         'timestamp': DateTime.now().millisecondsSinceEpoch,
       };
       await prefs.setString('reading_progress_$_comicId', jsonEncode(progress));
