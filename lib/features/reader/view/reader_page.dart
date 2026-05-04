@@ -21,6 +21,7 @@ import 'package:hazuki/features/reader/support/reader_display_bridge.dart';
 import 'package:hazuki/features/reader/support/reader_image_pipeline_controller.dart';
 import 'package:hazuki/features/reader/support/reader_navigation_controller.dart';
 import 'package:hazuki/features/reader/support/reader_session_controller.dart';
+import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/features/reader/support/reader_zoom_controller.dart';
 import 'package:hazuki/features/reader/view/reader_image_views.dart';
 import 'package:hazuki/features/reader/view/reader_overlay_builders.dart';
@@ -99,6 +100,7 @@ class _ReaderPageState extends State<ReaderPage>
         epId: widget.epId,
         loadImagesErrorBuilder: (error) =>
             l10n(context).readerChapterLoadFailed('$error'),
+        sourceService: HazukiSourceService.instance,
       );
   late final ReaderZoomController _readerZoomController = ReaderZoomController(
     transformationController: _zoomController,
@@ -150,6 +152,7 @@ class _ReaderPageState extends State<ReaderPage>
         chapterTitle: widget.chapterTitle,
         chapterIndex: widget.chapterIndex,
         widgetImages: widget.images,
+        sourceService: HazukiSourceService.instance,
       );
 
   ComicDetailsData? _chapterDetailsCache;

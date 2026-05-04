@@ -36,7 +36,7 @@ class ReaderSessionController {
     required String chapterTitle,
     required int chapterIndex,
     required List<String> widgetImages,
-    HazukiSourceService? sourceService,
+    required HazukiSourceService sourceService,
   }) : _runtimeState = runtimeState,
        _displayBridge = displayBridge,
        _settingsStore = settingsStore,
@@ -58,7 +58,7 @@ class ReaderSessionController {
        _chapterTitle = chapterTitle,
        _chapterIndex = chapterIndex,
        _widgetImages = widgetImages,
-       _sourceService = sourceService ?? HazukiSourceService.instance;
+       _sourceService = sourceService;
 
   final ReaderRuntimeState _runtimeState;
   final ReaderDisplayBridge _displayBridge;

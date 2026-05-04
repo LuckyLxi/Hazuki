@@ -9,7 +9,6 @@ import 'package:hazuki/features/comments/support/comments_content_support.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/services/comment_filter_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
 import 'comments_widgets.dart';
@@ -118,7 +117,7 @@ class _CommentsPageState extends State<CommentsPage>
     _controller = CommentsPageController();
     WidgetsBinding.instance.addObserver(this);
     _commentFocusNode.addListener(_handleCommentFocusChanged);
-    CommentFilterService.instance.addListener(_onFilterChanged);
+    _controller.addFilterListener(_onFilterChanged);
     unawaited(_loadInitial());
   }
 
@@ -132,7 +131,7 @@ class _CommentsPageState extends State<CommentsPage>
     if (_ownsScrollController) {
       _scrollController.dispose();
     }
-    CommentFilterService.instance.removeListener(_onFilterChanged);
+    _controller.removeFilterListener(_onFilterChanged);
     _commentFocusNode
       ..removeListener(_handleCommentFocusChanged)
       ..dispose();
@@ -690,9 +689,7 @@ class _CommentsPageState extends State<CommentsPage>
   }
 
   Widget _buildCommentTile(ComicCommentData comment, int index) {
-    final filter = CommentFilterService.instance;
-    if (filter.mode == CommentFilterMode.collapse &&
-        filter.isFiltered(normalizeCommentText(comment.content))) {
+    if (_controller.isCollapsedComment(comment.content)) {
       final key =
           comment.id ??
           '${comment.userName}|${comment.time}|${comment.content}';
@@ -1022,17 +1019,14 @@ class _CommentsPageState extends State<CommentsPage>
   }
 
   void _maybeLoadMoreForHiddenFilter() {
-    final filter = CommentFilterService.instance;
-    if (filter.mode != CommentFilterMode.hide) return;
+    if (!_controller.filterModeIsHide) return;
     if (_initialLoading ||
         _loadingMore ||
         !_hasMore ||
         _hideFilterLoadMoreQueued) {
       return;
     }
-    final visibleCount = _comments
-        .where((c) => !filter.isFiltered(normalizeCommentText(c.content)))
-        .length;
+    final visibleCount = _controller.visibleComments(_comments).length;
     if (visibleCount >= _pageSize || visibleCount == _comments.length) return;
 
     _hideFilterLoadMoreQueued = true;
@@ -1046,11 +1040,8 @@ class _CommentsPageState extends State<CommentsPage>
         await _loadMore();
         if (!mounted) return;
         if (_currentPage == previousPage) return;
-        final filter = CommentFilterService.instance;
-        if (filter.mode != CommentFilterMode.hide) return;
-        final visibleCount = _comments
-            .where((c) => !filter.isFiltered(normalizeCommentText(c.content)))
-            .length;
+        if (!_controller.filterModeIsHide) return;
+        final visibleCount = _controller.visibleComments(_comments).length;
         if (visibleCount >= _pageSize) return;
       }
     } finally {
@@ -1063,12 +1054,7 @@ class _CommentsPageState extends State<CommentsPage>
         ? const HazukiLoadMoreFooter()
         : const SizedBox(height: 4);
     final listBottomPadding = EdgeInsets.only(bottom: 10 + extraBottomPadding);
-    final filter = CommentFilterService.instance;
-    final visibleComments = filter.mode == CommentFilterMode.hide
-        ? _comments
-              .where((c) => !filter.isFiltered(normalizeCommentText(c.content)))
-              .toList()
-        : _comments;
+    final visibleComments = _controller.visibleComments(_comments);
     final hiddenCount = _comments.length - visibleComments.length;
 
     if (widget.isTabView) {
