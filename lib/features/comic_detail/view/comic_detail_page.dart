@@ -137,6 +137,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
             chapterIndex: chapterIndex,
             images: const [],
             comicTheme: comicTheme,
+            favoriteController: _favoriteController,
           ),
       searchPageBuilder: (initialKeyword) => SearchPage(
         initialKeyword: initialKeyword,

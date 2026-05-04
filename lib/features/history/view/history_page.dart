@@ -127,18 +127,16 @@ class _HistoryPageState extends State<HistoryPage> {
         }
       } catch (_) {}
     }
-    final jsonList = history
-        .map((e) {
-          final base = existingById[e.id] ?? <String, dynamic>{};
-          return <String, dynamic>{
-            ...base,
-            'id': e.id,
-            'title': e.title,
-            'cover': e.cover,
-            'subTitle': e.subTitle,
-          };
-        })
-        .toList();
+    final jsonList = history.map((e) {
+      final base = existingById[e.id] ?? <String, dynamic>{};
+      return <String, dynamic>{
+        ...base,
+        'id': e.id,
+        'title': e.title,
+        'cover': e.cover,
+        'subTitle': e.subTitle,
+      };
+    }).toList();
     await prefs.setString('hazuki_read_history', jsonEncode(jsonList));
   }
 
