@@ -70,6 +70,7 @@ class ComicDetailActionsController extends ChangeNotifier {
         pageBuilder: (dialogContext, animation, secondaryAnimation) {
           return _coverPreviewPageBuilder(
             imageUrl: normalized,
+            sourceKey: _comic.sourceKey,
             heroTag: _heroTag,
             onLongPress: () {
               unawaited(HapticFeedback.selectionClick());
@@ -258,7 +259,10 @@ class ComicDetailActionsController extends ChangeNotifier {
     String imageUrl,
   ) async {
     try {
-      final bytes = await _repository.downloadImageBytes(imageUrl);
+      final bytes = await _repository.downloadImageBytes(
+        imageUrl,
+        sourceKey: _comic.sourceKey,
+      );
       final uri = Uri.tryParse(imageUrl);
       final lastSegment = uri?.pathSegments.isNotEmpty == true
           ? uri!.pathSegments.last

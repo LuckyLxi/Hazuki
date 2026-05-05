@@ -22,6 +22,7 @@ class ComicDetailSessionController extends ChangeNotifier {
   ComicDetailSessionController({
     required ComicDetailRepository repository,
     required ExploreComic comic,
+    required String sourceKey,
     required bool? shouldAnimateInitialRevealOverride,
     required TickerProvider vsync,
     required ScrollController scrollController,
@@ -32,6 +33,7 @@ class ComicDetailSessionController extends ChangeNotifier {
     applyInitialFavoriteOverrides,
   }) : _repository = repository,
        _comic = comic,
+       _sourceKey = sourceKey,
        _shouldAnimateInitialRevealOverride = shouldAnimateInitialRevealOverride,
        _vsync = vsync,
        _scrollController = scrollController,
@@ -39,6 +41,7 @@ class ComicDetailSessionController extends ChangeNotifier {
 
   final ComicDetailRepository _repository;
   final ExploreComic _comic;
+  final String _sourceKey;
   final bool? _shouldAnimateInitialRevealOverride;
   final TickerProvider _vsync;
   final ScrollController _scrollController;
@@ -222,6 +225,7 @@ class ComicDetailSessionController extends ChangeNotifier {
       final details = await _future;
       final localFavorite = await _repository.isComicLocallyFavorited(
         details.id.trim().isNotEmpty ? details.id : _comic.id,
+        sourceKey: details.sourceKey,
       );
       if (_disposed) return;
       _applyInitialFavoriteOverrides(
@@ -248,6 +252,7 @@ class ComicDetailSessionController extends ChangeNotifier {
       final images = await _repository.loadChapterImages(
         comicId: details.id,
         epId: first.key,
+        sourceKey: details.sourceKey,
       );
       if (_disposed) return;
       await _repository.prefetchComicImages(
@@ -256,13 +261,17 @@ class ComicDetailSessionController extends ChangeNotifier {
         imageUrls: images,
         count: 3,
         memoryCount: 1,
+        sourceKey: details.sourceKey,
       );
     } catch (_) {}
   }
 
   Future<ComicDetailsData> _createComicDetailsFuture() {
     final completer = Completer<ComicDetailsData>();
-    final sourceFuture = _repository.loadComicDetails(_comic.id);
+    final sourceFuture = _repository.loadComicDetails(
+      _comic.id,
+      sourceKey: _sourceKey,
+    );
 
     _detailsTimeoutTimer = Timer(const Duration(seconds: 30), () {
       if (!completer.isCompleted) {

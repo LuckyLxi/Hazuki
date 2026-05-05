@@ -46,9 +46,9 @@ class DownloadsCompletedTab extends StatelessWidget {
             separatorBuilder: (_, _) => const SizedBox(height: 12),
             itemBuilder: (context, index) {
               final comic = comics[index];
-              final selected = selectedComicIds.contains(comic.comicId);
+              final selected = selectedComicIds.contains(comic.storageKey);
               final hasIntegrityIssue = comicsWithIntegrityIssues.contains(
-                comic.comicId,
+                comic.storageKey,
               );
               return AnimatedContainer(
                 duration: const Duration(milliseconds: 220),
@@ -79,12 +79,12 @@ class DownloadsCompletedTab extends StatelessWidget {
                     borderRadius: BorderRadius.circular(18),
                     onTap: () {
                       if (selectionMode) {
-                        onToggleSelection(comic.comicId);
+                        onToggleSelection(comic.storageKey);
                       } else {
                         onOpenComic(comic);
                       }
                     },
-                    onLongPress: () => onToggleSelection(comic.comicId),
+                    onLongPress: () => onToggleSelection(comic.storageKey),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -94,7 +94,7 @@ class DownloadsCompletedTab extends StatelessWidget {
                             children: [
                               DownloadedComicCover(
                                 comic: comic,
-                                heroTag: 'downloaded_cover_${comic.comicId}',
+                                heroTag: 'downloaded_cover_${comic.storageKey}',
                               ),
                               const SizedBox(width: 12),
                               Expanded(

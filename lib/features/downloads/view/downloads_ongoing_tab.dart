@@ -42,26 +42,26 @@ class _DownloadsOngoingTabState extends State<DownloadsOngoingTab> {
 
   void _syncVisibleTasks() {
     final nextById = <String, MangaDownloadTask>{
-      for (final task in widget.tasks) task.comicId: task,
+      for (final task in widget.tasks) task.storageKey: task,
     };
     final retainedIds = <String>{};
     final nextVisible = <_AnimatedTaskEntry>[];
 
     for (final entry in _visibleTasks) {
-      final nextTask = nextById[entry.task.comicId];
+      final nextTask = nextById[entry.task.storageKey];
       if (nextTask != null) {
         nextVisible.add(_AnimatedTaskEntry(task: nextTask));
-        retainedIds.add(entry.task.comicId);
+        retainedIds.add(entry.task.storageKey);
         continue;
       }
       nextVisible.add(entry.copyWith(exiting: true));
       if (!entry.exiting) {
-        _scheduleRemoval(entry.task.comicId);
+        _scheduleRemoval(entry.task.storageKey);
       }
     }
 
     for (final task in widget.tasks) {
-      if (retainedIds.add(task.comicId)) {
+      if (retainedIds.add(task.storageKey)) {
         nextVisible.add(_AnimatedTaskEntry(task: task));
       }
     }
@@ -90,17 +90,17 @@ class _DownloadsOngoingTabState extends State<DownloadsOngoingTab> {
     return true;
   }
 
-  void _scheduleRemoval(String comicId) {
+  void _scheduleRemoval(String storageKey) {
     Future<void>.delayed(DownloadsOngoingTab.dismissDuration, () {
       if (!mounted) {
         return;
       }
-      if (widget.tasks.any((task) => task.comicId == comicId)) {
+      if (widget.tasks.any((task) => task.storageKey == storageKey)) {
         return;
       }
       setState(() {
         _visibleTasks = _visibleTasks
-            .where((entry) => entry.task.comicId != comicId)
+            .where((entry) => entry.task.storageKey != storageKey)
             .toList(growable: false);
       });
     });
@@ -119,7 +119,7 @@ class _DownloadsOngoingTabState extends State<DownloadsOngoingTab> {
       itemBuilder: (context, index) {
         final entry = _visibleTasks[index];
         return _AnimatedOngoingTaskCard(
-          key: ValueKey<String>('ongoing_${entry.task.comicId}'),
+          key: ValueKey<String>('ongoing_${entry.task.storageKey}'),
           entry: entry,
           onPauseTask: widget.onPauseTask,
           onResumeTask: widget.onResumeTask,

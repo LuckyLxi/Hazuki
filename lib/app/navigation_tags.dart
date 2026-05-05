@@ -88,11 +88,17 @@ Widget buildComicCoverHeroFlightShuttle(
   if (cachedImage != null) {
     final url = cachedImage.url.trim();
     if (url.isNotEmpty) {
-      var bytes = peekHazukiWidgetImageMemory(url);
+      final sourceKey = cachedImage.sourceKey.trim().isNotEmpty
+          ? cachedImage.sourceKey
+          : HazukiSourceService.instance.activeSourceKey;
+      var bytes = peekHazukiWidgetImageMemory(url, sourceKey: sourceKey);
       if (bytes == null) {
-        bytes = HazukiSourceService.instance.peekImageBytesFromMemory(url);
+        bytes = HazukiSourceService.instance.peekImageBytesFromMemory(
+          url,
+          sourceKey: sourceKey,
+        );
         if (bytes != null) {
-          putHazukiWidgetImageMemory(url, bytes);
+          putHazukiWidgetImageMemory(url, bytes, sourceKey: sourceKey);
         }
       }
       if (bytes != null) {

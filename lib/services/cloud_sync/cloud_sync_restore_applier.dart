@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../hazuki_source_service.dart';
+import '../../models/hazuki_models.dart';
 import 'cloud_sync_config_store.dart';
 import 'cloud_sync_models.dart';
 
@@ -104,13 +105,22 @@ class CloudSyncRestoreApplier {
         if (comicId.isEmpty) {
           continue;
         }
+        final sourceKey =
+            (progress['sourceKey'] ?? _sourceService.activeSourceKey)
+                .toString()
+                .trim();
+        final scopedKey = SourceScopedComicId(
+          sourceKey: sourceKey,
+          comicId: comicId,
+        ).storageKey;
         final store = <String, dynamic>{
+          'sourceKey': sourceKey,
           'epId': progress['epId'],
           'title': progress['title'],
           'index': progress['index'],
           'timestamp': progress['timestamp'],
         };
-        await prefs.setString('reading_progress_$comicId', jsonEncode(store));
+        await prefs.setString('reading_progress_$scopedKey', jsonEncode(store));
       }
     }
   }

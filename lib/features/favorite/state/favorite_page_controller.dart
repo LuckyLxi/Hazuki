@@ -62,6 +62,7 @@ class FavoritePageController extends ChangeNotifier {
       _state.mode == FavoritePageMode.cloud && !_cloudFlow.isLogged;
 
   bool get supportsFolderLoad => true;
+  String get _activeSourceKey => _sourceService.activeSourceKey;
 
   bool get supportsFolderDelete => _state.mode == FavoritePageMode.local
       ? true
@@ -249,6 +250,7 @@ class FavoritePageController extends ChangeNotifier {
               page: nextPage,
               folderId: targetFolderId,
               sortOrder: _state.favoriteSortOrder,
+              sourceKey: _activeSourceKey,
             )
           : await _cloudFlow.loadPage(
               page: nextPage,
@@ -311,6 +313,7 @@ class FavoritePageController extends ChangeNotifier {
               page: 1,
               folderId: selectedFolderId,
               sortOrder: _state.favoriteSortOrder,
+              sourceKey: _activeSourceKey,
             )
           : await _cloudFlow.loadPage(
               page: 1,
@@ -361,6 +364,7 @@ class FavoritePageController extends ChangeNotifier {
             page: 1,
             folderId: folderId,
             sortOrder: _state.favoriteSortOrder,
+            sourceKey: _activeSourceKey,
           )
         : await _cloudFlow.loadPage(
             page: 1,
@@ -394,7 +398,7 @@ class FavoritePageController extends ChangeNotifier {
   }) async {
     try {
       if (_state.mode == FavoritePageMode.local) {
-        await _localFlow.addFolder(name);
+        await _localFlow.addFolder(name, sourceKey: _activeSourceKey);
         await _reloadLocalFolders();
       } else {
         await _cloudFlow.addFolder(name);
@@ -426,7 +430,11 @@ class FavoritePageController extends ChangeNotifier {
     }
 
     try {
-      await _localFlow.renameFolder(folderId: normalizedFolderId, name: name);
+      await _localFlow.renameFolder(
+        folderId: normalizedFolderId,
+        name: name,
+        sourceKey: _activeSourceKey,
+      );
       if (_disposed) {
         return null;
       }
@@ -479,7 +487,7 @@ class FavoritePageController extends ChangeNotifier {
 
     try {
       if (_state.mode == FavoritePageMode.local) {
-        await _localFlow.deleteFolder(currentId);
+        await _localFlow.deleteFolder(currentId, sourceKey: _activeSourceKey);
         _state.selectedLocalFolderId = '';
         await _saveSelectedFolderId(FavoritePageMode.local, '');
         await _reloadLocalFolders();
@@ -552,6 +560,7 @@ class FavoritePageController extends ChangeNotifier {
       page: 1,
       folderId: _state.selectedLocalFolderId,
       sortOrder: _state.favoriteSortOrder,
+      sourceKey: _activeSourceKey,
     );
     if (_disposed || requestVersion != _state.listRequestVersion) {
       return;
@@ -589,6 +598,7 @@ class FavoritePageController extends ChangeNotifier {
           page: 1,
           folderId: targetFolderId,
           sortOrder: _state.favoriteSortOrder,
+          sourceKey: _activeSourceKey,
         );
         if (_disposed ||
             _state.mode != FavoritePageMode.local ||
@@ -608,7 +618,7 @@ class FavoritePageController extends ChangeNotifier {
     _state.loadingFolders = true;
     _notify();
 
-    final result = await _localFlow.loadFolders();
+    final result = await _localFlow.loadFoldersForSource(_activeSourceKey);
     if (_disposed) {
       return;
     }

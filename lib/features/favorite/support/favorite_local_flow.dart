@@ -34,30 +34,44 @@ class FavoriteLocalFlow {
     return localFavoritesService.loadFavoriteFolders();
   }
 
+  Future<FavoriteFoldersResult> loadFoldersForSource(String sourceKey) {
+    return localFavoritesService.loadFavoriteFolders(sourceKey: sourceKey);
+  }
+
   Future<FavoriteComicsResult> loadPage({
     required int page,
     required String folderId,
     required String sortOrder,
+    String sourceKey = '',
   }) {
     return localFavoritesService.loadFavoriteComics(
       page: page,
       folderId: folderId.trim(),
       sortOrder: sortOrder,
+      sourceKey: sourceKey,
     );
   }
 
-  Future<void> addFolder(String name) {
-    return localFavoritesService.addFavoriteFolder(name);
+  Future<void> addFolder(String name, {String sourceKey = ''}) {
+    return localFavoritesService.addFavoriteFolder(name, sourceKey: sourceKey);
   }
 
-  Future<void> renameFolder({required String folderId, required String name}) {
+  Future<void> renameFolder({
+    required String folderId,
+    required String name,
+    String sourceKey = '',
+  }) {
     return localFavoritesService.renameFavoriteFolder(
       folderId: folderId,
       name: name,
+      sourceKey: sourceKey,
     );
   }
 
-  Future<void> deleteFolder(String folderId) {
-    return localFavoritesService.deleteFavoriteFolder(folderId);
+  Future<void> deleteFolder(String folderId, {String sourceKey = ''}) {
+    return localFavoritesService.deleteFavoriteFolder(
+      folderId,
+      sourceKey: sourceKey,
+    );
   }
 }

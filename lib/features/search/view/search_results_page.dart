@@ -291,6 +291,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
         title: details.title.trim().isEmpty ? keyword.trim() : details.title,
         subTitle: details.subTitle,
         cover: details.cover,
+        sourceKey: details.sourceKey,
       );
       await addSearchHistory(keyword);
       if (!mounted) {

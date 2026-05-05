@@ -51,6 +51,7 @@ class DiscoverComicCoverTile extends StatelessWidget {
                       )
                     : HazukiCachedImage(
                         url: comic.cover,
+                        sourceKey: comic.sourceKey,
                         fit: BoxFit.cover,
                         width: double.infinity,
                         cacheWidth: coverCacheWidth,

@@ -106,12 +106,17 @@ class _ComicDetailPageState extends State<ComicDetailPage>
       lastReadProgressGetter: () => _sessionController.lastReadProgress,
       reloadReadingProgress: () => _sessionController.loadReadingProgress(),
       coverPreviewPageBuilder:
-          ({required imageUrl, required heroTag, required onLongPress}) =>
-              ComicCoverPreviewPage(
-                imageUrl: imageUrl,
-                heroTag: heroTag,
-                onLongPress: onLongPress,
-              ),
+          ({
+            required imageUrl,
+            required sourceKey,
+            required heroTag,
+            required onLongPress,
+          }) => ComicCoverPreviewPage(
+            imageUrl: imageUrl,
+            sourceKey: sourceKey,
+            heroTag: heroTag,
+            onLongPress: onLongPress,
+          ),
       chaptersPanelBuilder:
           ({
             required details,
@@ -136,6 +141,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
             epId: epId,
             chapterIndex: chapterIndex,
             images: const [],
+            sourceKey: details.sourceKey,
             comicTheme: comicTheme,
             favoriteController: _favoriteController,
           ),
@@ -153,6 +159,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
     _sessionController = ComicDetailSessionController(
       repository: _repository,
       comic: widget.comic,
+      sourceKey: widget.comic.sourceKey,
       shouldAnimateInitialRevealOverride:
           widget.shouldAnimateInitialRevealOverride,
       vsync: this,
@@ -192,6 +199,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
             children: [
               ComicDetailParallaxBackground(
                 coverUrl: widget.comic.cover.trim(),
+                sourceKey: widget.comic.sourceKey,
                 scrollController: _scrollController,
               ),
               ComicDetailTopSurfaceOverlay(

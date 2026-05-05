@@ -84,7 +84,7 @@ class DownloadsPageController extends ChangeNotifier {
     if (confirmed != true) {
       return;
     }
-    await _downloadService.deleteDownloadedComics([comic.comicId]);
+    await _downloadService.deleteDownloadedComics([comic.storageKey]);
   }
 
   Future<void> pauseTask(String comicId) async {

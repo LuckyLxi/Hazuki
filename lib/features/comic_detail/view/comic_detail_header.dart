@@ -95,6 +95,7 @@ class ComicDetailHeaderSection extends StatelessWidget {
                       child: displayCoverUrl.isNotEmpty
                           ? HazukiCachedImage(
                               url: displayCoverUrl,
+                              sourceKey: details?.sourceKey ?? '',
                               fit: BoxFit.cover,
                               keepInMemory: true,
                               cacheWidth: headerCoverCacheWidth,

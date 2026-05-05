@@ -39,6 +39,7 @@ class ReaderPage extends StatefulWidget {
     required this.epId,
     required this.chapterIndex,
     required this.images,
+    this.sourceKey = '',
     this.comicTheme,
     this.favoriteController,
   });
@@ -49,6 +50,7 @@ class ReaderPage extends StatefulWidget {
   final String epId;
   final int chapterIndex;
   final List<String> images;
+  final String sourceKey;
   final ThemeData? comicTheme;
   final ComicDetailFavoriteController? favoriteController;
 
@@ -98,6 +100,7 @@ class _ReaderPageState extends State<ReaderPage>
         noImageModeEnabled: () => _noImageModeEnabled,
         comicId: widget.comicId,
         epId: widget.epId,
+        sourceKey: widget.sourceKey,
         loadImagesErrorBuilder: (error) =>
             l10n(context).readerChapterLoadFailed('$error'),
         sourceService: HazukiSourceService.instance,
@@ -149,6 +152,7 @@ class _ReaderPageState extends State<ReaderPage>
         onZoomChanged: _readerZoomController.onZoomChanged,
         comicId: widget.comicId,
         epId: widget.epId,
+        sourceKey: widget.sourceKey,
         chapterTitle: widget.chapterTitle,
         chapterIndex: widget.chapterIndex,
         widgetImages: widget.images,
@@ -652,7 +656,10 @@ class _ReaderPageState extends State<ReaderPage>
   Future<ComicDetailsData> _loadReaderComicDetails() async {
     final details =
         _chapterDetailsCache ??
-        await _sessionController.loadComicDetails(widget.comicId);
+        await _sessionController.loadComicDetails(
+          widget.comicId,
+          sourceKey: widget.sourceKey,
+        );
     _chapterDetailsCache ??= details;
     return details;
   }
@@ -860,6 +867,7 @@ class _ReaderPageState extends State<ReaderPage>
           epId: epId,
           chapterIndex: index,
           images: const [],
+          sourceKey: widget.sourceKey,
           comicTheme: widget.comicTheme,
         ),
       ),
@@ -927,6 +935,7 @@ class _ReaderPageState extends State<ReaderPage>
             epId: targetChapter.key,
             chapterIndex: targetIndex,
             images: const [],
+            sourceKey: widget.sourceKey,
             comicTheme: widget.comicTheme,
           ),
         ),

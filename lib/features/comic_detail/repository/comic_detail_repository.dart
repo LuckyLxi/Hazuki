@@ -25,18 +25,30 @@ class ComicDetailRepository {
   bool get favoriteSingleFolderForSingleComic =>
       _source.favoriteSingleFolderForSingleComic;
 
-  Future<ComicDetailsData> loadComicDetails(String id) =>
-      _source.loadComicDetails(id);
+  Future<ComicDetailsData> loadComicDetails(
+    String id, {
+    String sourceKey = '',
+  }) => _source.loadComicDetails(id, sourceKey: sourceKey);
 
   Future<Uint8List> downloadImageBytes(
     String url, {
     bool keepInMemory = false,
-  }) => _source.downloadImageBytes(url, keepInMemory: keepInMemory);
+    String sourceKey = '',
+  }) => _source.downloadImageBytes(
+    url,
+    keepInMemory: keepInMemory,
+    sourceKey: sourceKey,
+  );
 
   Future<List<String>> loadChapterImages({
     required String comicId,
     required String epId,
-  }) => _source.loadChapterImages(comicId: comicId, epId: epId);
+    String sourceKey = '',
+  }) => _source.loadChapterImages(
+    comicId: comicId,
+    epId: epId,
+    sourceKey: sourceKey,
+  );
 
   Future<void> prefetchComicImages({
     required String comicId,
@@ -44,12 +56,14 @@ class ComicDetailRepository {
     required List<String> imageUrls,
     required int count,
     required int memoryCount,
+    String sourceKey = '',
   }) => _source.prefetchComicImages(
     comicId: comicId,
     epId: epId,
     imageUrls: imageUrls,
     count: count,
     memoryCount: memoryCount,
+    sourceKey: sourceKey,
   );
 
   Future<FavoriteFoldersResult> loadCloudFavoriteFolders({
@@ -74,12 +88,15 @@ class ComicDetailRepository {
 
   // ── Local favorites ──────────────────────────────────────────────────────
 
-  Future<bool> isComicLocallyFavorited(String comicId) =>
-      _local.isComicFavorited(comicId);
+  Future<bool> isComicLocallyFavorited(
+    String comicId, {
+    String sourceKey = '',
+  }) => _local.isComicFavorited(comicId, sourceKey: sourceKey);
 
   Future<FavoriteFoldersResult> loadLocalFavoriteFolders({
     required String comicId,
-  }) => _local.loadFavoriteFolders(comicId: comicId);
+    String sourceKey = '',
+  }) => _local.loadFavoriteFolders(comicId: comicId, sourceKey: sourceKey);
 
   Future<void> addLocalFavoriteFolder(String name) =>
       _local.addFavoriteFolder(name);
@@ -116,7 +133,13 @@ class ComicDetailRepository {
   Future<Map<String, dynamic>?> loadReadingProgress(String comicId) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final jsonStr = prefs.getString('reading_progress_$comicId');
+      final scopedKey = SourceScopedComicId(
+        sourceKey: _source.activeSourceKey,
+        comicId: comicId,
+      ).storageKey;
+      final jsonStr =
+          prefs.getString('reading_progress_$scopedKey') ??
+          prefs.getString('reading_progress_$comicId');
       if (jsonStr == null) return null;
       return jsonDecode(jsonStr) as Map<String, dynamic>?;
     } catch (_) {
@@ -145,13 +168,29 @@ class ComicDetailRepository {
       }
 
       final comicId = details.id.trim().isNotEmpty ? details.id : comic.id;
+      final sourceKey = details.sourceKey.trim().isNotEmpty
+          ? details.sourceKey
+          : comic.sourceKey;
+      final storageKey = SourceScopedComicId(
+        sourceKey: sourceKey,
+        comicId: comicId,
+      ).storageKey;
       final coverUrl = details.cover.trim().isNotEmpty
           ? details.cover
           : comic.cover;
 
-      history.removeWhere((e) => e['id'] == comicId);
+      history.removeWhere((e) {
+        final entryId = (e['id'] ?? '').toString();
+        final entrySourceKey = (e['sourceKey'] ?? '').toString();
+        return SourceScopedComicId(
+              sourceKey: entrySourceKey,
+              comicId: entryId,
+            ).storageKey ==
+            storageKey;
+      });
       history.insert(0, {
         'id': comicId,
+        'sourceKey': sourceKey,
         'title': details.title.isNotEmpty ? details.title : comic.title,
         'cover': coverUrl,
         'subTitle': details.subTitle.isNotEmpty

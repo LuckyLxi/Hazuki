@@ -94,6 +94,7 @@ class HomeNavigationActions {
           epId: chapter.epId,
           chapterIndex: chapter.index,
           images: chapter.imagePaths,
+          sourceKey: comic.sourceKey,
         ),
       ),
     );

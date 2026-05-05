@@ -29,14 +29,20 @@ extension HazukiSourceServiceImageCacheMaintenanceCapability
     return dir;
   }
 
-  String _cacheFileNameForUrl(String url) {
-    final hash = md5.convert(utf8.encode(url)).toString();
+  String _cacheFileNameForUrl(String url, {String sourceKey = ''}) {
+    final scopedUrl = SourceScopedComicId(
+      sourceKey: sourceKey,
+      comicId: url,
+    ).imageCacheKey;
+    final hash = md5.convert(utf8.encode(scopedUrl)).toString();
     return '$hash.bin';
   }
 
-  Future<File> _cacheFileForUrl(String url) async {
+  Future<File> _cacheFileForUrl(String url, {String sourceKey = ''}) async {
     final dir = await _ensureImageCacheDir();
-    return File('${dir.path}/${_cacheFileNameForUrl(url)}');
+    return File(
+      '${dir.path}/${_cacheFileNameForUrl(url, sourceKey: sourceKey)}',
+    );
   }
 
   Future<void> _enforceImageCachePolicy({bool force = false}) {
@@ -206,7 +212,10 @@ extension HazukiSourceServiceImageCacheMaintenanceCapability
         continue;
       }
       try {
-        final file = await _cacheFileForUrl(normalizedUrl);
+        final file = await _cacheFileForUrl(
+          normalizedUrl,
+          sourceKey: activeSourceKey,
+        );
         if (await file.exists()) {
           await file.delete();
         }

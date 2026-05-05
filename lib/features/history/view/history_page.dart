@@ -89,6 +89,7 @@ class _HistoryPageState extends State<HistoryPage> {
                 title: e['title'] as String? ?? '',
                 cover: e['cover'] as String? ?? '',
                 subTitle: e['subTitle'] as String? ?? '',
+                sourceKey: e['sourceKey'] as String? ?? '',
               ),
             )
             .toList();
@@ -121,17 +122,24 @@ class _HistoryPageState extends State<HistoryPage> {
         final List<dynamic> existing = jsonDecode(existingStr);
         for (final e in existing) {
           final id = (e['id'] as String?) ?? '';
+          final sourceKey = (e['sourceKey'] as String?) ?? '';
           if (id.isNotEmpty) {
-            existingById[id] = Map<String, dynamic>.from(e as Map);
+            existingById[SourceScopedComicId(
+              sourceKey: sourceKey,
+              comicId: id,
+            ).storageKey] = Map<String, dynamic>.from(
+              e as Map,
+            );
           }
         }
       } catch (_) {}
     }
     final jsonList = history.map((e) {
-      final base = existingById[e.id] ?? <String, dynamic>{};
+      final base = existingById[e.scopedId.storageKey] ?? <String, dynamic>{};
       return <String, dynamic>{
         ...base,
         'id': e.id,
+        'sourceKey': e.sourceKey,
         'title': e.title,
         'cover': e.cover,
         'subTitle': e.subTitle,
@@ -161,7 +169,7 @@ class _HistoryPageState extends State<HistoryPage> {
     }
 
     final newHistory = _history
-        .where((e) => !_selectedIds.contains(e.id))
+        .where((e) => !_selectedIds.contains(e.scopedId.storageKey))
         .toList();
     await _saveHistory(newHistory);
     _updateHistoryState(() {
@@ -190,7 +198,9 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 
   Future<void> _handleDeleteHistoryItem(ExploreComic comic) async {
-    final newHistory = _history.where((e) => e.id != comic.id).toList();
+    final newHistory = _history
+        .where((e) => e.scopedId.storageKey != comic.scopedId.storageKey)
+        .toList();
     await _saveHistory(newHistory);
     _updateHistoryState(() {
       _history = newHistory;
@@ -229,12 +239,12 @@ class _HistoryPageState extends State<HistoryPage> {
     }
   }
 
-  void _toggleSelection(String comicId, {bool? selected}) {
+  void _toggleSelection(String storageKey, {bool? selected}) {
     _updateHistoryState(() {
-      if (selected ?? !_selectedIds.contains(comicId)) {
-        _selectedIds.add(comicId);
+      if (selected ?? !_selectedIds.contains(storageKey)) {
+        _selectedIds.add(storageKey);
       } else {
-        _selectedIds.remove(comicId);
+        _selectedIds.remove(storageKey);
       }
     });
   }
@@ -242,19 +252,19 @@ class _HistoryPageState extends State<HistoryPage> {
   Widget _buildItem(ExploreComic comic, int index) {
     final heroTag = widget.comicCoverHeroTagBuilder(comic, salt: 'history');
     return HistoryComicListItem(
-      key: ValueKey(comic.id),
+      key: ValueKey(comic.scopedId.storageKey),
       comic: comic,
       index: index,
       heroTag: heroTag,
       selectionMode: _selectionMode,
-      selected: _selectedIds.contains(comic.id),
+      selected: _selectedIds.contains(comic.scopedId.storageKey),
       onShowMenu: (globalPosition, itemContext) =>
           _showComicMenu(comic, globalPosition, itemContext),
       onToggleSelection: (selected) =>
-          _toggleSelection(comic.id, selected: selected),
+          _toggleSelection(comic.scopedId.storageKey, selected: selected),
       onTap: () async {
         if (_selectionMode) {
-          _toggleSelection(comic.id);
+          _toggleSelection(comic.scopedId.storageKey);
           return;
         }
         await openComicDetail(

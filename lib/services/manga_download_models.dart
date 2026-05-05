@@ -1,3 +1,5 @@
+import '../models/hazuki_models.dart';
+
 enum MangaDownloadTaskStatus { queued, downloading, paused, failed }
 
 MangaDownloadTaskStatus _mangaDownloadTaskStatusFromRaw(String? raw) {
@@ -38,6 +40,7 @@ class MangaChapterDownloadTarget {
 class MangaDownloadTask {
   const MangaDownloadTask({
     required this.comicId,
+    this.sourceKey = '',
     required this.title,
     required this.subTitle,
     required this.description,
@@ -56,6 +59,7 @@ class MangaDownloadTask {
   });
 
   final String comicId;
+  final String sourceKey;
   final String title;
   final String subTitle;
   final String description;
@@ -71,6 +75,14 @@ class MangaDownloadTask {
   final int currentImageTotal;
   final String? errorMessage;
   final int retryCount;
+
+  String get storageKey =>
+      SourceScopedComicId(sourceKey: sourceKey, comicId: comicId).storageKey;
+
+  String get downloadDirName => SourceScopedComicId(
+    sourceKey: sourceKey,
+    comicId: comicId,
+  ).downloadDirName;
 
   int get totalCount => targets.length;
   int get completedCount => completedEpIds.length;
@@ -101,6 +113,7 @@ class MangaDownloadTask {
   }) {
     return MangaDownloadTask(
       comicId: comicId,
+      sourceKey: sourceKey,
       title: title,
       subTitle: subTitle,
       description: description,
@@ -127,6 +140,7 @@ class MangaDownloadTask {
 
   Map<String, dynamic> toJson() => {
     'comicId': comicId,
+    if (sourceKey.isNotEmpty) 'sourceKey': sourceKey,
     'title': title,
     'subTitle': subTitle,
     'description': description,
@@ -170,6 +184,7 @@ class MangaDownloadTask {
     }
     return MangaDownloadTask(
       comicId: (map['comicId'] ?? '').toString(),
+      sourceKey: (map['sourceKey'] ?? '').toString(),
       title: (map['title'] ?? '').toString(),
       subTitle: (map['subTitle'] ?? '').toString(),
       description: (map['description'] ?? '').toString(),
@@ -236,6 +251,7 @@ class DownloadedMangaChapter {
 class DownloadedMangaComic {
   const DownloadedMangaComic({
     required this.comicId,
+    this.sourceKey = '',
     required this.title,
     required this.subTitle,
     required this.description,
@@ -246,6 +262,7 @@ class DownloadedMangaComic {
   });
 
   final String comicId;
+  final String sourceKey;
   final String title;
   final String subTitle;
   final String description;
@@ -254,6 +271,14 @@ class DownloadedMangaComic {
   final List<DownloadedMangaChapter> chapters;
   final int updatedAtMillis;
 
+  String get storageKey =>
+      SourceScopedComicId(sourceKey: sourceKey, comicId: comicId).storageKey;
+
+  String get downloadDirName => SourceScopedComicId(
+    sourceKey: sourceKey,
+    comicId: comicId,
+  ).downloadDirName;
+
   DownloadedMangaComic copyWith({
     String? localCoverPath,
     List<DownloadedMangaChapter>? chapters,
@@ -261,6 +286,7 @@ class DownloadedMangaComic {
   }) {
     return DownloadedMangaComic(
       comicId: comicId,
+      sourceKey: sourceKey,
       title: title,
       subTitle: subTitle,
       description: description,
@@ -273,6 +299,7 @@ class DownloadedMangaComic {
 
   Map<String, dynamic> toJson() => {
     'comicId': comicId,
+    if (sourceKey.isNotEmpty) 'sourceKey': sourceKey,
     'title': title,
     'subTitle': subTitle,
     'description': description,
@@ -297,6 +324,7 @@ class DownloadedMangaComic {
     chapters.sort((a, b) => a.index.compareTo(b.index));
     return DownloadedMangaComic(
       comicId: (map['comicId'] ?? '').toString(),
+      sourceKey: (map['sourceKey'] ?? '').toString(),
       title: (map['title'] ?? '').toString(),
       subTitle: (map['subTitle'] ?? '').toString(),
       description: (map['description'] ?? '').toString(),

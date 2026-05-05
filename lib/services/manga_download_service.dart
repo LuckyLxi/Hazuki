@@ -31,7 +31,7 @@ class MangaDownloadService extends ChangeNotifier {
       removeTaskByComicId: _removeTaskByComicId,
       latestTask: _latestTask,
       shouldAbortTask: _shouldAbortTask,
-      downloadedComicById: downloadedComicById,
+      downloadedComicById: _downloadedComicByStorageKey,
       upsertDownloadedComic: _upsertDownloadedComic,
       flushState: _flushState,
       ensureAndroidDownloadsAccess: _ensureAndroidDownloadsAccess,
@@ -125,7 +125,7 @@ class MangaDownloadService extends ChangeNotifier {
         }
       }
       if (hasIssue) {
-        issueIds.add(comic.comicId);
+        issueIds.add(comic.storageKey);
       }
     }
     return issueIds;
@@ -169,8 +169,30 @@ class MangaDownloadService extends ChangeNotifier {
   }
 
   DownloadedMangaComic? downloadedComicById(String comicId) {
+    return downloadedComicByIdForSource(comicId, sourceKey: '');
+  }
+
+  DownloadedMangaComic? downloadedComicByIdForSource(
+    String comicId, {
+    required String sourceKey,
+  }) {
+    final storageKey = SourceScopedComicId(
+      sourceKey: sourceKey,
+      comicId: comicId,
+    ).storageKey;
     for (final item in _downloaded) {
-      if (item.comicId == comicId) {
+      if (item.storageKey == storageKey ||
+          (sourceKey.isEmpty && item.comicId == comicId)) {
+        return item;
+      }
+    }
+    return null;
+  }
+
+  DownloadedMangaComic? _downloadedComicByStorageKey(String storageKey) {
+    for (final item in _downloaded) {
+      if (item.storageKey == storageKey ||
+          (item.sourceKey.isEmpty && item.comicId == storageKey)) {
         return item;
       }
     }
@@ -197,7 +219,11 @@ class MangaDownloadService extends ChangeNotifier {
     }
 
     await ensureInitialized();
-    final existingDownloaded = downloadedComicById(details.id);
+    final sourceKey = details.sourceKey.trim();
+    final existingDownloaded = downloadedComicByIdForSource(
+      details.id,
+      sourceKey: sourceKey,
+    );
     final downloadedEpIds = existingDownloaded == null
         ? <String>{}
         : existingDownloaded.chapters.map((e) => e.epId).toSet();
@@ -217,7 +243,7 @@ class MangaDownloadService extends ChangeNotifier {
     }
 
     final existingTaskIndex = _tasks.indexWhere(
-      (task) => task.comicId == details.id,
+      (task) => task.storageKey == details.scopedId.storageKey,
     );
     if (existingTaskIndex >= 0) {
       final task = _tasks[existingTaskIndex];
@@ -238,6 +264,7 @@ class MangaDownloadService extends ChangeNotifier {
       _tasks.add(
         MangaDownloadTask(
           comicId: details.id,
+          sourceKey: sourceKey,
           title: details.title,
           subTitle: details.subTitle,
           description: description,
@@ -273,22 +300,26 @@ class MangaDownloadService extends ChangeNotifier {
     }
 
     final rootDir = await _ensureRootDir();
-    for (final comicId in ids) {
+    for (final storageKey in ids) {
       try {
-        final dir = Directory('${rootDir.path}/$comicId');
+        final comic = _downloadedComicByStorageKey(storageKey);
+        final dirName =
+            comic?.downloadDirName ??
+            SourceScopedComicId.fromStorageKey(storageKey).downloadDirName;
+        final dir = Directory('${rootDir.path}/$dirName');
         if (await dir.exists()) {
           await dir.delete(recursive: true);
         }
       } catch (_) {}
     }
-    _downloaded.removeWhere((item) => ids.contains(item.comicId));
+    _downloaded.removeWhere((item) => ids.contains(item.storageKey));
     await _persistState();
     notifyListeners();
   }
 
-  Future<void> pauseTask(String comicId) async {
+  Future<void> pauseTask(String storageKey) async {
     await ensureInitialized();
-    final index = _tasks.indexWhere((item) => item.comicId == comicId);
+    final index = _tasks.indexWhere((item) => item.storageKey == storageKey);
     if (index < 0) {
       return;
     }
@@ -299,9 +330,9 @@ class MangaDownloadService extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> resumeTask(String comicId) async {
+  Future<void> resumeTask(String storageKey) async {
     await ensureInitialized();
-    final index = _tasks.indexWhere((item) => item.comicId == comicId);
+    final index = _tasks.indexWhere((item) => item.storageKey == storageKey);
     if (index < 0) {
       return;
     }
@@ -315,9 +346,9 @@ class MangaDownloadService extends ChangeNotifier {
     unawaited(_queueExecutor.processQueue());
   }
 
-  Future<void> deleteTask(String comicId) async {
+  Future<void> deleteTask(String storageKey) async {
     await ensureInitialized();
-    final index = _tasks.indexWhere((item) => item.comicId == comicId);
+    final index = _tasks.indexWhere((item) => item.storageKey == storageKey);
     if (index < 0) {
       return;
     }
@@ -329,8 +360,8 @@ class MangaDownloadService extends ChangeNotifier {
 
     final task = _tasks.removeAt(index);
     final rootDir = await _ensureRootDir();
-    final comicDir = Directory('${rootDir.path}/${task.comicId}');
-    final downloadedComic = downloadedComicById(task.comicId);
+    final comicDir = Directory('${rootDir.path}/${task.downloadDirName}');
+    final downloadedComic = _downloadedComicByStorageKey(task.storageKey);
     if (task.currentChapterEpId?.isNotEmpty == true) {
       try {
         final chapterDir = await _recoveryScanner.resolveChapterDirForEpId(
@@ -453,8 +484,11 @@ class MangaDownloadService extends ChangeNotifier {
       ..sort((a, b) => b.updatedAtMillis.compareTo(a.updatedAtMillis));
   }
 
-  bool _replaceTask(String comicId, MangaDownloadTask next) {
-    final index = _tasks.indexWhere((item) => item.comicId == comicId);
+  bool _replaceTask(String storageKey, MangaDownloadTask next) {
+    final index = _tasks.indexWhere(
+      (item) =>
+          item.storageKey == storageKey || item.storageKey == next.storageKey,
+    );
     if (index < 0) {
       return false;
     }
@@ -462,8 +496,12 @@ class MangaDownloadService extends ChangeNotifier {
     return true;
   }
 
-  bool _removeTaskByComicId(String comicId) {
-    final index = _tasks.indexWhere((item) => item.comicId == comicId);
+  bool _removeTaskByComicId(String storageKey) {
+    final index = _tasks.indexWhere(
+      (item) =>
+          item.storageKey == storageKey ||
+          (item.sourceKey.isEmpty && item.comicId == storageKey),
+    );
     if (index < 0) {
       return false;
     }
@@ -471,17 +509,18 @@ class MangaDownloadService extends ChangeNotifier {
     return true;
   }
 
-  MangaDownloadTask? _latestTask(String comicId) {
+  MangaDownloadTask? _latestTask(String storageKey) {
     for (final item in _tasks) {
-      if (item.comicId == comicId) {
+      if (item.storageKey == storageKey ||
+          (item.sourceKey.isEmpty && item.comicId == storageKey)) {
         return item;
       }
     }
     return null;
   }
 
-  Future<bool> _shouldAbortTask(String comicId) async {
-    final latest = _latestTask(comicId);
+  Future<bool> _shouldAbortTask(String storageKey) async {
+    final latest = _latestTask(storageKey);
     if (latest == null) {
       return true;
     }
@@ -531,6 +570,7 @@ class MangaDownloadService extends ChangeNotifier {
       final bytes = await HazukiSourceService.instance.downloadImageBytes(
         normalized,
         keepInMemory: false,
+        sourceKey: task.sourceKey,
       );
       await target.writeAsBytes(bytes, flush: true);
       return target.path;
@@ -541,7 +581,7 @@ class MangaDownloadService extends ChangeNotifier {
 
   void _upsertDownloadedComic(DownloadedMangaComic comic) {
     final index = _downloaded.indexWhere(
-      (item) => item.comicId == comic.comicId,
+      (item) => item.storageKey == comic.storageKey,
     );
     if (index >= 0) {
       _downloaded[index] = comic;

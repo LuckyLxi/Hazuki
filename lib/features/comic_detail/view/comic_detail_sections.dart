@@ -320,6 +320,7 @@ class _ComicDetailRelatedTabState extends State<ComicDetailRelatedTab>
                                 )
                               : HazukiCachedImage(
                                   url: comic.cover,
+                                  sourceKey: comic.sourceKey,
                                   fit: BoxFit.cover,
                                   width: double.infinity,
                                   keepInMemory: false,

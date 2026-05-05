@@ -8,10 +8,12 @@ class ComicDetailParallaxBackground extends StatefulWidget {
   const ComicDetailParallaxBackground({
     super.key,
     required this.coverUrl,
+    required this.sourceKey,
     required this.scrollController,
   });
 
   final String coverUrl;
+  final String sourceKey;
   final ScrollController scrollController;
 
   @override
@@ -89,7 +91,10 @@ class _ComicDetailParallaxBackgroundState
         child: Transform.translate(
           offset: Offset(0, -_offset),
           child: RepaintBoundary(
-            child: ComicBlurredCoverBackground(coverUrl: widget.coverUrl),
+            child: ComicBlurredCoverBackground(
+              coverUrl: widget.coverUrl,
+              sourceKey: widget.sourceKey,
+            ),
           ),
         ),
       ),

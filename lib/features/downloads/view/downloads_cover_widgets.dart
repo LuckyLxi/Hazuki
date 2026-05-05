@@ -48,6 +48,7 @@ class DownloadedComicCover extends StatelessWidget {
         borderRadius: radius,
         child: HazukiCachedImage(
           url: comic.coverUrl,
+          sourceKey: comic.sourceKey,
           width: width,
           height: height,
           fit: BoxFit.cover,
@@ -105,6 +106,7 @@ class DownloadedComicCoverPreviewPage extends StatelessWidget {
     } else if (networkUrl.isNotEmpty) {
       imageChild = HazukiCachedImage(
         url: networkUrl,
+        sourceKey: comic.sourceKey,
         fit: BoxFit.contain,
         loading: Container(width: 220, height: 300, color: placeholderColor),
         error: Container(

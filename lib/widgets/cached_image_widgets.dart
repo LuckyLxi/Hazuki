@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 
 import '../app/ui_flags.dart';
+import '../models/hazuki_models.dart';
 import '../services/hazuki_source_service.dart';
 
 enum HazukiCachedImageLoadState { idle, deferred, loading, loaded, error }
@@ -14,26 +15,48 @@ typedef HazukiCachedImageStateChanged =
 const int _hazukiWidgetImageMemoryLimit = 300;
 final Map<String, Uint8List> _hazukiWidgetImageMemory = <String, Uint8List>{};
 
-Uint8List? peekHazukiWidgetImageMemory(String url) {
-  return _hazukiWidgetImageMemory[url.trim()];
+String hazukiWidgetImageMemoryKey(String url, {String sourceKey = ''}) {
+  return SourceScopedComicId(sourceKey: sourceKey, comicId: url).imageCacheKey;
 }
 
-Uint8List? takeHazukiWidgetImageMemory(String url) {
-  final bytes = _hazukiWidgetImageMemory[url];
+Uint8List? peekHazukiWidgetImageMemory(String url, {String sourceKey = ''}) {
+  final key = hazukiWidgetImageMemoryKey(url, sourceKey: sourceKey);
+  return _hazukiWidgetImageMemory[key] ??
+      (sourceKey.trim().isNotEmpty
+          ? _hazukiWidgetImageMemory[url.trim()]
+          : null);
+}
+
+Uint8List? takeHazukiWidgetImageMemory(String url, {String sourceKey = ''}) {
+  final key = hazukiWidgetImageMemoryKey(url, sourceKey: sourceKey);
+  final bytes =
+      _hazukiWidgetImageMemory[key] ??
+      (sourceKey.trim().isNotEmpty
+          ? _hazukiWidgetImageMemory[url.trim()]
+          : null);
   if (bytes == null) {
     return null;
   }
-  _hazukiWidgetImageMemory.remove(url);
-  _hazukiWidgetImageMemory[url] = bytes;
+  _hazukiWidgetImageMemory.remove(key);
+  _hazukiWidgetImageMemory[key] = bytes;
   return bytes;
 }
 
-void putHazukiWidgetImageMemory(String url, Uint8List bytes) {
-  _hazukiWidgetImageMemory.remove(url);
-  _hazukiWidgetImageMemory[url] = bytes;
+void putHazukiWidgetImageMemory(
+  String url,
+  Uint8List bytes, {
+  String sourceKey = '',
+}) {
+  final key = hazukiWidgetImageMemoryKey(url, sourceKey: sourceKey);
+  _hazukiWidgetImageMemory.remove(key);
+  _hazukiWidgetImageMemory[key] = bytes;
   while (_hazukiWidgetImageMemory.length > _hazukiWidgetImageMemoryLimit) {
     _hazukiWidgetImageMemory.remove(_hazukiWidgetImageMemory.keys.first);
   }
+}
+
+void clearHazukiWidgetImageMemoryForTesting() {
+  _hazukiWidgetImageMemory.clear();
 }
 
 class HazukiCachedImage extends StatefulWidget {
@@ -55,6 +78,7 @@ class HazukiCachedImage extends StatefulWidget {
     this.filterQuality = FilterQuality.medium,
     this.deferLoadingWhileScrolling = false,
     this.useShimmerLoading = true,
+    this.sourceKey = '',
     this.onStateChanged,
   });
 
@@ -74,6 +98,7 @@ class HazukiCachedImage extends StatefulWidget {
   final FilterQuality filterQuality;
   final bool deferLoadingWhileScrolling;
   final bool useShimmerLoading;
+  final String sourceKey;
   final HazukiCachedImageStateChanged? onStateChanged;
 
   @override
@@ -92,6 +117,14 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
 
   bool get _noImageModeEnabled {
     return !widget.ignoreNoImageMode && hazukiNoImageModeNotifier.value;
+  }
+
+  String get _resolvedSourceKey {
+    final explicit = widget.sourceKey.trim();
+    if (explicit.isNotEmpty) {
+      return explicit;
+    }
+    return HazukiSourceService.instance.activeSourceKey;
   }
 
   void _reportState(HazukiCachedImageLoadState state) {
@@ -243,14 +276,18 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
       _useLoadedImageReveal = false;
       return false;
     }
+    final sourceKey = _resolvedSourceKey;
     final cached =
-        takeHazukiWidgetImageMemory(normalized) ??
-        HazukiSourceService.instance.peekImageBytesFromMemory(normalized);
+        takeHazukiWidgetImageMemory(normalized, sourceKey: sourceKey) ??
+        HazukiSourceService.instance.peekImageBytesFromMemory(
+          normalized,
+          sourceKey: sourceKey,
+        );
     if (cached == null) {
       return false;
     }
     if (widget.keepInMemory) {
-      putHazukiWidgetImageMemory(normalized, cached);
+      putHazukiWidgetImageMemory(normalized, cached, sourceKey: sourceKey);
     }
     _bytes = cached;
     _error = null;
@@ -308,12 +345,16 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
       return;
     }
 
+    final sourceKey = _resolvedSourceKey;
     final cached =
-        takeHazukiWidgetImageMemory(normalized) ??
-        HazukiSourceService.instance.peekImageBytesFromMemory(normalized);
+        takeHazukiWidgetImageMemory(normalized, sourceKey: sourceKey) ??
+        HazukiSourceService.instance.peekImageBytesFromMemory(
+          normalized,
+          sourceKey: sourceKey,
+        );
     if (cached != null) {
       if (widget.keepInMemory) {
-        putHazukiWidgetImageMemory(normalized, cached);
+        putHazukiWidgetImageMemory(normalized, cached, sourceKey: sourceKey);
       }
       if (!mounted) {
         _bytes = cached;
@@ -355,9 +396,10 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
       final bytes = await HazukiSourceService.instance.downloadImageBytes(
         normalized,
         keepInMemory: widget.keepInMemory,
+        sourceKey: sourceKey,
       );
       if (widget.keepInMemory) {
-        putHazukiWidgetImageMemory(normalized, bytes);
+        putHazukiWidgetImageMemory(normalized, bytes, sourceKey: sourceKey);
       }
       if (!mounted || widget.url.trim() != normalized) {
         return;

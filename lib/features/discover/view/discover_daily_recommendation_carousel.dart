@@ -647,6 +647,9 @@ class _DiscoverDailyRecommendationCarouselState
     final coverUrl = _resolvedRecommendationEntry(
       normalizedIndex,
     ).comic.cover.trim();
+    final sourceKey = _resolvedRecommendationEntry(
+      normalizedIndex,
+    ).comic.sourceKey;
     if (coverUrl.isEmpty) {
       return;
     }
@@ -654,8 +657,9 @@ class _DiscoverDailyRecommendationCarouselState
       final bytes = await HazukiSourceService.instance.downloadImageBytes(
         coverUrl,
         keepInMemory: true,
+        sourceKey: sourceKey,
       );
-      putHazukiWidgetImageMemory(coverUrl, bytes);
+      putHazukiWidgetImageMemory(coverUrl, bytes, sourceKey: sourceKey);
     } catch (_) {
       _prefetchedCoverIndexes.remove(normalizedIndex);
     }
@@ -1038,6 +1042,7 @@ class _DiscoverDailyRecommendationCarouselState
                               ? ColoredBox(color: placeholderColor)
                               : HazukiCachedImage(
                                   url: entry.comic.cover,
+                                  sourceKey: entry.comic.sourceKey,
                                   fit: BoxFit.cover,
                                   cacheWidth: coverCacheWidth.round(),
                                   animateOnLoad: true,

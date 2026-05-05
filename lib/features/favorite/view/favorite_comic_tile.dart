@@ -90,6 +90,7 @@ class _FavoriteComicTileState extends State<FavoriteComicTile> {
                       )
                     : HazukiCachedImage(
                         url: widget.comic.cover,
+                        sourceKey: widget.comic.sourceKey,
                         width: 72,
                         height: 102,
                         fit: BoxFit.cover,

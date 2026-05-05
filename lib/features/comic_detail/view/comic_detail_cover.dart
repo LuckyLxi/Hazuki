@@ -12,27 +12,43 @@ const int _comicStaticBlurredCoverCacheLimit = 24;
 final Map<String, Uint8List> _comicStaticBlurredCoverCache =
     <String, Uint8List>{};
 
-Uint8List? _takeComicStaticBlurredCover(String url) {
+Uint8List? _takeComicStaticBlurredCover(String url, {String sourceKey = ''}) {
   final normalizedUrl = url.trim();
   if (normalizedUrl.isEmpty) {
     return null;
   }
-  final bytes = _comicStaticBlurredCoverCache[normalizedUrl];
+  final cacheKey = hazukiWidgetImageMemoryKey(
+    normalizedUrl,
+    sourceKey: sourceKey,
+  );
+  final bytes =
+      _comicStaticBlurredCoverCache[cacheKey] ??
+      (sourceKey.trim().isNotEmpty
+          ? _comicStaticBlurredCoverCache[normalizedUrl]
+          : null);
   if (bytes == null) {
     return null;
   }
-  _comicStaticBlurredCoverCache.remove(normalizedUrl);
-  _comicStaticBlurredCoverCache[normalizedUrl] = bytes;
+  _comicStaticBlurredCoverCache.remove(cacheKey);
+  _comicStaticBlurredCoverCache[cacheKey] = bytes;
   return bytes;
 }
 
-void _putComicStaticBlurredCover(String url, Uint8List bytes) {
+void _putComicStaticBlurredCover(
+  String url,
+  Uint8List bytes, {
+  String sourceKey = '',
+}) {
   final normalizedUrl = url.trim();
   if (normalizedUrl.isEmpty || bytes.isEmpty) {
     return;
   }
-  _comicStaticBlurredCoverCache.remove(normalizedUrl);
-  _comicStaticBlurredCoverCache[normalizedUrl] = bytes;
+  final cacheKey = hazukiWidgetImageMemoryKey(
+    normalizedUrl,
+    sourceKey: sourceKey,
+  );
+  _comicStaticBlurredCoverCache.remove(cacheKey);
+  _comicStaticBlurredCoverCache[cacheKey] = bytes;
   while (_comicStaticBlurredCoverCache.length >
       _comicStaticBlurredCoverCacheLimit) {
     _comicStaticBlurredCoverCache.remove(
@@ -41,19 +57,24 @@ void _putComicStaticBlurredCover(String url, Uint8List bytes) {
   }
 }
 
-Uint8List? _takeBackgroundCoverBytes(String url) {
+Uint8List? _takeBackgroundCoverBytes(String url, {String sourceKey = ''}) {
   final normalizedUrl = url.trim();
   if (normalizedUrl.isEmpty) {
     return null;
   }
-  return _takeComicStaticBlurredCover(normalizedUrl) ??
-      takeHazukiWidgetImageMemory(normalizedUrl);
+  return _takeComicStaticBlurredCover(normalizedUrl, sourceKey: sourceKey) ??
+      takeHazukiWidgetImageMemory(normalizedUrl, sourceKey: sourceKey);
 }
 
 class ComicBlurredCoverBackground extends StatefulWidget {
-  const ComicBlurredCoverBackground({super.key, required this.coverUrl});
+  const ComicBlurredCoverBackground({
+    super.key,
+    required this.coverUrl,
+    required this.sourceKey,
+  });
 
   final String coverUrl;
+  final String sourceKey;
 
   @override
   State<ComicBlurredCoverBackground> createState() =>
@@ -68,7 +89,10 @@ class _ComicBlurredCoverBackgroundState
   @override
   void initState() {
     super.initState();
-    final cached = _takeBackgroundCoverBytes(widget.coverUrl);
+    final cached = _takeBackgroundCoverBytes(
+      widget.coverUrl,
+      sourceKey: widget.sourceKey,
+    );
     if (cached != null) {
       _coverBytes = cached;
       _queueBackgroundReveal();
@@ -83,10 +107,14 @@ class _ComicBlurredCoverBackgroundState
   @override
   void didUpdateWidget(covariant ComicBlurredCoverBackground oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.coverUrl == widget.coverUrl) {
+    if (oldWidget.coverUrl == widget.coverUrl &&
+        oldWidget.sourceKey == widget.sourceKey) {
       return;
     }
-    final cached = _takeBackgroundCoverBytes(widget.coverUrl);
+    final cached = _takeBackgroundCoverBytes(
+      widget.coverUrl,
+      sourceKey: widget.sourceKey,
+    );
     if (cached != null) {
       setState(() {
         _coverBytes = cached;
@@ -110,9 +138,18 @@ class _ComicBlurredCoverBackgroundState
       final bytes = await HazukiSourceService.instance.downloadImageBytes(
         normalizedUrl,
         keepInMemory: true,
+        sourceKey: widget.sourceKey,
       );
-      putHazukiWidgetImageMemory(normalizedUrl, bytes);
-      _putComicStaticBlurredCover(normalizedUrl, bytes);
+      putHazukiWidgetImageMemory(
+        normalizedUrl,
+        bytes,
+        sourceKey: widget.sourceKey,
+      );
+      _putComicStaticBlurredCover(
+        normalizedUrl,
+        bytes,
+        sourceKey: widget.sourceKey,
+      );
       if (!mounted || widget.coverUrl.trim() != normalizedUrl) {
         return;
       }
@@ -211,11 +248,13 @@ class ComicCoverPreviewPage extends StatelessWidget {
   const ComicCoverPreviewPage({
     super.key,
     required this.imageUrl,
+    required this.sourceKey,
     required this.heroTag,
     required this.onLongPress,
   });
 
   final String imageUrl;
+  final String sourceKey;
   final String heroTag;
   final VoidCallback onLongPress;
 
@@ -252,6 +291,7 @@ class ComicCoverPreviewPage extends StatelessWidget {
                       maxScale: 4,
                       child: HazukiCachedImage(
                         url: imageUrl,
+                        sourceKey: sourceKey,
                         fit: BoxFit.contain,
                         loading: Container(
                           width: 220,

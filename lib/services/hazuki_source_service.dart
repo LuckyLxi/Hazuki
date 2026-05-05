@@ -261,11 +261,21 @@ class HazukiSourceService extends ChangeNotifier {
   String get statusText => _statusText;
   SourceRuntimeState get sourceRuntimeState => _runtimeState;
   SourceMeta? get sourceMeta => _sourceMeta;
+  String get activeSourceKey => _sourceMeta?.key.trim() ?? '';
   bool get isInitialized => _engine != null && _sourceMeta != null;
   bool get softwareLogCaptureEnabled => _softwareLogCaptureEnabled;
 
   void _notifyRuntimeStateChanged() {
     notifyListeners();
+  }
+
+  String _resolveActiveSourceKey([String? requestedSourceKey]) {
+    final requested = requestedSourceKey?.trim() ?? '';
+    final active = activeSourceKey;
+    if (requested.isNotEmpty && active.isNotEmpty && requested != active) {
+      throw Exception('source_mismatch:$requested:$active');
+    }
+    return requested.isNotEmpty ? requested : active;
   }
 
   Future<SearchComicsResult> searchComics({

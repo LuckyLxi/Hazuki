@@ -77,6 +77,7 @@ extension HazukiSourceServiceExploreCapability on HazukiSourceService {
   }
 
   List<ExploreComic> _parseExploreComics(List list) {
+    final sourceKey = activeSourceKey;
     final comics = <ExploreComic>[];
     for (final comic in list) {
       if (comic is! Map) {
@@ -90,6 +91,7 @@ extension HazukiSourceServiceExploreCapability on HazukiSourceService {
           subTitle: (comicMap['subTitle'] ?? comicMap['subtitle'] ?? '')
               .toString(),
           cover: comicMap['cover']?.toString() ?? '',
+          sourceKey: sourceKey,
         ),
       );
     }

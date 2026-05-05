@@ -56,12 +56,27 @@ extension HazukiSourceServiceImageCacheCapability on HazukiSourceService {
     };
   }
 
-  Uint8List? peekImageBytesFromMemory(String url) {
-    return facade.cache.touchImageBytes(url);
+  Uint8List? peekImageBytesFromMemory(String url, {String sourceKey = ''}) {
+    final cacheKey = SourceScopedComicId(
+      sourceKey: _resolveActiveSourceKey(sourceKey),
+      comicId: url,
+    ).imageCacheKey;
+    return facade.cache.touchImageBytes(cacheKey);
   }
 
-  void evictImageBytesFromMemory(Iterable<String> urls) {
-    facade.cache.evictImageBytes(urls);
+  void evictImageBytesFromMemory(
+    Iterable<String> urls, {
+    String sourceKey = '',
+  }) {
+    final resolvedSourceKey = _resolveActiveSourceKey(sourceKey);
+    facade.cache.evictImageBytes(
+      urls.map(
+        (url) => SourceScopedComicId(
+          sourceKey: resolvedSourceKey,
+          comicId: url,
+        ).imageCacheKey,
+      ),
+    );
   }
 
   void _putInMemoryCache(String url, Uint8List bytes) {

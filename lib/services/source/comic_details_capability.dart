@@ -1,37 +1,50 @@
 part of '../hazuki_source_service.dart';
 
 extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
-  Future<ComicDetailsData> loadComicDetails(String comicId) async {
+  Future<ComicDetailsData> loadComicDetails(
+    String comicId, {
+    String sourceKey = '',
+  }) async {
     final normalizedComicId = comicId.trim();
     if (normalizedComicId.isEmpty) {
       throw Exception('comic_id_empty');
     }
+    final resolvedSourceKey = _resolveActiveSourceKey(sourceKey);
+    final scopedComicKey = SourceScopedComicId(
+      sourceKey: resolvedSourceKey,
+      comicId: normalizedComicId,
+    ).storageKey;
 
-    final memoryCached = _getComicDetailsFromMemoryCache(normalizedComicId);
+    final memoryCached = _getComicDetailsFromMemoryCache(scopedComicKey);
     if (memoryCached != null) {
       return memoryCached;
     }
 
     final facade = this.facade;
 
-    final inFlight = facade.cache.comicDetailsInFlight[normalizedComicId];
+    final inFlight = facade.cache.comicDetailsInFlight[scopedComicKey];
     if (inFlight != null) {
       return inFlight;
     }
 
-    final future = _loadComicDetailsFromSource(normalizedComicId, facade);
-    facade.cache.comicDetailsInFlight[normalizedComicId] = future;
+    final future = _loadComicDetailsFromSource(
+      normalizedComicId,
+      facade,
+      sourceKey: resolvedSourceKey,
+    );
+    facade.cache.comicDetailsInFlight[scopedComicKey] = future;
     try {
       return await future;
     } finally {
-      facade.cache.comicDetailsInFlight.remove(normalizedComicId);
+      facade.cache.comicDetailsInFlight.remove(scopedComicKey);
     }
   }
 
   Future<ComicDetailsData> _loadComicDetailsFromSource(
     String normalizedComicId,
-    HazukiSourceFacade facade,
-  ) async {
+    HazukiSourceFacade facade, {
+    required String sourceKey,
+  }) async {
     await facade.ensureInitialized();
 
     final engine = facade.js.engine;
@@ -78,11 +91,18 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
     final details = _buildComicDetailsFromSourceMap(
       map: Map<String, dynamic>.from(resolved),
       normalizedComicId: normalizedComicId,
+      sourceKey: sourceKey,
     );
 
-    _putComicDetailsInMemoryCache(normalizedComicId, details);
+    _putComicDetailsInMemoryCache(
+      SourceScopedComicId(
+        sourceKey: details.sourceKey,
+        comicId: normalizedComicId,
+      ).storageKey,
+      details,
+    );
     if (details.id != normalizedComicId) {
-      _putComicDetailsInMemoryCache(details.id, details);
+      _putComicDetailsInMemoryCache(details.scopedId.storageKey, details);
     }
     return details;
   }
@@ -90,7 +110,9 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
   Future<List<String>> loadChapterImages({
     required String comicId,
     required String epId,
+    String sourceKey = '',
   }) async {
+    _resolveActiveSourceKey(sourceKey);
     final facade = this.facade;
     final engine = facade.js.engine;
     if (engine == null) {
@@ -120,6 +142,7 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
   ComicDetailsData _buildComicDetailsFromSourceMap({
     required Map<String, dynamic> map,
     required String normalizedComicId,
+    required String sourceKey,
   }) {
     final chapters = _extractComicDetailsChapters(
       map,
@@ -145,6 +168,7 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
       recommend: recommend,
       isFavorite: _asBool(map['isFavorite']),
       subId: map['subId']?.toString() ?? '',
+      sourceKey: sourceKey,
     );
   }
 
@@ -202,6 +226,7 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
   List<ExploreComic> _extractComicDetailsRecommendations(
     Map<String, dynamic> map,
   ) {
+    final sourceKey = activeSourceKey;
     final recommend = <ExploreComic>[];
     final recommendRaw = map['recommend'];
     if (recommendRaw is List) {
@@ -221,7 +246,13 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
                 .trim();
         final cover = recommendMap['cover']?.toString().trim() ?? '';
         recommend.add(
-          ExploreComic(id: id, title: title, subTitle: subTitle, cover: cover),
+          ExploreComic(
+            id: id,
+            title: title,
+            subTitle: subTitle,
+            cover: cover,
+            sourceKey: sourceKey,
+          ),
         );
       }
     }

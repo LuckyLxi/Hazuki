@@ -20,7 +20,7 @@ class DownloadedComicDetailPage extends StatelessWidget {
   final DownloadedMangaComic comic;
   final DownloadedComicReaderPageBuilder readerPageBuilder;
 
-  String get _coverHeroTag => 'downloaded_cover_${comic.comicId}';
+  String get _coverHeroTag => 'downloaded_cover_${comic.storageKey}';
 
   @override
   Widget build(BuildContext context) {

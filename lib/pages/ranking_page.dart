@@ -338,6 +338,7 @@ class _RankingPageState extends State<RankingPage> {
                         )
                       : HazukiCachedImage(
                           url: comic.cover,
+                          sourceKey: comic.sourceKey,
                           width: 72,
                           height: 102,
                           fit: BoxFit.cover,

@@ -189,8 +189,8 @@ class DownloadsOngoingTaskCard extends StatelessWidget {
                   child: FilledButton.tonalIcon(
                     onPressed:
                         task.status == MangaDownloadTaskStatus.downloading
-                        ? () => onPauseTask(task.comicId)
-                        : () => onResumeTask(task.comicId),
+                        ? () => onPauseTask(task.storageKey)
+                        : () => onResumeTask(task.storageKey),
                     icon: Icon(
                       task.status == MangaDownloadTaskStatus.downloading
                           ? Icons.pause_circle_outline_rounded
@@ -206,7 +206,7 @@ class DownloadsOngoingTaskCard extends StatelessWidget {
                 const SizedBox(width: 10),
                 Expanded(
                   child: OutlinedButton.icon(
-                    onPressed: () => onDeleteTask(task.comicId),
+                    onPressed: () => onDeleteTask(task.storageKey),
                     icon: const Icon(Icons.delete_outline_rounded),
                     label: Text(l10n(context).comicDetailDelete),
                   ),
@@ -264,6 +264,7 @@ class _DownloadTaskCover extends StatelessWidget {
     if (task.coverUrl.trim().isNotEmpty) {
       image = HazukiCachedImage(
         url: task.coverUrl,
+        sourceKey: task.sourceKey,
         width: 84,
         height: 118,
         fit: BoxFit.cover,

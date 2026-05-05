@@ -33,6 +33,7 @@ class ReaderSessionController {
     required void Function() onZoomChanged,
     required String comicId,
     required String epId,
+    String sourceKey = '',
     required String chapterTitle,
     required int chapterIndex,
     required List<String> widgetImages,
@@ -55,6 +56,7 @@ class ReaderSessionController {
        _onZoomChanged = onZoomChanged,
        _comicId = comicId,
        _epId = epId,
+       _sourceKey = sourceKey,
        _chapterTitle = chapterTitle,
        _chapterIndex = chapterIndex,
        _widgetImages = widgetImages,
@@ -79,13 +81,19 @@ class ReaderSessionController {
   final void Function() _onZoomChanged;
   final String _comicId;
   final String _epId;
+  final String _sourceKey;
   final String _chapterTitle;
   final int _chapterIndex;
   final List<String> _widgetImages;
   final HazukiSourceService _sourceService;
 
-  Future<ComicDetailsData> loadComicDetails(String comicId) =>
-      _sourceService.loadComicDetails(comicId);
+  Future<ComicDetailsData> loadComicDetails(
+    String comicId, {
+    String sourceKey = '',
+  }) => _sourceService.loadComicDetails(
+    comicId,
+    sourceKey: sourceKey.isNotEmpty ? sourceKey : _sourceKey,
+  );
 
   Future<PreparedChapterImageData> prepareImageForSave(
     String imageUrl, {
@@ -214,13 +222,21 @@ class ReaderSessionController {
     try {
       final prefs = await SharedPreferences.getInstance();
       final progress = {
+        'sourceKey': _sourceKey,
         'epId': _epId,
         'title': _chapterTitle,
         'index': _chapterIndex,
         'pageIndex': lastPageIndex,
         'timestamp': DateTime.now().millisecondsSinceEpoch,
       };
-      await prefs.setString('reading_progress_$_comicId', jsonEncode(progress));
+      final scopedKey = SourceScopedComicId(
+        sourceKey: _sourceKey,
+        comicId: _comicId,
+      ).storageKey;
+      await prefs.setString(
+        'reading_progress_$scopedKey',
+        jsonEncode(progress),
+      );
     } catch (_) {}
   }
 }

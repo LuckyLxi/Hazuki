@@ -12,7 +12,7 @@ typedef MangaDownloadRemoveTask = bool Function(String comicId);
 typedef MangaDownloadLatestTask = MangaDownloadTask? Function(String comicId);
 typedef MangaDownloadAbortCheck = Future<bool> Function(String comicId);
 typedef MangaDownloadFindDownloadedComic =
-    DownloadedMangaComic? Function(String comicId);
+    DownloadedMangaComic? Function(String storageKey);
 typedef MangaDownloadUpsertComic = void Function(DownloadedMangaComic comic);
 typedef MangaDownloadStateFlush = Future<void> Function();
 typedef MangaDownloadEnsureAccess = Future<bool> Function();
@@ -126,7 +126,7 @@ class MangaDownloadQueueExecutor {
       status: MangaDownloadTaskStatus.downloading,
       clearErrorMessage: true,
     );
-    if (!_replaceTask(task.comicId, task)) {
+    if (!_replaceTask(task.storageKey, task)) {
       return;
     }
     await _flushState();
@@ -148,15 +148,16 @@ class MangaDownloadQueueExecutor {
         );
       }
       final rootDir = await _ensureRootDir();
-      final comicDir = Directory('${rootDir.path}/${task.comicId}');
+      final comicDir = Directory('${rootDir.path}/${task.downloadDirName}');
       if (!await comicDir.exists()) {
         await comicDir.create(recursive: true);
       }
 
       var downloadedComic =
-          _downloadedComicById(task.comicId) ??
+          _downloadedComicById(task.storageKey) ??
           DownloadedMangaComic(
             comicId: task.comicId,
+            sourceKey: task.sourceKey,
             title: task.title,
             subTitle: task.subTitle,
             description: task.description,
@@ -181,7 +182,7 @@ class MangaDownloadQueueExecutor {
       final sourceService = HazukiSourceService.instance;
 
       for (final target in task.targets) {
-        if (await _shouldAbortTask(task.comicId)) {
+        if (await _shouldAbortTask(task.storageKey)) {
           return;
         }
         if (_shouldSuspendDownloads()) {
@@ -195,7 +196,7 @@ class MangaDownloadQueueExecutor {
           task = task.copyWith(
             completedEpIds: {...task.completedEpIds, target.epId},
           );
-          if (!_replaceTask(task.comicId, task)) {
+          if (!_replaceTask(task.storageKey, task)) {
             return;
           }
           continue;
@@ -204,8 +205,9 @@ class MangaDownloadQueueExecutor {
         final imageUrls = await sourceService.loadChapterImages(
           comicId: task.comicId,
           epId: target.epId,
+          sourceKey: task.sourceKey,
         );
-        if (await _shouldAbortTask(task.comicId)) {
+        if (await _shouldAbortTask(task.storageKey)) {
           return;
         }
         final chapterDir = _chapterDirForTarget(comicDir, target);
@@ -226,13 +228,13 @@ class MangaDownloadQueueExecutor {
           currentImageIndex: savedPaths.length,
           currentImageTotal: imageUrls.length,
         );
-        if (!_replaceTask(task.comicId, task)) {
+        if (!_replaceTask(task.storageKey, task)) {
           return;
         }
         await _flushState();
 
         for (var i = savedPaths.length; i < imageUrls.length; i++) {
-          if (await _shouldAbortTask(task.comicId)) {
+          if (await _shouldAbortTask(task.storageKey)) {
             return;
           }
           if (_shouldSuspendDownloads()) {
@@ -247,8 +249,9 @@ class MangaDownloadQueueExecutor {
             imageUrl,
             comicId: task.comicId,
             epId: target.epId,
+            sourceKey: task.sourceKey,
           );
-          if (await _shouldAbortTask(task.comicId)) {
+          if (await _shouldAbortTask(task.storageKey)) {
             return;
           }
           final fileName =
@@ -262,7 +265,7 @@ class MangaDownloadQueueExecutor {
             currentImageIndex: i + 1,
             currentImageTotal: imageUrls.length,
           );
-          if (!_replaceTask(task.comicId, task)) {
+          if (!_replaceTask(task.storageKey, task)) {
             return;
           }
           await _flushState();
@@ -285,7 +288,7 @@ class MangaDownloadQueueExecutor {
           currentImageIndex: 0,
           currentImageTotal: 0,
         );
-        if (!_replaceTask(task.comicId, task)) {
+        if (!_replaceTask(task.storageKey, task)) {
           return;
         }
 
@@ -298,7 +301,7 @@ class MangaDownloadQueueExecutor {
         await _flushState();
       }
 
-      _removeTaskByComicId(task.comicId);
+      _removeTaskByComicId(task.storageKey);
       _upsertDownloadedComic(downloadedComic);
       await _writeMetadataFile(comicDir, downloadedComic);
       await _flushState();
@@ -313,7 +316,7 @@ class MangaDownloadQueueExecutor {
         );
         return;
       }
-      final latest = _latestTask(task.comicId);
+      final latest = _latestTask(task.storageKey);
       if (latest == null) {
         _logDownload(
           'Download task vanished during error handling',
@@ -323,7 +326,7 @@ class MangaDownloadQueueExecutor {
         return;
       }
       _replaceTask(
-        task.comicId,
+        task.storageKey,
         latest.copyWith(
           status: MangaDownloadTaskStatus.failed,
           clearCurrentChapterEpId: true,
@@ -344,7 +347,7 @@ class MangaDownloadQueueExecutor {
     Object? error,
     bool countAsRetry = false,
   }) async {
-    final latest = _latestTask(task.comicId);
+    final latest = _latestTask(task.storageKey);
     if (latest == null) {
       return;
     }
@@ -362,7 +365,7 @@ class MangaDownloadQueueExecutor {
       final newRetryCount = latest.retryCount + 1;
       if (newRetryCount >= _maxTransientRetries) {
         _replaceTask(
-          task.comicId,
+          task.storageKey,
           latest.copyWith(
             status: MangaDownloadTaskStatus.failed,
             clearCurrentChapterEpId: true,
@@ -377,7 +380,7 @@ class MangaDownloadQueueExecutor {
         return;
       }
       _replaceTask(
-        task.comicId,
+        task.storageKey,
         latest.copyWith(
           status: MangaDownloadTaskStatus.queued,
           clearErrorMessage: true,
@@ -386,7 +389,7 @@ class MangaDownloadQueueExecutor {
       );
     } else {
       _replaceTask(
-        task.comicId,
+        task.storageKey,
         latest.copyWith(
           status: MangaDownloadTaskStatus.queued,
           clearErrorMessage: true,

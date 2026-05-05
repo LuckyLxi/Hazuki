@@ -197,6 +197,7 @@ class SearchComicListItem extends StatelessWidget {
                         )
                       : HazukiCachedImage(
                           url: comic.cover,
+                          sourceKey: comic.sourceKey,
                           width: 72,
                           height: 102,
                           fit: BoxFit.cover,

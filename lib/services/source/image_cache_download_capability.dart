@@ -35,7 +35,9 @@ extension HazukiSourceServiceImageCacheDownloadCapability
     required List<String> imageUrls,
     required int count,
     int memoryCount = 0,
+    String sourceKey = '',
   }) async {
+    final resolvedSourceKey = _resolveActiveSourceKey(sourceKey);
     final max = count < imageUrls.length ? count : imageUrls.length;
     for (var i = 0; i < max; i++) {
       final url = imageUrls[i];
@@ -48,6 +50,7 @@ extension HazukiSourceServiceImageCacheDownloadCapability
           comicId: comicId,
           epId: epId,
           keepInMemory: i < memoryCount,
+          sourceKey: resolvedSourceKey,
         );
       } catch (_) {
         continue;
@@ -61,34 +64,43 @@ extension HazukiSourceServiceImageCacheDownloadCapability
     String? epId,
     bool keepInMemory = true,
     bool useDiskCache = true,
+    String sourceKey = '',
   }) async {
     final normalizedUrl = url.trim();
     if (normalizedUrl.isEmpty) {
       throw Exception('image_url_empty');
     }
+    final resolvedSourceKey = _resolveActiveSourceKey(sourceKey);
+    final cacheKey = SourceScopedComicId(
+      sourceKey: resolvedSourceKey,
+      comicId: normalizedUrl,
+    ).imageCacheKey;
 
-    final cached = _imageBytesCache[normalizedUrl];
+    final cached = _imageBytesCache[cacheKey];
     if (cached != null) {
-      _imageBytesCache.remove(normalizedUrl);
-      _imageBytesCache[normalizedUrl] = cached;
+      _imageBytesCache.remove(cacheKey);
+      _imageBytesCache[cacheKey] = cached;
       return cached;
     }
 
     if (useDiskCache) {
-      final diskCached = await _readImageBytesFromDisk(normalizedUrl);
+      final diskCached = await _readImageBytesFromDisk(
+        normalizedUrl,
+        sourceKey: resolvedSourceKey,
+      );
       if (diskCached != null) {
         if (keepInMemory) {
-          _putInMemoryCache(normalizedUrl, diskCached);
+          _putInMemoryCache(cacheKey, diskCached);
         }
         return diskCached;
       }
     }
 
-    final inFlight = _imageDownloadInFlight[normalizedUrl];
+    final inFlight = _imageDownloadInFlight[cacheKey];
     if (inFlight != null) {
       final bytes = await inFlight;
       if (keepInMemory) {
-        _putInMemoryCache(normalizedUrl, bytes);
+        _putInMemoryCache(cacheKey, bytes);
       }
       return bytes;
     }
@@ -105,19 +117,23 @@ extension HazukiSourceServiceImageCacheDownloadCapability
         _releaseImageDownloadSlot();
       }
     }();
-    _imageDownloadInFlight[normalizedUrl] = future;
+    _imageDownloadInFlight[cacheKey] = future;
 
     try {
       final bytes = await future;
       if (useDiskCache) {
-        await _saveImageBytesToDisk(normalizedUrl, bytes);
+        await _saveImageBytesToDisk(
+          normalizedUrl,
+          bytes,
+          sourceKey: resolvedSourceKey,
+        );
       }
       if (keepInMemory) {
-        _putInMemoryCache(normalizedUrl, bytes);
+        _putInMemoryCache(cacheKey, bytes);
       }
       return bytes;
     } finally {
-      _imageDownloadInFlight.remove(normalizedUrl);
+      _imageDownloadInFlight.remove(cacheKey);
     }
   }
 
@@ -171,9 +187,12 @@ extension HazukiSourceServiceImageCacheDownloadCapability
     return Uint8List.fromList(data);
   }
 
-  Future<Uint8List?> _readImageBytesFromDisk(String url) async {
+  Future<Uint8List?> _readImageBytesFromDisk(
+    String url, {
+    String sourceKey = '',
+  }) async {
     try {
-      final file = await _cacheFileForUrl(url);
+      final file = await _cacheFileForUrl(url, sourceKey: sourceKey);
       if (!await file.exists()) {
         return null;
       }
@@ -190,9 +209,13 @@ extension HazukiSourceServiceImageCacheDownloadCapability
     }
   }
 
-  Future<void> _saveImageBytesToDisk(String url, Uint8List bytes) async {
+  Future<void> _saveImageBytesToDisk(
+    String url,
+    Uint8List bytes, {
+    String sourceKey = '',
+  }) async {
     try {
-      final file = await _cacheFileForUrl(url);
+      final file = await _cacheFileForUrl(url, sourceKey: sourceKey);
       if (await file.exists()) {
         final stat = await file.stat();
         if (stat.size == bytes.length && stat.size > 0) {

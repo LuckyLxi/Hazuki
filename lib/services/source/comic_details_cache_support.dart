@@ -20,9 +20,16 @@ extension HazukiSourceServiceComicDetailsCacheSupport on HazukiSourceService {
     return '$hash.json';
   }
 
-  Future<File> _comicDetailsCacheFile(String comicId) async {
+  Future<File> _comicDetailsCacheFile(
+    String comicId, {
+    String sourceKey = '',
+  }) async {
     final dir = await _ensureComicDetailsCacheDir();
-    return File('${dir.path}/${_comicDetailsCacheFileName(comicId)}');
+    final scopedKey = SourceScopedComicId(
+      sourceKey: _resolveActiveSourceKey(sourceKey),
+      comicId: comicId,
+    ).storageKey;
+    return File('${dir.path}/${_comicDetailsCacheFileName(scopedKey)}');
   }
 
   ComicDetailsData? _getComicDetailsFromMemoryCache(String comicId) {
@@ -45,6 +52,7 @@ extension HazukiSourceServiceComicDetailsCacheSupport on HazukiSourceService {
   Map<String, dynamic> _comicDetailsToJson(ComicDetailsData details) {
     return {
       'id': details.id,
+      'sourceKey': details.sourceKey,
       'title': details.title,
       'subTitle': details.subTitle,
       'cover': details.cover,
@@ -57,6 +65,7 @@ extension HazukiSourceServiceComicDetailsCacheSupport on HazukiSourceService {
           .map(
             (comic) => {
               'id': comic.id,
+              'sourceKey': comic.sourceKey,
               'title': comic.title,
               'subTitle': comic.subTitle,
               'cover': comic.cover,
@@ -73,6 +82,7 @@ extension HazukiSourceServiceComicDetailsCacheSupport on HazukiSourceService {
     if (id.isEmpty) {
       return null;
     }
+    final sourceKey = map['sourceKey']?.toString().trim() ?? activeSourceKey;
 
     final chapters = <String, String>{};
     final chapterRaw = map['chapters'];
@@ -119,6 +129,8 @@ extension HazukiSourceServiceComicDetailsCacheSupport on HazukiSourceService {
                     .toString()
                     .trim(),
             cover: recommendMap['cover']?.toString().trim() ?? '',
+            sourceKey:
+                recommendMap['sourceKey']?.toString().trim() ?? sourceKey,
           ),
         );
       }
@@ -137,13 +149,17 @@ extension HazukiSourceServiceComicDetailsCacheSupport on HazukiSourceService {
       recommend: recommend,
       isFavorite: _asBool(map['isFavorite']),
       subId: map['subId']?.toString() ?? '',
+      sourceKey: sourceKey,
     );
   }
 
   // ignore: unused_element
-  Future<ComicDetailsData?> _readComicDetailsFromDisk(String comicId) async {
+  Future<ComicDetailsData?> _readComicDetailsFromDisk(
+    String comicId, {
+    String sourceKey = '',
+  }) async {
     try {
-      final file = await _comicDetailsCacheFile(comicId);
+      final file = await _comicDetailsCacheFile(comicId, sourceKey: sourceKey);
       if (!await file.exists()) {
         return null;
       }
@@ -170,7 +186,10 @@ extension HazukiSourceServiceComicDetailsCacheSupport on HazukiSourceService {
     ComicDetailsData details,
   ) async {
     try {
-      final file = await _comicDetailsCacheFile(comicId);
+      final file = await _comicDetailsCacheFile(
+        comicId,
+        sourceKey: details.sourceKey,
+      );
       await file.writeAsString(
         jsonEncode(_comicDetailsToJson(details)),
         flush: false,

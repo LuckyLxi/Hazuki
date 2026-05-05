@@ -5,6 +5,7 @@ import 'package:hazuki/models/hazuki_models.dart';
 typedef ComicDetailCoverPreviewPageBuilder =
     Widget Function({
       required String imageUrl,
+      required String sourceKey,
       required String heroTag,
       required VoidCallback onLongPress,
     });

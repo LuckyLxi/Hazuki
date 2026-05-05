@@ -16,7 +16,10 @@ Future<void> toggleFavoriteFromHistory(
   final strings = AppLocalizations.of(context)!;
 
   try {
-    final details = await service.loadComicDetails(comic.id);
+    final details = await service.loadComicDetails(
+      comic.id,
+      sourceKey: comic.sourceKey,
+    );
     if (!context.mounted) {
       return;
     }

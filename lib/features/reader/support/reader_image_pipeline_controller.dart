@@ -27,6 +27,7 @@ class ReaderImagePipelineController {
     required bool Function() noImageModeEnabled,
     required String comicId,
     required String epId,
+    String sourceKey = '',
     required String Function(Object error) loadImagesErrorBuilder,
     Future<ImageProvider> Function(String url, {bool useDiskCache})?
     imageProviderBuilder,
@@ -47,6 +48,7 @@ class ReaderImagePipelineController {
        _noImageModeEnabled = noImageModeEnabled,
        _comicId = comicId,
        _epId = epId,
+       _sourceKey = sourceKey,
        _loadImagesErrorBuilder = loadImagesErrorBuilder,
        _imageProviderBuilder = imageProviderBuilder,
        _sourceService = sourceService ?? HazukiSourceService.instance,
@@ -83,6 +85,7 @@ class ReaderImagePipelineController {
   final bool Function() _noImageModeEnabled;
   final String _comicId;
   final String _epId;
+  final String _sourceKey;
   final String Function(Object error) _loadImagesErrorBuilder;
   final Future<ImageProvider> Function(String url, {bool useDiskCache})?
   _imageProviderBuilder;
@@ -132,6 +135,7 @@ class ReaderImagePipelineController {
       final images = await _sourceService.loadChapterImages(
         comicId: _comicId,
         epId: _epId,
+        sourceKey: _sourceKey,
       );
       if (!_isMounted()) {
         return;
@@ -494,6 +498,7 @@ class ReaderImagePipelineController {
               epId: _epId,
               keepInMemory: true,
               useDiskCache: true,
+              sourceKey: _sourceKey,
             )
             .then((_) {})
             .catchError((_) {}),
@@ -617,6 +622,7 @@ class ReaderImagePipelineController {
         comicId: _comicId,
         epId: _epId,
         useDiskCache: useDiskCache,
+        sourceKey: _sourceKey,
       );
       _rememberAspectRatio(url, prepared.aspectRatio);
       final decoded = imageAspectRatioCache.containsKey(url)

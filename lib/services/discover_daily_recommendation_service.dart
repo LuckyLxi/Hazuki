@@ -24,6 +24,7 @@ class DiscoverDailyRecommendationEntry {
       'author': author,
       'comic': <String, dynamic>{
         'id': comic.id,
+        'sourceKey': comic.sourceKey,
         'title': comic.title,
         'subTitle': comic.subTitle,
         'cover': comic.cover,
@@ -44,6 +45,7 @@ class DiscoverDailyRecommendationEntry {
     final author = (map['author'] ?? '').toString().trim();
     final comic = ExploreComic(
       id: (comicMap['id'] ?? '').toString(),
+      sourceKey: (comicMap['sourceKey'] ?? '').toString(),
       title: (comicMap['title'] ?? '').toString(),
       subTitle: (comicMap['subTitle'] ?? '').toString(),
       cover: (comicMap['cover'] ?? '').toString(),
@@ -347,8 +349,9 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
     _DiscoverDailyRecommendationSnapshot snapshot,
   ) {
     return prefs.setString(
-      _cachePayloadKey,
+      _sourceCachePayloadKey(snapshot.sourceKey),
       jsonEncode(<String, dynamic>{
+        'sourceKey': snapshot.sourceKey,
         'generatedAt': snapshot.generatedAt.toIso8601String(),
         'selectedAuthor': snapshot.selectedAuthor,
         'entries': snapshot.recommendations
@@ -359,7 +362,10 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
   }
 
   _DiscoverDailyRecommendationSnapshot? _readCache(SharedPreferences prefs) {
-    final raw = prefs.getString(_cachePayloadKey);
+    final activeSourceKey = HazukiSourceService.instance.activeSourceKey;
+    final raw =
+        prefs.getString(_sourceCachePayloadKey(activeSourceKey)) ??
+        prefs.getString(_cachePayloadKey);
     if (raw == null || raw.trim().isEmpty) {
       return null;
     }
@@ -369,6 +375,7 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
         return null;
       }
       final map = Map<String, dynamic>.from(decoded);
+      final sourceKey = (map['sourceKey'] ?? activeSourceKey).toString().trim();
       final generatedAt = DateTime.tryParse(
         (map['generatedAt'] ?? '').toString(),
       )?.toLocal();
@@ -389,6 +396,7 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
         recommendations: entries,
         selectedAuthor: selectedAuthor,
         generatedAt: generatedAt,
+        sourceKey: sourceKey,
       );
     } catch (_) {
       return null;
@@ -437,7 +445,16 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
           .toList(growable: false),
       selectedAuthor: author,
       generatedAt: DateTime.now(),
+      sourceKey: HazukiSourceService.instance.activeSourceKey,
     );
+  }
+
+  String _sourceCachePayloadKey(String sourceKey) {
+    final normalized = sourceKey.trim();
+    if (normalized.isEmpty) {
+      return _cachePayloadKey;
+    }
+    return '${_cachePayloadKey}_$normalized';
   }
 
   Future<List<String>> _loadAuthors() async {
@@ -464,7 +481,10 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
     for (final comic in comics) {
       final id = comic.id.trim();
       final title = comic.title.trim();
-      final key = id.isNotEmpty ? id : title;
+      final key = SourceScopedComicId(
+        sourceKey: comic.sourceKey,
+        comicId: id.isNotEmpty ? id : title,
+      ).storageKey;
       if (key.isEmpty || deduped.containsKey(key)) {
         continue;
       }
@@ -483,9 +503,11 @@ class _DiscoverDailyRecommendationSnapshot {
     required this.recommendations,
     required this.selectedAuthor,
     required this.generatedAt,
+    required this.sourceKey,
   });
 
   final List<DiscoverDailyRecommendationEntry> recommendations;
   final String selectedAuthor;
   final DateTime generatedAt;
+  final String sourceKey;
 }
