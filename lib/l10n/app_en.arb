@@ -297,6 +297,12 @@
       "error": {}
     }
   },
+  "searchIdExtractHint": "Extracted: {id}",
+  "@searchIdExtractHint": {
+    "placeholders": {
+      "id": {}
+    }
+  },
   "searchStartPrompt": "Enter keywords to start searching",
   "searchLoading": "Searching...",
   "searchEmpty": "No results found",

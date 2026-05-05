@@ -8,6 +8,7 @@ import 'package:hazuki/widgets/windows_comic_detail_host.dart';
 
 import 'search_bar_shell.dart';
 import 'search_history_section.dart';
+import 'search_id_extract_pill.dart';
 import 'search_results_page.dart';
 import '../state/search_focus_coordinator.dart';
 import '../support/search_history_service.dart';
@@ -45,6 +46,7 @@ class _SearchEntryPageState extends State<SearchEntryPage> {
   bool _historyEditMode = false;
   bool _historyExpanded = false;
   double _searchRevealProgress = 0;
+  String? _extractedComicId;
 
   bool get _showCollapsedSearch => _revealSupport.showCollapsedSearch;
 
@@ -271,6 +273,7 @@ class _SearchEntryPageState extends State<SearchEntryPage> {
       onTap: () => _handleSearchBarTap(logTarget),
       onClear: () {
         _focusCoordinator.clearText();
+        setState(() => _extractedComicId = null);
         unawaited(_focusCoordinator.requestPrimarySearchFocus(context));
       },
       onSubmit: () => unawaited(
@@ -288,6 +291,7 @@ class _SearchEntryPageState extends State<SearchEntryPage> {
         } else {
           _focusCoordinator.syncText(value, updatePrimary: false);
         }
+        setState(() => _extractedComicId = extractBestComicId(value));
       },
     );
   }
@@ -508,36 +512,60 @@ class _SearchEntryPageState extends State<SearchEntryPage> {
                   ),
                 ],
               ),
-              body: ListView(
-                controller: _scrollController,
-                physics: const AlwaysScrollableScrollPhysics(
-                  parent: ClampingScrollPhysics(),
-                ),
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+              body: Stack(
                 children: [
-                  _buildTopSearchBox(),
-                  const SizedBox(height: 18),
-                  SearchHistorySection(
-                    historyList: _historyList,
-                    historyEditMode: _historyEditMode,
-                    historyExpanded: _historyExpanded,
-                    onKeywordPressed: (keyword) {
-                      unawaited(
-                        _openResults(
-                          keyword,
-                          intent: SearchEntryIntent.historySelection,
-                        ),
-                      );
-                    },
-                    onKeywordDeleted: (keyword) =>
-                        unawaited(_removeHistory(keyword)),
-                    onExpandedChanged: (expanded) {
-                      setState(() {
-                        _historyExpanded = expanded;
-                      });
-                      _scheduleSearchRevealSyncBurst(true);
-                    },
-                    onLayoutChanged: () => _scheduleSearchRevealSync(true),
+                  ListView(
+                    controller: _scrollController,
+                    physics: const AlwaysScrollableScrollPhysics(
+                      parent: ClampingScrollPhysics(),
+                    ),
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                    children: [
+                      _buildTopSearchBox(),
+                      const SizedBox(height: 18),
+                      SearchHistorySection(
+                        historyList: _historyList,
+                        historyEditMode: _historyEditMode,
+                        historyExpanded: _historyExpanded,
+                        onKeywordPressed: (keyword) {
+                          unawaited(
+                            _openResults(
+                              keyword,
+                              intent: SearchEntryIntent.historySelection,
+                            ),
+                          );
+                        },
+                        onKeywordDeleted: (keyword) =>
+                            unawaited(_removeHistory(keyword)),
+                        onExpandedChanged: (expanded) {
+                          setState(() {
+                            _historyExpanded = expanded;
+                          });
+                          _scheduleSearchRevealSyncBurst(true);
+                        },
+                        onLayoutChanged: () => _scheduleSearchRevealSync(true),
+                      ),
+                    ],
+                  ),
+                  Positioned(
+                    left: 16,
+                    right: 16,
+                    bottom: 12,
+                    child: SearchIdExtractPill(
+                      extractedId: _extractedComicId,
+                      onApply: () {
+                        final id = _extractedComicId;
+                        if (id == null) return;
+                        _focusCoordinator.syncText(id);
+                        setState(() => _extractedComicId = null);
+                        unawaited(
+                          _openResults(
+                            id,
+                            intent: SearchEntryIntent.submitFromEntry,
+                          ),
+                        );
+                      },
+                    ),
                   ),
                 ],
               ),

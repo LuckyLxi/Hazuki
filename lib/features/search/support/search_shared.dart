@@ -52,6 +52,14 @@ Map<String, String> searchOrderLabels(BuildContext context) {
   };
 }
 
+String? extractBestComicId(String text) {
+  final trimmed = text.trim();
+  if (trimmed.isEmpty) return null;
+  final digitsOnly = trimmed.replaceAll(RegExp(r'[^\d]'), '');
+  if (digitsOnly.length > 2 && digitsOnly != trimmed) return digitsOnly;
+  return null;
+}
+
 Future<String> normalizeSubmittedKeyword(
   String rawKeyword, {
   TextEditingController? controller,
@@ -63,9 +71,9 @@ Future<String> normalizeSubmittedKeyword(
 
   final prefs = await SharedPreferences.getInstance();
   if (prefs.getBool(hazukiComicIdSearchEnhancePreferenceKey) == true) {
-    final digitsOnly = keyword.replaceAll(RegExp(r'[^\d]'), '');
-    if (digitsOnly.length > 2 && digitsOnly != keyword) {
-      keyword = digitsOnly;
+    final extractedId = extractBestComicId(keyword);
+    if (extractedId != null) {
+      keyword = extractedId;
       controller?.value = TextEditingValue(
         text: keyword,
         selection: TextSelection.collapsed(offset: keyword.length),

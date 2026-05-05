@@ -12,6 +12,7 @@ import '../state/search_focus_coordinator.dart';
 import '../state/search_results_controller.dart';
 import '../support/search_shared.dart';
 import 'search_bar_shell.dart';
+import 'search_id_extract_pill.dart';
 import 'search_results_shell_widgets.dart';
 import 'search_results_widgets.dart';
 
@@ -51,6 +52,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
   bool _showBackToTop = false;
   double _searchRevealProgress = 0;
   bool _flyingSearchToTop = false;
+  String? _extractedComicId;
   AnimationController? _flyController;
   OverlayEntry? _flyOverlay;
 
@@ -105,6 +107,21 @@ class _SearchResultsPageState extends State<SearchResultsPage>
               children: [
                 _buildSearchResultsBody(),
                 _buildSearchBackToTopButton(),
+                Positioned(
+                  left: 16,
+                  right: 16,
+                  bottom: 12,
+                  child: SearchIdExtractPill(
+                    extractedId: _extractedComicId,
+                    onApply: () {
+                      final id = _extractedComicId;
+                      if (id == null) return;
+                      _focusCoordinator.syncText(id);
+                      _updateSearchResultsState(() => _extractedComicId = null);
+                      unawaited(_submitSearch(submittedText: id));
+                    },
+                  ),
+                ),
               ],
             ),
           ),
@@ -214,6 +231,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
 
   void _clearSearch() {
     _focusCoordinator.clearText();
+    _updateSearchResultsState(() => _extractedComicId = null);
     _resultsController.clearSearchData();
     unawaited(_requestExpandedSearchFocus());
     _focusCoordinator.exitCollapsedMode();
@@ -489,6 +507,13 @@ class _SearchResultsPageState extends State<SearchResultsPage>
     );
   }
 
+  void _updateExtractedId(String value) {
+    final id = extractBestComicId(value);
+    if (id != _extractedComicId) {
+      _updateSearchResultsState(() => _extractedComicId = id);
+    }
+  }
+
   Widget _buildTopSearchBox() {
     return SearchResultsTopSearchBox(
       revealProgress: _searchRevealProgress,
@@ -503,6 +528,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
         onClear: _clearSearch,
         onChanged: (value) {
           _focusCoordinator.syncText(value, updatePrimary: false);
+          _updateExtractedId(value);
         },
       ),
     );
@@ -522,9 +548,10 @@ class _SearchResultsPageState extends State<SearchResultsPage>
         clearKey: 'results-collapsed-clear',
         submitKey: 'results-collapsed-submit',
         compact: true,
-        onClear: _focusCoordinator.clearText,
+        onClear: _clearSearch,
         onChanged: (value) {
           _focusCoordinator.syncText(value, updateCollapsed: false);
+          _updateExtractedId(value);
         },
       ),
       onExpandCollapsedSearch: _expandCollapsedSearch,
