@@ -183,7 +183,6 @@ class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
     final strings = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final presetWidth = (MediaQuery.of(context).size.width - 96) / 3;
 
     return ListView(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -355,88 +354,95 @@ class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: List<Widget>.generate(kHazukiColorPresets.length, (
-                  index,
-                ) {
-                  final preset = kHazukiColorPresets[index];
-                  final selected = widget.settings.presetIndex == index;
-                  return AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    curve: Curves.easeOutCubic,
-                    width: presetWidth,
-                    child: InkWell(
-                      borderRadius: BorderRadius.circular(16),
-                      onTap: () {
-                        unawaited(
-                          widget.onApply(
-                            widget.settings.copyWith(presetIndex: index),
-                          ),
-                        );
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 12,
-                        ),
-                        decoration: BoxDecoration(
-                          color: selected
-                              ? colorScheme.primaryContainer
-                              : colorScheme.surface,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: selected
-                                ? colorScheme.primary
-                                : colorScheme.outlineVariant.withValues(
-                                    alpha: 0.5,
-                                  ),
-                            width: selected ? 1.5 : 1,
-                          ),
-                        ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Container(
-                              width: 28,
-                              height: 28,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  const spacing = 10.0;
+                  final presetWidth = (constraints.maxWidth - spacing * 2) / 3;
+                  return Wrap(
+                    spacing: spacing,
+                    runSpacing: spacing,
+                    children: List<Widget>.generate(
+                      kHazukiColorPresets.length,
+                      (index) {
+                        final preset = kHazukiColorPresets[index];
+                        final selected = widget.settings.presetIndex == index;
+                        return AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          curve: Curves.easeOutCubic,
+                          width: presetWidth,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(16),
+                            onTap: () {
+                              unawaited(
+                                widget.onApply(
+                                  widget.settings.copyWith(presetIndex: index),
+                                ),
+                              );
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 12,
+                              ),
                               decoration: BoxDecoration(
-                                color: preset.seedColor,
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  if (selected)
-                                    BoxShadow(
-                                      color: preset.seedColor.withValues(
-                                        alpha: 0.4,
-                                      ),
-                                      blurRadius: 8,
-                                      offset: const Offset(0, 2),
+                                color: selected
+                                    ? colorScheme.primaryContainer
+                                    : colorScheme.surface,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                  color: selected
+                                      ? colorScheme.primary
+                                      : colorScheme.outlineVariant.withValues(
+                                          alpha: 0.5,
+                                        ),
+                                  width: selected ? 1.5 : 1,
+                                ),
+                              ),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 28,
+                                    height: 28,
+                                    decoration: BoxDecoration(
+                                      color: preset.seedColor,
+                                      shape: BoxShape.circle,
+                                      boxShadow: [
+                                        if (selected)
+                                          BoxShadow(
+                                            color: preset.seedColor.withValues(
+                                              alpha: 0.4,
+                                            ),
+                                            blurRadius: 8,
+                                            offset: const Offset(0, 2),
+                                          ),
+                                      ],
                                     ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    preset.labelBuilder(strings),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: selected
+                                          ? FontWeight.w600
+                                          : FontWeight.w500,
+                                      color: selected
+                                          ? colorScheme.onPrimaryContainer
+                                          : colorScheme.onSurface,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
-                            const SizedBox(height: 8),
-                            Text(
-                              preset.labelBuilder(strings),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: selected
-                                    ? FontWeight.w600
-                                    : FontWeight.w500,
-                                color: selected
-                                    ? colorScheme.onPrimaryContainer
-                                    : colorScheme.onSurface,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
+                          ),
+                        );
+                      },
                     ),
                   );
-                }),
+                },
               ),
             ),
           ],

@@ -26,13 +26,16 @@ class CommentFilterService with ChangeNotifier {
   List<String> get userKeywords => List.unmodifiable(_userKeywords);
   CommentFilterMode get mode => _mode;
 
-  Future<void> load() async {
+  Future<void> load({bool notify = false}) async {
     final prefs = await SharedPreferences.getInstance();
     _userKeywords = prefs.getStringList(hazukiCommentFilterKeywordsKey) ?? [];
     final modeStr = prefs.getString(hazukiCommentFilterModeKey);
     _mode = modeStr == 'hide'
         ? CommentFilterMode.hide
         : CommentFilterMode.collapse;
+    if (notify) {
+      notifyListeners();
+    }
   }
 
   Future<void> save({

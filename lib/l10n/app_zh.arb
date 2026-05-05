@@ -146,6 +146,15 @@
   "commentFilterEditKeywordTitle": "编辑关键词",
   "commentFilterBackTooltip": "返回",
   "commentFilterKeywordListTitle": "已添加的关键词",
+  "commentFilterCollapseKeywordList": "收起",
+  "commentFilterExpandKeywordList": "展开全部 {count} 个",
+  "@commentFilterExpandKeywordList": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "commentFilteredCollapsedLabel": "此评论已被过滤",
   "commentFilteredExpandLabel": "点击展开",
   "commentFilterHiddenBanner": "已隐藏 {count} 条评论",

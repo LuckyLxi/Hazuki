@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hazuki/app/app_preferences.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_config_store.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_models.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_remote_client.dart';
@@ -131,6 +132,33 @@ void main() {
       final tombstone = tombstones.single as Map<String, dynamic>;
       expect(tombstone['comicId'], '123');
       expect(tombstone['sourceKey'], 'jm');
+    });
+
+    test('merges comment filter keywords from remote settings', () async {
+      SharedPreferences.setMockInitialValues({
+        hazukiCommentFilterKeywordsKey: ['local'],
+      });
+
+      final remoteSettings = jsonEncode({
+        'version': 2,
+        'data': {
+          hazukiCommentFilterKeywordsKey: ['remote', 'local'],
+        },
+      });
+
+      await CloudSyncSnapshotCodec(
+        configStore: CloudSyncConfigStore(),
+      ).mergeRemoteIntoLocal(
+        _FakeCloudSyncRemoteClient({
+          CloudSyncConfigStore.settingsFileName: remoteSettings,
+        }),
+      );
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getStringList(hazukiCommentFilterKeywordsKey), [
+        'remote',
+        'local',
+      ]);
     });
   });
 }

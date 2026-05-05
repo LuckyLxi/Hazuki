@@ -146,6 +146,15 @@
   "commentFilterEditKeywordTitle": "Edit keyword",
   "commentFilterBackTooltip": "Back",
   "commentFilterKeywordListTitle": "Added keywords",
+  "commentFilterCollapseKeywordList": "Collapse",
+  "commentFilterExpandKeywordList": "Show all {count} keywords",
+  "@commentFilterExpandKeywordList": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "commentFilteredCollapsedLabel": "This comment was filtered",
   "commentFilteredExpandLabel": "Tap to expand",
   "commentFilterHiddenBanner": "{count} comment(s) hidden",

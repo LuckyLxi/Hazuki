@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../app/app_preferences.dart';
 import '../hazuki_source_service.dart';
 import '../../models/hazuki_models.dart';
 import 'cloud_sync_config_store.dart';
@@ -40,6 +41,8 @@ class CloudSyncSnapshotCodec {
       if (raw != null) localProgressSnapshot[key] = raw;
     }
     final localSearchSnapshot = prefs.getStringList('search_history');
+    final localCommentFilterKeywordsSnapshot =
+        prefs.getStringList(hazukiCommentFilterKeywordsKey) ?? const <String>[];
     final localFoldersSnapshot = prefs.getString('local_favorite_folders_v1');
     final localEntriesSnapshot = prefs.getString('local_favorite_entries_v1');
 
@@ -231,6 +234,11 @@ class CloudSyncSnapshotCodec {
               localFoldersSnapshot: localFoldersSnapshot,
               localEntriesSnapshot: localEntriesSnapshot,
             );
+            await _mergeCommentFilterKeywords(
+              prefs,
+              data,
+              localKeywordsSnapshot: localCommentFilterKeywordsSnapshot,
+            );
           }
         }
       } catch (_) {}
@@ -326,6 +334,32 @@ class CloudSyncSnapshotCodec {
       searchCount: search.length,
       jmSource: await _sourceService.readLocalJmSourceIfExists(),
     );
+  }
+
+  Future<void> _mergeCommentFilterKeywords(
+    SharedPreferences prefs,
+    Map<dynamic, dynamic> remoteData, {
+    required List<String> localKeywordsSnapshot,
+  }) async {
+    final remoteRaw = remoteData[hazukiCommentFilterKeywordsKey];
+    if (remoteRaw is! List) {
+      return;
+    }
+
+    final merged = <String>[];
+    final seen = <String>{};
+    for (final keyword in [
+      ...remoteRaw.map((e) => e.toString()),
+      ...localKeywordsSnapshot,
+    ]) {
+      if (keyword.trim().isEmpty) {
+        continue;
+      }
+      if (seen.add(keyword)) {
+        merged.add(keyword);
+      }
+    }
+    await prefs.setStringList(hazukiCommentFilterKeywordsKey, merged);
   }
 
   Future<void> _mergeLocalFavorites(

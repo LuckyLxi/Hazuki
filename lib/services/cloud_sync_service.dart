@@ -8,6 +8,7 @@ import 'cloud_sync/cloud_sync_models.dart';
 import 'cloud_sync/cloud_sync_remote_client.dart';
 import 'cloud_sync/cloud_sync_restore_applier.dart';
 import 'cloud_sync/cloud_sync_snapshot_codec.dart';
+import 'comment_filter_service.dart';
 import 'local_favorites_service.dart';
 
 export 'cloud_sync/cloud_sync_models.dart';
@@ -67,6 +68,7 @@ class CloudSyncService {
         if (remoteUpdatedAtMs > lastSyncedRemoteTs) {
           await _snapshotCodec.mergeRemoteIntoLocal(client);
           LocalFavoritesService.instance.onExternalDataChanged();
+          await CommentFilterService.instance.load(notify: true);
         }
       }
 
@@ -169,6 +171,7 @@ class CloudSyncService {
     final settingsResult = await _restoreApplier.applySettingsJson(
       settingsText,
     );
+    await CommentFilterService.instance.load(notify: true);
     await _restoreApplier.applyReadingSnapshot(readingText);
     await _restoreApplier.applySearchHistoryJsonl(searchHistoryText);
 
