@@ -22,6 +22,7 @@ import 'app/theme_reveal_support.dart';
 import 'app/ui_flags.dart';
 import 'app/windows_title_bar_controller.dart';
 import 'features/comic_detail/view/comic_detail_page.dart';
+import 'features/reader/view/reader_page.dart';
 import 'features/search/search.dart';
 import 'l10n/app_localizations.dart';
 import 'l10n/l10n.dart';
@@ -251,7 +252,31 @@ class _HazukiAppState extends State<HazukiApp>
   }
 
   Widget _buildRootComicDetailPage(ExploreComic comic, String heroTag) {
-    return ComicDetailPage(comic: comic, heroTag: heroTag);
+    return ComicDetailPage(
+      comic: comic,
+      heroTag: heroTag,
+      readerWidgetBuilder: ({
+        required title,
+        required chapterTitle,
+        required comicId,
+        required epId,
+        required chapterIndex,
+        required images,
+        required sourceKey,
+        comicTheme,
+        onFavoriteRequested,
+      }) => ReaderPage(
+        title: title,
+        chapterTitle: chapterTitle,
+        comicId: comicId,
+        epId: epId,
+        chapterIndex: chapterIndex,
+        images: images,
+        sourceKey: sourceKey,
+        comicTheme: comicTheme,
+        onFavoriteRequested: onFavoriteRequested,
+      ),
+    );
   }
 
   Future<void> _handleLaunchShortcutAction(

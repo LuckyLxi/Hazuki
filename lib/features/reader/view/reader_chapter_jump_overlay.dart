@@ -5,7 +5,7 @@ class ReaderChapterJumpOverlay extends StatelessWidget {
     super.key,
     required this.controlsVisible,
     required this.onPreviousChapter,
-    required this.onFavorite,
+    this.onFavorite,
     required this.onComments,
     required this.onNextChapter,
     required this.previousTooltip,
@@ -16,7 +16,7 @@ class ReaderChapterJumpOverlay extends StatelessWidget {
 
   final bool controlsVisible;
   final VoidCallback onPreviousChapter;
-  final VoidCallback onFavorite;
+  final VoidCallback? onFavorite;
   final VoidCallback onComments;
   final VoidCallback onNextChapter;
   final String previousTooltip;

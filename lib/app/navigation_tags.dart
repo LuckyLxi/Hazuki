@@ -10,6 +10,7 @@ typedef ComicDetailPageBuilder =
     Widget Function(ExploreComic comic, String heroTag);
 
 const discoverSearchHeroTag = 'discover_search_to_search_page';
+const discoverDailyHeroSaltPrefix = 'discover-daily-';
 
 String comicCoverHeroTag(ExploreComic comic, {String? salt}) {
   final key = comic.id.isEmpty ? comic.title : comic.id;
@@ -20,7 +21,7 @@ String comicCoverHeroTag(ExploreComic comic, {String? salt}) {
 }
 
 double comicCoverHeroBorderRadius(String heroTag, {double fallback = 10}) {
-  if (heroTag.contains('discover-daily-')) {
+  if (heroTag.contains(discoverDailyHeroSaltPrefix)) {
     return 28;
   }
   return fallback;

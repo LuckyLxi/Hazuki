@@ -35,11 +35,55 @@ void main() {
       subTitle: 'Smoke',
       cover: '',
     );
-    final detail = const ComicDetailPage(comic: comic, heroTag: 'hero');
+    final detail = ComicDetailPage(
+      comic: comic,
+      heroTag: 'hero',
+      readerWidgetBuilder: ({
+        required title,
+        required chapterTitle,
+        required comicId,
+        required epId,
+        required chapterIndex,
+        required images,
+        required sourceKey,
+        comicTheme,
+        onFavoriteRequested,
+      }) => ReaderPage(
+        title: title,
+        chapterTitle: chapterTitle,
+        comicId: comicId,
+        epId: epId,
+        chapterIndex: chapterIndex,
+        images: images,
+        sourceKey: sourceKey,
+      ),
+    );
+    Widget buildDetail(ExploreComic comic, String heroTag) => ComicDetailPage(
+      comic: comic,
+      heroTag: heroTag,
+      readerWidgetBuilder: ({
+        required title,
+        required chapterTitle,
+        required comicId,
+        required epId,
+        required chapterIndex,
+        required images,
+        required sourceKey,
+        comicTheme,
+        onFavoriteRequested,
+      }) => ReaderPage(
+        title: title,
+        chapterTitle: chapterTitle,
+        comicId: comicId,
+        epId: epId,
+        chapterIndex: chapterIndex,
+        images: images,
+        sourceKey: sourceKey,
+      ),
+    );
     final search = SearchPage(
       initialKeyword: comic.title,
-      comicDetailPageBuilder: (comic, heroTag) =>
-          ComicDetailPage(comic: comic, heroTag: heroTag),
+      comicDetailPageBuilder: buildDetail,
     );
     final favorite = FavoritePage(
       authVersion: 1,
@@ -50,8 +94,7 @@ void main() {
       readerPageBuilder: (comic, chapter) => const SizedBox.shrink(),
     );
     final history = HistoryPage(
-      comicDetailPageBuilder: (comic, heroTag) =>
-          ComicDetailPage(comic: comic, heroTag: heroTag),
+      comicDetailPageBuilder: buildDetail,
     );
     final settings = SettingsPage(
       appearanceSettings: const AppearanceSettingsData(

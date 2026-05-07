@@ -171,7 +171,7 @@ Widget buildReaderChapterJumpOverlay({
   required BuildContext context,
   required ReaderRuntimeState runtimeState,
   required VoidCallback onPreviousChapter,
-  required VoidCallback onFavorite,
+  VoidCallback? onFavorite,
   required VoidCallback onComments,
   required VoidCallback onNextChapter,
 }) {

@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_page.dart';
+import 'package:hazuki/features/reader/view/reader_page.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 
 void main() {
@@ -25,7 +26,29 @@ void main() {
       MaterialApp(
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        home: const ComicDetailPage(comic: comic, heroTag: 'hero'),
+        home: ComicDetailPage(
+          comic: comic,
+          heroTag: 'hero',
+          readerWidgetBuilder: ({
+            required title,
+            required chapterTitle,
+            required comicId,
+            required epId,
+            required chapterIndex,
+            required images,
+            required sourceKey,
+            comicTheme,
+            onFavoriteRequested,
+          }) => ReaderPage(
+            title: title,
+            chapterTitle: chapterTitle,
+            comicId: comicId,
+            epId: epId,
+            chapterIndex: chapterIndex,
+            images: images,
+            sourceKey: sourceKey,
+          ),
+        ),
       ),
     );
 

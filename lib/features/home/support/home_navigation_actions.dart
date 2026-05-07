@@ -4,13 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:hazuki/app/app.dart';
-import 'package:hazuki/features/comic_detail/view/comic_detail_page.dart';
 import 'package:hazuki/features/downloads/downloads.dart';
 import 'package:hazuki/features/history/history.dart';
 import 'package:hazuki/features/search/search.dart';
 import 'package:hazuki/features/settings/settings.dart';
 import 'package:hazuki/features/home/view/home_drawer.dart';
-import 'package:hazuki/features/reader/view/reader_page.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/pages/ranking_page.dart';
 import 'package:hazuki/pages/tag_category_page.dart';
@@ -24,6 +22,8 @@ class HomeNavigationActions {
     required this.onAppearanceChanged,
     required this.locale,
     required this.onLocaleChanged,
+    required this.comicDetailPageBuilder,
+    required this.downloadsReaderPageBuilder,
   });
 
   final BuildContext context;
@@ -33,9 +33,11 @@ class HomeNavigationActions {
   final AppearanceSettingsApplyCallback onAppearanceChanged;
   final Locale? locale;
   final Future<void> Function(Locale? locale) onLocaleChanged;
+  final ComicDetailPageBuilder comicDetailPageBuilder;
+  final DownloadedComicReaderPageBuilder downloadsReaderPageBuilder;
 
   Widget buildComicDetailPage(ExploreComic comic, String heroTag) {
-    return ComicDetailPage(comic: comic, heroTag: heroTag);
+    return comicDetailPageBuilder(comic, heroTag);
   }
 
   Future<void> openFavoriteDetail(ExploreComic comic, String heroTag) {
@@ -87,15 +89,7 @@ class HomeNavigationActions {
     await _openDrawerDestination(
       hideComicDetailPanel: true,
       (_) => DownloadsPage(
-        readerPageBuilder: (comic, chapter) => ReaderPage(
-          title: comic.title,
-          chapterTitle: resolveHazukiChapterTitle(context, chapter.title),
-          comicId: comic.comicId,
-          epId: chapter.epId,
-          chapterIndex: chapter.index,
-          images: chapter.imagePaths,
-          sourceKey: comic.sourceKey,
-        ),
+        readerPageBuilder: downloadsReaderPageBuilder,
       ),
     );
   }

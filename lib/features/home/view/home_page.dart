@@ -4,7 +4,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/app/app.dart';
+import 'package:hazuki/features/comic_detail/view/comic_detail_page.dart';
 import 'package:hazuki/features/home/home.dart';
+import 'package:hazuki/features/reader/view/reader_page.dart';
 
 class HazukiHomePage extends StatefulWidget {
   const HazukiHomePage({
@@ -95,6 +97,40 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
           onAppearanceChanged: widget.onAppearanceChanged,
           locale: widget.locale,
           onLocaleChanged: widget.onLocaleChanged,
+          comicDetailPageBuilder: (comic, heroTag) => ComicDetailPage(
+            comic: comic,
+            heroTag: heroTag,
+            readerWidgetBuilder: ({
+              required title,
+              required chapterTitle,
+              required comicId,
+              required epId,
+              required chapterIndex,
+              required images,
+              required sourceKey,
+              comicTheme,
+              onFavoriteRequested,
+            }) => ReaderPage(
+              title: title,
+              chapterTitle: chapterTitle,
+              comicId: comicId,
+              epId: epId,
+              chapterIndex: chapterIndex,
+              images: images,
+              sourceKey: sourceKey,
+              comicTheme: comicTheme,
+              onFavoriteRequested: onFavoriteRequested,
+            ),
+          ),
+          downloadsReaderPageBuilder: (comic, chapter) => ReaderPage(
+            title: comic.title,
+            chapterTitle: resolveHazukiChapterTitle(context, chapter.title),
+            comicId: comic.comicId,
+            epId: chapter.epId,
+            chapterIndex: chapter.index,
+            images: chapter.imagePaths,
+            sourceKey: comic.sourceKey,
+          ),
         );
 
         return HomeScaffoldShell(

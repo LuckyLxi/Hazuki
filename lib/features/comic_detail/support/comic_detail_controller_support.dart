@@ -28,3 +28,15 @@ typedef ComicDetailReaderPageBuilder =
     });
 
 typedef ComicDetailSearchPageBuilder = Widget Function(String initialKeyword);
+
+typedef ReaderWidgetBuilder = Widget Function({
+  required String title,
+  required String chapterTitle,
+  required String comicId,
+  required String epId,
+  required int chapterIndex,
+  required List<String> images,
+  required String sourceKey,
+  ThemeData? comicTheme,
+  Future<void> Function(BuildContext)? onFavoriteRequested,
+});

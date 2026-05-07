@@ -1001,7 +1001,7 @@ class _DiscoverDailyRecommendationCarouselState
                       );
                       final heroTag = widget.comicCoverHeroTagBuilder(
                         entry.comic,
-                        salt: 'discover-daily-$effectiveIndex',
+                        salt: '$discoverDailyHeroSaltPrefix$effectiveIndex',
                       );
                       return AnimatedBuilder(
                         animation: _pageController,

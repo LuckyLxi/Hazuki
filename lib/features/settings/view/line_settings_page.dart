@@ -1,8 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:hazuki/features/settings/state/line_settings_controller.dart';
 import 'package:hazuki/l10n/l10n.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
 class LineSettingsPage extends StatefulWidget {
@@ -13,135 +13,53 @@ class LineSettingsPage extends StatefulWidget {
 }
 
 class _LineSettingsPageState extends State<LineSettingsPage> {
-  bool _loading = true;
-  bool _refreshingStatus = false;
-
-  String _selectedApiDomain = '1';
-  String _selectedImageStream = '1';
-  bool _refreshDomainsOnStart = true;
-
-  List<String> _apiDomains = const [];
-  int _imageStreamCount = 4;
-  String _currentImageHost = '';
+  late final LineSettingsController _controller;
 
   @override
   void initState() {
     super.initState();
-    unawaited(_loadSnapshot());
+    _controller = LineSettingsController();
+    unawaited(_loadInitial());
   }
 
-  Future<void> _loadSnapshot({bool showLoading = true}) async {
-    if (showLoading) {
-      setState(() {
-        _loading = true;
-      });
-    }
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
+  Future<void> _loadInitial() async {
     try {
-      final snapshot = await HazukiSourceService.instance
-          .getLineSettingsSnapshot()
-          .timeout(const Duration(seconds: 20));
-
-      final apiDomainsRaw = snapshot['apiDomains'];
-      final apiDomains = <String>[];
-      if (apiDomainsRaw is List) {
-        for (final item in apiDomainsRaw) {
-          final text = item?.toString().trim() ?? '';
-          if (text.isNotEmpty) {
-            apiDomains.add(text);
-          }
-        }
-      }
-
-      final imageCountRaw = snapshot['imageStreamOptionsCount'];
-      final parsedImageCount = switch (imageCountRaw) {
-        int value => value,
-        num value => value.toInt(),
-        _ => int.tryParse(imageCountRaw?.toString() ?? ''),
-      };
-
-      final apiCount = apiDomains.isEmpty ? 4 : apiDomains.length;
-      var selectedApi = snapshot['apiDomain']?.toString() ?? '1';
-      final selectedApiInt = int.tryParse(selectedApi);
-      if (selectedApiInt == null ||
-          selectedApiInt < 1 ||
-          selectedApiInt > apiCount) {
-        selectedApi = '1';
-      }
-
-      final imageCount = (parsedImageCount ?? 4).clamp(1, 8);
-      var selectedImage = snapshot['imageStream']?.toString() ?? '1';
-      final selectedImageInt = int.tryParse(selectedImage);
-      if (selectedImageInt == null ||
-          selectedImageInt < 1 ||
-          selectedImageInt > imageCount) {
-        selectedImage = '1';
-      }
-
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _selectedApiDomain = selectedApi;
-        _selectedImageStream = selectedImage;
-        _refreshDomainsOnStart = snapshot['refreshDomainsOnStart'] == true;
-        _apiDomains = apiDomains;
-        _imageStreamCount = imageCount;
-        _currentImageHost = snapshot['imageHost']?.toString() ?? '';
-      });
+      await _controller.loadSnapshot();
     } catch (e) {
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
       final strings = l10n(context);
       unawaited(
         showHazukiPrompt(context, strings.lineLoadFailed('$e'), isError: true),
       );
-    } finally {
-      if (mounted && showLoading) {
-        setState(() {
-          _loading = false;
-        });
-      }
     }
   }
 
   Future<void> _refreshLineStatus() async {
-    if (_refreshingStatus) {
-      return;
-    }
-
-    setState(() {
-      _refreshingStatus = true;
-    });
-
     try {
-      await HazukiSourceService.instance.refreshLines();
-      await _loadSnapshot(showLoading: false);
+      await _controller.refreshLineStatus();
     } catch (e) {
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
       final strings = l10n(context);
       unawaited(
         showHazukiPrompt(context, strings.lineLoadFailed('$e'), isError: true),
       );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _refreshingStatus = false;
-        });
-      }
     }
   }
 
   List<DropdownMenuItem<String>> _buildApiItems(BuildContext context) {
     final strings = l10n(context);
     final items = <DropdownMenuItem<String>>[];
-    final count = _apiDomains.isEmpty ? 4 : _apiDomains.length;
+    final domains = _controller.apiDomains;
+    final count = domains.isEmpty ? 4 : domains.length;
     for (var i = 1; i <= count; i++) {
       final value = '$i';
-      final host = i - 1 < _apiDomains.length ? _apiDomains[i - 1] : '';
+      final host = i - 1 < domains.length ? domains[i - 1] : '';
       items.add(
         DropdownMenuItem<String>(
           value: value,
@@ -159,7 +77,7 @@ class _LineSettingsPageState extends State<LineSettingsPage> {
   List<DropdownMenuItem<String>> _buildImageItems(BuildContext context) {
     final strings = l10n(context);
     final items = <DropdownMenuItem<String>>[];
-    for (var i = 1; i <= _imageStreamCount; i++) {
+    for (var i = 1; i <= _controller.imageStreamCount; i++) {
       final value = '$i';
       items.add(
         DropdownMenuItem<String>(
@@ -172,28 +90,16 @@ class _LineSettingsPageState extends State<LineSettingsPage> {
   }
 
   Future<void> _onApiChanged(String? value) async {
-    if (value == null || value == _selectedApiDomain) {
+    if (value == null || value == _controller.selectedApiDomain) {
       return;
     }
-    setState(() {
-      _selectedApiDomain = value;
-    });
-
     try {
-      await HazukiSourceService.instance.updateLineSetting('apiDomain', value);
-      await HazukiSourceService.instance.refreshLines(
-        refreshApiDomains: false,
-        refreshImageHost: false,
-      );
-      if (!mounted) {
-        return;
-      }
+      await _controller.setApiDomain(value);
+      if (!mounted) return;
       final strings = l10n(context);
       unawaited(showHazukiPrompt(context, strings.lineApiSwitched(value)));
     } catch (e) {
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
       final strings = l10n(context);
       unawaited(
         showHazukiPrompt(
@@ -206,32 +112,16 @@ class _LineSettingsPageState extends State<LineSettingsPage> {
   }
 
   Future<void> _onImageStreamChanged(String? value) async {
-    if (value == null || value == _selectedImageStream) {
+    if (value == null || value == _controller.selectedImageStream) {
       return;
     }
-    setState(() {
-      _selectedImageStream = value;
-    });
-
     try {
-      await HazukiSourceService.instance.updateLineSetting(
-        'imageStream',
-        value,
-      );
-      await HazukiSourceService.instance.refreshLines(
-        refreshApiDomains: false,
-        refreshImageHost: true,
-      );
-      await _loadSnapshot();
-      if (!mounted) {
-        return;
-      }
+      await _controller.setImageStream(value);
+      if (!mounted) return;
       final strings = l10n(context);
       unawaited(showHazukiPrompt(context, strings.lineImageSwitched(value)));
     } catch (e) {
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
       final strings = l10n(context);
       unawaited(
         showHazukiPrompt(
@@ -244,24 +134,13 @@ class _LineSettingsPageState extends State<LineSettingsPage> {
   }
 
   Future<void> _onRefreshDomainsOnStartChanged(bool value) async {
-    setState(() {
-      _refreshDomainsOnStart = value;
-    });
-
     try {
-      await HazukiSourceService.instance.updateLineSetting(
-        'refreshDomainsOnStart',
-        value,
-      );
-      if (!mounted) {
-        return;
-      }
+      await _controller.setRefreshDomainsOnStart(value);
+      if (!mounted) return;
       final strings = l10n(context);
       unawaited(showHazukiPrompt(context, strings.lineRefreshOnStartUpdated));
     } catch (e) {
-      if (!mounted) {
-        return;
-      }
+      if (!mounted) return;
       final strings = l10n(context);
       unawaited(
         showHazukiPrompt(context, strings.lineSaveFailed('$e'), isError: true),
@@ -274,158 +153,171 @@ class _LineSettingsPageState extends State<LineSettingsPage> {
     final strings = l10n(context);
     final colorScheme = Theme.of(context).colorScheme;
 
-    if (_loading) {
-      return Scaffold(
-        appBar: hazukiFrostedAppBar(
-          context: context,
-          title: Text(strings.lineSettingsTitle),
-        ),
-        body: const Center(child: CircularProgressIndicator()),
-      );
-    }
+    return ListenableBuilder(
+      listenable: _controller,
+      builder: (context, _) {
+        if (_controller.loading) {
+          return Scaffold(
+            appBar: hazukiFrostedAppBar(
+              context: context,
+              title: Text(strings.lineSettingsTitle),
+            ),
+            body: const Center(child: CircularProgressIndicator()),
+          );
+        }
 
-    return Scaffold(
-      appBar: hazukiFrostedAppBar(
-        context: context,
-        title: Text(strings.lineSettingsTitle),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(12, 12, 12, 20),
-        children: [
-          Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: colorScheme.primaryContainer.withValues(alpha: 0.45),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  Icons.route_outlined,
-                  color: colorScheme.onPrimaryContainer,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    strings.lineIntro,
-                    style: TextStyle(color: colorScheme.onPrimaryContainer),
-                  ),
-                ),
-              ],
-            ),
+        return Scaffold(
+          appBar: hazukiFrostedAppBar(
+            context: context,
+            title: Text(strings.lineSettingsTitle),
           ),
-          const SizedBox(height: 12),
-          Card(
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-              side: BorderSide(color: colorScheme.outlineVariant),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.cloud_outlined),
-                    title: Text(strings.lineApiTitle),
-                    subtitle: Text(strings.lineApiSubtitle),
-                  ),
-                  DropdownButtonFormField<String>(
-                    initialValue: _selectedApiDomain,
-                    items: _buildApiItems(context),
-                    decoration: InputDecoration(
-                      border: const OutlineInputBorder(),
-                      labelText: strings.lineSelectApiLabel,
-                      isDense: true,
-                    ),
-                    onChanged: _onApiChanged,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Card(
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-              side: BorderSide(color: colorScheme.outlineVariant),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.image_outlined),
-                    title: Text(strings.lineImageTitle),
-                    subtitle: Text(
-                      _currentImageHost.trim().isEmpty
-                          ? strings.lineImageHostUnavailable
-                          : strings.lineImageHostCurrent(_currentImageHost),
-                    ),
-                  ),
-                  DropdownButtonFormField<String>(
-                    initialValue: _selectedImageStream,
-                    items: _buildImageItems(context),
-                    decoration: InputDecoration(
-                      border: const OutlineInputBorder(),
-                      labelText: strings.lineSelectImageLabel,
-                      isDense: true,
-                    ),
-                    onChanged: _onImageStreamChanged,
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Card(
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-              side: BorderSide(color: colorScheme.outlineVariant),
-            ),
-            child: Column(
-              children: [
-                SwitchListTile(
-                  secondary: const Icon(Icons.autorenew_rounded),
-                  title: Text(strings.lineRefreshOnStartTitle),
-                  subtitle: Text(strings.lineRefreshOnStartSubtitle),
-                  value: _refreshDomainsOnStart,
-                  onChanged: _onRefreshDomainsOnStartChanged,
+          body: ListView(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 20),
+            children: [
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: colorScheme.primaryContainer.withValues(alpha: 0.45),
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                const Divider(height: 1),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.tonalIcon(
-                      onPressed: _refreshingStatus ? null : _refreshLineStatus,
-                      icon: _refreshingStatus
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.refresh),
-                      label: Text(
-                        _refreshingStatus
-                            ? strings.commonLoading
-                            : strings.lineRefreshStatusButton,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.route_outlined,
+                      color: colorScheme.onPrimaryContainer,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        strings.lineIntro,
+                        style: TextStyle(
+                          color: colorScheme.onPrimaryContainer,
+                        ),
                       ),
                     ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Card(
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(color: colorScheme.outlineVariant),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.cloud_outlined),
+                        title: Text(strings.lineApiTitle),
+                        subtitle: Text(strings.lineApiSubtitle),
+                      ),
+                      DropdownButtonFormField<String>(
+                        initialValue: _controller.selectedApiDomain,
+                        items: _buildApiItems(context),
+                        decoration: InputDecoration(
+                          border: const OutlineInputBorder(),
+                          labelText: strings.lineSelectApiLabel,
+                          isDense: true,
+                        ),
+                        onChanged: _onApiChanged,
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 12),
+              Card(
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(color: colorScheme.outlineVariant),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: const Icon(Icons.image_outlined),
+                        title: Text(strings.lineImageTitle),
+                        subtitle: Text(
+                          _controller.currentImageHost.trim().isEmpty
+                              ? strings.lineImageHostUnavailable
+                              : strings.lineImageHostCurrent(
+                                  _controller.currentImageHost,
+                                ),
+                        ),
+                      ),
+                      DropdownButtonFormField<String>(
+                        initialValue: _controller.selectedImageStream,
+                        items: _buildImageItems(context),
+                        decoration: InputDecoration(
+                          border: const OutlineInputBorder(),
+                          labelText: strings.lineSelectImageLabel,
+                          isDense: true,
+                        ),
+                        onChanged: _onImageStreamChanged,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Card(
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(color: colorScheme.outlineVariant),
+                ),
+                child: Column(
+                  children: [
+                    SwitchListTile(
+                      secondary: const Icon(Icons.autorenew_rounded),
+                      title: Text(strings.lineRefreshOnStartTitle),
+                      subtitle: Text(strings.lineRefreshOnStartSubtitle),
+                      value: _controller.refreshDomainsOnStart,
+                      onChanged: _onRefreshDomainsOnStartChanged,
+                    ),
+                    const Divider(height: 1),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.tonalIcon(
+                          onPressed: _controller.refreshingStatus
+                              ? null
+                              : _refreshLineStatus,
+                          icon: _controller.refreshingStatus
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.refresh),
+                          label: Text(
+                            _controller.refreshingStatus
+                                ? strings.commonLoading
+                                : strings.lineRefreshStatusButton,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

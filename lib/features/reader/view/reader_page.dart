@@ -7,10 +7,6 @@ import 'package:flutter/services.dart';
 
 import 'package:hazuki/app/app.dart';
 import 'package:hazuki/app/windows_title_bar_controller.dart';
-import 'package:hazuki/features/comic_detail/repository/comic_detail_repository.dart';
-import 'package:hazuki/features/comic_detail/support/comic_detail_favorite_controller.dart';
-import 'package:hazuki/features/comic_detail/view/comic_detail_favorite_dialog.dart';
-import 'package:hazuki/features/comic_detail/view/comic_detail_panels.dart';
 import 'package:hazuki/features/comments/comments.dart';
 import 'package:hazuki/features/reader/reader.dart';
 import 'package:hazuki/features/reader/state/reader_image_pipeline_state.dart';
@@ -41,7 +37,7 @@ class ReaderPage extends StatefulWidget {
     required this.images,
     this.sourceKey = '',
     this.comicTheme,
-    this.favoriteController,
+    this.onFavoriteRequested,
   });
 
   final String title;
@@ -52,7 +48,7 @@ class ReaderPage extends StatefulWidget {
   final List<String> images;
   final String sourceKey;
   final ThemeData? comicTheme;
-  final ComicDetailFavoriteController? favoriteController;
+  final Future<void> Function(BuildContext)? onFavoriteRequested;
 
   @override
   State<ReaderPage> createState() => _ReaderPageState();
@@ -71,12 +67,6 @@ class _ReaderPageState extends State<ReaderPage>
   final ReaderRuntimeState _runtimeState = ReaderRuntimeState();
   final ReaderImagePipelineState _imagePipelineState =
       ReaderImagePipelineState();
-
-  late final ComicDetailFavoriteController _favoriteController =
-      widget.favoriteController ??
-      ComicDetailFavoriteController(repository: const ComicDetailRepository());
-
-  bool get _ownsFavoriteController => widget.favoriteController == null;
 
   late final AnimationController _resetAnimController = AnimationController(
     vsync: this,
@@ -215,9 +205,6 @@ class _ReaderPageState extends State<ReaderPage>
     _resetAnimController.dispose();
     _sessionController.dispose();
     _imagePipelineController.dispose();
-    if (_ownsFavoriteController) {
-      _favoriteController.dispose();
-    }
     super.dispose();
   }
 
@@ -412,9 +399,11 @@ class _ReaderPageState extends State<ReaderPage>
       onPreviousChapter: () {
         unawaited(_jumpToAdjacentChapter(-1));
       },
-      onFavorite: () {
-        unawaited(_openFavoriteDialog());
-      },
+      onFavorite: widget.onFavoriteRequested != null
+          ? () {
+              unawaited(_openFavoriteDialog());
+            }
+          : null,
       onComments: () {
         unawaited(_openCommentsSheet());
       },
@@ -666,18 +655,11 @@ class _ReaderPageState extends State<ReaderPage>
 
   Future<void> _openFavoriteDialog() async {
     _logReaderEvent('Reader favorite dialog requested', source: 'reader_ui');
+    if (widget.onFavoriteRequested == null) {
+      return;
+    }
     try {
-      final details = await _loadReaderComicDetails();
-      if (!mounted) {
-        return;
-      }
-      await _favoriteController.showFoldersDialog(context, details, (vm) {
-        final themedData = widget.comicTheme ?? Theme.of(context);
-        return Theme(
-          data: themedData,
-          child: FavoriteFoldersMorphDialog(viewModel: vm),
-        );
-      });
+      await widget.onFavoriteRequested!(context);
     } catch (error) {
       if (!mounted) {
         return;
@@ -869,6 +851,7 @@ class _ReaderPageState extends State<ReaderPage>
           images: const [],
           sourceKey: widget.sourceKey,
           comicTheme: widget.comicTheme,
+          onFavoriteRequested: widget.onFavoriteRequested,
         ),
       ),
     );
@@ -937,6 +920,7 @@ class _ReaderPageState extends State<ReaderPage>
             images: const [],
             sourceKey: widget.sourceKey,
             comicTheme: widget.comicTheme,
+            onFavoriteRequested: widget.onFavoriteRequested,
           ),
         ),
       );
