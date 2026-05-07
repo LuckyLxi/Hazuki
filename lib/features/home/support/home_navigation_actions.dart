@@ -88,9 +88,7 @@ class HomeNavigationActions {
   Future<void> openDownloads() async {
     await _openDrawerDestination(
       hideComicDetailPanel: true,
-      (_) => DownloadsPage(
-        readerPageBuilder: downloadsReaderPageBuilder,
-      ),
+      (_) => DownloadsPage(readerPageBuilder: downloadsReaderPageBuilder),
     );
   }
 

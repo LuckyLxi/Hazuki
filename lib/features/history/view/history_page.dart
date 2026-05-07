@@ -33,6 +33,7 @@ class _HistoryPageState extends State<HistoryPage> {
 
   List<ExploreComic> _history = [];
   bool _loading = true;
+  bool _playItemEntryAnimation = true;
   bool _selectionMode = false;
   bool _showBackToTop = false;
   final Set<String> _selectedIds = {};
@@ -256,6 +257,7 @@ class _HistoryPageState extends State<HistoryPage> {
       comic: comic,
       index: index,
       heroTag: heroTag,
+      animateEntry: _playItemEntryAnimation,
       selectionMode: _selectionMode,
       selected: _selectedIds.contains(comic.scopedId.storageKey),
       onShowMenu: (globalPosition, itemContext) =>
@@ -267,6 +269,7 @@ class _HistoryPageState extends State<HistoryPage> {
           _toggleSelection(comic.scopedId.storageKey);
           return;
         }
+        _playItemEntryAnimation = false;
         await openComicDetail(
           context,
           comic: comic,

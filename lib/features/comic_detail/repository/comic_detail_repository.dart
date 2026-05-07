@@ -18,12 +18,18 @@ class ComicDetailRepository implements FavoriteFoldersRepository {
 
   // ── Source capabilities ──────────────────────────────────────────────────
 
-  @override bool get isLogged => _source.isLogged;
-  @override bool get supportFavoriteFolderLoad => _source.supportFavoriteFolderLoad;
-  @override bool get supportFavoriteFolderAdd => _source.supportFavoriteFolderAdd;
-  @override bool get supportFavoriteFolderDelete => _source.supportFavoriteFolderDelete;
-  @override bool get supportFavoriteToggle => _source.supportFavoriteToggle;
-  @override bool get favoriteSingleFolderForSingleComic =>
+  @override
+  bool get isLogged => _source.isLogged;
+  @override
+  bool get supportFavoriteFolderLoad => _source.supportFavoriteFolderLoad;
+  @override
+  bool get supportFavoriteFolderAdd => _source.supportFavoriteFolderAdd;
+  @override
+  bool get supportFavoriteFolderDelete => _source.supportFavoriteFolderDelete;
+  @override
+  bool get supportFavoriteToggle => _source.supportFavoriteToggle;
+  @override
+  bool get favoriteSingleFolderForSingleComic =>
       _source.favoriteSingleFolderForSingleComic;
 
   Future<ComicDetailsData> loadComicDetails(

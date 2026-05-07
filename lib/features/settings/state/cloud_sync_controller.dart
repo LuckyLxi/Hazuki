@@ -5,9 +5,7 @@ import 'package:hazuki/app/hazuki_app_controller.dart';
 import 'package:hazuki/services/cloud_sync_service.dart';
 
 typedef ApplyCloudSyncRestoreCallback =
-    Future<CloudSyncRestoreApplyResult> Function(
-      CloudSyncRestoreResult result,
-    );
+    Future<CloudSyncRestoreApplyResult> Function(CloudSyncRestoreResult result);
 
 class CloudSyncRestoreOutcome {
   const CloudSyncRestoreOutcome({

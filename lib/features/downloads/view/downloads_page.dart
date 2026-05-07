@@ -34,7 +34,8 @@ class _DownloadsPageState extends State<DownloadsPage>
 
   MangaDownloadService get _downloadService => _controller.downloadService;
   WindowsComicDetailController get _windowsController =>
-      widget.windowsComicDetailController ?? WindowsComicDetailController.instance;
+      widget.windowsComicDetailController ??
+      WindowsComicDetailController.instance;
 
   @override
   void initState() {

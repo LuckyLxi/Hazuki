@@ -26,10 +26,7 @@ class SearchIdExtractPill extends StatelessWidget {
           opacity: visible ? 1.0 : 0.0,
           duration: const Duration(milliseconds: 200),
           curve: Curves.easeOutCubic,
-          child: _PillContent(
-            extractedId: extractedId ?? '',
-            onApply: onApply,
-          ),
+          child: _PillContent(extractedId: extractedId ?? '', onApply: onApply),
         ),
       ),
     );
@@ -59,15 +56,14 @@ class _PillContent extends StatelessWidget {
               borderRadius: BorderRadius.circular(24),
               onTap: onApply,
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 10,
+                ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(
-                      Icons.tag,
-                      size: 16,
-                      color: colorScheme.primary,
-                    ),
+                    Icon(Icons.tag, size: 16, color: colorScheme.primary),
                     const SizedBox(width: 6),
                     Text(
                       strings.searchIdExtractHint(extractedId),

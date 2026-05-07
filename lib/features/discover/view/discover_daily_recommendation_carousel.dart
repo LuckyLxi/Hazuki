@@ -103,9 +103,11 @@ class _DiscoverDailyRecommendationCarouselState
   HazukiSourceService get _sourceService =>
       widget.sourceService ?? HazukiSourceService.instance;
   DiscoverDailyRecommendationService get _recommendationService =>
-      widget.recommendationService ?? DiscoverDailyRecommendationService.instance;
+      widget.recommendationService ??
+      DiscoverDailyRecommendationService.instance;
   WindowsComicDetailController get _windowsController =>
-      widget.windowsComicDetailController ?? WindowsComicDetailController.instance;
+      widget.windowsComicDetailController ??
+      WindowsComicDetailController.instance;
 
   @override
   void initState() {

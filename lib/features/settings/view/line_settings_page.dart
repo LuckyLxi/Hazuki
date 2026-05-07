@@ -191,9 +191,7 @@ class _LineSettingsPageState extends State<LineSettingsPage> {
                     Expanded(
                       child: Text(
                         strings.lineIntro,
-                        style: TextStyle(
-                          color: colorScheme.onPrimaryContainer,
-                        ),
+                        style: TextStyle(color: colorScheme.onPrimaryContainer),
                       ),
                     ),
                   ],

@@ -11,6 +11,7 @@ class HistoryComicListItem extends StatelessWidget {
     required this.comic,
     required this.index,
     required this.heroTag,
+    required this.animateEntry,
     required this.selectionMode,
     required this.selected,
     required this.onTap,
@@ -21,6 +22,7 @@ class HistoryComicListItem extends StatelessWidget {
   final ExploreComic comic;
   final int index;
   final String heroTag;
+  final bool animateEntry;
   final bool selectionMode;
   final bool selected;
   final Future<void> Function() onTap;
@@ -134,6 +136,10 @@ class HistoryComicListItem extends StatelessWidget {
         ),
       ),
     );
+
+    if (!animateEntry) {
+      return item;
+    }
 
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(begin: 0.0, end: 1.0),

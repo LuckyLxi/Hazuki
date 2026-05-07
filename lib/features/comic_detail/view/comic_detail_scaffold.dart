@@ -193,7 +193,6 @@ class ComicDetailBody extends StatelessWidget {
                     return RepaintBoundary(
                       child: ComicDetailRelatedTab(
                         details: details,
-                        heroTagPrefix: heroTag,
                         isActiveInTabView: shouldRender,
                         isDesktopPanel: isDesktopPanel,
                         onCloseRequested: onCloseRequested,

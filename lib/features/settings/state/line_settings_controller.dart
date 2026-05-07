@@ -41,9 +41,9 @@ class LineSettingsController extends ChangeNotifier {
     }
 
     try {
-      final snapshot = await _sourceService
-          .getLineSettingsSnapshot()
-          .timeout(const Duration(seconds: 20));
+      final snapshot = await _sourceService.getLineSettingsSnapshot().timeout(
+        const Duration(seconds: 20),
+      );
       if (_disposed) return;
 
       final apiDomainsRaw = snapshot['apiDomains'];

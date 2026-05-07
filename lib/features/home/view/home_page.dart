@@ -110,18 +110,19 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
     super.initState();
     _coordinator = HomeCoordinator(initialTabIndex: widget.initialTabIndex);
     _coordinator.start(context);
-    WindowsComicDetailController.instance.panelBuilder = (
-      comic,
-      heroTag, {
-      required shouldAnimatePanelReveal,
-      required onCloseRequested,
-    }) => _buildComicDetailPage(
-      comic,
-      heroTag,
-      isDesktopPanel: true,
-      shouldAnimateInitialRevealOverride: shouldAnimatePanelReveal,
-      onCloseRequested: onCloseRequested,
-    );
+    WindowsComicDetailController.instance.panelBuilder =
+        (
+          comic,
+          heroTag, {
+          required shouldAnimatePanelReveal,
+          required onCloseRequested,
+        }) => _buildComicDetailPage(
+          comic,
+          heroTag,
+          isDesktopPanel: true,
+          shouldAnimateInitialRevealOverride: shouldAnimatePanelReveal,
+          onCloseRequested: onCloseRequested,
+        );
   }
 
   @override

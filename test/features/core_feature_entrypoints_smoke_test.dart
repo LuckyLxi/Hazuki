@@ -38,49 +38,51 @@ void main() {
     final detail = ComicDetailPage(
       comic: comic,
       heroTag: 'hero',
-      readerWidgetBuilder: ({
-        required title,
-        required chapterTitle,
-        required comicId,
-        required epId,
-        required chapterIndex,
-        required images,
-        required sourceKey,
-        comicTheme,
-        onFavoriteRequested,
-      }) => ReaderPage(
-        title: title,
-        chapterTitle: chapterTitle,
-        comicId: comicId,
-        epId: epId,
-        chapterIndex: chapterIndex,
-        images: images,
-        sourceKey: sourceKey,
-      ),
+      readerWidgetBuilder:
+          ({
+            required title,
+            required chapterTitle,
+            required comicId,
+            required epId,
+            required chapterIndex,
+            required images,
+            required sourceKey,
+            comicTheme,
+            onFavoriteRequested,
+          }) => ReaderPage(
+            title: title,
+            chapterTitle: chapterTitle,
+            comicId: comicId,
+            epId: epId,
+            chapterIndex: chapterIndex,
+            images: images,
+            sourceKey: sourceKey,
+          ),
       searchPageBuilder: (_) => const SizedBox.shrink(),
     );
     Widget buildDetail(ExploreComic comic, String heroTag) => ComicDetailPage(
       comic: comic,
       heroTag: heroTag,
-      readerWidgetBuilder: ({
-        required title,
-        required chapterTitle,
-        required comicId,
-        required epId,
-        required chapterIndex,
-        required images,
-        required sourceKey,
-        comicTheme,
-        onFavoriteRequested,
-      }) => ReaderPage(
-        title: title,
-        chapterTitle: chapterTitle,
-        comicId: comicId,
-        epId: epId,
-        chapterIndex: chapterIndex,
-        images: images,
-        sourceKey: sourceKey,
-      ),
+      readerWidgetBuilder:
+          ({
+            required title,
+            required chapterTitle,
+            required comicId,
+            required epId,
+            required chapterIndex,
+            required images,
+            required sourceKey,
+            comicTheme,
+            onFavoriteRequested,
+          }) => ReaderPage(
+            title: title,
+            chapterTitle: chapterTitle,
+            comicId: comicId,
+            epId: epId,
+            chapterIndex: chapterIndex,
+            images: images,
+            sourceKey: sourceKey,
+          ),
       searchPageBuilder: (_) => const SizedBox.shrink(),
     );
     final search = SearchPage(
@@ -95,9 +97,7 @@ void main() {
     final downloads = DownloadsPage(
       readerPageBuilder: (comic, chapter) => const SizedBox.shrink(),
     );
-    final history = HistoryPage(
-      comicDetailPageBuilder: buildDetail,
-    );
+    final history = HistoryPage(comicDetailPageBuilder: buildDetail);
     final settings = SettingsPage(
       appearanceSettings: const AppearanceSettingsData(
         themeMode: ThemeMode.system,

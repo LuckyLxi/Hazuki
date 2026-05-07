@@ -48,11 +48,7 @@ class _CloudSyncPageState extends State<CloudSyncPage> {
       final uri = Uri.tryParse(url);
       if (uri == null || !uri.hasScheme || url.isEmpty) {
         unawaited(
-          showHazukiPrompt(
-            context,
-            strings.cloudSyncInvalidUrl,
-            isError: true,
-          ),
+          showHazukiPrompt(context, strings.cloudSyncInvalidUrl, isError: true),
         );
         return;
       }
@@ -260,12 +256,7 @@ class _CloudSyncPageState extends State<CloudSyncPage> {
                       child: !_controller.enabled
                           ? const SizedBox.shrink()
                           : Padding(
-                              padding: const EdgeInsets.fromLTRB(
-                                16,
-                                0,
-                                16,
-                                16,
-                              ),
+                              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [

@@ -196,7 +196,6 @@ class ComicDetailRelatedTab extends StatefulWidget {
   const ComicDetailRelatedTab({
     super.key,
     required this.details,
-    required this.heroTagPrefix,
     required this.isActiveInTabView,
     required this.isDesktopPanel,
     required this.onCloseRequested,
@@ -204,7 +203,6 @@ class ComicDetailRelatedTab extends StatefulWidget {
   });
 
   final ComicDetailsData? details;
-  final String heroTagPrefix;
   final bool isActiveInTabView;
   final bool isDesktopPanel;
   final VoidCallback? onCloseRequested;
@@ -278,7 +276,7 @@ class _ComicDetailRelatedTabState extends State<ComicDetailRelatedTab>
           sliver: SliverGrid(
             delegate: SliverChildBuilderDelegate((context, index) {
               final comic = details.recommend[index];
-              final heroTag = '${widget.heroTagPrefix}_related_$index';
+              final heroTag = comicCoverHeroTag(comic, salt: 'related-$index');
               final child = InkWell(
                 borderRadius: BorderRadius.circular(8),
                 onTap: () {

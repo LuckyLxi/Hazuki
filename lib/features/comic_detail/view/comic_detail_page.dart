@@ -147,15 +147,14 @@ class _ComicDetailPageState extends State<ComicDetailPage>
             images: const [],
             sourceKey: details.sourceKey,
             comicTheme: comicTheme,
-            onFavoriteRequested: (ctx) =>
-                _favoriteController.showFoldersDialog(
-                  ctx,
-                  details,
-                  (vm) => Theme(
-                    data: comicTheme,
-                    child: FavoriteFoldersMorphDialog(viewModel: vm),
-                  ),
-                ),
+            onFavoriteRequested: (ctx) => _favoriteController.showFoldersDialog(
+              ctx,
+              details,
+              (vm) => Theme(
+                data: comicTheme,
+                child: FavoriteFoldersMorphDialog(viewModel: vm),
+              ),
+            ),
           ),
       searchPageBuilder: widget.searchPageBuilder,
       mediaChannel: _comicDetailMediaChannel,
