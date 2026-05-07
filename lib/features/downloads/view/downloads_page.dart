@@ -7,9 +7,16 @@ import 'package:hazuki/widgets/windows_comic_detail_host.dart';
 import '../downloads.dart';
 
 class DownloadsPage extends StatefulWidget {
-  const DownloadsPage({super.key, required this.readerPageBuilder});
+  const DownloadsPage({
+    super.key,
+    required this.readerPageBuilder,
+    this.downloadService,
+    this.windowsComicDetailController,
+  });
 
   final DownloadedComicReaderPageBuilder readerPageBuilder;
+  final MangaDownloadService? downloadService;
+  final WindowsComicDetailController? windowsComicDetailController;
 
   @override
   State<DownloadsPage> createState() => _DownloadsPageState();
@@ -25,19 +32,25 @@ class _DownloadsPageState extends State<DownloadsPage>
   bool get _selectionMode =>
       _controller.selectionModeForTab(_tabController.index);
 
+  MangaDownloadService get _downloadService => _controller.downloadService;
+  WindowsComicDetailController get _windowsController =>
+      widget.windowsComicDetailController ?? WindowsComicDetailController.instance;
+
   @override
   void initState() {
     super.initState();
-    _initFuture = MangaDownloadService.instance.ensureInitialized();
+    _controller = DownloadsPageController(
+      downloadService: widget.downloadService,
+    );
+    _initFuture = _downloadService.ensureInitialized();
     _initFuture.then((_) {
       if (mounted) unawaited(_controller.runIntegrityCheck());
     });
     _tabController = TabController(length: 2, vsync: this);
-    _controller = DownloadsPageController();
     _pageListenable = Listenable.merge([
       _tabController,
       _controller,
-      MangaDownloadService.instance,
+      _downloadService,
     ]);
     _tabController.addListener(_handleTabChanged);
   }
@@ -66,8 +79,8 @@ class _DownloadsPageState extends State<DownloadsPage>
         return AnimatedBuilder(
           animation: _pageListenable,
           builder: (context, child) {
-            final tasks = MangaDownloadService.instance.tasks;
-            final comics = MangaDownloadService.instance.downloadedComics;
+            final tasks = _downloadService.tasks;
+            final comics = _downloadService.downloadedComics;
             return WindowsComicDetailHost(
               child: Scaffold(
                 appBar: DownloadsPageAppBar(
@@ -119,8 +132,7 @@ class _DownloadsPageState extends State<DownloadsPage>
                             onOpenComic: (comic) {
                               unawaited(() async {
                                 if (useWindowsComicDetailPanel) {
-                                  await WindowsComicDetailController.instance
-                                      .closeAndWait();
+                                  await _windowsController.closeAndWait();
                                   if (!context.mounted) {
                                     return;
                                   }

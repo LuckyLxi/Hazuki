@@ -5,11 +5,11 @@ import 'package:flutter/services.dart';
 
 import 'package:hazuki/models/hazuki_models.dart';
 
-import '../repository/comic_detail_repository.dart';
+import '../repository/favorite_folders_repository.dart';
 
 class FavoriteFoldersViewModel extends ChangeNotifier {
   FavoriteFoldersViewModel({
-    required ComicDetailRepository repository,
+    required FavoriteFoldersRepository repository,
     required ComicDetailsData details,
     required bool? cloudFavoriteOverride,
     required bool initialIsFavorite,
@@ -20,7 +20,7 @@ class FavoriteFoldersViewModel extends ChangeNotifier {
        _initialIsFavorite = initialIsFavorite,
        _singleFolderOnly = singleFolderOnly;
 
-  final ComicDetailRepository _repository;
+  final FavoriteFoldersRepository _repository;
   final ComicDetailsData _details;
   final bool? _cloudFavoriteOverride;
   final bool _initialIsFavorite;

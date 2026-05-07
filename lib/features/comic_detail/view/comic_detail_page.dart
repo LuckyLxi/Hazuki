@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'package:hazuki/features/search/search.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 
 import '../repository/comic_detail_repository.dart';
@@ -12,7 +11,8 @@ import '../support/comic_detail_scope.dart';
 import '../support/comic_detail_session_controller.dart';
 import '../support/comic_detail_theme_controller.dart';
 import 'comic_detail_app_bar.dart';
-import 'comic_detail_favorite_dialog.dart';
+import 'package:hazuki/features/favorite/view/favorite_folders_morph_dialog.dart';
+
 import 'comic_detail_background.dart';
 import 'comic_detail_cover.dart';
 import 'comic_detail_panels.dart';
@@ -28,6 +28,7 @@ class ComicDetailPage extends StatefulWidget {
     required this.comic,
     required this.heroTag,
     required this.readerWidgetBuilder,
+    required this.searchPageBuilder,
     this.isDesktopPanel = false,
     this.shouldAnimateInitialRevealOverride,
     this.onCloseRequested,
@@ -36,6 +37,7 @@ class ComicDetailPage extends StatefulWidget {
   final ExploreComic comic;
   final String heroTag;
   final ReaderWidgetBuilder readerWidgetBuilder;
+  final ComicDetailSearchPageBuilder searchPageBuilder;
   final bool isDesktopPanel;
   final bool? shouldAnimateInitialRevealOverride;
   final VoidCallback? onCloseRequested;
@@ -155,16 +157,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
                   ),
                 ),
           ),
-      searchPageBuilder: (initialKeyword) => SearchPage(
-        initialKeyword: initialKeyword,
-        comicDetailPageBuilder: (comic, heroTag) => ComicDetailPage(
-          comic: comic,
-          heroTag: heroTag,
-          readerWidgetBuilder: widget.readerWidgetBuilder,
-          isDesktopPanel: widget.isDesktopPanel,
-          onCloseRequested: widget.onCloseRequested,
-        ),
-      ),
+      searchPageBuilder: widget.searchPageBuilder,
       mediaChannel: _comicDetailMediaChannel,
     );
     _sessionController = ComicDetailSessionController(
@@ -234,6 +227,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
                     comic: comic,
                     heroTag: heroTag,
                     readerWidgetBuilder: widget.readerWidgetBuilder,
+                    searchPageBuilder: widget.searchPageBuilder,
                     isDesktopPanel: widget.isDesktopPanel,
                     onCloseRequested: widget.onCloseRequested,
                   ),

@@ -20,6 +20,9 @@ class DiscoverDailyRecommendationCarousel extends StatefulWidget {
     this.isPendingReady = false,
     required this.comicDetailPageBuilder,
     required this.comicCoverHeroTagBuilder,
+    this.sourceService,
+    this.recommendationService,
+    this.windowsComicDetailController,
   });
 
   final List<DiscoverDailyRecommendationEntry> displayedRecommendations;
@@ -27,6 +30,9 @@ class DiscoverDailyRecommendationCarousel extends StatefulWidget {
   final bool isPendingReady;
   final ComicDetailPageBuilder comicDetailPageBuilder;
   final ComicHeroTagBuilder comicCoverHeroTagBuilder;
+  final HazukiSourceService? sourceService;
+  final DiscoverDailyRecommendationService? recommendationService;
+  final WindowsComicDetailController? windowsComicDetailController;
 
   @override
   State<DiscoverDailyRecommendationCarousel> createState() =>
@@ -94,6 +100,13 @@ class _DiscoverDailyRecommendationCarouselState
 
   PageController get _pageController => _loopController.pageController;
 
+  HazukiSourceService get _sourceService =>
+      widget.sourceService ?? HazukiSourceService.instance;
+  DiscoverDailyRecommendationService get _recommendationService =>
+      widget.recommendationService ?? DiscoverDailyRecommendationService.instance;
+  WindowsComicDetailController get _windowsController =>
+      widget.windowsComicDetailController ?? WindowsComicDetailController.instance;
+
   @override
   void initState() {
     super.initState();
@@ -104,9 +117,7 @@ class _DiscoverDailyRecommendationCarouselState
       onLog: (title, {content}) => _logCarouselEvent(title, content: content),
     );
     if (useWindowsComicDetailPanel) {
-      WindowsComicDetailController.instance.addListener(
-        _handleWindowsDetailControllerChanged,
-      );
+      _windowsController.addListener(_handleWindowsDetailControllerChanged);
     }
     _displayedRecommendations =
         List<DiscoverDailyRecommendationEntry>.unmodifiable(
@@ -209,9 +220,7 @@ class _DiscoverDailyRecommendationCarouselState
     _overlayRevealTimer?.cancel();
     _detachRouteAnimation();
     if (useWindowsComicDetailPanel) {
-      WindowsComicDetailController.instance.removeListener(
-        _handleWindowsDetailControllerChanged,
-      );
+      _windowsController.removeListener(_handleWindowsDetailControllerChanged);
     }
     _logCarouselEvent(
       'Discover carousel disposed',
@@ -326,7 +335,7 @@ class _DiscoverDailyRecommendationCarouselState
     String level = 'info',
     Map<String, Object?>? content,
   }) {
-    HazukiSourceService.instance.addApplicationLog(
+    _sourceService.addApplicationLog(
       level: level,
       title: title,
       source: 'discover_carousel',
@@ -581,10 +590,7 @@ class _DiscoverDailyRecommendationCarouselState
       _clearPendingRecommendations();
     });
     _warmUpRecommendationCovers(_currentPage);
-    unawaited(
-      DiscoverDailyRecommendationService.instance
-          .promotePendingRecommendations(),
-    );
+    unawaited(_recommendationService.promotePendingRecommendations());
     _logCarouselEvent(
       'Discover carousel pending recommendations promoted',
       content: {'trigger': trigger},
@@ -654,7 +660,7 @@ class _DiscoverDailyRecommendationCarouselState
       return;
     }
     try {
-      final bytes = await HazukiSourceService.instance.downloadImageBytes(
+      final bytes = await _sourceService.downloadImageBytes(
         coverUrl,
         keepInMemory: true,
         sourceKey: sourceKey,
@@ -833,8 +839,7 @@ class _DiscoverDailyRecommendationCarouselState
       );
     } finally {
       final keepDetailOpen =
-          useWindowsComicDetailPanel &&
-          WindowsComicDetailController.instance.isOpen;
+          useWindowsComicDetailPanel && _windowsController.isOpen;
       if (!keepDetailOpen && mounted) {
         setState(() {
           _detailOpen = false;
@@ -856,7 +861,7 @@ class _DiscoverDailyRecommendationCarouselState
   }
 
   void _handleWindowsDetailControllerChanged() {
-    final controller = WindowsComicDetailController.instance;
+    final controller = _windowsController;
     final panelOpen = controller.isOpen;
     final closedHeroTag = !panelOpen ? _activeOverlayHeroTag : null;
     if (_detailOpen == panelOpen &&

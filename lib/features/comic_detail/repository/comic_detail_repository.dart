@@ -3,12 +3,13 @@ import 'dart:typed_data';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:hazuki/features/favorite/repository/favorite_folders_repository.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/services/local_favorites_service.dart';
 import 'package:hazuki/services/manga_download_service.dart';
 
-class ComicDetailRepository {
+class ComicDetailRepository implements FavoriteFoldersRepository {
   const ComicDetailRepository();
 
   HazukiSourceService get _source => HazukiSourceService.instance;
@@ -17,12 +18,12 @@ class ComicDetailRepository {
 
   // ── Source capabilities ──────────────────────────────────────────────────
 
-  bool get isLogged => _source.isLogged;
-  bool get supportFavoriteFolderLoad => _source.supportFavoriteFolderLoad;
-  bool get supportFavoriteFolderAdd => _source.supportFavoriteFolderAdd;
-  bool get supportFavoriteFolderDelete => _source.supportFavoriteFolderDelete;
-  bool get supportFavoriteToggle => _source.supportFavoriteToggle;
-  bool get favoriteSingleFolderForSingleComic =>
+  @override bool get isLogged => _source.isLogged;
+  @override bool get supportFavoriteFolderLoad => _source.supportFavoriteFolderLoad;
+  @override bool get supportFavoriteFolderAdd => _source.supportFavoriteFolderAdd;
+  @override bool get supportFavoriteFolderDelete => _source.supportFavoriteFolderDelete;
+  @override bool get supportFavoriteToggle => _source.supportFavoriteToggle;
+  @override bool get favoriteSingleFolderForSingleComic =>
       _source.favoriteSingleFolderForSingleComic;
 
   Future<ComicDetailsData> loadComicDetails(
@@ -66,13 +67,16 @@ class ComicDetailRepository {
     sourceKey: sourceKey,
   );
 
+  @override
   Future<FavoriteFoldersResult> loadCloudFavoriteFolders({
     required String comicId,
   }) => _source.loadFavoriteFolders(comicId: comicId);
 
+  @override
   Future<void> addCloudFavoriteFolder(String name) =>
       _source.addFavoriteFolder(name);
 
+  @override
   Future<void> deleteCloudFavoriteFolder(String id) =>
       _source.deleteFavoriteFolder(id);
 
@@ -93,14 +97,17 @@ class ComicDetailRepository {
     String sourceKey = '',
   }) => _local.isComicFavorited(comicId, sourceKey: sourceKey);
 
+  @override
   Future<FavoriteFoldersResult> loadLocalFavoriteFolders({
     required String comicId,
     String sourceKey = '',
   }) => _local.loadFavoriteFolders(comicId: comicId, sourceKey: sourceKey);
 
+  @override
   Future<void> addLocalFavoriteFolder(String name) =>
       _local.addFavoriteFolder(name);
 
+  @override
   Future<void> deleteLocalFavoriteFolder(String id) =>
       _local.deleteFavoriteFolder(id);
 

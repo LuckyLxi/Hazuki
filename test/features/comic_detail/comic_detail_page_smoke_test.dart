@@ -48,6 +48,7 @@ void main() {
             images: images,
             sourceKey: sourceKey,
           ),
+          searchPageBuilder: (_) => const SizedBox.shrink(),
         ),
       ),
     );

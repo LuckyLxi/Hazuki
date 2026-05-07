@@ -3,8 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../app/windows_comic_detail.dart';
-import 'package:hazuki/features/comic_detail/view/comic_detail_page.dart';
-import 'package:hazuki/features/reader/view/reader_page.dart';
 
 class WindowsComicDetailHost extends StatefulWidget {
   const WindowsComicDetailHost({super.key, required this.child});
@@ -269,39 +267,15 @@ class _WindowsComicDetailHostState extends State<WindowsComicDetailHost> {
                                     },
                                     child: KeyedSubtree(
                                       key: ValueKey<int>(activeEntry.revision),
-                                      child: ComicDetailPage(
-                                        comic: activeEntry.comic,
-                                        heroTag: activeEntry.heroTag,
-                                        readerWidgetBuilder: ({
-                                          required title,
-                                          required chapterTitle,
-                                          required comicId,
-                                          required epId,
-                                          required chapterIndex,
-                                          required images,
-                                          required sourceKey,
-                                          comicTheme,
-                                          onFavoriteRequested,
-                                        }) => ReaderPage(
-                                          title: title,
-                                          chapterTitle: chapterTitle,
-                                          comicId: comicId,
-                                          epId: epId,
-                                          chapterIndex: chapterIndex,
-                                          images: images,
-                                          sourceKey: sourceKey,
-                                          comicTheme: comicTheme,
-                                          onFavoriteRequested:
-                                              onFavoriteRequested,
-                                        ),
-                                        isDesktopPanel: true,
-                                        shouldAnimateInitialRevealOverride:
-                                            shouldAnimatePanelReveal,
-                                        onCloseRequested:
-                                            WindowsComicDetailController
-                                                .instance
-                                                .close,
-                                      ),
+                                      child:
+                                          controller.panelBuilder?.call(
+                                            activeEntry.comic,
+                                            activeEntry.heroTag,
+                                            shouldAnimatePanelReveal:
+                                                shouldAnimatePanelReveal,
+                                            onCloseRequested: controller.close,
+                                          ) ??
+                                          const SizedBox.shrink(),
                                     ),
                                   ),
                                 ),

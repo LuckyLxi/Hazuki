@@ -8,7 +8,6 @@ import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
 import '../support/favorite_folders_view_model.dart';
-import 'comic_detail_morph_loader.dart';
 
 class FavoriteFoldersMorphDialog extends StatefulWidget {
   const FavoriteFoldersMorphDialog({super.key, required this.viewModel});

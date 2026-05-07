@@ -108,6 +108,7 @@ class HomeScaffoldShell extends StatelessWidget {
         allowInitialLoad: allowDiscoverInitialLoad,
         hideLoadingUntilInitialLoadAllowed: hideDiscoverLoadingUntilAllowed,
         onSearchMorphProgressChanged: onDiscoverSearchMorphProgressChanged,
+        onSearchTap: onOpenSearch,
       ),
       favoriteChild: FavoritePage(
         key: favoritePageKey,

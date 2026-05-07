@@ -26,6 +26,14 @@ import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
+typedef CommentsWidgetBuilder =
+    Widget Function({
+      required String comicId,
+      String? subId,
+      ScrollController? scrollController,
+      Future<void> Function()? onRequestTabFullscreen,
+    });
+
 class ReaderPage extends StatefulWidget {
   const ReaderPage({
     super.key,
@@ -38,6 +46,7 @@ class ReaderPage extends StatefulWidget {
     this.sourceKey = '',
     this.comicTheme,
     this.onFavoriteRequested,
+    this.commentsWidgetBuilder,
   });
 
   final String title;
@@ -49,6 +58,7 @@ class ReaderPage extends StatefulWidget {
   final String sourceKey;
   final ThemeData? comicTheme;
   final Future<void> Function(BuildContext)? onFavoriteRequested;
+  final CommentsWidgetBuilder? commentsWidgetBuilder;
 
   @override
   State<ReaderPage> createState() => _ReaderPageState();
@@ -700,6 +710,7 @@ class _ReaderPageState extends State<ReaderPage>
             child: _ReaderCommentsSheet(
               comicId: details.id,
               subId: details.subId.isEmpty ? null : details.subId,
+              commentsWidgetBuilder: widget.commentsWidgetBuilder,
             ),
           );
         },
@@ -852,6 +863,7 @@ class _ReaderPageState extends State<ReaderPage>
           sourceKey: widget.sourceKey,
           comicTheme: widget.comicTheme,
           onFavoriteRequested: widget.onFavoriteRequested,
+          commentsWidgetBuilder: widget.commentsWidgetBuilder,
         ),
       ),
     );
@@ -921,6 +933,7 @@ class _ReaderPageState extends State<ReaderPage>
             sourceKey: widget.sourceKey,
             comicTheme: widget.comicTheme,
             onFavoriteRequested: widget.onFavoriteRequested,
+            commentsWidgetBuilder: widget.commentsWidgetBuilder,
           ),
         ),
       );
@@ -1240,10 +1253,15 @@ class _ReaderPageState extends State<ReaderPage>
 }
 
 class _ReaderCommentsSheet extends StatefulWidget {
-  const _ReaderCommentsSheet({required this.comicId, required this.subId});
+  const _ReaderCommentsSheet({
+    required this.comicId,
+    required this.subId,
+    this.commentsWidgetBuilder,
+  });
 
   final String comicId;
   final String? subId;
+  final CommentsWidgetBuilder? commentsWidgetBuilder;
 
   @override
   State<_ReaderCommentsSheet> createState() => _ReaderCommentsSheetState();
@@ -1359,13 +1377,20 @@ class _ReaderCommentsSheetState extends State<_ReaderCommentsSheet> {
                       color: cs.outlineVariant.withValues(alpha: 0.48),
                     ),
                     Expanded(
-                      child: CommentsPage(
-                        comicId: widget.comicId,
-                        subId: widget.subId,
-                        showAppBar: false,
-                        scrollController: scrollController,
-                        onRequestTabFullscreen: _expandToFullscreen,
-                      ),
+                      child:
+                          widget.commentsWidgetBuilder?.call(
+                            comicId: widget.comicId,
+                            subId: widget.subId,
+                            scrollController: scrollController,
+                            onRequestTabFullscreen: _expandToFullscreen,
+                          ) ??
+                          CommentsPage(
+                            comicId: widget.comicId,
+                            subId: widget.subId,
+                            showAppBar: false,
+                            scrollController: scrollController,
+                            onRequestTabFullscreen: _expandToFullscreen,
+                          ),
                     ),
                   ],
                 ),

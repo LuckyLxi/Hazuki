@@ -22,6 +22,7 @@ import 'app/theme_reveal_support.dart';
 import 'app/ui_flags.dart';
 import 'app/windows_title_bar_controller.dart';
 import 'features/comic_detail/view/comic_detail_page.dart';
+import 'features/comments/comments.dart';
 import 'features/reader/view/reader_page.dart';
 import 'features/search/search.dart';
 import 'l10n/app_localizations.dart';
@@ -275,6 +276,22 @@ class _HazukiAppState extends State<HazukiApp>
         sourceKey: sourceKey,
         comicTheme: comicTheme,
         onFavoriteRequested: onFavoriteRequested,
+        commentsWidgetBuilder: ({
+          required comicId,
+          subId,
+          scrollController,
+          onRequestTabFullscreen,
+        }) => CommentsPage(
+          comicId: comicId,
+          subId: subId,
+          showAppBar: false,
+          scrollController: scrollController,
+          onRequestTabFullscreen: onRequestTabFullscreen,
+        ),
+      ),
+      searchPageBuilder: (initialKeyword) => SearchPage(
+        initialKeyword: initialKeyword,
+        comicDetailPageBuilder: _buildRootComicDetailPage,
       ),
     );
   }

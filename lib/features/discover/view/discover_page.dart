@@ -4,8 +4,8 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/app/app.dart';
-import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/features/search/search.dart';
+import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
@@ -130,8 +130,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
       MaterialPageRoute<void>(
         builder: (_) => SearchPage(
           initialKeyword: null,
-          comicDetailPageBuilder: (comic, heroTag) =>
-              widget.comicDetailPageBuilder(comic, heroTag),
+          comicDetailPageBuilder: widget.comicDetailPageBuilder,
           comicCoverHeroTagBuilder: widget.comicCoverHeroTagBuilder,
         ),
       ),

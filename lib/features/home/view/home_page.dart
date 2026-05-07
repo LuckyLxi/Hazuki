@@ -5,8 +5,11 @@ import 'package:flutter/material.dart';
 
 import 'package:hazuki/app/app.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_page.dart';
+import 'package:hazuki/features/comments/comments.dart';
 import 'package:hazuki/features/home/home.dart';
 import 'package:hazuki/features/reader/view/reader_page.dart';
+import 'package:hazuki/features/search/search.dart';
+import 'package:hazuki/models/hazuki_models.dart';
 
 class HazukiHomePage extends StatefulWidget {
   const HazukiHomePage({
@@ -38,15 +41,92 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
   late final HomeCoordinator _coordinator;
   HomeDrawerDestination? _selectedDrawerDestination;
 
+  static Widget _buildReaderComments({
+    required String comicId,
+    String? subId,
+    ScrollController? scrollController,
+    Future<void> Function()? onRequestTabFullscreen,
+  }) => CommentsPage(
+    comicId: comicId,
+    subId: subId,
+    showAppBar: false,
+    scrollController: scrollController,
+    onRequestTabFullscreen: onRequestTabFullscreen,
+  );
+
+  Widget _buildReaderPage({
+    required String title,
+    required String chapterTitle,
+    required String comicId,
+    required String epId,
+    required int chapterIndex,
+    required List<String> images,
+    required String sourceKey,
+    ThemeData? comicTheme,
+    Future<void> Function(BuildContext)? onFavoriteRequested,
+  }) {
+    return ReaderPage(
+      title: title,
+      chapterTitle: chapterTitle,
+      comicId: comicId,
+      epId: epId,
+      chapterIndex: chapterIndex,
+      images: images,
+      sourceKey: sourceKey,
+      comicTheme: comicTheme,
+      onFavoriteRequested: onFavoriteRequested,
+      commentsWidgetBuilder: _buildReaderComments,
+    );
+  }
+
+  Widget _buildSearchPage(String initialKeyword) {
+    return SearchPage(
+      initialKeyword: initialKeyword,
+      comicDetailPageBuilder: (comic, heroTag) =>
+          _buildComicDetailPage(comic, heroTag),
+    );
+  }
+
+  ComicDetailPage _buildComicDetailPage(
+    ExploreComic comic,
+    String heroTag, {
+    bool isDesktopPanel = false,
+    bool? shouldAnimateInitialRevealOverride,
+    VoidCallback? onCloseRequested,
+  }) {
+    return ComicDetailPage(
+      comic: comic,
+      heroTag: heroTag,
+      readerWidgetBuilder: _buildReaderPage,
+      searchPageBuilder: _buildSearchPage,
+      isDesktopPanel: isDesktopPanel,
+      shouldAnimateInitialRevealOverride: shouldAnimateInitialRevealOverride,
+      onCloseRequested: onCloseRequested,
+    );
+  }
+
   @override
   void initState() {
     super.initState();
     _coordinator = HomeCoordinator(initialTabIndex: widget.initialTabIndex);
     _coordinator.start(context);
+    WindowsComicDetailController.instance.panelBuilder = (
+      comic,
+      heroTag, {
+      required shouldAnimatePanelReveal,
+      required onCloseRequested,
+    }) => _buildComicDetailPage(
+      comic,
+      heroTag,
+      isDesktopPanel: true,
+      shouldAnimateInitialRevealOverride: shouldAnimatePanelReveal,
+      onCloseRequested: onCloseRequested,
+    );
   }
 
   @override
   void dispose() {
+    WindowsComicDetailController.instance.panelBuilder = null;
     _coordinator.dispose();
     super.dispose();
   }
@@ -97,31 +177,8 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
           onAppearanceChanged: widget.onAppearanceChanged,
           locale: widget.locale,
           onLocaleChanged: widget.onLocaleChanged,
-          comicDetailPageBuilder: (comic, heroTag) => ComicDetailPage(
-            comic: comic,
-            heroTag: heroTag,
-            readerWidgetBuilder: ({
-              required title,
-              required chapterTitle,
-              required comicId,
-              required epId,
-              required chapterIndex,
-              required images,
-              required sourceKey,
-              comicTheme,
-              onFavoriteRequested,
-            }) => ReaderPage(
-              title: title,
-              chapterTitle: chapterTitle,
-              comicId: comicId,
-              epId: epId,
-              chapterIndex: chapterIndex,
-              images: images,
-              sourceKey: sourceKey,
-              comicTheme: comicTheme,
-              onFavoriteRequested: onFavoriteRequested,
-            ),
-          ),
+          comicDetailPageBuilder: (comic, heroTag) =>
+              _buildComicDetailPage(comic, heroTag),
           downloadsReaderPageBuilder: (comic, chapter) => ReaderPage(
             title: comic.title,
             chapterTitle: resolveHazukiChapterTitle(context, chapter.title),
@@ -130,6 +187,7 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
             chapterIndex: chapter.index,
             images: chapter.imagePaths,
             sourceKey: comic.sourceKey,
+            commentsWidgetBuilder: _buildReaderComments,
           ),
         );
 

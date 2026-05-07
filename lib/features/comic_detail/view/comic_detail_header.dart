@@ -9,7 +9,8 @@ import 'package:hazuki/widgets/widgets.dart';
 
 import '../support/comic_detail_scope.dart';
 import '../support/comic_detail_session_controller.dart';
-import 'comic_detail_favorite_dialog.dart';
+import 'package:hazuki/features/favorite/view/favorite_folders_morph_dialog.dart';
+
 import 'comic_detail_view_primitives.dart';
 
 class ComicDetailHeaderSection extends StatelessWidget {

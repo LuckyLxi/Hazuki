@@ -57,6 +57,7 @@ void main() {
         images: images,
         sourceKey: sourceKey,
       ),
+      searchPageBuilder: (_) => const SizedBox.shrink(),
     );
     Widget buildDetail(ExploreComic comic, String heroTag) => ComicDetailPage(
       comic: comic,
@@ -80,6 +81,7 @@ void main() {
         images: images,
         sourceKey: sourceKey,
       ),
+      searchPageBuilder: (_) => const SizedBox.shrink(),
     );
     final search = SearchPage(
       initialKeyword: comic.title,

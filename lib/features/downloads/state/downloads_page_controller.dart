@@ -9,6 +9,8 @@ class DownloadsPageController extends ChangeNotifier {
 
   final MangaDownloadService _downloadService;
 
+  MangaDownloadService get downloadService => _downloadService;
+
   final Set<String> _selectedComicIds = <String>{};
   bool _selectionEnabled = false;
   bool _scanningDownloaded = false;

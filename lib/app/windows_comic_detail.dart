@@ -7,6 +7,13 @@ import '../models/hazuki_models.dart';
 bool get useWindowsComicDetailPanel => Platform.isWindows;
 const windowsComicDetailPanelAnimationDuration = Duration(milliseconds: 320);
 
+typedef WindowsComicDetailPanelBuilder = Widget Function(
+  ExploreComic comic,
+  String heroTag, {
+  required bool shouldAnimatePanelReveal,
+  required VoidCallback onCloseRequested,
+});
+
 @immutable
 class WindowsComicDetailEntry {
   const WindowsComicDetailEntry({
@@ -31,6 +38,8 @@ class WindowsComicDetailController extends ChangeNotifier {
   int _temporaryHideDepth = 0;
   int _temporaryHideTokenSeed = 0;
   int? _pendingPanelRevealRevision;
+
+  WindowsComicDetailPanelBuilder? panelBuilder;
 
   WindowsComicDetailEntry? get entry => _entry;
   bool get isOpen => _entry != null;

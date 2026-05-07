@@ -8,8 +8,9 @@ import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/widgets/hazuki_prompt.dart';
 
+import 'package:hazuki/features/favorite/support/favorite_folders_view_model.dart';
+
 import '../repository/comic_detail_repository.dart';
-import 'favorite_folders_view_model.dart';
 
 typedef ComicDetailFavoriteDialogBuilder =
     Widget Function(FavoriteFoldersViewModel viewModel);
