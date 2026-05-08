@@ -2,10 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import 'package:hazuki/app/app.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 
 import '../repository/comic_detail_repository.dart';
+import 'package:hazuki/shared/ui_flags.dart';
 
 const int _animatedComicDetailIdsLimit = 200;
 final Set<String> _animatedComicDetailIds = <String>{};

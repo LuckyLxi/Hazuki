@@ -5,7 +5,7 @@ import 'package:hazuki/app/app.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/widgets/sun_moon_icon.dart';
-import '../display_mode_settings_page.dart';
+import 'display_mode_settings_page.dart';
 import '../settings_group.dart';
 import 'appearance_settings_locale_dialog.dart';
 

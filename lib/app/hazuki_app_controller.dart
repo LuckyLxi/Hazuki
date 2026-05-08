@@ -3,8 +3,8 @@ import 'package:flutter/widgets.dart';
 import '../services/cloud_sync_service.dart';
 import '../services/hazuki_source_service.dart';
 import 'app_settings_store.dart';
-import 'hazuki_theme_controller.dart';
-import 'windows_title_bar_controller.dart';
+import 'theme/hazuki_theme_controller.dart';
+import 'windows/windows_title_bar_controller.dart';
 
 class CloudSyncRestoreApplyResult {
   const CloudSyncRestoreApplyResult({

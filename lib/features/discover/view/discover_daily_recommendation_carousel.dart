@@ -3,7 +3,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import 'package:hazuki/app/app.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
@@ -11,6 +10,8 @@ import 'package:hazuki/widgets/widgets.dart';
 import '../support/discover_daily_recommendation_carousel_support.dart';
 import 'discover_daily_recommendation_carousel_controllers.dart';
 import 'discover_daily_recommendation_carousel_widgets.dart';
+import 'package:hazuki/shared/navigation_tags.dart';
+import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 
 class DiscoverDailyRecommendationCarousel extends StatefulWidget {
   const DiscoverDailyRecommendationCarousel({

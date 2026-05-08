@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:hazuki/app/app.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/widgets/widgets.dart';
@@ -13,6 +12,8 @@ import '../support/history_actions.dart';
 import '../support/history_favorite_support.dart';
 import '../support/history_menu_support.dart';
 import 'history_comic_list_item.dart';
+import 'package:hazuki/shared/navigation_tags.dart';
+import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 
 class HistoryPage extends StatefulWidget {
   const HistoryPage({
@@ -115,7 +116,7 @@ class _HistoryPageState extends State<HistoryPage> {
 
   Future<void> _saveHistory(List<ExploreComic> history) async {
     final prefs = await SharedPreferences.getInstance();
-    // 读取原始JSON以保留timestamp等额外字段，避免云同步合并时丢失时序信息
+    // 璇诲彇鍘熷JSON浠ヤ繚鐣檛imestamp绛夐澶栧瓧娈碉紝閬垮厤浜戝悓姝ュ悎骞舵椂涓㈠け鏃跺簭淇℃伅
     final existingStr = prefs.getString('hazuki_read_history');
     final existingById = <String, Map<String, dynamic>>{};
     if (existingStr != null) {

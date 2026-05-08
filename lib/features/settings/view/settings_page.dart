@@ -2,9 +2,8 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:hazuki/app/app.dart';
-import 'package:hazuki/app/windows_title_bar_controller.dart';
+import 'package:hazuki/app/windows/windows_title_bar_controller.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
-import 'package:hazuki/pages/about_page.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:hazuki/widgets/windows_comic_detail_host.dart';
 import '../settings.dart';

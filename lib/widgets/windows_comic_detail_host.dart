@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import '../app/windows_comic_detail.dart';
+import '../shared/windows/windows_comic_detail.dart';
 
 class WindowsComicDetailHost extends StatefulWidget {
   const WindowsComicDetailHost({super.key, required this.child});

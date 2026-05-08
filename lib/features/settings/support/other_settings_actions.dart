@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hazuki/app/app.dart';
-import 'package:hazuki/app/windows_title_bar_controller.dart';
+import 'package:hazuki/app/windows/windows_title_bar_controller.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
-import 'package:hazuki/services/manga_download_service.dart';
-import 'package:hazuki/services/manga_download_storage_support.dart';
+import 'package:hazuki/services/manga_download/manga_download_service.dart';
+import 'package:hazuki/services/manga_download/manga_download_storage_support.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

@@ -3,7 +3,6 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
-import 'package:hazuki/app/app.dart';
 import 'package:hazuki/features/favorite/favorite.dart';
 import 'package:hazuki/features/favorite/view/favorite_page.dart';
 import 'package:hazuki/l10n/l10n.dart';
@@ -18,6 +17,7 @@ import 'home_bottom_navigation.dart';
 import 'home_content_stack.dart';
 import 'discover_app_bar_actions.dart';
 import 'package:hazuki/features/home/view/home_drawer.dart';
+import 'package:hazuki/shared/navigation_tags.dart';
 
 class HomeScaffoldShell extends StatelessWidget {
   const HomeScaffoldShell({

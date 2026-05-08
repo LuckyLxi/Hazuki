@@ -5,8 +5,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'package:hazuki/app/app.dart';
-import 'package:hazuki/app/windows_title_bar_controller.dart';
+import 'package:hazuki/app/windows/windows_title_bar_controller.dart';
 import 'package:hazuki/features/comments/comments.dart';
 import 'package:hazuki/features/reader/reader.dart';
 import 'package:hazuki/features/reader/state/reader_image_pipeline_state.dart';
@@ -15,6 +14,7 @@ import 'package:hazuki/features/reader/state/reader_settings_store.dart';
 import 'package:hazuki/features/reader/support/reader_diagnostics_support.dart';
 import 'package:hazuki/features/reader/support/reader_display_bridge.dart';
 import 'package:hazuki/features/reader/support/reader_image_pipeline_controller.dart';
+import 'package:hazuki/shared/ui_flags.dart';
 import 'package:hazuki/features/reader/support/reader_navigation_controller.dart';
 import 'package:hazuki/features/reader/support/reader_session_controller.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';

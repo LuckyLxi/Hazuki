@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:hazuki/app/ui_flags.dart';
+import 'package:hazuki/shared/ui_flags.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
 final RegExp _commentInlineImagePattern = RegExp(

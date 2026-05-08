@@ -2,9 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import 'package:hazuki/app/app.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
+import 'package:hazuki/shared/navigation_tags.dart';
+import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
 import '../support/comic_detail_scope.dart';
@@ -93,7 +94,7 @@ class _ComicDetailInfoTabState extends State<ComicDetailInfoTab> {
     // Only animate on the very first active render with loaded content.
     final shouldAnimate = widget.shouldAnimateResolvedContent && !_hasAnimated;
     if (shouldAnimate) {
-      // Set synchronously 鈥?no setState needed since we only ever go false鈫抰rue
+      // Set synchronously 閳?no setState needed since we only ever go false閳姲rue
       // and this flag never drives a rebuild on its own.
       _hasAnimated = true;
     }

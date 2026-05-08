@@ -10,6 +10,8 @@ import 'package:hazuki/features/home/home.dart';
 import 'package:hazuki/features/reader/view/reader_page.dart';
 import 'package:hazuki/features/search/search.dart';
 import 'package:hazuki/models/hazuki_models.dart';
+import 'package:hazuki/shared/windows/windows_comic_detail.dart';
+import 'package:hazuki/shared/chapter_title_resolver.dart';
 
 class HazukiHomePage extends StatefulWidget {
   const HazukiHomePage({

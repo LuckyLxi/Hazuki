@@ -3,7 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
-import '../app/ui_flags.dart';
+import '../shared/ui_flags.dart';
 import '../models/hazuki_models.dart';
 import '../services/hazuki_source_service.dart';
 

@@ -1,10 +1,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:hazuki/app/app.dart';
-import 'package:hazuki/services/manga_download_service.dart';
+import 'package:hazuki/services/manga_download/manga_download_service.dart';
 import 'package:hazuki/widgets/windows_comic_detail_host.dart';
 import '../downloads.dart';
+import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 
 class DownloadsPage extends StatefulWidget {
   const DownloadsPage({

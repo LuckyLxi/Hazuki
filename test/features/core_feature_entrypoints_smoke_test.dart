@@ -11,6 +11,7 @@ import 'package:hazuki/features/reader/view/reader_page.dart';
 import 'package:hazuki/features/search/search.dart';
 import 'package:hazuki/features/settings/settings.dart';
 import 'package:hazuki/models/hazuki_models.dart';
+import 'package:hazuki/shared/navigation_tags.dart';
 
 void main() {
   test('feature-first entry widgets are constructible from public paths', () {

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/downloads/downloads.dart';
-import 'package:hazuki/services/manga_download_service.dart';
+import 'package:hazuki/services/manga_download/manga_download_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
 void main() {

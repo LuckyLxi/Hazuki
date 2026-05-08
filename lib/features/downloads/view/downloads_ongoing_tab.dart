@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hazuki/l10n/l10n.dart';
-import 'package:hazuki/services/manga_download_service.dart';
+import 'package:hazuki/services/manga_download/manga_download_service.dart';
 import 'downloads_task_card.dart';
 
 class DownloadsOngoingTab extends StatefulWidget {

@@ -1,7 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:hazuki/app/navigation_tags.dart';
+import 'package:hazuki/shared/navigation_tags.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 
 class SearchResultsTopSearchBox extends StatelessWidget {

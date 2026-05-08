@@ -16,42 +16,50 @@ import 'package:pointycastle/block/aes.dart';
 import 'package:pointycastle/block/modes/ecb.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../app/chapter_title_resolver.dart';
+import '../shared/chapter_title_resolver.dart';
 import '../models/hazuki_models.dart';
 
-part 'source/account_session_capability.dart';
-part 'source/account_session_retry_support.dart';
-part 'source/category_capability.dart';
-part 'source/category_ranking_capability.dart';
-part 'source/category_view_more_capability.dart';
-part 'source/check_in_capability.dart';
-part 'source/comic_details_cache_support.dart';
-part 'source/comic_details_capability.dart';
-part 'source/comments_avatar_support.dart';
-part 'source/comments_capability.dart';
-part 'source/cookie_store_support.dart';
-part 'source/debug_capability.dart';
-part 'source/debug_favorites_capability.dart';
-part 'source/debug_log_storage_capability.dart';
-part 'source/debug_report_capability.dart';
 part 'source/explore_capability.dart';
-part 'source/favorites_capability.dart';
-part 'source/favorites_collection_capability.dart';
-part 'source/favorites_management_capability.dart';
-part 'source/image_cache_capability.dart';
-part 'source/image_cache_download_capability.dart';
-part 'source/image_cache_maintenance_capability.dart';
-part 'source/image_prepare_capability.dart';
-part 'source/image_prepare_segment_support.dart';
-part 'source/image_prepare_unscramble_support.dart';
-part 'source/js_bridge_support.dart';
-part 'source/line_settings.dart';
-part 'source/source_bootstrap_support.dart';
-part 'source/source_file_management_capability.dart';
-part 'source/source_loader_capability.dart';
-part 'source/source_runtime_support.dart';
-part 'source/source_store_support.dart';
-part 'source/version_update_capability.dart';
+
+part 'source/account/account_session_capability.dart';
+part 'source/account/account_session_retry_support.dart';
+part 'source/account/check_in_capability.dart';
+
+part 'source/category/category_capability.dart';
+part 'source/category/category_ranking_capability.dart';
+part 'source/category/category_view_more_capability.dart';
+
+part 'source/comic/comic_details_cache_support.dart';
+part 'source/comic/comic_details_capability.dart';
+
+part 'source/comments/comments_avatar_support.dart';
+part 'source/comments/comments_capability.dart';
+
+part 'source/debug/debug_capability.dart';
+part 'source/debug/debug_favorites_capability.dart';
+part 'source/debug/debug_log_storage_capability.dart';
+part 'source/debug/debug_report_capability.dart';
+
+part 'source/favorites/favorites_capability.dart';
+part 'source/favorites/favorites_collection_capability.dart';
+part 'source/favorites/favorites_management_capability.dart';
+
+part 'source/image/image_cache_capability.dart';
+part 'source/image/image_cache_download_capability.dart';
+part 'source/image/image_cache_maintenance_capability.dart';
+part 'source/image/image_prepare_capability.dart';
+part 'source/image/image_prepare_segment_support.dart';
+part 'source/image/image_prepare_unscramble_support.dart';
+
+part 'source/runtime/cookie_store_support.dart';
+part 'source/runtime/js_bridge_support.dart';
+part 'source/runtime/line_settings.dart';
+part 'source/runtime/source_bootstrap_support.dart';
+part 'source/runtime/source_file_management_capability.dart';
+part 'source/runtime/source_loader_capability.dart';
+part 'source/runtime/source_runtime_support.dart';
+part 'source/runtime/source_store_support.dart';
+part 'source/runtime/version_update_capability.dart';
 
 const _jmSourceUrls = [
   'https://cdn.jsdelivr.net/gh/venera-app/venera-configs@main/jm.js',

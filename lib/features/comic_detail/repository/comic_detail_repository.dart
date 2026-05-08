@@ -7,7 +7,7 @@ import 'package:hazuki/features/favorite/repository/favorite_folders_repository.
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/services/local_favorites_service.dart';
-import 'package:hazuki/services/manga_download_service.dart';
+import 'package:hazuki/services/manga_download/manga_download_service.dart';
 
 class ComicDetailRepository implements FavoriteFoldersRepository {
   const ComicDetailRepository();

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import 'package:hazuki/app/app.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
+import 'package:hazuki/shared/navigation_tags.dart';
 
 class DiscoverCarouselPagePhysics extends PageScrollPhysics {
   const DiscoverCarouselPagePhysics({super.parent});

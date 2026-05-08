@@ -4,11 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app_preferences.dart';
-import 'software_update_dialog_support.dart';
-import 'source_runtime_coordinator.dart';
-import 'source_runtime_widgets.dart';
-import 'source_update_dialog_support.dart';
-import 'windows_adaptation_notice_dialog_support.dart';
+import 'software_update/software_update_dialog_support.dart';
+import 'source_runtime/source_runtime_coordinator.dart';
+import 'source_runtime/source_runtime_widgets.dart';
+import 'source_runtime/source_update_dialog_support.dart';
+import 'windows/windows_adaptation_notice_dialog_support.dart';
 
 class HazukiAppStartupCoordinator extends ChangeNotifier {
   HazukiAppStartupCoordinator({

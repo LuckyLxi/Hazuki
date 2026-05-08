@@ -8,6 +8,7 @@ import 'package:hazuki/app/app.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 
 import '../repository/comic_detail_repository.dart';
+import 'package:hazuki/shared/ui_flags.dart';
 
 const int _comicDynamicColorSchemeCacheLimit = 24;
 final Map<String, _ComicDynamicColorCacheEntry> _comicDynamicColorSchemeCache =

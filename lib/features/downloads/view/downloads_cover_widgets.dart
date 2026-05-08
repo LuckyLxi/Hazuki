@@ -2,7 +2,7 @@ import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
-import 'package:hazuki/services/manga_download_service.dart';
+import 'package:hazuki/services/manga_download/manga_download_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
 class DownloadedComicCover extends StatelessWidget {

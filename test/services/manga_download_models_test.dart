@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hazuki/services/manga_download_models.dart';
+import 'package:hazuki/services/manga_download/manga_download_models.dart';
 
 void main() {
   group('Manga download source identity', () {

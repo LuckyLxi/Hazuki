@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:hazuki/app/chapter_title_resolver.dart';
+import 'package:hazuki/shared/chapter_title_resolver.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 

@@ -10,8 +10,10 @@ import 'package:hazuki/features/search/search.dart';
 import 'package:hazuki/features/settings/settings.dart';
 import 'package:hazuki/features/home/view/home_drawer.dart';
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/pages/ranking_page.dart';
-import 'package:hazuki/pages/tag_category_page.dart';
+import 'package:hazuki/features/discover/view/ranking_page.dart';
+import 'package:hazuki/features/discover/view/tag_category_page.dart';
+import 'package:hazuki/shared/navigation_tags.dart';
+import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 
 class HomeNavigationActions {
   const HomeNavigationActions({

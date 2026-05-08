@@ -1,10 +1,10 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:hazuki/app/chapter_title_resolver.dart';
-import 'package:hazuki/app/windows_title_bar_controller.dart';
+import 'package:hazuki/shared/chapter_title_resolver.dart';
+import 'package:hazuki/app/windows/windows_title_bar_controller.dart';
 import 'package:hazuki/l10n/l10n.dart';
-import 'package:hazuki/services/manga_download_service.dart';
+import 'package:hazuki/services/manga_download/manga_download_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'downloaded_comic_detail_widgets.dart';
 import 'downloads_cover_widgets.dart';

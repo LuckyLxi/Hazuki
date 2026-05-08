@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:hazuki/app/app.dart';
+import 'package:hazuki/shared/navigation_tags.dart';
 
 import 'search_entry_page.dart';
 import 'search_results_page.dart';

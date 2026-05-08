@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import 'package:hazuki/app/app.dart';
 import 'package:hazuki/l10n/l10n.dart';
+import 'package:hazuki/shared/navigation_tags.dart';
 
 class DiscoverAppBarActions extends StatefulWidget {
   const DiscoverAppBarActions({

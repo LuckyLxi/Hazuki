@@ -1,0 +1,83 @@
+part of '../../hazuki_source_service.dart';
+
+extension HazukiSourceServiceImagePrepareSegmentSupport on HazukiSourceService {
+  int calculateJmImageSegments(String epId, String imageUrl) {
+    if ((facade.sourceMeta?.key ?? '').toLowerCase() != 'jm') {
+      return 0;
+    }
+
+    const scrambleId = 220980;
+    final id = int.tryParse(epId) ?? 0;
+    if (id < scrambleId) {
+      return 0;
+    }
+    if (id < 268850) {
+      return 10;
+    }
+
+    final pictureName = _extractJmPictureName(imageUrl);
+    final digest = md5.convert(utf8.encode('$id$pictureName')).toString();
+    final charCode = digest.codeUnitAt(digest.length - 1);
+
+    if (id > 421926) {
+      final remainder = charCode % 8;
+      return remainder * 2 + 2;
+    }
+    final remainder = charCode % 10;
+    return remainder * 2 + 2;
+  }
+
+  String _extractJmPictureName(String imageUrl) {
+    final normalizedUrl = imageUrl.trim();
+    final uri = Uri.tryParse(normalizedUrl);
+    final lastSegment = uri?.pathSegments.isNotEmpty == true
+        ? uri!.pathSegments.last
+        : normalizedUrl.split('/').last.split('?').first;
+    final dotIndex = lastSegment.lastIndexOf('.');
+    if (dotIndex > 0) {
+      return lastSegment.substring(0, dotIndex);
+    }
+    return lastSegment;
+  }
+
+  Future<int?> _resolveSourceDeclaredImageSegments(
+    String imageUrl, {
+    required String comicId,
+    required String epId,
+  }) async {
+    try {
+      final facade = this.facade;
+      final engine = facade.js.engine;
+      if (engine == null) {
+        return null;
+      }
+      final dynamic configRaw = engine.evaluate(
+        'this.__hazuki_source.comic?.onImageLoad?.(${jsonEncode(imageUrl)}, ${jsonEncode(comicId)}, ${jsonEncode(epId)}) ?? {}',
+        name: 'source_on_image_prepare.js',
+      );
+      final dynamic config = await facade.js.resolve(configRaw);
+      if (config is! Map) {
+        return null;
+      }
+      final directSegments = config['segments'] ?? config['num'];
+      if (directSegments is num) {
+        return directSegments.toInt();
+      }
+      final directSegmentsText = directSegments?.toString().trim() ?? '';
+      if (directSegmentsText.isNotEmpty) {
+        final parsed = int.tryParse(directSegmentsText);
+        if (parsed != null) {
+          return parsed;
+        }
+      }
+      final modifyImage = config['modifyImage']?.toString().trim() ?? '';
+      if (modifyImage.isEmpty) {
+        return null;
+      }
+      final match = RegExp(r'\bnum\s*=\s*(\d+)\b').firstMatch(modifyImage);
+      return int.tryParse(match?.group(1) ?? '');
+    } catch (_) {
+      return null;
+    }
+  }
+}
