@@ -53,6 +53,8 @@ class _SearchResultsPageState extends State<SearchResultsPage>
   bool _showBackToTop = false;
   double _searchRevealProgress = 0;
   bool _flyingSearchToTop = false;
+  bool _comicIdSearchEnhance = false;
+  bool _pendingExtractedComicIdHide = false;
   String? _extractedComicId;
   AnimationController? _flyController;
   OverlayEntry? _flyOverlay;
@@ -115,8 +117,10 @@ class _SearchResultsPageState extends State<SearchResultsPage>
                   child: SearchIdExtractPill(
                     extractedId: _extractedComicId,
                     onApply: () {
+                      // 提前捕获，防止计时器并发时状态已为 null
                       final id = _extractedComicId;
                       if (id == null) return;
+                      _pendingExtractedComicIdHide = false;
                       _focusCoordinator.syncText(id);
                       _updateSearchResultsState(() => _extractedComicId = null);
                       unawaited(_submitSearch(submittedText: id));
@@ -138,6 +142,9 @@ class _SearchResultsPageState extends State<SearchResultsPage>
     );
     _scrollController.addListener(_onScroll);
     WidgetsBinding.instance.addObserver(this);
+    _focusCoordinator.primaryFocusNode.addListener(_handleSearchFocusChanged);
+    _focusCoordinator.collapsedFocusNode.addListener(_handleSearchFocusChanged);
+    unawaited(_loadComicIdSearchEnhance());
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
@@ -154,6 +161,12 @@ class _SearchResultsPageState extends State<SearchResultsPage>
   }
 
   void _disposeSearchResultsPage() {
+    _focusCoordinator.primaryFocusNode.removeListener(
+      _handleSearchFocusChanged,
+    );
+    _focusCoordinator.collapsedFocusNode.removeListener(
+      _handleSearchFocusChanged,
+    );
     _scrollController.removeListener(_onScroll);
     WidgetsBinding.instance.removeObserver(this);
     _scrollController.dispose();
@@ -163,11 +176,80 @@ class _SearchResultsPageState extends State<SearchResultsPage>
     _flyOverlay?.remove();
   }
 
+  Future<void> _loadComicIdSearchEnhance() async {
+    final enabled = await isComicIdSearchEnhanceEnabled();
+    if (!mounted) {
+      return;
+    }
+    _updateSearchResultsState(() {
+      _comicIdSearchEnhance = enabled;
+      _extractedComicId = _extractComicIdFromFocusedInput(
+        _focusCoordinator.text,
+      );
+    });
+  }
+
+  bool get _searchInputFocused =>
+      _focusCoordinator.primaryFocusNode.hasFocus ||
+      _focusCoordinator.collapsedFocusNode.hasFocus;
+
+  String? _extractComicIdFromFocusedInput(String value) {
+    if (!_comicIdSearchEnhance || !_searchInputFocused) {
+      return null;
+    }
+    return extractBestComicId(value);
+  }
+
+  void _hideExtractedComicId() {
+    _pendingExtractedComicIdHide = false;
+    if (_extractedComicId == null) {
+      return;
+    }
+    _updateSearchResultsState(() => _extractedComicId = null);
+  }
+
+  void _scheduleHideExtractedComicIdIfUnfocused() {
+    if (_pendingExtractedComicIdHide) {
+      return;
+    }
+    _pendingExtractedComicIdHide = true;
+    // 延迟需大于 InkWell 的点击响应时间，避免药丸 onTap 前状态已被清空
+    Future<void>.delayed(const Duration(milliseconds: 300), () {
+      if (!mounted || !_pendingExtractedComicIdHide) {
+        return;
+      }
+      _pendingExtractedComicIdHide = false;
+      if (!_searchInputFocused) {
+        _hideExtractedComicId();
+      }
+    });
+  }
+
+  void _syncExtractedComicIdWithFocus(String value) {
+    _pendingExtractedComicIdHide = false;
+    final id = _extractComicIdFromFocusedInput(value);
+    if (id != _extractedComicId) {
+      _updateSearchResultsState(() => _extractedComicId = id);
+    }
+  }
+
+  void _handleSearchFocusChanged() {
+    if (_searchInputFocused) {
+      _syncExtractedComicIdWithFocus(_focusCoordinator.text);
+    } else {
+      _scheduleHideExtractedComicIdIfUnfocused();
+    }
+  }
+
   void _handleMetricsChanged() {
     if (!mounted) {
       return;
     }
+    final wasKeyboardVisible = _focusCoordinator.keyboardVisible;
     _focusCoordinator.syncKeyboardVisibility();
+    if (wasKeyboardVisible && !_focusCoordinator.keyboardVisible) {
+      _scheduleHideExtractedComicIdIfUnfocused();
+    }
   }
 
   Future<void> _requestExpandedSearchFocus({bool showKeyboard = true}) {
@@ -337,6 +419,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
   }
 
   Future<void> _submitSearch({String? submittedText}) async {
+    _hideExtractedComicId();
     final activeController = _focusCoordinator.activeController;
     final rawKeyword = submittedText ?? activeController.text;
     _focusCoordinator.syncText(rawKeyword);
@@ -501,6 +584,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
       clearKey: clearKey,
       submitKey: submitKey,
       compact: compact,
+      onTap: () => _syncExtractedComicIdWithFocus(controller.text),
       onClear: onClear,
       onSubmit: () => unawaited(_submitSearch()),
       onSubmitted: (value) => unawaited(_submitSearch(submittedText: value)),
@@ -509,10 +593,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
   }
 
   void _updateExtractedId(String value) {
-    final id = extractBestComicId(value);
-    if (id != _extractedComicId) {
-      _updateSearchResultsState(() => _extractedComicId = id);
-    }
+    _syncExtractedComicIdWithFocus(value);
   }
 
   Widget _buildTopSearchBox() {

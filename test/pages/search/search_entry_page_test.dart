@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hazuki/app/app.dart';
 import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/features/search/search.dart';
 import 'package:hazuki/features/search/view/search_entry_page.dart';
+import 'package:hazuki/features/search/view/search_id_extract_pill.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -146,6 +148,91 @@ void main() {
     },
   );
 
+  testWidgets('comic id enhancement does not rewrite keyboard submissions', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      hazukiComicIdSearchEnhancePreferenceKey: true,
+    });
+    final requests = <String>[];
+
+    await tester.pumpWidget(
+      _buildTestApp(
+        SearchEntryPage(
+          comicDetailPageBuilder: _comicDetailPageBuilder,
+          comicCoverHeroTagBuilder: (_, {String? salt}) => 'hero-$salt',
+          searchPageLoader: _recordingSearchPageLoader(requests),
+        ),
+      ),
+    );
+    await _pumpSearchSettled(tester);
+
+    await tester.enterText(
+      find.descendant(
+        of: find.byKey(const ValueKey('search-entry-primary-search-bar')),
+        matching: find.byType(EditableText),
+      ),
+      'abc123def',
+    );
+    await tester.pump();
+
+    expect(_currentExtractedId(tester), '123');
+
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await _pumpSearchSettled(tester);
+
+    expect(requests, contains('abc123def'));
+    expect(requests, isNot(contains('123')));
+    expect(_currentExtractedId(tester), isNull);
+
+    await tester.tap(
+      find.byKey(const ValueKey('search-results-primary-search-bar')),
+    );
+    await tester.pump();
+
+    expect(_currentExtractedId(tester), '123');
+
+    FocusManager.instance.primaryFocus?.unfocus();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(_currentExtractedId(tester), isNull);
+  });
+
+  testWidgets('comic id pill applies the extracted id', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      hazukiComicIdSearchEnhancePreferenceKey: true,
+    });
+    final requests = <String>[];
+
+    await tester.pumpWidget(
+      _buildTestApp(
+        SearchEntryPage(
+          comicDetailPageBuilder: _comicDetailPageBuilder,
+          comicCoverHeroTagBuilder: (_, {String? salt}) => 'hero-$salt',
+          searchPageLoader: _recordingSearchPageLoader(requests),
+        ),
+      ),
+    );
+    await _pumpSearchSettled(tester);
+
+    await tester.enterText(
+      find.descendant(
+        of: find.byKey(const ValueKey('search-entry-primary-search-bar')),
+        matching: find.byType(EditableText),
+      ),
+      'abc123def',
+    );
+    await tester.pumpAndSettle();
+
+    expect(_currentExtractedId(tester), '123');
+
+    await tester.tap(find.text('Extracted: 123'));
+    await _pumpSearchSettled(tester);
+
+    expect(requests, contains('123'));
+    expect(requests, isNot(contains('abc123def')));
+  });
+
   testWidgets('external keyword opens results without keyboard', (
     tester,
   ) async {
@@ -264,6 +351,14 @@ SearchPageLoader _recordingSearchPageLoader(List<String> requests) {
       order: order,
     );
   };
+}
+
+String? _currentExtractedId(WidgetTester tester) {
+  final pills = tester.widgetList<SearchIdExtractPill>(
+    find.byType(SearchIdExtractPill),
+  );
+  expect(pills, isNotEmpty);
+  return pills.last.extractedId;
 }
 
 Widget _comicDetailPageBuilder(ExploreComic comic, String heroTag) {

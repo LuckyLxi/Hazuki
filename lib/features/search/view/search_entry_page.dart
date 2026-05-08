@@ -31,7 +31,8 @@ class SearchEntryPage extends StatefulWidget {
   State<SearchEntryPage> createState() => _SearchEntryPageState();
 }
 
-class _SearchEntryPageState extends State<SearchEntryPage> {
+class _SearchEntryPageState extends State<SearchEntryPage>
+    with WidgetsBindingObserver {
   late final SearchFocusCoordinator _focusCoordinator = SearchFocusCoordinator(
     isMounted: () => mounted,
     allowCollapsedFocus: false,
@@ -46,6 +47,8 @@ class _SearchEntryPageState extends State<SearchEntryPage> {
   bool _historyEditMode = false;
   bool _historyExpanded = false;
   double _searchRevealProgress = 0;
+  bool _comicIdSearchEnhance = false;
+  bool _pendingExtractedComicIdHide = false;
   String? _extractedComicId;
 
   bool get _showCollapsedSearch => _revealSupport.showCollapsedSearch;
@@ -54,6 +57,8 @@ class _SearchEntryPageState extends State<SearchEntryPage> {
   void initState() {
     super.initState();
     unawaited(_loadHistory());
+    unawaited(_loadComicIdSearchEnhance());
+    WidgetsBinding.instance.addObserver(this);
     _scrollController.addListener(_onScroll);
     _focusCoordinator.primaryFocusNode.addListener(_handleSearchFocusChanged);
     _focusCoordinator.collapsedFocusNode.addListener(_handleSearchFocusChanged);
@@ -67,6 +72,7 @@ class _SearchEntryPageState extends State<SearchEntryPage> {
     _focusCoordinator.collapsedFocusNode.removeListener(
       _handleSearchFocusChanged,
     );
+    WidgetsBinding.instance.removeObserver(this);
     _revealSupport.dispose();
     _scrollController.removeListener(_onScroll);
     _focusCoordinator.dispose();
@@ -74,7 +80,25 @@ class _SearchEntryPageState extends State<SearchEntryPage> {
     super.dispose();
   }
 
+  @override
+  void didChangeMetrics() {
+    super.didChangeMetrics();
+    if (!mounted) {
+      return;
+    }
+    final wasKeyboardVisible = _focusCoordinator.keyboardVisible;
+    _focusCoordinator.syncKeyboardVisibility();
+    if (wasKeyboardVisible && !_focusCoordinator.keyboardVisible) {
+      _scheduleHideExtractedComicIdIfUnfocused();
+    }
+  }
+
   void _handleSearchFocusChanged() {
+    if (_searchInputFocused) {
+      _syncExtractedComicIdWithFocus(_focusCoordinator.text);
+    } else {
+      _scheduleHideExtractedComicIdIfUnfocused();
+    }
     _logSearchEntryEvent('Search entry focus changed', stage: 'focus_listener');
   }
 
@@ -137,6 +161,63 @@ class _SearchEntryPageState extends State<SearchEntryPage> {
     _scheduleSearchRevealSyncBurst(false);
   }
 
+  Future<void> _loadComicIdSearchEnhance() async {
+    final enabled = await isComicIdSearchEnhanceEnabled();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _comicIdSearchEnhance = enabled;
+      _extractedComicId = _extractComicIdFromFocusedInput(
+        _focusCoordinator.text,
+      );
+    });
+  }
+
+  bool get _searchInputFocused =>
+      _focusCoordinator.primaryFocusNode.hasFocus ||
+      _focusCoordinator.collapsedFocusNode.hasFocus;
+
+  String? _extractComicIdFromFocusedInput(String value) {
+    if (!_comicIdSearchEnhance || !_searchInputFocused) {
+      return null;
+    }
+    return extractBestComicId(value);
+  }
+
+  void _hideExtractedComicId() {
+    _pendingExtractedComicIdHide = false;
+    if (_extractedComicId == null) {
+      return;
+    }
+    setState(() => _extractedComicId = null);
+  }
+
+  void _scheduleHideExtractedComicIdIfUnfocused() {
+    if (_pendingExtractedComicIdHide) {
+      return;
+    }
+    _pendingExtractedComicIdHide = true;
+    // 延迟需大于 InkWell 的点击响应时间，避免药丸 onTap 前状态已被清空
+    Future<void>.delayed(const Duration(milliseconds: 300), () {
+      if (!mounted || !_pendingExtractedComicIdHide) {
+        return;
+      }
+      _pendingExtractedComicIdHide = false;
+      if (!_searchInputFocused) {
+        _hideExtractedComicId();
+      }
+    });
+  }
+
+  void _syncExtractedComicIdWithFocus(String value) {
+    _pendingExtractedComicIdHide = false;
+    final id = _extractComicIdFromFocusedInput(value);
+    if (id != _extractedComicId) {
+      setState(() => _extractedComicId = id);
+    }
+  }
+
   Future<void> _removeHistory(String keyword) async {
     final newHistory = await _historyService.remove(keyword);
     if (!mounted) {
@@ -168,6 +249,7 @@ class _SearchEntryPageState extends State<SearchEntryPage> {
     String rawKeyword, {
     required SearchEntryIntent intent,
   }) async {
+    _hideExtractedComicId();
     await _focusCoordinator.dismissKeyboard(context, parkOnPage: true);
     _focusCoordinator.syncText(rawKeyword);
     final keyword = await normalizeSubmittedKeyword(
@@ -291,12 +373,13 @@ class _SearchEntryPageState extends State<SearchEntryPage> {
         } else {
           _focusCoordinator.syncText(value, updatePrimary: false);
         }
-        setState(() => _extractedComicId = extractBestComicId(value));
+        _syncExtractedComicIdWithFocus(value);
       },
     );
   }
 
   void _handleSearchBarTap(String target) {
+    _syncExtractedComicIdWithFocus(_focusCoordinator.text);
     _logSearchEntryEvent(
       'Search entry bar tapped',
       stage: 'tap_start',
@@ -554,8 +637,10 @@ class _SearchEntryPageState extends State<SearchEntryPage> {
                     child: SearchIdExtractPill(
                       extractedId: _extractedComicId,
                       onApply: () {
+                        // 提前捕获，防止计时器并发时状态已为 null
                         final id = _extractedComicId;
                         if (id == null) return;
+                        _pendingExtractedComicIdHide = false;
                         _focusCoordinator.syncText(id);
                         setState(() => _extractedComicId = null);
                         unawaited(

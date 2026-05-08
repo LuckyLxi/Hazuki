@@ -60,26 +60,20 @@ String? extractBestComicId(String text) {
   return null;
 }
 
+Future<bool> isComicIdSearchEnhanceEnabled() async {
+  final prefs = await SharedPreferences.getInstance();
+  return prefs.getBool(hazukiComicIdSearchEnhancePreferenceKey) == true;
+}
+
 Future<String> normalizeSubmittedKeyword(
   String rawKeyword, {
   TextEditingController? controller,
 }) async {
-  var keyword = rawKeyword.trim();
-  if (keyword.isEmpty) {
-    return '';
-  }
-
-  final prefs = await SharedPreferences.getInstance();
-  if (prefs.getBool(hazukiComicIdSearchEnhancePreferenceKey) == true) {
-    final extractedId = extractBestComicId(keyword);
-    if (extractedId != null) {
-      keyword = extractedId;
-      controller?.value = TextEditingValue(
-        text: keyword,
-        selection: TextSelection.collapsed(offset: keyword.length),
-      );
-    }
-  }
+  final keyword = rawKeyword.trim();
+  controller?.value = TextEditingValue(
+    text: keyword,
+    selection: TextSelection.collapsed(offset: keyword.length),
+  );
   return keyword;
 }
 
