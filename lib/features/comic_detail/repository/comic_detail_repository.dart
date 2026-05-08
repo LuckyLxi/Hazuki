@@ -28,6 +28,7 @@ class ComicDetailRepository implements FavoriteFoldersRepository {
   bool get supportFavoriteFolderDelete => _source.supportFavoriteFolderDelete;
   @override
   bool get supportFavoriteToggle => _source.supportFavoriteToggle;
+  bool get supportComicLike => _source.supportComicLike;
   @override
   bool get favoriteSingleFolderForSingleComic =>
       _source.favoriteSingleFolderForSingleComic;
@@ -97,6 +98,16 @@ class ComicDetailRepository implements FavoriteFoldersRepository {
   );
 
   // ── Local favorites ──────────────────────────────────────────────────────
+
+  Future<void> toggleComicLike({
+    required String comicId,
+    required bool isLike,
+    String sourceKey = '',
+  }) => _source.toggleComicLike(
+    comicId: comicId,
+    isLike: isLike,
+    sourceKey: sourceKey,
+  );
 
   Future<bool> isComicLocallyFavorited(
     String comicId, {

@@ -214,6 +214,7 @@ class ComicDetailsData {
     required this.recommend,
     required this.isFavorite,
     required this.subId,
+    this.isLiked = false,
     this.sourceKey = '',
   });
 
@@ -229,10 +230,45 @@ class ComicDetailsData {
   final List<ExploreComic> recommend;
   final bool isFavorite;
   final String subId;
+  final bool isLiked;
   final String sourceKey;
 
   SourceScopedComicId get scopedId =>
       SourceScopedComicId(sourceKey: sourceKey, comicId: id);
+
+  ComicDetailsData copyWith({
+    String? id,
+    String? title,
+    String? subTitle,
+    String? cover,
+    String? description,
+    String? updateTime,
+    String? likesCount,
+    Map<String, String>? chapters,
+    Map<String, List<String>>? tags,
+    List<ExploreComic>? recommend,
+    bool? isFavorite,
+    String? subId,
+    bool? isLiked,
+    String? sourceKey,
+  }) {
+    return ComicDetailsData(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      subTitle: subTitle ?? this.subTitle,
+      cover: cover ?? this.cover,
+      description: description ?? this.description,
+      updateTime: updateTime ?? this.updateTime,
+      likesCount: likesCount ?? this.likesCount,
+      chapters: chapters ?? this.chapters,
+      tags: tags ?? this.tags,
+      recommend: recommend ?? this.recommend,
+      isFavorite: isFavorite ?? this.isFavorite,
+      subId: subId ?? this.subId,
+      isLiked: isLiked ?? this.isLiked,
+      sourceKey: sourceKey ?? this.sourceKey,
+    );
+  }
 }
 
 class ComicCommentData {

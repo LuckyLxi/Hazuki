@@ -167,9 +167,84 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
       tags: _extractComicDetailsTags(map),
       recommend: recommend,
       isFavorite: _asBool(map['isFavorite']),
+      isLiked: _asBool(map['isLiked']),
       subId: map['subId']?.toString() ?? '',
       sourceKey: sourceKey,
     );
+  }
+
+  bool get supportComicLike {
+    final engine = facade.js.engine;
+    if (engine == null) return false;
+    try {
+      return _asBool(
+        engine.evaluate('!!this.__hazuki_source.comic?.likeComic'),
+      );
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> toggleComicLike({
+    required String comicId,
+    required bool isLike,
+    String sourceKey = '',
+  }) async {
+    final normalizedComicId = comicId.trim();
+    if (normalizedComicId.isEmpty) {
+      throw Exception('comic_id_empty');
+    }
+    final resolvedSourceKey = _resolveActiveSourceKey(sourceKey);
+    final facade = this.facade;
+    await facade.ensureInitialized();
+
+    await _runWithReloginRetry(() async {
+      final engine = facade.js.engine;
+      if (engine == null) {
+        throw Exception('source_not_initialized');
+      }
+      if (!_asBool(
+        engine.evaluate('!!this.__hazuki_source.comic?.likeComic'),
+      )) {
+        throw Exception('comic_like_not_supported');
+      }
+
+      final dynamic result = engine.evaluate(
+        'this.__hazuki_source.comic.likeComic(${jsonEncode(normalizedComicId)}, $isLike)',
+        name: 'source_comic_like.js',
+      );
+      await facade.js.resolve(result);
+    });
+
+    final scopedKey = SourceScopedComicId(
+      sourceKey: resolvedSourceKey,
+      comicId: normalizedComicId,
+    ).storageKey;
+    final cached = _getComicDetailsFromMemoryCache(scopedKey);
+    if (cached != null) {
+      _updateComicDetailsLikeStateInMemoryCache(
+        cached.scopedId,
+        isLike: isLike,
+      );
+    }
+  }
+
+  void _updateComicDetailsLikeStateInMemoryCache(
+    SourceScopedComicId scopedId, {
+    required bool isLike,
+  }) {
+    final canonicalKey = scopedId.storageKey;
+    final entries = _comicDetailsMemoryCache.entries.toList();
+    for (final entry in entries) {
+      if (entry.key != canonicalKey &&
+          entry.value.scopedId.storageKey != canonicalKey) {
+        continue;
+      }
+      _putComicDetailsInMemoryCache(
+        entry.key,
+        entry.value.copyWith(isLiked: isLike),
+      );
+    }
   }
 
   Map<String, String> _extractComicDetailsChapters(

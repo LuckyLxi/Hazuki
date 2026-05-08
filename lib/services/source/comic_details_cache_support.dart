@@ -73,6 +73,7 @@ extension HazukiSourceServiceComicDetailsCacheSupport on HazukiSourceService {
           )
           .toList(),
       'isFavorite': details.isFavorite,
+      'isLiked': details.isLiked,
       'subId': details.subId,
     };
   }
@@ -148,6 +149,7 @@ extension HazukiSourceServiceComicDetailsCacheSupport on HazukiSourceService {
       tags: tags,
       recommend: recommend,
       isFavorite: _asBool(map['isFavorite']),
+      isLiked: _asBool(map['isLiked']),
       subId: map['subId']?.toString() ?? '',
       sourceKey: sourceKey,
     );

@@ -23,12 +23,16 @@ class ComicDetailFavoriteController extends ChangeNotifier {
   bool _disposed = false;
 
   bool _busy = false;
+  bool _likeBusy = false;
   bool? _favoriteOverride;
   bool? _cloudFavoriteOverride;
+  bool? _likedOverride;
 
   bool get isBusy => _busy;
+  bool get isLikeBusy => _likeBusy;
   bool? get favoriteOverride => _favoriteOverride;
   bool? get cloudFavoriteOverride => _cloudFavoriteOverride;
+  bool? get likedOverride => _likedOverride;
 
   void applyInitialOverrides({
     required bool favoriteOverride,
@@ -38,6 +42,59 @@ class ComicDetailFavoriteController extends ChangeNotifier {
     _favoriteOverride = favoriteOverride;
     _cloudFavoriteOverride = cloudFavoriteOverride;
     notifyListeners();
+  }
+
+  Future<void> toggleLike(
+    BuildContext context,
+    ComicDetailsData details,
+  ) async {
+    if (_likeBusy) return;
+    if (!_repository.supportComicLike) {
+      unawaited(
+        showHazukiPrompt(
+          context,
+          l10n(context).comicDetailLikeActionFailed('not_supported'),
+          isError: true,
+        ),
+      );
+      return;
+    }
+
+    final nextLiked = !(_likedOverride ?? details.isLiked);
+    _likeBusy = true;
+    notifyListeners();
+
+    try {
+      await _repository.toggleComicLike(
+        comicId: details.id,
+        isLike: nextLiked,
+        sourceKey: details.sourceKey,
+      );
+      if (_disposed) return;
+      _likedOverride = nextLiked;
+      unawaited(
+        showHazukiPrompt(
+          context,
+          nextLiked
+              ? l10n(context).comicDetailLiked
+              : l10n(context).comicDetailUnliked,
+        ),
+      );
+    } catch (e) {
+      if (_disposed) return;
+      unawaited(
+        showHazukiPrompt(
+          context,
+          l10n(context).comicDetailLikeActionFailed('$e'),
+          isError: true,
+        ),
+      );
+    } finally {
+      if (!_disposed) {
+        _likeBusy = false;
+        notifyListeners();
+      }
+    }
   }
 
   Future<void> showFoldersDialog(

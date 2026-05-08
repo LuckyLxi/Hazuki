@@ -406,6 +406,16 @@
       "count": {}
     }
   },
+  "comicDetailLike": "点赞",
+  "comicDetailUnlike": "取消点赞",
+  "comicDetailLiked": "已点赞",
+  "comicDetailUnliked": "已取消点赞",
+  "comicDetailLikeActionFailed": "点赞操作失败：{error}",
+  "@comicDetailLikeActionFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
   "comicDetailFavorite": "收藏",
   "comicDetailUnfavorite": "取消收藏",
   "comicDetailRead": "阅读",

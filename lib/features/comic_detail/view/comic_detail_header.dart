@@ -69,6 +69,7 @@ class ComicDetailHeaderSection extends StatelessWidget {
 
     final favoriteActive =
         favorite.favoriteOverride ?? details?.isFavorite ?? false;
+    final likedActive = favorite.likedOverride ?? details?.isLiked ?? false;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -195,47 +196,94 @@ class ComicDetailHeaderSection extends StatelessWidget {
                   ),
                   SizedBox(
                     width: favoriteButtonWidth,
-                    child: AbsorbPointer(
-                      absorbing: !detailsReady || favorite.isBusy,
-                      child: FilledButton.icon(
-                        onPressed: () {
-                          if (detailsReady) {
-                            unawaited(
-                              favorite.showFoldersDialog(context, details!, (
-                                vm,
-                              ) {
-                                final themedData = scope.theme.buildDetailTheme(
-                                  Theme.of(context),
-                                );
-                                return Theme(
-                                  data: themedData,
-                                  child: FavoriteFoldersMorphDialog(
-                                    viewModel: vm,
-                                  ),
-                                );
-                              }),
-                            );
-                          }
-                        },
-                        icon: Icon(
-                          favoriteActive
-                              ? Icons.favorite
-                              : Icons.favorite_border,
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 48,
+                          child: Tooltip(
+                            message: likedActive
+                                ? l10n(context).comicDetailUnlike
+                                : l10n(context).comicDetailLike,
+                            child: FilledButton(
+                              onPressed: detailsReady && !favorite.isLikeBusy
+                                  ? () => unawaited(
+                                      favorite.toggleLike(context, details!),
+                                    )
+                                  : null,
+                              style: FilledButton.styleFrom(
+                                padding: EdgeInsets.zero,
+                                minimumSize: const Size(48, 40),
+                                fixedSize: const Size(48, 40),
+                                backgroundColor: likedActive
+                                    ? theme.colorScheme.primaryContainer
+                                    : null,
+                                foregroundColor: likedActive
+                                    ? theme.colorScheme.onPrimaryContainer
+                                    : null,
+                              ),
+                              child: Icon(
+                                likedActive
+                                    ? Icons.thumb_up_alt_rounded
+                                    : Icons.thumb_up_alt_outlined,
+                              ),
+                            ),
+                          ),
                         ),
-                        label: Text(
-                          favoriteActive
-                              ? l10n(context).comicDetailUnfavorite
-                              : l10n(context).comicDetailFavorite,
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: AbsorbPointer(
+                            absorbing: !detailsReady || favorite.isBusy,
+                            child: FilledButton.icon(
+                              onPressed: () {
+                                if (detailsReady) {
+                                  unawaited(
+                                    favorite.showFoldersDialog(
+                                      context,
+                                      details!,
+                                      (vm) {
+                                        final themedData = scope.theme
+                                            .buildDetailTheme(
+                                              Theme.of(context),
+                                            );
+                                        return Theme(
+                                          data: themedData,
+                                          child: FavoriteFoldersMorphDialog(
+                                            viewModel: vm,
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  );
+                                }
+                              },
+                              icon: Icon(
+                                favoriteActive
+                                    ? Icons.favorite
+                                    : Icons.favorite_border,
+                              ),
+                              label: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                child: Text(
+                                  favoriteActive
+                                      ? l10n(context).comicDetailUnfavorite
+                                      : l10n(context).comicDetailFavorite,
+                                ),
+                              ),
+                              style: FilledButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                ),
+                                backgroundColor: favoriteActive
+                                    ? theme.colorScheme.primaryContainer
+                                    : null,
+                                foregroundColor: favoriteActive
+                                    ? theme.colorScheme.onPrimaryContainer
+                                    : null,
+                              ),
+                            ),
+                          ),
                         ),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: favoriteActive
-                              ? theme.colorScheme.primaryContainer
-                              : null,
-                          foregroundColor: favoriteActive
-                              ? theme.colorScheme.onPrimaryContainer
-                              : null,
-                        ),
-                      ),
+                      ],
                     ),
                   ),
                 ],
