@@ -1,0 +1,130 @@
+import 'dart:convert';
+
+import 'package:flutter_test/flutter_test.dart';
+import 'package:hazuki/models/hazuki_models.dart';
+import 'package:hazuki/services/discover_daily_recommendation_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+void main() {
+  group('Discover daily recommendation author metadata', () {
+    test('extracts author values from comic detail tags', () {
+      const details = ComicDetailsData(
+        id: '100',
+        title: 'Comic',
+        subTitle: '',
+        cover: '',
+        description: '',
+        updateTime: '',
+        likesCount: '',
+        chapters: <String, String>{'1': 'Chapter 1'},
+        tags: <String, List<String>>{
+          '\u4f5c\u8005': <String>['\u4f5c\u8005\uFF1AAlice / Bob'],
+          'tags': <String>['Tag'],
+        },
+        recommend: <ExploreComic>[],
+        isFavorite: false,
+        subId: '',
+      );
+
+      expect(extractDiscoverRecommendationAuthor(details), 'Alice / Bob');
+    });
+
+    test('deduplicates comma separated author values', () {
+      const details = ComicDetailsData(
+        id: '101',
+        title: 'Comic',
+        subTitle: '',
+        cover: '',
+        description: '',
+        updateTime: '',
+        likesCount: '',
+        chapters: <String, String>{'1': 'Chapter 1'},
+        tags: <String, List<String>>{
+          'authors': <String>['Alice, Bob', 'Alice'],
+        },
+        recommend: <ExploreComic>[],
+        isFavorite: false,
+        subId: '',
+      );
+
+      expect(extractDiscoverRecommendationAuthor(details), 'Alice / Bob');
+    });
+  });
+
+  group('Discover daily recommendation cache restore', () {
+    tearDown(() async {
+      SharedPreferences.setMockInitialValues(const <String, Object>{});
+      await DiscoverDailyRecommendationService.instance.ensurePrepared(
+        enabled: false,
+      );
+    });
+
+    test(
+      'restores source scoped cache before source runtime is ready',
+      () async {
+        SharedPreferences.setMockInitialValues(<String, Object>{
+          'discover_daily_recommendation_cache_jm': _cachePayload(
+            sourceKey: 'jm',
+            titlePrefix: 'Scoped',
+          ),
+        });
+        await DiscoverDailyRecommendationService.instance.ensurePrepared(
+          enabled: false,
+        );
+
+        final state = await DiscoverDailyRecommendationService.instance
+            .ensurePrepared(enabled: true);
+
+        expect(state.hasRecommendations, isTrue);
+        expect(state.displayedRecommendations, hasLength(7));
+        expect(state.displayedRecommendations.first.comic.title, 'Scoped 1');
+      },
+    );
+
+    test('restores legacy cache without schema version immediately', () async {
+      SharedPreferences.setMockInitialValues(<String, Object>{
+        'discover_daily_recommendation_cache': _cachePayload(
+          includeVersion: false,
+          sourceKey: '',
+          titlePrefix: 'Legacy',
+        ),
+      });
+      await DiscoverDailyRecommendationService.instance.ensurePrepared(
+        enabled: false,
+      );
+
+      final state = await DiscoverDailyRecommendationService.instance
+          .ensurePrepared(enabled: true);
+
+      expect(state.hasRecommendations, isTrue);
+      expect(state.displayedRecommendations, hasLength(7));
+      expect(state.displayedRecommendations.first.comic.title, 'Legacy 1');
+    });
+  });
+}
+
+String _cachePayload({
+  required String sourceKey,
+  required String titlePrefix,
+  bool includeVersion = true,
+}) {
+  return jsonEncode(<String, dynamic>{
+    if (includeVersion) 'version': 2,
+    'sourceKey': sourceKey,
+    'generatedAt': DateTime.now().toIso8601String(),
+    'selectedAuthor': 'Author',
+    'entries': List<Object>.generate(7, (index) {
+      final id = index + 1;
+      return <String, Object>{
+        'author': 'Author',
+        'comic': <String, Object>{
+          'id': '$id',
+          'sourceKey': sourceKey,
+          'title': '$titlePrefix $id',
+          'subTitle': 'Subtitle $id',
+          'cover': 'https://example.com/$id.jpg',
+        },
+      };
+    }),
+  });
+}

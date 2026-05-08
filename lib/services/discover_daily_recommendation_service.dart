@@ -129,6 +129,47 @@ class DiscoverDailyRecommendationState {
 
 const Object _discoverRecommendationUnset = Object();
 
+@visibleForTesting
+String extractDiscoverRecommendationAuthor(ComicDetailsData details) {
+  final authors = normalizeDiscoverRecommendationMetaValues(
+    details.tags.keys
+        .where(_isDiscoverRecommendationAuthorKey)
+        .expand((key) => details.tags[key] ?? const <String>[])
+        .toList(),
+  );
+  return authors.join(' / ').trim();
+}
+
+@visibleForTesting
+List<String> normalizeDiscoverRecommendationMetaValues(List<String> rawValues) {
+  final values = <String>[];
+  final seen = <String>{};
+  for (final raw in rawValues) {
+    final parts = raw
+        .trim()
+        .replaceFirst(
+          RegExp('^(author|authors|\\u4f5c\\u8005)\\s*[:\\uFF1A]\\s*'),
+          '',
+        )
+        .split(RegExp('[\\n,\\uFF0C/]+'))
+        .map((value) => value.trim())
+        .where((value) => value.isNotEmpty);
+    for (final part in parts) {
+      if (seen.add(part)) {
+        values.add(part);
+      }
+    }
+  }
+  return values;
+}
+
+bool _isDiscoverRecommendationAuthorKey(String key) {
+  final normalized = key.trim().toLowerCase();
+  return normalized == 'author' ||
+      normalized == 'authors' ||
+      key.trim() == '\u4f5c\u8005';
+}
+
 class DiscoverDailyRecommendationService extends ChangeNotifier {
   DiscoverDailyRecommendationService._();
 
@@ -137,6 +178,7 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
 
   static const String authorsAssetPath = 'assets/data/authors.txt';
   static const String _cachePayloadKey = 'discover_daily_recommendation_cache';
+  static const int _cacheSchemaVersion = 2;
   static const Duration _cacheTtl = Duration(minutes: 20);
   static const int recommendationCount = 7;
 
@@ -351,6 +393,7 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
     return prefs.setString(
       _sourceCachePayloadKey(snapshot.sourceKey),
       jsonEncode(<String, dynamic>{
+        'version': _cacheSchemaVersion,
         'sourceKey': snapshot.sourceKey,
         'generatedAt': snapshot.generatedAt.toIso8601String(),
         'selectedAuthor': snapshot.selectedAuthor,
@@ -363,9 +406,49 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
 
   _DiscoverDailyRecommendationSnapshot? _readCache(SharedPreferences prefs) {
     final activeSourceKey = HazukiSourceService.instance.activeSourceKey;
-    final raw =
-        prefs.getString(_sourceCachePayloadKey(activeSourceKey)) ??
-        prefs.getString(_cachePayloadKey);
+    final candidates = <String>[
+      if (activeSourceKey.trim().isNotEmpty)
+        _sourceCachePayloadKey(activeSourceKey),
+      _cachePayloadKey,
+      if (activeSourceKey.trim().isEmpty)
+        ...prefs
+            .getKeys()
+            .where(
+              (key) =>
+                  key.startsWith('${_cachePayloadKey}_') &&
+                  key != _cachePayloadKey,
+            )
+            .toList()
+          ..sort(),
+    ];
+
+    _DiscoverDailyRecommendationSnapshot? newestFallback;
+    for (final key in candidates) {
+      final snapshot = _parseCachePayload(
+        prefs.getString(key),
+        activeSourceKey: activeSourceKey,
+      );
+      if (snapshot == null) {
+        continue;
+      }
+      if (activeSourceKey.trim().isNotEmpty ||
+          key == _cachePayloadKey ||
+          snapshot.sourceKey.trim().isEmpty) {
+        return snapshot;
+      }
+      final currentFallback = newestFallback;
+      if (currentFallback == null ||
+          snapshot.generatedAt.isAfter(currentFallback.generatedAt)) {
+        newestFallback = snapshot;
+      }
+    }
+    return newestFallback;
+  }
+
+  _DiscoverDailyRecommendationSnapshot? _parseCachePayload(
+    String? raw, {
+    required String activeSourceKey,
+  }) {
     if (raw == null || raw.trim().isEmpty) {
       return null;
     }
@@ -375,6 +458,7 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
         return null;
       }
       final map = Map<String, dynamic>.from(decoded);
+      final version = map['version'] is int ? map['version'] as int : 1;
       final sourceKey = (map['sourceKey'] ?? activeSourceKey).toString().trim();
       final generatedAt = DateTime.tryParse(
         (map['generatedAt'] ?? '').toString(),
@@ -397,6 +481,7 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
         selectedAuthor: selectedAuthor,
         generatedAt: generatedAt,
         sourceKey: sourceKey,
+        schemaVersion: version,
       );
     } catch (_) {
       return null;
@@ -412,7 +497,8 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
   }
 
   bool _isCacheFresh(_DiscoverDailyRecommendationSnapshot snapshot) {
-    return DateTime.now().difference(snapshot.generatedAt) <= _cacheTtl;
+    return snapshot.schemaVersion == _cacheSchemaVersion &&
+        DateTime.now().difference(snapshot.generatedAt) <= _cacheTtl;
   }
 
   Future<_DiscoverDailyRecommendationSnapshot?>
@@ -435,17 +521,20 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
     if (sampledComics.length != recommendationCount) {
       return null;
     }
+    final recommendations = await _buildRecommendationEntries(
+      sampledComics,
+      fallbackAuthor: author,
+    );
+    if (recommendations.length != recommendationCount) {
+      return null;
+    }
 
     return _DiscoverDailyRecommendationSnapshot(
-      recommendations: sampledComics
-          .map(
-            (comic) =>
-                DiscoverDailyRecommendationEntry(author: author, comic: comic),
-          )
-          .toList(growable: false),
+      recommendations: recommendations,
       selectedAuthor: author,
       generatedAt: DateTime.now(),
       sourceKey: HazukiSourceService.instance.activeSourceKey,
+      schemaVersion: _cacheSchemaVersion,
     );
   }
 
@@ -471,6 +560,39 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
       authors.add(normalized);
     }
     return authors;
+  }
+
+  Future<List<DiscoverDailyRecommendationEntry>> _buildRecommendationEntries(
+    List<ExploreComic> comics, {
+    required String fallbackAuthor,
+  }) async {
+    final entries = <DiscoverDailyRecommendationEntry>[];
+    for (final comic in comics) {
+      final author = await _loadComicAuthor(comic);
+      final resolvedAuthor = author.isEmpty ? fallbackAuthor : author;
+      if (resolvedAuthor.isEmpty) {
+        continue;
+      }
+      entries.add(
+        DiscoverDailyRecommendationEntry(author: resolvedAuthor, comic: comic),
+      );
+      if (entries.length == recommendationCount) {
+        break;
+      }
+    }
+    return entries;
+  }
+
+  Future<String> _loadComicAuthor(ExploreComic comic) async {
+    try {
+      final details = await HazukiSourceService.instance.loadComicDetails(
+        comic.id,
+        sourceKey: comic.sourceKey,
+      );
+      return extractDiscoverRecommendationAuthor(details);
+    } catch (_) {
+      return '';
+    }
   }
 
   List<ExploreComic> _sampleUniqueComics(
@@ -504,10 +626,12 @@ class _DiscoverDailyRecommendationSnapshot {
     required this.selectedAuthor,
     required this.generatedAt,
     required this.sourceKey,
+    required this.schemaVersion,
   });
 
   final List<DiscoverDailyRecommendationEntry> recommendations;
   final String selectedAuthor;
   final DateTime generatedAt;
   final String sourceKey;
+  final int schemaVersion;
 }
