@@ -19,14 +19,24 @@ class SearchIdExtractPill extends StatelessWidget {
     return IgnorePointer(
       ignoring: !visible,
       child: AnimatedSlide(
-        offset: visible ? Offset.zero : const Offset(0, 1.6),
-        duration: const Duration(milliseconds: 280),
+        // 出现时从下方弹入，消失时原地缩小淡出（不再向下滑出）
+        offset: visible ? Offset.zero : const Offset(0, 0.3),
+        duration: Duration(milliseconds: visible ? 300 : 200),
         curve: visible ? Curves.easeOutBack : Curves.easeInCubic,
-        child: AnimatedOpacity(
-          opacity: visible ? 1.0 : 0.0,
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOutCubic,
-          child: _PillContent(extractedId: extractedId ?? '', onApply: onApply),
+        child: AnimatedScale(
+          scale: visible ? 1.0 : 0.82,
+          duration: Duration(milliseconds: visible ? 300 : 180),
+          curve: visible ? Curves.easeOutBack : Curves.easeInCubic,
+          alignment: Alignment.bottomCenter,
+          child: AnimatedOpacity(
+            opacity: visible ? 1.0 : 0.0,
+            duration: Duration(milliseconds: visible ? 220 : 160),
+            curve: visible ? Curves.easeOutCubic : Curves.easeInCubic,
+            child: _PillContent(
+              extractedId: extractedId ?? '',
+              onApply: onApply,
+            ),
+          ),
         ),
       ),
     );

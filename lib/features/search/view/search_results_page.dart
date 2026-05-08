@@ -213,9 +213,9 @@ class _SearchResultsPageState extends State<SearchResultsPage>
 
   /// 同步提示药丸的底部偏移，避免被搜索 ID 药丸遮挡
   void _syncPromptAnchor(bool pillVisible) {
-    // 药丸高度约 48px + 底部定位 12px + 间距 8px
+    // 药丸高度约 36px + 底部定位 12px，间距约 6px
     hazukiPromptPlacementController.setExtraBottomPadding(
-      pillVisible ? 68.0 : 0.0,
+      pillVisible ? 36.0 : 0.0,
     );
   }
 
