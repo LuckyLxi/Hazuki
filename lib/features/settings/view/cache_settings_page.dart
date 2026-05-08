@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:hazuki/features/settings/state/cache_settings_controller.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/widgets/widgets.dart';
+import 'package:loading_indicator_m3e/loading_indicator_m3e.dart';
 import 'settings_group.dart';
 
 class CacheSettingsPage extends StatefulWidget {
@@ -310,7 +311,7 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
           listenable: _controller,
           builder: (context, _) {
             if (_controller.loading) {
-              return const Center(child: CircularProgressIndicator());
+              return const Center(child: LoadingIndicatorM3E());
             }
 
             final maxBytes = _controller.maxBytes;

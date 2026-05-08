@@ -54,6 +54,7 @@ dependencies:
   device_info_plus: ^13.0.0
   file_selector: ^1.1.0
   window_manager: ^0.5.1
+  loading_indicator_m3e: ^0.1.1
 
 dev_dependencies:
   flutter_test:
