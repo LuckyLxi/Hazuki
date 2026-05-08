@@ -72,6 +72,8 @@ class _SearchEntryPageState extends State<SearchEntryPage>
     _focusCoordinator.collapsedFocusNode.removeListener(
       _handleSearchFocusChanged,
     );
+    // 页面退出时清除额外底部偏移，避免影响其他页面的提示药丸
+    hazukiPromptPlacementController.setExtraBottomPadding(0);
     WidgetsBinding.instance.removeObserver(this);
     _revealSupport.dispose();
     _scrollController.removeListener(_onScroll);
@@ -191,6 +193,15 @@ class _SearchEntryPageState extends State<SearchEntryPage>
       return;
     }
     setState(() => _extractedComicId = null);
+    _syncPromptAnchor(false);
+  }
+
+  /// 同步提示药丸的底部偏移，避免被搜索 ID 药丸遮挡
+  void _syncPromptAnchor(bool pillVisible) {
+    // 药丸高度约 48px + 底部定位 12px + 间距 8px
+    hazukiPromptPlacementController.setExtraBottomPadding(
+      pillVisible ? 68.0 : 0.0,
+    );
   }
 
   void _scheduleHideExtractedComicIdIfUnfocused() {
@@ -215,6 +226,7 @@ class _SearchEntryPageState extends State<SearchEntryPage>
     final id = _extractComicIdFromFocusedInput(value);
     if (id != _extractedComicId) {
       setState(() => _extractedComicId = id);
+      _syncPromptAnchor(id != null);
     }
   }
 

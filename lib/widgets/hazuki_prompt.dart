@@ -27,12 +27,14 @@ class HazukiPromptPlacementController extends ChangeNotifier {
   bool _rootRouteVisible = true;
   int _homeTabIndex = 0;
   double _elevatedBottomPadding = _defaultBottomPadding;
+  // 页面级别的额外底部偏移（如搜索 ID 药丸出现时叠加）
+  double _extraBottomPadding = 0;
 
   double get bottomPadding {
-    if (_rootRouteVisible && _shouldElevateForTab(_homeTabIndex)) {
-      return _elevatedBottomPadding;
-    }
-    return _defaultBottomPadding;
+    final base = (_rootRouteVisible && _shouldElevateForTab(_homeTabIndex))
+        ? _elevatedBottomPadding
+        : _defaultBottomPadding;
+    return base + _extraBottomPadding;
   }
 
   void updateHomeAnchor({
@@ -56,6 +58,16 @@ class HazukiPromptPlacementController extends ChangeNotifier {
       return;
     }
     _rootRouteVisible = value;
+    notifyListeners();
+  }
+
+  /// 设置页面级额外底部偏移，搜索 ID 药丸可见时向上推开提示药丸
+  void setExtraBottomPadding(double value) {
+    final clamped = value < 0 ? 0.0 : value;
+    if (_extraBottomPadding == clamped) {
+      return;
+    }
+    _extraBottomPadding = clamped;
     notifyListeners();
   }
 
