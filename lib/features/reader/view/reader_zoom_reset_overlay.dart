@@ -14,12 +14,19 @@ class ReaderZoomResetOverlay extends StatelessWidget {
   final VoidCallback onResetZoom;
   final String label;
 
+  static const double _hiddenBottomOffset = 24;
+  static const double _visibleBottomOffset = 168;
+
   @override
   Widget build(BuildContext context) {
+    final bottomPadding = MediaQuery.paddingOf(context).bottom;
+
     return AnimatedPositioned(
       duration: const Duration(milliseconds: 260),
       curve: Curves.easeOutBack,
-      bottom: controlsVisible ? 104 : 24,
+      bottom:
+          bottomPadding +
+          (controlsVisible ? _visibleBottomOffset : _hiddenBottomOffset),
       left: 0,
       right: 0,
       child: Center(
