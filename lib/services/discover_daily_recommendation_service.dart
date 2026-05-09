@@ -179,7 +179,7 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
   static const String authorsAssetPath = 'assets/data/authors.txt';
   static const String _cachePayloadKey = 'discover_daily_recommendation_cache';
   static const int _cacheSchemaVersion = 2;
-  static const Duration _cacheTtl = Duration(minutes: 20);
+  static const Duration _cacheTtl = Duration(minutes: 10);
   static const int recommendationCount = 7;
 
   final math.Random _random = math.Random();
@@ -406,11 +406,11 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
 
   _DiscoverDailyRecommendationSnapshot? _readCache(SharedPreferences prefs) {
     final activeSourceKey = HazukiSourceService.instance.activeSourceKey;
+    final hasActiveSourceKey = activeSourceKey.trim().isNotEmpty;
     final candidates = <String>[
-      if (activeSourceKey.trim().isNotEmpty)
-        _sourceCachePayloadKey(activeSourceKey),
+      if (hasActiveSourceKey) _sourceCachePayloadKey(activeSourceKey),
       _cachePayloadKey,
-      if (activeSourceKey.trim().isEmpty)
+      if (!hasActiveSourceKey)
         ...prefs
             .getKeys()
             .where(
@@ -431,9 +431,7 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
       if (snapshot == null) {
         continue;
       }
-      if (activeSourceKey.trim().isNotEmpty ||
-          key == _cachePayloadKey ||
-          snapshot.sourceKey.trim().isEmpty) {
+      if (hasActiveSourceKey) {
         return snapshot;
       }
       final currentFallback = newestFallback;

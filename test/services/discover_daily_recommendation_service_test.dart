@@ -100,6 +100,35 @@ void main() {
       expect(state.displayedRecommendations, hasLength(7));
       expect(state.displayedRecommendations.first.comic.title, 'Legacy 1');
     });
+
+    test(
+      'restores newest source scoped cache when source runtime is unavailable',
+      () async {
+        final now = DateTime.now();
+        SharedPreferences.setMockInitialValues(<String, Object>{
+          'discover_daily_recommendation_cache': _cachePayload(
+            sourceKey: '',
+            titlePrefix: 'Old',
+            generatedAt: now.subtract(const Duration(minutes: 25)),
+          ),
+          'discover_daily_recommendation_cache_jm': _cachePayload(
+            sourceKey: 'jm',
+            titlePrefix: 'Fresh',
+            generatedAt: now,
+          ),
+        });
+        await DiscoverDailyRecommendationService.instance.ensurePrepared(
+          enabled: false,
+        );
+
+        final state = await DiscoverDailyRecommendationService.instance
+            .ensurePrepared(enabled: true);
+
+        expect(state.hasRecommendations, isTrue);
+        expect(state.selectedAuthor, 'Fresh Author');
+        expect(state.displayedRecommendations.first.comic.title, 'Fresh 1');
+      },
+    );
   });
 }
 
@@ -107,16 +136,17 @@ String _cachePayload({
   required String sourceKey,
   required String titlePrefix,
   bool includeVersion = true,
+  DateTime? generatedAt,
 }) {
   return jsonEncode(<String, dynamic>{
     if (includeVersion) 'version': 2,
     'sourceKey': sourceKey,
-    'generatedAt': DateTime.now().toIso8601String(),
-    'selectedAuthor': 'Author',
+    'generatedAt': (generatedAt ?? DateTime.now()).toIso8601String(),
+    'selectedAuthor': '$titlePrefix Author',
     'entries': List<Object>.generate(7, (index) {
       final id = index + 1;
       return <String, Object>{
-        'author': 'Author',
+        'author': '$titlePrefix Author',
         'comic': <String, Object>{
           'id': '$id',
           'sourceKey': sourceKey,
