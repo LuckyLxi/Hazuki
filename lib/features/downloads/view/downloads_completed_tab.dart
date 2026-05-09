@@ -4,7 +4,7 @@ import 'package:hazuki/services/manga_download/manga_download_service.dart';
 import 'downloads_action_dock.dart';
 import 'downloads_cover_widgets.dart';
 
-class DownloadsCompletedTab extends StatelessWidget {
+class DownloadsCompletedTab extends StatefulWidget {
   const DownloadsCompletedTab({
     super.key,
     required this.comics,
@@ -34,118 +34,119 @@ class DownloadsCompletedTab extends StatelessWidget {
   final ValueChanged<DownloadedMangaComic> onOpenComic;
   final ValueChanged<DownloadedMangaComic> onDeleteComic;
 
+  static const Duration dismissDuration = Duration(milliseconds: 320);
+
+  @override
+  State<DownloadsCompletedTab> createState() => _DownloadsCompletedTabState();
+}
+
+class _DownloadsCompletedTabState extends State<DownloadsCompletedTab> {
+  List<_AnimatedDownloadedComicEntry> _visibleComics =
+      const <_AnimatedDownloadedComicEntry>[];
+
+  @override
+  void initState() {
+    super.initState();
+    _visibleComics = widget.comics
+        .map((comic) => _AnimatedDownloadedComicEntry(comic: comic))
+        .toList(growable: false);
+  }
+
+  @override
+  void didUpdateWidget(covariant DownloadsCompletedTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _syncVisibleComics();
+  }
+
+  void _syncVisibleComics() {
+    final nextById = <String, DownloadedMangaComic>{
+      for (final comic in widget.comics) comic.storageKey: comic,
+    };
+    final retainedIds = <String>{};
+    final nextVisible = <_AnimatedDownloadedComicEntry>[];
+
+    for (final entry in _visibleComics) {
+      final nextComic = nextById[entry.comic.storageKey];
+      if (nextComic != null) {
+        nextVisible.add(_AnimatedDownloadedComicEntry(comic: nextComic));
+        retainedIds.add(entry.comic.storageKey);
+        continue;
+      }
+      nextVisible.add(entry.copyWith(exiting: true));
+      if (!entry.exiting) {
+        _scheduleRemoval(entry.comic.storageKey);
+      }
+    }
+
+    for (final comic in widget.comics) {
+      if (retainedIds.add(comic.storageKey)) {
+        nextVisible.add(_AnimatedDownloadedComicEntry(comic: comic));
+      }
+    }
+
+    if (!_sameEntries(_visibleComics, nextVisible)) {
+      setState(() {
+        _visibleComics = nextVisible;
+      });
+    }
+  }
+
+  bool _sameEntries(
+    List<_AnimatedDownloadedComicEntry> current,
+    List<_AnimatedDownloadedComicEntry> next,
+  ) {
+    if (current.length != next.length) {
+      return false;
+    }
+    for (int i = 0; i < current.length; i++) {
+      final a = current[i];
+      final b = next[i];
+      if (a.comic != b.comic || a.exiting != b.exiting) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  void _scheduleRemoval(String storageKey) {
+    Future<void>.delayed(DownloadsCompletedTab.dismissDuration, () {
+      if (!mounted) {
+        return;
+      }
+      if (widget.comics.any((comic) => comic.storageKey == storageKey)) {
+        return;
+      }
+      setState(() {
+        _visibleComics = _visibleComics
+            .where((entry) => entry.comic.storageKey != storageKey)
+            .toList(growable: false);
+      });
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final content = comics.isEmpty
+    final content = _visibleComics.isEmpty
         ? Center(child: Text(l10n(context).downloadsEmptyDownloaded))
-        : ListView.separated(
+        : ListView.builder(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 176),
-            itemCount: comics.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 12),
+            itemCount: _visibleComics.length,
             itemBuilder: (context, index) {
-              final comic = comics[index];
-              final selected = selectedComicIds.contains(comic.storageKey);
-              final hasIntegrityIssue = comicsWithIntegrityIssues.contains(
-                comic.storageKey,
-              );
-              return AnimatedContainer(
-                duration: const Duration(milliseconds: 220),
-                curve: Curves.easeOutCubic,
-                clipBehavior: Clip.antiAlias,
-                decoration: BoxDecoration(
-                  color: selected
-                      ? colorScheme.secondaryContainer.withValues(alpha: 0.96)
-                      : colorScheme.surfaceContainerLow,
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: selected
-                        ? colorScheme.primary.withValues(alpha: 0.34)
-                        : colorScheme.outlineVariant.withValues(alpha: 0.36),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: colorScheme.shadow.withValues(alpha: 0.05),
-                      blurRadius: 18,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
+              final entry = _visibleComics[index];
+              return _AnimatedDownloadedComicCard(
+                key: ValueKey<String>('downloaded_${entry.comic.storageKey}'),
+                entry: entry,
+                bottomSpacing: index == _visibleComics.length - 1 ? 0 : 12,
+                selectionMode: widget.selectionMode,
+                selected: widget.selectedComicIds.contains(
+                  entry.comic.storageKey,
                 ),
-                child: Material(
-                  color: Colors.transparent,
-                  borderRadius: BorderRadius.circular(18),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(18),
-                    onTap: () {
-                      if (selectionMode) {
-                        onToggleSelection(comic.storageKey);
-                      } else {
-                        onOpenComic(comic);
-                      }
-                    },
-                    onLongPress: () => onToggleSelection(comic.storageKey),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.all(12),
-                          child: Row(
-                            children: [
-                              DownloadedComicCover(
-                                comic: comic,
-                                heroTag: 'downloaded_cover_${comic.storageKey}',
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      comic.title,
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: theme.textTheme.titleMedium,
-                                    ),
-                                    if (comic.subTitle.isNotEmpty) ...[
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        comic.subTitle,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: theme.textTheme.bodySmall,
-                                      ),
-                                    ],
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      l10n(context).downloadsChapterCount(
-                                        '${comic.chapters.length}',
-                                      ),
-                                      style: theme.textTheme.bodySmall
-                                          ?.copyWith(
-                                            color: colorScheme.onSurfaceVariant,
-                                          ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              _DownloadedComicTrailingAction(
-                                selectionMode: selectionMode,
-                                selected: selected,
-                                onDelete: () => onDeleteComic(comic),
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (hasIntegrityIssue)
-                          _IntegrityWarningBanner(
-                            message: l10n(context).downloadsIntegrityWarning,
-                          ),
-                      ],
-                    ),
-                  ),
+                hasIntegrityIssue: widget.comicsWithIntegrityIssues.contains(
+                  entry.comic.storageKey,
                 ),
+                onToggleSelection: widget.onToggleSelection,
+                onOpenComic: widget.onOpenComic,
+                onDeleteComic: widget.onDeleteComic,
               );
             },
           );
@@ -157,15 +158,238 @@ class DownloadsCompletedTab extends StatelessWidget {
           right: 16,
           bottom: 16 + bottomInset,
           child: DownloadsActionDock(
-            selectionMode: selectionMode,
-            scanning: scanning,
-            selectedCount: selectedCount,
-            onToggleSelectionMode: onToggleSelectionMode,
-            onDeleteSelected: onDeleteSelected,
-            onScanDownloaded: onScanDownloaded,
+            selectionMode: widget.selectionMode,
+            scanning: widget.scanning,
+            selectedCount: widget.selectedCount,
+            onToggleSelectionMode: widget.onToggleSelectionMode,
+            onDeleteSelected: widget.onDeleteSelected,
+            onScanDownloaded: widget.onScanDownloaded,
           ),
         ),
       ],
+    );
+  }
+}
+
+class _AnimatedDownloadedComicCard extends StatelessWidget {
+  const _AnimatedDownloadedComicCard({
+    super.key,
+    required this.entry,
+    required this.bottomSpacing,
+    required this.selectionMode,
+    required this.selected,
+    required this.hasIntegrityIssue,
+    required this.onToggleSelection,
+    required this.onOpenComic,
+    required this.onDeleteComic,
+  });
+
+  final _AnimatedDownloadedComicEntry entry;
+  final double bottomSpacing;
+  final bool selectionMode;
+  final bool selected;
+  final bool hasIntegrityIssue;
+  final ValueChanged<String> onToggleSelection;
+  final ValueChanged<DownloadedMangaComic> onOpenComic;
+  final ValueChanged<DownloadedMangaComic> onDeleteComic;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(end: entry.exiting ? 0 : 1),
+      duration: DownloadsCompletedTab.dismissDuration,
+      curve: entry.exiting ? Curves.easeInCubic : Curves.easeOutCubic,
+      builder: (context, value, child) {
+        return Opacity(
+          opacity: value,
+          child: Transform.translate(
+            offset: Offset(0, 8 * (1 - value)),
+            child: Transform.scale(
+              scale: 0.98 + (0.02 * value),
+              alignment: Alignment.topCenter,
+              child: ClipRect(
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  heightFactor: value,
+                  child: child,
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+      child: _DownloadedComicCard(
+        bottomSpacing: bottomSpacing,
+        child: _DownloadedComicCardContent(
+          comic: entry.comic,
+          selectionMode: selectionMode,
+          selected: selected,
+          hasIntegrityIssue: hasIntegrityIssue,
+          onToggleSelection: onToggleSelection,
+          onOpenComic: onOpenComic,
+          onDeleteComic: onDeleteComic,
+        ),
+      ),
+    );
+  }
+}
+
+class _DownloadedComicCard extends StatelessWidget {
+  const _DownloadedComicCard({
+    required this.bottomSpacing,
+    required this.child,
+  });
+
+  final double bottomSpacing;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: bottomSpacing),
+      child: child,
+    );
+  }
+}
+
+class _DownloadedComicCardContent extends StatelessWidget {
+  const _DownloadedComicCardContent({
+    required this.comic,
+    required this.selectionMode,
+    required this.selected,
+    required this.hasIntegrityIssue,
+    required this.onToggleSelection,
+    required this.onOpenComic,
+    required this.onDeleteComic,
+  });
+
+  final DownloadedMangaComic comic;
+  final bool selectionMode;
+  final bool selected;
+  final bool hasIntegrityIssue;
+  final ValueChanged<String> onToggleSelection;
+  final ValueChanged<DownloadedMangaComic> onOpenComic;
+  final ValueChanged<DownloadedMangaComic> onDeleteComic;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        color: selected
+            ? colorScheme.secondaryContainer.withValues(alpha: 0.96)
+            : colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: selected
+              ? colorScheme.primary.withValues(alpha: 0.34)
+              : colorScheme.outlineVariant.withValues(alpha: 0.36),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: colorScheme.shadow.withValues(alpha: 0.05),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(18),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: () {
+            if (selectionMode) {
+              onToggleSelection(comic.storageKey);
+            } else {
+              onOpenComic(comic);
+            }
+          },
+          onLongPress: () => onToggleSelection(comic.storageKey),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  children: [
+                    DownloadedComicCover(
+                      comic: comic,
+                      heroTag: 'downloaded_cover_${comic.storageKey}',
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            comic.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.titleMedium,
+                          ),
+                          if (comic.subTitle.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              comic.subTitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodySmall,
+                            ),
+                          ],
+                          const SizedBox(height: 8),
+                          Text(
+                            l10n(
+                              context,
+                            ).downloadsChapterCount('${comic.chapters.length}'),
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    _DownloadedComicTrailingAction(
+                      selectionMode: selectionMode,
+                      selected: selected,
+                      onDelete: () => onDeleteComic(comic),
+                    ),
+                  ],
+                ),
+              ),
+              if (hasIntegrityIssue)
+                _IntegrityWarningBanner(
+                  message: l10n(context).downloadsIntegrityWarning,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AnimatedDownloadedComicEntry {
+  const _AnimatedDownloadedComicEntry({
+    required this.comic,
+    this.exiting = false,
+  });
+
+  final DownloadedMangaComic comic;
+  final bool exiting;
+
+  _AnimatedDownloadedComicEntry copyWith({
+    DownloadedMangaComic? comic,
+    bool? exiting,
+  }) {
+    return _AnimatedDownloadedComicEntry(
+      comic: comic ?? this.comic,
+      exiting: exiting ?? this.exiting,
     );
   }
 }

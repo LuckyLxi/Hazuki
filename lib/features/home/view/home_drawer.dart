@@ -615,6 +615,7 @@ class HomeDrawerContent extends StatelessWidget {
           const SizedBox(height: 8),
           Expanded(
             child: ListView(
+              physics: const NeverScrollableScrollPhysics(),
               padding: EdgeInsets.only(
                 left: 12,
                 right: 12,

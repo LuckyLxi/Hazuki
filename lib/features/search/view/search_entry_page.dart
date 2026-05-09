@@ -190,6 +190,7 @@ class _SearchEntryPageState extends State<SearchEntryPage>
   void _hideExtractedComicId() {
     _pendingExtractedComicIdHide = false;
     if (_extractedComicId == null) {
+      _syncPromptAnchor(false);
       return;
     }
     setState(() => _extractedComicId = null);
@@ -367,7 +368,7 @@ class _SearchEntryPageState extends State<SearchEntryPage>
       onTap: () => _handleSearchBarTap(logTarget),
       onClear: () {
         _focusCoordinator.clearText();
-        setState(() => _extractedComicId = null);
+        _hideExtractedComicId();
         unawaited(_focusCoordinator.requestPrimarySearchFocus(context));
       },
       onSubmit: () => unawaited(
@@ -654,7 +655,7 @@ class _SearchEntryPageState extends State<SearchEntryPage>
                         if (id == null) return;
                         _pendingExtractedComicIdHide = false;
                         _focusCoordinator.syncText(id);
-                        setState(() => _extractedComicId = null);
+                        _hideExtractedComicId();
                         unawaited(
                           _openResults(
                             id,

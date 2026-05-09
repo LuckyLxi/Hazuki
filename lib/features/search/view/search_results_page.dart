@@ -122,7 +122,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
                       if (id == null) return;
                       _pendingExtractedComicIdHide = false;
                       _focusCoordinator.syncText(id);
-                      _updateSearchResultsState(() => _extractedComicId = null);
+                      _hideExtractedComicId();
                       unawaited(_submitSearch(submittedText: id));
                     },
                   ),
@@ -205,6 +205,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
   void _hideExtractedComicId() {
     _pendingExtractedComicIdHide = false;
     if (_extractedComicId == null) {
+      _syncPromptAnchor(false);
       return;
     }
     _updateSearchResultsState(() => _extractedComicId = null);
@@ -326,7 +327,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
 
   void _clearSearch() {
     _focusCoordinator.clearText();
-    _updateSearchResultsState(() => _extractedComicId = null);
+    _hideExtractedComicId();
     _resultsController.clearSearchData();
     unawaited(_requestExpandedSearchFocus());
     _focusCoordinator.exitCollapsedMode();

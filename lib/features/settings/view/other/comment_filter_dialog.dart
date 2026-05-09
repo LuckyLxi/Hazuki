@@ -144,224 +144,235 @@ class _CommentFilterSheetState extends State<_CommentFilterSheet>
     final strings = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final bottomPadding = MediaQuery.viewInsetsOf(context).bottom;
+    final mediaSize = MediaQuery.sizeOf(context);
+    final mediaPadding = MediaQuery.paddingOf(context);
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
     final sheetColor = colorScheme.surfaceContainerLow;
 
-    final screenWidth = MediaQuery.sizeOf(context).width;
+    final screenWidth = mediaSize.width;
     final isWide = screenWidth >= 600;
     final sheetWidth = isWide ? 480.0 : double.infinity;
     final sheetRadius = isWide
         ? BorderRadius.circular(20)
         : const BorderRadius.vertical(top: Radius.circular(24));
     final sheetAlignment = isWide ? Alignment.center : Alignment.bottomCenter;
+    final availableHeight =
+        (mediaSize.height - keyboardInset - mediaPadding.top - 12)
+            .clamp(240.0, mediaSize.height)
+            .toDouble();
+    final baseMaxHeight = mediaSize.height * 0.85;
+    final maxSheetHeight = availableHeight < baseMaxHeight
+        ? availableHeight
+        : baseMaxHeight;
 
-    return Align(
-      alignment: sheetAlignment,
-      child: Material(
-        color: Colors.transparent,
-        child: Container(
-          width: sheetWidth,
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.sizeOf(context).height * 0.85,
-          ),
-          decoration: BoxDecoration(
-            color: sheetColor,
-            borderRadius: sheetRadius,
-          ),
-          child: SafeArea(
-            top: false,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // 拖拽指示条（仅窄屏）
-                if (!isWide)
-                  Center(
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 12, bottom: 4),
-                      child: Container(
-                        width: 36,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: colorScheme.onSurfaceVariant.withValues(
-                            alpha: 0.28,
+    return Padding(
+      padding: EdgeInsets.only(bottom: keyboardInset),
+      child: Align(
+        alignment: sheetAlignment,
+        child: Material(
+          color: Colors.transparent,
+          child: Container(
+            width: sheetWidth,
+            constraints: BoxConstraints(maxHeight: maxSheetHeight),
+            decoration: BoxDecoration(
+              color: sheetColor,
+              borderRadius: sheetRadius,
+            ),
+            child: SafeArea(
+              top: false,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // 拖拽指示条（仅窄屏）
+                  if (!isWide)
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 12, bottom: 4),
+                        child: Container(
+                          width: 36,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: colorScheme.onSurfaceVariant.withValues(
+                              alpha: 0.28,
+                            ),
+                            borderRadius: BorderRadius.circular(2),
                           ),
-                          borderRadius: BorderRadius.circular(2),
                         ),
                       ),
                     ),
-                  ),
-                // 标题栏
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 8, 8, 0),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          strings.commentFilterDialogTitle,
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close),
-                        onPressed: () => Navigator.of(context).pop(),
-                        tooltip: MaterialLocalizations.of(
-                          context,
-                        ).closeButtonLabel,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Flexible(
-                  child: SingleChildScrollView(
-                    padding: EdgeInsets.fromLTRB(24, 8, 24, 16 + bottomPadding),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                  // 标题栏
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 8, 8, 0),
+                    child: Row(
                       children: [
-                        // 过滤模式
-                        Text(
-                          strings.commentFilterModeLabel,
-                          style: theme.textTheme.labelLarge?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        SegmentedButton<CommentFilterMode>(
-                          style: SegmentedButton.styleFrom(
-                            backgroundColor: colorScheme.surfaceContainer,
-                          ),
-                          segments: [
-                            ButtonSegment(
-                              value: CommentFilterMode.collapse,
-                              label: Text(strings.commentFilterModeCollapse),
-                              icon: const Icon(Icons.unfold_less_rounded),
-                            ),
-                            ButtonSegment(
-                              value: CommentFilterMode.hide,
-                              label: Text(strings.commentFilterModeHide),
-                              icon: const Icon(Icons.visibility_off_outlined),
-                            ),
-                          ],
-                          selected: {_mode},
-                          onSelectionChanged: (s) =>
-                              setState(() => _mode = s.first),
-                        ),
-                        const SizedBox(height: 20),
-                        // 添加关键词
-                        Text(
-                          strings.commentFilterUserKeywordsLabel,
-                          style: theme.textTheme.labelLarge?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                controller: _addController,
-                                focusNode: _addFocusNode,
-                                decoration: InputDecoration(
-                                  hintText: strings.commentFilterAddHint,
-                                  isDense: true,
-                                  filled: true,
-                                  fillColor: colorScheme.surfaceContainer,
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide.none,
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(12),
-                                    borderSide: BorderSide(
-                                      color: colorScheme.primary,
-                                      width: 1.5,
-                                    ),
-                                  ),
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 14,
-                                    vertical: 12,
-                                  ),
-                                ),
-                                onSubmitted: (_) {
-                                  _addKeyword();
-                                  _addFocusNode.requestFocus();
-                                },
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            FilledButton.tonal(
-                              onPressed: _addKeyword,
-                              style: FilledButton.styleFrom(
-                                minimumSize: const Size(48, 48),
-                                padding: EdgeInsets.zero,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              child: const Icon(Icons.add),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 14),
-                        // 关键词 chips
-                        AnimatedCrossFade(
-                          duration: const Duration(milliseconds: 260),
-                          crossFadeState: _userKeywords.isEmpty
-                              ? CrossFadeState.showFirst
-                              : CrossFadeState.showSecond,
-                          firstChild: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 12,
-                            ),
-                            decoration: BoxDecoration(
-                              color: colorScheme.surfaceContainer,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              strings.commentFilterNoUserKeywords,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ),
-                          secondChild: _KeywordChipsSection(
-                            keywords: _userKeywords,
-                            expanded: _keywordsExpanded,
-                            colorScheme: colorScheme,
-                            theme: theme,
-                            onToggleExpand: () => setState(
-                              () => _keywordsExpanded = !_keywordsExpanded,
-                            ),
-                            onEdit: _showEditKeywordDialog,
-                            onRemove: _removeKeyword,
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-                        // 保存按钮
-                        FilledButton(
-                          onPressed: () async {
-                            await _save();
-                            if (context.mounted) Navigator.of(context).pop();
-                          },
-                          style: FilledButton.styleFrom(
-                            minimumSize: const Size.fromHeight(48),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
+                        Expanded(
                           child: Text(
-                            MaterialLocalizations.of(context).saveButtonLabel,
+                            strings.commentFilterDialogTitle,
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.of(context).pop(),
+                          tooltip: MaterialLocalizations.of(
+                            context,
+                          ).closeButtonLabel,
                         ),
                       ],
                     ),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 4),
+                  Flexible(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          // 过滤模式
+                          Text(
+                            strings.commentFilterModeLabel,
+                            style: theme.textTheme.labelLarge?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          SegmentedButton<CommentFilterMode>(
+                            style: SegmentedButton.styleFrom(
+                              backgroundColor: colorScheme.surfaceContainer,
+                            ),
+                            segments: [
+                              ButtonSegment(
+                                value: CommentFilterMode.collapse,
+                                label: Text(strings.commentFilterModeCollapse),
+                                icon: const Icon(Icons.unfold_less_rounded),
+                              ),
+                              ButtonSegment(
+                                value: CommentFilterMode.hide,
+                                label: Text(strings.commentFilterModeHide),
+                                icon: const Icon(Icons.visibility_off_outlined),
+                              ),
+                            ],
+                            selected: {_mode},
+                            onSelectionChanged: (s) =>
+                                setState(() => _mode = s.first),
+                          ),
+                          const SizedBox(height: 20),
+                          // 添加关键词
+                          Text(
+                            strings.commentFilterUserKeywordsLabel,
+                            style: theme.textTheme.labelLarge?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: _addController,
+                                  focusNode: _addFocusNode,
+                                  decoration: InputDecoration(
+                                    hintText: strings.commentFilterAddHint,
+                                    isDense: true,
+                                    filled: true,
+                                    fillColor: colorScheme.surfaceContainer,
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide.none,
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(
+                                        color: colorScheme.primary,
+                                        width: 1.5,
+                                      ),
+                                    ),
+                                    contentPadding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 12,
+                                    ),
+                                  ),
+                                  onSubmitted: (_) {
+                                    _addKeyword();
+                                    _addFocusNode.requestFocus();
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              FilledButton.tonal(
+                                onPressed: _addKeyword,
+                                style: FilledButton.styleFrom(
+                                  minimumSize: const Size(48, 48),
+                                  padding: EdgeInsets.zero,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                                child: const Icon(Icons.add),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          // 关键词 chips
+                          AnimatedCrossFade(
+                            duration: const Duration(milliseconds: 260),
+                            crossFadeState: _userKeywords.isEmpty
+                                ? CrossFadeState.showFirst
+                                : CrossFadeState.showSecond,
+                            firstChild: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 12,
+                              ),
+                              decoration: BoxDecoration(
+                                color: colorScheme.surfaceContainer,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                strings.commentFilterNoUserKeywords,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ),
+                            secondChild: _KeywordChipsSection(
+                              keywords: _userKeywords,
+                              expanded: _keywordsExpanded,
+                              colorScheme: colorScheme,
+                              theme: theme,
+                              onToggleExpand: () => setState(
+                                () => _keywordsExpanded = !_keywordsExpanded,
+                              ),
+                              onEdit: _showEditKeywordDialog,
+                              onRemove: _removeKeyword,
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          // 保存按钮
+                          FilledButton(
+                            onPressed: () async {
+                              await _save();
+                              if (context.mounted) Navigator.of(context).pop();
+                            },
+                            style: FilledButton.styleFrom(
+                              minimumSize: const Size.fromHeight(48),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                            child: Text(
+                              MaterialLocalizations.of(context).saveButtonLabel,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),

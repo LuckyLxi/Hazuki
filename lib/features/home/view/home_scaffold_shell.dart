@@ -219,7 +219,7 @@ class HomeScaffoldShell extends StatelessWidget {
                 ? const SizedBox.shrink()
                 : const Text('Hazuki'),
             centerTitle: useWindowsCenteredDiscoverSearch,
-            enableBlur: currentIndex != 0,
+            enableBlur: currentIndex != 0 && currentIndex != 1,
             actions: [
               if (!useWindowsCenteredDiscoverSearch)
                 HomeAppBarActions(

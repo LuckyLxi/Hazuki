@@ -131,16 +131,11 @@ class DownloadsOngoingTaskCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 14),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(999),
-              child: LinearProgressIndicator(
-                minHeight: 9,
-                value: task.status == MangaDownloadTaskStatus.failed
-                    ? null
-                    : progress,
-                backgroundColor: colorScheme.surfaceContainerHighest,
-                color: statusMeta.foreground,
-              ),
+            _AnimatedTaskProgressBar(
+              progress: progress,
+              isIndeterminate: task.status == MangaDownloadTaskStatus.failed,
+              backgroundColor: colorScheme.surfaceContainerHighest,
+              color: statusMeta.foreground,
             ),
             const SizedBox(height: 10),
             Row(
@@ -246,6 +241,40 @@ class DownloadsOngoingTaskCard extends StatelessWidget {
         foreground: colorScheme.error,
       ),
     };
+  }
+}
+
+class _AnimatedTaskProgressBar extends StatelessWidget {
+  const _AnimatedTaskProgressBar({
+    required this.progress,
+    required this.isIndeterminate,
+    required this.backgroundColor,
+    required this.color,
+  });
+
+  final double progress;
+  final bool isIndeterminate;
+  final Color backgroundColor;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(end: progress),
+      duration: const Duration(milliseconds: 360),
+      curve: Curves.easeOutCubic,
+      builder: (context, animatedProgress, _) {
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: LinearProgressIndicator(
+            minHeight: 9,
+            value: isIndeterminate ? null : animatedProgress,
+            backgroundColor: backgroundColor,
+            color: color,
+          ),
+        );
+      },
+    );
   }
 }
 
