@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../../app/service_locator.dart';
 import 'software_update_service.dart';
 
 enum SoftwareUpdateDownloadStage { idle, downloading, success, failed }
@@ -20,10 +21,16 @@ enum SoftwareUpdateDownloadFailureKind {
 }
 
 class SoftwareUpdateDownloadService extends ChangeNotifier {
-  SoftwareUpdateDownloadService._();
+  SoftwareUpdateDownloadService();
 
-  static final SoftwareUpdateDownloadService instance =
-      SoftwareUpdateDownloadService._();
+  static SoftwareUpdateDownloadService get instance {
+    if (!sl.isRegistered<SoftwareUpdateDownloadService>()) {
+      sl.registerLazySingleton<SoftwareUpdateDownloadService>(
+        () => SoftwareUpdateDownloadService(),
+      );
+    }
+    return sl<SoftwareUpdateDownloadService>();
+  }
 
   static const MethodChannel _mediaChannel = MethodChannel(
     'hazuki.comics/media',
