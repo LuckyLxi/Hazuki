@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../app/service_locator.dart';
 import '../../models/hazuki_models.dart';
 import '../hazuki_source_service.dart';
 import 'manga_download_models.dart';
@@ -15,7 +16,7 @@ import 'manga_download_storage_support.dart';
 export 'manga_download_models.dart';
 
 class MangaDownloadService extends ChangeNotifier {
-  MangaDownloadService._() {
+  MangaDownloadService() {
     _stateStore = MangaDownloadStateStore(logScan: _logScan);
     _access = MangaDownloadAccess(logScan: _logScan);
     _recoveryScanner = MangaDownloadRecoveryScanner(
@@ -46,7 +47,14 @@ class MangaDownloadService extends ChangeNotifier {
     );
   }
 
-  static final MangaDownloadService instance = MangaDownloadService._();
+  static MangaDownloadService get instance {
+    if (!sl.isRegistered<MangaDownloadService>()) {
+      sl.registerLazySingleton<MangaDownloadService>(
+        () => MangaDownloadService(),
+      );
+    }
+    return sl<MangaDownloadService>();
+  }
 
   static const String _metadataFileName = 'comic.json';
   static const String _legacyMetadataFileName = 'metadata.json';

@@ -2,6 +2,7 @@ import 'package:get_it/get_it.dart';
 
 import '../services/comment_filter_service.dart';
 import '../services/local_favorites_service.dart';
+import '../services/manga_download/manga_download_service.dart';
 import '../services/password_lock_service.dart';
 import '../services/software_update/software_update_download_service.dart';
 import '../services/software_update/software_update_service.dart';
@@ -30,5 +31,8 @@ void registerServices() {
     sl.registerLazySingleton<SoftwareUpdateService>(
       () => SoftwareUpdateService(),
     );
+  }
+  if (!sl.isRegistered<MangaDownloadService>()) {
+    sl.registerLazySingleton<MangaDownloadService>(() => MangaDownloadService());
   }
 }
