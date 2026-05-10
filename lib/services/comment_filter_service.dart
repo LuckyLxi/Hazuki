@@ -7,7 +7,12 @@ import 'package:hazuki/app/service_locator.dart';
 enum CommentFilterMode { collapse, hide }
 
 class CommentFilterService with ChangeNotifier {
-  static CommentFilterService get instance => sl<CommentFilterService>();
+  static CommentFilterService get instance {
+    if (!sl.isRegistered<CommentFilterService>()) {
+      sl.registerLazySingleton<CommentFilterService>(() => CommentFilterService());
+    }
+    return sl<CommentFilterService>();
+  }
   CommentFilterService();
 
   static const builtinPhrases = [

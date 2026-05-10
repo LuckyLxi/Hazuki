@@ -1,6 +1,7 @@
 import 'package:get_it/get_it.dart';
 
 import '../services/comment_filter_service.dart';
+import '../services/local_favorites_service.dart';
 
 final GetIt sl = GetIt.instance;
 
@@ -8,5 +9,10 @@ final GetIt sl = GetIt.instance;
 ///
 /// Called once during startup, before any service `.instance` accessor is used.
 void registerServices() {
-  sl.registerLazySingleton<CommentFilterService>(() => CommentFilterService());
+  if (!sl.isRegistered<CommentFilterService>()) {
+    sl.registerLazySingleton<CommentFilterService>(() => CommentFilterService());
+  }
+  if (!sl.isRegistered<LocalFavoritesService>()) {
+    sl.registerLazySingleton<LocalFavoritesService>(() => LocalFavoritesService());
+  }
 }
