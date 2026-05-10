@@ -1,3 +1,0 @@
-refactor(di): route CloudSyncService through service locator
-
-Co-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>
