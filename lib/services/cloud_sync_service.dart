@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 
+import '../app/service_locator.dart';
 import 'cloud_sync/cloud_sync_config_store.dart';
 import 'cloud_sync/cloud_sync_models.dart';
 import 'cloud_sync/cloud_sync_remote_client.dart';
@@ -14,9 +15,14 @@ import 'local_favorites_service.dart';
 export 'cloud_sync/cloud_sync_models.dart';
 
 class CloudSyncService {
-  CloudSyncService._();
+  CloudSyncService();
 
-  static final CloudSyncService instance = CloudSyncService._();
+  static CloudSyncService get instance {
+    if (!sl.isRegistered<CloudSyncService>()) {
+      sl.registerLazySingleton<CloudSyncService>(() => CloudSyncService());
+    }
+    return sl<CloudSyncService>();
+  }
 
   final CloudSyncConfigStore _configStore = CloudSyncConfigStore();
   late final CloudSyncSnapshotCodec _snapshotCodec = CloudSyncSnapshotCodec(

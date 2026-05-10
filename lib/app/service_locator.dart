@@ -1,5 +1,6 @@
 import 'package:get_it/get_it.dart';
 
+import '../services/cloud_sync_service.dart';
 import '../services/comment_filter_service.dart';
 import '../services/discover_daily_recommendation_service.dart';
 import '../services/local_favorites_service.dart';
@@ -40,5 +41,8 @@ void registerServices() {
     sl.registerLazySingleton<DiscoverDailyRecommendationService>(
       () => DiscoverDailyRecommendationService(),
     );
+  }
+  if (!sl.isRegistered<CloudSyncService>()) {
+    sl.registerLazySingleton<CloudSyncService>(() => CloudSyncService());
   }
 }
