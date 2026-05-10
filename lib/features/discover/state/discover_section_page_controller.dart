@@ -6,11 +6,11 @@ import 'discover_section_page_state.dart';
 
 class DiscoverSectionPageController extends ChangeNotifier {
   DiscoverSectionPageController({
+    required HazukiSourceService sourceService,
     String? viewMoreUrl,
-    HazukiSourceService? sourceService,
     List<ExploreComic>? initialComics,
   }) : _viewMoreUrl = viewMoreUrl,
-       _sourceService = sourceService ?? HazukiSourceService.instance {
+       _sourceService = sourceService {
     if (initialComics != null) {
       _state.comics = List<ExploreComic>.of(initialComics);
       _state.hasMore = false;

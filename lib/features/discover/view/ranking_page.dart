@@ -27,6 +27,7 @@ class RankingPage extends StatefulWidget {
 class _RankingPageState extends State<RankingPage> {
   static const _loadTimeout = Duration(seconds: 25);
 
+  final HazukiSourceService _sourceService = HazukiSourceService.instance;
   final ScrollController _scrollController = ScrollController();
 
   List<CategoryRankingOption> _rankingOptions = const <CategoryRankingOption>[];
@@ -105,7 +106,7 @@ class _RankingPageState extends State<RankingPage> {
     final timeoutMessage = AppLocalizations.of(
       context,
     )!.rankingLoadOptionsTimeout;
-    return HazukiSourceService.instance.loadCategoryRankingOptions().timeout(
+    return _sourceService.loadCategoryRankingOptions().timeout(
       _loadTimeout,
       onTimeout: () => throw Exception(timeoutMessage),
     );
@@ -116,7 +117,7 @@ class _RankingPageState extends State<RankingPage> {
     required int page,
   }) {
     final timeoutMessage = AppLocalizations.of(context)!.rankingLoadTimeout;
-    return HazukiSourceService.instance
+    return _sourceService
         .loadCategoryRankingComics(rankingOption: rankingOption, page: page)
         .timeout(
           _loadTimeout,

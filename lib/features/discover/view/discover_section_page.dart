@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
+import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:hazuki/widgets/windows_comic_detail_host.dart';
 
@@ -42,6 +43,7 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
   void initState() {
     super.initState();
     _controller = DiscoverSectionPageController(
+      sourceService: HazukiSourceService.instance,
       viewMoreUrl: widget.section.viewMoreUrl,
       initialComics: widget.section.viewMoreUrl == null
           ? widget.section.comics

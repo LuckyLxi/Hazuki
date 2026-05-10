@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:hazuki/features/search/search.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
+import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
@@ -50,7 +51,9 @@ class _DiscoverPageState extends State<DiscoverPage> {
   @override
   void initState() {
     super.initState();
-    _controller = DiscoverPageController();
+    _controller = DiscoverPageController(
+      sourceService: HazukiSourceService.instance,
+    );
     _scrollController.addListener(_handleScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;

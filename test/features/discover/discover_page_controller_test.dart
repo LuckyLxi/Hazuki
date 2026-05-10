@@ -6,7 +6,9 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test('forwards source service changes until disposed', () {
-    final controller = DiscoverPageController();
+    final controller = DiscoverPageController(
+      sourceService: HazukiSourceService.instance,
+    );
     var notifications = 0;
     controller.addListener(() {
       notifications++;

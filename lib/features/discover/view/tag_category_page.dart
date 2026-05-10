@@ -63,6 +63,8 @@ class _TagCategoryGroupCard extends StatelessWidget {
 class _TagCategoryPageState extends State<TagCategoryPage> {
   static const _loadTimeout = Duration(seconds: 25);
 
+  final HazukiSourceService _sourceService = HazukiSourceService.instance;
+
   List<CategoryTagGroup> _tagGroups = const <CategoryTagGroup>[];
 
   String? _errorMessage;
@@ -79,7 +81,7 @@ class _TagCategoryPageState extends State<TagCategoryPage> {
     super.initState();
     _sessionStartedAt = DateTime.now();
     _sessionId = _sessionStartedAt.microsecondsSinceEpoch.toString();
-    if (HazukiSourceService.instance.softwareLogCaptureEnabled) {
+    if (_sourceService.softwareLogCaptureEnabled) {
       WidgetsBinding.instance.addTimingsCallback(_handleFrameTimings);
       _frameTimingsCallbackAttached = true;
     }
@@ -114,7 +116,7 @@ class _TagCategoryPageState extends State<TagCategoryPage> {
     String level = 'info',
     Map<String, Object?>? content,
   }) {
-    HazukiSourceService.instance.addApplicationLog(
+    _sourceService.addApplicationLog(
       level: level,
       title: title,
       source: 'tag_category',
@@ -136,7 +138,7 @@ class _TagCategoryPageState extends State<TagCategoryPage> {
   }
 
   void _handleFrameTimings(List<FrameTiming> timings) {
-    if (!mounted || !HazukiSourceService.instance.softwareLogCaptureEnabled) {
+    if (!mounted || !_sourceService.softwareLogCaptureEnabled) {
       return;
     }
     for (final timing in timings) {
@@ -164,7 +166,7 @@ class _TagCategoryPageState extends State<TagCategoryPage> {
 
   Future<List<CategoryTagGroup>> _loadTagGroups() {
     final timeoutMessage = AppLocalizations.of(context)!.tagCategoryLoadTimeout;
-    return HazukiSourceService.instance.loadCategoryTagGroups().timeout(
+    return _sourceService.loadCategoryTagGroups().timeout(
       _loadTimeout,
       onTimeout: () => throw Exception(timeoutMessage),
     );

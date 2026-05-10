@@ -7,8 +7,8 @@ import 'package:hazuki/services/hazuki_source_service.dart';
 import 'discover_page_state.dart';
 
 class DiscoverPageController extends ChangeNotifier {
-  DiscoverPageController({HazukiSourceService? sourceService})
-    : _sourceService = sourceService ?? HazukiSourceService.instance {
+  DiscoverPageController({required HazukiSourceService sourceService})
+    : _sourceService = sourceService {
     _sourceService.addListener(_onSourceChanged);
   }
 
