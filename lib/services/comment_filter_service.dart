@@ -2,12 +2,13 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:hazuki/app/app_preferences.dart';
+import 'package:hazuki/app/service_locator.dart';
 
 enum CommentFilterMode { collapse, hide }
 
 class CommentFilterService with ChangeNotifier {
-  static final instance = CommentFilterService._();
-  CommentFilterService._();
+  static CommentFilterService get instance => sl<CommentFilterService>();
+  CommentFilterService();
 
   static const builtinPhrases = [
     '萝莉视频',
