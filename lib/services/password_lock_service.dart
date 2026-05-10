@@ -6,12 +6,19 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../app/service_locator.dart';
+
 enum PasswordVerificationResult { incomplete, success, failed, lockedOut }
 
 class PasswordLockService extends ChangeNotifier {
-  PasswordLockService._();
+  PasswordLockService();
 
-  static final PasswordLockService instance = PasswordLockService._();
+  static PasswordLockService get instance {
+    if (!sl.isRegistered<PasswordLockService>()) {
+      sl.registerLazySingleton<PasswordLockService>(() => PasswordLockService());
+    }
+    return sl<PasswordLockService>();
+  }
   static const MethodChannel _privacyChannel = MethodChannel(
     'hazuki.comics/privacy',
   );

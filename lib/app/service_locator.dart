@@ -2,6 +2,7 @@ import 'package:get_it/get_it.dart';
 
 import '../services/comment_filter_service.dart';
 import '../services/local_favorites_service.dart';
+import '../services/password_lock_service.dart';
 
 final GetIt sl = GetIt.instance;
 
@@ -14,5 +15,8 @@ void registerServices() {
   }
   if (!sl.isRegistered<LocalFavoritesService>()) {
     sl.registerLazySingleton<LocalFavoritesService>(() => LocalFavoritesService());
+  }
+  if (!sl.isRegistered<PasswordLockService>()) {
+    sl.registerLazySingleton<PasswordLockService>(() => PasswordLockService());
   }
 }
