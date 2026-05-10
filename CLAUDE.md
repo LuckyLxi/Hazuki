@@ -89,6 +89,7 @@ Platform adaptation: Android uses a bottom drawer; Windows gets a sidebar naviga
 - **`SoftwareUpdateService`** / **`SoftwareUpdateDownloadService`** — self-update from `update.json`.
 - **`LocalFavoritesService`** — local (on-device) favorites storage separate from cloud sync.
 - **`DiscoverDailyRecommendationService`** — caches daily recommendation results.
+- **`CommentFilterService`** — filters/blocks comments by user-defined rules.
 
 ### Theme switching
 
