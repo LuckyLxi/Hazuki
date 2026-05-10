@@ -40,11 +40,18 @@ void registerServices() {
   }
   if (!sl.isRegistered<DiscoverDailyRecommendationService>()) {
     sl.registerLazySingleton<DiscoverDailyRecommendationService>(
-      () => DiscoverDailyRecommendationService(),
+      () => DiscoverDailyRecommendationService(
+        source: sl<HazukiSourceService>(),
+      ),
     );
   }
   if (!sl.isRegistered<CloudSyncService>()) {
-    sl.registerLazySingleton<CloudSyncService>(() => CloudSyncService());
+    sl.registerLazySingleton<CloudSyncService>(
+      () => CloudSyncService(
+        localFavorites: sl<LocalFavoritesService>(),
+        commentFilter: sl<CommentFilterService>(),
+      ),
+    );
   }
   if (!sl.isRegistered<HazukiSourceService>()) {
     sl.registerLazySingleton<HazukiSourceService>(() => HazukiSourceService());

@@ -172,16 +172,26 @@ bool _isDiscoverRecommendationAuthorKey(String key) {
 }
 
 class DiscoverDailyRecommendationService extends ChangeNotifier {
-  DiscoverDailyRecommendationService();
+  DiscoverDailyRecommendationService({required HazukiSourceService source})
+    : _source = source;
 
   static DiscoverDailyRecommendationService get instance {
+    if (!sl.isRegistered<HazukiSourceService>()) {
+      sl.registerLazySingleton<HazukiSourceService>(
+        () => HazukiSourceService(),
+      );
+    }
     if (!sl.isRegistered<DiscoverDailyRecommendationService>()) {
       sl.registerLazySingleton<DiscoverDailyRecommendationService>(
-        () => DiscoverDailyRecommendationService(),
+        () => DiscoverDailyRecommendationService(
+          source: sl<HazukiSourceService>(),
+        ),
       );
     }
     return sl<DiscoverDailyRecommendationService>();
   }
+
+  final HazukiSourceService _source;
 
   static const String authorsAssetPath = 'assets/data/authors.txt';
   static const String _cachePayloadKey = 'discover_daily_recommendation_cache';
@@ -249,7 +259,7 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
       return _state;
     }
 
-    if (!HazukiSourceService.instance.isInitialized) {
+    if (!_source.isInitialized) {
       _setState(const DiscoverDailyRecommendationState(enabled: true));
       return _state;
     }
@@ -321,7 +331,7 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
     if (_refreshInFlight != null ||
         !_state.enabled ||
         _state.isPendingReady ||
-        !HazukiSourceService.instance.isInitialized) {
+        !_source.isInitialized) {
       return;
     }
 
@@ -377,7 +387,7 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
     try {
       await Future.wait(
         imageUrls.map((url) async {
-          final bytes = await HazukiSourceService.instance.downloadImageBytes(
+          final bytes = await _source.downloadImageBytes(
             url,
             keepInMemory: true,
           );
@@ -412,7 +422,7 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
   }
 
   _DiscoverDailyRecommendationSnapshot? _readCache(SharedPreferences prefs) {
-    final activeSourceKey = HazukiSourceService.instance.activeSourceKey;
+    final activeSourceKey = _source.activeSourceKey;
     final hasActiveSourceKey = activeSourceKey.trim().isNotEmpty;
     final candidates = <String>[
       if (hasActiveSourceKey) _sourceCachePayloadKey(activeSourceKey),
@@ -514,7 +524,7 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
     }
 
     final author = authors[_random.nextInt(authors.length)];
-    final result = await HazukiSourceService.instance.searchComics(
+    final result = await _source.searchComics(
       keyword: author,
       page: 1,
       order: 'mr',
@@ -538,7 +548,7 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
       recommendations: recommendations,
       selectedAuthor: author,
       generatedAt: DateTime.now(),
-      sourceKey: HazukiSourceService.instance.activeSourceKey,
+      sourceKey: _source.activeSourceKey,
       schemaVersion: _cacheSchemaVersion,
     );
   }
@@ -590,7 +600,7 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
 
   Future<String> _loadComicAuthor(ExploreComic comic) async {
     try {
-      final details = await HazukiSourceService.instance.loadComicDetails(
+      final details = await _source.loadComicDetails(
         comic.id,
         sourceKey: comic.sourceKey,
       );
