@@ -68,3 +68,6 @@ coverage/
 # Git hooks
 .githooks/
 
+# Local commit-message scratch files
+.commit-msg.tmp
+
