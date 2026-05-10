@@ -1,6 +1,7 @@
 import 'package:get_it/get_it.dart';
 
 import '../services/comment_filter_service.dart';
+import '../services/discover_daily_recommendation_service.dart';
 import '../services/local_favorites_service.dart';
 import '../services/manga_download/manga_download_service.dart';
 import '../services/password_lock_service.dart';
@@ -34,5 +35,10 @@ void registerServices() {
   }
   if (!sl.isRegistered<MangaDownloadService>()) {
     sl.registerLazySingleton<MangaDownloadService>(() => MangaDownloadService());
+  }
+  if (!sl.isRegistered<DiscoverDailyRecommendationService>()) {
+    sl.registerLazySingleton<DiscoverDailyRecommendationService>(
+      () => DiscoverDailyRecommendationService(),
+    );
   }
 }

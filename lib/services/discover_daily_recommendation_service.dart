@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../app/app_preferences.dart';
+import '../app/service_locator.dart';
 import '../models/hazuki_models.dart';
 import 'hazuki_source_service.dart';
 
@@ -171,10 +172,16 @@ bool _isDiscoverRecommendationAuthorKey(String key) {
 }
 
 class DiscoverDailyRecommendationService extends ChangeNotifier {
-  DiscoverDailyRecommendationService._();
+  DiscoverDailyRecommendationService();
 
-  static final DiscoverDailyRecommendationService instance =
-      DiscoverDailyRecommendationService._();
+  static DiscoverDailyRecommendationService get instance {
+    if (!sl.isRegistered<DiscoverDailyRecommendationService>()) {
+      sl.registerLazySingleton<DiscoverDailyRecommendationService>(
+        () => DiscoverDailyRecommendationService(),
+      );
+    }
+    return sl<DiscoverDailyRecommendationService>();
+  }
 
   static const String authorsAssetPath = 'assets/data/authors.txt';
   static const String _cachePayloadKey = 'discover_daily_recommendation_cache';
