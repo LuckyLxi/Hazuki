@@ -10,6 +10,7 @@ import 'app/app_settings_store.dart';
 import 'app/app_startup_coordinator.dart';
 import 'app/appearance_settings.dart';
 import 'app/hazuki_app_controller.dart';
+import 'app/service_locator.dart';
 import 'app/theme/hazuki_theme_controller.dart';
 import 'app/theme/hazuki_theme_factory.dart';
 import 'app/launch_shortcut_bridge.dart';
@@ -65,6 +66,7 @@ Future<void> _ensureNoMediaFile(String dirPath) async {
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  registerServices();
   await loadHazukiUiFlags();
   await HazukiSourceService.instance.loadSoftwareLogCaptureEnabled();
   await _ensureAndroidNoMediaMarker();

@@ -69,7 +69,7 @@ Each feature's `support/` subdirectory contains controllers, async action flows,
 
 - `lib/models/` — shared data models used across features.
 - `lib/widgets/` — shared UI widgets (not feature-specific).
-- `lib/pages/` — standalone pages (about, ranking, tag_category) that don't belong to a feature module.
+- `lib/app/service_locator.dart` — `get_it` based DI container (`sl`); call `registerServices()` once during startup.
 
 ### Navigation
 
