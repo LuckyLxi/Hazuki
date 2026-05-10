@@ -4,6 +4,7 @@ import '../services/comment_filter_service.dart';
 import '../services/local_favorites_service.dart';
 import '../services/password_lock_service.dart';
 import '../services/software_update/software_update_download_service.dart';
+import '../services/software_update/software_update_service.dart';
 
 final GetIt sl = GetIt.instance;
 
@@ -23,6 +24,11 @@ void registerServices() {
   if (!sl.isRegistered<SoftwareUpdateDownloadService>()) {
     sl.registerLazySingleton<SoftwareUpdateDownloadService>(
       () => SoftwareUpdateDownloadService(),
+    );
+  }
+  if (!sl.isRegistered<SoftwareUpdateService>()) {
+    sl.registerLazySingleton<SoftwareUpdateService>(
+      () => SoftwareUpdateService(),
     );
   }
 }

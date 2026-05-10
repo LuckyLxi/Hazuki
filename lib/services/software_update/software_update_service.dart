@@ -6,10 +6,19 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
-class SoftwareUpdateService {
-  SoftwareUpdateService._();
+import '../../app/service_locator.dart';
 
-  static final SoftwareUpdateService instance = SoftwareUpdateService._();
+class SoftwareUpdateService {
+  SoftwareUpdateService();
+
+  static SoftwareUpdateService get instance {
+    if (!sl.isRegistered<SoftwareUpdateService>()) {
+      sl.registerLazySingleton<SoftwareUpdateService>(
+        () => SoftwareUpdateService(),
+      );
+    }
+    return sl<SoftwareUpdateService>();
+  }
 
   static const _updateManifestUrls = [
     'https://cdn.jsdelivr.net/gh/LuckyLxi/Hazuki@main/update.json',
