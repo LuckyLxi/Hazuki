@@ -141,7 +141,7 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
     final downloadedVersion = _extractSourceVersion(jmScript);
     await jmFile.writeAsString(jmScript);
     final prefs = await facade.ensurePrefs();
-    await prefs.setBool(HazukiSourceService._customEditedJmSourceKey, false);
+    await prefs.setBool(SourcePrefsKeys.customEditedJmSource, false);
 
     facade.lastSourceVersionDebugInfo = {
       'checkedAt': DateTime.now().toIso8601String(),

@@ -1,0 +1,15 @@
+class SourcePrefsKeys {
+  const SourcePrefsKeys._();
+
+  static const String cacheMaxBytes = 'image_cache_max_bytes';
+  static const String cacheAutoCleanMode = 'image_cache_auto_clean_mode';
+  static const String cacheLastAutoCleanAt = 'image_cache_last_auto_clean_at';
+  static const String customEditedJmSource = 'custom_edited_jm_source';
+  static const String softwareLogCaptureEnabled =
+      'advanced_software_log_capture_enabled';
+
+  static const int defaultCacheMaxBytes = 400 * 1024 * 1024;
+  static const String defaultAutoCleanMode = 'size_overflow';
+  static const Duration discoverCacheTtl = Duration(days: 1);
+  static const double cacheOverflowTrimTargetRatio = 0.75;
+}

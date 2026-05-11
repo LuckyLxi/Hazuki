@@ -72,7 +72,7 @@ extension HazukiSourceServiceImageCacheMaintenanceCapability
 
     if (mode == 'seven_days') {
       final lastAtMs =
-          prefs.getInt(HazukiSourceService._cacheLastAutoCleanAtKey) ?? 0;
+          prefs.getInt(SourcePrefsKeys.cacheLastAutoCleanAt) ?? 0;
       final shouldCleanByAge =
           force ||
           lastAtMs <= 0 ||
@@ -81,7 +81,7 @@ extension HazukiSourceServiceImageCacheMaintenanceCapability
       if (shouldCleanByAge) {
         await _cleanImageCacheByAge(const Duration(days: 1));
         await prefs.setInt(
-          HazukiSourceService._cacheLastAutoCleanAtKey,
+          SourcePrefsKeys.cacheLastAutoCleanAt,
           now.millisecondsSinceEpoch,
         );
       }
@@ -90,7 +90,7 @@ extension HazukiSourceServiceImageCacheMaintenanceCapability
     final trimmedByOverflow = await _trimImageCacheToOverflowTarget();
     if (mode != 'seven_days' && trimmedByOverflow) {
       await prefs.setInt(
-        HazukiSourceService._cacheLastAutoCleanAtKey,
+        SourcePrefsKeys.cacheLastAutoCleanAt,
         now.millisecondsSinceEpoch,
       );
     }
@@ -127,7 +127,7 @@ extension HazukiSourceServiceImageCacheMaintenanceCapability
     }
 
     var targetBytes =
-        (maxBytes * HazukiSourceService._cacheOverflowTrimTargetRatio).round();
+        (maxBytes * SourcePrefsKeys.cacheOverflowTrimTargetRatio).round();
     if (targetBytes < 0) {
       targetBytes = 0;
     }

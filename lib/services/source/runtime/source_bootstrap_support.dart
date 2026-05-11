@@ -5,7 +5,7 @@ extension SourceBootstrapSupport on HazukiSourceService {
     final facade = this.facade;
     final prefs = await facade.ensurePrefs();
     facade.debug.softwareLogCaptureEnabled =
-        prefs.getBool(HazukiSourceService._softwareLogCaptureEnabledKey) ??
+        prefs.getBool(SourcePrefsKeys.softwareLogCaptureEnabled) ??
         false;
     if (!facade.softwareLogCaptureEnabled) {
       _clearCapturedLogs();
@@ -21,7 +21,7 @@ extension SourceBootstrapSupport on HazukiSourceService {
     }
     final prefs = await facade.ensurePrefs();
     await prefs.setBool(
-      HazukiSourceService._softwareLogCaptureEnabledKey,
+      SourcePrefsKeys.softwareLogCaptureEnabled,
       enabled,
     );
   }
@@ -103,7 +103,7 @@ extension SourceBootstrapSupport on HazukiSourceService {
       );
       final prefs = await facade.ensurePrefs();
       facade.debug.softwareLogCaptureEnabled =
-          prefs.getBool(HazukiSourceService._softwareLogCaptureEnabledKey) ??
+          prefs.getBool(SourcePrefsKeys.softwareLogCaptureEnabled) ??
           false;
       _configureDioCookieBridge();
       await _initImageCache();

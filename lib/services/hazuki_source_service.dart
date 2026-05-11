@@ -19,6 +19,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../shared/chapter_title_resolver.dart';
 import '../models/hazuki_models.dart';
 import 'source/common/source_json_coerce.dart';
+import 'source/common/source_prefs_keys.dart';
 import 'source/runtime/line_settings_capability.dart';
 
 part 'source/explore_capability.dart';
@@ -173,19 +174,6 @@ class HazukiSourceService extends ChangeNotifier {
       sendTimeout: const Duration(seconds: 35),
     ),
   );
-
-  static const String _cacheMaxBytesKey = 'image_cache_max_bytes';
-  static const String _cacheAutoCleanModeKey = 'image_cache_auto_clean_mode';
-  static const String _cacheLastAutoCleanAtKey =
-      'image_cache_last_auto_clean_at';
-  static const String _customEditedJmSourceKey = 'custom_edited_jm_source';
-  static const String _softwareLogCaptureEnabledKey =
-      'advanced_software_log_capture_enabled';
-
-  static const int _defaultCacheMaxBytes = 400 * 1024 * 1024;
-  static const String _defaultAutoCleanMode = 'size_overflow';
-  static const Duration _discoverCacheTtl = Duration(days: 1);
-  static const double _cacheOverflowTrimTargetRatio = 0.75;
 
   final SourceRuntimeKernel _runtimeKernel = SourceRuntimeKernel();
   final SourceSessionStore _sessionStore = SourceSessionStore();

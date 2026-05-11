@@ -4,10 +4,10 @@ extension HazukiSourceServiceImageCacheCapability on HazukiSourceService {
   int get imageCacheMaxBytes {
     final prefs = facade.session.prefs;
     final value =
-        prefs?.getInt(HazukiSourceService._cacheMaxBytesKey) ??
-        HazukiSourceService._defaultCacheMaxBytes;
-    return value < HazukiSourceService._defaultCacheMaxBytes
-        ? HazukiSourceService._defaultCacheMaxBytes
+        prefs?.getInt(SourcePrefsKeys.cacheMaxBytes) ??
+        SourcePrefsKeys.defaultCacheMaxBytes;
+    return value < SourcePrefsKeys.defaultCacheMaxBytes
+        ? SourcePrefsKeys.defaultCacheMaxBytes
         : value;
   }
 
@@ -16,20 +16,20 @@ extension HazukiSourceServiceImageCacheCapability on HazukiSourceService {
     if (prefs == null) {
       return;
     }
-    final normalized = value < HazukiSourceService._defaultCacheMaxBytes
-        ? HazukiSourceService._defaultCacheMaxBytes
+    final normalized = value < SourcePrefsKeys.defaultCacheMaxBytes
+        ? SourcePrefsKeys.defaultCacheMaxBytes
         : value;
-    await prefs.setInt(HazukiSourceService._cacheMaxBytesKey, normalized);
+    await prefs.setInt(SourcePrefsKeys.cacheMaxBytes, normalized);
     await facade.enforceImageCachePolicy();
   }
 
   String get imageCacheAutoCleanMode {
     final prefs = facade.session.prefs;
-    final mode = prefs?.getString(HazukiSourceService._cacheAutoCleanModeKey);
+    final mode = prefs?.getString(SourcePrefsKeys.cacheAutoCleanMode);
     if (mode == 'seven_days') {
       return mode!;
     }
-    return HazukiSourceService._defaultAutoCleanMode;
+    return SourcePrefsKeys.defaultAutoCleanMode;
   }
 
   Future<void> setImageCacheAutoCleanMode(String mode) async {
@@ -39,7 +39,7 @@ extension HazukiSourceServiceImageCacheCapability on HazukiSourceService {
     }
     final normalized = mode == 'seven_days' ? 'seven_days' : 'size_overflow';
     await prefs.setString(
-      HazukiSourceService._cacheAutoCleanModeKey,
+      SourcePrefsKeys.cacheAutoCleanMode,
       normalized,
     );
     await facade.enforceImageCachePolicy(force: true);

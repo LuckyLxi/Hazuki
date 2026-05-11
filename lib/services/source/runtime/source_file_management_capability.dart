@@ -26,7 +26,7 @@ extension HazukiSourceServiceSourceFileManagementCapability
     final result = await _downloadOrLoadSourceFiles();
     await result.jmFile.writeAsString(content, flush: true);
     final prefs = await facade.ensurePrefs();
-    await prefs.setBool(HazukiSourceService._customEditedJmSourceKey, true);
+    await prefs.setBool(SourcePrefsKeys.customEditedJmSource, true);
     facade.lastSourceVersionDebugInfo = {
       'checkedAt': DateTime.now().toIso8601String(),
       'resolvedFrom': 'local_source_editor',
@@ -46,7 +46,7 @@ extension HazukiSourceServiceSourceFileManagementCapability
 
   Future<bool> hasCustomEditedJmSource() async {
     final prefs = await facade.ensurePrefs();
-    return prefs.getBool(HazukiSourceService._customEditedJmSourceKey) ?? false;
+    return prefs.getBool(SourcePrefsKeys.customEditedJmSource) ?? false;
   }
 
   Future<void> reloadFromLocalSourceFiles() async {

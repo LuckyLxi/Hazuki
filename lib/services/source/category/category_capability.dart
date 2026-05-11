@@ -28,7 +28,7 @@ extension HazukiSourceServiceCategoryCapability on HazukiSourceService {
 
     if (!forceRefresh) {
       final memoryCached = facade.cache.getCategoryTagGroupsFromMemoryCache(
-        HazukiSourceService._discoverCacheTtl,
+        SourcePrefsKeys.discoverCacheTtl,
       );
       if (memoryCached != null) {
         _logCategoryTagTiming(

@@ -118,7 +118,7 @@ extension HazukiSourceServiceExploreCapability on HazukiSourceService {
       return null;
     }
     if (DateTime.now().difference(cachedAt) >
-        HazukiSourceService._discoverCacheTtl) {
+        SourcePrefsKeys.discoverCacheTtl) {
       _exploreSectionsMemoryCache = null;
       _exploreSectionsMemoryCachedAt = null;
       return null;
