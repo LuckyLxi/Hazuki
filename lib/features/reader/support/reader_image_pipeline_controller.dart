@@ -34,7 +34,7 @@ class ReaderImagePipelineController {
     void Function(Iterable<String>)? evictImageBytesFromMemory,
     Future<void> Function(Iterable<String>)? evictImageCacheEntries,
     Future<void> Function(ImageProvider provider)? precacheImageCallback,
-    HazukiSourceService? sourceService,
+    required HazukiSourceService sourceService,
   }) : _runtimeState = runtimeState,
        _pipelineState = pipelineState,
        _diagnosticsState = diagnosticsState,
@@ -51,15 +51,11 @@ class ReaderImagePipelineController {
        _sourceKey = sourceKey,
        _loadImagesErrorBuilder = loadImagesErrorBuilder,
        _imageProviderBuilder = imageProviderBuilder,
-       _sourceService = sourceService ?? HazukiSourceService.instance,
+       _sourceService = sourceService,
        _evictImageBytesFromMemory =
-           evictImageBytesFromMemory ??
-           (sourceService ?? HazukiSourceService.instance)
-               .evictImageBytesFromMemory,
+           evictImageBytesFromMemory ?? sourceService.evictImageBytesFromMemory,
        _evictImageCacheEntries =
-           evictImageCacheEntries ??
-           (sourceService ?? HazukiSourceService.instance)
-               .evictImageCacheEntries,
+           evictImageCacheEntries ?? sourceService.evictImageCacheEntries,
        _precacheImageCallback = precacheImageCallback;
 
   static const int _maxUnscrambleConcurrency = 5;

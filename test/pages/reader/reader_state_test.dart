@@ -10,6 +10,7 @@ import 'package:hazuki/features/reader/state/reader_image_pipeline_state.dart';
 import 'package:hazuki/features/reader/state/reader_mode.dart';
 import 'package:hazuki/features/reader/support/reader_image_pipeline_controller.dart';
 import 'package:hazuki/features/reader/support/reader_navigation_controller.dart';
+import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
 import 'package:hazuki/features/reader/state/reader_settings_store.dart';
 
@@ -197,6 +198,7 @@ void main() {
             home: Builder(
               builder: (context) {
                 controller = ReaderImagePipelineController(
+                  sourceService: HazukiSourceService.instance,
                   runtimeState: runtimeState,
                   pipelineState: pipelineState,
                   diagnosticsState: diagnosticsState,
@@ -270,6 +272,7 @@ void main() {
             home: Builder(
               builder: (context) {
                 controller = ReaderImagePipelineController(
+                  sourceService: HazukiSourceService.instance,
                   runtimeState: runtimeState,
                   pipelineState: pipelineState,
                   diagnosticsState: diagnosticsState,

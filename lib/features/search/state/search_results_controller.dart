@@ -10,13 +10,13 @@ class SearchResultsController extends ChangeNotifier {
 
   SearchResultsController({
     required String initialOrder,
+    required HazukiSourceService sourceService,
     SearchPageLoader? searchPageLoader,
-    HazukiSourceService? sourceService,
   }) : _searchPageLoader = searchPageLoader,
        _searchOrder = searchOrderKeys.contains(initialOrder)
            ? initialOrder
            : 'mr',
-       _sourceService = sourceService ?? HazukiSourceService.instance {
+       _sourceService = sourceService {
     _sourceService.addListener(_onSourceChanged);
   }
 

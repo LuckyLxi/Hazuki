@@ -37,6 +37,7 @@ class _SearchEntryPageState extends State<SearchEntryPage>
     isMounted: () => mounted,
     allowCollapsedFocus: false,
   );
+  final HazukiSourceService _sourceService = HazukiSourceService.instance;
   final ScrollController _scrollController = ScrollController();
   final SearchHistoryService _historyService = SearchHistoryService();
   late final SearchRevealSupport _revealSupport = SearchRevealSupport(
@@ -433,7 +434,7 @@ class _SearchEntryPageState extends State<SearchEntryPage>
         : null;
     final primarySelection = _focusCoordinator.primaryController.selection;
     final collapsedSelection = _focusCoordinator.collapsedController.selection;
-    HazukiSourceService.instance.addApplicationLog(
+    _sourceService.addApplicationLog(
       level: 'info',
       title: title,
       source: 'search_entry_focus',

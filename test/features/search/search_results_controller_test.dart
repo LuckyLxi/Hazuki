@@ -6,7 +6,10 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   test('forwards source service changes until disposed', () {
-    final controller = SearchResultsController(initialOrder: 'mr');
+    final controller = SearchResultsController(
+      initialOrder: 'mr',
+      sourceService: HazukiSourceService.instance,
+    );
     var notifications = 0;
     controller.addListener(() {
       notifications++;
