@@ -212,16 +212,6 @@ class HazukiSourceService extends ChangeNotifier {
   bool get _softwareLogCaptureEnabled =>
       _debugLogStore.softwareLogCaptureEnabled;
 
-  Map<String, dynamic>? get _lastLoginDebugInfoStorage =>
-      _debugLogStore.lastLoginDebugInfoStorage;
-  set _lastLoginDebugInfoStorage(Map<String, dynamic>? value) =>
-      _debugLogStore.lastLoginDebugInfoStorage = value;
-
-  Map<String, dynamic>? get _lastSourceVersionDebugInfoStorage =>
-      _debugLogStore.lastSourceVersionDebugInfoStorage;
-  set _lastSourceVersionDebugInfoStorage(Map<String, dynamic>? value) =>
-      _debugLogStore.lastSourceVersionDebugInfoStorage = value;
-
   LinkedHashMap<String, Uint8List> get _imageBytesCache =>
       _cacheStore.imageBytesCache;
   Map<String, Future<Uint8List>> get _imageDownloadInFlight =>
@@ -249,20 +239,6 @@ class HazukiSourceService extends ChangeNotifier {
   Directory? get _discoverCacheDir => _cacheStore.discoverCacheDir;
   set _discoverCacheDir(Directory? value) =>
       _cacheStore.discoverCacheDir = value;
-
-  Map<String, dynamic>? get _lastLoginDebugInfo =>
-      _softwareLogCaptureEnabled ? _lastLoginDebugInfoStorage : null;
-  set _lastLoginDebugInfo(Map<String, dynamic>? value) {
-    _lastLoginDebugInfoStorage = _softwareLogCaptureEnabled ? value : null;
-  }
-
-  Map<String, dynamic>? get _lastSourceVersionDebugInfo =>
-      _softwareLogCaptureEnabled ? _lastSourceVersionDebugInfoStorage : null;
-  set _lastSourceVersionDebugInfo(Map<String, dynamic>? value) {
-    _lastSourceVersionDebugInfoStorage = _softwareLogCaptureEnabled
-        ? value
-        : null;
-  }
 
   String get statusText => _statusText;
   SourceRuntimeState get sourceRuntimeState => _runtimeState;
@@ -603,6 +579,18 @@ class SourceDebugLogStore {
   Map<String, dynamic>? lastLoginDebugInfoStorage;
   Map<String, dynamic>? lastSourceVersionDebugInfoStorage;
 
+  Map<String, dynamic>? get lastLoginDebugInfo =>
+      softwareLogCaptureEnabled ? lastLoginDebugInfoStorage : null;
+  set lastLoginDebugInfo(Map<String, dynamic>? value) {
+    lastLoginDebugInfoStorage = softwareLogCaptureEnabled ? value : null;
+  }
+
+  Map<String, dynamic>? get lastSourceVersionDebugInfo =>
+      softwareLogCaptureEnabled ? lastSourceVersionDebugInfoStorage : null;
+  set lastSourceVersionDebugInfo(Map<String, dynamic>? value) {
+    lastSourceVersionDebugInfoStorage = softwareLogCaptureEnabled ? value : null;
+  }
+
   void clearCapturedLogs() {
     favoritesDebugCache = null;
     recentNetworkLogs.clear();
@@ -690,14 +678,14 @@ class HazukiSourceFacade {
   set favoritesDebugCache(Map<String, dynamic>? value) =>
       debug.favoritesDebugCache = value;
 
-  Map<String, dynamic>? get lastLoginDebugInfo => _service._lastLoginDebugInfo;
+  Map<String, dynamic>? get lastLoginDebugInfo => debug.lastLoginDebugInfo;
   set lastLoginDebugInfo(Map<String, dynamic>? value) =>
-      _service._lastLoginDebugInfo = value;
+      debug.lastLoginDebugInfo = value;
 
   Map<String, dynamic>? get lastSourceVersionDebugInfo =>
-      _service._lastSourceVersionDebugInfo;
+      debug.lastSourceVersionDebugInfo;
   set lastSourceVersionDebugInfo(Map<String, dynamic>? value) =>
-      _service._lastSourceVersionDebugInfo = value;
+      debug.lastSourceVersionDebugInfo = value;
 
   void clearCapturedLogs() => debug.clearCapturedLogs();
 
