@@ -7,8 +7,8 @@ import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
 class HomeProfileController extends ChangeNotifier {
-  HomeProfileController({HazukiSourceService? sourceService})
-    : _sourceService = sourceService ?? HazukiSourceService.instance;
+  HomeProfileController({required HazukiSourceService sourceService})
+    : _sourceService = sourceService;
 
   static const _firstUseDateKey = 'app_first_use_date';
 

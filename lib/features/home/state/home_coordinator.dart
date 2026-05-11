@@ -13,11 +13,16 @@ import 'package:hazuki/features/home/support/home_profile_flow.dart';
 import 'package:hazuki/features/home/state/home_shell_controller.dart';
 
 class HomeCoordinator extends ChangeNotifier {
-  HomeCoordinator({required int initialTabIndex})
-    : _profileController = HomeProfileController(),
-      _shellController = HomeShellController(initialTabIndex: initialTabIndex),
-      scaffoldKey = GlobalKey<ScaffoldState>(),
-      favoritePageKey = GlobalKey<FavoritePageState>() {
+  HomeCoordinator({
+    required int initialTabIndex,
+    required HazukiSourceService sourceService,
+    required DiscoverDailyRecommendationService dailyRecommendationService,
+  }) : _sourceService = sourceService,
+       _dailyRecommendationService = dailyRecommendationService,
+       _profileController = HomeProfileController(sourceService: sourceService),
+       _shellController = HomeShellController(initialTabIndex: initialTabIndex),
+       scaffoldKey = GlobalKey<ScaffoldState>(),
+       favoritePageKey = GlobalKey<FavoritePageState>() {
     _profileController.addListener(_relayChange);
     _shellController.addListener(_relayChange);
     _dailyRecommendationService.addListener(_relayChange);
@@ -27,10 +32,10 @@ class HomeCoordinator extends ChangeNotifier {
     'hazuki.comics/media',
   );
 
+  final HazukiSourceService _sourceService;
   final HomeProfileController _profileController;
   final HomeShellController _shellController;
-  final DiscoverDailyRecommendationService _dailyRecommendationService =
-      DiscoverDailyRecommendationService.instance;
+  final DiscoverDailyRecommendationService _dailyRecommendationService;
   final GlobalKey<ScaffoldState> scaffoldKey;
   final GlobalKey<FavoritePageState> favoritePageKey;
   bool _disposed = false;
@@ -56,8 +61,8 @@ class HomeCoordinator extends ChangeNotifier {
     unawaited(loadFirstUseText(context));
     unawaited(loadOtherSettings(context));
     unawaited(_prewarmSourceRuntime(context));
-    if (HazukiSourceService.instance.isLogged) {
-      unawaited(HazukiSourceService.instance.warmUpFavoritesDebugInfo());
+    if (_sourceService.isLogged) {
+      unawaited(_sourceService.warmUpFavoritesDebugInfo());
     }
   }
 
@@ -148,6 +153,7 @@ class HomeCoordinator extends ChangeNotifier {
       context: context,
       isMounted: isMounted,
       profileController: _profileController,
+      sourceService: _sourceService,
       mediaChannel: _mediaChannel,
       syncUserProfile: () => syncUserProfile(context),
     );
@@ -167,13 +173,13 @@ class HomeCoordinator extends ChangeNotifier {
   }
 
   Future<void> _prewarmSourceRuntime(BuildContext context) async {
-    await HazukiSourceService.instance.prewarmInBackground();
+    await _sourceService.prewarmInBackground();
     if (!context.mounted) {
       return;
     }
     await syncUserProfile(context);
-    if (HazukiSourceService.instance.isLogged) {
-      unawaited(HazukiSourceService.instance.warmUpFavoritesDebugInfo());
+    if (_sourceService.isLogged) {
+      unawaited(_sourceService.warmUpFavoritesDebugInfo());
     }
   }
 

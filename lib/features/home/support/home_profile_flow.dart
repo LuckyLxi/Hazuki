@@ -14,6 +14,7 @@ class HomeProfileFlow {
     required this.context,
     required this.isMounted,
     required this.profileController,
+    required this.sourceService,
     required this.mediaChannel,
     required this.syncUserProfile,
   });
@@ -21,6 +22,7 @@ class HomeProfileFlow {
   final BuildContext context;
   final bool Function() isMounted;
   final HomeProfileController profileController;
+  final HazukiSourceService sourceService;
   final MethodChannel mediaChannel;
   final Future<void> Function() syncUserProfile;
 
@@ -28,7 +30,7 @@ class HomeProfileFlow {
     String account,
     String password,
   ) async {
-    await HazukiSourceService.instance.login(
+    await sourceService.login(
       account: account,
       password: password,
     );
@@ -46,7 +48,7 @@ class HomeProfileFlow {
     unawaited(showHazukiPrompt(context, l10n(context).homeLoginSuccess));
     return HomeLoginDialogProfile(
       username:
-          HazukiSourceService.instance.currentAccount ??
+          sourceService.currentAccount ??
           profileController.username,
       avatarUrl: (profileController.avatarUrl ?? '').trim(),
     );
@@ -67,7 +69,7 @@ class HomeProfileFlow {
   }
 
   Future<void> logout() async {
-    if (!HazukiSourceService.instance.isLogged) {
+    if (!sourceService.isLogged) {
       return;
     }
 
@@ -76,7 +78,7 @@ class HomeProfileFlow {
       return;
     }
 
-    await HazukiSourceService.instance.logout();
+    await sourceService.logout();
     if (!isMounted() || !context.mounted) {
       return;
     }
@@ -94,6 +96,7 @@ class HomeProfileFlow {
       context,
       mediaChannel: mediaChannel,
       imageUrl: avatarUrl,
+      sourceService: sourceService,
     );
   }
 

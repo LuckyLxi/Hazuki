@@ -10,6 +10,8 @@ import 'package:hazuki/features/home/home.dart';
 import 'package:hazuki/features/reader/view/reader_page.dart';
 import 'package:hazuki/features/search/search.dart';
 import 'package:hazuki/models/hazuki_models.dart';
+import 'package:hazuki/services/discover_daily_recommendation_service.dart';
+import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 import 'package:hazuki/shared/chapter_title_resolver.dart';
 
@@ -110,7 +112,11 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
   @override
   void initState() {
     super.initState();
-    _coordinator = HomeCoordinator(initialTabIndex: widget.initialTabIndex);
+    _coordinator = HomeCoordinator(
+      initialTabIndex: widget.initialTabIndex,
+      sourceService: HazukiSourceService.instance,
+      dailyRecommendationService: DiscoverDailyRecommendationService.instance,
+    );
     _coordinator.start(context);
     WindowsComicDetailController.instance.panelBuilder =
         (
