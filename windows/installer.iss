@@ -18,11 +18,16 @@ SolidCompression=yes
 WizardStyle=modern
 WizardSizePercent=100
 WizardResizable=no
+ShowLanguageDialog=auto
+UsePreviousLanguage=no
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
 UninstallDisplayIcon={app}\{#AppExeName}
 CloseApplications=force
 
+[Languages]
+Name: "english"; MessagesFile: "compiler:Default.isl"
+Name: "chinesesimplified"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked

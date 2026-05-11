@@ -6,7 +6,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-
 enum PasswordVerificationResult { incomplete, success, failed, lockedOut }
 
 class PasswordLockService extends ChangeNotifier {

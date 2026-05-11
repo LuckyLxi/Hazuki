@@ -105,8 +105,7 @@ class _DiscoverDailyRecommendationCarouselState
   HazukiSourceService get _sourceService =>
       widget.sourceService ?? sl<HazukiSourceService>();
   DiscoverDailyRecommendationService get _recommendationService =>
-      widget.recommendationService ??
-      sl<DiscoverDailyRecommendationService>();
+      widget.recommendationService ?? sl<DiscoverDailyRecommendationService>();
   WindowsComicDetailController get _windowsController =>
       widget.windowsComicDetailController ??
       WindowsComicDetailController.instance;

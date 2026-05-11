@@ -201,11 +201,7 @@ class ImageCacheCapability {
     try {
       final bytes = await future;
       if (useDiskCache) {
-        await _saveToDisk(
-          normalizedUrl,
-          bytes,
-          sourceKey: resolvedSourceKey,
-        );
+        await _saveToDisk(normalizedUrl, bytes, sourceKey: resolvedSourceKey);
       }
       if (keepInMemory) {
         _putInMemoryCache(cacheKey, bytes);
@@ -290,10 +286,7 @@ class ImageCacheCapability {
 
   // ---------- Disk cache ----------
 
-  Future<Uint8List?> _readFromDisk(
-    String url, {
-    String sourceKey = '',
-  }) async {
+  Future<Uint8List?> _readFromDisk(String url, {String sourceKey = ''}) async {
     try {
       final file = await _cacheFileFor(url, sourceKey: sourceKey);
       if (!await file.exists()) {
@@ -400,8 +393,7 @@ class ImageCacheCapability {
     final mode = autoCleanMode;
 
     if (mode == 'seven_days') {
-      final lastAtMs =
-          prefs.getInt(SourcePrefsKeys.cacheLastAutoCleanAt) ?? 0;
+      final lastAtMs = prefs.getInt(SourcePrefsKeys.cacheLastAutoCleanAt) ?? 0;
       final shouldCleanByAge =
           force ||
           lastAtMs <= 0 ||
@@ -455,8 +447,8 @@ class ImageCacheCapability {
       return false;
     }
 
-    var targetBytes =
-        (limit * SourcePrefsKeys.cacheOverflowTrimTargetRatio).round();
+    var targetBytes = (limit * SourcePrefsKeys.cacheOverflowTrimTargetRatio)
+        .round();
     if (targetBytes < 0) {
       targetBytes = 0;
     }

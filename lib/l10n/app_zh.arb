@@ -982,7 +982,7 @@
   "advancedDebugSubtitle": "错误日志、操作日志、系统日志与性能日志",
   "advancedSoftwareLogCaptureTitle": "记录软件日志",
   "advancedSoftwareLogCaptureSubtitle": "关闭后将不再抓取错误、操作、系统与性能日志",
-  "advancedComicIdSearchTitle": "漫画 ID 搜索优化",
+  "advancedComicIdSearchTitle": "漫画 ID 识别",
   "advancedComicIdSearchSubtitle": "搜索文本可提取漫画 ID 时，在输入法上方显示可点击的提示",
   "advancedNoImageModeTitle": "无图模式",
   "advancedNoImageModeSubtitle": "全局不显示图片（侧边栏登录头像除外）",

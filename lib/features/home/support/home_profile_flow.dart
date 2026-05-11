@@ -30,10 +30,7 @@ class HomeProfileFlow {
     String account,
     String password,
   ) async {
-    await sourceService.login(
-      account: account,
-      password: password,
-    );
+    await sourceService.login(account: account, password: password);
 
     if (!isMounted()) {
       throw StateError('Home page disposed');
@@ -47,9 +44,7 @@ class HomeProfileFlow {
 
     unawaited(showHazukiPrompt(context, l10n(context).homeLoginSuccess));
     return HomeLoginDialogProfile(
-      username:
-          sourceService.currentAccount ??
-          profileController.username,
+      username: sourceService.currentAccount ?? profileController.username,
       avatarUrl: (profileController.avatarUrl ?? '').trim(),
     );
   }

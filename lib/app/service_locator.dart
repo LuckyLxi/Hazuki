@@ -17,10 +17,14 @@ final GetIt sl = GetIt.instance;
 /// Called once during startup, before any service `.instance` accessor is used.
 void registerServices() {
   if (!sl.isRegistered<CommentFilterService>()) {
-    sl.registerLazySingleton<CommentFilterService>(() => CommentFilterService());
+    sl.registerLazySingleton<CommentFilterService>(
+      () => CommentFilterService(),
+    );
   }
   if (!sl.isRegistered<LocalFavoritesService>()) {
-    sl.registerLazySingleton<LocalFavoritesService>(() => LocalFavoritesService());
+    sl.registerLazySingleton<LocalFavoritesService>(
+      () => LocalFavoritesService(),
+    );
   }
   if (!sl.isRegistered<PasswordLockService>()) {
     sl.registerLazySingleton<PasswordLockService>(() => PasswordLockService());
@@ -36,13 +40,14 @@ void registerServices() {
     );
   }
   if (!sl.isRegistered<MangaDownloadService>()) {
-    sl.registerLazySingleton<MangaDownloadService>(() => MangaDownloadService());
+    sl.registerLazySingleton<MangaDownloadService>(
+      () => MangaDownloadService(),
+    );
   }
   if (!sl.isRegistered<DiscoverDailyRecommendationService>()) {
     sl.registerLazySingleton<DiscoverDailyRecommendationService>(
-      () => DiscoverDailyRecommendationService(
-        source: sl<HazukiSourceService>(),
-      ),
+      () =>
+          DiscoverDailyRecommendationService(source: sl<HazukiSourceService>()),
     );
   }
   if (!sl.isRegistered<CloudSyncService>()) {

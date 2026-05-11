@@ -173,7 +173,10 @@ class DebugLogCapability {
       'contentPreview': toBodyPreview(contentText, keep: 320),
     });
     if (targetLogs.length > DebugLogConstants.maxTypedLogsKept) {
-      targetLogs.removeRange(0, targetLogs.length - DebugLogConstants.maxTypedLogsKept);
+      targetLogs.removeRange(
+        0,
+        targetLogs.length - DebugLogConstants.maxTypedLogsKept,
+      );
     }
   }
 
@@ -404,7 +407,8 @@ class DebugLogCapability {
       'content': safeContent,
       'contentPreview': toBodyPreview(contentText),
     });
-    if (recentApplicationLogs.length > DebugLogConstants.maxApplicationLogsKept) {
+    if (recentApplicationLogs.length >
+        DebugLogConstants.maxApplicationLogsKept) {
       recentApplicationLogs.removeRange(
         0,
         recentApplicationLogs.length - DebugLogConstants.maxApplicationLogsKept,
@@ -753,7 +757,9 @@ class DebugLogCapability {
       'cookie',
       'authorization',
     };
-    for (final entry in value.entries.take(DebugLogConstants.networkHeadersKeep)) {
+    for (final entry in value.entries.take(
+      DebugLogConstants.networkHeadersKeep,
+    )) {
       final key = entry.key.toString();
       final lower = key.toLowerCase();
       if (!allowed.contains(lower)) {

@@ -96,5 +96,4 @@ extension HazukiSourceServiceExploreCapability on HazukiSourceService {
     }
     return comics;
   }
-
 }

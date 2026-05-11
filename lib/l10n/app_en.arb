@@ -982,7 +982,7 @@
   "advancedDebugSubtitle": "Error, action, system, and performance logs",
   "advancedSoftwareLogCaptureTitle": "Record software logs",
   "advancedSoftwareLogCaptureSubtitle": "When turned off, error, action, system, and performance logs will no longer be captured",
-  "advancedComicIdSearchTitle": "Comic ID search optimization",
+  "advancedComicIdSearchTitle": "Comic ID detection",
   "advancedComicIdSearchSubtitle": "Show a tappable hint above the keyboard when a comic ID can be extracted from the search text",
   "advancedNoImageModeTitle": "No-image mode",
   "advancedNoImageModeSubtitle": "Hide images globally (except the login avatar in the sidebar)",

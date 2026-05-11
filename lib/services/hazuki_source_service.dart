@@ -391,7 +391,9 @@ class HazukiSourceService extends ChangeNotifier {
     final normalizedPage = page < 1 ? 1 : page;
     final normalizedOrder = order.trim().isEmpty ? 'mr' : order.trim();
 
-    final hasSearch = jsAsBool(engine.evaluate('!!this.__hazuki_source.search'));
+    final hasSearch = jsAsBool(
+      engine.evaluate('!!this.__hazuki_source.search'),
+    );
     final hasSearchLoad = jsAsBool(
       engine.evaluate('!!this.__hazuki_source.search?.load'),
     );
@@ -699,7 +701,9 @@ class SourceDebugLogStore {
   Map<String, dynamic>? get lastSourceVersionDebugInfo =>
       softwareLogCaptureEnabled ? lastSourceVersionDebugInfoStorage : null;
   set lastSourceVersionDebugInfo(Map<String, dynamic>? value) {
-    lastSourceVersionDebugInfoStorage = softwareLogCaptureEnabled ? value : null;
+    lastSourceVersionDebugInfoStorage = softwareLogCaptureEnabled
+        ? value
+        : null;
   }
 
   void clearCapturedLogs() {
@@ -855,7 +859,8 @@ class HazukiSourceFacade {
     return session._saveCookieStore(cookies);
   }
 
-  Future<Directory> ensureImageCacheDir() => _service.imageCache.ensureCacheDir();
+  Future<Directory> ensureImageCacheDir() =>
+      _service.imageCache.ensureCacheDir();
 
   Future<int> computeImageCacheSizeBytes() =>
       _service.imageCache.computeSizeBytes();
