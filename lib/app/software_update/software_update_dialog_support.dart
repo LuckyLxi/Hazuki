@@ -6,6 +6,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -395,8 +396,8 @@ class _SoftwareUpdateDialogCardState extends State<_SoftwareUpdateDialogCard> {
                 const SizedBox(height: 10),
                 Flexible(
                   child: SingleChildScrollView(
-                    child: Text(
-                      changelog,
+                    child: _LinkifiedChangelog(
+                      text: changelog,
                       style: textTheme.bodySmall?.copyWith(height: 1.45),
                     ),
                   ),
@@ -674,5 +675,67 @@ class _SoftwareUpdateDialogCardState extends State<_SoftwareUpdateDialogCard> {
       return '${(safeBytes / 1024).toStringAsFixed(1)} KB/s';
     }
     return '${safeBytes.toStringAsFixed(0)} B/s';
+  }
+}
+
+class _LinkifiedChangelog extends StatefulWidget {
+  const _LinkifiedChangelog({required this.text, this.style});
+
+  final String text;
+  final TextStyle? style;
+
+  @override
+  State<_LinkifiedChangelog> createState() => _LinkifiedChangelogState();
+}
+
+class _LinkifiedChangelogState extends State<_LinkifiedChangelog> {
+  // Matches Markdown-style links: [label](https://...)
+  static final RegExp _linkPattern = RegExp(
+    r'\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)',
+  );
+
+  final List<TapGestureRecognizer> _recognizers = [];
+
+  @override
+  void dispose() {
+    for (final r in _recognizers) {
+      r.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final linkStyle = (widget.style ?? const TextStyle()).copyWith(
+      color: colorScheme.primary,
+      decoration: TextDecoration.underline,
+      decorationColor: colorScheme.primary,
+    );
+
+    final spans = <InlineSpan>[];
+    final matches = _linkPattern.allMatches(widget.text).toList();
+    var cursor = 0;
+    for (final match in matches) {
+      if (match.start > cursor) {
+        spans.add(TextSpan(text: widget.text.substring(cursor, match.start)));
+      }
+      final label = match.group(1)!;
+      final url = match.group(2)!;
+      final recognizer = TapGestureRecognizer()
+        ..onTap = () {
+          launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+        };
+      _recognizers.add(recognizer);
+      spans.add(
+        TextSpan(text: label, style: linkStyle, recognizer: recognizer),
+      );
+      cursor = match.end;
+    }
+    if (cursor < widget.text.length) {
+      spans.add(TextSpan(text: widget.text.substring(cursor)));
+    }
+
+    return Text.rich(TextSpan(style: widget.style, children: spans));
   }
 }
