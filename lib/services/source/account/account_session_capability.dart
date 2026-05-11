@@ -44,7 +44,7 @@ extension HazukiSourceServiceAccountSessionCapability on HazukiSourceService {
         'ok': true,
         'account': account,
         'durationMs': DateTime.now().difference(startedAt).inMilliseconds,
-        'result': _jsonSafe(resolvedResult),
+        'result': jsonSafe(resolvedResult),
       };
       facade.networkLogSink.append(
         method: 'LOGIN',
@@ -56,7 +56,7 @@ extension HazukiSourceServiceAccountSessionCapability on HazukiSourceService {
         requestHeaders: const {},
         requestData: {'account': account},
         responseHeaders: const {},
-        responseBody: _jsonSafe(resolvedResult),
+        responseBody: jsonSafe(resolvedResult),
       );
       await facade.saveSourceData(sourceMeta.key, 'account', [
         account,
@@ -69,7 +69,7 @@ extension HazukiSourceServiceAccountSessionCapability on HazukiSourceService {
         'account': account,
         'durationMs': DateTime.now().difference(startedAt).inMilliseconds,
         'error': e.toString(),
-        'result': _jsonSafe(resolvedResult),
+        'result': jsonSafe(resolvedResult),
       };
       facade.networkLogSink.append(
         method: 'LOGIN',
@@ -81,7 +81,7 @@ extension HazukiSourceServiceAccountSessionCapability on HazukiSourceService {
         requestHeaders: const {},
         requestData: {'account': account},
         responseHeaders: const {},
-        responseBody: _jsonSafe(resolvedResult),
+        responseBody: jsonSafe(resolvedResult),
       );
       throw Exception('login_failed:$e');
     }

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/debug/debug_log_internals.dart';
 import 'logs_cards.dart';
 
 class LogsTabSpec {

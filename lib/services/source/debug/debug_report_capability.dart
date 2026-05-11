@@ -7,7 +7,7 @@ extension HazukiSourceServiceDebugReportCapability on HazukiSourceService {
     final logs = _typedDebugReportLogsFor(normalizedType);
     final approxBytes = logs.fold<int>(
       0,
-      (sum, item) => sum + _estimatePayloadBytes(item),
+      (sum, item) => sum + estimatePayloadBytes(item),
     );
     return <String, dynamic>{
       'type': normalizedType,
@@ -28,7 +28,7 @@ extension HazukiSourceServiceDebugReportCapability on HazukiSourceService {
         'keptCount': logs.length,
         'approxBytes': approxBytes,
       },
-      'logs': _copyLogsWithoutDedupKey(logs),
+      'logs': copyLogsWithoutDedupKey(logs),
     };
   }
 
@@ -52,7 +52,7 @@ extension HazukiSourceServiceDebugReportCapability on HazukiSourceService {
     final recentNetworkLogs = facade.debug.recentNetworkLogs;
     final approxBytes = recentNetworkLogs.fold<int>(
       0,
-      (sum, item) => sum + _estimatePayloadBytes(item),
+      (sum, item) => sum + estimatePayloadBytes(item),
     );
     return <String, dynamic>{
       'statusText': facade.statusText,
@@ -74,7 +74,7 @@ extension HazukiSourceServiceDebugReportCapability on HazukiSourceService {
       },
       'lastLoginDebugInfo': facade.lastLoginDebugInfo,
       'lastSourceVersionDebugInfo': facade.lastSourceVersionDebugInfo,
-      'recentNetworkLogs': _copyLogsWithoutDedupKey(recentNetworkLogs),
+      'recentNetworkLogs': copyLogsWithoutDedupKey(recentNetworkLogs),
     };
   }
 
@@ -83,7 +83,7 @@ extension HazukiSourceServiceDebugReportCapability on HazukiSourceService {
     final recentApplicationLogs = facade.debug.recentApplicationLogs;
     final approxBytes = recentApplicationLogs.fold<int>(
       0,
-      (sum, item) => sum + _estimatePayloadBytes(item),
+      (sum, item) => sum + estimatePayloadBytes(item),
     );
     return <String, dynamic>{
       'statusText': facade.statusText,
@@ -102,7 +102,7 @@ extension HazukiSourceServiceDebugReportCapability on HazukiSourceService {
         'keptCount': recentApplicationLogs.length,
         'approxBytes': approxBytes,
       },
-      'recentApplicationLogs': _copyLogsWithoutDedupKey(recentApplicationLogs),
+      'recentApplicationLogs': copyLogsWithoutDedupKey(recentApplicationLogs),
     };
   }
 
@@ -111,7 +111,7 @@ extension HazukiSourceServiceDebugReportCapability on HazukiSourceService {
     final recentReaderLogs = facade.debug.recentReaderLogs;
     final approxBytes = recentReaderLogs.fold<int>(
       0,
-      (sum, item) => sum + _estimatePayloadBytes(item),
+      (sum, item) => sum + estimatePayloadBytes(item),
     );
     return <String, dynamic>{
       'statusText': facade.statusText,
@@ -130,7 +130,7 @@ extension HazukiSourceServiceDebugReportCapability on HazukiSourceService {
         'keptCount': recentReaderLogs.length,
         'approxBytes': approxBytes,
       },
-      'recentReaderLogs': _copyLogsWithoutDedupKey(recentReaderLogs),
+      'recentReaderLogs': copyLogsWithoutDedupKey(recentReaderLogs),
     };
   }
 }

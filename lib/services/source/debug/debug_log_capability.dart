@@ -1,6 +1,12 @@
-part of '../../hazuki_source_service.dart';
+import 'dart:convert';
 
-extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
+import '../../hazuki_source_service.dart';
+import 'debug_log_internals.dart';
+
+class DebugLogCapability {
+  DebugLogCapability(this.facade);
+
+  final HazukiSourceFacade facade;
   void addDebugLog({
     required String type,
     required String level,
@@ -16,8 +22,8 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
       level: level,
       title: title,
       content: _compactGenericLogValue(
-        _jsonSafe(content),
-        maxStringLength: _debugApplicationStringKeep,
+        jsonSafe(content),
+        maxStringLength: DebugLogConstants.applicationStringKeep,
         maxItems: 24,
         maxDepth: 4,
       ),
@@ -50,8 +56,8 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
       level: level,
       title: title,
       content: _compactGenericLogValue(
-        _jsonSafe(content),
-        maxStringLength: _debugApplicationStringKeep,
+        jsonSafe(content),
+        maxStringLength: DebugLogConstants.applicationStringKeep,
         maxItems: 24,
         maxDepth: 4,
       ),
@@ -84,7 +90,7 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
       level: level,
       title: title,
       content: _compactReaderLogContent(
-        _jsonSafe(content),
+        jsonSafe(content),
         source: source,
         level: level,
       ),
@@ -94,13 +100,13 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
 
   void _pruneByAgeIfNeeded() {
     final now = DateTime.now();
-    if (facade.debug._lastAgeCleanupAt != null &&
-        now.difference(facade.debug._lastAgeCleanupAt!) <
+    if (facade.debug.lastAgeCleanupAt != null &&
+        now.difference(facade.debug.lastAgeCleanupAt!) <
             const Duration(hours: 1)) {
       return;
     }
-    facade.debug._lastAgeCleanupAt = now;
-    final cutoff = now.subtract(_debugLogMaxAge);
+    facade.debug.lastAgeCleanupAt = now;
+    final cutoff = now.subtract(DebugLogConstants.maxAge);
     _pruneListByAge(facade.debug.recentNetworkLogs, cutoff);
     _pruneListByAge(facade.debug.recentApplicationLogs, cutoff);
     _pruneListByAge(facade.debug.recentReaderLogs, cutoff);
@@ -131,8 +137,8 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
     final normalizedLevel = _normalizeDebugLevel(level);
     final sourceText = source.trim().isEmpty ? 'app' : source.trim();
     final titleText = title.trim().isEmpty ? 'Log' : title.trim();
-    final safeContent = _jsonSafe(content);
-    final contentText = _toBodyFull(safeContent) ?? 'null';
+    final safeContent = jsonSafe(content);
+    final contentText = toBodyFull(safeContent) ?? 'null';
     final dedupKey = [
       normalizedType,
       sourceText,
@@ -150,7 +156,7 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
       existing['lastSeenAt'] = now.toIso8601String();
       existing['level'] = normalizedLevel;
       existing['content'] = safeContent;
-      existing['contentPreview'] = _toBodyPreview(contentText, keep: 320);
+      existing['contentPreview'] = toBodyPreview(contentText, keep: 320);
       return;
     }
 
@@ -164,10 +170,10 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
       'level': normalizedLevel,
       'title': titleText,
       'content': safeContent,
-      'contentPreview': _toBodyPreview(contentText, keep: 320),
+      'contentPreview': toBodyPreview(contentText, keep: 320),
     });
-    if (targetLogs.length > _debugMaxTypedLogsKept) {
-      targetLogs.removeRange(0, targetLogs.length - _debugMaxTypedLogsKept);
+    if (targetLogs.length > DebugLogConstants.maxTypedLogsKept) {
+      targetLogs.removeRange(0, targetLogs.length - DebugLogConstants.maxTypedLogsKept);
     }
   }
 
@@ -211,7 +217,7 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
 
     final sourceText = source.toLowerCase();
     final titleText = title.toLowerCase();
-    final contentText = (_toBodyFull(_jsonSafe(content)) ?? '').toLowerCase();
+    final contentText = (toBodyFull(jsonSafe(content)) ?? '').toLowerCase();
     final combined = '$sourceText\n$titleText\n$contentText';
 
     const errorKeywords = [
@@ -304,11 +310,11 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
     final normalizedLevel = level.trim().isEmpty ? 'info' : level.trim();
     final titleText = title.trim().isEmpty ? 'Reader' : title.trim();
     final safeContent = _compactReaderLogContent(
-      _jsonSafe(content),
+      jsonSafe(content),
       source: source,
       level: normalizedLevel,
     );
-    final contentText = _toBodyFull(safeContent) ?? 'null';
+    final contentText = toBodyFull(safeContent) ?? 'null';
     final dedupKey = [
       source,
       normalizedLevel.toLowerCase(),
@@ -326,7 +332,7 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
       existing['level'] = normalizedLevel;
       existing['title'] = titleText;
       existing['content'] = safeContent;
-      existing['contentPreview'] = _toBodyPreview(contentText);
+      existing['contentPreview'] = toBodyPreview(contentText);
       return;
     }
 
@@ -339,12 +345,12 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
       'level': normalizedLevel,
       'title': titleText,
       'content': safeContent,
-      'contentPreview': _toBodyPreview(contentText),
+      'contentPreview': toBodyPreview(contentText),
     });
-    if (recentReaderLogs.length > _debugMaxReaderLogsKept) {
+    if (recentReaderLogs.length > DebugLogConstants.maxReaderLogsKept) {
       recentReaderLogs.removeRange(
         0,
-        recentReaderLogs.length - _debugMaxReaderLogsKept,
+        recentReaderLogs.length - DebugLogConstants.maxReaderLogsKept,
       );
     }
   }
@@ -360,12 +366,12 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
     final normalizedLevel = level.trim().isEmpty ? 'info' : level.trim();
     final titleText = title.trim().isEmpty ? 'Application' : title.trim();
     final safeContent = _compactGenericLogValue(
-      _jsonSafe(content),
-      maxStringLength: _debugApplicationStringKeep,
+      jsonSafe(content),
+      maxStringLength: DebugLogConstants.applicationStringKeep,
       maxItems: 20,
       maxDepth: 4,
     );
-    final contentText = _toBodyFull(safeContent) ?? 'null';
+    final contentText = toBodyFull(safeContent) ?? 'null';
     final dedupKey = [
       source,
       normalizedLevel.toLowerCase(),
@@ -383,7 +389,7 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
       existing['level'] = normalizedLevel;
       existing['title'] = titleText;
       existing['content'] = safeContent;
-      existing['contentPreview'] = _toBodyPreview(contentText);
+      existing['contentPreview'] = toBodyPreview(contentText);
       return;
     }
 
@@ -396,12 +402,12 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
       'level': normalizedLevel,
       'title': titleText,
       'content': safeContent,
-      'contentPreview': _toBodyPreview(contentText),
+      'contentPreview': toBodyPreview(contentText),
     });
-    if (recentApplicationLogs.length > _debugMaxApplicationLogsKept) {
+    if (recentApplicationLogs.length > DebugLogConstants.maxApplicationLogsKept) {
       recentApplicationLogs.removeRange(
         0,
-        recentApplicationLogs.length - _debugMaxApplicationLogsKept,
+        recentApplicationLogs.length - DebugLogConstants.maxApplicationLogsKept,
       );
     }
   }
@@ -455,32 +461,32 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
       durationMs: durationMs,
     );
     final requestHeadersSafe = keepRequestDetails
-        ? _compactNetworkHeaders(_jsonSafe(requestHeaders))
+        ? _compactNetworkHeaders(jsonSafe(requestHeaders))
         : null;
     final requestDataSafe = keepRequestDetails
-        ? _compactNetworkPayload(_jsonSafe(requestData), keep: 420)
+        ? _compactNetworkPayload(jsonSafe(requestData), keep: 420)
         : null;
     final responseHeadersSafe = keepResponseDetails
-        ? _compactNetworkHeaders(_jsonSafe(responseHeaders))
+        ? _compactNetworkHeaders(jsonSafe(responseHeaders))
         : null;
     final responseBodyFull = keepResponseDetails
-        ? _toBodyPreview(
-            _toBodyFull(responseBody),
-            keep: _debugNetworkFullBodyKeep,
+        ? toBodyPreview(
+            toBodyFull(responseBody),
+            keep: DebugLogConstants.networkFullBodyKeep,
           )
         : null;
     final responseBodyPreviewSource = keepResponseDetails
         ? responseBodyFull
-        : _toBodyPreview(
-            _toBodyFull(responseBody),
-            keep: _debugNetworkPreviewKeep,
+        : toBodyPreview(
+            toBodyFull(responseBody),
+            keep: DebugLogConstants.networkPreviewKeep,
           );
     final responseBodyPreview = isImportant
-        ? _toBodyPreview(
+        ? toBodyPreview(
             responseBodyPreviewSource,
-            keep: _debugNetworkPreviewKeep,
+            keep: DebugLogConstants.networkPreviewKeep,
           )
-        : _toBodyPreview(_toBodyFull(responseBody), keep: 160);
+        : toBodyPreview(toBodyFull(responseBody), keep: 160);
 
     final dedupKey = [
       category ?? '',
@@ -597,10 +603,10 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
       source: source,
       content: typedContent,
     );
-    if (recentNetworkLogs.length > _debugMaxNetworkLogsKept) {
+    if (recentNetworkLogs.length > DebugLogConstants.maxNetworkLogsKept) {
       recentNetworkLogs.removeRange(
         0,
-        recentNetworkLogs.length - _debugMaxNetworkLogsKept,
+        recentNetworkLogs.length - DebugLogConstants.maxNetworkLogsKept,
       );
     }
   }
@@ -728,7 +734,7 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
       return _compactGenericLogValue(
         value,
         maxStringLength: 160,
-        maxItems: _debugNetworkHeadersKeep,
+        maxItems: DebugLogConstants.networkHeadersKeep,
         maxDepth: 2,
       );
     }
@@ -747,7 +753,7 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
       'cookie',
       'authorization',
     };
-    for (final entry in value.entries.take(_debugNetworkHeadersKeep)) {
+    for (final entry in value.entries.take(DebugLogConstants.networkHeadersKeep)) {
       final key = entry.key.toString();
       final lower = key.toLowerCase();
       if (!allowed.contains(lower)) {
@@ -785,7 +791,7 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
   }) {
     final compacted = _compactGenericLogValue(
       value,
-      maxStringLength: _debugReaderStringKeep,
+      maxStringLength: DebugLogConstants.readerStringKeep,
       maxItems: 40,
       maxDepth: 4,
     );
@@ -939,7 +945,7 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
       }
     }
     if (value is String) {
-      return _toBodyPreview(value, keep: maxStringLength);
+      return toBodyPreview(value, keep: maxStringLength);
     }
     if (value is num || value is bool) {
       return value;
@@ -986,6 +992,6 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
       }
       return limited;
     }
-    return _toBodyPreview(value.toString(), keep: maxStringLength);
+    return toBodyPreview(value.toString(), keep: maxStringLength);
   }
 }

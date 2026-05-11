@@ -20,6 +20,8 @@ import '../shared/chapter_title_resolver.dart';
 import '../models/hazuki_models.dart';
 import 'source/common/source_json_coerce.dart';
 import 'source/common/source_prefs_keys.dart';
+import 'source/debug/debug_log_capability.dart';
+import 'source/debug/debug_log_internals.dart';
 import 'source/debug/source_network_log_sink.dart';
 import 'source/http/source_http_gateway.dart';
 import 'source/image/image_cache_capability.dart';
@@ -44,7 +46,6 @@ part 'source/comments/comments_capability.dart';
 
 part 'source/debug/debug_capability.dart';
 part 'source/debug/debug_favorites_capability.dart';
-part 'source/debug/debug_log_storage_capability.dart';
 part 'source/debug/debug_report_capability.dart';
 
 part 'source/favorites/favorites_capability.dart';
@@ -214,6 +215,71 @@ class HazukiSourceService extends ChangeNotifier {
 
   late final ImageCacheCapability imageCache = ImageCacheCapability(this);
   late final ExploreCacheCapability exploreCache = ExploreCacheCapability(this);
+  late final DebugLogCapability debugLog = DebugLogCapability(facade);
+
+  void addDebugLog({
+    required String type,
+    required String level,
+    required String title,
+    Object? content,
+    String source = 'app',
+  }) => debugLog.addDebugLog(
+    type: type,
+    level: level,
+    title: title,
+    content: content,
+    source: source,
+  );
+
+  void addApplicationLog({
+    required String level,
+    required String title,
+    Object? content,
+    String source = 'app',
+  }) => debugLog.addApplicationLog(
+    level: level,
+    title: title,
+    content: content,
+    source: source,
+  );
+
+  void addReaderLog({
+    required String level,
+    required String title,
+    Object? content,
+    String source = 'reader',
+  }) => debugLog.addReaderLog(
+    level: level,
+    title: title,
+    content: content,
+    source: source,
+  );
+
+  void appendNetworkLogEntry({
+    required String method,
+    required String url,
+    required int? statusCode,
+    required String? error,
+    required DateTime startedAt,
+    String source = 'js_http',
+    String? category,
+    Map<String, dynamic>? requestHeaders,
+    Object? requestData,
+    Map<String, dynamic>? responseHeaders,
+    Object? responseBody,
+  }) => debugLog.appendNetworkLogEntry(
+    method: method,
+    url: url,
+    statusCode: statusCode,
+    error: error,
+    startedAt: startedAt,
+    source: source,
+    category: category,
+    requestHeaders: requestHeaders,
+    requestData: requestData,
+    responseHeaders: responseHeaders,
+    responseBody: responseBody,
+  );
 
   int get imageCacheMaxBytes => imageCache.maxBytes;
   Future<void> setImageCacheMaxBytes(int value) =>
@@ -339,7 +405,7 @@ class HazukiSourceService extends ChangeNotifier {
       'this.__hazuki_source.search.load(${jsonEncode(normalizedKeyword)}, $optionsArg, $normalizedPage)',
       name: 'source_search.js',
     );
-    final dynamic resolved = await _awaitJsResult(result);
+    final dynamic resolved = await awaitJsResult(result);
 
     if (resolved is! Map) {
       return const SearchComicsResult(comics: [], maxPage: null);
@@ -621,7 +687,7 @@ class SourceDebugLogStore {
   final List<Map<String, dynamic>> recentSystemLogs = [];
   final List<Map<String, dynamic>> recentPerformanceLogs = [];
   int networkLogDedupedCount = 0;
-  DateTime? _lastAgeCleanupAt;
+  DateTime? lastAgeCleanupAt;
   Map<String, dynamic>? lastLoginDebugInfoStorage;
   Map<String, dynamic>? lastSourceVersionDebugInfoStorage;
 
@@ -664,7 +730,7 @@ class SourceJsBridge {
   }
 
   Future<dynamic> resolve(dynamic value) {
-    return _awaitJsResult(value);
+    return awaitJsResult(value);
   }
 
   bool asBool(dynamic value) => jsAsBool(value);

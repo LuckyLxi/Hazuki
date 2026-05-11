@@ -66,7 +66,7 @@ extension HazukiSourceServiceFavoritesDebugCapability on HazukiSourceService {
     checks['hasFavorites'] = facade.js.asBool(
       facade.js.evaluate('!!this.__hazuki_source?.favorites'),
     );
-    checks['multiFolder'] = _jsonSafe(
+    checks['multiFolder'] = jsonSafe(
       engine.evaluate('this.__hazuki_source?.favorites?.multiFolder'),
     );
     checks['hasLoadFolders'] = facade.js.asBool(
@@ -153,7 +153,7 @@ extension HazukiSourceServiceFavoritesDebugCapability on HazukiSourceService {
       final resolved = await facade.js
           .resolve(result)
           .timeout(const Duration(seconds: 20));
-      return {'ok': true, 'data': _jsonSafe(resolved)};
+      return {'ok': true, 'data': jsonSafe(resolved)};
     } catch (e) {
       return {'ok': false, 'error': e.toString()};
     }
