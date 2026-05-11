@@ -164,5 +164,72 @@ void main() {
         'local',
       ]);
     });
+
+    test('trims merged search history to the shared local limit', () async {
+      SharedPreferences.setMockInitialValues({
+        'search_history': List.generate(10, (index) => 'local-$index'),
+      });
+
+      final remoteSearchHistory = List.generate(
+        hazukiSearchHistoryMaxCount + 5,
+        (index) => jsonEncode({'keyword': 'remote-$index'}),
+      ).join('\n');
+
+      await CloudSyncSnapshotCodec(
+        configStore: CloudSyncConfigStore(),
+      ).mergeRemoteIntoLocal(
+        _FakeCloudSyncRemoteClient({
+          CloudSyncConfigStore.searchHistoryFileName: remoteSearchHistory,
+        }),
+      );
+
+      final prefs = await SharedPreferences.getInstance();
+      final history = prefs.getStringList('search_history')!;
+      expect(history, hasLength(hazukiSearchHistoryMaxCount));
+      expect(history.take(10), List.generate(10, (index) => 'local-$index'));
+      expect(history[10], 'remote-0');
+      expect(history.last, 'remote-${hazukiSearchHistoryMaxCount - 11}');
+    });
+
+    test('trims restored search history to the shared local limit', () async {
+      final backupSearchHistory = List.generate(
+        hazukiSearchHistoryMaxCount + 5,
+        (index) => jsonEncode({'keyword': 'keyword-$index'}),
+      ).join('\n');
+
+      await CloudSyncRestoreApplier().applySearchHistoryJsonl(
+        backupSearchHistory,
+      );
+
+      final prefs = await SharedPreferences.getInstance();
+      final history = prefs.getStringList('search_history')!;
+      expect(history, hasLength(hazukiSearchHistoryMaxCount));
+      expect(history.first, 'keyword-0');
+      expect(history.last, 'keyword-${hazukiSearchHistoryMaxCount - 1}');
+    });
+
+    test('trims backed up search history to the shared local limit', () async {
+      SharedPreferences.setMockInitialValues({
+        'search_history': List.generate(
+          hazukiSearchHistoryMaxCount + 5,
+          (index) => 'keyword-$index',
+        ),
+      });
+
+      final snapshot = await CloudSyncSnapshotCodec(
+        configStore: CloudSyncConfigStore(),
+      ).buildLocalSnapshotFiles();
+      final lines = snapshot.searchHistoryJsonl
+          .split('\n')
+          .where((line) => line.trim().isNotEmpty)
+          .toList();
+
+      expect(snapshot.searchCount, hazukiSearchHistoryMaxCount);
+      expect(lines, hasLength(hazukiSearchHistoryMaxCount));
+      expect(
+        jsonDecode(lines.last)['keyword'],
+        'keyword-${hazukiSearchHistoryMaxCount - 1}',
+      );
+    });
   });
 }

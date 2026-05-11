@@ -179,7 +179,7 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
   static const String authorsAssetPath = 'assets/data/authors.txt';
   static const String _cachePayloadKey = 'discover_daily_recommendation_cache';
   static const int _cacheSchemaVersion = 2;
-  static const Duration _cacheTtl = Duration(minutes: 10);
+  static const Duration _cacheTtl = Duration(minutes: 15);
   static const int recommendationCount = 7;
 
   final math.Random _random = math.Random();

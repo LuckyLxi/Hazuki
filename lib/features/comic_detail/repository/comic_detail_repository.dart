@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:hazuki/app/app_preferences.dart';
 import 'package:hazuki/features/favorite/repository/favorite_folders_repository.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
@@ -229,8 +230,8 @@ class ComicDetailRepository implements FavoriteFoldersRepository {
         'timestamp': DateTime.now().millisecondsSinceEpoch,
       });
 
-      if (history.length > 70) {
-        history = history.sublist(0, 70);
+      if (history.length > hazukiReadHistoryMaxCount) {
+        history = history.sublist(0, hazukiReadHistoryMaxCount);
       }
 
       await prefs.setString('hazuki_read_history', jsonEncode(history));

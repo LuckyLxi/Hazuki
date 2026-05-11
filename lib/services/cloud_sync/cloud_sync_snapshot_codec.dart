@@ -105,8 +105,8 @@ class CloudSyncSnapshotCodec {
               (a['timestamp'] as num?)?.toInt() ?? 0,
             ),
           );
-        if (historyList.length > 150) {
-          historyList = historyList.sublist(0, 150);
+        if (historyList.length > hazukiReadHistoryMaxCount) {
+          historyList = historyList.sublist(0, hazukiReadHistoryMaxCount);
         }
         await prefs.setString('hazuki_read_history', jsonEncode(historyList));
 
@@ -218,8 +218,11 @@ class CloudSyncSnapshotCodec {
     final localKeywords = localSearchSnapshot ?? const <String>[];
     final merged = <String>[];
     final seen = <String>{};
-    for (final keyword in [...remoteKeywords, ...localKeywords]) {
+    for (final keyword in [...localKeywords, ...remoteKeywords]) {
       if (seen.add(keyword)) merged.add(keyword);
+    }
+    if (merged.length > hazukiSearchHistoryMaxCount) {
+      merged.removeRange(hazukiSearchHistoryMaxCount, merged.length);
     }
     await prefs.setStringList('search_history', merged);
 
@@ -279,8 +282,8 @@ class CloudSyncSnapshotCodec {
         }
       } catch (_) {}
     }
-    if (history.length > 150) {
-      history = history.sublist(0, 150);
+    if (history.length > hazukiReadHistoryMaxCount) {
+      history = history.sublist(0, hazukiReadHistoryMaxCount);
     }
 
     final progress = <Map<String, dynamic>>[];
@@ -321,7 +324,8 @@ class CloudSyncSnapshotCodec {
       'progress': progress,
     });
 
-    final search = prefs.getStringList('search_history') ?? const <String>[];
+    final search = (prefs.getStringList('search_history') ?? const <String>[])
+        .take(hazukiSearchHistoryMaxCount);
     final lines = search
         .map((keyword) => jsonEncode({'keyword': keyword}))
         .join('\n');

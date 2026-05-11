@@ -1,8 +1,9 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:hazuki/app/app_preferences.dart';
+
 class SearchHistoryService {
   static const _key = 'search_history';
-  static const _maxCount = 50;
 
   Future<List<String>> load() async {
     final prefs = await SharedPreferences.getInstance();
@@ -16,8 +17,8 @@ class SearchHistoryService {
     final prefs = await SharedPreferences.getInstance();
     final history = prefs.getStringList(_key) ?? const <String>[];
     final next = [keyword, ...history.where((e) => e != keyword)];
-    if (next.length > _maxCount) {
-      next.removeRange(_maxCount, next.length);
+    if (next.length > hazukiSearchHistoryMaxCount) {
+      next.removeRange(hazukiSearchHistoryMaxCount, next.length);
     }
     await prefs.setStringList(_key, next);
   }

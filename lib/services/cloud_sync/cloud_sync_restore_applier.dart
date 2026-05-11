@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../app/app_preferences.dart';
 import '../hazuki_source_service.dart';
 import '../../models/hazuki_models.dart';
 import 'cloud_sync_config_store.dart';
@@ -85,7 +86,9 @@ class CloudSyncRestoreApplier {
           .whereType<Map>()
           .map((e) => Map<String, dynamic>.from(e))
           .toList();
-      final trimmed = history.length > 150 ? history.sublist(0, 150) : history;
+      final trimmed = history.length > hazukiReadHistoryMaxCount
+          ? history.sublist(0, hazukiReadHistoryMaxCount)
+          : history;
       await prefs.setString('hazuki_read_history', jsonEncode(trimmed));
     }
 
@@ -149,6 +152,9 @@ class CloudSyncRestoreApplier {
     for (final keyword in list) {
       if (seen.add(keyword)) {
         deduped.add(keyword);
+        if (deduped.length >= hazukiSearchHistoryMaxCount) {
+          break;
+        }
       }
     }
     final prefs = await SharedPreferences.getInstance();
