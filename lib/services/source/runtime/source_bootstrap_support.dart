@@ -106,7 +106,7 @@ extension SourceBootstrapSupport on HazukiSourceService {
           prefs.getBool(SourcePrefsKeys.softwareLogCaptureEnabled) ??
           false;
       _configureDioCookieBridge();
-      await _initImageCache();
+      await imageCache.init();
       await _initDiscoverCache();
       _setRuntimeBusyState(
         busyPhase,
