@@ -124,7 +124,7 @@ extension _JsBridgeSupport on HazukiSourceService {
       response?.headers.forEach((name, values) {
         responseHeadersForLog[name] = values.join(',');
       });
-      _appendNetworkLog(
+      facade.networkLogSink.append(
         method: method,
         url: url,
         statusCode: response?.statusCode,
@@ -183,7 +183,7 @@ extension _JsBridgeSupport on HazukiSourceService {
             response.headers.forEach((name, values) {
               responseHeadersForLog[name] = values.join(',');
             });
-            _appendNetworkLog(
+            facade.networkLogSink.append(
               method: response.requestOptions.method,
               url: requestUrl,
               statusCode: response.statusCode,
@@ -214,7 +214,7 @@ extension _JsBridgeSupport on HazukiSourceService {
             response?.headers.forEach((name, values) {
               responseHeadersForLog[name] = values.join(',');
             });
-            _appendNetworkLog(
+            facade.networkLogSink.append(
               method: options.method,
               url: options.uri.toString(),
               statusCode: response?.statusCode,

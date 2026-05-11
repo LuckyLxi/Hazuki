@@ -148,7 +148,7 @@ extension SourceBootstrapSupport on HazukiSourceService {
             extra: {'skipNetworkDebugLog': true, 'hazukiLogCategory': source},
           ),
         );
-        _appendNetworkLog(
+        facade.networkLogSink.append(
           source: source,
           method: 'GET',
           url: url,
@@ -164,7 +164,7 @@ extension SourceBootstrapSupport on HazukiSourceService {
           return response.data;
         }
       } catch (e) {
-        _appendNetworkLog(
+        facade.networkLogSink.append(
           source: source,
           method: 'GET',
           url: url,
@@ -222,7 +222,7 @@ extension SourceBootstrapSupport on HazukiSourceService {
           ),
           onReceiveProgress: onProgress,
         );
-        _appendNetworkLog(
+        facade.networkLogSink.append(
           source: source,
           method: 'GET',
           url: url,
@@ -238,7 +238,7 @@ extension SourceBootstrapSupport on HazukiSourceService {
           return response.data;
         }
       } catch (e) {
-        _appendNetworkLog(
+        facade.networkLogSink.append(
           source: source,
           method: 'GET',
           url: url,

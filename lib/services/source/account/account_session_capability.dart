@@ -46,7 +46,7 @@ extension HazukiSourceServiceAccountSessionCapability on HazukiSourceService {
         'durationMs': DateTime.now().difference(startedAt).inMilliseconds,
         'result': _jsonSafe(resolvedResult),
       };
-      _appendNetworkLog(
+      facade.networkLogSink.append(
         method: 'LOGIN',
         url: 'source://account.login',
         statusCode: 200,
@@ -71,7 +71,7 @@ extension HazukiSourceServiceAccountSessionCapability on HazukiSourceService {
         'error': e.toString(),
         'result': _jsonSafe(resolvedResult),
       };
-      _appendNetworkLog(
+      facade.networkLogSink.append(
         method: 'LOGIN',
         url: 'source://account.login',
         statusCode: null,

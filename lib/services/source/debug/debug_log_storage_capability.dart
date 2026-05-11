@@ -406,7 +406,7 @@ extension HazukiSourceServiceDebugLogStorageCapability on HazukiSourceService {
     }
   }
 
-  void _appendNetworkLog({
+  void appendNetworkLogEntry({
     required String method,
     required String url,
     required int? statusCode,
