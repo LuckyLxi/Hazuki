@@ -44,7 +44,6 @@ part 'source/comic/comic_details_capability.dart';
 part 'source/comments/comments_avatar_support.dart';
 part 'source/comments/comments_capability.dart';
 
-part 'source/debug/debug_capability.dart';
 part 'source/debug/debug_favorites_capability.dart';
 part 'source/debug/debug_report_capability.dart';
 
