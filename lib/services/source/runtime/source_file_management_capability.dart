@@ -64,8 +64,7 @@ extension HazukiSourceServiceSourceFileManagementCapability
       );
       facade.lastReloginAt = null;
       facade.favoritesDebugCache = null;
-      _exploreSectionsMemoryCache = null;
-      _exploreSectionsMemoryCachedAt = null;
+      exploreCache.clearMemory();
       facade.cache.clearCategoryTagGroupsMemoryCache();
       final result = await _ensureLocalSourceFiles();
       _setRuntimeBusyState(

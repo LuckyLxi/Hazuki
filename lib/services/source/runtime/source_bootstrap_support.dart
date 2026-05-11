@@ -107,7 +107,7 @@ extension SourceBootstrapSupport on HazukiSourceService {
           false;
       _configureDioCookieBridge();
       await imageCache.init();
-      await _initDiscoverCache();
+      await exploreCache.init();
       _setRuntimeBusyState(
         busyPhase,
         SourceRuntimeStep.downloadingSource,

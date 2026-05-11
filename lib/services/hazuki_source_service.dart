@@ -23,6 +23,7 @@ import 'source/common/source_prefs_keys.dart';
 import 'source/debug/source_network_log_sink.dart';
 import 'source/http/source_http_gateway.dart';
 import 'source/image/image_cache_capability.dart';
+import 'source/runtime/explore_cache_capability.dart';
 import 'source/runtime/line_settings_capability.dart';
 
 part 'source/explore_capability.dart';
@@ -212,6 +213,7 @@ class HazukiSourceService extends ChangeNotifier {
   );
 
   late final ImageCacheCapability imageCache = ImageCacheCapability(this);
+  late final ExploreCacheCapability exploreCache = ExploreCacheCapability(this);
 
   int get imageCacheMaxBytes => imageCache.maxBytes;
   Future<void> setImageCacheMaxBytes(int value) =>
@@ -277,23 +279,9 @@ class HazukiSourceService extends ChangeNotifier {
   LinkedHashMap<String, ComicDetailsData> get _comicDetailsMemoryCache =>
       _cacheStore.comicDetailsMemoryCache;
 
-  List<ExploreSection>? get _exploreSectionsMemoryCache =>
-      _cacheStore.exploreSectionsMemoryCache;
-  set _exploreSectionsMemoryCache(List<ExploreSection>? value) =>
-      _cacheStore.exploreSectionsMemoryCache = value;
-
-  DateTime? get _exploreSectionsMemoryCachedAt =>
-      _cacheStore.exploreSectionsMemoryCachedAt;
-  set _exploreSectionsMemoryCachedAt(DateTime? value) =>
-      _cacheStore.exploreSectionsMemoryCachedAt = value;
-
   Directory? get _comicDetailsCacheDir => _cacheStore.comicDetailsCacheDir;
   set _comicDetailsCacheDir(Directory? value) =>
       _cacheStore.comicDetailsCacheDir = value;
-
-  Directory? get _discoverCacheDir => _cacheStore.discoverCacheDir;
-  set _discoverCacheDir(Directory? value) =>
-      _cacheStore.discoverCacheDir = value;
 
   String get statusText => _statusText;
   SourceRuntimeState get sourceRuntimeState => _runtimeState;

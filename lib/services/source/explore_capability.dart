@@ -8,13 +8,12 @@ extension HazukiSourceServiceExploreCapability on HazukiSourceService {
     await facade.ensureInitialized();
 
     if (!forceRefresh) {
-      final memoryCached = _getExploreSectionsFromMemoryCache();
+      final memoryCached = exploreCache.getCachedSections();
       if (memoryCached != null) {
         return memoryCached;
       }
     } else {
-      _exploreSectionsMemoryCache = null;
-      _exploreSectionsMemoryCachedAt = null;
+      exploreCache.clearMemory();
     }
 
     final engine = facade.js.engine;
@@ -72,7 +71,7 @@ extension HazukiSourceServiceExploreCapability on HazukiSourceService {
       }
     }
 
-    _putExploreSectionsInMemoryCache(sections);
+    exploreCache.putSections(sections);
     return List<ExploreSection>.unmodifiable(sections);
   }
 
@@ -98,36 +97,4 @@ extension HazukiSourceServiceExploreCapability on HazukiSourceService {
     return comics;
   }
 
-  Future<void> _initDiscoverCache() async {
-    _exploreSectionsMemoryCache = null;
-    _exploreSectionsMemoryCachedAt = null;
-    facade.cache.clearCategoryTagGroupsMemoryCache();
-    final dir = _discoverCacheDir;
-    _discoverCacheDir = null;
-    try {
-      if (dir != null && await dir.exists()) {
-        await dir.delete(recursive: true);
-      }
-    } catch (_) {}
-  }
-
-  List<ExploreSection>? _getExploreSectionsFromMemoryCache() {
-    final sections = _exploreSectionsMemoryCache;
-    final cachedAt = _exploreSectionsMemoryCachedAt;
-    if (sections == null || cachedAt == null) {
-      return null;
-    }
-    if (DateTime.now().difference(cachedAt) >
-        SourcePrefsKeys.discoverCacheTtl) {
-      _exploreSectionsMemoryCache = null;
-      _exploreSectionsMemoryCachedAt = null;
-      return null;
-    }
-    return sections;
-  }
-
-  void _putExploreSectionsInMemoryCache(List<ExploreSection> sections) {
-    _exploreSectionsMemoryCache = List<ExploreSection>.unmodifiable(sections);
-    _exploreSectionsMemoryCachedAt = DateTime.now();
-  }
 }

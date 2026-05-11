@@ -173,8 +173,7 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
       );
       facade.lastReloginAt = null;
       facade.favoritesDebugCache = null;
-      _exploreSectionsMemoryCache = null;
-      _exploreSectionsMemoryCachedAt = null;
+      exploreCache.clearMemory();
       facade.cache.clearCategoryTagGroupsMemoryCache();
       facade.runtime.sourceMeta = null;
       final result = await _downloadOrLoadSourceFiles();
