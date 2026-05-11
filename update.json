@@ -1,12 +1,12 @@
 {
-  "version": "1.0.9",
-  "releaseUrl": "https://github.com/LuckyLxi/Hazuki/releases/tag/v1.0.9",
+  "version": "1.1.0",
+  "releaseUrl": "https://github.com/LuckyLxi/Hazuki/releases/tag/v1.1.0",
   "apkUrls": {
-    "arm64-v8a": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.9/app-arm64-v8a-release.apk"
+    "arm64-v8a": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.1.0/app-arm64-v8a-release.apk"
   },
   "windowsUrls": {
-    "x64_zip": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.9/hazuki-windows-x64-v1.0.9.zip",
-    "x64_exe": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.0.9/hazuki-windows-x64-v1.0.9-setup.exe"
+    "x64_zip": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.1.0/hazuki-windows-x64-v1.1.0.zip",
+    "x64_exe": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.1.0/hazuki-windows-x64-v1.1.0-setup.exe"
   },
-  "changelog": "v1.0.9\n\n- 支持漫画点赞功能"
+  "changelog": "[查看完整提交记录](https://github.com/LuckyLxi/Hazuki/compare/v1.0.9...v1.0.10)"
 }
