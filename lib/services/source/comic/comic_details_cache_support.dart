@@ -148,8 +148,8 @@ extension HazukiSourceServiceComicDetailsCacheSupport on HazukiSourceService {
       chapters: chapters,
       tags: tags,
       recommend: recommend,
-      isFavorite: _asBool(map['isFavorite']),
-      isLiked: _asBool(map['isLiked']),
+      isFavorite: jsAsBool(map['isFavorite']),
+      isLiked: jsAsBool(map['isLiked']),
       subId: map['subId']?.toString() ?? '',
       sourceKey: sourceKey,
     );

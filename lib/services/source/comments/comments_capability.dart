@@ -30,7 +30,7 @@ extension HazukiSourceServiceCommentsCapability on HazukiSourceService {
     if (commentsRaw is! List) {
       return ComicCommentsPageResult(
         comments: const [],
-        maxPage: _asInt(resultMap['maxPage']),
+        maxPage: jsAsInt(resultMap['maxPage']),
       );
     }
 
@@ -42,10 +42,10 @@ extension HazukiSourceServiceCommentsCapability on HazukiSourceService {
         time: map['time']?.toString() ?? '',
         content: map['content']?.toString() ?? '',
         id: map['id']?.toString() ?? map['commentId']?.toString(),
-        replyCount: _asInt(map['replyCount']),
+        replyCount: jsAsInt(map['replyCount']),
         isLiked: map['isLiked'] is bool ? map['isLiked'] as bool : null,
-        score: _asInt(map['score']),
-        voteStatus: _asInt(map['voteStatus']),
+        score: jsAsInt(map['score']),
+        voteStatus: jsAsInt(map['voteStatus']),
       );
     }).toList();
 
@@ -55,7 +55,7 @@ extension HazukiSourceServiceCommentsCapability on HazukiSourceService {
 
     return ComicCommentsPageResult(
       comments: comments,
-      maxPage: _asInt(resultMap['maxPage']),
+      maxPage: jsAsInt(resultMap['maxPage']),
     );
   }
 

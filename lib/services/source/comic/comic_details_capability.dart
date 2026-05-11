@@ -166,8 +166,8 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
       chapters: chapters,
       tags: _extractComicDetailsTags(map),
       recommend: recommend,
-      isFavorite: _asBool(map['isFavorite']),
-      isLiked: _asBool(map['isLiked']),
+      isFavorite: jsAsBool(map['isFavorite']),
+      isLiked: jsAsBool(map['isLiked']),
       subId: map['subId']?.toString() ?? '',
       sourceKey: sourceKey,
     );
@@ -177,7 +177,7 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
     final engine = facade.js.engine;
     if (engine == null) return false;
     try {
-      return _asBool(
+      return jsAsBool(
         engine.evaluate('!!this.__hazuki_source.comic?.likeComic'),
       );
     } catch (_) {
@@ -203,7 +203,7 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
       if (engine == null) {
         throw Exception('source_not_initialized');
       }
-      if (!_asBool(
+      if (!jsAsBool(
         engine.evaluate('!!this.__hazuki_source.comic?.likeComic'),
       )) {
         throw Exception('comic_like_not_supported');

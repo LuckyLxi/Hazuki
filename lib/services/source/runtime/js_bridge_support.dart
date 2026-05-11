@@ -266,22 +266,22 @@ extension _JsBridgeSupport on HazukiSourceService {
       case 'utf8':
         return isEncode
             ? utf8.encode((value ?? '').toString())
-            : utf8.decode(_toBytes(value));
+            : utf8.decode(jsToBytes(value));
       case 'base64':
         return isEncode
-            ? base64Encode(_toBytes(value))
+            ? base64Encode(jsToBytes(value))
             : base64Decode((value ?? '').toString());
       case 'md5':
-        return Uint8List.fromList(md5.convert(_toBytes(value)).bytes);
+        return Uint8List.fromList(md5.convert(jsToBytes(value)).bytes);
       case 'sha1':
-        return Uint8List.fromList(sha1.convert(_toBytes(value)).bytes);
+        return Uint8List.fromList(sha1.convert(jsToBytes(value)).bytes);
       case 'sha256':
-        return Uint8List.fromList(sha256.convert(_toBytes(value)).bytes);
+        return Uint8List.fromList(sha256.convert(jsToBytes(value)).bytes);
       case 'sha512':
-        return Uint8List.fromList(sha512.convert(_toBytes(value)).bytes);
+        return Uint8List.fromList(sha512.convert(jsToBytes(value)).bytes);
       case 'hmac':
-        final keyBytes = _toBytes(request['key']);
-        final valueBytes = _toBytes(value);
+        final keyBytes = jsToBytes(request['key']);
+        final valueBytes = jsToBytes(value);
         final hashType = request['hash']?.toString() ?? 'md5';
         final digest = Hmac(switch (hashType) {
           'md5' => md5,
@@ -295,8 +295,8 @@ extension _JsBridgeSupport on HazukiSourceService {
         }
         return Uint8List.fromList(digest.bytes);
       case 'aes-ecb':
-        final key = _toBytes(request['key']);
-        final bytes = _toBytes(value);
+        final key = jsToBytes(request['key']);
+        final bytes = jsToBytes(value);
         final cipher = ECBBlockCipher(AESEngine())
           ..init(isEncode, KeyParameter(key));
         final result = Uint8List(bytes.length);
@@ -316,45 +316,4 @@ extension _JsBridgeSupport on HazukiSourceService {
     }
   }
 
-  Uint8List _toBytes(dynamic value) {
-    if (value is Uint8List) {
-      return value;
-    }
-    if (value is List<int>) {
-      return Uint8List.fromList(value);
-    }
-    if (value is List) {
-      return Uint8List.fromList(value.map((e) => (e as num).toInt()).toList());
-    }
-    if (value is String) {
-      return Uint8List.fromList(utf8.encode(value));
-    }
-    return Uint8List(0);
-  }
-
-  bool _asBool(dynamic value) {
-    if (value is bool) {
-      return value;
-    }
-    if (value is num) {
-      return value != 0;
-    }
-    if (value is String) {
-      return value == 'true' || value == '1';
-    }
-    return false;
-  }
-
-  int? _asInt(dynamic value) {
-    if (value is int) {
-      return value;
-    }
-    if (value is num) {
-      return value.toInt();
-    }
-    if (value is String) {
-      return int.tryParse(value);
-    }
-    return null;
-  }
 }

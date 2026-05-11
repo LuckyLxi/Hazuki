@@ -78,7 +78,7 @@ extension HazukiSourceServiceSourceLoaderCapability on HazukiSourceService {
           .toString();
       final version = (engine.evaluate('this.__hazuki_source.version') ?? '')
           .toString();
-      final supportsAccount = _asBool(
+      final supportsAccount = jsAsBool(
         engine.evaluate('!!this.__hazuki_source.account?.login'),
       );
 

@@ -18,6 +18,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../shared/chapter_title_resolver.dart';
 import '../models/hazuki_models.dart';
+import 'source/common/source_json_coerce.dart';
 import 'source/runtime/line_settings_capability.dart';
 
 part 'source/explore_capability.dart';
@@ -297,8 +298,8 @@ class HazukiSourceService extends ChangeNotifier {
     final normalizedPage = page < 1 ? 1 : page;
     final normalizedOrder = order.trim().isEmpty ? 'mr' : order.trim();
 
-    final hasSearch = _asBool(engine.evaluate('!!this.__hazuki_source.search'));
-    final hasSearchLoad = _asBool(
+    final hasSearch = jsAsBool(engine.evaluate('!!this.__hazuki_source.search'));
+    final hasSearchLoad = jsAsBool(
       engine.evaluate('!!this.__hazuki_source.search?.load'),
     );
     if (!hasSearch || !hasSearchLoad) {
@@ -638,13 +639,9 @@ class SourceJsBridge {
     return _awaitJsResult(value);
   }
 
-  bool asBool(dynamic value) {
-    return _service._asBool(value);
-  }
+  bool asBool(dynamic value) => jsAsBool(value);
 
-  int? asInt(dynamic value) {
-    return _service._asInt(value);
-  }
+  int? asInt(dynamic value) => jsAsInt(value);
 
   String evaluateString(String code) {
     return (evaluate(code) ?? '').toString().trim();
