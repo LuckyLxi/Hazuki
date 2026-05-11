@@ -3,8 +3,13 @@ part of '../../hazuki_source_service.dart';
 extension HazukiSourceServiceSourceFileManagementCapability
     on HazukiSourceService {
   Future<String?> readLocalJmSourceIfExists() async {
-    final sourceDir = await _getSourceStorageDirectory();
-    final jmFile = File('${sourceDir.path}/jm.js');
+    final File jmFile;
+    try {
+      final sourceDir = await _getSourceStorageDirectory();
+      jmFile = File('${sourceDir.path}/jm.js');
+    } catch (_) {
+      return null;
+    }
     if (!await jmFile.exists()) {
       return null;
     }

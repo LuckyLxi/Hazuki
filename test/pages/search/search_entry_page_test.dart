@@ -199,6 +199,10 @@ void main() {
     FocusManager.instance.primaryFocus?.unfocus();
     await tester.pump(const Duration(milliseconds: 100));
 
+    expect(_currentExtractedId(tester), '123');
+
+    await tester.pump(const Duration(milliseconds: 250));
+
     expect(_currentExtractedId(tester), isNull);
   });
 
