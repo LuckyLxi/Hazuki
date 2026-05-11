@@ -5,8 +5,8 @@ const int _defaultCacheMaxBytes = 400 * 1024 * 1024;
 const String _defaultAutoCleanMode = 'size_overflow';
 
 class CacheSettingsController extends ChangeNotifier {
-  CacheSettingsController({HazukiSourceService? sourceService})
-    : _sourceService = sourceService ?? HazukiSourceService.instance;
+  CacheSettingsController({required HazukiSourceService sourceService})
+    : _sourceService = sourceService;
 
   final HazukiSourceService _sourceService;
 

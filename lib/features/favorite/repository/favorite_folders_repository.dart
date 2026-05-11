@@ -29,10 +29,14 @@ abstract class FavoriteFoldersRepository {
 }
 
 class DefaultFavoriteFoldersRepository implements FavoriteFoldersRepository {
-  const DefaultFavoriteFoldersRepository();
+  const DefaultFavoriteFoldersRepository({
+    required HazukiSourceService source,
+    required LocalFavoritesService local,
+  }) : _source = source,
+       _local = local;
 
-  HazukiSourceService get _source => HazukiSourceService.instance;
-  LocalFavoritesService get _local => LocalFavoritesService.instance;
+  final HazukiSourceService _source;
+  final LocalFavoritesService _local;
 
   @override
   bool get isLogged => _source.isLogged;

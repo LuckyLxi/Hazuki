@@ -9,6 +9,8 @@ import 'package:hazuki/features/comments/support/comments_content_support.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
+import 'package:hazuki/services/comment_filter_service.dart';
+import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
 import 'comments_widgets.dart';
@@ -114,7 +116,10 @@ class _CommentsPageState extends State<CommentsPage>
     super.initState();
     _ownsScrollController = widget.scrollController == null;
     _scrollController = widget.scrollController ?? ScrollController();
-    _controller = CommentsPageController();
+    _controller = CommentsPageController(
+      sourceService: HazukiSourceService.instance,
+      filterService: CommentFilterService.instance,
+    );
     WidgetsBinding.instance.addObserver(this);
     _commentFocusNode.addListener(_handleCommentFocusChanged);
     _controller.addFilterListener(_onFilterChanged);

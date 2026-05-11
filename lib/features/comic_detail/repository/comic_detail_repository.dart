@@ -10,11 +10,17 @@ import 'package:hazuki/services/local_favorites_service.dart';
 import 'package:hazuki/services/manga_download/manga_download_service.dart';
 
 class ComicDetailRepository implements FavoriteFoldersRepository {
-  const ComicDetailRepository();
+  const ComicDetailRepository({
+    required HazukiSourceService source,
+    required LocalFavoritesService local,
+    required MangaDownloadService downloader,
+  }) : _source = source,
+       _local = local,
+       _downloader = downloader;
 
-  HazukiSourceService get _source => HazukiSourceService.instance;
-  LocalFavoritesService get _local => LocalFavoritesService.instance;
-  MangaDownloadService get _downloader => MangaDownloadService.instance;
+  final HazukiSourceService _source;
+  final LocalFavoritesService _local;
+  final MangaDownloadService _downloader;
 
   // ── Source capabilities ──────────────────────────────────────────────────
 

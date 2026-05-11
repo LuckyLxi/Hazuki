@@ -2,8 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
 
 class LineSettingsController extends ChangeNotifier {
-  LineSettingsController({HazukiSourceService? sourceService})
-    : _sourceService = sourceService ?? HazukiSourceService.instance;
+  LineSettingsController({required HazukiSourceService sourceService})
+    : _sourceService = sourceService;
 
   final HazukiSourceService _sourceService;
 

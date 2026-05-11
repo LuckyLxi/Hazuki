@@ -4,8 +4,8 @@ import 'package:hazuki/services/manga_download/manga_download_service.dart';
 import '../support/downloads_actions.dart';
 
 class DownloadsPageController extends ChangeNotifier {
-  DownloadsPageController({MangaDownloadService? downloadService})
-    : _downloadService = downloadService ?? MangaDownloadService.instance;
+  DownloadsPageController({required MangaDownloadService downloadService})
+    : _downloadService = downloadService;
 
   final MangaDownloadService _downloadService;
 

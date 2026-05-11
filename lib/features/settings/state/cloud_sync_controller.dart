@@ -17,8 +17,7 @@ class CloudSyncRestoreOutcome {
 }
 
 class CloudSyncController extends ChangeNotifier {
-  CloudSyncController({CloudSyncService? service})
-    : _service = service ?? CloudSyncService.instance;
+  CloudSyncController({required CloudSyncService service}) : _service = service;
 
   final CloudSyncService _service;
 

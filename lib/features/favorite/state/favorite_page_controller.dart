@@ -12,17 +12,12 @@ import '../support/favorite_local_flow.dart';
 
 class FavoritePageController extends ChangeNotifier {
   FavoritePageController({
-    HazukiSourceService? sourceService,
-    LocalFavoritesService? localFavoritesService,
-  }) : _sourceService = sourceService ?? HazukiSourceService.instance,
-       _localFavoritesService =
-           localFavoritesService ?? LocalFavoritesService.instance,
-       _cloudFlow = FavoriteCloudFlow(
-         sourceService ?? HazukiSourceService.instance,
-       ),
-       _localFlow = FavoriteLocalFlow(
-         localFavoritesService ?? LocalFavoritesService.instance,
-       ) {
+    required HazukiSourceService sourceService,
+    required LocalFavoritesService localFavoritesService,
+  }) : _sourceService = sourceService,
+       _localFavoritesService = localFavoritesService,
+       _cloudFlow = FavoriteCloudFlow(sourceService),
+       _localFlow = FavoriteLocalFlow(localFavoritesService) {
     _localFavoritesService.addListener(_handleLocalFavoritesChanged);
     _sourceService.addListener(_handleSourceServiceChanged);
   }

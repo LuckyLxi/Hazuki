@@ -41,7 +41,7 @@ class _DownloadsPageState extends State<DownloadsPage>
   void initState() {
     super.initState();
     _controller = DownloadsPageController(
-      downloadService: widget.downloadService,
+      downloadService: widget.downloadService ?? MangaDownloadService.instance,
     );
     _initFuture = _downloadService.ensureInitialized();
     _initFuture.then((_) {

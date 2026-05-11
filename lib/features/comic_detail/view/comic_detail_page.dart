@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:hazuki/models/hazuki_models.dart';
+import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/local_favorites_service.dart';
+import 'package:hazuki/services/manga_download/manga_download_service.dart';
 
 import '../repository/comic_detail_repository.dart';
 import '../support/comic_detail_actions_controller.dart';
@@ -62,7 +65,11 @@ class _ComicDetailPageState extends State<ComicDetailPage>
   @override
   void initState() {
     super.initState();
-    _repository = const ComicDetailRepository();
+    _repository = ComicDetailRepository(
+      source: HazukiSourceService.instance,
+      local: LocalFavoritesService.instance,
+      downloader: MangaDownloadService.instance,
+    );
     _initializeControllers();
     _sessionController.initialize();
     _themeController.addListener(_rebuildPage);

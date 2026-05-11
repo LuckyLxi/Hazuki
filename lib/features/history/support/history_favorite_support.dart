@@ -45,7 +45,10 @@ Future<void> _showFavoriteFoldersPanelFromHistory(
   BuildContext context,
   ComicDetailsData details,
 ) async {
-  final repository = const DefaultFavoriteFoldersRepository();
+  final repository = DefaultFavoriteFoldersRepository(
+    source: HazukiSourceService.instance,
+    local: LocalFavoritesService.instance,
+  );
   final singleFolderOnly = repository.favoriteSingleFolderForSingleComic;
   final viewModel = FavoriteFoldersViewModel(
     repository: repository,

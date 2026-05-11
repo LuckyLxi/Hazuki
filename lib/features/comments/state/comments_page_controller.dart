@@ -6,10 +6,10 @@ import 'package:hazuki/services/hazuki_source_service.dart';
 
 class CommentsPageController {
   CommentsPageController({
-    HazukiSourceService? sourceService,
-    CommentFilterService? filterService,
-  }) : _sourceService = sourceService ?? HazukiSourceService.instance,
-       _filterService = filterService ?? CommentFilterService.instance;
+    required HazukiSourceService sourceService,
+    required CommentFilterService filterService,
+  }) : _sourceService = sourceService,
+       _filterService = filterService;
 
   final HazukiSourceService _sourceService;
   final CommentFilterService _filterService;

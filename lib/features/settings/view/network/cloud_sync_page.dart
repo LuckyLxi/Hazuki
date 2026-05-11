@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:hazuki/app/app.dart';
 import 'package:hazuki/features/settings/state/cloud_sync_controller.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/services/cloud_sync_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import '../settings_group.dart';
 
@@ -21,7 +22,7 @@ class _CloudSyncPageState extends State<CloudSyncPage> {
   @override
   void initState() {
     super.initState();
-    _controller = CloudSyncController();
+    _controller = CloudSyncController(service: CloudSyncService.instance);
     unawaited(_controller.loadConfig());
   }
 
