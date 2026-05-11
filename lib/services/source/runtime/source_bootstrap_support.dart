@@ -140,7 +140,7 @@ extension SourceBootstrapSupport on HazukiSourceService {
     Future<String?> requestOnce(String url) async {
       final startedAt = DateTime.now();
       try {
-        final response = await _dio.get<String>(
+        final response = await dio.get<String>(
           url,
           options: Options(
             responseType: ResponseType.plain,
@@ -213,7 +213,7 @@ extension SourceBootstrapSupport on HazukiSourceService {
     for (final url in urls) {
       final startedAt = DateTime.now();
       try {
-        final response = await _dio.get<String>(
+        final response = await dio.get<String>(
           url,
           options: Options(
             responseType: ResponseType.plain,

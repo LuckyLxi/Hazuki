@@ -1,6 +1,6 @@
 part of '../../hazuki_source_service.dart';
 
-extension _CookieStoreSupport on HazukiSourceService {
+extension CookieStoreSupport on HazukiSourceService {
   Future<dynamic> _handleCookieOperation(Map<String, dynamic> request) async {
     final fn = request['function']?.toString();
     final rawUrl = request['url']?.toString();
@@ -105,7 +105,7 @@ extension _CookieStoreSupport on HazukiSourceService {
     await _saveCookieStore(all);
   }
 
-  String? _buildCookieHeader(String url) {
+  String? buildCookieHeader(String url) {
     final cookies = _getCookies(url);
     if (cookies.isEmpty) {
       return null;

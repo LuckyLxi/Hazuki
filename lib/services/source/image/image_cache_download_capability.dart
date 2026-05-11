@@ -165,12 +165,12 @@ extension HazukiSourceServiceImageCacheDownloadCapability
       }
     } catch (_) {}
 
-    final cookie = _buildCookieHeader(url);
+    final cookie = facade.httpGateway.buildCookieHeader(url);
     if (cookie != null && cookie.isNotEmpty && !headers.containsKey('cookie')) {
       headers['cookie'] = cookie;
     }
 
-    final response = await _dio.get<List<int>>(
+    final response = await facade.httpGateway.dio.get<List<int>>(
       url,
       options: Options(
         responseType: ResponseType.bytes,

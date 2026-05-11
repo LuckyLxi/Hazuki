@@ -104,7 +104,7 @@ extension _JsBridgeSupport on HazukiSourceService {
     final data = request['data'];
 
     try {
-      response = await _dio.request<dynamic>(
+      response = await dio.request<dynamic>(
         url,
         data: data,
         options: Options(
@@ -153,11 +153,11 @@ extension _JsBridgeSupport on HazukiSourceService {
   }
 
   void _configureDioCookieBridge() {
-    _dio.interceptors.add(
+    dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) {
           options.extra['hazukiStartedAt'] = DateTime.now();
-          final cookieHeader = _buildCookieHeader(options.uri.toString());
+          final cookieHeader = buildCookieHeader(options.uri.toString());
           if (cookieHeader != null && cookieHeader.isNotEmpty) {
             final existing = options.headers['cookie'];
             if (existing is String && existing.trim().isNotEmpty) {
@@ -233,7 +233,7 @@ extension _JsBridgeSupport on HazukiSourceService {
       ),
     );
 
-    _dio.httpClientAdapter = IOHttpClientAdapter(
+    dio.httpClientAdapter = IOHttpClientAdapter(
       createHttpClient: () {
         return HttpClient();
       },

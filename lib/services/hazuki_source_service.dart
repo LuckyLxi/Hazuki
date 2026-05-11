@@ -21,6 +21,7 @@ import '../models/hazuki_models.dart';
 import 'source/common/source_json_coerce.dart';
 import 'source/common/source_prefs_keys.dart';
 import 'source/debug/source_network_log_sink.dart';
+import 'source/http/source_http_gateway.dart';
 import 'source/runtime/line_settings_capability.dart';
 
 part 'source/explore_capability.dart';
@@ -166,7 +167,7 @@ class SourceRuntimeState {
 class HazukiSourceService extends ChangeNotifier {
   HazukiSourceService();
 
-  final Dio _dio = Dio(
+  final Dio dio = Dio(
     BaseOptions(
       responseType: ResponseType.plain,
       validateStatus: (status) => true,
@@ -182,6 +183,7 @@ class HazukiSourceService extends ChangeNotifier {
   final SourceDebugLogStore _debugLogStore = SourceDebugLogStore();
   late final SourceJsBridge _jsBridge = SourceJsBridge._(this);
   late final SourceNetworkLogSink _networkLogSink = SourceNetworkLogSink(this);
+  late final SourceHttpGateway _httpGateway = SourceHttpGateway(this);
   late final HazukiSourceFacade facade = HazukiSourceFacade._(
     service: this,
     runtime: _runtimeKernel,
@@ -190,6 +192,7 @@ class HazukiSourceService extends ChangeNotifier {
     debug: _debugLogStore,
     js: _jsBridge,
     networkLogSink: _networkLogSink,
+    httpGateway: _httpGateway,
   );
 
   late final LineSettingsCapability lineSettings = LineSettingsCapability(
@@ -648,6 +651,7 @@ class HazukiSourceFacade {
     required this.debug,
     required this.js,
     required this.networkLogSink,
+    required this.httpGateway,
   }) : _service = service;
 
   final HazukiSourceService _service;
@@ -657,6 +661,7 @@ class HazukiSourceFacade {
   final SourceDebugLogStore debug;
   final SourceJsBridge js;
   final SourceNetworkLogSink networkLogSink;
+  final SourceHttpGateway httpGateway;
 
   Future<void> ensureInitialized() => _service.ensureInitialized();
 
