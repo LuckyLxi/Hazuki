@@ -18,6 +18,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../shared/chapter_title_resolver.dart';
 import '../models/hazuki_models.dart';
+import 'source/runtime/line_settings_capability.dart';
 
 part 'source/explore_capability.dart';
 
@@ -53,7 +54,6 @@ part 'source/image/image_prepare_unscramble_support.dart';
 
 part 'source/runtime/cookie_store_support.dart';
 part 'source/runtime/js_bridge_support.dart';
-part 'source/runtime/line_settings.dart';
 part 'source/runtime/source_bootstrap_support.dart';
 part 'source/runtime/source_file_management_capability.dart';
 part 'source/runtime/source_loader_capability.dart';
@@ -199,6 +199,24 @@ class HazukiSourceService extends ChangeNotifier {
     cache: _cacheStore,
     debug: _debugLogStore,
     js: _jsBridge,
+  );
+
+  late final LineSettingsCapability lineSettings = LineSettingsCapability(
+    facade,
+  );
+
+  Future<Map<String, dynamic>> getLineSettingsSnapshot() =>
+      lineSettings.getSnapshot();
+
+  Future<void> updateLineSetting(String key, dynamic value) =>
+      lineSettings.updateSetting(key, value);
+
+  Future<void> refreshLines({
+    bool refreshApiDomains = true,
+    bool refreshImageHost = true,
+  }) => lineSettings.refresh(
+    refreshApiDomains: refreshApiDomains,
+    refreshImageHost: refreshImageHost,
   );
 
   FlutterQjs? get _engine => _runtimeKernel.engine;
@@ -623,6 +641,10 @@ class SourceJsBridge {
 
   bool asBool(dynamic value) {
     return _service._asBool(value);
+  }
+
+  int? asInt(dynamic value) {
+    return _service._asInt(value);
   }
 
   String evaluateString(String code) {
