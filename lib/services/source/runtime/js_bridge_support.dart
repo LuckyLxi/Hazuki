@@ -18,32 +18,32 @@ extension _JsBridgeSupport on HazukiSourceService {
         result = _handleCookieOperation(map);
         break;
       case 'load_data':
-        result = _loadSourceData(
+        result = facade.loadSourceData(
           map['key']?.toString() ?? '',
           map['data_key']?.toString() ?? '',
         );
         break;
       case 'save_data':
-        result = _saveSourceData(
+        result = facade.saveSourceData(
           map['key']?.toString() ?? '',
           map['data_key']?.toString() ?? '',
           map['data'],
         );
         break;
       case 'delete_data':
-        result = _deleteSourceData(
+        result = facade.deleteSourceData(
           map['key']?.toString() ?? '',
           map['data_key']?.toString() ?? '',
         );
         break;
       case 'load_setting':
-        result = _loadSourceSetting(
+        result = facade.loadSourceSetting(
           map['key']?.toString() ?? '',
           map['setting_key']?.toString() ?? '',
         );
         break;
       case 'isLogged':
-        result = _loadAccountDataSync() != null;
+        result = facade.loadAccountDataSync() != null;
         break;
       case 'delay':
         final ms = map['time'] is num ? (map['time'] as num).toInt() : 0;

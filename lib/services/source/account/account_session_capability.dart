@@ -9,7 +9,7 @@ extension HazukiSourceServiceAccountSessionCapability on HazukiSourceService {
     return accountData.first;
   }
 
-  bool get isLogged => _loadAccountDataSync() != null;
+  bool get isLogged => facade.loadAccountDataSync() != null;
 
   Future<void> login({
     required String account,

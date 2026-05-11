@@ -58,7 +58,6 @@ part 'source/runtime/source_bootstrap_support.dart';
 part 'source/runtime/source_file_management_capability.dart';
 part 'source/runtime/source_loader_capability.dart';
 part 'source/runtime/source_runtime_support.dart';
-part 'source/runtime/source_store_support.dart';
 part 'source/runtime/version_update_capability.dart';
 
 const _jmSourceUrls = [
