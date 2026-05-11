@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:hazuki/app/windows/windows_title_bar_controller.dart';
+import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/features/comments/comments.dart';
 import 'package:hazuki/features/reader/reader.dart';
 import 'package:hazuki/features/reader/state/reader_image_pipeline_state.dart';
@@ -103,7 +104,7 @@ class _ReaderPageState extends State<ReaderPage>
         sourceKey: widget.sourceKey,
         loadImagesErrorBuilder: (error) =>
             l10n(context).readerChapterLoadFailed('$error'),
-        sourceService: HazukiSourceService.instance,
+        sourceService: sl<HazukiSourceService>(),
       );
   late final ReaderZoomController _readerZoomController = ReaderZoomController(
     transformationController: _zoomController,
@@ -156,7 +157,7 @@ class _ReaderPageState extends State<ReaderPage>
         chapterTitle: widget.chapterTitle,
         chapterIndex: widget.chapterIndex,
         widgetImages: widget.images,
-        sourceService: HazukiSourceService.instance,
+        sourceService: sl<HazukiSourceService>(),
       );
 
   ComicDetailsData? _chapterDetailsCache;

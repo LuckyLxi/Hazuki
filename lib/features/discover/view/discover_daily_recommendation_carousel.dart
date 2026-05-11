@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
+import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
@@ -102,10 +103,10 @@ class _DiscoverDailyRecommendationCarouselState
   PageController get _pageController => _loopController.pageController;
 
   HazukiSourceService get _sourceService =>
-      widget.sourceService ?? HazukiSourceService.instance;
+      widget.sourceService ?? sl<HazukiSourceService>();
   DiscoverDailyRecommendationService get _recommendationService =>
       widget.recommendationService ??
-      DiscoverDailyRecommendationService.instance;
+      sl<DiscoverDailyRecommendationService>();
   WindowsComicDetailController get _windowsController =>
       widget.windowsComicDetailController ??
       WindowsComicDetailController.instance;

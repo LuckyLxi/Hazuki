@@ -16,7 +16,6 @@ import 'package:pointycastle/block/aes.dart';
 import 'package:pointycastle/block/modes/ecb.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../app/service_locator.dart';
 import '../shared/chapter_title_resolver.dart';
 import '../models/hazuki_models.dart';
 
@@ -164,13 +163,6 @@ class SourceRuntimeState {
 
 class HazukiSourceService extends ChangeNotifier {
   HazukiSourceService();
-
-  static HazukiSourceService get instance {
-    if (!sl.isRegistered<HazukiSourceService>()) {
-      sl.registerLazySingleton<HazukiSourceService>(() => HazukiSourceService());
-    }
-    return sl<HazukiSourceService>();
-  }
 
   final Dio _dio = Dio(
     BaseOptions(

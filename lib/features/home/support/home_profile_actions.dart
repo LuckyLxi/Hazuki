@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:hazuki/l10n/l10n.dart';
+import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
@@ -104,7 +105,7 @@ Future<void> saveHomeAvatarToDownloads(
   }
 
   final strings = l10n(context);
-  final service = sourceService ?? HazukiSourceService.instance;
+  final service = sourceService ?? sl<HazukiSourceService>();
   try {
     final bytes = await service.downloadImageBytes(normalized);
     final directory = Directory('/storage/emulated/0/Pictures/Hazuki');

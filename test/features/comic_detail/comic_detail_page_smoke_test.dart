@@ -5,8 +5,13 @@ import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_page.dart';
 import 'package:hazuki/features/reader/view/reader_page.dart';
 import 'package:hazuki/models/hazuki_models.dart';
+import '../../support/test_service_locator.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  setUp(() async {
+    await ensureTestServiceLocator();
+  });
   testWidgets('comic detail page builds without controller wiring crashes', (
     tester,
   ) async {

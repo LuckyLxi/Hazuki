@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hazuki/app/service_locator.dart';
 
 import '../../l10n/l10n.dart';
 import '../../services/hazuki_source_service.dart';
@@ -282,7 +283,7 @@ class _SourceUpdateDialogCardState extends State<SourceUpdateDialogCard> {
       _indeterminate = true;
     });
 
-    final ok = await HazukiSourceService.instance.downloadJmSourceAndReload(
+    final ok = await sl<HazukiSourceService>().downloadJmSourceAndReload(
       onProgress: (received, total) {
         _updateDialogState(() {
           if (total > 0) {

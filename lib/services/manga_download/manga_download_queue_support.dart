@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:hazuki/app/service_locator.dart';
 
 import 'package:dio/dio.dart';
 
@@ -179,7 +180,7 @@ class MangaDownloadQueueExecutor {
         ...downloadedComic.chapters,
       ];
       final existingChapterIds = downloadedChapters.map((e) => e.epId).toSet();
-      final sourceService = HazukiSourceService.instance;
+      final sourceService = sl<HazukiSourceService>();
 
       for (final target in task.targets) {
         if (await _shouldAbortTask(task.storageKey)) {

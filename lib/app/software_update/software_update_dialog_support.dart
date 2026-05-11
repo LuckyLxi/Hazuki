@@ -1,6 +1,7 @@
 // ignore_for_file: use_build_context_synchronously
 
 import 'dart:async';
+import 'package:hazuki/app/service_locator.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
@@ -27,7 +28,7 @@ class SoftwareUpdateDialogSupport {
     required String skipPrefsKey,
     bool respectSkipPreference = true,
   }) async {
-    final check = await SoftwareUpdateService.instance.checkForUpdates();
+    final check = await sl<SoftwareUpdateService>().checkForUpdates();
     if (!isMounted() || check == null || !check.hasUpdate) {
       return null;
     }
@@ -173,7 +174,7 @@ class _SoftwareUpdateDialogCard extends StatefulWidget {
 
 class _SoftwareUpdateDialogCardState extends State<_SoftwareUpdateDialogCard> {
   final SoftwareUpdateDownloadService _downloadService =
-      SoftwareUpdateDownloadService.instance;
+      sl<SoftwareUpdateDownloadService>();
 
   bool _downloadTriggerBusy = false;
   String? _selectedWindowsUrl;

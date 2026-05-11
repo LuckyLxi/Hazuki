@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hazuki/l10n/l10n.dart';
+import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/services/password_lock_service.dart';
 import 'package:hazuki/widgets/password_lock_widgets.dart';
 import 'package:hazuki/widgets/widgets.dart';
@@ -113,7 +114,7 @@ class _PasswordLockSetupPageState extends State<PasswordLockSetupPage> {
     });
     await Future<void>.delayed(const Duration(milliseconds: 180));
     try {
-      await PasswordLockService.instance.enableWithPin(_input);
+      await sl<PasswordLockService>().enableWithPin(_input);
       if (!mounted) {
         return;
       }

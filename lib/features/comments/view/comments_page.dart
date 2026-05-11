@@ -5,6 +5,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:hazuki/features/comments/state/comments_page_controller.dart';
+import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/features/comments/support/comments_content_support.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/l10n/l10n.dart';
@@ -117,8 +118,8 @@ class _CommentsPageState extends State<CommentsPage>
     _ownsScrollController = widget.scrollController == null;
     _scrollController = widget.scrollController ?? ScrollController();
     _controller = CommentsPageController(
-      sourceService: HazukiSourceService.instance,
-      filterService: CommentFilterService.instance,
+      sourceService: sl<HazukiSourceService>(),
+      filterService: sl<CommentFilterService>(),
     );
     WidgetsBinding.instance.addObserver(this);
     _commentFocusNode.addListener(_handleCommentFocusChanged);

@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/app/app.dart';
+import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_page.dart';
 import 'package:hazuki/features/comments/comments.dart';
 import 'package:hazuki/features/home/home.dart';
@@ -114,8 +115,8 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
     super.initState();
     _coordinator = HomeCoordinator(
       initialTabIndex: widget.initialTabIndex,
-      sourceService: HazukiSourceService.instance,
-      dailyRecommendationService: DiscoverDailyRecommendationService.instance,
+      sourceService: sl<HazukiSourceService>(),
+      dailyRecommendationService: sl<DiscoverDailyRecommendationService>(),
     );
     _coordinator.start(context);
     WindowsComicDetailController.instance.panelBuilder =

@@ -3,7 +3,6 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 
-import '../app/service_locator.dart';
 import 'cloud_sync/cloud_sync_config_store.dart';
 import 'cloud_sync/cloud_sync_models.dart';
 import 'cloud_sync/cloud_sync_remote_client.dart';
@@ -20,28 +19,6 @@ class CloudSyncService {
     required CommentFilterService commentFilter,
   }) : _localFavorites = localFavorites,
        _commentFilter = commentFilter;
-
-  static CloudSyncService get instance {
-    if (!sl.isRegistered<LocalFavoritesService>()) {
-      sl.registerLazySingleton<LocalFavoritesService>(
-        () => LocalFavoritesService(),
-      );
-    }
-    if (!sl.isRegistered<CommentFilterService>()) {
-      sl.registerLazySingleton<CommentFilterService>(
-        () => CommentFilterService(),
-      );
-    }
-    if (!sl.isRegistered<CloudSyncService>()) {
-      sl.registerLazySingleton<CloudSyncService>(
-        () => CloudSyncService(
-          localFavorites: sl<LocalFavoritesService>(),
-          commentFilter: sl<CommentFilterService>(),
-        ),
-      );
-    }
-    return sl<CloudSyncService>();
-  }
 
   final LocalFavoritesService _localFavorites;
   final CommentFilterService _commentFilter;

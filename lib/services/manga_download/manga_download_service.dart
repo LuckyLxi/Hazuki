@@ -47,15 +47,6 @@ class MangaDownloadService extends ChangeNotifier {
     );
   }
 
-  static MangaDownloadService get instance {
-    if (!sl.isRegistered<MangaDownloadService>()) {
-      sl.registerLazySingleton<MangaDownloadService>(
-        () => MangaDownloadService(),
-      );
-    }
-    return sl<MangaDownloadService>();
-  }
-
   static const String _metadataFileName = 'comic.json';
   static const String _legacyMetadataFileName = 'metadata.json';
 
@@ -575,7 +566,7 @@ class MangaDownloadService extends ChangeNotifier {
     }
     final target = File('${comicDir.path}/cover.jpg');
     try {
-      final bytes = await HazukiSourceService.instance.downloadImageBytes(
+      final bytes = await sl<HazukiSourceService>().downloadImageBytes(
         normalized,
         keepInMemory: false,
         sourceKey: task.sourceKey,

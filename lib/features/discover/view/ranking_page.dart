@@ -8,6 +8,7 @@ import '../../../services/hazuki_source_service.dart';
 import '../../../widgets/widgets.dart';
 import '../../../widgets/windows_comic_detail_host.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
+import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 
 class RankingPage extends StatefulWidget {
@@ -27,7 +28,7 @@ class RankingPage extends StatefulWidget {
 class _RankingPageState extends State<RankingPage> {
   static const _loadTimeout = Duration(seconds: 25);
 
-  final HazukiSourceService _sourceService = HazukiSourceService.instance;
+  final HazukiSourceService _sourceService = sl<HazukiSourceService>();
   final ScrollController _scrollController = ScrollController();
 
   List<CategoryRankingOption> _rankingOptions = const <CategoryRankingOption>[];

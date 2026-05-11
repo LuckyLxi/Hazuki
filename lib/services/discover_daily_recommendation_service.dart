@@ -7,7 +7,6 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../app/app_preferences.dart';
-import '../app/service_locator.dart';
 import '../models/hazuki_models.dart';
 import 'hazuki_source_service.dart';
 
@@ -174,22 +173,6 @@ bool _isDiscoverRecommendationAuthorKey(String key) {
 class DiscoverDailyRecommendationService extends ChangeNotifier {
   DiscoverDailyRecommendationService({required HazukiSourceService source})
     : _source = source;
-
-  static DiscoverDailyRecommendationService get instance {
-    if (!sl.isRegistered<HazukiSourceService>()) {
-      sl.registerLazySingleton<HazukiSourceService>(
-        () => HazukiSourceService(),
-      );
-    }
-    if (!sl.isRegistered<DiscoverDailyRecommendationService>()) {
-      sl.registerLazySingleton<DiscoverDailyRecommendationService>(
-        () => DiscoverDailyRecommendationService(
-          source: sl<HazukiSourceService>(),
-        ),
-      );
-    }
-    return sl<DiscoverDailyRecommendationService>();
-  }
 
   final HazukiSourceService _source;
 

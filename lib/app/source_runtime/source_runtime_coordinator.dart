@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:hazuki/app/service_locator.dart';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
@@ -60,7 +61,7 @@ class SourceRuntimeCoordinator {
     required VoidCallback onSourceReady,
     required VoidCallback scheduleSourceUpdateDialogCheck,
   }) async {
-    final hasLocalSource = await HazukiSourceService.instance
+    final hasLocalSource = await sl<HazukiSourceService>()
         .hasLocalJmSourceFile();
     if (!isMounted()) {
       return;
@@ -91,7 +92,7 @@ class SourceRuntimeCoordinator {
         );
       }());
       try {
-        await HazukiSourceService.instance.init(
+        await sl<HazukiSourceService>().init(
           onSourceDownloadProgress: (received, total) {
             if (!isMounted()) {
               return;
@@ -106,7 +107,7 @@ class SourceRuntimeCoordinator {
             );
           },
         );
-        await HazukiSourceService.instance.ensureInitialized();
+        await sl<HazukiSourceService>().ensureInitialized();
         bootstrapSucceeded = true;
       } catch (e) {
         if (!isMounted()) {
@@ -214,7 +215,7 @@ class SourceRuntimeCoordinator {
     required bool Function() isMounted,
     required VoidCallback scheduleSourceUpdateDialogCheck,
   }) async {
-    final refreshed = await HazukiSourceService.instance
+    final refreshed = await sl<HazukiSourceService>()
         .refreshSourceOnNetworkRecovery();
     if (!isMounted() || !refreshed) {
       return;

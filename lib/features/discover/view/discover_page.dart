@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/features/search/search.dart';
+import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
@@ -52,7 +53,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
   void initState() {
     super.initState();
     _controller = DiscoverPageController(
-      sourceService: HazukiSourceService.instance,
+      sourceService: sl<HazukiSourceService>(),
     );
     _scrollController.addListener(_handleScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {

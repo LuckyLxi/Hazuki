@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/services/comment_filter_service.dart';
 
 Future<void> showCommentFilterDialog(BuildContext context) {
@@ -61,7 +62,7 @@ class _CommentFilterSheetState extends State<_CommentFilterSheet>
   @override
   void initState() {
     super.initState();
-    final service = CommentFilterService.instance;
+    final service = sl<CommentFilterService>();
     _mode = service.mode;
     _userKeywords = List.of(service.userKeywords);
   }
@@ -74,7 +75,7 @@ class _CommentFilterSheetState extends State<_CommentFilterSheet>
   }
 
   Future<void> _save() async {
-    await CommentFilterService.instance.save(
+    await sl<CommentFilterService>().save(
       userKeywords: _userKeywords,
       mode: _mode,
     );

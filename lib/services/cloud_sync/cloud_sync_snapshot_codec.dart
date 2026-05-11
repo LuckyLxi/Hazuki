@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:hazuki/app/service_locator.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -13,7 +14,7 @@ class CloudSyncSnapshotCodec {
   CloudSyncSnapshotCodec({
     required CloudSyncConfigStore configStore,
     HazukiSourceService? sourceService,
-  }) : _sourceService = sourceService ?? HazukiSourceService.instance;
+  }) : _sourceService = sourceService ?? sl<HazukiSourceService>();
 
   final HazukiSourceService _sourceService;
 

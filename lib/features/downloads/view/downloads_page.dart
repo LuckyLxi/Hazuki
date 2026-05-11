@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:hazuki/services/manga_download/manga_download_service.dart';
+import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/widgets/windows_comic_detail_host.dart';
 import '../downloads.dart';
 import 'package:hazuki/shared/windows/windows_comic_detail.dart';
@@ -41,7 +42,7 @@ class _DownloadsPageState extends State<DownloadsPage>
   void initState() {
     super.initState();
     _controller = DownloadsPageController(
-      downloadService: widget.downloadService ?? MangaDownloadService.instance,
+      downloadService: widget.downloadService ?? sl<MangaDownloadService>(),
     );
     _initFuture = _downloadService.ensureInitialized();
     _initFuture.then((_) {

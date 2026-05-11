@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:hazuki/features/favorite/repository/favorite_folders_repository.dart';
+import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/features/favorite/support/favorite_folders_view_model.dart';
 import 'package:hazuki/features/favorite/view/favorite_folders_morph_dialog.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
@@ -14,7 +15,7 @@ Future<void> toggleFavoriteFromHistory(
   BuildContext context,
   ExploreComic comic,
 ) async {
-  final service = HazukiSourceService.instance;
+  final service = sl<HazukiSourceService>();
   final strings = AppLocalizations.of(context)!;
 
   try {
@@ -46,8 +47,8 @@ Future<void> _showFavoriteFoldersPanelFromHistory(
   ComicDetailsData details,
 ) async {
   final repository = DefaultFavoriteFoldersRepository(
-    source: HazukiSourceService.instance,
-    local: LocalFavoritesService.instance,
+    source: sl<HazukiSourceService>(),
+    local: sl<LocalFavoritesService>(),
   );
   final singleFolderOnly = repository.favoriteSingleFolderForSingleComic;
   final viewModel = FavoriteFoldersViewModel(
@@ -156,8 +157,8 @@ Future<void> _applyFavoriteSelectionChangesFromHistory({
   required Set<String> initialFavoritedResult,
   required bool singleFolderOnly,
 }) async {
-  final service = HazukiSourceService.instance;
-  final localService = LocalFavoritesService.instance;
+  final service = sl<HazukiSourceService>();
+  final localService = sl<LocalFavoritesService>();
   final selectedHandles = _favoriteHandlesFromStorageKeys(selectedResult);
   final initialHandles = _favoriteHandlesFromStorageKeys(
     initialFavoritedResult,

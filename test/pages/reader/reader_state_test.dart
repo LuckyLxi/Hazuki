@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:hazuki/app/service_locator.dart';
 import 'dart:typed_data';
 import 'dart:ui';
 
@@ -13,9 +14,13 @@ import 'package:hazuki/features/reader/support/reader_navigation_controller.dart
 import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
 import 'package:hazuki/features/reader/state/reader_settings_store.dart';
+import '../../support/test_service_locator.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  setUp(() async {
+    await ensureTestServiceLocator();
+  });
   final validPngBytes = Uint8List.fromList(const <int>[
     0x89,
     0x50,
@@ -198,7 +203,7 @@ void main() {
             home: Builder(
               builder: (context) {
                 controller = ReaderImagePipelineController(
-                  sourceService: HazukiSourceService.instance,
+                  sourceService: sl<HazukiSourceService>(),
                   runtimeState: runtimeState,
                   pipelineState: pipelineState,
                   diagnosticsState: diagnosticsState,
@@ -272,7 +277,7 @@ void main() {
             home: Builder(
               builder: (context) {
                 controller = ReaderImagePipelineController(
-                  sourceService: HazukiSourceService.instance,
+                  sourceService: sl<HazukiSourceService>(),
                   runtimeState: runtimeState,
                   pipelineState: pipelineState,
                   diagnosticsState: diagnosticsState,

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
 import 'package:hazuki/widgets/widgets.dart';
@@ -37,7 +38,7 @@ class _SearchEntryPageState extends State<SearchEntryPage>
     isMounted: () => mounted,
     allowCollapsedFocus: false,
   );
-  final HazukiSourceService _sourceService = HazukiSourceService.instance;
+  final HazukiSourceService _sourceService = sl<HazukiSourceService>();
   final ScrollController _scrollController = ScrollController();
   final SearchHistoryService _historyService = SearchHistoryService();
   late final SearchRevealSupport _revealSupport = SearchRevealSupport(

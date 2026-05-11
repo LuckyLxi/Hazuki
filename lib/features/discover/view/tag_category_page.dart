@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:hazuki/app/service_locator.dart';
 import 'dart:ui' show FrameTiming;
 
 import 'package:flutter/material.dart';
@@ -63,7 +64,7 @@ class _TagCategoryGroupCard extends StatelessWidget {
 class _TagCategoryPageState extends State<TagCategoryPage> {
   static const _loadTimeout = Duration(seconds: 25);
 
-  final HazukiSourceService _sourceService = HazukiSourceService.instance;
+  final HazukiSourceService _sourceService = sl<HazukiSourceService>();
 
   List<CategoryTagGroup> _tagGroups = const <CategoryTagGroup>[];
 

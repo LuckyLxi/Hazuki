@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:hazuki/features/favorite/favorite.dart';
+import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
@@ -53,8 +54,8 @@ class FavoritePageState extends State<FavoritePage>
   void initState() {
     super.initState();
     _controller = FavoritePageController(
-      sourceService: HazukiSourceService.instance,
-      localFavoritesService: LocalFavoritesService.instance,
+      sourceService: sl<HazukiSourceService>(),
+      localFavoritesService: sl<LocalFavoritesService>(),
     );
     _controller.addListener(_handleControllerChanged);
     _scrollController.addListener(_onScroll);

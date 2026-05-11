@@ -3,9 +3,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/downloads/downloads.dart';
 import 'package:hazuki/services/manga_download/manga_download_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
+import '../../support/test_service_locator.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  setUp(() async {
+    await ensureTestServiceLocator();
+  });
 
   group('DownloadedComicCover', () {
     testWidgets('renders network cover when no local path is provided', (

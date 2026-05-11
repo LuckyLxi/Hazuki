@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:hazuki/features/settings/state/line_settings_controller.dart';
+import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
@@ -20,7 +21,7 @@ class _LineSettingsPageState extends State<LineSettingsPage> {
   void initState() {
     super.initState();
     _controller = LineSettingsController(
-      sourceService: HazukiSourceService.instance,
+      sourceService: sl<HazukiSourceService>(),
     );
     unawaited(_loadInitial());
   }

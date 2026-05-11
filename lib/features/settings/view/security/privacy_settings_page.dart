@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/services/password_lock_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'password_lock_pages.dart';
@@ -21,7 +22,7 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
   bool _loading = true;
 
   bool get _canToggleAuthOnResume =>
-      _biometricAuth || PasswordLockService.instance.isEnabled;
+      _biometricAuth || sl<PasswordLockService>().isEnabled;
 
   @override
   void initState() {
@@ -33,7 +34,7 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
     try {
       final dynamic result = await _channel.invokeMethod('getPrivacySettings');
       if (result is Map) {
-        await PasswordLockService.instance.refreshPrivacySettings();
+        await sl<PasswordLockService>().refreshPrivacySettings();
         if (!mounted) {
           return;
         }
@@ -72,17 +73,17 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
 
     setState(() {
       _biometricAuth = value;
-      if (!value && !PasswordLockService.instance.isEnabled) {
+      if (!value && !sl<PasswordLockService>().isEnabled) {
         _authOnResume = false;
       }
     });
     try {
       await _channel.invokeMethod('setBiometricAuth', {'enabled': value});
-      if (!value && !PasswordLockService.instance.isEnabled) {
+      if (!value && !sl<PasswordLockService>().isEnabled) {
         await _channel.invokeMethod('setAuthOnResume', {'enabled': false});
       }
     } catch (_) {}
-    await PasswordLockService.instance.refreshPrivacySettings();
+    await sl<PasswordLockService>().refreshPrivacySettings();
   }
 
   Future<void> _toggleAuthOnResume(bool value) async {
@@ -91,15 +92,15 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
     try {
       await _channel.invokeMethod('setAuthOnResume', {'enabled': value});
     } catch (_) {}
-    await PasswordLockService.instance.refreshPrivacySettings();
+    await sl<PasswordLockService>().refreshPrivacySettings();
   }
 
   Future<void> _handlePasswordLockTap() async {
-    await PasswordLockService.instance.ensureInitialized();
+    await sl<PasswordLockService>().ensureInitialized();
     if (!mounted) {
       return;
     }
-    final service = PasswordLockService.instance;
+    final service = sl<PasswordLockService>();
     if (!service.isEnabled) {
       await Navigator.of(context).push<bool>(
         MaterialPageRoute<bool>(builder: (_) => const PasswordLockIntroPage()),
@@ -243,7 +244,7 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
                       leading: const Icon(Icons.password_rounded),
                       title: Text(strings.privacyPasswordLockTitle),
                       subtitle: Text(
-                        PasswordLockService.instance.isEnabled
+                        sl<PasswordLockService>().isEnabled
                             ? strings.privacyPasswordLockEnabledSubtitle
                             : strings.privacyPasswordLockDisabledSubtitle,
                       ),

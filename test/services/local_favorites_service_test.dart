@@ -1,17 +1,22 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/local_favorites_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../support/test_service_locator.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  setUp(() async {
+    await ensureTestServiceLocator();
+  });
 
   group('LocalFavoritesService selected favorite folder persistence', () {
     late LocalFavoritesService service;
 
     setUp(() {
       SharedPreferences.setMockInitialValues(const {});
-      service = LocalFavoritesService.instance;
+      service = sl<LocalFavoritesService>();
     });
 
     test('uses mode-specific defaults when no folder was saved', () async {
@@ -72,7 +77,7 @@ void main() {
 
     setUp(() {
       SharedPreferences.setMockInitialValues(const {});
-      service = LocalFavoritesService.instance;
+      service = sl<LocalFavoritesService>();
     });
 
     test('keeps the same comic id separate across source keys', () async {

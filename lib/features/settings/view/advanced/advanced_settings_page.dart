@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/shared/ui_flags.dart';
 import 'package:hazuki/widgets/widgets.dart';
@@ -37,9 +38,9 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
 
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
-    final hasCustomEditedSource = await HazukiSourceService.instance
+    final hasCustomEditedSource = await sl<HazukiSourceService>()
         .hasCustomEditedJmSource();
-    final softwareLogCaptureEnabled = await HazukiSourceService.instance
+    final softwareLogCaptureEnabled = await sl<HazukiSourceService>()
         .loadSoftwareLogCaptureEnabled();
     if (!mounted) {
       return;
@@ -59,11 +60,11 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
 
   Future<void> _toggleSoftwareLogCaptureEnabled(bool value) async {
     setState(() => _softwareLogCaptureEnabled = value);
-    await HazukiSourceService.instance.setSoftwareLogCaptureEnabled(value);
+    await sl<HazukiSourceService>().setSoftwareLogCaptureEnabled(value);
   }
 
   Future<void> _refreshCustomEditedSourceState() async {
-    final hasCustomEditedSource = await HazukiSourceService.instance
+    final hasCustomEditedSource = await sl<HazukiSourceService>()
         .hasCustomEditedJmSource();
     if (!mounted) {
       return;

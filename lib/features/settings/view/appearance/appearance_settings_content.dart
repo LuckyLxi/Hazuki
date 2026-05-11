@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:hazuki/app/app.dart';
+import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/widgets/sun_moon_icon.dart';
@@ -36,7 +37,7 @@ class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
     String level = 'info',
     Map<String, Object?>? content,
   }) {
-    HazukiSourceService.instance.addApplicationLog(
+    sl<HazukiSourceService>().addApplicationLog(
       level: level,
       title: title,
       source: 'appearance_theme_ui',

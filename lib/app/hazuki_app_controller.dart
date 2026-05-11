@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+import 'package:hazuki/app/service_locator.dart';
 
 import '../services/cloud_sync_service.dart';
 import '../services/hazuki_source_service.dart';
@@ -49,7 +50,7 @@ class HazukiAppController {
     var sourceNeedsRestart = false;
     if (result.restoredSourceFile) {
       try {
-        await HazukiSourceService.instance.reloadFromLocalSourceFiles();
+        await sl<HazukiSourceService>().reloadFromLocalSourceFiles();
         sourceReloaded = true;
       } catch (_) {
         sourceNeedsRestart = true;

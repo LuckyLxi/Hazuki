@@ -1,11 +1,16 @@
 import 'dart:convert';
+import 'package:hazuki/app/service_locator.dart';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../support/test_service_locator.dart';
 
 void main() {
+  setUp(() async {
+    await ensureTestServiceLocator();
+  });
   group('Discover daily recommendation author metadata', () {
     test('extracts author values from comic detail tags', () {
       const details = ComicDetailsData(
@@ -54,7 +59,7 @@ void main() {
   group('Discover daily recommendation cache restore', () {
     tearDown(() async {
       SharedPreferences.setMockInitialValues(const <String, Object>{});
-      await DiscoverDailyRecommendationService.instance.ensurePrepared(
+      await sl<DiscoverDailyRecommendationService>().ensurePrepared(
         enabled: false,
       );
     });
@@ -68,11 +73,11 @@ void main() {
             titlePrefix: 'Scoped',
           ),
         });
-        await DiscoverDailyRecommendationService.instance.ensurePrepared(
+        await sl<DiscoverDailyRecommendationService>().ensurePrepared(
           enabled: false,
         );
 
-        final state = await DiscoverDailyRecommendationService.instance
+        final state = await sl<DiscoverDailyRecommendationService>()
             .ensurePrepared(enabled: true);
 
         expect(state.hasRecommendations, isTrue);
@@ -89,11 +94,11 @@ void main() {
           titlePrefix: 'Legacy',
         ),
       });
-      await DiscoverDailyRecommendationService.instance.ensurePrepared(
+      await sl<DiscoverDailyRecommendationService>().ensurePrepared(
         enabled: false,
       );
 
-      final state = await DiscoverDailyRecommendationService.instance
+      final state = await sl<DiscoverDailyRecommendationService>()
           .ensurePrepared(enabled: true);
 
       expect(state.hasRecommendations, isTrue);
@@ -117,11 +122,11 @@ void main() {
             generatedAt: now,
           ),
         });
-        await DiscoverDailyRecommendationService.instance.ensurePrepared(
+        await sl<DiscoverDailyRecommendationService>().ensurePrepared(
           enabled: false,
         );
 
-        final state = await DiscoverDailyRecommendationService.instance
+        final state = await sl<DiscoverDailyRecommendationService>()
             .ensurePrepared(enabled: true);
 
         expect(state.hasRecommendations, isTrue);

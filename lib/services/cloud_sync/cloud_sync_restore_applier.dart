@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:hazuki/app/service_locator.dart';
 import 'dart:io';
 
 import 'package:shared_preferences/shared_preferences.dart';
@@ -10,7 +11,7 @@ import 'cloud_sync_models.dart';
 
 class CloudSyncRestoreApplier {
   CloudSyncRestoreApplier({HazukiSourceService? sourceService})
-    : _sourceService = sourceService ?? HazukiSourceService.instance;
+    : _sourceService = sourceService ?? sl<HazukiSourceService>();
 
   final HazukiSourceService _sourceService;
 

@@ -1,6 +1,7 @@
 // ignore_for_file: use_build_context_synchronously
 
 import 'dart:convert';
+import 'package:hazuki/app/service_locator.dart';
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -19,7 +20,7 @@ class SourceUpdateDialogSupport {
     required String skipPrefsKey,
     bool respectSkipPreference = true,
   }) async {
-    final check = await HazukiSourceService.instance
+    final check = await sl<HazukiSourceService>()
         .checkJmSourceVersionFromCloud();
     if (!isMounted() || check == null || !check.hasUpdate) {
       return null;

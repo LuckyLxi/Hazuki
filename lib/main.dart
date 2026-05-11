@@ -68,11 +68,11 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   registerServices();
   await loadHazukiUiFlags();
-  await HazukiSourceService.instance.loadSoftwareLogCaptureEnabled();
+  await sl<HazukiSourceService>().loadSoftwareLogCaptureEnabled();
   await _ensureAndroidNoMediaMarker();
-  await MangaDownloadService.instance.ensureInitialized();
-  await PasswordLockService.instance.ensureInitialized();
-  await CommentFilterService.instance.load();
+  await sl<MangaDownloadService>().ensureInitialized();
+  await sl<PasswordLockService>().ensureInitialized();
+  await sl<CommentFilterService>().load();
   const settingsStore = HazukiAppSettingsStore();
   final initialAppearance = await settingsStore.loadAppearance();
   final initialLocale = await settingsStore.loadLocalePreference();
@@ -187,14 +187,14 @@ class _HazukiAppState extends State<HazukiApp>
     _locale = widget.initialLocale;
     _startupCoordinator.initialize();
     _launchShortcutCoordinator.initialize();
-    unawaited(CloudSyncService.instance.autoSyncOnce());
+    unawaited(sl<CloudSyncService>().autoSyncOnce());
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-    MangaDownloadService.instance.handleAppLifecycleState(state);
-    unawaited(PasswordLockService.instance.handleAppLifecycleState(state));
+    sl<MangaDownloadService>().handleAppLifecycleState(state);
+    unawaited(sl<PasswordLockService>().handleAppLifecycleState(state));
   }
 
   @override
@@ -319,7 +319,7 @@ class _HazukiAppState extends State<HazukiApp>
     String level = 'info',
     Map<String, Object?>? content,
   }) {
-    HazukiSourceService.instance.addApplicationLog(
+    sl<HazukiSourceService>().addApplicationLog(
       level: level,
       title: title,
       source: 'theme_switch',
@@ -440,15 +440,14 @@ class _HazukiAppState extends State<HazukiApp>
                               ),
                             ),
                             ListenableBuilder(
-                              listenable: PasswordLockService.instance,
+                              listenable: sl<PasswordLockService>(),
                               builder: (context, _) {
-                                if (!PasswordLockService
-                                    .instance
+                                if (!sl<PasswordLockService>()
                                     .shouldBlockApp) {
                                   return const SizedBox.shrink();
                                 }
                                 return PasswordLockGateOverlay(
-                                  controller: PasswordLockService.instance,
+                                  controller: sl<PasswordLockService>(),
                                 );
                               },
                             ),

@@ -5,6 +5,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:hazuki/app/software_update/software_update_dialog_support.dart';
+import 'package:hazuki/app/service_locator.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../services/software_update/software_update_service.dart';
 import 'settings_group.dart';
@@ -96,7 +97,7 @@ class _AboutPageState extends State<AboutPage> {
 
     setState(() => _checkingUpdate = true);
     try {
-      final check = await SoftwareUpdateService.instance.checkForUpdates();
+      final check = await sl<SoftwareUpdateService>().checkForUpdates();
       if (!mounted) {
         return;
       }

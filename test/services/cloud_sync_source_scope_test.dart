@@ -8,6 +8,7 @@ import 'package:hazuki/services/cloud_sync/cloud_sync_remote_client.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_restore_applier.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_snapshot_codec.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../support/test_service_locator.dart';
 
 class _FakeCloudSyncRemoteClient extends CloudSyncRemoteClient {
   _FakeCloudSyncRemoteClient(this.files)
@@ -29,6 +30,9 @@ class _FakeCloudSyncRemoteClient extends CloudSyncRemoteClient {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  setUp(() async {
+    await ensureTestServiceLocator();
+  });
 
   group('CloudSyncRestoreApplier source-scoped reading data', () {
     setUp(() {

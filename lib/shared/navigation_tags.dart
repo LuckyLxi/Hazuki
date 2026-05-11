@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+import 'package:hazuki/app/service_locator.dart';
 
 import '../models/hazuki_models.dart';
 import '../services/hazuki_source_service.dart';
@@ -91,10 +92,10 @@ Widget buildComicCoverHeroFlightShuttle(
     if (url.isNotEmpty) {
       final sourceKey = cachedImage.sourceKey.trim().isNotEmpty
           ? cachedImage.sourceKey
-          : HazukiSourceService.instance.activeSourceKey;
+          : sl<HazukiSourceService>().activeSourceKey;
       var bytes = peekHazukiWidgetImageMemory(url, sourceKey: sourceKey);
       if (bytes == null) {
-        bytes = HazukiSourceService.instance.peekImageBytesFromMemory(
+        bytes = sl<HazukiSourceService>().peekImageBytesFromMemory(
           url,
           sourceKey: sourceKey,
         );

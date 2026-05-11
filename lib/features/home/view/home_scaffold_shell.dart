@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/features/favorite/favorite.dart';
+import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/features/favorite/view/favorite_page.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
@@ -126,7 +127,7 @@ class HomeScaffoldShell extends StatelessWidget {
       checkInBusy: checkInBusy,
       checkedInToday: checkedInToday,
       onProfileTap:
-          HazukiSourceService.instance.sourceMeta?.supportsAccount == true
+          sl<HazukiSourceService>().sourceMeta?.supportsAccount == true
           ? onProfileTap
           : null,
       onCheckInPressed: onCheckInPressed,
@@ -151,10 +152,7 @@ class HomeScaffoldShell extends StatelessWidget {
                   currentIndex: currentIndex,
                   selectedDestination: selectedDrawerDestination,
                   onProfileTap:
-                      HazukiSourceService
-                              .instance
-                              .sourceMeta
-                              ?.supportsAccount ==
+                      sl<HazukiSourceService>().sourceMeta?.supportsAccount ==
                           true
                       ? onProfileTap
                       : null,

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hazuki/l10n/l10n.dart';
+import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import '../logs/logs_export_button.dart';
@@ -444,7 +445,7 @@ class _LogsPageState extends State<LogsPage> {
     if (confirm != true || !mounted) {
       return;
     }
-    HazukiSourceService.instance.facade.clearCapturedLogs();
+    sl<HazukiSourceService>().facade.clearCapturedLogs();
     unawaited(showHazukiPrompt(context, strings.logsCleared));
     setState(() {
       _clearEpoch++;

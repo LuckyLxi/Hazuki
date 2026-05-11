@@ -4,18 +4,10 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../app/service_locator.dart';
 import '../models/hazuki_models.dart';
 
 class LocalFavoritesService extends ChangeNotifier {
   LocalFavoritesService();
-
-  static LocalFavoritesService get instance {
-    if (!sl.isRegistered<LocalFavoritesService>()) {
-      sl.registerLazySingleton<LocalFavoritesService>(() => LocalFavoritesService());
-    }
-    return sl<LocalFavoritesService>();
-  }
 
   Future<void> _opQueue = Future.value();
 

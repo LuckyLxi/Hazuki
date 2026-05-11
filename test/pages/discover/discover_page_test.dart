@@ -6,12 +6,16 @@ import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/features/discover/view/discover_page.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
+import '../../support/test_service_locator.dart';
 
 const double _selectedIndicatorRenderWidth = 28;
 const double _unselectedIndicatorRenderWidth = 14;
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  setUp(() async {
+    await ensureTestServiceLocator();
+  });
 
   tearDown(() {
     WindowsComicDetailController.instance.close();

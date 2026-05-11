@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
@@ -56,7 +57,7 @@ class _ComicSourceEditorPageState extends State<ComicSourceEditorPage> {
       _inlineErrorText = null;
     });
     try {
-      final content = await HazukiSourceService.instance.loadEditableJmSource();
+      final content = await sl<HazukiSourceService>().loadEditableJmSource();
       if (!mounted) {
         return;
       }
@@ -87,7 +88,7 @@ class _ComicSourceEditorPageState extends State<ComicSourceEditorPage> {
     });
     try {
       final content = _controller.text;
-      await HazukiSourceService.instance.saveEditedJmSource(content);
+      await sl<HazukiSourceService>().saveEditedJmSource(content);
       if (!mounted) {
         return;
       }

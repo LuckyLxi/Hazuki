@@ -3,6 +3,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
@@ -139,7 +140,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
   void _initializeSearchResultsPage() {
     _resultsController = SearchResultsController(
       initialOrder: widget.initialOrder,
-      sourceService: HazukiSourceService.instance,
+      sourceService: sl<HazukiSourceService>(),
       searchPageLoader: widget.searchPageLoader,
     );
     _scrollController.addListener(_onScroll);

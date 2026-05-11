@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:hazuki/l10n/l10n.dart';
+import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
 import 'logs_cards.dart';
 
@@ -50,7 +51,7 @@ String _performanceLogsTitle(BuildContext context) =>
 Future<Map<String, dynamic>> collectVisibleLogsForIndex(int index) {
   final clampedIndex = index.clamp(0, logsTabSpecs.length - 1).toInt();
   final spec = logsTabSpecs[clampedIndex];
-  return HazukiSourceService.instance.collectTypedDebugInfo(spec.type);
+  return sl<HazukiSourceService>().collectTypedDebugInfo(spec.type);
 }
 
 Map<String, dynamic>? debugInfoForVisibleIndex(
@@ -130,7 +131,7 @@ class _DebugLogsTabState extends State<DebugLogsTab>
       _errorText = null;
     });
     try {
-      final debugInfo = await HazukiSourceService.instance
+      final debugInfo = await sl<HazukiSourceService>()
           .collectTypedDebugInfo(widget.spec.type)
           .timeout(const Duration(seconds: 10));
       if (!mounted) {

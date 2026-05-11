@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:hazuki/app/service_locator.dart';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -124,7 +125,7 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
     if (explicit.isNotEmpty) {
       return explicit;
     }
-    return HazukiSourceService.instance.activeSourceKey;
+    return sl<HazukiSourceService>().activeSourceKey;
   }
 
   void _reportState(HazukiCachedImageLoadState state) {
@@ -279,7 +280,7 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
     final sourceKey = _resolvedSourceKey;
     final cached =
         takeHazukiWidgetImageMemory(normalized, sourceKey: sourceKey) ??
-        HazukiSourceService.instance.peekImageBytesFromMemory(
+        sl<HazukiSourceService>().peekImageBytesFromMemory(
           normalized,
           sourceKey: sourceKey,
         );
@@ -348,7 +349,7 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
     final sourceKey = _resolvedSourceKey;
     final cached =
         takeHazukiWidgetImageMemory(normalized, sourceKey: sourceKey) ??
-        HazukiSourceService.instance.peekImageBytesFromMemory(
+        sl<HazukiSourceService>().peekImageBytesFromMemory(
           normalized,
           sourceKey: sourceKey,
         );
@@ -393,7 +394,7 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
     }
 
     try {
-      final bytes = await HazukiSourceService.instance.downloadImageBytes(
+      final bytes = await sl<HazukiSourceService>().downloadImageBytes(
         normalized,
         keepInMemory: widget.keepInMemory,
         sourceKey: sourceKey,
@@ -662,7 +663,7 @@ class _HazukiCachedCircleAvatarState extends State<HazukiCachedCircleAvatar> {
     }
 
     try {
-      final bytes = await HazukiSourceService.instance.downloadImageBytes(
+      final bytes = await sl<HazukiSourceService>().downloadImageBytes(
         normalized,
       );
       putHazukiWidgetImageMemory(normalized, bytes);

@@ -8,9 +8,13 @@ import 'package:hazuki/features/search/search.dart';
 import 'package:hazuki/features/search/view/search_entry_page.dart';
 import 'package:hazuki/features/search/view/search_id_extract_pill.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../support/test_service_locator.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  setUp(() async {
+    await ensureTestServiceLocator();
+  });
 
   tearDown(() {
     WindowsComicDetailController.instance.close();
