@@ -114,7 +114,7 @@ class ComicDetailFavoriteController extends ChangeNotifier {
       singleFolderOnly: singleFolderOnly,
     );
 
-    final changed = await showGeneralDialog<Map<String, Set<String>>>(
+    final changed = await showGeneralDialog<FavoriteFolderSelectionResult>(
       context: context,
       barrierDismissible: true,
       barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
@@ -162,27 +162,22 @@ class ComicDetailFavoriteController extends ChangeNotifier {
 
     if (changed == null || _disposed) return;
 
-    final selectedResult = Set<String>.from(changed['selected'] ?? <String>{});
-    final initialFavoritedResult = Set<String>.from(
-      changed['initial'] ?? <String>{},
-    );
-
-    final addTargets = selectedResult.difference(initialFavoritedResult);
-    final removeTargets = initialFavoritedResult.difference(selectedResult);
-    if (addTargets.isEmpty && removeTargets.isEmpty) return;
+    if (!changed.hasChanges) return;
 
     _busy = true;
     notifyListeners();
 
     try {
-      await _applyFavoriteSelectionChanges(
+      final result = await applyFavoriteFolderSelectionChanges(
+        repository: _repository,
         details: details,
-        selectedResult: selectedResult,
-        initialFavoritedResult: initialFavoritedResult,
+        selection: changed,
         singleFolderOnly: singleFolderOnly,
       );
-
       if (_disposed) return;
+      _favoriteOverride = result.hasSelection;
+      _cloudFavoriteOverride = result.hasCloudSelection;
+
       unawaited(
         showHazukiPrompt(
           context,
@@ -204,109 +199,6 @@ class ComicDetailFavoriteController extends ChangeNotifier {
         notifyListeners();
       }
     }
-  }
-
-  Future<void> _applyFavoriteSelectionChanges({
-    required ComicDetailsData details,
-    required Set<String> selectedResult,
-    required Set<String> initialFavoritedResult,
-    required bool singleFolderOnly,
-  }) async {
-    final selectedHandles = _favoriteHandlesFromStorageKeys(selectedResult);
-    final initialHandles = _favoriteHandlesFromStorageKeys(
-      initialFavoritedResult,
-    );
-
-    final selectedCloudIds = _folderIdsForSource(
-      selectedHandles,
-      FavoriteFolderSource.cloud,
-    );
-    final initialCloudIds = _folderIdsForSource(
-      initialHandles,
-      FavoriteFolderSource.cloud,
-    );
-    final selectedLocalIds = _folderIdsForSource(
-      selectedHandles,
-      FavoriteFolderSource.local,
-    );
-    final initialLocalIds = _folderIdsForSource(
-      initialHandles,
-      FavoriteFolderSource.local,
-    );
-
-    if (singleFolderOnly &&
-        _repository.isLogged &&
-        _repository.supportFavoriteToggle) {
-      if (selectedCloudIds.isEmpty && initialCloudIds.isNotEmpty) {
-        await _repository.toggleCloudFavorite(
-          comicId: details.id,
-          isAdding: false,
-          folderId: initialCloudIds.first,
-        );
-      } else if (selectedCloudIds.isNotEmpty &&
-          !_setContentsEqual(selectedCloudIds, initialCloudIds)) {
-        await _repository.toggleCloudFavorite(
-          comicId: details.id,
-          isAdding: true,
-          folderId: selectedCloudIds.first,
-        );
-      }
-    } else if (_repository.isLogged && _repository.supportFavoriteToggle) {
-      for (final folderId in selectedCloudIds.difference(initialCloudIds)) {
-        await _repository.toggleCloudFavorite(
-          comicId: details.id,
-          isAdding: true,
-          folderId: folderId,
-        );
-      }
-      for (final folderId in initialCloudIds.difference(selectedCloudIds)) {
-        await _repository.toggleCloudFavorite(
-          comicId: details.id,
-          isAdding: false,
-          folderId: folderId,
-        );
-      }
-    }
-
-    for (final folderId in selectedLocalIds.difference(initialLocalIds)) {
-      await _repository.toggleLocalFavorite(
-        details: details,
-        isAdding: true,
-        folderId: folderId,
-      );
-    }
-    for (final folderId in initialLocalIds.difference(selectedLocalIds)) {
-      await _repository.toggleLocalFavorite(
-        details: details,
-        isAdding: false,
-        folderId: folderId,
-      );
-    }
-
-    if (!_disposed) {
-      _favoriteOverride = selectedResult.isNotEmpty;
-      _cloudFavoriteOverride = selectedCloudIds.isNotEmpty;
-    }
-  }
-
-  Set<FavoriteFolderHandle> _favoriteHandlesFromStorageKeys(Set<String> keys) {
-    final handles = <FavoriteFolderHandle>{};
-    for (final key in keys) {
-      final handle = favoriteFolderHandleFromStorageKey(key);
-      if (handle != null) handles.add(handle);
-    }
-    return handles;
-  }
-
-  Set<String> _folderIdsForSource(
-    Set<FavoriteFolderHandle> handles,
-    FavoriteFolderSource source,
-  ) {
-    return handles.where((h) => h.source == source).map((h) => h.id).toSet();
-  }
-
-  bool _setContentsEqual(Set<String> left, Set<String> right) {
-    return left.length == right.length && left.containsAll(right);
   }
 
   @override

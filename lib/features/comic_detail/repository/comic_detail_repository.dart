@@ -94,6 +94,7 @@ class ComicDetailRepository implements FavoriteFoldersRepository {
   Future<void> deleteCloudFavoriteFolder(String id) =>
       _source.deleteFavoriteFolder(id);
 
+  @override
   Future<void> toggleCloudFavorite({
     required String comicId,
     required bool isAdding,
@@ -128,13 +129,14 @@ class ComicDetailRepository implements FavoriteFoldersRepository {
   }) => _local.loadFavoriteFolders(comicId: comicId, sourceKey: sourceKey);
 
   @override
-  Future<void> addLocalFavoriteFolder(String name) =>
-      _local.addFavoriteFolder(name);
+  Future<void> addLocalFavoriteFolder(String name, {String sourceKey = ''}) =>
+      _local.addFavoriteFolder(name, sourceKey: sourceKey);
 
   @override
-  Future<void> deleteLocalFavoriteFolder(String id) =>
-      _local.deleteFavoriteFolder(id);
+  Future<void> deleteLocalFavoriteFolder(String id, {String sourceKey = ''}) =>
+      _local.deleteFavoriteFolder(id, sourceKey: sourceKey);
 
+  @override
   Future<void> toggleLocalFavorite({
     required ComicDetailsData details,
     required bool isAdding,

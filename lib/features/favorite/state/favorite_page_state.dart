@@ -8,7 +8,7 @@ const defaultCloudFavoriteFolder = FavoriteFolder(
   source: FavoriteFolderSource.cloud,
 );
 
-class FavoritePageState {
+class FavoritePageData {
   bool isFirstLoad = true;
   FavoritePageMode mode = FavoritePageMode.cloud;
   List<ExploreComic> comics = const <ExploreComic>[];

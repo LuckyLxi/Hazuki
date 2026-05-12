@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 
 import '../repository/favorite_folders_repository.dart';
+import 'favorite_selection_result.dart';
 
 class FavoriteFoldersViewModel extends ChangeNotifier {
   FavoriteFoldersViewModel({
@@ -75,6 +76,7 @@ class FavoriteFoldersViewModel extends ChangeNotifier {
     try {
       final localResult = await _repository.loadLocalFavoriteFolders(
         comicId: _details.id,
+        sourceKey: _details.sourceKey,
       );
       final cloudResult = _canLoadCloudFolders
           ? await _repository.loadCloudFavoriteFolders(comicId: _details.id)
@@ -194,7 +196,10 @@ class FavoriteFoldersViewModel extends ChangeNotifier {
     notifyListeners();
     try {
       if (target == FavoriteFolderSource.local) {
-        await _repository.addLocalFavoriteFolder(name);
+        await _repository.addLocalFavoriteFolder(
+          name,
+          sourceKey: _details.sourceKey,
+        );
       } else {
         await _repository.addCloudFavoriteFolder(name);
       }
@@ -214,7 +219,10 @@ class FavoriteFoldersViewModel extends ChangeNotifier {
     notifyListeners();
     try {
       if (folder.source == FavoriteFolderSource.local) {
-        await _repository.deleteLocalFavoriteFolder(folder.id);
+        await _repository.deleteLocalFavoriteFolder(
+          folder.id,
+          sourceKey: _details.sourceKey,
+        );
       } else {
         await _repository.deleteCloudFavoriteFolder(folder.id);
       }
@@ -228,11 +236,11 @@ class FavoriteFoldersViewModel extends ChangeNotifier {
     }
   }
 
-  Map<String, Set<String>> buildSaveResult() {
-    return {
-      'selected': Set<String>.from(_selected),
-      'initial': Set<String>.from(_initialFavorited),
-    };
+  FavoriteFolderSelectionResult buildSaveResult() {
+    return FavoriteFolderSelectionResult(
+      selected: Set<String>.from(_selected),
+      initial: Set<String>.from(_initialFavorited),
+    );
   }
 
   Set<String> _toStorageKeys({

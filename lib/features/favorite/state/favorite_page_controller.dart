@@ -28,7 +28,7 @@ class FavoritePageController extends ChangeNotifier {
   final FavoriteCloudFlow _cloudFlow;
   final FavoriteLocalFlow _localFlow;
   final LocalFavoritesService _localFavoritesService;
-  final FavoritePageState _state = FavoritePageState();
+  final FavoritePageData _state = FavoritePageData();
 
   bool _disposed = false;
   bool _syncingExternalLocalChange = false;
@@ -240,19 +240,11 @@ class FavoritePageController extends ChangeNotifier {
 
     try {
       final nextPage = _state.currentPage + 1;
-      final result = _state.mode == FavoritePageMode.local
-          ? await _localFlow.loadPage(
-              page: nextPage,
-              folderId: targetFolderId,
-              sortOrder: _state.favoriteSortOrder,
-              sourceKey: _activeSourceKey,
-            )
-          : await _cloudFlow.loadPage(
-              page: nextPage,
-              folderId: targetFolderId,
-              timeoutMessage: timeoutMessage,
-              timeout: favoriteLoadTimeout,
-            );
+      final result = await _loadPage(
+        page: nextPage,
+        folderId: targetFolderId,
+        timeoutMessage: timeoutMessage,
+      );
       if (_disposed || requestVersion != _state.listRequestVersion) {
         return null;
       }
@@ -303,19 +295,11 @@ class FavoritePageController extends ChangeNotifier {
         _notify();
         return;
       }
-      final result = _state.mode == FavoritePageMode.local
-          ? await _localFlow.loadPage(
-              page: 1,
-              folderId: selectedFolderId,
-              sortOrder: _state.favoriteSortOrder,
-              sourceKey: _activeSourceKey,
-            )
-          : await _cloudFlow.loadPage(
-              page: 1,
-              folderId: selectedFolderId,
-              timeoutMessage: timeoutMessage,
-              timeout: favoriteLoadTimeout,
-            );
+      final result = await _loadPage(
+        page: 1,
+        folderId: selectedFolderId,
+        timeoutMessage: timeoutMessage,
+      );
       if (_disposed || requestVersion != _state.listRequestVersion) {
         return;
       }
@@ -354,34 +338,16 @@ class FavoritePageController extends ChangeNotifier {
     _state.loadingMore = false;
     _notify();
 
-    final result = _state.mode == FavoritePageMode.local
-        ? await _localFlow.loadPage(
-            page: 1,
-            folderId: folderId,
-            sortOrder: _state.favoriteSortOrder,
-            sourceKey: _activeSourceKey,
-          )
-        : await _cloudFlow.loadPage(
-            page: 1,
-            folderId: folderId,
-            timeoutMessage: timeoutMessage,
-            timeout: favoriteLoadTimeout,
-          );
+    final result = await _loadPage(
+      page: 1,
+      folderId: folderId,
+      timeoutMessage: timeoutMessage,
+    );
     if (_disposed || requestVersion != _state.listRequestVersion) {
       return;
     }
 
-    if (result.errorMessage == null) {
-      _state.comics = result.comics;
-      _state.currentPage = 1;
-      if (result.maxPage != null) {
-        _state.hasMore = _state.currentPage < result.maxPage!;
-      } else {
-        _state.hasMore = result.comics.isNotEmpty;
-      }
-    } else {
-      _state.errorMessage = result.errorMessage;
-    }
+    _state.applyFirstPageResult(result);
     _state.initialLoading = false;
     _notify();
   }
@@ -533,6 +499,28 @@ class FavoritePageController extends ChangeNotifier {
       return;
     }
     unawaited(_syncLocalFavoritesAfterExternalChange());
+  }
+
+  Future<FavoriteComicsResult> _loadPage({
+    required int page,
+    required String folderId,
+    required String timeoutMessage,
+  }) {
+    if (_state.mode == FavoritePageMode.local) {
+      return _localFlow.loadPage(
+        page: page,
+        folderId: folderId,
+        sortOrder: _state.favoriteSortOrder,
+        sourceKey: _activeSourceKey,
+      );
+    }
+
+    return _cloudFlow.loadPage(
+      page: page,
+      folderId: folderId,
+      timeoutMessage: timeoutMessage,
+      timeout: favoriteLoadTimeout,
+    );
   }
 
   Future<void> _loadInitialLocal() async {

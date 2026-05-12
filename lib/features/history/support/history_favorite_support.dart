@@ -57,7 +57,7 @@ Future<void> _showFavoriteFoldersPanelFromHistory(
     singleFolderOnly: singleFolderOnly,
   );
 
-  final changed = await showGeneralDialog<Map<String, Set<String>>>(
+  final changed = await showGeneralDialog<FavoriteFolderSelectionResult>(
     context: context,
     barrierDismissible: true,
     barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
@@ -104,23 +104,15 @@ Future<void> _showFavoriteFoldersPanelFromHistory(
     return;
   }
 
-  final selectedResult = Set<String>.from(changed['selected'] ?? <String>{});
-  final initialFavoritedResult = Set<String>.from(
-    changed['initial'] ?? <String>{},
-  );
-
-  final addTargets = selectedResult.difference(initialFavoritedResult);
-  final removeTargets = initialFavoritedResult.difference(selectedResult);
-
-  if (addTargets.isEmpty && removeTargets.isEmpty) {
+  if (!changed.hasChanges) {
     return;
   }
 
   try {
-    await _applyFavoriteSelectionChangesFromHistory(
+    await applyFavoriteFolderSelectionChanges(
+      repository: repository,
       details: details,
-      selectedResult: selectedResult,
-      initialFavoritedResult: initialFavoritedResult,
+      selection: changed,
       singleFolderOnly: singleFolderOnly,
     );
 
@@ -147,111 +139,4 @@ Future<void> _showFavoriteFoldersPanelFromHistory(
       ),
     );
   }
-}
-
-Future<void> _applyFavoriteSelectionChangesFromHistory({
-  required ComicDetailsData details,
-  required Set<String> selectedResult,
-  required Set<String> initialFavoritedResult,
-  required bool singleFolderOnly,
-}) async {
-  final service = sl<HazukiSourceService>();
-  final localService = sl<LocalFavoritesService>();
-  final selectedHandles = _favoriteHandlesFromStorageKeys(selectedResult);
-  final initialHandles = _favoriteHandlesFromStorageKeys(
-    initialFavoritedResult,
-  );
-
-  final selectedCloudIds = _folderIdsForSource(
-    selectedHandles,
-    FavoriteFolderSource.cloud,
-  );
-  final initialCloudIds = _folderIdsForSource(
-    initialHandles,
-    FavoriteFolderSource.cloud,
-  );
-  final selectedLocalIds = _folderIdsForSource(
-    selectedHandles,
-    FavoriteFolderSource.local,
-  );
-  final initialLocalIds = _folderIdsForSource(
-    initialHandles,
-    FavoriteFolderSource.local,
-  );
-
-  if (singleFolderOnly && service.isLogged && service.supportFavoriteToggle) {
-    if (selectedCloudIds.isEmpty && initialCloudIds.isNotEmpty) {
-      await service.toggleFavorite(
-        comicId: details.id,
-        isAdding: false,
-        folderId: initialCloudIds.first,
-      );
-    } else if (selectedCloudIds.isNotEmpty &&
-        !_setContentsEqual(selectedCloudIds, initialCloudIds)) {
-      await service.toggleFavorite(
-        comicId: details.id,
-        isAdding: true,
-        folderId: selectedCloudIds.first,
-      );
-    }
-  } else if (service.isLogged && service.supportFavoriteToggle) {
-    final addCloudIds = selectedCloudIds.difference(initialCloudIds);
-    final removeCloudIds = initialCloudIds.difference(selectedCloudIds);
-    for (final folderId in addCloudIds) {
-      await service.toggleFavorite(
-        comicId: details.id,
-        isAdding: true,
-        folderId: folderId,
-      );
-    }
-    for (final folderId in removeCloudIds) {
-      await service.toggleFavorite(
-        comicId: details.id,
-        isAdding: false,
-        folderId: folderId,
-      );
-    }
-  }
-
-  final addLocalIds = selectedLocalIds.difference(initialLocalIds);
-  final removeLocalIds = initialLocalIds.difference(selectedLocalIds);
-  for (final folderId in addLocalIds) {
-    await localService.toggleFavorite(
-      details: details,
-      isAdding: true,
-      folderId: folderId,
-    );
-  }
-  for (final folderId in removeLocalIds) {
-    await localService.toggleFavorite(
-      details: details,
-      isAdding: false,
-      folderId: folderId,
-    );
-  }
-}
-
-Set<FavoriteFolderHandle> _favoriteHandlesFromStorageKeys(Set<String> keys) {
-  final handles = <FavoriteFolderHandle>{};
-  for (final key in keys) {
-    final handle = favoriteFolderHandleFromStorageKey(key);
-    if (handle != null) {
-      handles.add(handle);
-    }
-  }
-  return handles;
-}
-
-Set<String> _folderIdsForSource(
-  Set<FavoriteFolderHandle> handles,
-  FavoriteFolderSource source,
-) {
-  return handles
-      .where((handle) => handle.source == source)
-      .map((handle) => handle.id)
-      .toSet();
-}
-
-bool _setContentsEqual(Set<String> left, Set<String> right) {
-  return left.length == right.length && left.containsAll(right);
 }

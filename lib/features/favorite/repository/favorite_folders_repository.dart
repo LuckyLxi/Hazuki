@@ -23,9 +23,21 @@ abstract class FavoriteFoldersRepository {
     String sourceKey = '',
   });
 
-  Future<void> addLocalFavoriteFolder(String name);
+  Future<void> addLocalFavoriteFolder(String name, {String sourceKey = ''});
 
-  Future<void> deleteLocalFavoriteFolder(String id);
+  Future<void> deleteLocalFavoriteFolder(String id, {String sourceKey = ''});
+
+  Future<void> toggleCloudFavorite({
+    required String comicId,
+    required bool isAdding,
+    required String folderId,
+  });
+
+  Future<void> toggleLocalFavorite({
+    required ComicDetailsData details,
+    required bool isAdding,
+    required String folderId,
+  });
 }
 
 class DefaultFavoriteFoldersRepository implements FavoriteFoldersRepository {
@@ -77,10 +89,32 @@ class DefaultFavoriteFoldersRepository implements FavoriteFoldersRepository {
   }) => _local.loadFavoriteFolders(comicId: comicId, sourceKey: sourceKey);
 
   @override
-  Future<void> addLocalFavoriteFolder(String name) =>
-      _local.addFavoriteFolder(name);
+  Future<void> addLocalFavoriteFolder(String name, {String sourceKey = ''}) =>
+      _local.addFavoriteFolder(name, sourceKey: sourceKey);
 
   @override
-  Future<void> deleteLocalFavoriteFolder(String id) =>
-      _local.deleteFavoriteFolder(id);
+  Future<void> deleteLocalFavoriteFolder(String id, {String sourceKey = ''}) =>
+      _local.deleteFavoriteFolder(id, sourceKey: sourceKey);
+
+  @override
+  Future<void> toggleCloudFavorite({
+    required String comicId,
+    required bool isAdding,
+    required String folderId,
+  }) => _source.toggleFavorite(
+    comicId: comicId,
+    isAdding: isAdding,
+    folderId: folderId,
+  );
+
+  @override
+  Future<void> toggleLocalFavorite({
+    required ComicDetailsData details,
+    required bool isAdding,
+    required String folderId,
+  }) => _local.toggleFavorite(
+    details: details,
+    isAdding: isAdding,
+    folderId: folderId,
+  );
 }
