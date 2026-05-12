@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:hazuki/features/favorite/favorite.dart';
 import 'package:hazuki/features/favorite/state/favorite_page_controller.dart';
 import 'package:hazuki/app/service_locator.dart';
@@ -268,6 +269,7 @@ class FavoritePageState extends State<FavoritePage>
       return;
     }
 
+    unawaited(HapticFeedback.lightImpact());
     final strings = _strings(context);
     final renamed = await showFavoriteRenameFolderDialog(
       context,
