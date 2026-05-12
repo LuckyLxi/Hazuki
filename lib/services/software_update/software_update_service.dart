@@ -6,6 +6,8 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import 'software_update_version_utils.dart';
+
 class SoftwareUpdateService {
   SoftwareUpdateService();
 
@@ -192,9 +194,7 @@ class SoftwareUpdateService {
     );
   }
 
-  String _normalizeVersion(String version) {
-    return version.trim().replaceFirst(RegExp(r'^[vV]'), '');
-  }
+  String _normalizeVersion(String version) => normalizeSoftwareVersion(version);
 
   String? _normalizeChangelog(String? changelog) {
     if (changelog == null) {
@@ -418,30 +418,7 @@ class SoftwareUpdateService {
 
   static const List<String> _windowsArchPriority = ['x64', 'arm64', 'x86'];
 
-  bool _isVersionGreater(String a, String b) {
-    final pa = _parseVersionSegments(a);
-    final pb = _parseVersionSegments(b);
-    final len = pa.length > pb.length ? pa.length : pb.length;
-    for (var i = 0; i < len; i++) {
-      final va = i < pa.length ? pa[i] : 0;
-      final vb = i < pb.length ? pb[i] : 0;
-      if (va > vb) {
-        return true;
-      }
-      if (va < vb) {
-        return false;
-      }
-    }
-    return false;
-  }
-
-  List<int> _parseVersionSegments(String version) {
-    final cleaned = version.trim().split('+').first.split('-').first;
-    return cleaned.split('.').map((segment) {
-      final match = RegExp(r'\d+').firstMatch(segment);
-      return int.tryParse(match?.group(0) ?? '0') ?? 0;
-    }).toList();
-  }
+  bool _isVersionGreater(String a, String b) => isSoftwareVersionGreater(a, b);
 }
 
 class SoftwareUpdateCheckResult {
