@@ -1,16 +1,15 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:window_manager/window_manager.dart';
 
 import 'app/app_settings_store.dart';
 import 'app/app_startup_coordinator.dart';
 import 'app/appearance_settings.dart';
 import 'app/hazuki_app_controller.dart';
 import 'app/service_locator.dart';
+import 'app/startup/app_bootstrap.dart';
 import 'app/theme/hazuki_theme_controller.dart';
 import 'app/theme/hazuki_theme_factory.dart';
 import 'app/launch_shortcut_bridge.dart';
@@ -19,7 +18,6 @@ import 'app/source_runtime/source_runtime_coordinator.dart';
 import 'app/source_runtime/source_runtime_bootstrap_overlay.dart';
 import 'app/source_runtime/source_update_dialog_support.dart';
 import 'app/theme/theme_reveal_support.dart';
-import 'shared/ui_flags.dart';
 import 'app/windows/windows_title_bar_controller.dart';
 import 'app/software_update/software_update_dialog_support.dart';
 import 'features/comic_detail/view/comic_detail_page.dart';
@@ -31,75 +29,20 @@ import 'l10n/l10n.dart';
 import 'package:hazuki/features/home/view/home_page.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'services/cloud_sync_service.dart';
-import 'services/comment_filter_service.dart';
 import 'services/hazuki_source_service.dart';
 import 'services/manga_download/manga_download_service.dart';
-import 'services/manga_download/manga_download_storage_support.dart';
 import 'services/password_lock_service.dart';
 import 'widgets/hazuki_prompt.dart';
 import 'features/password_lock/view/password_lock_widgets.dart';
 
-Future<void> _ensureAndroidNoMediaMarker() async {
-  if (!Platform.isAndroid) {
-    return;
-  }
-
-  final rootPath = await MangaDownloadAccess.loadDownloadsRootPath();
-  await _ensureNoMediaFile(rootPath);
-}
-
-Future<void> _ensureNoMediaFile(String dirPath) async {
-  if (dirPath.trim().isEmpty) {
-    return;
-  }
-  try {
-    final dir = Directory(dirPath);
-    if (!await dir.exists()) {
-      await dir.create(recursive: true);
-    }
-    final noMediaFile = File('${dir.path}/.nomedia');
-    if (!await noMediaFile.exists()) {
-      await noMediaFile.writeAsString('', flush: true);
-    }
-  } catch (_) {}
-}
-
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  registerServices();
-  await loadHazukiUiFlags();
-  await sl<HazukiSourceService>().loadSoftwareLogCaptureEnabled();
-  await _ensureAndroidNoMediaMarker();
-  await sl<MangaDownloadService>().ensureInitialized();
-  await sl<PasswordLockService>().ensureInitialized();
-  await sl<CommentFilterService>().load();
-  const settingsStore = HazukiAppSettingsStore();
-  final initialAppearance = await settingsStore.loadAppearance();
-  final initialLocale = await settingsStore.loadLocalePreference();
-  final initialUseSystemTitleBar = await settingsStore.loadUseSystemTitleBar();
-  if (Platform.isWindows) {
-    await windowManager.ensureInitialized();
-    windowManager.waitUntilReadyToShow(
-      WindowOptions(
-        minimumSize: const Size(960, 640),
-        title: 'Hazuki',
-        titleBarStyle: initialUseSystemTitleBar
-            ? TitleBarStyle.normal
-            : TitleBarStyle.hidden,
-        windowButtonVisibility: initialUseSystemTitleBar,
-      ),
-      () async {
-        await windowManager.show();
-        await windowManager.focus();
-      },
-    );
-  }
+  final bootstrap = await bootstrapApp();
   runApp(
     HazukiApp(
-      settingsStore: settingsStore,
-      initialAppearance: initialAppearance,
-      initialLocale: initialLocale,
-      initialUseSystemTitleBar: initialUseSystemTitleBar,
+      settingsStore: bootstrap.settingsStore,
+      initialAppearance: bootstrap.initialAppearance,
+      initialLocale: bootstrap.initialLocale,
+      initialUseSystemTitleBar: bootstrap.initialUseSystemTitleBar,
     ),
   );
 }
