@@ -1,8 +1,8 @@
 import 'dart:async';
-import 'package:hazuki/app/service_locator.dart';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
+import 'package:hazuki/app/service_locator.dart';
 
 import '../../services/hazuki_source_service.dart';
 import 'source_runtime_widgets.dart';
@@ -49,6 +49,10 @@ class SourceBootstrapState {
 }
 
 class SourceRuntimeCoordinator {
+  SourceRuntimeCoordinator({HazukiSourceService? sourceService})
+    : _sourceService = sourceService ?? sl<HazukiSourceService>();
+
+  final HazukiSourceService _sourceService;
   final Connectivity _connectivity = Connectivity();
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   bool _hasConnectivity = true;
@@ -61,7 +65,7 @@ class SourceRuntimeCoordinator {
     required VoidCallback onSourceReady,
     required VoidCallback scheduleSourceUpdateDialogCheck,
   }) async {
-    final hasLocalSource = await sl<HazukiSourceService>()
+    final hasLocalSource = await _sourceService
         .hasLocalJmSourceFile();
     if (!isMounted()) {
       return;
@@ -92,7 +96,7 @@ class SourceRuntimeCoordinator {
         );
       }());
       try {
-        await sl<HazukiSourceService>().init(
+        await _sourceService.init(
           onSourceDownloadProgress: (received, total) {
             if (!isMounted()) {
               return;
@@ -107,7 +111,7 @@ class SourceRuntimeCoordinator {
             );
           },
         );
-        await sl<HazukiSourceService>().ensureInitialized();
+        await _sourceService.ensureInitialized();
         bootstrapSucceeded = true;
       } catch (e) {
         if (!isMounted()) {
@@ -215,7 +219,7 @@ class SourceRuntimeCoordinator {
     required bool Function() isMounted,
     required VoidCallback scheduleSourceUpdateDialogCheck,
   }) async {
-    final refreshed = await sl<HazukiSourceService>()
+    final refreshed = await _sourceService
         .refreshSourceOnNetworkRecovery();
     if (!isMounted() || !refreshed) {
       return;
