@@ -3,6 +3,25 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/l10n/l10n.dart';
+import 'package:hazuki/widgets/widgets.dart';
+
+class ComicDetailLoadingView extends StatelessWidget {
+  const ComicDetailLoadingView({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const HazukiSandyLoadingIndicator(size: 136),
+          const SizedBox(height: 10),
+          Text(l10n(context).comicDetailLoading),
+        ],
+      ),
+    );
+  }
+}
 
 class ComicDetailAppBarTitle extends StatelessWidget {
   const ComicDetailAppBarTitle({

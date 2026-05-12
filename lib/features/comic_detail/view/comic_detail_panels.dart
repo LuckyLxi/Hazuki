@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-export 'package:hazuki/widgets/chapters_panel_sheet.dart';
-
 class HazukiTabBarDelegate extends SliverPersistentHeaderDelegate {
   const HazukiTabBarDelegate(
     this.tabBar,

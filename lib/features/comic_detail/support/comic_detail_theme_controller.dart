@@ -8,11 +8,13 @@ import 'package:hazuki/app/app.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 
 import '../repository/comic_detail_repository.dart';
+import 'package:hazuki/shared/lru_cache.dart';
 import 'package:hazuki/shared/ui_flags.dart';
 
-const int _comicDynamicColorSchemeCacheLimit = 24;
-final Map<String, _ComicDynamicColorCacheEntry> _comicDynamicColorSchemeCache =
-    <String, _ComicDynamicColorCacheEntry>{};
+final LruCache<String, _ComicDynamicColorCacheEntry>
+_comicDynamicColorSchemeCache = LruCache<String, _ComicDynamicColorCacheEntry>(
+  maxSize: 24,
+);
 final Map<String, Future<_ComicDynamicColorCacheEntry>>
 _comicDynamicColorSchemeInFlight =
     <String, Future<_ComicDynamicColorCacheEntry>>{};
@@ -30,10 +32,7 @@ class _ComicDynamicColorCacheEntry {
 _ComicDynamicColorCacheEntry? _takeComicDynamicColorScheme(String url) {
   final normalizedUrl = url.trim();
   if (normalizedUrl.isEmpty) return null;
-  final entry = _comicDynamicColorSchemeCache.remove(normalizedUrl);
-  if (entry == null) return null;
-  _comicDynamicColorSchemeCache[normalizedUrl] = entry;
-  return entry;
+  return _comicDynamicColorSchemeCache.get(normalizedUrl);
 }
 
 void _putComicDynamicColorScheme(
@@ -42,14 +41,7 @@ void _putComicDynamicColorScheme(
 ) {
   final normalizedUrl = url.trim();
   if (normalizedUrl.isEmpty) return;
-  _comicDynamicColorSchemeCache.remove(normalizedUrl);
-  _comicDynamicColorSchemeCache[normalizedUrl] = entry;
-  while (_comicDynamicColorSchemeCache.length >
-      _comicDynamicColorSchemeCacheLimit) {
-    _comicDynamicColorSchemeCache.remove(
-      _comicDynamicColorSchemeCache.keys.first,
-    );
-  }
+  _comicDynamicColorSchemeCache.put(normalizedUrl, entry);
 }
 
 class ComicDetailThemeController extends ChangeNotifier {

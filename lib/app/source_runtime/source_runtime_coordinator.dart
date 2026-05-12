@@ -65,8 +65,7 @@ class SourceRuntimeCoordinator {
     required VoidCallback onSourceReady,
     required VoidCallback scheduleSourceUpdateDialogCheck,
   }) async {
-    final hasLocalSource = await _sourceService
-        .hasLocalJmSourceFile();
+    final hasLocalSource = await _sourceService.hasLocalJmSourceFile();
     if (!isMounted()) {
       return;
     }
@@ -219,8 +218,7 @@ class SourceRuntimeCoordinator {
     required bool Function() isMounted,
     required VoidCallback scheduleSourceUpdateDialogCheck,
   }) async {
-    final refreshed = await _sourceService
-        .refreshSourceOnNetworkRecovery();
+    final refreshed = await _sourceService.refreshSourceOnNetworkRecovery();
     if (!isMounted() || !refreshed) {
       return;
     }

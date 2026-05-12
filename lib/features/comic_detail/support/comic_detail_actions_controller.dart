@@ -116,10 +116,9 @@ class ComicDetailActionsController extends ChangeNotifier {
         reverseCurve: Curves.easeInCubic,
       ),
       builder: (routeContext) {
-        final themedData = _detailThemeApplier(Theme.of(routeContext));
-        return Theme(
-          data: themedData,
-          child: _chaptersPanelBuilder(
+        return _wrapWithDetailTheme(
+          routeContext,
+          _chaptersPanelBuilder(
             details: details,
             onDownloadConfirm: (selectedEpIds) {
               Navigator.of(routeContext).pop();
@@ -304,7 +303,6 @@ class ComicDetailActionsController extends ChangeNotifier {
 
   Future<void> _showCoverActions(BuildContext context, String imageUrl) async {
     FocusManager.instance.primaryFocus?.unfocus();
-    final themedData = _detailThemeApplier(Theme.of(context));
     await showGeneralDialog<void>(
       context: context,
       barrierDismissible: true,
@@ -312,9 +310,9 @@ class ComicDetailActionsController extends ChangeNotifier {
       barrierColor: Colors.black.withValues(alpha: 0.32),
       transitionDuration: const Duration(milliseconds: 240),
       pageBuilder: (dialogContext, animation, secondaryAnimation) {
-        return Theme(
-          data: themedData,
-          child: AlertDialog(
+        return _wrapWithDetailTheme(
+          context,
+          AlertDialog(
             title: Text(l10n(context).comicDetailSaveImage),
             actions: [
               TextButton(
@@ -387,6 +385,10 @@ class ComicDetailActionsController extends ChangeNotifier {
         l10n(context).downloadsQueued('${targets.length}'),
       ),
     );
+  }
+
+  Widget _wrapWithDetailTheme(BuildContext context, Widget child) {
+    return Theme(data: _detailThemeApplier(Theme.of(context)), child: child);
   }
 
   @override

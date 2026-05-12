@@ -10,28 +10,24 @@ void main() {
 
   setUp(() {
     SharedPreferences.setMockInitialValues(const {});
-    TestDefaultBinaryMessengerBinding
-        .instance
-        .defaultBinaryMessenger
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(_privacyChannel, (call) async {
-      if (call.method == 'getPrivacySettings') {
-        return <String, dynamic>{
-          'biometricAuth': false,
-          'authOnResume': false,
-        };
-      }
-      if (call.method == 'authenticate') {
-        return false;
-      }
-      // setPasswordLockEnabled — no-op
-      return null;
-    });
+          if (call.method == 'getPrivacySettings') {
+            return <String, dynamic>{
+              'biometricAuth': false,
+              'authOnResume': false,
+            };
+          }
+          if (call.method == 'authenticate') {
+            return false;
+          }
+          // setPasswordLockEnabled — no-op
+          return null;
+        });
   });
 
   tearDown(() {
-    TestDefaultBinaryMessengerBinding
-        .instance
-        .defaultBinaryMessenger
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(_privacyChannel, null);
   });
 
@@ -120,35 +116,39 @@ void main() {
       expect(service.input, '');
     });
 
-    test('wrong pin increments failed attempts; 3 failures trigger lockout',
-        () async {
-      Future<PasswordVerificationResult> enter(String pin) async {
-        PasswordVerificationResult last =
-            PasswordVerificationResult.incomplete;
-        for (final c in pin.split('')) {
-          last = await service.appendDigit(c);
+    test(
+      'wrong pin increments failed attempts; 3 failures trigger lockout',
+      () async {
+        Future<PasswordVerificationResult> enter(String pin) async {
+          PasswordVerificationResult last =
+              PasswordVerificationResult.incomplete;
+          for (final c in pin.split('')) {
+            last = await service.appendDigit(c);
+          }
+          return last;
         }
-        return last;
-      }
 
-      expect(await enter('9999'), PasswordVerificationResult.failed);
-      expect(service.remainingAttempts, 2);
-      expect(await enter('9999'), PasswordVerificationResult.failed);
-      expect(service.remainingAttempts, 1);
-      expect(await enter('9999'), PasswordVerificationResult.lockedOut);
-      expect(service.isLockedOut, isTrue);
-      expect(service.remainingAttempts, 0);
-    });
+        expect(await enter('9999'), PasswordVerificationResult.failed);
+        expect(service.remainingAttempts, 2);
+        expect(await enter('9999'), PasswordVerificationResult.failed);
+        expect(service.remainingAttempts, 1);
+        expect(await enter('9999'), PasswordVerificationResult.lockedOut);
+        expect(service.isLockedOut, isTrue);
+        expect(service.remainingAttempts, 0);
+      },
+    );
 
-    test('removeLastDigit pops one character and clearInput empties input',
-        () async {
-      await service.appendDigit('1');
-      await service.appendDigit('2');
-      service.removeLastDigit();
-      expect(service.input, '1');
-      service.clearInput();
-      expect(service.input, '');
-    });
+    test(
+      'removeLastDigit pops one character and clearInput empties input',
+      () async {
+        await service.appendDigit('1');
+        await service.appendDigit('2');
+        service.removeLastDigit();
+        expect(service.input, '1');
+        service.clearInput();
+        expect(service.input, '');
+      },
+    );
   });
 
   group('PasswordLockService.disable', () {

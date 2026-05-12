@@ -14,13 +14,14 @@ import '../support/comic_detail_favorite_controller.dart';
 import '../support/comic_detail_scope.dart';
 import '../support/comic_detail_session_controller.dart';
 import '../support/comic_detail_theme_controller.dart';
+import '../support/comic_detail_ui_state_controller.dart';
 import 'comic_detail_app_bar.dart';
 import 'package:hazuki/features/favorite/favorite.dart';
 
 import 'comic_detail_background.dart';
 import 'comic_detail_cover.dart';
-import 'comic_detail_panels.dart';
 import 'comic_detail_scaffold.dart';
+import 'package:hazuki/widgets/chapters_panel_sheet.dart';
 
 const MethodChannel _comicDetailMediaChannel = MethodChannel(
   'hazuki.comics/media',
@@ -59,6 +60,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
 
   late final ComicDetailRepository _repository;
   late final ComicDetailSessionController _sessionController;
+  late final ComicDetailUiStateController _uiStateController;
   late final ComicDetailThemeController _themeController;
   late final ComicDetailActionsController _actionsController;
   late final ComicDetailFavoriteController _favoriteController;
@@ -72,9 +74,11 @@ class _ComicDetailPageState extends State<ComicDetailPage>
       downloader: sl<MangaDownloadService>(),
     );
     _initializeControllers();
+    _uiStateController.initialize(initialAppBarTitle: widget.comic.title);
     _sessionController.initialize();
     _themeController.addListener(_rebuildPage);
     _sessionController.addListener(_rebuildPage);
+    _uiStateController.addListener(_rebuildPage);
     _favoriteController.addListener(_rebuildPage);
   }
 
@@ -88,8 +92,10 @@ class _ComicDetailPageState extends State<ComicDetailPage>
   void dispose() {
     _themeController.removeListener(_rebuildPage);
     _sessionController.removeListener(_rebuildPage);
+    _uiStateController.removeListener(_rebuildPage);
     _favoriteController.removeListener(_rebuildPage);
     _sessionController.dispose();
+    _uiStateController.dispose();
     _themeController.dispose();
     _actionsController.dispose();
     _favoriteController.dispose();
@@ -171,11 +177,14 @@ class _ComicDetailPageState extends State<ComicDetailPage>
       repository: _repository,
       comic: widget.comic,
       sourceKey: widget.comic.sourceKey,
+      applyInitialFavoriteOverrides: _favoriteController.applyInitialOverrides,
+    );
+    _uiStateController = ComicDetailUiStateController(
+      comicId: widget.comic.id,
       shouldAnimateInitialRevealOverride:
           widget.shouldAnimateInitialRevealOverride,
       vsync: this,
       scrollController: _scrollController,
-      applyInitialFavoriteOverrides: _favoriteController.applyInitialOverrides,
     );
   }
 
@@ -187,6 +196,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
 
     return ComicDetailScope(
       session: _sessionController,
+      uiState: _uiStateController,
       theme: _themeController,
       actions: _actionsController,
       favorite: _favoriteController,
@@ -199,9 +209,9 @@ class _ComicDetailPageState extends State<ComicDetailPage>
           extendBodyBehindAppBar: true,
           resizeToAvoidBottomInset: false,
           appBar: ComicDetailScrollAwareAppBar(
-            collapsedTitleListenable: _sessionController.collapsedTitleNotifier,
-            appBarComicTitle: _sessionController.appBarComicTitle,
-            appBarUpdateTime: _sessionController.appBarUpdateTime,
+            collapsedTitleListenable: _uiStateController.collapsedTitleNotifier,
+            appBarComicTitle: _uiStateController.appBarComicTitle,
+            appBarUpdateTime: _uiStateController.appBarUpdateTime,
             theme: theme,
             isDesktopPanel: widget.isDesktopPanel,
             onCloseRequested: widget.onCloseRequested,
@@ -215,7 +225,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
               ),
               ComicDetailTopSurfaceOverlay(
                 progressListenable:
-                    _sessionController.appBarSolidProgressNotifier,
+                    _uiStateController.appBarSolidProgressNotifier,
                 surface: surface,
                 height: topInset,
               ),

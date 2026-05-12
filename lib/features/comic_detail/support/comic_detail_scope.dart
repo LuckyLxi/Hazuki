@@ -4,11 +4,13 @@ import 'comic_detail_actions_controller.dart';
 import 'comic_detail_favorite_controller.dart';
 import 'comic_detail_session_controller.dart';
 import 'comic_detail_theme_controller.dart';
+import 'comic_detail_ui_state_controller.dart';
 
 class ComicDetailScope extends InheritedWidget {
   const ComicDetailScope({
     super.key,
     required this.session,
+    required this.uiState,
     required this.theme,
     required this.actions,
     required this.favorite,
@@ -16,6 +18,7 @@ class ComicDetailScope extends InheritedWidget {
   });
 
   final ComicDetailSessionController session;
+  final ComicDetailUiStateController uiState;
   final ComicDetailThemeController theme;
   final ComicDetailActionsController actions;
   final ComicDetailFavoriteController favorite;

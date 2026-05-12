@@ -4,14 +4,14 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
+import 'package:hazuki/shared/lru_cache.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
-const int _comicStaticBlurredCoverCacheLimit = 24;
-final Map<String, Uint8List> _comicStaticBlurredCoverCache =
-    <String, Uint8List>{};
+final LruCache<String, Uint8List> _comicStaticBlurredCoverCache =
+    LruCache<String, Uint8List>(maxSize: 24);
 
 Uint8List? _takeComicStaticBlurredCover(String url, {String sourceKey = ''}) {
   final normalizedUrl = url.trim();
@@ -23,15 +23,10 @@ Uint8List? _takeComicStaticBlurredCover(String url, {String sourceKey = ''}) {
     sourceKey: sourceKey,
   );
   final bytes =
-      _comicStaticBlurredCoverCache[cacheKey] ??
+      _comicStaticBlurredCoverCache.get(cacheKey) ??
       (sourceKey.trim().isNotEmpty
-          ? _comicStaticBlurredCoverCache[normalizedUrl]
+          ? _comicStaticBlurredCoverCache.get(normalizedUrl)
           : null);
-  if (bytes == null) {
-    return null;
-  }
-  _comicStaticBlurredCoverCache.remove(cacheKey);
-  _comicStaticBlurredCoverCache[cacheKey] = bytes;
   return bytes;
 }
 
@@ -48,14 +43,7 @@ void _putComicStaticBlurredCover(
     normalizedUrl,
     sourceKey: sourceKey,
   );
-  _comicStaticBlurredCoverCache.remove(cacheKey);
-  _comicStaticBlurredCoverCache[cacheKey] = bytes;
-  while (_comicStaticBlurredCoverCache.length >
-      _comicStaticBlurredCoverCacheLimit) {
-    _comicStaticBlurredCoverCache.remove(
-      _comicStaticBlurredCoverCache.keys.first,
-    );
-  }
+  _comicStaticBlurredCoverCache.put(cacheKey, bytes);
 }
 
 Uint8List? _takeBackgroundCoverBytes(String url, {String sourceKey = ''}) {

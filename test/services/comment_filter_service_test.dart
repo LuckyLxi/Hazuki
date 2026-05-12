@@ -63,26 +63,25 @@ void main() {
   });
 
   group('CommentFilterService persistence', () {
-    test('load reads stored keywords and mode from SharedPreferences',
-        () async {
-      SharedPreferences.setMockInitialValues({
-        'comment_filter_keywords': const ['abc', 'def'],
-        'comment_filter_mode': 'hide',
-      });
-      final service = CommentFilterService();
-      await service.load();
-      expect(service.userKeywords, ['abc', 'def']);
-      expect(service.mode, CommentFilterMode.hide);
-    });
+    test(
+      'load reads stored keywords and mode from SharedPreferences',
+      () async {
+        SharedPreferences.setMockInitialValues({
+          'comment_filter_keywords': const ['abc', 'def'],
+          'comment_filter_mode': 'hide',
+        });
+        final service = CommentFilterService();
+        await service.load();
+        expect(service.userKeywords, ['abc', 'def']);
+        expect(service.mode, CommentFilterMode.hide);
+      },
+    );
 
     test('save round-trips through SharedPreferences', () async {
       SharedPreferences.setMockInitialValues(const {});
       final a = CommentFilterService();
       await a.load();
-      await a.save(
-        userKeywords: ['kw1', 'kw2'],
-        mode: CommentFilterMode.hide,
-      );
+      await a.save(userKeywords: ['kw1', 'kw2'], mode: CommentFilterMode.hide);
 
       final b = CommentFilterService();
       await b.load();
@@ -94,10 +93,7 @@ void main() {
       SharedPreferences.setMockInitialValues(const {});
       final service = CommentFilterService();
       await service.load();
-      await service.save(
-        userKeywords: ['x'],
-        mode: CommentFilterMode.collapse,
-      );
+      await service.save(userKeywords: ['x'], mode: CommentFilterMode.collapse);
       expect(() => service.userKeywords.add('y'), throwsUnsupportedError);
     });
   });

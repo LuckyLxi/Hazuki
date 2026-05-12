@@ -6,9 +6,10 @@ import 'package:hazuki/models/hazuki_models.dart';
 
 import '../support/comic_detail_scope.dart';
 import 'comic_detail_header.dart';
+import 'comic_detail_info_tab.dart';
 import 'comic_detail_meta.dart';
 import 'comic_detail_panels.dart';
-import 'comic_detail_sections.dart';
+import 'comic_detail_related_tab.dart';
 import 'comic_detail_view_primitives.dart';
 
 class ComicDetailBody extends StatelessWidget {
@@ -40,6 +41,7 @@ class ComicDetailBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final scope = ComicDetailScope.of(context);
     final session = scope.session;
+    final uiState = scope.uiState;
     final surface = Theme.of(context).colorScheme.surface;
 
     return FutureBuilder<ComicDetailsData>(
@@ -58,16 +60,16 @@ class ComicDetailBody extends StatelessWidget {
             ? listCoverUrl
             : (details?.cover.trim() ?? '');
         final shouldAnimateInitialDetailReveal =
-            session.shouldAnimateInitialDetailReveal;
+            uiState.shouldAnimateInitialDetailReveal;
         final shouldAnimateResolvedContent =
             shouldAnimateInitialDetailReveal && details != null;
 
-        session.updateAppBarMetadata(
+        uiState.updateAppBarMetadata(
           title: displayTitle,
           updateTime: details?.updateTime ?? '',
         );
         if (details != null) {
-          session.markComicDetailRevealHandled(details);
+          uiState.markComicDetailRevealHandled(details.id);
         }
 
         return NestedScrollView(
@@ -112,7 +114,7 @@ class ComicDetailBody extends StatelessWidget {
                   pinned: true,
                   delegate: HazukiTabBarDelegate(
                     TabBar(
-                      controller: session.tabController,
+                      controller: uiState.tabController,
                       onTap: (_) =>
                           FocusManager.instance.primaryFocus?.unfocus(),
                       isScrollable: true,
@@ -146,11 +148,11 @@ class ComicDetailBody extends StatelessWidget {
           body: ColoredBox(
             color: surface,
             child: TabBarView(
-              controller: session.tabController,
+              controller: uiState.tabController,
               physics: const ClampingScrollPhysics(),
               children: [
                 ComicDetailTabTickerScope(
-                  tabController: session.tabController,
+                  tabController: uiState.tabController,
                   tabIndex: 0,
                   builder: (context, shouldRender, _) {
                     return RepaintBoundary(
@@ -165,7 +167,7 @@ class ComicDetailBody extends StatelessWidget {
                   },
                 ),
                 ComicDetailTabTickerScope(
-                  tabController: session.tabController,
+                  tabController: uiState.tabController,
                   tabIndex: 1,
                   builder: (context, shouldRender, _) {
                     return details != null
@@ -178,16 +180,16 @@ class ComicDetailBody extends StatelessWidget {
                               isTabView: true,
                               isActiveInTabView: shouldRender,
                               onRequestTabFullscreen:
-                                  session.ensureCommentsTabFullscreen,
+                                  uiState.ensureCommentsTabFullscreen,
                               debugOuterScrollStateBuilder:
-                                  session.buildCommentsTabDebugState,
+                                  uiState.buildCommentsTabDebugState,
                             ),
                           )
                         : const ComicDetailLoadingView();
                   },
                 ),
                 ComicDetailTabTickerScope(
-                  tabController: session.tabController,
+                  tabController: uiState.tabController,
                   tabIndex: 2,
                   builder: (context, shouldRender, _) {
                     return RepaintBoundary(
