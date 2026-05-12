@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
@@ -9,10 +8,10 @@ import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
-import 'package:hazuki/widgets/widgets.dart';
 
 import '../state/discover_page_controller.dart';
 import 'discover_daily_recommendation_carousel.dart';
+import 'discover_page_body.dart';
 import 'discover_page_sections.dart';
 
 class DiscoverPage extends StatefulWidget {
@@ -164,7 +163,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
     );
   }
 
-  Widget _buildHeaderItem(int index) {
+  Widget _buildHeaderItem(BuildContext context, int index) {
     var currentIndex = index;
     if (!widget.usePinnedSearchInAppBar) {
       if (currentIndex == 0) {
@@ -183,55 +182,17 @@ class _DiscoverPageState extends State<DiscoverPage> {
 
   @override
   Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: _controller,
-      builder: (context, _) {
-        final visibleSectionCount = math.min(
-          _controller.visibleSectionCount,
-          _controller.sections.length,
-        );
-        final hasSections = visibleSectionCount > 0;
-
-        return HazukiPullToRefresh(
-          onRefresh: _triggerRefresh,
-          edgeOffset: 56,
-          child: ListView.builder(
-            controller: _scrollController,
-            physics: const AlwaysScrollableScrollPhysics(
-              parent: ClampingScrollPhysics(),
-            ),
-            padding: const EdgeInsets.all(16),
-            itemCount: hasSections
-                ? visibleSectionCount + _headerItemCount
-                : _headerItemCount + 1,
-            itemBuilder: (context, index) {
-              if (index < _headerItemCount) {
-                return _buildHeaderItem(index);
-              }
-              if (!hasSections) {
-                return DiscoverStateView(
-                  initialLoading: _controller.initialLoading,
-                  refreshing: _controller.refreshing,
-                  sections: _controller.sections,
-                  errorMessage: _controller.errorMessage,
-                  sourceRuntimeState: _controller.sourceRuntimeState,
-                  allowInitialLoad: widget.allowInitialLoad,
-                  hideLoadingUntilInitialLoadAllowed:
-                      widget.hideLoadingUntilInitialLoadAllowed,
-                  onRetry: _triggerRefresh,
-                );
-              }
-              final sectionIndex = index - _headerItemCount;
-              return DiscoverSectionBlock(
-                section: _controller.sections[sectionIndex],
-                sectionIndex: sectionIndex,
-                comicDetailPageBuilder: widget.comicDetailPageBuilder,
-                comicCoverHeroTagBuilder: widget.comicCoverHeroTagBuilder,
-              );
-            },
-          ),
-        );
-      },
+    return DiscoverPageBody(
+      controller: _controller,
+      scrollController: _scrollController,
+      headerItemCount: _headerItemCount,
+      headerItemBuilder: _buildHeaderItem,
+      onRefresh: _triggerRefresh,
+      allowInitialLoad: widget.allowInitialLoad,
+      hideLoadingUntilInitialLoadAllowed:
+          widget.hideLoadingUntilInitialLoadAllowed,
+      comicDetailPageBuilder: widget.comicDetailPageBuilder,
+      comicCoverHeroTagBuilder: widget.comicCoverHeroTagBuilder,
     );
   }
 }
