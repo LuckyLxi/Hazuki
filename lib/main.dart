@@ -37,7 +37,7 @@ import 'services/manga_download/manga_download_service.dart';
 import 'services/manga_download/manga_download_storage_support.dart';
 import 'services/password_lock_service.dart';
 import 'widgets/hazuki_prompt.dart';
-import 'widgets/password_lock_widgets.dart';
+import 'features/password_lock/view/password_lock_widgets.dart';
 
 Future<void> _ensureAndroidNoMediaMarker() async {
   if (!Platform.isAndroid) {

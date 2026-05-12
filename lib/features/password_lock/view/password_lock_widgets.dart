@@ -5,8 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:lottie/lottie.dart';
 
-import '../l10n/l10n.dart';
-import '../services/password_lock_service.dart';
+import 'package:hazuki/l10n/l10n.dart';
+import 'package:hazuki/services/password_lock_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Lottie header (设置密码页使用)

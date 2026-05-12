@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../l10n/app_localizations.dart';
-import '../l10n/l10n.dart';
-import '../services/hazuki_source_service.dart';
+import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/l10n/l10n.dart';
+import 'package:hazuki/services/hazuki_source_service.dart';
 
 bool shouldShowSourceRuntimeStatusCard(
   SourceRuntimeState state, {

@@ -5,8 +5,8 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
-import '../../widgets/windows_custom_title_bar.dart';
 import '../appearance_settings.dart';
+import '../windows/windows_custom_title_bar.dart';
 import '../windows/windows_title_bar_controller.dart';
 
 typedef ThemeRevealLogCallback =
