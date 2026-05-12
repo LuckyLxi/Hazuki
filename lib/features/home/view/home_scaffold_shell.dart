@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 
 import 'package:hazuki/features/favorite/favorite.dart';
 import 'package:hazuki/app/service_locator.dart';
-import 'package:hazuki/features/favorite/view/favorite_page.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
@@ -35,7 +34,7 @@ class HomeScaffoldShell extends StatelessWidget {
     required this.autoCheckInEnabled,
     required this.checkInBusy,
     required this.checkedInToday,
-    required this.favoritePageKey,
+    required this.favoriteActionsBinding,
     required this.authVersion,
     required this.allowDiscoverInitialLoad,
     required this.hideDiscoverLoadingUntilAllowed,
@@ -73,7 +72,7 @@ class HomeScaffoldShell extends StatelessWidget {
   final bool autoCheckInEnabled;
   final bool checkInBusy;
   final bool checkedInToday;
-  final GlobalKey<FavoritePageState> favoritePageKey;
+  final FavoritePageActionsBinding favoriteActionsBinding;
   final int authVersion;
   final bool allowDiscoverInitialLoad;
   final bool hideDiscoverLoadingUntilAllowed;
@@ -112,7 +111,7 @@ class HomeScaffoldShell extends StatelessWidget {
         onSearchTap: onOpenSearch,
       ),
       favoriteChild: FavoritePage(
-        key: favoritePageKey,
+        actionsBinding: favoriteActionsBinding,
         authVersion: authVersion,
         onAppBarActionsChanged: onFavoriteAppBarActionsChanged,
         onRequestLogin: onRequestLogin,

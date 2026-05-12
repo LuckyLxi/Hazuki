@@ -4,7 +4,7 @@ import 'dart:typed_data';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:hazuki/app/app_preferences.dart';
-import 'package:hazuki/features/favorite/repository/favorite_folders_repository.dart';
+import 'package:hazuki/features/favorite/favorite.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/services/local_favorites_service.dart';

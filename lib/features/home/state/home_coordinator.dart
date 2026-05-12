@@ -5,7 +5,6 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
 import 'package:hazuki/features/favorite/favorite.dart';
-import 'package:hazuki/features/favorite/view/favorite_page.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/features/home/state/home_profile_controller.dart';
@@ -22,7 +21,7 @@ class HomeCoordinator extends ChangeNotifier {
        _profileController = HomeProfileController(sourceService: sourceService),
        _shellController = HomeShellController(initialTabIndex: initialTabIndex),
        scaffoldKey = GlobalKey<ScaffoldState>(),
-       favoritePageKey = GlobalKey<FavoritePageState>() {
+       favoriteActionsBinding = FavoritePageActionsBinding() {
     _profileController.addListener(_relayChange);
     _shellController.addListener(_relayChange);
     _dailyRecommendationService.addListener(_relayChange);
@@ -37,7 +36,7 @@ class HomeCoordinator extends ChangeNotifier {
   final HomeShellController _shellController;
   final DiscoverDailyRecommendationService _dailyRecommendationService;
   final GlobalKey<ScaffoldState> scaffoldKey;
-  final GlobalKey<FavoritePageState> favoritePageKey;
+  final FavoritePageActionsBinding favoriteActionsBinding;
   bool _disposed = false;
 
   String? get avatarUrl => _profileController.avatarUrl;
@@ -126,15 +125,15 @@ class HomeCoordinator extends ChangeNotifier {
   }
 
   Future<void> changeFavoriteSortOrder(String order) {
-    return _shellController.changeFavoriteSortOrder(favoritePageKey, order);
+    return favoriteActionsBinding.changeSortOrder(order);
   }
 
   Future<void> createFavoriteFolder() {
-    return _shellController.createFavoriteFolder(favoritePageKey);
+    return favoriteActionsBinding.createFolder();
   }
 
   Future<void> toggleFavoriteMode() {
-    return _shellController.toggleFavoriteMode(favoritePageKey);
+    return favoriteActionsBinding.toggleMode();
   }
 
   void handleDiscoverSearchMorphProgressChanged(double progress) {

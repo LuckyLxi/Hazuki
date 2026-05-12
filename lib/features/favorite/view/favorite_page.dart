@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:hazuki/features/favorite/favorite.dart';
+import 'package:hazuki/features/favorite/state/favorite_page_controller.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
@@ -25,19 +26,22 @@ class FavoritePage extends StatefulWidget {
     required this.onComicTap,
     this.onAppBarActionsChanged,
     this.onRequestLogin,
+    this.actionsBinding,
   });
 
   final int authVersion;
   final FavoriteComicTapHandler onComicTap;
   final ValueChanged<FavoriteAppBarActionsState>? onAppBarActionsChanged;
   final Future<void> Function()? onRequestLogin;
+  final FavoritePageActionsBinding? actionsBinding;
 
   @override
   State<FavoritePage> createState() => FavoritePageState();
 }
 
 class FavoritePageState extends State<FavoritePage>
-    with AutomaticKeepAliveClientMixin {
+    with AutomaticKeepAliveClientMixin
+    implements FavoritePageActions {
   @override
   bool get wantKeepAlive => true;
 
@@ -59,6 +63,7 @@ class FavoritePageState extends State<FavoritePage>
     );
     _controller.addListener(_handleControllerChanged);
     _scrollController.addListener(_onScroll);
+    widget.actionsBinding?.attach(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
         return;
@@ -75,6 +80,11 @@ class FavoritePageState extends State<FavoritePage>
   @override
   void didUpdateWidget(covariant FavoritePage oldWidget) {
     super.didUpdateWidget(oldWidget);
+
+    if (!identical(oldWidget.actionsBinding, widget.actionsBinding)) {
+      oldWidget.actionsBinding?.detach(this);
+      widget.actionsBinding?.attach(this);
+    }
 
     if (oldWidget.authVersion != widget.authVersion) {
       if (_controller.mode == FavoritePageMode.local) {
@@ -99,6 +109,7 @@ class FavoritePageState extends State<FavoritePage>
 
   @override
   void dispose() {
+    widget.actionsBinding?.detach(this);
     widget.onAppBarActionsChanged?.call(
       const FavoriteAppBarActionsState(
         showSort: false,
@@ -115,6 +126,7 @@ class FavoritePageState extends State<FavoritePage>
     super.dispose();
   }
 
+  @override
   Future<void> createFolder() async {
     final strings = _strings(context);
     final name = await showFavoriteCreateFolderDialog(context);
@@ -143,6 +155,7 @@ class FavoritePageState extends State<FavoritePage>
     unawaited(showHazukiPrompt(context, strings.favoriteCreated(name)));
   }
 
+  @override
   Future<void> changeSortOrder(String order) async {
     _pendingFreshListEntryAnimation = true;
     final error = await _controller.changeSortOrder(
@@ -162,6 +175,7 @@ class FavoritePageState extends State<FavoritePage>
     );
   }
 
+  @override
   Future<void> toggleMode() {
     _pendingFreshListEntryAnimation = true;
     return _controller.toggleMode(

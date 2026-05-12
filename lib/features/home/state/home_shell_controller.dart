@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:hazuki/features/favorite/favorite.dart';
-import 'package:hazuki/features/favorite/view/favorite_page.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/widgets/widgets.dart';
@@ -74,24 +73,5 @@ class HomeShellController extends ChangeNotifier {
     }
     _favoriteAppBarActions = state;
     notifyListeners();
-  }
-
-  Future<void> changeFavoriteSortOrder(
-    GlobalKey<FavoritePageState> favoritePageKey,
-    String order,
-  ) async {
-    await favoritePageKey.currentState?.changeSortOrder(order);
-  }
-
-  Future<void> createFavoriteFolder(
-    GlobalKey<FavoritePageState> favoritePageKey,
-  ) async {
-    await favoritePageKey.currentState?.createFolder();
-  }
-
-  Future<void> toggleFavoriteMode(
-    GlobalKey<FavoritePageState> favoritePageKey,
-  ) async {
-    await favoritePageKey.currentState?.toggleMode();
   }
 }

@@ -215,7 +215,7 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
           autoCheckInEnabled: _coordinator.autoCheckInEnabled,
           checkInBusy: _coordinator.checkInBusy,
           checkedInToday: _coordinator.checkedInToday,
-          favoritePageKey: _coordinator.favoritePageKey,
+          favoriteActionsBinding: _coordinator.favoriteActionsBinding,
           authVersion: _coordinator.authVersion,
           allowDiscoverInitialLoad: widget.allowDiscoverInitialLoad,
           hideDiscoverLoadingUntilAllowed:

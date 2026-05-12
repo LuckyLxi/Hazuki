@@ -1,10 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:hazuki/features/favorite/repository/favorite_folders_repository.dart';
+import 'package:hazuki/features/favorite/favorite.dart';
 import 'package:hazuki/app/service_locator.dart';
-import 'package:hazuki/features/favorite/support/favorite_folders_view_model.dart';
-import 'package:hazuki/features/favorite/view/favorite_folders_morph_dialog.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';

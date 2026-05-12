@@ -15,7 +15,7 @@ import '../support/comic_detail_scope.dart';
 import '../support/comic_detail_session_controller.dart';
 import '../support/comic_detail_theme_controller.dart';
 import 'comic_detail_app_bar.dart';
-import 'package:hazuki/features/favorite/view/favorite_folders_morph_dialog.dart';
+import 'package:hazuki/features/favorite/favorite.dart';
 
 import 'comic_detail_background.dart';
 import 'comic_detail_cover.dart';
