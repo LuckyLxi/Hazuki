@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/l10n/l10n.dart';
+import 'package:hazuki/features/reader/view/reader_overlay_layout.dart';
 
 class ReaderPageIndicatorOverlay extends StatelessWidget {
   const ReaderPageIndicatorOverlay({
@@ -26,7 +27,12 @@ class ReaderPageIndicatorOverlay extends StatelessWidget {
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+        padding: const EdgeInsets.fromLTRB(
+          ReaderOverlayLayout.edgePadding,
+          0,
+          ReaderOverlayLayout.edgePadding,
+          ReaderOverlayLayout.bottomControlsBottomPadding,
+        ),
         child: IgnorePointer(
           ignoring: true,
           child: AnimatedSlide(

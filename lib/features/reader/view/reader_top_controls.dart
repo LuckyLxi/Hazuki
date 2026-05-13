@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:hazuki/features/reader/view/reader_overlay_layout.dart';
+
 class ReaderTopControls extends StatelessWidget {
   const ReaderTopControls({
     super.key,
@@ -23,7 +25,12 @@ class ReaderTopControls extends StatelessWidget {
     return SafeArea(
       bottom: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+        padding: const EdgeInsets.fromLTRB(
+          ReaderOverlayLayout.edgePadding,
+          ReaderOverlayLayout.topControlsTopPadding,
+          ReaderOverlayLayout.edgePadding,
+          0,
+        ),
         child: IgnorePointer(
           ignoring: !controlsVisible,
           child: AnimatedSlide(

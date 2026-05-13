@@ -123,6 +123,11 @@ Widget buildReaderBottomControls({
   required void Function(VoidCallback update) updateState,
   required Future<void> Function(int target) goToPage,
   required Future<void> Function() onOpenChaptersPanel,
+  required VoidCallback onPreviousChapter,
+  VoidCallback? onFavorite,
+  required VoidCallback onComments,
+  required VoidCallback onNextChapter,
+  required VoidCallback onResetZoom,
 }) {
   final maxIndex = math.max(runtimeState.readerSpreadCount - 1, 0);
   return ReaderBottomControls(
@@ -164,39 +169,17 @@ Widget buildReaderBottomControls({
           }
         : null,
     onOpenChaptersPanel: onOpenChaptersPanel,
-  );
-}
-
-Widget buildReaderChapterJumpOverlay({
-  required BuildContext context,
-  required ReaderRuntimeState runtimeState,
-  required VoidCallback onPreviousChapter,
-  VoidCallback? onFavorite,
-  required VoidCallback onComments,
-  required VoidCallback onNextChapter,
-}) {
-  return ReaderChapterJumpOverlay(
-    controlsVisible: runtimeState.controlsVisible,
     onPreviousChapter: onPreviousChapter,
     onFavorite: onFavorite,
     onComments: onComments,
     onNextChapter: onNextChapter,
+    onResetZoom: onResetZoom,
+    isZoomed: runtimeState.pinchToZoom && runtimeState.isZoomed,
     previousTooltip: l10n(context).readerPreviousChapter,
+    chaptersTooltip: l10n(context).comicDetailChapters,
     favoriteTooltip: l10n(context).comicDetailFavorite,
     commentsTooltip: l10n(context).commentsTitle,
     nextTooltip: l10n(context).readerNextChapter,
-  );
-}
-
-Widget buildReaderZoomResetOverlay({
-  required BuildContext context,
-  required ReaderRuntimeState runtimeState,
-  required VoidCallback onResetZoom,
-}) {
-  return ReaderZoomResetOverlay(
-    controlsVisible: runtimeState.controlsVisible,
-    isZoomed: runtimeState.isZoomed,
-    onResetZoom: onResetZoom,
-    label: l10n(context).readerResetZoom,
+    resetZoomLabel: l10n(context).readerResetZoom,
   );
 }

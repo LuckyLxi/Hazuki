@@ -3,37 +3,33 @@ import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
-import 'package:hazuki/app/windows/windows_title_bar_controller.dart';
 import 'package:hazuki/app/service_locator.dart';
-import 'package:hazuki/features/comments/comments.dart';
+import 'package:hazuki/app/windows/windows_title_bar_controller.dart';
 import 'package:hazuki/features/reader/reader.dart';
 import 'package:hazuki/features/reader/state/reader_image_pipeline_state.dart';
 import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
 import 'package:hazuki/features/reader/state/reader_settings_store.dart';
+import 'package:hazuki/features/reader/support/reader_actions_controller.dart';
+import 'package:hazuki/features/reader/support/reader_callbacks.dart';
 import 'package:hazuki/features/reader/support/reader_diagnostics_support.dart';
 import 'package:hazuki/features/reader/support/reader_display_bridge.dart';
 import 'package:hazuki/features/reader/support/reader_image_pipeline_controller.dart';
-import 'package:hazuki/shared/ui_flags.dart';
 import 'package:hazuki/features/reader/support/reader_navigation_controller.dart';
+import 'package:hazuki/features/reader/support/reader_page_context.dart';
+import 'package:hazuki/features/reader/support/reader_save_image_controller.dart';
 import 'package:hazuki/features/reader/support/reader_session_controller.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/features/reader/support/reader_settings_controller.dart';
 import 'package:hazuki/features/reader/support/reader_zoom_controller.dart';
 import 'package:hazuki/features/reader/view/reader_image_views.dart';
 import 'package:hazuki/features/reader/view/reader_overlay_builders.dart';
+import 'package:hazuki/features/reader/view/reader_overlay_host.dart';
 import 'package:hazuki/features/reader/view/reader_state_views.dart';
 import 'package:hazuki/l10n/l10n.dart';
-import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/widgets/widgets.dart';
+import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/shared/ui_flags.dart';
 
-typedef CommentsWidgetBuilder =
-    Widget Function({
-      required String comicId,
-      String? subId,
-      ScrollController? scrollController,
-      Future<void> Function()? onRequestTabFullscreen,
-    });
+typedef CommentsWidgetBuilder = ReaderCommentsWidgetBuilder;
 
 class ReaderPage extends StatefulWidget {
   const ReaderPage({
@@ -78,6 +74,18 @@ class _ReaderPageState extends State<ReaderPage>
   final ReaderRuntimeState _runtimeState = ReaderRuntimeState();
   final ReaderImagePipelineState _imagePipelineState =
       ReaderImagePipelineState();
+  late final ReaderPageContext _pageContext = ReaderPageContext(
+    title: widget.title,
+    chapterTitle: widget.chapterTitle,
+    comicId: widget.comicId,
+    epId: widget.epId,
+    chapterIndex: widget.chapterIndex,
+    images: widget.images,
+    sourceKey: widget.sourceKey,
+    comicTheme: widget.comicTheme,
+    onFavoriteRequested: widget.onFavoriteRequested,
+    commentsWidgetBuilder: widget.commentsWidgetBuilder,
+  );
 
   late final AnimationController _resetAnimController = AnimationController(
     vsync: this,
@@ -159,9 +167,40 @@ class _ReaderPageState extends State<ReaderPage>
         widgetImages: widget.images,
         sourceService: sl<HazukiSourceService>(),
       );
+  late final ReaderSettingsController _settingsController =
+      ReaderSettingsController(
+        runtimeState: _runtimeState,
+        settingsStore: _readerSettingsStore,
+        navigationController: _navigationController,
+        sessionController: _sessionController,
+        zoomController: _readerZoomController,
+        updateState: _updateReaderState,
+        logEvent: _logReaderEvent,
+        logPayload: _readerLogPayload,
+      );
+  late final ReaderActionsController _actionsController =
+      ReaderActionsController(
+        context: () => context,
+        isMounted: () => mounted,
+        updateState: _updateReaderState,
+        logEvent: _logReaderEvent,
+        logPayload: _readerLogPayload,
+        sessionController: _sessionController,
+        pageContext: _pageContext,
+        buildReplacementPage: _buildReaderPageFromContext,
+      );
+  late final ReaderSaveImageController _saveImageController =
+      ReaderSaveImageController(
+        context: () => context,
+        resolveReaderTheme: _resolveReaderTheme,
+        sessionController: _sessionController,
+        isMounted: () => mounted,
+        logEvent: _logReaderEvent,
+        logPayload: _readerLogPayload,
+        comicId: widget.comicId,
+        epId: widget.epId,
+      );
 
-  ComicDetailsData? _chapterDetailsCache;
-  bool _chapterPanelLoading = false;
   HazukiWindowsTitleBarController? _windowsTitleBarController;
 
   bool get _noImageModeEnabled => hazukiNoImageModeNotifier.value;
@@ -268,46 +307,46 @@ class _ReaderPageState extends State<ReaderPage>
           child: SafeArea(
             top: false,
             bottom: false,
-            child: Stack(
-              children: [
-                Listener(
-                  behavior: HitTestBehavior.translucent,
-                  onPointerDown: _readerZoomController.handlePointerDown,
-                  onPointerUp: _readerZoomController.handlePointerEnd,
-                  onPointerCancel: _readerZoomController.handlePointerEnd,
-                  child: _wrapReaderTapPaging(
-                    _runtimeState.readerMode == ReaderMode.rightToLeft
-                        ? _buildReaderPageView()
-                        : _buildTopToBottomReaderView(),
-                  ),
+            child: ReaderOverlayHost(
+              runtimeState: _runtimeState,
+              readerTheme: readerTheme,
+              title: widget.title,
+              chapterIndex: widget.chapterIndex,
+              chapterPanelLoading: _actionsController.chapterPanelLoading,
+              updateState: _updateReaderState,
+              goToPage: (target) => _navigationController.goToPage(
+                target,
+                trigger: 'bottom_slider',
+              ),
+              onBackPressed: _handleBackPressed,
+              onOpenSettingsDrawer: _openReaderSettingsDrawer,
+              onOpenChaptersPanel: _actionsController.openChaptersPanel,
+              onPreviousChapter: () {
+                unawaited(_actionsController.jumpToAdjacentChapter(-1));
+              },
+              onFavorite: widget.onFavoriteRequested != null
+                  ? () {
+                      unawaited(_actionsController.openFavoriteDialog());
+                    }
+                  : null,
+              onComments: () {
+                unawaited(_actionsController.openCommentsSheet());
+              },
+              onNextChapter: () {
+                unawaited(_actionsController.jumpToAdjacentChapter(1));
+              },
+              onResetZoom: _readerZoomController.resetZoom,
+              child: Listener(
+                behavior: HitTestBehavior.translucent,
+                onPointerDown: _readerZoomController.handlePointerDown,
+                onPointerUp: _readerZoomController.handlePointerEnd,
+                onPointerCancel: _readerZoomController.handlePointerEnd,
+                child: _wrapReaderTapPaging(
+                  _runtimeState.readerMode == ReaderMode.rightToLeft
+                      ? _buildReaderPageView()
+                      : _buildTopToBottomReaderView(),
                 ),
-                Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  child: _buildReaderTopControls(readerTheme),
-                ),
-                if (_runtimeState.pageIndicator)
-                  Positioned(
-                    left: 0,
-                    right: 0,
-                    bottom: 0,
-                    child: _buildReaderPageIndicator(readerTheme),
-                  ),
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  child: _buildReaderBottomControls(readerTheme),
-                ),
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  child: _buildReaderChapterJumpOverlay(),
-                ),
-                if (_runtimeState.pinchToZoom) _buildReaderZoomResetOverlay(),
-              ],
+              ),
             ),
           ),
         ),
@@ -340,8 +379,19 @@ class _ReaderPageState extends State<ReaderPage>
     return result;
   }
 
-  void _maybeTriggerSliderHaptic(double value) {
-    maybeTriggerReaderSliderHaptic(runtimeState: _runtimeState, value: value);
+  Widget _buildReaderPageFromContext(ReaderPageContext pageContext) {
+    return ReaderPage(
+      title: pageContext.title,
+      chapterTitle: pageContext.chapterTitle,
+      comicId: pageContext.comicId,
+      epId: pageContext.epId,
+      chapterIndex: pageContext.chapterIndex,
+      images: pageContext.images,
+      sourceKey: pageContext.sourceKey,
+      comicTheme: pageContext.comicTheme,
+      onFavoriteRequested: pageContext.onFavoriteRequested,
+      commentsWidgetBuilder: pageContext.commentsWidgetBuilder,
+    );
   }
 
   Widget _buildReaderSettingsDrawer(ThemeData readerTheme) {
@@ -349,286 +399,25 @@ class _ReaderPageState extends State<ReaderPage>
       context: context,
       readerTheme: readerTheme,
       runtimeState: _runtimeState,
-      onReaderModeChanged: _updateReaderModeSetting,
-      onDoublePageModeChanged: _toggleDoublePageModeSetting,
+      onReaderModeChanged: _settingsController.updateReaderMode,
+      onDoublePageModeChanged: _settingsController.toggleDoublePageMode,
       onTapToTurnPageChanged: _runtimeState.readerMode == ReaderMode.rightToLeft
-          ? _toggleTapToTurnPageSetting
+          ? _settingsController.toggleTapToTurnPage
           : null,
-      onVolumeButtonTurnPageChanged: _toggleVolumeButtonTurnPageSetting,
-      onPinchToZoomChanged: _togglePinchToZoomSetting,
-      onLongPressToSaveChanged: _toggleLongPressToSaveSetting,
-      onImmersiveModeChanged: _toggleImmersiveModeSetting,
-      onKeepScreenOnChanged: _toggleKeepScreenOnSetting,
-      onPageIndicatorChanged: _togglePageIndicatorSetting,
-      onCustomBrightnessChanged: _toggleCustomBrightnessSetting,
+      onVolumeButtonTurnPageChanged:
+          _settingsController.toggleVolumeButtonTurnPage,
+      onPinchToZoomChanged: _settingsController.togglePinchToZoom,
+      onLongPressToSaveChanged: _settingsController.toggleLongPressToSave,
+      onImmersiveModeChanged: _settingsController.toggleImmersiveMode,
+      onKeepScreenOnChanged: _settingsController.toggleKeepScreenOn,
+      onPageIndicatorChanged: _settingsController.togglePageIndicator,
+      onCustomBrightnessChanged: _settingsController.toggleCustomBrightness,
       onBrightnessChanged: _runtimeState.customBrightness
-          ? _updateBrightnessSetting
+          ? _settingsController.updateBrightness
           : null,
       onBrightnessChangeEnd: _runtimeState.customBrightness
-          ? _handleBrightnessChangeEnd
+          ? _settingsController.handleBrightnessChangeEnd
           : null,
-    );
-  }
-
-  Widget _buildReaderTopControls(ThemeData readerTheme) {
-    return buildReaderTopControls(
-      context: context,
-      runtimeState: _runtimeState,
-      readerTheme: readerTheme,
-      title: widget.title,
-      onBackPressed: _handleBackPressed,
-      onOpenSettingsDrawer: _openReaderSettingsDrawer,
-    );
-  }
-
-  Widget _buildReaderPageIndicator(ThemeData readerTheme) {
-    return buildReaderPageIndicator(
-      runtimeState: _runtimeState,
-      readerTheme: readerTheme,
-      chapterIndex: widget.chapterIndex,
-    );
-  }
-
-  Widget _buildReaderBottomControls(ThemeData readerTheme) {
-    return buildReaderBottomControls(
-      context: context,
-      runtimeState: _runtimeState,
-      readerTheme: readerTheme,
-      chapterPanelLoading: _chapterPanelLoading,
-      maybeTriggerSliderHaptic: _maybeTriggerSliderHaptic,
-      updateState: _updateReaderState,
-      goToPage: (target) =>
-          _navigationController.goToPage(target, trigger: 'bottom_slider'),
-      onOpenChaptersPanel: _openChaptersPanel,
-    );
-  }
-
-  Widget _buildReaderChapterJumpOverlay() {
-    return buildReaderChapterJumpOverlay(
-      context: context,
-      runtimeState: _runtimeState,
-      onPreviousChapter: () {
-        unawaited(_jumpToAdjacentChapter(-1));
-      },
-      onFavorite: widget.onFavoriteRequested != null
-          ? () {
-              unawaited(_openFavoriteDialog());
-            }
-          : null,
-      onComments: () {
-        unawaited(_openCommentsSheet());
-      },
-      onNextChapter: () {
-        unawaited(_jumpToAdjacentChapter(1));
-      },
-    );
-  }
-
-  Widget _buildReaderZoomResetOverlay() {
-    return buildReaderZoomResetOverlay(
-      context: context,
-      runtimeState: _runtimeState,
-      onResetZoom: _readerZoomController.resetZoom,
-    );
-  }
-
-  Future<void> _updateReaderModeSetting(ReaderMode? value) async {
-    if (value == null) {
-      return;
-    }
-    final targetImageIndex = _runtimeState.spreadStartIndex(
-      _runtimeState.currentPageIndex,
-    );
-    final previousMode = _runtimeState.readerMode.prefsValue;
-    final changed = _runtimeState.readerMode != value;
-    _updateReaderState(() {
-      _runtimeState.readerMode = value;
-    });
-    await _readerSettingsStore.saveReaderMode(value);
-    _logReaderEvent(
-      changed ? 'Reader mode changed' : 'Reader mode reselected',
-      source: 'reader_settings',
-      content: _readerLogPayload({
-        'setting': 'reading_mode',
-        'previousValue': previousMode,
-        'nextValue': value.prefsValue,
-      }),
-    );
-    if (changed) {
-      _readerZoomController.resetZoomImmediately(
-        reason: 'reading_mode_changed',
-      );
-      _navigationController.syncPositionToImageIndex(
-        targetImageIndex,
-        trigger: 'mode_changed_sync',
-      );
-    }
-  }
-
-  Future<void> _toggleDoublePageModeSetting(bool value) async {
-    final targetImageIndex = _runtimeState.spreadStartIndex(
-      _runtimeState.currentPageIndex,
-    );
-    final previousValue = _runtimeState.doublePageMode;
-    _updateReaderState(() {
-      _runtimeState.doublePageMode = value;
-      _runtimeState.rebuildSpreadItemKeys();
-    });
-    await _readerSettingsStore.saveDoublePageMode(value);
-    _logReaderEvent(
-      previousValue != value
-          ? 'Reader double page mode toggled'
-          : 'Reader double page mode reselected',
-      source: 'reader_settings',
-      content: _readerLogPayload({
-        'setting': 'double_page_mode',
-        'previousValue': previousValue,
-        'nextValue': value,
-      }),
-    );
-    if (previousValue != value) {
-      _readerZoomController.resetZoomImmediately(
-        reason: 'double_page_mode_changed',
-      );
-      _navigationController.syncPositionToImageIndex(
-        targetImageIndex,
-        trigger: 'double_page_mode_changed_sync',
-      );
-    }
-  }
-
-  Future<void> _toggleTapToTurnPageSetting(bool value) async {
-    _updateReaderState(() {
-      _runtimeState.tapToTurnPage = value;
-    });
-    await _readerSettingsStore.saveTapToTurnPage(value);
-    _logReaderEvent(
-      'Reader tap to turn page toggled',
-      source: 'reader_settings',
-      content: _readerLogPayload({
-        'setting': 'tap_to_turn_page',
-        'value': value,
-      }),
-    );
-  }
-
-  Future<void> _toggleVolumeButtonTurnPageSetting(bool value) async {
-    _updateReaderState(() {
-      _runtimeState.volumeButtonTurnPage = value;
-    });
-    await _readerSettingsStore.saveVolumeButtonTurnPage(value);
-    _logReaderEvent(
-      'Reader volume button turn page toggled',
-      source: 'reader_settings',
-      content: _readerLogPayload({
-        'setting': 'volume_button_turn_page',
-        'value': value,
-      }),
-    );
-    await _sessionController.syncVolumeButtonPagingPlatformState();
-  }
-
-  Future<void> _toggleImmersiveModeSetting(bool value) async {
-    _updateReaderState(() {
-      _runtimeState.immersiveMode = value;
-    });
-    await _readerSettingsStore.saveImmersiveMode(value);
-    _logReaderEvent(
-      'Reader immersive mode toggled',
-      source: 'reader_settings',
-      content: _readerLogPayload({'setting': 'immersive_mode', 'value': value}),
-    );
-    await _sessionController.applyReaderDisplaySettings();
-  }
-
-  Future<void> _toggleKeepScreenOnSetting(bool value) async {
-    _updateReaderState(() {
-      _runtimeState.keepScreenOn = value;
-    });
-    await _readerSettingsStore.saveKeepScreenOn(value);
-    _logReaderEvent(
-      'Reader keep screen on toggled',
-      source: 'reader_settings',
-      content: _readerLogPayload({'setting': 'keep_screen_on', 'value': value}),
-    );
-    await _sessionController.applyReaderDisplaySettings();
-  }
-
-  Future<void> _toggleCustomBrightnessSetting(bool value) async {
-    _updateReaderState(() {
-      _runtimeState.customBrightness = value;
-    });
-    await _readerSettingsStore.saveCustomBrightness(value);
-    _logReaderEvent(
-      'Reader custom brightness toggled',
-      source: 'reader_settings',
-      content: _readerLogPayload({
-        'setting': 'custom_brightness',
-        'value': value,
-      }),
-    );
-    await _sessionController.applyReaderDisplaySettings();
-  }
-
-  Future<void> _updateBrightnessSetting(double value) async {
-    final normalized = ReaderSettingsStore.normalizeBrightnessValue(value);
-    _updateReaderState(() {
-      _runtimeState.brightnessValue = normalized;
-    });
-    await _readerSettingsStore.saveBrightnessValue(normalized);
-    await _sessionController.applyReaderDisplaySettings();
-  }
-
-  Future<void> _togglePageIndicatorSetting(bool value) async {
-    _updateReaderState(() {
-      _runtimeState.pageIndicator = value;
-    });
-    await _readerSettingsStore.savePageIndicator(value);
-    _logReaderEvent(
-      'Reader page indicator toggled',
-      source: 'reader_settings',
-      content: _readerLogPayload({'setting': 'page_indicator', 'value': value}),
-    );
-  }
-
-  Future<void> _togglePinchToZoomSetting(bool value) async {
-    final previousValue = _runtimeState.pinchToZoom;
-    final targetImageIndex = _runtimeState.images.isEmpty
-        ? 0
-        : _runtimeState.spreadStartIndex(_runtimeState.pageIndexNotifier.value);
-    if (!value) {
-      _readerZoomController.resetZoomImmediately(
-        reason: 'pinch_to_zoom_disabled',
-      );
-    }
-    _updateReaderState(() {
-      _runtimeState.pinchToZoom = value;
-    });
-    await _readerSettingsStore.savePinchToZoom(value);
-    _logReaderEvent(
-      'Reader pinch to zoom toggled',
-      source: 'reader_settings',
-      content: _readerLogPayload({'setting': 'pinch_to_zoom', 'value': value}),
-    );
-    if (previousValue != value) {
-      unawaited(
-        _navigationController.syncPositionAfterPinchToggle(targetImageIndex),
-      );
-    }
-  }
-
-  Future<void> _toggleLongPressToSaveSetting(bool value) async {
-    _updateReaderState(() {
-      _runtimeState.longPressToSave = value;
-    });
-    await _readerSettingsStore.saveLongPressToSave(value);
-    _logReaderEvent(
-      'Reader long press to save toggled',
-      source: 'reader_settings',
-      content: _readerLogPayload({
-        'setting': 'long_press_to_save',
-        'value': value,
-      }),
     );
   }
 
@@ -653,463 +442,13 @@ class _ReaderPageState extends State<ReaderPage>
     _scaffoldKey.currentState?.openEndDrawer();
   }
 
-  Future<ComicDetailsData> _loadReaderComicDetails() async {
-    final details =
-        _chapterDetailsCache ??
-        await _sessionController.loadComicDetails(
-          widget.comicId,
-          sourceKey: widget.sourceKey,
-        );
-    _chapterDetailsCache ??= details;
-    return details;
-  }
-
-  Future<void> _openFavoriteDialog() async {
-    _logReaderEvent('Reader favorite dialog requested', source: 'reader_ui');
-    if (widget.onFavoriteRequested == null) {
-      return;
-    }
-    try {
-      await widget.onFavoriteRequested!(context);
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
-      unawaited(
-        showHazukiPrompt(
-          context,
-          l10n(context).comicDetailFavoriteSettingsUpdateFailed('$error'),
-          isError: true,
-        ),
-      );
-    }
-  }
-
-  Future<void> _openCommentsSheet() async {
-    _logReaderEvent('Reader comments sheet requested', source: 'reader_ui');
-    try {
-      final details = await _loadReaderComicDetails();
-      if (!mounted) {
-        return;
-      }
-      await showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        isDismissible: true,
-        enableDrag: false,
-        useSafeArea: false,
-        backgroundColor: Colors.transparent,
-        barrierColor: Colors.black.withValues(alpha: 0.46),
-        sheetAnimationStyle: const AnimationStyle(
-          duration: Duration(milliseconds: 360),
-          reverseDuration: Duration(milliseconds: 260),
-        ),
-        builder: (routeContext) {
-          final themedData = widget.comicTheme ?? Theme.of(routeContext);
-          return Theme(
-            data: themedData,
-            child: _ReaderCommentsSheet(
-              comicId: details.id,
-              subId: details.subId.isEmpty ? null : details.subId,
-              commentsWidgetBuilder: widget.commentsWidgetBuilder,
-            ),
-          );
-        },
-      );
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
-      unawaited(
-        showHazukiPrompt(
-          context,
-          l10n(context).commentsLoadFailed('$error'),
-          isError: true,
-        ),
-      );
-    }
-  }
-
-  Future<void> _openChaptersPanel() async {
-    if (_chapterPanelLoading) {
-      return;
-    }
-    final hadCachedChapterDetails = _chapterDetailsCache != null;
-    _updateReaderState(() {
-      _chapterPanelLoading = true;
-    });
-    _logReaderEvent(
-      'Reader chapters panel requested',
-      source: 'reader_navigation',
-      content: _readerLogPayload({
-        'hadCachedChapterDetails': hadCachedChapterDetails,
-      }),
-    );
-    try {
-      final details = await _loadReaderComicDetails();
-      if (!mounted) {
-        return;
-      }
-      _logReaderEvent(
-        'Reader chapters panel opened',
-        source: 'reader_navigation',
-        content: _readerLogPayload({
-          'hadCachedChapterDetails': hadCachedChapterDetails,
-        }),
-      );
-      showModalBottomSheet<void>(
-        context: context,
-        isScrollControlled: true,
-        isDismissible: true,
-        enableDrag: true,
-        useSafeArea: false,
-        sheetAnimationStyle: const AnimationStyle(
-          duration: Duration(milliseconds: 380),
-          reverseDuration: Duration(milliseconds: 280),
-        ),
-        builder: (routeContext) {
-          final themedData = widget.comicTheme ?? Theme.of(routeContext);
-          return Theme(
-            data: themedData,
-            child: ChaptersPanelSheet(
-              details: details,
-              onDownloadConfirm: (_) {
-                Navigator.of(routeContext).pop();
-              },
-              onChapterTap: (epId, chapterTitle, index) {
-                unawaited(
-                  _handleChapterSelectedFromPanel(
-                    routeContext,
-                    epId,
-                    chapterTitle,
-                    index,
-                  ),
-                );
-              },
-            ),
-          );
-        },
-      );
-    } catch (error) {
-      _logReaderEvent(
-        'Reader chapters panel failed',
-        level: 'error',
-        source: 'reader_navigation',
-        content: _readerLogPayload({
-          'hadCachedChapterDetails': hadCachedChapterDetails,
-          'error': '$error',
-        }),
-      );
-      if (!mounted) {
-        return;
-      }
-      unawaited(
-        showHazukiPrompt(
-          context,
-          l10n(context).readerChapterLoadFailed('$error'),
-          isError: true,
-        ),
-      );
-    } finally {
-      if (mounted) {
-        _updateReaderState(() {
-          _chapterPanelLoading = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _handleChapterSelectedFromPanel(
-    BuildContext routeContext,
-    String epId,
-    String chapterTitle,
-    int index,
-  ) async {
-    Navigator.of(routeContext).pop();
-    if (epId == widget.epId) {
-      _logReaderEvent(
-        'Reader chapter selection ignored',
-        source: 'reader_navigation',
-        content: _readerLogPayload({
-          'targetEpId': epId,
-          'targetChapterTitle': chapterTitle,
-          'targetChapterIndex': index,
-          'reason': 'already_current_chapter',
-        }),
-      );
-      return;
-    }
-    _logReaderEvent(
-      'Reader chapter selected',
-      source: 'reader_navigation',
-      content: _readerLogPayload({
-        'targetEpId': epId,
-        'targetChapterTitle': chapterTitle,
-        'targetChapterIndex': index,
-      }),
-    );
-    await Future<void>.delayed(const Duration(milliseconds: 280));
-    if (!mounted) {
-      return;
-    }
-    await Navigator.of(context).pushReplacement(
-      MaterialPageRoute<void>(
-        builder: (_) => ReaderPage(
-          title: widget.title,
-          chapterTitle: chapterTitle,
-          comicId: widget.comicId,
-          epId: epId,
-          chapterIndex: index,
-          images: const [],
-          sourceKey: widget.sourceKey,
-          comicTheme: widget.comicTheme,
-          onFavoriteRequested: widget.onFavoriteRequested,
-          commentsWidgetBuilder: widget.commentsWidgetBuilder,
-        ),
-      ),
-    );
-  }
-
-  Future<void> _jumpToAdjacentChapter(int offset) async {
-    final navigator = Navigator.of(context);
-    final strings = l10n(context);
-    try {
-      final details = await _loadReaderComicDetails();
-      final chapterEntries = details.chapters.entries.toList(growable: false);
-      if (chapterEntries.isEmpty) {
-        return;
-      }
-
-      var currentChapterIndex = chapterEntries.indexWhere(
-        (entry) => entry.key == widget.epId,
-      );
-      if (currentChapterIndex < 0) {
-        currentChapterIndex = widget.chapterIndex.clamp(
-          0,
-          chapterEntries.length - 1,
-        );
-      }
-      final targetIndex = currentChapterIndex + offset;
-
-      if (targetIndex < 0) {
-        if (mounted) {
-          unawaited(showHazukiPrompt(context, strings.readerNoPreviousChapter));
-        }
-        return;
-      }
-      if (targetIndex >= chapterEntries.length) {
-        if (mounted) {
-          unawaited(
-            showHazukiPrompt(context, strings.readerAlreadyLastChapter),
-          );
-        }
-        return;
-      }
-
-      final targetChapter = chapterEntries[targetIndex];
-      _logReaderEvent(
-        'Reader adjacent chapter navigation requested',
-        source: 'reader_navigation',
-        content: _readerLogPayload({
-          'offset': offset,
-          'fromChapterIndex': currentChapterIndex,
-          'targetChapterIndex': targetIndex,
-          'targetEpId': targetChapter.key,
-          'targetChapterTitle': targetChapter.value,
-        }),
-      );
-
-      if (!mounted) {
-        return;
-      }
-      await navigator.pushReplacement(
-        MaterialPageRoute<void>(
-          builder: (_) => ReaderPage(
-            title: widget.title,
-            chapterTitle: targetChapter.value,
-            comicId: widget.comicId,
-            epId: targetChapter.key,
-            chapterIndex: targetIndex,
-            images: const [],
-            sourceKey: widget.sourceKey,
-            comicTheme: widget.comicTheme,
-            onFavoriteRequested: widget.onFavoriteRequested,
-            commentsWidgetBuilder: widget.commentsWidgetBuilder,
-          ),
-        ),
-      );
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
-      unawaited(
-        showHazukiPrompt(
-          context,
-          strings.readerChapterLoadFailed('$error'),
-          isError: true,
-        ),
-      );
-    }
-  }
-
   void _handleBackPressed() {
     _logReaderEvent('Reader back pressed', source: 'reader_navigation');
     Navigator.of(context).maybePop();
   }
 
-  void _handleBrightnessChangeEnd(double value) {
-    final normalized = math.max(0.0, math.min(value, 1.0));
-    _logReaderEvent(
-      'Reader brightness adjusted',
-      source: 'reader_settings',
-      content: _readerLogPayload({
-        'setting': 'brightness',
-        'value': normalized,
-        'brightnessPercent': (normalized * 100).round(),
-      }),
-    );
-  }
-
-  Future<void> _showSaveImageDialog(String imageUrl) async {
-    unawaited(HapticFeedback.heavyImpact());
-    final strings = l10n(context);
-    final dialogTheme = _resolveReaderTheme(context);
-    _logReaderEvent(
-      'Reader save image dialog opened',
-      source: 'reader_media',
-      content: _readerLogPayload({'imageUrl': imageUrl}),
-    );
-    final shouldSave = await showGeneralDialog<bool>(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: strings.commonClose,
-      transitionDuration: const Duration(milliseconds: 300),
-      transitionBuilder: (context, anim1, anim2, child) {
-        return Transform.scale(
-          scale: CurvedAnimation(
-            parent: anim1,
-            curve: Curves.easeOutBack,
-            reverseCurve: Curves.easeInBack,
-          ).value,
-          child: FadeTransition(opacity: anim1, child: child),
-        );
-      },
-      pageBuilder: (dialogContext, anim1, anim2) {
-        return Theme(
-          data: dialogTheme,
-          child: AlertDialog(
-            backgroundColor: dialogTheme.colorScheme.surfaceContainerHigh,
-            title: Text(strings.readerSaveImageTitle),
-            content: Text(strings.readerSaveImageContent),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(dialogContext, false),
-                child: Text(strings.commonCancel),
-              ),
-              FilledButton(
-                onPressed: () => Navigator.pop(dialogContext, true),
-                child: Text(strings.commonSave),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-    if (shouldSave != true || !mounted) {
-      _logReaderEvent(
-        'Reader save image cancelled',
-        source: 'reader_media',
-        content: _readerLogPayload({'imageUrl': imageUrl}),
-      );
-      return;
-    }
-    _logReaderEvent(
-      'Reader save image confirmed',
-      source: 'reader_media',
-      content: _readerLogPayload({'imageUrl': imageUrl}),
-    );
-    try {
-      Uint8List bytes;
-      String outputExtension = 'png';
-
-      if (_sessionController.isLocalImagePath(imageUrl)) {
-        final file = File(_sessionController.normalizeLocalImagePath(imageUrl));
-        bytes = await file.readAsBytes();
-        final localExtMatch = RegExp(
-          r'\.([a-zA-Z0-9]+)$',
-          caseSensitive: false,
-        ).firstMatch(file.path);
-        outputExtension =
-            localExtMatch?.group(1)?.toLowerCase().trim().isNotEmpty == true
-            ? localExtMatch!.group(1)!.toLowerCase()
-            : 'jpg';
-      } else {
-        final prepared = await _sessionController.prepareImageForSave(
-          imageUrl,
-          comicId: widget.comicId,
-          epId: widget.epId,
-        );
-        bytes = prepared.bytes;
-        outputExtension = prepared.extension;
-      }
-
-      final uri = Uri.tryParse(imageUrl);
-      final lastSegment = uri?.pathSegments.isNotEmpty == true
-          ? uri!.pathSegments.last
-          : '';
-      final defaultName =
-          'hazuki_${DateTime.now().millisecondsSinceEpoch}.$outputExtension';
-      final fileName = lastSegment.isEmpty
-          ? defaultName
-          : lastSegment.split('?').first;
-      final saveName = fileName.contains('.')
-          ? fileName.replaceAll(
-              RegExp(r'\.([a-zA-Z0-9]+)$', caseSensitive: false),
-              '.$outputExtension',
-            )
-          : '$fileName.$outputExtension';
-      Directory directory;
-      if (Platform.isWindows) {
-        final exeDir = File(Platform.resolvedExecutable).parent.path;
-        directory = Directory('$exeDir/Saved_Images');
-      } else {
-        directory = Directory('/storage/emulated/0/Pictures/Hazuki');
-      }
-      if (!await directory.exists()) {
-        await directory.create(recursive: true);
-      }
-      final file = File('${directory.path}/$saveName');
-      await file.writeAsBytes(bytes, flush: true);
-      if (!mounted) {
-        return;
-      }
-      _logReaderEvent(
-        'Reader image saved',
-        source: 'reader_media',
-        content: _readerLogPayload({
-          'imageUrl': imageUrl,
-          'savedPath': file.path,
-        }),
-      );
-      unawaited(showHazukiPrompt(context, strings.comicDetailSavedToPath));
-    } catch (error) {
-      _logReaderEvent(
-        'Reader image save failed',
-        level: 'error',
-        source: 'reader_media',
-        content: _readerLogPayload({'imageUrl': imageUrl, 'error': '$error'}),
-      );
-      if (!mounted) {
-        return;
-      }
-      unawaited(
-        showHazukiPrompt(
-          context,
-          strings.comicDetailSaveFailed('$error'),
-          isError: true,
-        ),
-      );
-    }
+  Future<void> _showSaveImageDialog(String imageUrl) {
+    return _saveImageController.showSaveImageDialog(imageUrl);
   }
 
   double _normalizeLogDouble(num value) => normalizeReaderLogDouble(value);
@@ -1249,157 +588,6 @@ class _ReaderPageState extends State<ReaderPage>
         if (_runtimeState.readerMode == ReaderMode.topToBottom)
           'nearbyRenderedItems': _captureRenderedItemsAround(safeIndex),
       }),
-    );
-  }
-}
-
-class _ReaderCommentsSheet extends StatefulWidget {
-  const _ReaderCommentsSheet({
-    required this.comicId,
-    required this.subId,
-    this.commentsWidgetBuilder,
-  });
-
-  final String comicId;
-  final String? subId;
-  final CommentsWidgetBuilder? commentsWidgetBuilder;
-
-  @override
-  State<_ReaderCommentsSheet> createState() => _ReaderCommentsSheetState();
-}
-
-class _ReaderCommentsSheetState extends State<_ReaderCommentsSheet> {
-  final DraggableScrollableController _sheetController =
-      DraggableScrollableController();
-  bool _sheetAtFullHeight = false;
-
-  @override
-  void dispose() {
-    _sheetController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _expandToFullscreen() async {
-    if (!_sheetController.isAttached) {
-      return;
-    }
-    await _sheetController.animateTo(
-      1,
-      duration: const Duration(milliseconds: 260),
-      curve: Curves.easeOutCubic,
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    return NotificationListener<DraggableScrollableNotification>(
-      onNotification: (notification) {
-        final nextAtFullHeight = notification.extent >= 0.98;
-        if (nextAtFullHeight != _sheetAtFullHeight) {
-          setState(() {
-            _sheetAtFullHeight = nextAtFullHeight;
-          });
-        }
-        return false;
-      },
-      child: DraggableScrollableSheet(
-        controller: _sheetController,
-        initialChildSize: 0.64,
-        minChildSize: 0.64,
-        maxChildSize: 1,
-        shouldCloseOnMinExtent: false,
-        expand: false,
-        builder: (context, scrollController) {
-          return DecoratedBox(
-            decoration: BoxDecoration(
-              color: cs.surface,
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(24),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.24),
-                  blurRadius: 28,
-                  offset: const Offset(0, -8),
-                ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(24),
-              ),
-              child: SafeArea(
-                top: _sheetAtFullHeight,
-                child: Column(
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 8, 4),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Center(
-                                  child: Container(
-                                    width: 38,
-                                    height: 4,
-                                    margin: const EdgeInsets.only(bottom: 12),
-                                    decoration: BoxDecoration(
-                                      color: cs.onSurfaceVariant.withValues(
-                                        alpha: 0.28,
-                                      ),
-                                      borderRadius: BorderRadius.circular(999),
-                                    ),
-                                  ),
-                                ),
-                                Text(
-                                  l10n(context).commentsTitle,
-                                  style: theme.textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          IconButton(
-                            tooltip: l10n(context).commonClose,
-                            onPressed: () => Navigator.of(context).pop(),
-                            icon: const Icon(Icons.close_rounded),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Divider(
-                      height: 1,
-                      color: cs.outlineVariant.withValues(alpha: 0.48),
-                    ),
-                    Expanded(
-                      child:
-                          widget.commentsWidgetBuilder?.call(
-                            comicId: widget.comicId,
-                            subId: widget.subId,
-                            scrollController: scrollController,
-                            onRequestTabFullscreen: _expandToFullscreen,
-                          ) ??
-                          CommentsPage(
-                            comicId: widget.comicId,
-                            subId: widget.subId,
-                            showAppBar: false,
-                            scrollController: scrollController,
-                            onRequestTabFullscreen: _expandToFullscreen,
-                          ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
-      ),
     );
   }
 }

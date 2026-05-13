@@ -5,12 +5,19 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:hazuki/features/reader/support/reader_diagnostics_support.dart';
 import 'package:hazuki/features/reader/state/reader_image_pipeline_state.dart';
 import 'package:hazuki/features/reader/state/reader_mode.dart';
+import 'package:hazuki/features/reader/support/reader_display_bridge.dart';
 import 'package:hazuki/features/reader/support/reader_image_pipeline_controller.dart';
 import 'package:hazuki/features/reader/support/reader_navigation_controller.dart';
+import 'package:hazuki/features/reader/support/reader_page_context.dart';
+import 'package:hazuki/features/reader/support/reader_session_controller.dart';
+import 'package:hazuki/features/reader/support/reader_settings_controller.dart';
+import 'package:hazuki/features/reader/support/reader_zoom_controller.dart';
+import 'package:hazuki/features/reader/view/reader_overlay_layout.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
 import 'package:hazuki/features/reader/state/reader_settings_store.dart';
@@ -184,6 +191,196 @@ void main() {
         expect(state.imageIndexMap, {'a': 0, 'b': 1});
       },
     );
+  });
+
+  group('ReaderSettingsController', () {
+    testWidgets(
+      'saves reading mode and syncs the current image after layout changes',
+      (tester) async {
+        SharedPreferences.setMockInitialValues({});
+        await tester.pumpWidget(const SizedBox.shrink());
+        final runtimeState = ReaderRuntimeState()
+          ..applyImages(['a', 'b', 'c', 'd'])
+          ..currentPageIndex = 1;
+        runtimeState.setDisplayedPageIndex(1);
+        final diagnosticsState = ReaderDiagnosticsState();
+        final scrollController = ScrollController();
+        final pageController = PageController();
+        final focusNode = FocusNode();
+        final transformationController = TransformationController(
+          Matrix4.diagonal3Values(2.0, 2.0, 1.0),
+        );
+        final resetAnimController = AnimationController(vsync: tester);
+        final settingsStore = ReaderSettingsStore();
+        final logEvents = <String>[];
+
+        addTearDown(scrollController.dispose);
+        addTearDown(pageController.dispose);
+        addTearDown(focusNode.dispose);
+        addTearDown(transformationController.dispose);
+        addTearDown(resetAnimController.dispose);
+        addTearDown(runtimeState.pageIndexNotifier.dispose);
+
+        final zoomController = ReaderZoomController(
+          transformationController: transformationController,
+          resetAnimController: resetAnimController,
+          runtimeState: runtimeState,
+          isMounted: () => true,
+          updateState: (update) => update(),
+          logEvent: (title, {level = 'info', source = 'reader_ui', content}) {
+            logEvents.add(title);
+          },
+          logPayload: ([extra]) => extra ?? <String, dynamic>{},
+        );
+        final navigationController = ReaderNavigationController(
+          runtimeState: runtimeState,
+          diagnosticsState: diagnosticsState,
+          scrollController: scrollController,
+          pageController: pageController,
+          isMounted: () => true,
+          updateState: (update) => update(),
+          logEvent: (title, {level = 'info', source = 'reader_ui', content}) {
+            logEvents.add(title);
+          },
+          logPayload: ([extra]) => extra ?? <String, dynamic>{},
+          logVisiblePageChange: ({required index, required trigger}) {},
+          resetZoomImmediately: zoomController.resetZoomImmediately,
+          prefetchAround: (_) {},
+          requestPrefetchAhead: (_) {},
+          noImageModeEnabled: () => false,
+          toggleControlsVisibility: () {},
+        );
+        final sessionController = ReaderSessionController(
+          runtimeState: runtimeState,
+          displayBridge: ReaderDisplayBridge(
+            onVolumeButtonPressed: (_) async {},
+          ),
+          settingsStore: settingsStore,
+          scrollController: scrollController,
+          pageController: pageController,
+          readerKeyFocusNode: focusNode,
+          zoomController: transformationController,
+          applyInitialImages: (_, {required trigger}) {},
+          loadChapterImages: ({trigger = 'manual'}) async {},
+          onNoImageModeChanged: () {},
+          isMounted: () => true,
+          updateState: (update) => update(),
+          logEvent: (title, {level = 'info', source = 'reader_ui', content}) {
+            logEvents.add(title);
+          },
+          logPayload: ([extra]) => extra ?? <String, dynamic>{},
+          onScrollPositionChanged: () {},
+          onZoomChanged: () {},
+          comicId: 'comic',
+          epId: 'ep',
+          chapterTitle: 'Chapter 1',
+          chapterIndex: 0,
+          widgetImages: const [],
+          sourceService: sl<HazukiSourceService>(),
+        );
+        final controller = ReaderSettingsController(
+          runtimeState: runtimeState,
+          settingsStore: settingsStore,
+          navigationController: navigationController,
+          sessionController: sessionController,
+          zoomController: zoomController,
+          updateState: (update) => update(),
+          logEvent: (title, {level = 'info', source = 'reader_ui', content}) {
+            logEvents.add(title);
+          },
+          logPayload: ([extra]) => extra ?? <String, dynamic>{},
+        );
+
+        await controller.updateReaderMode(ReaderMode.rightToLeft);
+        WidgetsBinding.instance.scheduleFrame();
+        await tester.pump();
+
+        final prefs = await SharedPreferences.getInstance();
+        expect(runtimeState.readerMode, ReaderMode.rightToLeft);
+        expect(
+          prefs.getString(ReaderSettingsStore.readingModeKey),
+          ReaderMode.rightToLeft.prefsValue,
+        );
+        expect(transformationController.value.getMaxScaleOnAxis(), 1);
+        expect(logEvents, contains('Reader mode changed'));
+
+        await controller.toggleDoublePageMode(true);
+        WidgetsBinding.instance.scheduleFrame();
+        await tester.pump();
+
+        expect(runtimeState.doublePageMode, isTrue);
+        expect(prefs.getBool(ReaderSettingsStore.doublePageModeKey), isTrue);
+        expect(runtimeState.currentPageIndex, 0);
+        expect(runtimeState.readerSpreadSize, 2);
+        expect(logEvents, contains('Reader double page mode toggled'));
+      },
+    );
+  });
+
+  group('ReaderPageContext', () {
+    test('copyForChapter preserves callbacks, source, theme, and title', () {
+      Future<void> onFavorite(BuildContext context) async {}
+      Widget commentsBuilder({
+        required String comicId,
+        String? subId,
+        ScrollController? scrollController,
+        Future<void> Function()? onRequestTabFullscreen,
+      }) {
+        return const SizedBox.shrink();
+      }
+
+      final theme = ThemeData.dark();
+      final context = ReaderPageContext(
+        title: 'Hazuki',
+        chapterTitle: 'Chapter 1',
+        comicId: 'comic',
+        epId: 'ep-1',
+        chapterIndex: 0,
+        images: const ['a'],
+        sourceKey: 'source',
+        comicTheme: theme,
+        onFavoriteRequested: onFavorite,
+        commentsWidgetBuilder: commentsBuilder,
+      );
+
+      final next = context.copyForChapter(
+        epId: 'ep-2',
+        chapterTitle: 'Chapter 2',
+        chapterIndex: 1,
+      );
+
+      expect(next.title, 'Hazuki');
+      expect(next.comicId, 'comic');
+      expect(next.sourceKey, 'source');
+      expect(next.comicTheme, same(theme));
+      expect(next.onFavoriteRequested, same(onFavorite));
+      expect(next.commentsWidgetBuilder, same(commentsBuilder));
+      expect(next.epId, 'ep-2');
+      expect(next.chapterTitle, 'Chapter 2');
+      expect(next.chapterIndex, 1);
+      expect(next.images, isEmpty);
+    });
+  });
+
+  group('ReaderOverlayLayout', () {
+    test('reserves room for the unified bottom controls', () {
+      expect(
+        ReaderOverlayLayout.bottomControlsReservedHeight,
+        greaterThanOrEqualTo(ReaderOverlayLayout.bottomControlsHeight),
+      );
+      expect(
+        ReaderOverlayLayout.bottomControlsHeight,
+        greaterThan(ReaderOverlayLayout.bottomControlsButtonSize),
+      );
+      expect(
+        ReaderOverlayLayout.bottomControlsHeight,
+        greaterThanOrEqualTo(
+          ReaderOverlayLayout.bottomControlsButtonSize * 2 +
+              ReaderOverlayLayout.bottomControlsRowGap +
+              16,
+        ),
+      );
+    });
   });
 
   group('ReaderImagePipelineController', () {
