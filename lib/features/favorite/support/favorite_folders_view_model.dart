@@ -114,14 +114,16 @@ class FavoriteFoldersViewModel extends ChangeNotifier {
       });
 
       if (!hasCloudSelection &&
-          _singleFolderOnly &&
           (_cloudFavoriteOverride ?? _initialIsFavorite) &&
           _canUseCloudDefaultFavoriteFallback &&
           cloudFolders.isNotEmpty) {
+        final fallbackId = cloudFolders.any((f) => f.id == '0')
+            ? '0'
+            : cloudFolders.first.id;
         nextInitialFavorited.add(
-          const FavoriteFolderHandle(
+          FavoriteFolderHandle(
             source: FavoriteFolderSource.cloud,
-            id: '0',
+            id: fallbackId,
           ).storageKey,
         );
       }
