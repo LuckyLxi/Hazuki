@@ -984,6 +984,26 @@
   "advancedSoftwareLogCaptureSubtitle": "When turned off, error, action, system, and performance logs will no longer be captured",
   "advancedComicIdSearchTitle": "Comic ID detection",
   "advancedComicIdSearchSubtitle": "Show a tappable hint above the keyboard when a comic ID can be extracted from the search text",
+  "labSourceAccountTitle": "Sources and accounts",
+  "labSourceAccountSubtitle": "Switch allowed sources and sign in per source",
+  "labSourceAccountActive": "Active",
+  "labSourceAccountSwitch": "Switch",
+  "labSourceAccountLogin": "Log in",
+  "labSourceAccountLogout": "Log out",
+  "labSourceAccountLoggedInAs": "Signed in as {account}",
+  "@labSourceAccountLoggedInAs": {
+    "placeholders": {
+      "account": {}
+    }
+  },
+  "labSourceAccountLoggedOut": "Not signed in",
+  "labSourceAccountSwitchSuccess": "Switched source",
+  "labSourceAccountSwitchFailed": "Could not switch source: {error}",
+  "@labSourceAccountSwitchFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
   "advancedNoImageModeTitle": "No-image mode",
   "advancedNoImageModeSubtitle": "Hide images globally (except the login avatar in the sidebar)",
   "advancedEditSourceTitle": "Edit comic source",

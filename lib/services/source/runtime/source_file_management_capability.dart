@@ -6,7 +6,7 @@ extension HazukiSourceServiceSourceFileManagementCapability
     final File jmFile;
     try {
       final sourceDir = await _getSourceStorageDirectory();
-      jmFile = File('${sourceDir.path}/jm.js');
+      jmFile = File('${sourceDir.path}/source.js');
     } catch (_) {
       return null;
     }
@@ -17,35 +17,72 @@ extension HazukiSourceServiceSourceFileManagementCapability
   }
 
   Future<String> loadEditableJmSource() async {
-    final result = await _downloadOrLoadSourceFiles();
-    return result.jmFile.readAsString();
+    return loadEditableSource(activeSourceKey);
   }
 
   Future<void> writeLocalJmSource(String content) async {
-    final result = await _ensureLocalSourceFiles(requireJmFile: false);
-    await result.jmFile.writeAsString(content, flush: true);
+    await writeLocalSource(activeSourceKey, content);
   }
 
   Future<void> saveEditedJmSource(String content) async {
-    final facade = this.facade;
-    final result = await _downloadOrLoadSourceFiles();
-    await result.jmFile.writeAsString(content, flush: true);
-    final prefs = await facade.ensurePrefs();
-    await prefs.setBool(SourcePrefsKeys.customEditedJmSource, true);
-    facade.lastSourceVersionDebugInfo = {
-      'checkedAt': DateTime.now().toIso8601String(),
-      'resolvedFrom': 'local_source_editor',
-      'outcome': 'edited_waiting_for_restart',
-    };
-    _setRuntimeWaitingForRestartState(
-      statusText: 'source_edited_waiting_for_restart',
-      debugDetail: 'local_source_editor',
-    );
+    await saveEditedSource(activeSourceKey, content);
+  }
+
+  Future<String> loadEditableSource(String sourceKey) async {
+    final previous = activeSourceKey;
+    await activateSource(sourceKey);
+    try {
+      final result = await _downloadOrLoadSourceFiles();
+      return result.jmFile.readAsString();
+    } finally {
+      if (previous != activeSourceKey) {
+        await activateSource(previous);
+      }
+    }
+  }
+
+  Future<void> writeLocalSource(String sourceKey, String content) async {
+    final sourceDir = await _getSourceStorageDirectory(sourceKey: sourceKey);
+    if (!await sourceDir.exists()) {
+      await sourceDir.create(recursive: true);
+    }
+    final file = File('${sourceDir.path}/source.js');
+    await file.writeAsString(content, flush: true);
+  }
+
+  Future<void> saveEditedSource(String sourceKey, String content) async {
+    final previous = activeSourceKey;
+    await activateSource(sourceKey);
+    try {
+      final facade = this.facade;
+      final result = await _downloadOrLoadSourceFiles();
+      await result.jmFile.writeAsString(content, flush: true);
+      final prefs = await facade.ensurePrefs();
+      await prefs.setBool(SourcePrefsKeys.customEditedJmSource, true);
+      facade.lastSourceVersionDebugInfo = {
+        'checkedAt': DateTime.now().toIso8601String(),
+        'resolvedFrom': 'local_source_editor',
+        'sourceKey': activeSourceKey,
+        'outcome': 'edited_waiting_for_restart',
+      };
+      _setRuntimeWaitingForRestartState(
+        statusText: 'source_edited_waiting_for_restart',
+        debugDetail: 'local_source_editor',
+      );
+    } finally {
+      if (previous != activeSourceKey) {
+        await activateSource(previous);
+      }
+    }
   }
 
   Future<bool> hasLocalJmSourceFile() async {
     final sourceDir = await _getSourceStorageDirectory();
-    final jmFile = File('${sourceDir.path}/jm.js');
+    final jmFile = File('${sourceDir.path}/source.js');
+    if (activeSourceKey == hazukiDefaultSourceKey && !await jmFile.exists()) {
+      final legacy = File('${sourceDir.parent.path}/jm.js');
+      return legacy.exists();
+    }
     return jmFile.exists();
   }
 
@@ -88,25 +125,30 @@ extension HazukiSourceServiceSourceFileManagementCapability
     }
   }
 
-  Future<Directory> _getSourceStorageDirectory() async {
+  Future<Directory> _getSourceStorageDirectory({String? sourceKey}) async {
+    final normalizedSourceKey = _normalizeAllowedSourceKey(
+      sourceKey ?? activeSourceKey,
+    );
     if (Platform.isAndroid) {
       final supportDir = await getApplicationSupportDirectory();
-      return Directory('${supportDir.path}/comic_source');
+      return Directory('${supportDir.path}/comic_source/$normalizedSourceKey');
     }
 
     if (Platform.isWindows) {
       final exeDir = File(Platform.resolvedExecutable).parent.path;
-      return Directory('$exeDir/comic_source');
+      return Directory('$exeDir/comic_source/$normalizedSourceKey');
     }
 
     if (Platform.isLinux || Platform.isMacOS) {
       final downloadsDir = await getDownloadsDirectory();
       if (downloadsDir != null) {
-        return Directory('${downloadsDir.path}/hazuki_source_test');
+        return Directory(
+          '${downloadsDir.path}/hazuki_source_test/$normalizedSourceKey',
+        );
       }
     }
 
     final documentsDir = await getApplicationDocumentsDirectory();
-    return Directory('${documentsDir.path}/comic_source');
+    return Directory('${documentsDir.path}/comic_source/$normalizedSourceKey');
   }
 }

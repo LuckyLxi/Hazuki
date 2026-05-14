@@ -54,7 +54,10 @@ extension SourceBootstrapSupport on HazukiSourceService {
     }
   }
 
-  Future<void> ensureInitialized() async {
+  Future<void> ensureInitialized({String? sourceKey}) async {
+    if (sourceKey != null && sourceKey.trim().isNotEmpty) {
+      await activateSource(sourceKey);
+    }
     final facade = this.facade;
     if (isInitialized) {
       return;
@@ -83,6 +86,7 @@ extension SourceBootstrapSupport on HazukiSourceService {
     void Function(int received, int total)? onSourceDownloadProgress,
     required bool prewarm,
   }) async {
+    await loadActiveSourcePreference();
     final facade = this.facade;
     final busyPhase = switch (facade.runtimeState.phase) {
       SourceRuntimePhase.failed => SourceRuntimePhase.retrying,

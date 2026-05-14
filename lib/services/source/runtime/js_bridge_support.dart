@@ -1,7 +1,10 @@
 part of '../../hazuki_source_service.dart';
 
 extension _JsBridgeSupport on HazukiSourceService {
-  dynamic _handleJsMessage(dynamic message) {
+  dynamic _handleJsMessageForHandle(
+    SourceRuntimeHandle handle,
+    dynamic message,
+  ) {
     if (message is! Map) {
       return null;
     }
@@ -12,38 +15,38 @@ extension _JsBridgeSupport on HazukiSourceService {
 
     switch (method) {
       case 'http':
-        result = _handleHttpRequest(map);
+        result = _handleHttpRequestForHandle(handle, map);
         break;
       case 'cookie':
-        result = _handleCookieOperation(map);
+        result = _handleCookieOperationForHandle(handle, map);
         break;
       case 'load_data':
-        result = facade.loadSourceData(
+        result = handle.facade.loadSourceData(
           map['key']?.toString() ?? '',
           map['data_key']?.toString() ?? '',
         );
         break;
       case 'save_data':
-        result = facade.saveSourceData(
+        result = handle.facade.saveSourceData(
           map['key']?.toString() ?? '',
           map['data_key']?.toString() ?? '',
           map['data'],
         );
         break;
       case 'delete_data':
-        result = facade.deleteSourceData(
+        result = handle.facade.deleteSourceData(
           map['key']?.toString() ?? '',
           map['data_key']?.toString() ?? '',
         );
         break;
       case 'load_setting':
-        result = facade.loadSourceSetting(
+        result = handle.facade.loadSourceSetting(
           map['key']?.toString() ?? '',
           map['setting_key']?.toString() ?? '',
         );
         break;
       case 'isLogged':
-        result = facade.loadAccountDataSync() != null;
+        result = handle.facade.loadAccountDataSync() != null;
         break;
       case 'delay':
         final ms = map['time'] is num ? (map['time'] as num).toInt() : 0;
@@ -63,7 +66,7 @@ extension _JsBridgeSupport on HazukiSourceService {
         result = (os == 'android' || os == 'ios') ? os : 'android';
         break;
       case 'log':
-        addApplicationLog(
+        handle.facade.addApplicationLog(
           level: map['level']?.toString() ?? 'info',
           title: map['title']?.toString() ?? 'Application',
           content: map['content'],
@@ -77,13 +80,14 @@ extension _JsBridgeSupport on HazukiSourceService {
 
     if (result is Future) {
       result = result.whenComplete(() {
-        _engine?.port.sendPort.send(null);
+        handle.runtime.engine?.port.sendPort.send(null);
       });
     }
     return result;
   }
 
-  Future<Map<String, dynamic>> _handleHttpRequest(
+  Future<Map<String, dynamic>> _handleHttpRequestForHandle(
+    SourceRuntimeHandle handle,
     Map<String, dynamic> request,
   ) async {
     Response<dynamic>? response;
@@ -104,7 +108,7 @@ extension _JsBridgeSupport on HazukiSourceService {
     final data = request['data'];
 
     try {
-      response = await dio.request<dynamic>(
+      response = await handle.dio.request<dynamic>(
         url,
         data: data,
         options: Options(
@@ -124,7 +128,7 @@ extension _JsBridgeSupport on HazukiSourceService {
       response?.headers.forEach((name, values) {
         responseHeadersForLog[name] = values.join(',');
       });
-      facade.networkLogSink.append(
+      handle.facade.networkLogSink.append(
         method: method,
         url: url,
         statusCode: response?.statusCode,
@@ -153,11 +157,19 @@ extension _JsBridgeSupport on HazukiSourceService {
   }
 
   void _configureDioCookieBridge() {
-    dio.interceptors.add(
+    final handle = _activeHandle;
+    if (handle.dioCookieBridgeConfigured) {
+      return;
+    }
+    handle.dioCookieBridgeConfigured = true;
+    handle.dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) {
           options.extra['hazukiStartedAt'] = DateTime.now();
-          final cookieHeader = buildCookieHeader(options.uri.toString());
+          final cookieHeader = buildCookieHeaderForHandle(
+            handle,
+            options.uri.toString(),
+          );
           if (cookieHeader != null && cookieHeader.isNotEmpty) {
             final existing = options.headers['cookie'];
             if (existing is String && existing.trim().isNotEmpty) {
@@ -170,7 +182,11 @@ extension _JsBridgeSupport on HazukiSourceService {
         },
         onResponse: (response, handler) async {
           final requestUrl = response.requestOptions.uri.toString();
-          await _saveCookiesFromHeaders(requestUrl, response.headers.map);
+          await _saveCookiesFromHeadersForHandle(
+            handle,
+            requestUrl,
+            response.headers.map,
+          );
 
           final skipLog =
               response.requestOptions.extra['skipNetworkDebugLog'] == true;
@@ -183,7 +199,7 @@ extension _JsBridgeSupport on HazukiSourceService {
             response.headers.forEach((name, values) {
               responseHeadersForLog[name] = values.join(',');
             });
-            facade.networkLogSink.append(
+            handle.facade.networkLogSink.append(
               method: response.requestOptions.method,
               url: requestUrl,
               statusCode: response.statusCode,
@@ -214,7 +230,7 @@ extension _JsBridgeSupport on HazukiSourceService {
             response?.headers.forEach((name, values) {
               responseHeadersForLog[name] = values.join(',');
             });
-            facade.networkLogSink.append(
+            handle.facade.networkLogSink.append(
               method: options.method,
               url: options.uri.toString(),
               statusCode: response?.statusCode,
@@ -233,7 +249,7 @@ extension _JsBridgeSupport on HazukiSourceService {
       ),
     );
 
-    dio.httpClientAdapter = IOHttpClientAdapter(
+    handle.dio.httpClientAdapter = IOHttpClientAdapter(
       createHttpClient: () {
         return HttpClient();
       },

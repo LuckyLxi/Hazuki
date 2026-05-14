@@ -9,7 +9,13 @@ extension HazukiSourceServiceSourceLoaderCapability on HazukiSourceService {
       await sourceDir.create(recursive: true);
     }
 
-    final jmFile = File('${sourceDir.path}/jm.js');
+    final jmFile = File('${sourceDir.path}/source.js');
+    if (activeSourceKey == hazukiDefaultSourceKey && !await jmFile.exists()) {
+      final legacy = File('${sourceDir.parent.path}/jm.js');
+      if (await legacy.exists()) {
+        await legacy.copy(jmFile.path);
+      }
+    }
 
     if (requireJmFile && !await jmFile.exists()) {
       throw Exception('source_local_jm_missing');
@@ -35,7 +41,7 @@ extension HazukiSourceServiceSourceLoaderCapability on HazukiSourceService {
     }
 
     final jmScript = await _downloadFromUrlsWithProgress(
-      _jmSourceUrls,
+      await _resolveActiveSourceDownloadUrls(),
       onProgress: onProgress,
     );
     if (jmScript != null && jmScript.trim().isNotEmpty) {
@@ -61,7 +67,11 @@ extension HazukiSourceServiceSourceLoaderCapability on HazukiSourceService {
 
       final setGlobal =
           engine.evaluate('(k, v) => { this[k] = v; }') as JSInvokable;
-      setGlobal.invoke(['sendMessage', _handleJsMessage]);
+      final handle = _activeHandle;
+      setGlobal.invoke([
+        'sendMessage',
+        (dynamic message) => _handleJsMessageForHandle(handle, message),
+      ]);
       setGlobal.invoke(['appVersion', '1.0.0']);
       setGlobal.free();
 
@@ -125,5 +135,52 @@ extension HazukiSourceServiceSourceLoaderCapability on HazukiSourceService {
       engine.close();
       rethrow;
     }
+  }
+
+  Future<List<String>> _resolveActiveSourceDownloadUrls() async {
+    final definition = _definitionForSourceKey(activeSourceKey);
+    final directUrls = definition.directUrls
+        .map((url) => url.trim())
+        .where((url) => url.isNotEmpty)
+        .toList(growable: false);
+    if (directUrls.isNotEmpty) {
+      return directUrls;
+    }
+
+    final indexRaw = await _downloadFromUrls(
+      _sourceIndexUrls,
+      source: 'source_catalog_index',
+    );
+    if (indexRaw == null || indexRaw.trim().isEmpty) {
+      return definition.fallbackUrls();
+    }
+
+    try {
+      final decoded = jsonDecode(indexRaw);
+      if (decoded is List) {
+        for (final item in decoded) {
+          if (item is! Map) {
+            continue;
+          }
+          final map = Map<String, dynamic>.from(item);
+          if (!definition.matchesIndexEntry(map)) {
+            continue;
+          }
+          final rawUrl = map['url']?.toString().trim();
+          if (rawUrl != null && rawUrl.isNotEmpty) {
+            return [rawUrl];
+          }
+          final fileName =
+              map['fileName']?.toString().trim() ?? definition.fileName;
+          if (fileName.isNotEmpty) {
+            return [
+              'https://cdn.jsdelivr.net/gh/venera-app/venera-configs@main/$fileName',
+            ];
+          }
+        }
+      }
+    } catch (_) {}
+
+    return definition.fallbackUrls();
   }
 }

@@ -1,9 +1,10 @@
 import '../../hazuki_source_service.dart';
 
 class SourceNetworkLogSink {
-  SourceNetworkLogSink(this._service);
+  SourceNetworkLogSink(this._service, this._handle);
 
   final HazukiSourceService _service;
+  final SourceRuntimeHandle _handle;
 
   void append({
     required String method,
@@ -18,7 +19,8 @@ class SourceNetworkLogSink {
     Map<String, dynamic>? responseHeaders,
     Object? responseBody,
   }) {
-    _service.appendNetworkLogEntry(
+    _service.appendNetworkLogEntryForHandle(
+      _handle,
       method: method,
       url: url,
       statusCode: statusCode,

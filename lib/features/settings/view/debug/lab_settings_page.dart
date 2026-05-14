@@ -4,6 +4,7 @@ import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../settings_group.dart';
+import 'source_account_lab_page.dart';
 
 class LabSettingsPage extends StatefulWidget {
   const LabSettingsPage({super.key});
@@ -62,6 +63,18 @@ class _LabSettingsPageState extends State<LabSettingsPage> {
                         subtitle: Text(strings.advancedComicIdSearchSubtitle),
                         value: _comicIdSearchEnhance,
                         onChanged: _toggleComicIdSearchEnhance,
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.account_tree_outlined),
+                        title: Text(strings.labSourceAccountTitle),
+                        subtitle: Text(strings.labSourceAccountSubtitle),
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => const SourceAccountLabPage(),
+                            ),
+                          );
+                        },
                       ),
                     ],
                   ),

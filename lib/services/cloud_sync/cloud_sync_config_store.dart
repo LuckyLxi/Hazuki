@@ -31,6 +31,11 @@ class CloudSyncConfigStore {
     downloadsRootPathKey,
   };
 
+  static bool shouldAlwaysSkipSetting(String key) {
+    return alwaysSkippedSettings.contains(key) ||
+        key.startsWith('cookie_store_v2_');
+  }
+
   /// Keys that bypass the generic settings-restore loop and are restored
   /// specially during manual full restore so missing keys clear local state.
   static const Set<String> restoreSkippedSettings = {

@@ -186,7 +186,7 @@ class CloudSyncRestoreApplier {
     if (normalizedKey.isEmpty) {
       return null;
     }
-    if (CloudSyncConfigStore.alwaysSkippedSettings.contains(normalizedKey)) {
+    if (CloudSyncConfigStore.shouldAlwaysSkipSetting(normalizedKey)) {
       skippedKeys.add(normalizedKey);
       return null;
     }

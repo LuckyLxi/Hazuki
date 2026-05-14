@@ -25,6 +25,7 @@ class HomeCoordinator extends ChangeNotifier {
     _profileController.addListener(_relayChange);
     _shellController.addListener(_relayChange);
     _dailyRecommendationService.addListener(_relayChange);
+    _sourceService.addListener(_relayChange);
   }
 
   static const MethodChannel _mediaChannel = MethodChannel(
@@ -186,6 +187,7 @@ class HomeCoordinator extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _dailyRecommendationService.removeListener(_relayChange);
+    _sourceService.removeListener(_relayChange);
     _profileController
       ..removeListener(_relayChange)
       ..dispose();

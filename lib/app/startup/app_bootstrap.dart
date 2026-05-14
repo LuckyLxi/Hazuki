@@ -31,6 +31,7 @@ Future<AppBootstrapResult> bootstrapApp() async {
   WidgetsFlutterBinding.ensureInitialized();
   registerServices();
   await loadHazukiUiFlags();
+  await sl<SourceRuntimeRegistry>().loadActiveSourcePreference();
   await sl<HazukiSourceService>().loadSoftwareLogCaptureEnabled();
   await _ensureAndroidNoMediaMarker();
   await sl<MangaDownloadService>().ensureInitialized();

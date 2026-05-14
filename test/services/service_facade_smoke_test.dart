@@ -1,7 +1,9 @@
 import 'dart:typed_data';
+import 'dart:convert';
 import 'package:hazuki/app/service_locator.dart';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/cloud_sync_service.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -26,7 +28,13 @@ void main() {
       final bytes = Uint8List.fromList([1, 2, 3]);
 
       facade.cache.evictImageBytes([url]);
-      facade.cache.putImageBytes(url, bytes);
+      facade.cache.putImageBytes(
+        SourceScopedComicId(
+          sourceKey: hazukiDefaultSourceKey,
+          comicId: url,
+        ).imageCacheKey,
+        bytes,
+      );
 
       expect(service.peekImageBytesFromMemory(url), bytes);
       expect(
@@ -59,6 +67,50 @@ void main() {
       expect(restored.enabled, isTrue);
       expect(restored.url, 'https://example.com');
       expect(client.backupDirUrl, 'https://example.com/HazukiSync/backup');
+    },
+  );
+
+  test('source registry exposes the built-in JM source only by default', () {
+    final registry = sl<SourceRuntimeRegistry>();
+
+    expect(registry.activeSourceKey, hazukiDefaultSourceKey);
+    expect(registry.allowedSources.map((source) => source.key), ['jm']);
+    expect(
+      registry.allowedSources.single.matchesIndexEntry({
+        'key': 'jm',
+        'fileName': 'jm.js',
+      }),
+      isTrue,
+    );
+    expect(registry.isAllowedSourceKey('not-allowed'), isFalse);
+  });
+
+  test(
+    'legacy account and cookie session data is cleared on prefs init',
+    () async {
+      SharedPreferences.setMockInitialValues({
+        'cookie_store_v1': jsonEncode([
+          {
+            'name': 'sid',
+            'value': 'legacy',
+            'domain': 'example.com',
+            'path': '/',
+          },
+        ]),
+        'source_data_jm': jsonEncode({
+          'account': ['user', 'pass'],
+          'settings': {'favoriteOrder': 'mr'},
+        }),
+      });
+
+      final service = sl<HazukiSourceService>();
+      final prefs = await service.facade.ensurePrefs();
+      final sourceData = jsonDecode(prefs.getString('source_data_jm')!);
+
+      expect(prefs.getString('cookie_store_v1'), isNull);
+      expect(sourceData, isA<Map>());
+      expect((sourceData as Map).containsKey('account'), isFalse);
+      expect(sourceData['settings'], {'favoriteOrder': 'mr'});
     },
   );
 }

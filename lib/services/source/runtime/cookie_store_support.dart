@@ -1,7 +1,10 @@
 part of '../../hazuki_source_service.dart';
 
 extension CookieStoreSupport on HazukiSourceService {
-  Future<dynamic> _handleCookieOperation(Map<String, dynamic> request) async {
+  Future<dynamic> _handleCookieOperationForHandle(
+    SourceRuntimeHandle handle,
+    Map<String, dynamic> request,
+  ) async {
     final fn = request['function']?.toString();
     final rawUrl = request['url']?.toString();
     if (rawUrl == null || rawUrl.isEmpty) {
@@ -18,13 +21,13 @@ extension CookieStoreSupport on HazukiSourceService {
               .whereType<Map>()
               .map((e) => _Cookie.fromMap(Map<String, dynamic>.from(e)))
               .toList();
-          await _setCookies(url, cookies);
+          await _setCookiesForHandle(handle, url, cookies);
         }
         return null;
       case 'get':
-        return _getCookies(url).map((e) => e.toMap()).toList();
+        return _getCookiesForHandle(handle, url).map((e) => e.toMap()).toList();
       case 'delete':
-        await _deleteCookies(url);
+        await _deleteCookiesForHandle(handle, url);
         return null;
       default:
         return null;
@@ -35,17 +38,28 @@ extension CookieStoreSupport on HazukiSourceService {
     return facade._loadCookieStore();
   }
 
+  List<_Cookie> _loadCookieStoreForHandle(SourceRuntimeHandle handle) {
+    return handle.facade._loadCookieStore();
+  }
+
   Future<void> _saveCookieStore(List<_Cookie> cookies) async {
     await facade._saveCookieStore(cookies);
   }
 
-  List<_Cookie> _getCookies(String url) {
+  Future<void> _saveCookieStoreForHandle(
+    SourceRuntimeHandle handle,
+    List<_Cookie> cookies,
+  ) async {
+    await handle.facade._saveCookieStore(cookies);
+  }
+
+  List<_Cookie> _getCookiesForHandle(SourceRuntimeHandle handle, String url) {
     final uri = Uri.tryParse(url);
     if (uri == null) {
       return [];
     }
 
-    final all = _loadCookieStore();
+    final all = _loadCookieStoreForHandle(handle);
     final now = DateTime.now().millisecondsSinceEpoch;
 
     return all.where((cookie) {
@@ -56,13 +70,17 @@ extension CookieStoreSupport on HazukiSourceService {
     }).toList();
   }
 
-  Future<void> _setCookies(String url, List<_Cookie> cookies) async {
+  Future<void> _setCookiesForHandle(
+    SourceRuntimeHandle handle,
+    String url,
+    List<_Cookie> cookies,
+  ) async {
     final uri = Uri.tryParse(url);
     if (uri == null || cookies.isEmpty) {
       return;
     }
 
-    final all = _loadCookieStore();
+    final all = _loadCookieStoreForHandle(handle);
     for (final cookie in cookies) {
       final normalized = cookie.withFallbackDomain(uri.host);
       all.removeWhere(
@@ -91,22 +109,29 @@ extension CookieStoreSupport on HazukiSourceService {
       }
     }
 
-    await _saveCookieStore(all);
+    await _saveCookieStoreForHandle(handle, all);
   }
 
-  Future<void> _deleteCookies(String url) async {
+  Future<void> _deleteCookiesForHandle(
+    SourceRuntimeHandle handle,
+    String url,
+  ) async {
     final uri = Uri.tryParse(url);
     if (uri == null) {
       return;
     }
 
-    final all = _loadCookieStore();
+    final all = _loadCookieStoreForHandle(handle);
     all.removeWhere((cookie) => cookie.matches(uri));
-    await _saveCookieStore(all);
+    await _saveCookieStoreForHandle(handle, all);
   }
 
   String? buildCookieHeader(String url) {
-    final cookies = _getCookies(url);
+    return buildCookieHeaderForHandle(_activeHandle, url);
+  }
+
+  String? buildCookieHeaderForHandle(SourceRuntimeHandle handle, String url) {
+    final cookies = _getCookiesForHandle(handle, url);
     if (cookies.isEmpty) {
       return null;
     }
@@ -135,7 +160,8 @@ extension CookieStoreSupport on HazukiSourceService {
     return selected.values.map((e) => '${e.name}=${e.value}').join('; ');
   }
 
-  Future<void> _saveCookiesFromHeaders(
+  Future<void> _saveCookiesFromHeadersForHandle(
+    SourceRuntimeHandle handle,
     String url,
     Map<String, List<String>> headers,
   ) async {
@@ -158,7 +184,7 @@ extension CookieStoreSupport on HazukiSourceService {
         }
       }
     }
-    await _setCookies(url, parsed);
+    await _setCookiesForHandle(handle, url, parsed);
   }
 
   String _normalizeCookieUrl(String rawUrl) {

@@ -50,6 +50,11 @@ void registerServices() {
           DiscoverDailyRecommendationService(source: sl<HazukiSourceService>()),
     );
   }
+  if (!sl.isRegistered<SourceRuntimeRegistry>()) {
+    sl.registerLazySingleton<SourceRuntimeRegistry>(
+      () => sl<HazukiSourceService>().runtimeRegistry,
+    );
+  }
   if (!sl.isRegistered<CloudSyncService>()) {
     sl.registerLazySingleton<CloudSyncService>(
       () => CloudSyncService(

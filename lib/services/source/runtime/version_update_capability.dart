@@ -4,7 +4,7 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
   Future<SourceVersionCheckResult?> checkJmSourceVersionFromCloud() async {
     final facade = this.facade;
     final sourceDir = await _getSourceStorageDirectory();
-    final jmFile = File('${sourceDir.path}/jm.js');
+    final jmFile = File('${sourceDir.path}/source.js');
     if (!await jmFile.exists()) {
       facade.lastSourceVersionDebugInfo = {
         'checkedAt': DateTime.now().toIso8601String(),
@@ -79,11 +79,7 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
         continue;
       }
       final map = Map<String, dynamic>.from(item);
-      final name = map['name']?.toString().trim();
-      final key = map['key']?.toString().trim().toLowerCase();
-      final fileName = map['fileName']?.toString().trim().toLowerCase();
-      final isTarget = name == '绂佹极澶╁爞' || key == 'jm' || fileName == 'jm.js';
-      if (!isTarget) {
+      if (!_definitionForSourceKey(activeSourceKey).matchesIndexEntry(map)) {
         continue;
       }
       remoteVersion = map['version']?.toString().trim();
@@ -128,10 +124,10 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
     if (!await sourceDir.exists()) {
       await sourceDir.create(recursive: true);
     }
-    final jmFile = File('${sourceDir.path}/jm.js');
+    final jmFile = File('${sourceDir.path}/source.js');
 
     final jmScript = await _downloadFromUrlsWithProgress(
-      _jmSourceUrls,
+      await _resolveActiveSourceDownloadUrls(),
       onProgress: onProgress,
     );
     if (jmScript == null || jmScript.trim().isEmpty) {
@@ -213,7 +209,14 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
             final map = Map<String, dynamic>.from(item);
             final key = map['key']?.toString().trim().toLowerCase();
             final fileName = map['fileName']?.toString().trim().toLowerCase();
-            if (key != 'jm' && fileName != 'jm.js') {
+            final normalizedMap = <String, dynamic>{
+              ...map,
+              'key': key,
+              'fileName': fileName,
+            };
+            if (!_definitionForSourceKey(
+              activeSourceKey,
+            ).matchesIndexEntry(normalizedMap)) {
               continue;
             }
             final version = map['version']?.toString().trim();

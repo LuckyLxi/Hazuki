@@ -253,7 +253,7 @@ class CloudSyncSnapshotCodec {
     final prefs = await SharedPreferences.getInstance();
     final settingsMap = <String, dynamic>{};
     for (final key in prefs.getKeys()) {
-      if (CloudSyncConfigStore.alwaysSkippedSettings.contains(key)) {
+      if (CloudSyncConfigStore.shouldAlwaysSkipSetting(key)) {
         continue;
       }
       final value = prefs.get(key);
