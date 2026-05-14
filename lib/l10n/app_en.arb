@@ -984,7 +984,7 @@
   "advancedSoftwareLogCaptureSubtitle": "When turned off, error, action, system, and performance logs will no longer be captured",
   "advancedComicIdSearchTitle": "Comic ID detection",
   "advancedComicIdSearchSubtitle": "Show a tappable hint above the keyboard when a comic ID can be extracted from the search text",
-  "labSourceAccountTitle": "Sources and accounts",
+  "labSourceAccountTitle": "Switch Source",
   "labSourceAccountSubtitle": "Switch allowed sources and sign in per source",
   "labSourceAccountActive": "Active",
   "labSourceAccountSwitch": "Switch",

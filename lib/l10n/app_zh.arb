@@ -984,7 +984,7 @@
   "advancedSoftwareLogCaptureSubtitle": "关闭后将不再抓取错误、操作、系统与性能日志",
   "advancedComicIdSearchTitle": "漫画 ID 识别",
   "advancedComicIdSearchSubtitle": "搜索文本可提取漫画 ID 时，在输入法上方显示可点击的提示",
-  "labSourceAccountTitle": "来源与账号",
+  "labSourceAccountTitle": "切换漫画源",
   "labSourceAccountSubtitle": "切换内置允许来源，并分别登录账号",
   "labSourceAccountActive": "当前",
   "labSourceAccountSwitch": "切换",
