@@ -520,7 +520,7 @@ let Network = {
      * @returns {Promise<{status: number, headers: {}, body: string}>} The response from the request.
      */
     async get(url, headers, extra) {
-        return this.sendRequest('GET', url, headers, extra);
+        return this.sendRequest('GET', url, headers, null, extra);
     },
 
     /**
@@ -567,7 +567,7 @@ let Network = {
      * @returns {Promise<{status: number, headers: {}, body: string}>} The response from the request.
      */
     async delete(url, headers, extra) {
-        return this.sendRequest('DELETE', url, headers, extra);
+        return this.sendRequest('DELETE', url, headers, null, extra);
     },
 
     /**

@@ -4,6 +4,7 @@ import 'package:hazuki/app/service_locator.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
+import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../support/test_service_locator.dart';
 
@@ -132,6 +133,25 @@ void main() {
         expect(state.hasRecommendations, isTrue);
         expect(state.selectedAuthor, 'Fresh Author');
         expect(state.displayedRecommendations.first.comic.title, 'Fresh 1');
+      },
+    );
+
+    test(
+      'stays disabled on non-JM sources even when preference is enabled',
+      () async {
+        SharedPreferences.setMockInitialValues(<String, Object>{
+          'discover_daily_recommendation_cache_copy_manga': _cachePayload(
+            sourceKey: 'copy_manga',
+            titlePrefix: 'Copy',
+          ),
+        });
+        await sl<HazukiSourceService>().activateSource('copy_manga');
+
+        final state = await sl<DiscoverDailyRecommendationService>()
+            .ensurePrepared(enabled: true);
+
+        expect(state.enabled, isFalse);
+        expect(state.hasRecommendations, isFalse);
       },
     );
   });

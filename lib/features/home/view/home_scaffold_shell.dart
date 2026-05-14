@@ -32,6 +32,7 @@ class HomeScaffoldShell extends StatelessWidget {
     required this.avatarUrl,
     required this.username,
     required this.autoCheckInEnabled,
+    required this.showCheckInActions,
     required this.checkInBusy,
     required this.checkedInToday,
     required this.favoriteActionsBinding,
@@ -70,6 +71,7 @@ class HomeScaffoldShell extends StatelessWidget {
   final String? avatarUrl;
   final String username;
   final bool autoCheckInEnabled;
+  final bool showCheckInActions;
   final bool checkInBusy;
   final bool checkedInToday;
   final FavoritePageActionsBinding favoriteActionsBinding;
@@ -123,6 +125,7 @@ class HomeScaffoldShell extends StatelessWidget {
       avatarUrl: avatarUrl,
       username: username,
       autoCheckInEnabled: autoCheckInEnabled,
+      showCheckInActions: showCheckInActions,
       checkInBusy: checkInBusy,
       checkedInToday: checkedInToday,
       onProfileTap:

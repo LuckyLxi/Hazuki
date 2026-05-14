@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:hazuki/app/app.dart';
+import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../settings_group.dart';
@@ -14,6 +16,7 @@ class LabSettingsPage extends StatefulWidget {
 }
 
 class _LabSettingsPageState extends State<LabSettingsPage> {
+  final HazukiSourceService _sourceService = sl<HazukiSourceService>();
   bool _comicIdSearchEnhance = false;
   bool _loading = true;
 
@@ -21,6 +24,19 @@ class _LabSettingsPageState extends State<LabSettingsPage> {
   void initState() {
     super.initState();
     _loadSettings();
+    _sourceService.addListener(_handleSourceChanged);
+  }
+
+  @override
+  void dispose() {
+    _sourceService.removeListener(_handleSourceChanged);
+    super.dispose();
+  }
+
+  void _handleSourceChanged() {
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   Future<void> _loadSettings() async {
@@ -57,13 +73,14 @@ class _LabSettingsPageState extends State<LabSettingsPage> {
                 children: [
                   SettingsGroup(
                     children: [
-                      SwitchListTile(
-                        secondary: const Icon(Icons.tag_outlined),
-                        title: Text(strings.advancedComicIdSearchTitle),
-                        subtitle: Text(strings.advancedComicIdSearchSubtitle),
-                        value: _comicIdSearchEnhance,
-                        onChanged: _toggleComicIdSearchEnhance,
-                      ),
+                      if (_sourceService.isActiveJmSource)
+                        SwitchListTile(
+                          secondary: const Icon(Icons.tag_outlined),
+                          title: Text(strings.advancedComicIdSearchTitle),
+                          subtitle: Text(strings.advancedComicIdSearchSubtitle),
+                          value: _comicIdSearchEnhance,
+                          onChanged: _toggleComicIdSearchEnhance,
+                        ),
                       ListTile(
                         leading: const Icon(Icons.account_tree_outlined),
                         title: Text(strings.labSourceAccountTitle),

@@ -63,6 +63,7 @@ class ComicDetailBody extends StatelessWidget {
             uiState.shouldAnimateInitialDetailReveal;
         final shouldAnimateResolvedContent =
             shouldAnimateInitialDetailReveal && details != null;
+        final supportsJmExclusiveActions = scope.supportsJmExclusiveActions;
 
         uiState.updateAppBarMetadata(
           title: displayTitle,
@@ -130,10 +131,11 @@ class ComicDetailBody extends StatelessWidget {
                           height: 44,
                           text: l10n(context).comicDetailTabComments,
                         ),
-                        Tab(
-                          height: 44,
-                          text: l10n(context).comicDetailTabRelated,
-                        ),
+                        if (supportsJmExclusiveActions)
+                          Tab(
+                            height: 44,
+                            text: l10n(context).comicDetailTabRelated,
+                          ),
                       ],
                     ),
                     surface,
@@ -188,21 +190,22 @@ class ComicDetailBody extends StatelessWidget {
                         : const ComicDetailLoadingView();
                   },
                 ),
-                ComicDetailTabTickerScope(
-                  tabController: uiState.tabController,
-                  tabIndex: 2,
-                  builder: (context, shouldRender, _) {
-                    return RepaintBoundary(
-                      child: ComicDetailRelatedTab(
-                        details: details,
-                        isActiveInTabView: shouldRender,
-                        isDesktopPanel: isDesktopPanel,
-                        onCloseRequested: onCloseRequested,
-                        pageBuilder: buildComicDetailPage,
-                      ),
-                    );
-                  },
-                ),
+                if (supportsJmExclusiveActions)
+                  ComicDetailTabTickerScope(
+                    tabController: uiState.tabController,
+                    tabIndex: 2,
+                    builder: (context, shouldRender, _) {
+                      return RepaintBoundary(
+                        child: ComicDetailRelatedTab(
+                          details: details,
+                          isActiveInTabView: shouldRender,
+                          isDesktopPanel: isDesktopPanel,
+                          onCloseRequested: onCloseRequested,
+                          pageBuilder: buildComicDetailPage,
+                        ),
+                      );
+                    },
+                  ),
               ],
             ),
           ),

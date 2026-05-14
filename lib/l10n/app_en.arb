@@ -1004,6 +1004,14 @@
       "error": {}
     }
   },
+  "labSourceAccountNotDownloaded": "Not downloaded",
+  "labSourceAccountDownloadSuccess": "Comic source downloaded",
+  "labSourceAccountDownloadFailed": "Could not download comic source: {error}",
+  "@labSourceAccountDownloadFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
   "advancedNoImageModeTitle": "No-image mode",
   "advancedNoImageModeSubtitle": "Hide images globally (except the login avatar in the sidebar)",
   "advancedEditSourceTitle": "Edit comic source",

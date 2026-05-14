@@ -14,6 +14,7 @@ class ComicDetailScope extends InheritedWidget {
     required this.theme,
     required this.actions,
     required this.favorite,
+    required this.supportsJmExclusiveActions,
     required super.child,
   });
 
@@ -22,6 +23,7 @@ class ComicDetailScope extends InheritedWidget {
   final ComicDetailThemeController theme;
   final ComicDetailActionsController actions;
   final ComicDetailFavoriteController favorite;
+  final bool supportsJmExclusiveActions;
 
   static ComicDetailScope of(BuildContext context) {
     final scope = context

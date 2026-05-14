@@ -55,6 +55,27 @@ extension HazukiSourceServiceSourceLoaderCapability on HazukiSourceService {
     throw Exception('source_download_failed_without_cache');
   }
 
+  Future<_SourceLoadResult> _downloadSourceFiles({
+    void Function(int received, int total)? onProgress,
+  }) async {
+    final localFiles = await _ensureLocalSourceFiles(requireJmFile: false);
+    final jmFile = localFiles.jmFile;
+
+    final jmScript = await _downloadFromUrlsWithProgress(
+      await _resolveActiveSourceDownloadUrls(),
+      onProgress: onProgress,
+    );
+    if (jmScript != null && jmScript.trim().isNotEmpty) {
+      await jmFile.writeAsString(jmScript, flush: true);
+      return _SourceLoadResult(
+        jmFile: jmFile,
+        message: 'source_downloaded_manually',
+      );
+    }
+
+    throw Exception('source_download_failed_without_cache');
+  }
+
   Future<SourceMeta> _loadSourceMetadata(File jmFile) async {
     final facade = this.facade;
     final initScript = await rootBundle.loadString(_bundledInitAssetPath);

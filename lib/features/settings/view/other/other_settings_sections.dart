@@ -8,6 +8,7 @@ class OtherSettingsGeneralSection extends StatelessWidget {
     required this.autoSourceUpdateCheckEnabled,
     required this.autoSoftwareUpdateCheckEnabled,
     required this.discoverDailyRecommendationEnabled,
+    required this.showJmExclusiveSettings,
     required this.useSystemTitleBar,
     required this.mangaDownloadsRootPath,
     required this.showWindowsTitleBarToggle,
@@ -24,6 +25,7 @@ class OtherSettingsGeneralSection extends StatelessWidget {
   final bool autoSourceUpdateCheckEnabled;
   final bool autoSoftwareUpdateCheckEnabled;
   final bool discoverDailyRecommendationEnabled;
+  final bool showJmExclusiveSettings;
   final bool useSystemTitleBar;
   final String mangaDownloadsRootPath;
   final bool showWindowsTitleBarToggle;
@@ -40,13 +42,14 @@ class OtherSettingsGeneralSection extends StatelessWidget {
     final strings = AppLocalizations.of(context)!;
     return _OtherSettingsGroup(
       children: [
-        SwitchListTile(
-          secondary: const Icon(Icons.event_available_outlined),
-          title: Text(strings.otherAutoCheckInTitle),
-          subtitle: Text(strings.otherAutoCheckInSubtitle),
-          value: autoCheckInEnabled,
-          onChanged: onAutoCheckInChanged,
-        ),
+        if (showJmExclusiveSettings)
+          SwitchListTile(
+            secondary: const Icon(Icons.event_available_outlined),
+            title: Text(strings.otherAutoCheckInTitle),
+            subtitle: Text(strings.otherAutoCheckInSubtitle),
+            value: autoCheckInEnabled,
+            onChanged: onAutoCheckInChanged,
+          ),
         SwitchListTile(
           secondary: const Icon(Icons.system_update_alt_rounded),
           title: Text(strings.otherAutoSourceUpdateTitle),
@@ -61,13 +64,14 @@ class OtherSettingsGeneralSection extends StatelessWidget {
           value: autoSoftwareUpdateCheckEnabled,
           onChanged: onAutoSoftwareUpdateChanged,
         ),
-        SwitchListTile(
-          secondary: const Icon(Icons.auto_awesome_outlined),
-          title: Text(strings.otherDiscoverDailyRecommendationTitle),
-          subtitle: Text(strings.otherDiscoverDailyRecommendationSubtitle),
-          value: discoverDailyRecommendationEnabled,
-          onChanged: onDiscoverDailyRecommendationChanged,
-        ),
+        if (showJmExclusiveSettings)
+          SwitchListTile(
+            secondary: const Icon(Icons.auto_awesome_outlined),
+            title: Text(strings.otherDiscoverDailyRecommendationTitle),
+            subtitle: Text(strings.otherDiscoverDailyRecommendationSubtitle),
+            value: discoverDailyRecommendationEnabled,
+            onChanged: onDiscoverDailyRecommendationChanged,
+          ),
         if (showWindowsTitleBarToggle)
           SwitchListTile(
             secondary: const Icon(Icons.web_asset_outlined),

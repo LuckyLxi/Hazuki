@@ -31,20 +31,31 @@ extension HazukiSourceServiceExploreCapability on HazukiSourceService {
     final exploreType =
         (engine.evaluate('this.__hazuki_source.explore?.[0]?.type') ?? '')
             .toString();
-    if (exploreType != 'multiPartPage') {
+    if (exploreType != 'multiPartPage' &&
+        exploreType != 'singlePageWithMultiPart') {
       throw Exception('explore_type_not_supported:$exploreType');
     }
 
     final dynamic result = engine.evaluate(
-      'this.__hazuki_source.explore[0].load(null)',
+      exploreType == 'multiPartPage'
+          ? 'this.__hazuki_source.explore[0].load(null)'
+          : 'this.__hazuki_source.explore[0].load()',
       name: 'source_explore_load.js',
     );
 
     final dynamic resolved = await facade.js.resolve(result);
+    final sections = exploreType == 'multiPartPage'
+        ? _parseMultiPartExploreSections(resolved)
+        : _parseSinglePageWithMultiPartExploreSections(resolved);
+
+    exploreCache.putSections(sections);
+    return List<ExploreSection>.unmodifiable(sections);
+  }
+
+  List<ExploreSection> _parseMultiPartExploreSections(dynamic resolved) {
     if (resolved is! List) {
       return const [];
     }
-
     final sections = <ExploreSection>[];
     for (final item in resolved) {
       if (item is! Map) {
@@ -70,9 +81,30 @@ extension HazukiSourceServiceExploreCapability on HazukiSourceService {
         );
       }
     }
+    return sections;
+  }
 
-    exploreCache.putSections(sections);
-    return List<ExploreSection>.unmodifiable(sections);
+  List<ExploreSection> _parseSinglePageWithMultiPartExploreSections(
+    dynamic resolved,
+  ) {
+    if (resolved is! Map) {
+      return const [];
+    }
+    final map = Map<String, dynamic>.from(resolved);
+    final sections = <ExploreSection>[];
+    for (final entry in map.entries) {
+      final list = entry.value;
+      if (list is! List) {
+        continue;
+      }
+      final comics = _parseExploreComics(list);
+      if (comics.isNotEmpty) {
+        sections.add(
+          ExploreSection(title: entry.key.toString(), comics: comics),
+        );
+      }
+    }
+    return sections;
   }
 
   List<ExploreComic> _parseExploreComics(List list) {

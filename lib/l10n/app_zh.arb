@@ -1004,6 +1004,14 @@
       "error": {}
     }
   },
+  "labSourceAccountNotDownloaded": "未下载",
+  "labSourceAccountDownloadSuccess": "漫画源已下载",
+  "labSourceAccountDownloadFailed": "漫画源下载失败：{error}",
+  "@labSourceAccountDownloadFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
   "advancedNoImageModeTitle": "无图模式",
   "advancedNoImageModeSubtitle": "全局不显示图片（侧边栏登录头像除外）",
   "advancedEditSourceTitle": "编辑漫画源",

@@ -70,15 +70,25 @@ void main() {
     },
   );
 
-  test('source registry exposes the built-in JM source only by default', () {
+  test('source registry exposes built-in source catalog entries', () {
     final registry = sl<SourceRuntimeRegistry>();
 
     expect(registry.activeSourceKey, hazukiDefaultSourceKey);
-    expect(registry.allowedSources.map((source) => source.key), ['jm']);
+    expect(registry.allowedSources.map((source) => source.key), [
+      'jm',
+      'copy_manga',
+    ]);
     expect(
-      registry.allowedSources.single.matchesIndexEntry({
+      registry.allowedSources.first.matchesIndexEntry({
         'key': 'jm',
         'fileName': 'jm.js',
+      }),
+      isTrue,
+    );
+    expect(
+      registry.allowedSources.last.matchesIndexEntry({
+        'key': 'copy_manga',
+        'fileName': 'copy_manga.js',
       }),
       isTrue,
     );

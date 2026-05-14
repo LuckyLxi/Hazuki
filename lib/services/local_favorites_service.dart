@@ -35,6 +35,7 @@ class LocalFavoritesService extends ChangeNotifier {
       'favorite_selected_cloud_folder_v1';
   static const String _selectedLocalFolderKey =
       'favorite_selected_local_folder_v1';
+  static const String _legacyLocalFavoriteSourceKey = 'jm';
   static const int _tombstoneTtlMs = 90 * 24 * 60 * 60 * 1000;
   static const int _pageSize = 24;
 
@@ -107,10 +108,7 @@ class LocalFavoritesService extends ChangeNotifier {
     final store = await _loadStore();
     final folders = store.folders
         .where(
-          (folder) =>
-              normalizedSourceKey.isEmpty ||
-              folder.sourceKey.isEmpty ||
-              folder.sourceKey == normalizedSourceKey,
+          (folder) => _sourceMatches(folder.sourceKey, normalizedSourceKey),
         )
         .map(
           (folder) => FavoriteFolder(
@@ -158,9 +156,7 @@ class LocalFavoritesService extends ChangeNotifier {
         .where(
           (entry) =>
               entry.folderIds.contains(normalizedFolderId) &&
-              (normalizedSourceKey.isEmpty ||
-                  entry.sourceKey.isEmpty ||
-                  entry.sourceKey == normalizedSourceKey),
+              _sourceMatches(entry.sourceKey, normalizedSourceKey),
         )
         .toList();
 
@@ -187,7 +183,7 @@ class LocalFavoritesService extends ChangeNotifier {
     final end = (start + _pageSize).clamp(0, totalCount);
     final comics = filteredEntries
         .sublist(start, end)
-        .map((entry) => entry.toExploreComic())
+        .map((entry) => entry.toExploreComic(sourceKey: normalizedSourceKey))
         .toList(growable: false);
 
     return FavoriteComicsResult.success(comics, maxPage: maxPage);
@@ -356,9 +352,16 @@ class LocalFavoritesService extends ChangeNotifier {
   }
 
   bool _sourceMatches(String storedSourceKey, String requestedSourceKey) {
-    final stored = storedSourceKey.trim();
     final requested = requestedSourceKey.trim();
-    return requested.isEmpty || stored.isEmpty || stored == requested;
+    if (requested.isEmpty) {
+      return true;
+    }
+    return _effectiveStoredSourceKey(storedSourceKey) == requested;
+  }
+
+  String _effectiveStoredSourceKey(String storedSourceKey) {
+    final stored = storedSourceKey.trim();
+    return stored.isEmpty ? _legacyLocalFavoriteSourceKey : stored;
   }
 
   Future<void> _appendFolderTombstone(String folderId) async {
@@ -502,10 +505,11 @@ class _LocalFavoritesStore {
   }) {
     for (final entry in entries) {
       final requested = sourceKey.trim();
+      final storedSourceKey = entry.sourceKey.trim().isEmpty
+          ? LocalFavoritesService._legacyLocalFavoriteSourceKey
+          : entry.sourceKey.trim();
       if (entry.comicId == comicId &&
-          (requested.isEmpty ||
-              entry.sourceKey.isEmpty ||
-              entry.sourceKey == requested)) {
+          (requested.isEmpty || storedSourceKey == requested)) {
         return entry;
       }
     }
@@ -612,13 +616,16 @@ class _LocalFavoriteComicRecord {
 
   Set<String> get folderIds => folderSavedAtMs.keys.toSet();
 
-  ExploreComic toExploreComic() {
+  ExploreComic toExploreComic({String sourceKey = ''}) {
+    final resolvedSourceKey = this.sourceKey.trim().isNotEmpty
+        ? this.sourceKey
+        : sourceKey.trim();
     return ExploreComic(
       id: comicId,
       title: title,
       subTitle: subTitle,
       cover: cover,
-      sourceKey: sourceKey,
+      sourceKey: resolvedSourceKey,
     );
   }
 

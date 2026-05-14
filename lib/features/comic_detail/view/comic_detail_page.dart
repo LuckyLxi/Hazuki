@@ -64,6 +64,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
   late final ComicDetailThemeController _themeController;
   late final ComicDetailActionsController _actionsController;
   late final ComicDetailFavoriteController _favoriteController;
+  late final bool _supportsJmExclusiveActions;
 
   @override
   void initState() {
@@ -73,6 +74,10 @@ class _ComicDetailPageState extends State<ComicDetailPage>
       local: sl<LocalFavoritesService>(),
       downloader: sl<MangaDownloadService>(),
     );
+    final comicSourceKey = widget.comic.sourceKey.trim().isNotEmpty
+        ? widget.comic.sourceKey
+        : sl<HazukiSourceService>().activeSourceKey;
+    _supportsJmExclusiveActions = isHazukiJmSourceKey(comicSourceKey);
     _initializeControllers();
     _uiStateController.initialize(initialAppBarTitle: widget.comic.title);
     _sessionController.initialize();
@@ -185,6 +190,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
           widget.shouldAnimateInitialRevealOverride,
       vsync: this,
       scrollController: _scrollController,
+      includeRelatedTab: _supportsJmExclusiveActions,
     );
   }
 
@@ -200,6 +206,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
       theme: _themeController,
       actions: _actionsController,
       favorite: _favoriteController,
+      supportsJmExclusiveActions: _supportsJmExclusiveActions,
       child: AnimatedTheme(
         data: theme,
         duration: const Duration(milliseconds: 360),

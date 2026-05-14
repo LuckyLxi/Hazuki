@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/app/app.dart';
 import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
@@ -7,6 +8,7 @@ import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/features/search/search.dart';
 import 'package:hazuki/features/search/view/search_entry_page.dart';
 import 'package:hazuki/features/search/view/search_id_extract_pill.dart';
+import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../support/test_service_locator.dart';
 
@@ -239,6 +241,37 @@ void main() {
 
     expect(requests, contains('123'));
     expect(requests, isNot(contains('abc123def')));
+  });
+
+  testWidgets('comic id enhancement is inactive on non-JM sources', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      hazukiComicIdSearchEnhancePreferenceKey: true,
+    });
+    await sl<HazukiSourceService>().activateSource('copy_manga');
+
+    await tester.pumpWidget(
+      _buildTestApp(
+        SearchEntryPage(
+          comicDetailPageBuilder: _comicDetailPageBuilder,
+          comicCoverHeroTagBuilder: (_, {String? salt}) => 'hero-$salt',
+          searchPageLoader: _fakeSearchPageLoader,
+        ),
+      ),
+    );
+    await _pumpSearchSettled(tester);
+
+    await tester.enterText(
+      find.descendant(
+        of: find.byKey(const ValueKey('search-entry-primary-search-bar')),
+        matching: find.byType(EditableText),
+      ),
+      'abc123def',
+    );
+    await tester.pump();
+
+    expect(_currentExtractedId(tester), isNull);
   });
 
   testWidgets('external keyword opens results without keyboard', (

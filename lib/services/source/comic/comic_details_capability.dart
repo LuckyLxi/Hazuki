@@ -233,6 +233,26 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
     SourceScopedComicId scopedId, {
     required bool isLike,
   }) {
+    _updateComicDetailsStateInMemoryCache(
+      scopedId,
+      update: (details) => details.copyWith(isLiked: isLike),
+    );
+  }
+
+  void _updateComicDetailsFavoriteStateInMemoryCache(
+    SourceScopedComicId scopedId, {
+    required bool isFavorite,
+  }) {
+    _updateComicDetailsStateInMemoryCache(
+      scopedId,
+      update: (details) => details.copyWith(isFavorite: isFavorite),
+    );
+  }
+
+  void _updateComicDetailsStateInMemoryCache(
+    SourceScopedComicId scopedId, {
+    required ComicDetailsData Function(ComicDetailsData details) update,
+  }) {
     final canonicalKey = scopedId.storageKey;
     final entries = _comicDetailsMemoryCache.entries.toList();
     for (final entry in entries) {
@@ -240,10 +260,7 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
           entry.value.scopedId.storageKey != canonicalKey) {
         continue;
       }
-      _putComicDetailsInMemoryCache(
-        entry.key,
-        entry.value.copyWith(isLiked: isLike),
-      );
+      _putComicDetailsInMemoryCache(entry.key, update(entry.value));
     }
   }
 

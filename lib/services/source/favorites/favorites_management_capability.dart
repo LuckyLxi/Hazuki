@@ -50,6 +50,8 @@ extension HazukiSourceServiceFavoritesManagementCapability
     String folderId = '0',
     String? favoriteId,
   }) async {
+    final normalizedComicId = comicId.trim();
+    final resolvedSourceKey = _resolveActiveSourceKey();
     final facade = this.facade;
     await _runWithReloginRetry(() async {
       final engine = facade.js.engine;
@@ -81,5 +83,21 @@ extension HazukiSourceServiceFavoritesManagementCapability
 
       await facade.js.resolve(result);
     });
+
+    if (normalizedComicId.isNotEmpty) {
+      final scopedKey = SourceScopedComicId(
+        sourceKey: resolvedSourceKey,
+        comicId: normalizedComicId,
+      ).storageKey;
+      final cached = _getComicDetailsFromMemoryCache(scopedKey);
+      if (cached != null) {
+        _updateComicDetailsFavoriteStateInMemoryCache(
+          cached.scopedId,
+          isFavorite: isAdding,
+        );
+      }
+    }
+
+    notifyCloudFavoritesChanged();
   }
 }

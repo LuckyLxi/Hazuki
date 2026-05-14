@@ -53,6 +53,12 @@ class _DiscoverPageState extends State<DiscoverPage> {
     super.initState();
     _controller = DiscoverPageController(
       sourceService: sl<HazukiSourceService>(),
+      // 源切换时后台触发刷新，重新加载当前源的发现页数据
+      onSourceSwitched: () {
+        if (mounted) {
+          unawaited(_triggerRefresh());
+        }
+      },
     );
     _scrollController.addListener(_handleScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {

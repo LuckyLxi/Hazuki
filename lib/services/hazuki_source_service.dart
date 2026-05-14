@@ -67,12 +67,24 @@ const _jmSourceUrls = [
   'https://cdn.jsdelivr.net/gh/venera-app/venera-configs@main/jm.js',
 ];
 
+const _copyMangaSourceUrls = [
+  'https://cdn.jsdelivr.net/gh/venera-app/venera-configs@main/copy_manga.js',
+];
+
 const _sourceIndexUrls = [
   'https://cdn.jsdelivr.net/gh/venera-app/venera-configs@main/index.json',
 ];
 
 const _bundledInitAssetPath = 'assets/init.js';
 const hazukiDefaultSourceKey = 'jm';
+
+bool isHazukiJmSourceKey(String sourceKey) {
+  return sourceKey.trim() == hazukiDefaultSourceKey;
+}
+
+bool isHazukiCopyMangaSourceKey(String sourceKey) {
+  return sourceKey.trim() == 'copy_manga';
+}
 
 Dio _createSourceDio() {
   return Dio(
@@ -127,6 +139,12 @@ const List<SourceCatalogEntry> hazukiAllowedSourceCatalog = [
     name: 'JMComic',
     fileName: 'jm.js',
     directUrls: _jmSourceUrls,
+  ),
+  SourceCatalogEntry(
+    key: 'copy_manga',
+    name: 'CopyManga',
+    fileName: 'copy_manga.js',
+    directUrls: _copyMangaSourceUrls,
   ),
 ];
 
@@ -328,6 +346,15 @@ class HazukiSourceService extends ChangeNotifier {
       <String, SourceRuntimeHandle>{};
   String _activeSourceKey = hazukiDefaultSourceKey;
 
+  final StreamController<void> _cloudFavoritesChangedController =
+      StreamController<void>.broadcast();
+  Stream<void> get cloudFavoritesChangedStream =>
+      _cloudFavoritesChangedController.stream;
+
+  void notifyCloudFavoritesChanged() {
+    _cloudFavoritesChangedController.add(null);
+  }
+
   SourceRuntimeHandle get _activeHandle => _handleFor(_activeSourceKey);
 
   SourceRuntimeHandle _handleFor(String sourceKey) {
@@ -524,6 +551,7 @@ class HazukiSourceService extends ChangeNotifier {
   SourceRuntimeState get sourceRuntimeState => _runtimeState;
   SourceMeta? get sourceMeta => _sourceMeta;
   String get activeSourceKey => _activeSourceKey;
+  bool get isActiveJmSource => isHazukiJmSourceKey(_activeSourceKey);
   bool get isInitialized => _engine != null && _sourceMeta != null;
   bool get softwareLogCaptureEnabled => _softwareLogCaptureEnabled;
 
@@ -626,7 +654,11 @@ class HazukiSourceService extends ChangeNotifier {
     }
 
     final normalizedPage = page < 1 ? 1 : page;
-    final normalizedOrder = order.trim().isEmpty ? 'mr' : order.trim();
+    final activeSearchSourceKey = activeSourceKey;
+    final normalizedOrder = _normalizeSearchOptionForSource(
+      order,
+      sourceKey: activeSearchSourceKey,
+    );
 
     final hasSearch = jsAsBool(
       engine.evaluate('!!this.__hazuki_source.search'),
@@ -663,6 +695,18 @@ class HazukiSourceService extends ChangeNotifier {
     };
 
     return SearchComicsResult(comics: comics, maxPage: maxPage);
+  }
+
+  String _normalizeSearchOptionForSource(
+    String order, {
+    required String sourceKey,
+  }) {
+    final normalized = order.trim();
+    if (isHazukiCopyMangaSourceKey(sourceKey)) {
+      const copySearchModes = {'-', 'name', 'author', 'local'};
+      return copySearchModes.contains(normalized) ? normalized : '-';
+    }
+    return normalized.isEmpty ? 'mr' : normalized;
   }
 }
 

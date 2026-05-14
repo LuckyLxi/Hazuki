@@ -2,6 +2,10 @@ part of '../../hazuki_source_service.dart';
 
 extension HazukiSourceServiceCheckInCapability on HazukiSourceService {
   Future<bool> isDailyCheckInCompletedToday() async {
+    if (!isActiveJmSource) {
+      return false;
+    }
+
     final facade = this.facade;
     await facade.ensureInitialized();
 
@@ -19,6 +23,10 @@ extension HazukiSourceServiceCheckInCapability on HazukiSourceService {
   }
 
   Future<DailyCheckInResult> performDailyCheckIn() async {
+    if (!isActiveJmSource) {
+      return const DailyCheckInResult.skipped();
+    }
+
     final facade = this.facade;
     await facade.ensureInitialized();
 

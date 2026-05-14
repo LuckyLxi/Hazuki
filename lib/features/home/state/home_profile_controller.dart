@@ -32,6 +32,7 @@ class HomeProfileController extends ChangeNotifier {
   bool get checkInBusy => _checkInBusy;
   bool get checkedInToday => _checkedInToday;
   bool get isLogged => _sourceService.isLogged;
+  bool get isCheckInAvailable => _sourceService.isActiveJmSource;
 
   Future<void> syncUserProfile(BuildContext context) async {
     if (!_sourceService.isInitialized) {
@@ -96,7 +97,7 @@ class HomeProfileController extends ChangeNotifier {
   }
 
   Future<void> refreshCheckInState(BuildContext context) async {
-    if (!_sourceService.isLogged) {
+    if (!_sourceService.isActiveJmSource || !_sourceService.isLogged) {
       _checkedInToday = false;
       _notify();
       return;
@@ -113,6 +114,9 @@ class HomeProfileController extends ChangeNotifier {
   }
 
   Future<void> maybeAutoCheckInOnStartup(BuildContext context) async {
+    if (!_sourceService.isActiveJmSource) {
+      return;
+    }
     if (_didAttemptStartupCheckIn) {
       return;
     }
@@ -126,6 +130,7 @@ class HomeProfileController extends ChangeNotifier {
 
     if (!context.mounted ||
         !_autoCheckInEnabled ||
+        !_sourceService.isActiveJmSource ||
         !_sourceService.isLogged ||
         _checkInBusy) {
       return;
@@ -138,7 +143,7 @@ class HomeProfileController extends ChangeNotifier {
     BuildContext context, {
     required bool triggeredAutomatically,
   }) async {
-    if (_checkInBusy) {
+    if (_checkInBusy || !_sourceService.isActiveJmSource) {
       return;
     }
 
@@ -185,6 +190,10 @@ class HomeProfileController extends ChangeNotifier {
     _authVersion++;
     _checkedInToday = false;
     _notify();
+  }
+
+  void resetStartupCheckInAttempt() {
+    _didAttemptStartupCheckIn = false;
   }
 
   void _notify() {

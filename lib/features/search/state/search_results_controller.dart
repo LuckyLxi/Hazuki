@@ -13,10 +13,11 @@ class SearchResultsController extends ChangeNotifier {
     required HazukiSourceService sourceService,
     SearchPageLoader? searchPageLoader,
   }) : _searchPageLoader = searchPageLoader,
-       _searchOrder = searchOrderKeys.contains(initialOrder)
-           ? initialOrder
-           : 'mr',
-       _sourceService = sourceService {
+       _sourceService = sourceService,
+       _searchOrder = _normalizeSearchOrder(
+         initialOrder,
+         sourceService.activeSourceKey,
+       ) {
     _sourceService.addListener(_onSourceChanged);
   }
 
@@ -52,7 +53,24 @@ class SearchResultsController extends ChangeNotifier {
   void logRuntimeRetryRequested(String source) =>
       _sourceService.logRuntimeRetryRequested(source);
 
-  void _onSourceChanged() => _notify();
+  static String _normalizeSearchOrder(String order, String sourceKey) {
+    final normalized = order.trim();
+    if (sourceKey.trim() == copyMangaSourceKey) {
+      return copyMangaSearchModeKeys.contains(normalized) ? normalized : '-';
+    }
+    return searchOrderKeys.contains(normalized) ? normalized : 'mr';
+  }
+
+  void _onSourceChanged() {
+    final nextOrder = _normalizeSearchOrder(
+      _searchOrder,
+      _sourceService.activeSourceKey,
+    );
+    if (nextOrder != _searchOrder) {
+      _searchOrder = nextOrder;
+    }
+    _notify();
+  }
 
   void clearSearchData() {
     _searchRequestToken++;
@@ -68,10 +86,14 @@ class SearchResultsController extends ChangeNotifier {
   }
 
   void setSearchOrder(String order) {
-    if (_searchOrder == order) {
+    final normalized = _normalizeSearchOrder(
+      order,
+      _sourceService.activeSourceKey,
+    );
+    if (_searchOrder == normalized) {
       return;
     }
-    _searchOrder = order;
+    _searchOrder = normalized;
     _notify();
   }
 

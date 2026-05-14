@@ -97,12 +97,6 @@ extension _JsBridgeSupport on HazukiSourceService {
     final method = (request['http_method']?.toString() ?? 'GET').toUpperCase();
     var url = request['url']?.toString() ?? '';
 
-    if (method == 'GET' && url.isNotEmpty) {
-      final connector = url.contains('?') ? '&' : '?';
-      url =
-          '$url${connector}_hazuki_nocache=${DateTime.now().millisecondsSinceEpoch}';
-    }
-
     final headers = Map<String, dynamic>.from(request['headers'] as Map? ?? {});
     final bytes = request['bytes'] == true;
     final data = request['data'];

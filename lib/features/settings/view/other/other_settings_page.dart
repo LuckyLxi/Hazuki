@@ -1,7 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'comment_filter_dialog.dart';
 import 'other_settings_sections.dart';
@@ -23,6 +25,7 @@ class OtherSettingsPage extends StatefulWidget {
 }
 
 class _OtherSettingsPageState extends State<OtherSettingsPage> {
+  final HazukiSourceService _sourceService = sl<HazukiSourceService>();
   late OtherSettingsSnapshot _snapshot = OtherSettingsSnapshot.initial(
     useSystemTitleBar: widget.initialUseSystemTitleBar,
   );
@@ -31,6 +34,19 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
   void initState() {
     super.initState();
     unawaited(_loadSettings());
+    _sourceService.addListener(_handleSourceChanged);
+  }
+
+  @override
+  void dispose() {
+    _sourceService.removeListener(_handleSourceChanged);
+    super.dispose();
+  }
+
+  void _handleSourceChanged() {
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   Future<void> _loadSettings() async {
@@ -130,6 +146,7 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
                         _snapshot.autoSoftwareUpdateCheckEnabled,
                     discoverDailyRecommendationEnabled:
                         _snapshot.discoverDailyRecommendationEnabled,
+                    showJmExclusiveSettings: _sourceService.isActiveJmSource,
                     useSystemTitleBar: _snapshot.useSystemTitleBar,
                     mangaDownloadsRootPath: _snapshot.mangaDownloadsRootPath,
                     showWindowsTitleBarToggle:

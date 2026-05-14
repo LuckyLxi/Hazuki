@@ -7,8 +7,11 @@ import 'package:hazuki/services/hazuki_source_service.dart';
 import 'discover_page_state.dart';
 
 class DiscoverPageController extends ChangeNotifier {
-  DiscoverPageController({required HazukiSourceService sourceService})
-    : _sourceService = sourceService {
+  DiscoverPageController({
+    required HazukiSourceService sourceService,
+    this.onSourceSwitched,
+  }) : _sourceService = sourceService {
+    _lastActiveSourceKey = _sourceService.activeSourceKey;
     _sourceService.addListener(_onSourceChanged);
   }
 
@@ -19,11 +22,23 @@ class DiscoverPageController extends ChangeNotifier {
   final HazukiSourceService _sourceService;
   final DiscoverPageState _state = DiscoverPageState();
   bool _disposed = false;
+  late String _lastActiveSourceKey;
+
+  /// 源切换时的回调，由外层 View 绑定以触发刷新
+  final VoidCallback? onSourceSwitched;
 
   SourceRuntimeState get sourceRuntimeState =>
       _sourceService.sourceRuntimeState;
 
-  void _onSourceChanged() => _notify();
+  void _onSourceChanged() {
+    final activeKey = _sourceService.activeSourceKey;
+    if (activeKey != _lastActiveSourceKey) {
+      // 源发生了实际切换，通知 View 执行刷新
+      _lastActiveSourceKey = activeKey;
+      onSourceSwitched?.call();
+    }
+    _notify();
+  }
 
   List<ExploreSection> get sections => _state.sections;
   String? get errorMessage => _state.errorMessage;

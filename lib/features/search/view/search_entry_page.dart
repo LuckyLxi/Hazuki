@@ -61,6 +61,7 @@ class _SearchEntryPageState extends State<SearchEntryPage>
     unawaited(_loadHistory());
     unawaited(_loadComicIdSearchEnhance());
     WidgetsBinding.instance.addObserver(this);
+    _sourceService.addListener(_handleSourceChanged);
     _scrollController.addListener(_onScroll);
     _focusCoordinator.primaryFocusNode.addListener(_handleSearchFocusChanged);
     _focusCoordinator.collapsedFocusNode.addListener(_handleSearchFocusChanged);
@@ -77,6 +78,7 @@ class _SearchEntryPageState extends State<SearchEntryPage>
     // 页面退出时清除额外底部偏移，避免影响其他页面的提示药丸
     hazukiPromptPlacementController.setExtraBottomPadding(0);
     WidgetsBinding.instance.removeObserver(this);
+    _sourceService.removeListener(_handleSourceChanged);
     _revealSupport.dispose();
     _scrollController.removeListener(_onScroll);
     _focusCoordinator.dispose();
@@ -171,11 +173,27 @@ class _SearchEntryPageState extends State<SearchEntryPage>
       return;
     }
     setState(() {
-      _comicIdSearchEnhance = enabled;
+      _comicIdSearchEnhance = enabled && _sourceService.isActiveJmSource;
       _extractedComicId = _extractComicIdFromFocusedInput(
         _focusCoordinator.text,
       );
     });
+  }
+
+  void _handleSourceChanged() {
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      if (!_sourceService.isActiveJmSource) {
+        _comicIdSearchEnhance = false;
+        _extractedComicId = null;
+        _syncPromptAnchor(false);
+      }
+    });
+    if (_sourceService.isActiveJmSource) {
+      unawaited(_loadComicIdSearchEnhance());
+    }
   }
 
   bool get _searchInputFocused =>

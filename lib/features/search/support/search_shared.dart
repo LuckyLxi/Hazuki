@@ -19,6 +19,8 @@ const searchOrderKeys = <String>{
   'mp',
   'tf',
 };
+const copyMangaSourceKey = 'copy_manga';
+const copyMangaSearchModeKeys = <String>{'-', 'name', 'author', 'local'};
 
 enum SearchEntryIntent {
   editFromEntry,
@@ -39,7 +41,14 @@ typedef SearchPageLoader =
       required String order,
     });
 
-Map<String, String> searchOrderLabels(BuildContext context) {
+Map<String, String> searchOrderLabels(
+  BuildContext context, {
+  String sourceKey = '',
+}) {
+  if (sourceKey.trim() == copyMangaSourceKey) {
+    return const {'-': '全部', 'name': '名称', 'author': '作者', 'local': '汉化组'};
+  }
+
   final strings = AppLocalizations.of(context)!;
   return {
     'mr': strings.searchOrderLatest,

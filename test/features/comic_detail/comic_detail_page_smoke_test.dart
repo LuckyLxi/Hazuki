@@ -62,4 +62,60 @@ void main() {
     expect(find.byType(ComicDetailPage), findsOneWidget);
     expect(find.byType(TabBar), findsOneWidget);
   });
+
+  testWidgets('non-JM detail page hides related tab and like action', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(1200, 2200);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    const comic = ExploreComic(
+      id: 'copy-comic-id',
+      sourceKey: 'copy_manga',
+      title: 'Hazuki',
+      subTitle: 'Smoke',
+      cover: '',
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: ComicDetailPage(
+          comic: comic,
+          heroTag: 'hero',
+          readerWidgetBuilder:
+              ({
+                required title,
+                required chapterTitle,
+                required comicId,
+                required epId,
+                required chapterIndex,
+                required images,
+                required sourceKey,
+                comicTheme,
+                onFavoriteRequested,
+              }) => ReaderPage(
+                title: title,
+                chapterTitle: chapterTitle,
+                comicId: comicId,
+                epId: epId,
+                chapterIndex: chapterIndex,
+                images: images,
+                sourceKey: sourceKey,
+              ),
+          searchPageBuilder: (_) => const SizedBox.shrink(),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.byType(ComicDetailPage), findsOneWidget);
+    expect(find.byType(Tab), findsNWidgets(2));
+    expect(find.text('Related'), findsNothing);
+    expect(find.byIcon(Icons.thumb_up_alt_outlined), findsNothing);
+    expect(find.byIcon(Icons.favorite_border), findsOneWidget);
+  });
 }

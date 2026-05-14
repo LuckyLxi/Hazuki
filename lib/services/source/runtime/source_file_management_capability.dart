@@ -77,13 +77,50 @@ extension HazukiSourceServiceSourceFileManagementCapability
   }
 
   Future<bool> hasLocalJmSourceFile() async {
-    final sourceDir = await _getSourceStorageDirectory();
+    return hasLocalSourceFile(activeSourceKey);
+  }
+
+  Future<bool> hasLocalSourceFile(String sourceKey) async {
+    final normalizedSourceKey = _normalizeAllowedSourceKey(sourceKey);
+    final sourceDir = await _getSourceStorageDirectory(
+      sourceKey: normalizedSourceKey,
+    );
     final jmFile = File('${sourceDir.path}/source.js');
-    if (activeSourceKey == hazukiDefaultSourceKey && !await jmFile.exists()) {
+    if (normalizedSourceKey == hazukiDefaultSourceKey &&
+        !await jmFile.exists()) {
       final legacy = File('${sourceDir.parent.path}/jm.js');
       return legacy.exists();
     }
     return jmFile.exists();
+  }
+
+  Future<void> downloadSourceFile(
+    String sourceKey, {
+    void Function(int received, int total)? onProgress,
+  }) async {
+    final normalizedSourceKey = _normalizeAllowedSourceKey(sourceKey);
+    final previous = activeSourceKey;
+    await activateSource(normalizedSourceKey);
+    try {
+      final facade = this.facade;
+      facade.lastReloginAt = null;
+      exploreCache.clearMemory();
+      facade.cache.clearCategoryTagGroupsMemoryCache();
+      final result = await _downloadSourceFiles(onProgress: onProgress);
+      final prefs = await facade.ensurePrefs();
+      await prefs.setBool(SourcePrefsKeys.customEditedJmSource, false);
+      facade.lastSourceVersionDebugInfo = {
+        'checkedAt': DateTime.now().toIso8601String(),
+        'resolvedFrom': 'manual_source_download',
+        'sourceKey': activeSourceKey,
+        'outcome': result.message,
+      };
+    } catch (_) {
+      if (previous != activeSourceKey) {
+        await activateSource(previous);
+      }
+      rethrow;
+    }
   }
 
   Future<bool> hasCustomEditedJmSource() async {

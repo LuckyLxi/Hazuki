@@ -33,6 +33,7 @@ class HomeDrawer extends StatelessWidget {
     required this.avatarUrl,
     required this.username,
     required this.autoCheckInEnabled,
+    required this.showCheckInActions,
     required this.checkInBusy,
     required this.checkedInToday,
     required this.onProfileTap,
@@ -50,6 +51,7 @@ class HomeDrawer extends StatelessWidget {
   final String? avatarUrl;
   final String username;
   final bool autoCheckInEnabled;
+  final bool showCheckInActions;
   final bool checkInBusy;
   final bool checkedInToday;
   final VoidCallback? onProfileTap;
@@ -72,6 +74,7 @@ class HomeDrawer extends StatelessWidget {
         avatarUrl: avatarUrl,
         username: username,
         autoCheckInEnabled: autoCheckInEnabled,
+        showCheckInActions: showCheckInActions,
         checkInBusy: checkInBusy,
         checkedInToday: checkedInToday,
         onProfileTap: onProfileTap,
@@ -321,6 +324,7 @@ class HomeDrawerContent extends StatelessWidget {
     required this.avatarUrl,
     required this.username,
     required this.autoCheckInEnabled,
+    required this.showCheckInActions,
     required this.checkInBusy,
     required this.checkedInToday,
     this.onProfileTap,
@@ -338,6 +342,7 @@ class HomeDrawerContent extends StatelessWidget {
   final String? avatarUrl;
   final String username;
   final bool autoCheckInEnabled;
+  final bool showCheckInActions;
   final bool checkInBusy;
   final bool checkedInToday;
   final VoidCallback? onProfileTap;
@@ -550,7 +555,9 @@ class HomeDrawerContent extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      if (isLogged && !autoCheckInEnabled) ...[
+                      if (showCheckInActions &&
+                          isLogged &&
+                          !autoCheckInEnabled) ...[
                         const SizedBox(height: 16),
                         AnimatedSwitcher(
                           duration: const Duration(milliseconds: 260),

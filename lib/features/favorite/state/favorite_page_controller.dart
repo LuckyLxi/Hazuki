@@ -18,8 +18,13 @@ class FavoritePageController extends ChangeNotifier {
        _localFavoritesService = localFavoritesService,
        _cloudFlow = FavoriteCloudFlow(sourceService),
        _localFlow = FavoriteLocalFlow(localFavoritesService) {
+    _lastActiveSourceKey = _activeSourceKey;
     _localFavoritesService.addListener(_handleLocalFavoritesChanged);
     _sourceService.addListener(_handleSourceServiceChanged);
+    _cloudFavoritesSubscription = _sourceService.cloudFavoritesChangedStream
+        .listen((_) {
+          _handleCloudFavoritesChanged();
+        });
   }
 
   static const favoriteLoadTimeout = Duration(seconds: 90);
@@ -33,6 +38,8 @@ class FavoritePageController extends ChangeNotifier {
   bool _disposed = false;
   bool _syncingExternalLocalChange = false;
   bool _queuedExternalLocalChange = false;
+  StreamSubscription<void>? _cloudFavoritesSubscription;
+  String _lastActiveSourceKey = '';
   List<ExploreComic> get comics => _state.comics;
   List<FavoriteFolder> get folders => _state.folders;
   String get selectedFolderId => _state.selectedFolderId;
@@ -481,13 +488,27 @@ class FavoritePageController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _cloudFavoritesSubscription?.cancel();
     _localFavoritesService.removeListener(_handleLocalFavoritesChanged);
     _sourceService.removeListener(_handleSourceServiceChanged);
     super.dispose();
   }
 
   void _handleSourceServiceChanged() {
+    final activeSourceKey = _activeSourceKey;
+    if (activeSourceKey == _lastActiveSourceKey) {
+      _notify();
+      return;
+    }
+    _lastActiveSourceKey = activeSourceKey;
+    if (_state.mode == FavoritePageMode.local) {
+      unawaited(_syncLocalFavoritesAfterExternalChange());
+      return;
+    }
+    // 切换到新源后，云端模式需要重置状态并后台重新加载收藏数据
+    _state.resetForReload();
     _notify();
+    unawaited(_backgroundRefreshCloud());
   }
 
   void _handleLocalFavoritesChanged() {
@@ -499,6 +520,15 @@ class FavoritePageController extends ChangeNotifier {
       return;
     }
     unawaited(_syncLocalFavoritesAfterExternalChange());
+  }
+
+  void _handleCloudFavoritesChanged() {
+    if (_disposed || _state.mode != FavoritePageMode.cloud) {
+      return;
+    }
+    if (isHazukiCopyMangaSourceKey(_activeSourceKey)) {
+      unawaited(_syncCloudFavoritesAfterExternalChange());
+    }
   }
 
   Future<FavoriteComicsResult> _loadPage({
@@ -554,6 +584,16 @@ class FavoritePageController extends ChangeNotifier {
     _notify();
   }
 
+  /// 切换源后后台静默刷新云端收藏，不向用户展示任何加载提示或错误
+  Future<void> _backgroundRefreshCloud() async {
+    if (_disposed || _state.mode != FavoritePageMode.cloud) {
+      return;
+    }
+    // 必须用 loadInitial 而非 refresh：resetForReload 将 initialLoading 置为 true，
+    // 只有 loadInitial 会在完成后将其重置为 false，refresh 不处理 initialLoading
+    await loadInitial(timeoutMessage: '');
+  }
+
   Future<void> _syncLocalFavoritesAfterExternalChange() async {
     _syncingExternalLocalChange = true;
     try {
@@ -594,6 +634,41 @@ class FavoritePageController extends ChangeNotifier {
       } while (_queuedExternalLocalChange && !_disposed);
     } finally {
       _syncingExternalLocalChange = false;
+    }
+  }
+
+  Future<void> _syncCloudFavoritesAfterExternalChange() async {
+    if (_disposed ||
+        _state.mode != FavoritePageMode.cloud ||
+        !_cloudFlow.isLogged) {
+      return;
+    }
+
+    final requestVersion = ++_state.listRequestVersion;
+    _state.refreshing = true;
+    _notify();
+
+    try {
+      final result = await _cloudFlow.loadPage(
+        page: 1,
+        folderId: selectedFolderId,
+        timeoutMessage: 'Timeout',
+        timeout: favoriteLoadTimeout,
+      );
+      if (_disposed ||
+          _state.mode != FavoritePageMode.cloud ||
+          requestVersion != _state.listRequestVersion) {
+        return;
+      }
+      _state.applyFirstPageResult(result);
+      _notify();
+    } catch (_) {
+      // Ignore background errors
+    } finally {
+      if (!_disposed && requestVersion == _state.listRequestVersion) {
+        _state.refreshing = false;
+        _notify();
+      }
     }
   }
 

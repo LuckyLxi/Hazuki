@@ -22,10 +22,11 @@ class HomeCoordinator extends ChangeNotifier {
        _shellController = HomeShellController(initialTabIndex: initialTabIndex),
        scaffoldKey = GlobalKey<ScaffoldState>(),
        favoriteActionsBinding = FavoritePageActionsBinding() {
+    _lastSourceKey = _sourceService.activeSourceKey;
     _profileController.addListener(_relayChange);
     _shellController.addListener(_relayChange);
     _dailyRecommendationService.addListener(_relayChange);
-    _sourceService.addListener(_relayChange);
+    _sourceService.addListener(_handleSourceChanged);
   }
 
   static const MethodChannel _mediaChannel = MethodChannel(
@@ -39,12 +40,17 @@ class HomeCoordinator extends ChangeNotifier {
   final GlobalKey<ScaffoldState> scaffoldKey;
   final FavoritePageActionsBinding favoriteActionsBinding;
   bool _disposed = false;
+  late String _lastSourceKey;
+  // 标记新源尚未初始化完成，需要在初始化后再次同步用户信息
+  bool _awaitingSourceInit = false;
+  BuildContext? _context;
 
   String? get avatarUrl => _profileController.avatarUrl;
   String get username => _profileController.username;
   bool get autoCheckInEnabled => _profileController.autoCheckInEnabled;
   bool get checkInBusy => _profileController.checkInBusy;
   bool get checkedInToday => _profileController.checkedInToday;
+  bool get isCheckInAvailable => _profileController.isCheckInAvailable;
   int get authVersion => _profileController.authVersion;
   bool get isLogged => _profileController.isLogged;
 
@@ -57,6 +63,7 @@ class HomeCoordinator extends ChangeNotifier {
       _dailyRecommendationService.state;
 
   void start(BuildContext context) {
+    _context = context;
     unawaited(syncUserProfile(context));
     unawaited(loadFirstUseText(context));
     unawaited(loadOtherSettings(context));
@@ -172,6 +179,30 @@ class HomeCoordinator extends ChangeNotifier {
     }
   }
 
+  void _handleSourceChanged() {
+    final nextSourceKey = _sourceService.activeSourceKey;
+    if (nextSourceKey != _lastSourceKey) {
+      // 源发生切换，记录状态并立即同步（此时新源可能未初始化）
+      _lastSourceKey = nextSourceKey;
+      _awaitingSourceInit = !_sourceService.isInitialized;
+      _profileController.resetStartupCheckInAttempt();
+      final context = _context;
+      if (context != null && context.mounted) {
+        unawaited(syncUserProfile(context));
+        unawaited(loadOtherSettings(context));
+      }
+    } else if (_awaitingSourceInit && _sourceService.isInitialized) {
+      // 新源初始化完成，重新同步以获取正确的登录状态和头像
+      _awaitingSourceInit = false;
+      final context = _context;
+      if (context != null && context.mounted) {
+        unawaited(syncUserProfile(context));
+        unawaited(loadOtherSettings(context));
+      }
+    }
+    _relayChange();
+  }
+
   Future<void> _prewarmSourceRuntime(BuildContext context) async {
     await _sourceService.prewarmInBackground();
     if (!context.mounted) {
@@ -187,7 +218,7 @@ class HomeCoordinator extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _dailyRecommendationService.removeListener(_relayChange);
-    _sourceService.removeListener(_relayChange);
+    _sourceService.removeListener(_handleSourceChanged);
     _profileController
       ..removeListener(_relayChange)
       ..dispose();

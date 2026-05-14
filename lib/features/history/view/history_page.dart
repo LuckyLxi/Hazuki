@@ -84,17 +84,28 @@ class _HistoryPageState extends State<HistoryPage> {
     if (jsonStr != null) {
       try {
         final List<dynamic> jsonList = jsonDecode(jsonStr);
-        final history = jsonList
-            .map(
-              (e) => ExploreComic(
-                id: e['id'] as String? ?? '',
-                title: e['title'] as String? ?? '',
-                cover: e['cover'] as String? ?? '',
-                subTitle: e['subTitle'] as String? ?? '',
-                sourceKey: e['sourceKey'] as String? ?? '',
-              ),
-            )
-            .toList();
+        // 调试：逐条解析并打印原始字段，用于排查历史条目渲染异常
+        final history = <ExploreComic>[];
+        for (var i = 0; i < jsonList.length; i++) {
+          final e = jsonList[i] as Map<String, dynamic>;
+          debugPrint(
+            '[history] #$i '
+            'id=${e["id"]} (${e["id"]?.runtimeType}) '
+            'title=${e["title"]} '
+            'cover=${e["cover"]} '
+            'sourceKey=${e["sourceKey"]}',
+          );
+          history.add(
+            ExploreComic(
+              id: (e['id'] ?? '').toString(),
+              title: (e['title'] ?? '').toString(),
+              cover: (e['cover'] ?? '').toString(),
+              subTitle: (e['subTitle'] ?? '').toString(),
+              sourceKey: (e['sourceKey'] ?? '').toString(),
+            ),
+          );
+        }
+        debugPrint('[history] total ${history.length} entries loaded');
         if (mounted) {
           setState(() {
             _history = history;
@@ -252,6 +263,14 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 
   Widget _buildItem(ExploreComic comic, int index) {
+    // 调试：打印每条渲染时的字段，确认 title/cover/sourceKey 是否正确
+    debugPrint(
+      '[history._buildItem] #$index '
+      'id=${comic.id} '
+      'title="${comic.title}" '
+      'cover="${comic.cover}" '
+      'sourceKey=${comic.sourceKey}',
+    );
     final heroTag = widget.comicCoverHeroTagBuilder(comic, salt: 'history');
     return HistoryComicListItem(
       key: ValueKey(comic.scopedId.storageKey),

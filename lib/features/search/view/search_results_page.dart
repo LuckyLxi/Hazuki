@@ -48,6 +48,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
     isMounted: () => mounted,
     initialText: widget.initialKeyword,
   );
+  final HazukiSourceService _sourceService = sl<HazukiSourceService>();
 
   final ScrollController _scrollController = ScrollController();
   final GlobalKey _collapsedSearchKey = GlobalKey();
@@ -145,9 +146,9 @@ class _SearchResultsPageState extends State<SearchResultsPage>
     );
     _scrollController.addListener(_onScroll);
     WidgetsBinding.instance.addObserver(this);
+    _sourceService.addListener(_handleSourceChanged);
     _focusCoordinator.primaryFocusNode.addListener(_handleSearchFocusChanged);
     _focusCoordinator.collapsedFocusNode.addListener(_handleSearchFocusChanged);
-    unawaited(_loadComicIdSearchEnhance());
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
@@ -159,7 +160,13 @@ class _SearchResultsPageState extends State<SearchResultsPage>
         showKeyboard: _showKeyboardOnEnter,
         forceShowKeyboard: true,
       );
-      unawaited(_submitSearch());
+      unawaited(
+        _loadComicIdSearchEnhance().whenComplete(() {
+          if (mounted) {
+            unawaited(_submitSearch());
+          }
+        }),
+      );
     });
   }
 
@@ -172,6 +179,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
     );
     _scrollController.removeListener(_onScroll);
     WidgetsBinding.instance.removeObserver(this);
+    _sourceService.removeListener(_handleSourceChanged);
     // 页面退出时清除额外底部偏移，避免影响其他页面的提示药丸
     hazukiPromptPlacementController.setExtraBottomPadding(0);
     _scrollController.dispose();
@@ -187,11 +195,27 @@ class _SearchResultsPageState extends State<SearchResultsPage>
       return;
     }
     _updateSearchResultsState(() {
-      _comicIdSearchEnhance = enabled;
+      _comicIdSearchEnhance = enabled && _sourceService.isActiveJmSource;
       _extractedComicId = _extractComicIdFromFocusedInput(
         _focusCoordinator.text,
       );
     });
+  }
+
+  void _handleSourceChanged() {
+    if (!mounted) {
+      return;
+    }
+    _updateSearchResultsState(() {
+      if (!_sourceService.isActiveJmSource) {
+        _comicIdSearchEnhance = false;
+        _extractedComicId = null;
+        _syncPromptAnchor(false);
+      }
+    });
+    if (_sourceService.isActiveJmSource) {
+      unawaited(_loadComicIdSearchEnhance());
+    }
   }
 
   bool get _searchInputFocused =>
@@ -337,7 +361,10 @@ class _SearchResultsPageState extends State<SearchResultsPage>
   }
 
   Future<void> _onSearchOrderSelected(String order) async {
-    final orderLabels = searchOrderLabels(context);
+    final orderLabels = searchOrderLabels(
+      context,
+      sourceKey: _sourceService.activeSourceKey,
+    );
     if (!orderLabels.containsKey(order) || order == _searchOrder) {
       return;
     }
@@ -364,7 +391,10 @@ class _SearchResultsPageState extends State<SearchResultsPage>
 
   String get _currentSearchOrderLabel {
     final strings = AppLocalizations.of(context)!;
-    return searchOrderLabels(context)[_searchOrder] ??
+    return searchOrderLabels(
+          context,
+          sourceKey: _sourceService.activeSourceKey,
+        )[_searchOrder] ??
         strings.searchOrderLatest;
   }
 
@@ -392,6 +422,9 @@ class _SearchResultsPageState extends State<SearchResultsPage>
   }
 
   Future<bool> _tryOpenComicDetailByKeywordId(String keyword) async {
+    if (!_comicIdSearchEnhance || !_sourceService.isActiveJmSource) {
+      return false;
+    }
     final comicId = _normalizeComicIdKeyword(keyword);
     if (comicId == null) {
       return false;
@@ -461,7 +494,9 @@ class _SearchResultsPageState extends State<SearchResultsPage>
       return;
     }
 
-    final idKeyword = _normalizeComicIdKeyword(keyword);
+    final idKeyword = _comicIdSearchEnhance && _sourceService.isActiveJmSource
+        ? _normalizeComicIdKeyword(keyword)
+        : null;
     final requestToken = idKeyword != null
         ? _resultsController.prepareDirectIdLookup(keyword)
         : -1;
@@ -699,7 +734,10 @@ class _SearchResultsPageState extends State<SearchResultsPage>
   }
 
   PreferredSizeWidget _buildSearchResultsAppBar() {
-    final orderLabels = searchOrderLabels(context);
+    final orderLabels = searchOrderLabels(
+      context,
+      sourceKey: _sourceService.activeSourceKey,
+    );
     return hazukiFrostedAppBar(
       context: context,
       enableBlur: false,

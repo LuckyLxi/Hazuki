@@ -145,8 +145,39 @@ void main() {
       expect(otherComics.comics.single.sourceKey, 'other');
     });
 
+    test('legacy entries without source key belong to the JM source', () async {
+      SharedPreferences.setMockInitialValues({
+        'local_favorite_folders_v1': '[{"id":"folder","name":"Legacy"}]',
+        'local_favorite_entries_v1':
+            '[{"comicId":"123","title":"Legacy","folderIds":["folder"]}]',
+      });
+
+      final folders = await service.loadFavoriteFolders(sourceKey: 'jm');
+      final comics = await service.loadFavoriteComics(
+        page: 1,
+        folderId: folders.folders.single.id,
+        sourceKey: 'jm',
+      );
+
+      expect(comics.comics.single.id, '123');
+      expect(comics.comics.single.title, 'Legacy');
+      expect(comics.comics.single.sourceKey, 'jm');
+
+      final copyFolders = await service.loadFavoriteFolders(
+        sourceKey: 'copy_manga',
+      );
+      final copyComics = await service.loadFavoriteComics(
+        page: 1,
+        folderId: 'folder',
+        sourceKey: 'copy_manga',
+      );
+
+      expect(copyFolders.folders, isEmpty);
+      expect(copyComics.comics, isEmpty);
+    });
+
     test(
-      'legacy entries without source key can be read by current source',
+      'legacy local folders can be renamed and deleted from the JM source only',
       () async {
         SharedPreferences.setMockInitialValues({
           'local_favorite_folders_v1': '[{"id":"folder","name":"Legacy"}]',
@@ -154,15 +185,35 @@ void main() {
               '[{"comicId":"123","title":"Legacy","folderIds":["folder"]}]',
         });
 
-        final folders = await service.loadFavoriteFolders(sourceKey: 'jm');
-        final comics = await service.loadFavoriteComics(
+        await service.renameFavoriteFolder(
+          folderId: 'folder',
+          name: 'JM Legacy',
+          sourceKey: 'jm',
+        );
+        final jmFolders = await service.loadFavoriteFolders(sourceKey: 'jm');
+        expect(jmFolders.folders.single.name, 'JM Legacy');
+
+        expect(
+          service.renameFavoriteFolder(
+            folderId: 'folder',
+            name: 'Copy Legacy',
+            sourceKey: 'copy_manga',
+          ),
+          throwsException,
+        );
+
+        await service.deleteFavoriteFolder('folder', sourceKey: 'jm');
+        final foldersAfterDelete = await service.loadFavoriteFolders(
+          sourceKey: 'jm',
+        );
+        final comicsAfterDelete = await service.loadFavoriteComics(
           page: 1,
-          folderId: folders.folders.single.id,
+          folderId: 'folder',
           sourceKey: 'jm',
         );
 
-        expect(comics.comics.single.id, '123');
-        expect(comics.comics.single.title, 'Legacy');
+        expect(foldersAfterDelete.folders, isEmpty);
+        expect(comicsAfterDelete.comics, isEmpty);
       },
     );
   });

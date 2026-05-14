@@ -21,6 +21,9 @@ class _SourceAccountLabPageState extends State<SourceAccountLabPage> {
   final SourceRuntimeRegistry _registry = sl<SourceRuntimeRegistry>();
   final HazukiSourceService _sourceService = sl<HazukiSourceService>();
   String? _busySourceKey;
+  String? _downloadingSourceKey;
+  double? _downloadProgress;
+  final Map<String, bool> _sourceInstalled = <String, bool>{};
 
   AppLocalizations get _strings => l10n(context);
 
@@ -30,6 +33,7 @@ class _SourceAccountLabPageState extends State<SourceAccountLabPage> {
     _registry.addListener(_handleSourceChanged);
     _sourceService.addListener(_handleSourceChanged);
     unawaited(_registry.loadActiveSourcePreference());
+    unawaited(_refreshSourceInstallStates());
   }
 
   @override
@@ -43,6 +47,23 @@ class _SourceAccountLabPageState extends State<SourceAccountLabPage> {
     if (mounted) {
       setState(() {});
     }
+  }
+
+  Future<void> _refreshSourceInstallStates() async {
+    final updates = <String, bool>{};
+    for (final source in _registry.allowedSources) {
+      updates[source.normalizedKey] = await _sourceService.hasLocalSourceFile(
+        source.normalizedKey,
+      );
+    }
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _sourceInstalled
+        ..clear()
+        ..addAll(updates);
+    });
   }
 
   Future<void> _switchSource(SourceCatalogEntry source) async {
@@ -70,6 +91,65 @@ class _SourceAccountLabPageState extends State<SourceAccountLabPage> {
     } finally {
       if (mounted) {
         setState(() => _busySourceKey = null);
+      }
+    }
+  }
+
+  Future<void> _downloadSource(SourceCatalogEntry source) async {
+    if (_busySourceKey != null || _downloadingSourceKey != null) {
+      return;
+    }
+    setState(() {
+      _busySourceKey = source.normalizedKey;
+      _downloadingSourceKey = source.normalizedKey;
+      _downloadProgress = null;
+    });
+    var downloaded = false;
+    try {
+      await _sourceService.downloadSourceFile(
+        source.normalizedKey,
+        onProgress: (received, total) {
+          if (!mounted ||
+              total <= 0 ||
+              _downloadingSourceKey != source.normalizedKey) {
+            return;
+          }
+          setState(() {
+            _downloadProgress = (received / total).clamp(0.0, 1.0);
+          });
+        },
+      );
+      downloaded = true;
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _sourceInstalled[source.normalizedKey] = true;
+      });
+      await _sourceService.ensureInitialized(sourceKey: source.normalizedKey);
+      if (!mounted) {
+        return;
+      }
+      await showHazukiPrompt(context, _strings.labSourceAccountDownloadSuccess);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      await showHazukiPrompt(
+        context,
+        downloaded
+            ? _strings.labSourceAccountSwitchFailed('$error')
+            : _strings.labSourceAccountDownloadFailed('$error'),
+        isError: true,
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _busySourceKey = null;
+          _downloadingSourceKey = null;
+          _downloadProgress = null;
+        });
+        unawaited(_refreshSourceInstallStates());
       }
     }
   }
@@ -125,38 +205,67 @@ class _SourceAccountLabPageState extends State<SourceAccountLabPage> {
   Widget _buildSourceTile(SourceCatalogEntry source) {
     final key = source.normalizedKey;
     final active = key == _registry.activeSourceKey;
+    final installed = _sourceInstalled[key] ?? (key == hazukiDefaultSourceKey);
+    // 各源独立的账号信息，不依赖全局 isLogged
     final account = _registry.currentAccountForSource(key);
+    final isSourceLogged = account != null;
     final busy = _busySourceKey == key;
-    final subtitle = account == null
-        ? _strings.labSourceAccountLoggedOut
-        : _strings.labSourceAccountLoggedInAs(account);
+    final downloading = _downloadingSourceKey == key;
+    final accountStatus = isSourceLogged
+        ? _strings.labSourceAccountLoggedInAs(account)
+        : _strings.labSourceAccountLoggedOut;
+    final subtitle = installed
+        ? accountStatus
+        : _strings.labSourceAccountNotDownloaded;
 
     return ListTile(
+      // 点击整个 tile 切换源（非活跃已安装）或下载（未安装），活跃源点击无响应
+      onTap: _busySourceKey != null || active
+          ? null
+          : installed
+          ? () => _switchSource(source)
+          : () => _downloadSource(source),
       leading: Icon(
         active ? Icons.radio_button_checked : Icons.radio_button_off,
       ),
       title: Text(source.name),
       subtitle: Text('${source.key} · $subtitle'),
-      trailing: active
+      trailing: !installed
+          // 未安装：显示下载按钮
+          ? FilledButton(
+              onPressed: busy ? null : () => _downloadSource(source),
+              child: downloading
+                  ? _SourceDownloadProgressIndicator(
+                      progress: _downloadProgress,
+                    )
+                  : Text(_strings.sourceUpdateDownload),
+            )
+          // 已安装：所有源都显示登录/取消登录按钮
+          : active
           ? FilledButton(
               onPressed: _busySourceKey == null
-                  ? (_sourceService.isLogged ? _logout : _showLoginDialog)
+                  ? (isSourceLogged ? _logout : _showLoginDialog)
                   : null,
               child: Text(
-                _sourceService.isLogged
+                isSourceLogged
                     ? _strings.labSourceAccountLogout
                     : _strings.labSourceAccountLogin,
               ),
             )
+          // 非活跃源：显示按钮，但点击时提示先切换，不自动切换
           : TextButton(
-              onPressed: busy ? null : () => _switchSource(source),
-              child: busy
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+              onPressed: _busySourceKey == null
+                  ? () => showHazukiPrompt(
+                      context,
+                      _strings.labSourceAccountSwitchFirst(source.name),
+                      isError: false,
                     )
-                  : Text(_strings.labSourceAccountSwitch),
+                  : null,
+              child: Text(
+                isSourceLogged
+                    ? _strings.labSourceAccountLogout
+                    : _strings.labSourceAccountLogin,
+              ),
             ),
     );
   }
@@ -180,6 +289,25 @@ class _SourceAccountLabPageState extends State<SourceAccountLabPage> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _SourceDownloadProgressIndicator extends StatelessWidget {
+  const _SourceDownloadProgressIndicator({required this.progress});
+
+  final double? progress;
+
+  @override
+  Widget build(BuildContext context) {
+    final value = progress;
+    return SizedBox(
+      width: 18,
+      height: 18,
+      child: CircularProgressIndicator(
+        strokeWidth: 2,
+        value: value?.clamp(0.0, 1.0),
       ),
     );
   }

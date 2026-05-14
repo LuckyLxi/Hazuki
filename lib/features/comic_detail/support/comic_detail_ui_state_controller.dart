@@ -8,15 +8,18 @@ class ComicDetailUiStateController extends ChangeNotifier {
     required bool? shouldAnimateInitialRevealOverride,
     required TickerProvider vsync,
     required ScrollController scrollController,
+    required bool includeRelatedTab,
   }) : _comicId = comicId,
        _shouldAnimateInitialRevealOverride = shouldAnimateInitialRevealOverride,
        _vsync = vsync,
-       _scrollController = scrollController;
+       _scrollController = scrollController,
+       _includeRelatedTab = includeRelatedTab;
 
   final String _comicId;
   final bool? _shouldAnimateInitialRevealOverride;
   final TickerProvider _vsync;
   final ScrollController _scrollController;
+  final bool _includeRelatedTab;
 
   bool _disposed = false;
 
@@ -46,8 +49,10 @@ class ComicDetailUiStateController extends ChangeNotifier {
         !wasComicDetailIdAnimated(_comicId.trim());
     _appBarSolidProgressNotifier = ValueNotifier<double>(0);
     _collapsedTitleNotifier = ValueNotifier<bool>(false);
-    _tabController = TabController(length: 3, vsync: _vsync)
-      ..addListener(_handleTabChanged);
+    _tabController = TabController(
+      length: _includeRelatedTab ? 3 : 2,
+      vsync: _vsync,
+    )..addListener(_handleTabChanged);
     _appBarComicTitle = initialAppBarTitle;
     _scrollController.addListener(_handleScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {

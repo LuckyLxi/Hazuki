@@ -32,6 +32,7 @@ class ComicDetailHeaderFavoriteRow extends StatelessWidget {
     final scope = ComicDetailScope.of(context);
     final favorite = scope.favorite;
     final theme = Theme.of(context);
+    final showLikeButton = scope.supportsJmExclusiveActions;
     final detailsReady = details != null;
     final statsText = [
       if (details?.likesCount.isNotEmpty ?? false)
@@ -98,38 +99,40 @@ class ComicDetailHeaderFavoriteRow extends StatelessWidget {
                 width: favoriteButtonWidth,
                 child: Row(
                   children: [
-                    SizedBox(
-                      width: 48,
-                      child: Tooltip(
-                        message: likedActive
-                            ? l10n(context).comicDetailUnlike
-                            : l10n(context).comicDetailLike,
-                        child: FilledButton(
-                          onPressed: detailsReady && !favorite.isLikeBusy
-                              ? () => unawaited(
-                                  favorite.toggleLike(context, details!),
-                                )
-                              : null,
-                          style: FilledButton.styleFrom(
-                            padding: EdgeInsets.zero,
-                            minimumSize: const Size(48, 40),
-                            fixedSize: const Size(48, 40),
-                            backgroundColor: likedActive
-                                ? theme.colorScheme.primaryContainer
+                    if (showLikeButton) ...[
+                      SizedBox(
+                        width: 48,
+                        child: Tooltip(
+                          message: likedActive
+                              ? l10n(context).comicDetailUnlike
+                              : l10n(context).comicDetailLike,
+                          child: FilledButton(
+                            onPressed: detailsReady && !favorite.isLikeBusy
+                                ? () => unawaited(
+                                    favorite.toggleLike(context, details!),
+                                  )
                                 : null,
-                            foregroundColor: likedActive
-                                ? theme.colorScheme.onPrimaryContainer
-                                : null,
-                          ),
-                          child: Icon(
-                            likedActive
-                                ? Icons.thumb_up_alt_rounded
-                                : Icons.thumb_up_alt_outlined,
+                            style: FilledButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              minimumSize: const Size(48, 40),
+                              fixedSize: const Size(48, 40),
+                              backgroundColor: likedActive
+                                  ? theme.colorScheme.primaryContainer
+                                  : null,
+                              foregroundColor: likedActive
+                                  ? theme.colorScheme.onPrimaryContainer
+                                  : null,
+                            ),
+                            child: Icon(
+                              likedActive
+                                  ? Icons.thumb_up_alt_rounded
+                                  : Icons.thumb_up_alt_outlined,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
+                      const SizedBox(width: 8),
+                    ],
                     Expanded(
                       child: AbsorbPointer(
                         absorbing: !detailsReady || favorite.isBusy,
