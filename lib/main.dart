@@ -226,11 +226,13 @@ class _HazukiAppState extends State<HazukiApp>
                 ({
                   required comicId,
                   subId,
+                  required sourceKey,
                   scrollController,
                   onRequestTabFullscreen,
                 }) => CommentsPage(
                   comicId: comicId,
                   subId: subId,
+                  sourceKey: sourceKey,
                   showAppBar: false,
                   scrollController: scrollController,
                   onRequestTabFullscreen: onRequestTabFullscreen,
