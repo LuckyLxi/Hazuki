@@ -49,11 +49,13 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
   static Widget _buildReaderComments({
     required String comicId,
     String? subId,
+    required String sourceKey,
     ScrollController? scrollController,
     Future<void> Function()? onRequestTabFullscreen,
   }) => CommentsPage(
     comicId: comicId,
     subId: subId,
+    sourceKey: sourceKey,
     showAppBar: false,
     scrollController: scrollController,
     onRequestTabFullscreen: onRequestTabFullscreen,

@@ -13,11 +13,11 @@ import '../../hazuki_source_service.dart';
 import '../common/source_prefs_keys.dart';
 
 class ImageCacheCapability {
-  ImageCacheCapability(this._service);
+  ImageCacheCapability(this._handle);
 
-  final HazukiSourceService _service;
+  final SourceRuntimeHandle _handle;
 
-  HazukiSourceFacade get _facade => _service.facade;
+  HazukiSourceFacade get _facade => _handle.facade;
 
   static const int _maxConcurrent = 4;
   int _activeCount = 0;
@@ -80,16 +80,28 @@ class ImageCacheCapability {
 
   // ---------- Memory cache ----------
 
+  String _resolveSourceKeyForRequest(String sourceKey) {
+    final requested = sourceKey.trim();
+    final handleSourceKey = _facade.sourceKey;
+    if (requested.isEmpty) {
+      return handleSourceKey;
+    }
+    if (requested != handleSourceKey) {
+      throw Exception('source_mismatch:$requested:$handleSourceKey');
+    }
+    return requested;
+  }
+
   Uint8List? peekFromMemory(String url, {String sourceKey = ''}) {
     final cacheKey = SourceScopedComicId(
-      sourceKey: _service.resolveActiveSourceKey(sourceKey),
+      sourceKey: _resolveSourceKeyForRequest(sourceKey),
       comicId: url,
     ).imageCacheKey;
     return _facade.cache.touchImageBytes(cacheKey);
   }
 
   void evictFromMemory(Iterable<String> urls, {String sourceKey = ''}) {
-    final resolvedSourceKey = _service.resolveActiveSourceKey(sourceKey);
+    final resolvedSourceKey = _resolveSourceKeyForRequest(sourceKey);
     _facade.cache.evictImageBytes(
       urls.map(
         (url) => SourceScopedComicId(
@@ -114,7 +126,7 @@ class ImageCacheCapability {
     int memoryCount = 0,
     String sourceKey = '',
   }) async {
-    final resolvedSourceKey = _service.resolveActiveSourceKey(sourceKey);
+    final resolvedSourceKey = _resolveSourceKeyForRequest(sourceKey);
     final max = count < imageUrls.length ? count : imageUrls.length;
     for (var i = 0; i < max; i++) {
       final url = imageUrls[i];
@@ -147,7 +159,7 @@ class ImageCacheCapability {
     if (normalizedUrl.isEmpty) {
       throw Exception('image_url_empty');
     }
-    final resolvedSourceKey = _service.resolveActiveSourceKey(sourceKey);
+    final resolvedSourceKey = _resolveSourceKeyForRequest(sourceKey);
     final cacheKey = SourceScopedComicId(
       sourceKey: resolvedSourceKey,
       comicId: normalizedUrl,
@@ -526,7 +538,11 @@ class ImageCacheCapability {
     _facade.cache.imageBytesCache.clear();
   }
 
-  Future<void> evictEntries(Iterable<String> urls) async {
+  Future<void> evictEntries(
+    Iterable<String> urls, {
+    String sourceKey = '',
+  }) async {
+    final resolvedSourceKey = _resolveSourceKeyForRequest(sourceKey);
     for (final url in urls) {
       final normalizedUrl = url.trim();
       if (normalizedUrl.isEmpty) {
@@ -535,7 +551,7 @@ class ImageCacheCapability {
       try {
         final file = await _cacheFileFor(
           normalizedUrl,
-          sourceKey: _service.activeSourceKey,
+          sourceKey: resolvedSourceKey,
         );
         if (await file.exists()) {
           await file.delete();

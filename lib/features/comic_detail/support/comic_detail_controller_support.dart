@@ -29,6 +29,9 @@ typedef ComicDetailReaderPageBuilder =
 
 typedef ComicDetailSearchPageBuilder = Widget Function(String initialKeyword);
 
+typedef ComicDetailNestedPageBuilder =
+    Widget Function(ExploreComic comic, String heroTag);
+
 typedef ReaderWidgetBuilder =
     Widget Function({
       required String title,

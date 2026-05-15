@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/app/service_locator.dart';
@@ -79,6 +81,14 @@ class _CommentFilterSheetState extends State<_CommentFilterSheet>
       userKeywords: _userKeywords,
       mode: _mode,
     );
+  }
+
+  Future<void> _setMode(CommentFilterMode mode) async {
+    if (_mode == mode) {
+      return;
+    }
+    setState(() => _mode = mode);
+    await _save();
   }
 
   void _addKeyword() {
@@ -257,8 +267,9 @@ class _CommentFilterSheetState extends State<_CommentFilterSheet>
                               ),
                             ],
                             selected: {_mode},
-                            onSelectionChanged: (s) =>
-                                setState(() => _mode = s.first),
+                            onSelectionChanged: (s) {
+                              unawaited(_setMode(s.first));
+                            },
                           ),
                           const SizedBox(height: 20),
                           // 添加关键词

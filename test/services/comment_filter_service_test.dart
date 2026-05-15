@@ -1,5 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hazuki/features/comments/state/comments_page_controller.dart';
+import 'package:hazuki/features/comments/support/comments_content_support.dart';
+import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/comment_filter_service.dart';
+import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -36,6 +40,16 @@ void main() {
       );
       expect(service.isFiltered('this contains spamword inside'), isTrue);
       expect(service.isFiltered('clean comment'), isFalse);
+    });
+
+    test('matches visible inline image alt text used by comments', () async {
+      await service.save(
+        userKeywords: ['blocked phrase'],
+        mode: CommentFilterMode.collapse,
+      );
+      const content =
+          '<p>safe prefix</p><img src="emoji.png" alt="blocked phrase">';
+      expect(service.isFiltered(commentFilterText(content)), isTrue);
     });
 
     test(
@@ -95,6 +109,70 @@ void main() {
       await service.load();
       await service.save(userKeywords: ['x'], mode: CommentFilterMode.collapse);
       expect(() => service.userKeywords.add('y'), throwsUnsupportedError);
+    });
+  });
+
+  group('CommentsPageController filtering', () {
+    test('collapse mode keeps filtered comments in the visible list', () async {
+      SharedPreferences.setMockInitialValues(const {});
+      final service = CommentFilterService();
+      await service.load();
+      await service.save(
+        userKeywords: ['blocked'],
+        mode: CommentFilterMode.collapse,
+      );
+      final controller = CommentsPageController(
+        sourceService: HazukiSourceService(),
+        filterService: service,
+      );
+      const comments = [
+        ComicCommentData(
+          avatar: '',
+          userName: 'a',
+          time: '',
+          content: 'blocked comment',
+        ),
+        ComicCommentData(
+          avatar: '',
+          userName: 'b',
+          time: '',
+          content: 'clean comment',
+        ),
+      ];
+
+      expect(controller.isCollapsedComment(comments.first.content), isTrue);
+      expect(controller.visibleComments(comments), comments);
+    });
+
+    test('hide mode removes filtered comments from the visible list', () async {
+      SharedPreferences.setMockInitialValues(const {});
+      final service = CommentFilterService();
+      await service.load();
+      await service.save(
+        userKeywords: ['blocked'],
+        mode: CommentFilterMode.hide,
+      );
+      final controller = CommentsPageController(
+        sourceService: HazukiSourceService(),
+        filterService: service,
+      );
+      const comments = [
+        ComicCommentData(
+          avatar: '',
+          userName: 'a',
+          time: '',
+          content: 'blocked comment',
+        ),
+        ComicCommentData(
+          avatar: '',
+          userName: 'b',
+          time: '',
+          content: 'clean comment',
+        ),
+      ];
+
+      expect(controller.isCollapsedComment(comments.first.content), isFalse);
+      expect(controller.visibleComments(comments), [comments.last]);
     });
   });
 }

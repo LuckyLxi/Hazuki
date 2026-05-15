@@ -329,7 +329,7 @@ class SourceRuntimeHandle {
   late final LineSettingsCapability lineSettings = LineSettingsCapability(
     facade,
   );
-  late final ImageCacheCapability imageCache = ImageCacheCapability(service);
+  late final ImageCacheCapability imageCache = ImageCacheCapability(this);
   late final ExploreCacheCapability exploreCache = ExploreCacheCapability(
     service,
   );
@@ -414,6 +414,14 @@ class HazukiSourceService extends ChangeNotifier {
   ImageCacheCapability get imageCache => _activeHandle.imageCache;
   ExploreCacheCapability get exploreCache => _activeHandle.exploreCache;
   DebugLogCapability get debugLog => _activeHandle.debugLog;
+
+  ImageCacheCapability _imageCacheForSourceRequest(String sourceKey) {
+    final requested = sourceKey.trim();
+    if (requested.isEmpty) {
+      return imageCache;
+    }
+    return _handleFor(requested).imageCache;
+  }
 
   void addDebugLog({
     required String type,
@@ -514,11 +522,15 @@ class HazukiSourceService extends ChangeNotifier {
       imageCache.setAutoCleanMode(mode);
   Future<Map<String, dynamic>> getImageCacheStatus() => imageCache.getStatus();
   Uint8List? peekImageBytesFromMemory(String url, {String sourceKey = ''}) =>
-      imageCache.peekFromMemory(url, sourceKey: sourceKey);
+      _imageCacheForSourceRequest(
+        sourceKey,
+      ).peekFromMemory(url, sourceKey: sourceKey);
   void evictImageBytesFromMemory(
     Iterable<String> urls, {
     String sourceKey = '',
-  }) => imageCache.evictFromMemory(urls, sourceKey: sourceKey);
+  }) => _imageCacheForSourceRequest(
+    sourceKey,
+  ).evictFromMemory(urls, sourceKey: sourceKey);
 
   Future<void> prefetchComicImages({
     required String comicId,
@@ -527,7 +539,7 @@ class HazukiSourceService extends ChangeNotifier {
     required int count,
     int memoryCount = 0,
     String sourceKey = '',
-  }) => imageCache.prefetchComicImages(
+  }) => _imageCacheForSourceRequest(sourceKey).prefetchComicImages(
     comicId: comicId,
     epId: epId,
     imageUrls: imageUrls,
@@ -543,7 +555,7 @@ class HazukiSourceService extends ChangeNotifier {
     bool keepInMemory = true,
     bool useDiskCache = true,
     String sourceKey = '',
-  }) => imageCache.downloadImageBytes(
+  }) => _imageCacheForSourceRequest(sourceKey).downloadImageBytes(
     url,
     comicId: comicId,
     epId: epId,
@@ -553,8 +565,12 @@ class HazukiSourceService extends ChangeNotifier {
   );
 
   Future<void> clearImageCache() => imageCache.clear();
-  Future<void> evictImageCacheEntries(Iterable<String> urls) =>
-      imageCache.evictEntries(urls);
+  Future<void> evictImageCacheEntries(
+    Iterable<String> urls, {
+    String sourceKey = '',
+  }) => _imageCacheForSourceRequest(
+    sourceKey,
+  ).evictEntries(urls, sourceKey: sourceKey);
 
   FlutterQjs? get _engine => _activeHandle.runtime.engine;
 
@@ -1219,14 +1235,13 @@ class HazukiSourceFacade {
     return session._saveCookieStore(cookies);
   }
 
-  Future<Directory> ensureImageCacheDir() =>
-      _service.imageCache.ensureCacheDir();
+  Future<Directory> ensureImageCacheDir() => handle.imageCache.ensureCacheDir();
 
   Future<int> computeImageCacheSizeBytes() =>
-      _service.imageCache.computeSizeBytes();
+      handle.imageCache.computeSizeBytes();
 
   Future<void> enforceImageCachePolicy({bool force = false}) {
-    return _service.imageCache.enforcePolicy(force: force);
+    return handle.imageCache.enforcePolicy(force: force);
   }
 
   Uri resolveImageBaseUri(String imageUrl, Uri baseUri) {

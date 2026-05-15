@@ -9,11 +9,13 @@ class ReaderCommentsSheet extends StatefulWidget {
     super.key,
     required this.comicId,
     required this.subId,
+    this.sourceKey = '',
     this.commentsWidgetBuilder,
   });
 
   final String comicId;
   final String? subId;
+  final String sourceKey;
   final ReaderCommentsWidgetBuilder? commentsWidgetBuilder;
 
   @override
@@ -134,12 +136,14 @@ class _ReaderCommentsSheetState extends State<ReaderCommentsSheet> {
                           widget.commentsWidgetBuilder?.call(
                             comicId: widget.comicId,
                             subId: widget.subId,
+                            sourceKey: widget.sourceKey,
                             scrollController: scrollController,
                             onRequestTabFullscreen: _expandToFullscreen,
                           ) ??
                           CommentsPage(
                             comicId: widget.comicId,
                             subId: widget.subId,
+                            sourceKey: widget.sourceKey,
                             showAppBar: false,
                             scrollController: scrollController,
                             onRequestTabFullscreen: _expandToFullscreen,

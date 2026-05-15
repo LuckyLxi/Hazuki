@@ -176,6 +176,14 @@ class _ComicDetailPageState extends State<ComicDetailPage>
             ),
           ),
       searchPageBuilder: widget.searchPageBuilder,
+      comicDetailPageBuilder: (comic, heroTag) => ComicDetailPage(
+        comic: comic,
+        heroTag: heroTag,
+        readerWidgetBuilder: widget.readerWidgetBuilder,
+        searchPageBuilder: widget.searchPageBuilder,
+        isDesktopPanel: widget.isDesktopPanel,
+        onCloseRequested: widget.onCloseRequested,
+      ),
       mediaChannel: _comicDetailMediaChannel,
     );
     _sessionController = ComicDetailSessionController(

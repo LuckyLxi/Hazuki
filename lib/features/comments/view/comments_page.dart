@@ -56,6 +56,7 @@ class CommentsPage extends StatefulWidget {
     super.key,
     required this.comicId,
     this.subId,
+    this.sourceKey = '',
     this.isTabView = false,
     this.isActiveInTabView = true,
     this.showAppBar = true,
@@ -66,6 +67,7 @@ class CommentsPage extends StatefulWidget {
 
   final String comicId;
   final String? subId;
+  final String sourceKey;
   final bool isTabView;
   final bool isActiveInTabView;
   final bool showAppBar;
@@ -436,6 +438,7 @@ class _CommentsPageState extends State<CommentsPage>
     return _controller.loadCommentsPage(
       comicId: widget.comicId,
       subId: widget.subId,
+      sourceKey: widget.sourceKey,
       page: page,
       pageSize: _pageSize,
       timeout: _commentsLoadTimeout,
@@ -630,7 +633,7 @@ class _CommentsPageState extends State<CommentsPage>
       return;
     }
 
-    if (!_controller.isLogged) {
+    if (!_controller.isLogged(widget.sourceKey)) {
       unawaited(
         showHazukiPrompt(
           context,
@@ -641,7 +644,7 @@ class _CommentsPageState extends State<CommentsPage>
       return;
     }
 
-    if (!_controller.supportCommentSend) {
+    if (!_controller.supportCommentSend(widget.sourceKey)) {
       unawaited(
         showHazukiPrompt(
           context,
@@ -662,6 +665,7 @@ class _CommentsPageState extends State<CommentsPage>
       await _controller.sendComment(
         comicId: widget.comicId,
         subId: widget.subId,
+        sourceKey: widget.sourceKey,
         content: text,
         replyTo: _replyToComment?.id,
       );
@@ -1060,8 +1064,13 @@ class _CommentsPageState extends State<CommentsPage>
         ? const HazukiLoadMoreFooter()
         : const SizedBox(height: 4);
     final listBottomPadding = EdgeInsets.only(bottom: 10 + extraBottomPadding);
-    final visibleComments = _controller.visibleComments(_comments);
-    final hiddenCount = _comments.length - visibleComments.length;
+    final hideFilteredComments = _controller.filterModeIsHide;
+    final visibleComments = hideFilteredComments
+        ? _controller.visibleComments(_comments)
+        : _comments;
+    final hiddenCount = hideFilteredComments
+        ? _comments.length - visibleComments.length
+        : 0;
 
     if (widget.isTabView) {
       final overlapHandle = NestedScrollView.sliverOverlapAbsorberHandleFor(

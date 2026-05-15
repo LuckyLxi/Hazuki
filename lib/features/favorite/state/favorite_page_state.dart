@@ -50,11 +50,14 @@ class FavoritePageData {
     required List<String> favoriteSortOrders,
   }) {
     if (mode == FavoritePageMode.local) {
+      final localSortOrders = favoriteSortOrders.isEmpty
+          ? const <String>['mr', 'mp']
+          : favoriteSortOrders;
       return FavoriteAppBarActionsState(
         showSort: true,
         showCreateFolder: true,
         currentSortOrder: favoriteSortOrder,
-        sortOrders: const <String>['mr', 'mp'],
+        sortOrders: localSortOrders,
         showModeToggle: true,
         currentMode: mode,
       );

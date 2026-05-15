@@ -31,7 +31,7 @@ class ComicDetailInfoTab extends StatelessWidget {
       details: details,
       showComicId: !isHazukiCopyMangaSourceKey(details.sourceKey),
       onCopyId: (id) => unawaited(actions.copyComicId(context, id)),
-      onMetaValuePressed: (v) => actions.openSearchForKeyword(context, v),
+      onTagValuePressed: (v) => unawaited(actions.openTagValue(context, v)),
       onMetaValueLongPress: (v) => unawaited(actions.copyMetaValue(context, v)),
     );
   }

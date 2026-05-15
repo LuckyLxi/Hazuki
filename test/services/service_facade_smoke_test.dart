@@ -50,6 +50,43 @@ void main() {
   );
 
   test(
+    'image memory cache can read a non-active source by sourceKey',
+    () async {
+      final service = sl<HazukiSourceService>();
+      const url = 'https://example.com/shared-cover.jpg';
+      final jmBytes = Uint8List.fromList([1, 2, 3]);
+      final copyBytes = Uint8List.fromList([4, 5, 6]);
+
+      service.facade.cache.putImageBytes(
+        SourceScopedComicId(
+          sourceKey: hazukiDefaultSourceKey,
+          comicId: url,
+        ).imageCacheKey,
+        jmBytes,
+      );
+
+      await service.runtimeRegistry.activateSource('copy_manga');
+      service.facade.cache.putImageBytes(
+        SourceScopedComicId(
+          sourceKey: 'copy_manga',
+          comicId: url,
+        ).imageCacheKey,
+        copyBytes,
+      );
+
+      await service.runtimeRegistry.activateSource(hazukiDefaultSourceKey);
+
+      expect(service.activeSourceKey, hazukiDefaultSourceKey);
+      expect(service.peekImageBytesFromMemory(url), jmBytes);
+      expect(
+        service.peekImageBytesFromMemory(url, sourceKey: 'copy_manga'),
+        copyBytes,
+      );
+      expect(service.activeSourceKey, hazukiDefaultSourceKey);
+    },
+  );
+
+  test(
     'CloudSyncFacade keeps config and remote client access reachable',
     () async {
       const config = CloudSyncConfig(

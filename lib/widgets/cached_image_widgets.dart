@@ -183,7 +183,8 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
       _resetStateWithoutImage();
       return;
     }
-    if (oldWidget.url != widget.url) {
+    if (oldWidget.url != widget.url ||
+        oldWidget.sourceKey != widget.sourceKey) {
       _cancelDeferredLoad();
       final primed = _primeFromMemory(widget.url);
       if (!primed) {
@@ -438,7 +439,7 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
     if (_bytes != null && !_noImageModeEnabled) {
       final image = Image.memory(
         _bytes!,
-        key: ValueKey('loaded-image-${widget.url}'),
+        key: ValueKey('loaded-image-${widget.sourceKey}-${widget.url}'),
         width: widget.width,
         height: widget.height,
         fit: widget.fit,
@@ -452,7 +453,7 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
         return image;
       }
       return AnimatedOpacity(
-        key: ValueKey('loaded-image-animate-${widget.url}'),
+        key: ValueKey('loaded-image-animate-${widget.sourceKey}-${widget.url}'),
         opacity: _showLoadedImage ? 1.0 : 0.0,
         duration: widget.loadAnimationDuration,
         curve: Curves.easeOutCubic,

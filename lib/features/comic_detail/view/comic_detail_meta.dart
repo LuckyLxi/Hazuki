@@ -62,14 +62,14 @@ class ComicDetailMetaSection extends StatelessWidget {
     required this.details,
     this.showComicId = true,
     required this.onCopyId,
-    required this.onMetaValuePressed,
+    required this.onTagValuePressed,
     required this.onMetaValueLongPress,
   });
 
   final ComicDetailsData details;
   final bool showComicId;
   final ValueChanged<String> onCopyId;
-  final ValueChanged<String> onMetaValuePressed;
+  final ValueChanged<String> onTagValuePressed;
   final ValueChanged<String> onMetaValueLongPress;
 
   @override
@@ -92,7 +92,7 @@ class ComicDetailMetaSection extends StatelessWidget {
                 .toList(),
             label: authorLabel,
           ),
-          onValuePressed: onMetaValuePressed,
+          onValuePressed: onTagValuePressed,
           onValueLongPress: onMetaValueLongPress,
         ),
         ComicDetailMetaRow(
@@ -108,7 +108,7 @@ class ComicDetailMetaSection extends StatelessWidget {
                 .toList(),
             label: tagLabel,
           ),
-          onValuePressed: onMetaValuePressed,
+          onValuePressed: onTagValuePressed,
           onValueLongPress: onMetaValueLongPress,
         ),
       ],

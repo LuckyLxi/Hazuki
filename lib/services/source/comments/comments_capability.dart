@@ -4,11 +4,15 @@ extension HazukiSourceServiceCommentsCapability on HazukiSourceService {
   Future<ComicCommentsPageResult> loadCommentsPage({
     required String comicId,
     String? subId,
+    String sourceKey = '',
     int page = 1,
     int pageSize = 16,
     String? replyTo,
   }) async {
-    final facade = this.facade;
+    final resolvedSourceKey = _resolveActiveSourceKey(sourceKey);
+    final facade = _handleFor(resolvedSourceKey).facade;
+    await facade.ensureInitialized();
+
     final engine = facade.js.engine;
     if (engine == null) {
       throw Exception('source_not_initialized');
@@ -62,6 +66,7 @@ extension HazukiSourceServiceCommentsCapability on HazukiSourceService {
   Future<List<ComicCommentData>> loadComments({
     required String comicId,
     String? subId,
+    String sourceKey = '',
     int page = 1,
     int pageSize = 16,
     String? replyTo,
@@ -69,6 +74,7 @@ extension HazukiSourceServiceCommentsCapability on HazukiSourceService {
     final result = await loadCommentsPage(
       comicId: comicId,
       subId: subId,
+      sourceKey: sourceKey,
       page: page,
       pageSize: pageSize,
       replyTo: replyTo,
@@ -79,10 +85,14 @@ extension HazukiSourceServiceCommentsCapability on HazukiSourceService {
   Future<void> sendComment({
     required String comicId,
     String? subId,
+    String sourceKey = '',
     required String content,
     String? replyTo,
   }) async {
-    final facade = this.facade;
+    final resolvedSourceKey = _resolveActiveSourceKey(sourceKey);
+    final facade = _handleFor(resolvedSourceKey).facade;
+    await facade.ensureInitialized();
+
     final engine = facade.js.engine;
     if (engine == null) {
       throw Exception('source_not_initialized');
@@ -96,12 +106,30 @@ extension HazukiSourceServiceCommentsCapability on HazukiSourceService {
     final subIdArg = subId == null ? 'null' : jsonEncode(subId);
     final replyToArg = replyTo == null ? 'null' : jsonEncode(replyTo);
 
-    await _runWithReloginRetry(() async {
+    Future<void> runSend() async {
       final dynamic result = engine.evaluate(
         'this.__hazuki_source.comic.sendComment(${jsonEncode(comicId)}, $subIdArg, ${jsonEncode(text)}, $replyToArg)',
         name: 'source_send_comment.js',
       );
       await facade.js.resolve(result);
-    });
+    }
+
+    if (resolvedSourceKey == activeSourceKey) {
+      await _runWithReloginRetry(runSend);
+    } else {
+      await runSend();
+    }
+  }
+
+  bool supportCommentSendForSource(String sourceKey) {
+    final resolvedSourceKey = _resolveActiveSourceKey(sourceKey);
+    final facade = _handleFor(resolvedSourceKey).facade;
+    final engine = facade.js.engine;
+    if (engine == null) {
+      return false;
+    }
+    return facade.js.asBool(
+      facade.js.evaluate('!!this.__hazuki_source.comic?.sendComment'),
+    );
   }
 }

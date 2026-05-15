@@ -179,6 +179,7 @@ class ComicDetailBody extends StatelessWidget {
                               subId: details.subId.isEmpty
                                   ? null
                                   : details.subId,
+                              sourceKey: details.sourceKey,
                               isTabView: true,
                               isActiveInTabView: shouldRender,
                               onRequestTabFullscreen:

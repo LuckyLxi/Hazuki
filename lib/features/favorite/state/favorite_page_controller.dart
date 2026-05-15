@@ -74,12 +74,14 @@ class FavoritePageController extends ChangeNotifier {
       ? selectedFolderId.isNotEmpty
       : selectedFolderId != '0';
 
+  List<String> get _favoriteSortOrders => _sourceService.favoriteSortOrders;
+
   FavoriteAppBarActionsState get appBarActionsState =>
       _state.buildAppBarActionsState(
         isLogged: _cloudFlow.isLogged,
         supportFavoriteSortOrder: _cloudFlow.supportsSortOrder,
         supportFavoriteFolderAdd: _cloudFlow.supportsFolderAdd,
-        favoriteSortOrders: _cloudFlow.sortOrders,
+        favoriteSortOrders: _favoriteSortOrders,
       );
 
   void resetForReload() {
@@ -420,11 +422,12 @@ class FavoritePageController extends ChangeNotifier {
     ValueChanged<String>? onFolderLoadError,
   }) async {
     final allowedOrders = _state.mode == FavoritePageMode.local
-        ? const <String>['mr', 'mp']
+        ? _favoriteSortOrders
         : _cloudFlow.sortOrders;
-    final normalized = allowedOrders.contains(order)
-        ? order
-        : allowedOrders.firstOrNull ?? 'mr';
+    final normalized = _normalizeFavoriteSortOrder(
+      order,
+      allowedOrders: allowedOrders,
+    );
     if (normalized == _state.favoriteSortOrder) {
       return null;
     }
@@ -507,6 +510,10 @@ class FavoritePageController extends ChangeNotifier {
       return;
     }
     _lastActiveSourceKey = activeSourceKey;
+    _state.favoriteSortOrder = _normalizeFavoriteSortOrder(
+      _state.favoriteSortOrder,
+      allowedOrders: _favoriteSortOrders,
+    );
     if (_state.mode == FavoritePageMode.local) {
       unawaited(_syncLocalFavoritesAfterExternalChange());
       return;
@@ -561,7 +568,10 @@ class FavoritePageController extends ChangeNotifier {
 
   Future<void> _loadInitialLocal() async {
     final requestVersion = ++_state.listRequestVersion;
-    _state.favoriteSortOrder = await _localFlow.loadSortOrder();
+    _state.favoriteSortOrder = _normalizeFavoriteSortOrder(
+      await _localFlow.loadSortOrder(),
+      allowedOrders: _favoriteSortOrders,
+    );
     await _reloadLocalFolders();
     if (_state.selectedLocalFolderId.isEmpty) {
       if (_disposed || requestVersion != _state.listRequestVersion) {
@@ -713,6 +723,29 @@ class FavoritePageController extends ChangeNotifier {
     if (!_disposed) {
       notifyListeners();
     }
+  }
+
+  String _normalizeFavoriteSortOrder(
+    String order, {
+    required List<String> allowedOrders,
+  }) {
+    final normalized = order.trim();
+    if (allowedOrders.contains(normalized)) {
+      return normalized;
+    }
+    if (allowedOrders.contains('-datetime_updated') && normalized == 'mp') {
+      return '-datetime_updated';
+    }
+    if (allowedOrders.contains('-datetime_modifier') && normalized == 'mr') {
+      return '-datetime_modifier';
+    }
+    if (allowedOrders.contains('mp') && normalized == '-datetime_updated') {
+      return 'mp';
+    }
+    if (allowedOrders.contains('mr')) {
+      return 'mr';
+    }
+    return allowedOrders.firstOrNull ?? 'mr';
   }
 
   Future<void> _saveSelectedFolderId(

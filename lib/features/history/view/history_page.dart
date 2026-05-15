@@ -2,8 +2,12 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
+import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/shared/navigation_tags.dart';
+import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:hazuki/widgets/windows_comic_detail_host.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -12,8 +16,34 @@ import '../support/history_actions.dart';
 import '../support/history_favorite_support.dart';
 import '../support/history_menu_support.dart';
 import 'history_comic_list_item.dart';
-import 'package:hazuki/shared/navigation_tags.dart';
-import 'package:hazuki/shared/windows/windows_comic_detail.dart';
+
+String normalizeHistorySourceKey(String sourceKey) {
+  final normalized = sourceKey.trim();
+  return normalized.isEmpty ? hazukiDefaultSourceKey : normalized;
+}
+
+bool historyEntryBelongsToSource(Map<String, dynamic> entry, String sourceKey) {
+  final entrySourceKey = normalizeHistorySourceKey(
+    (entry['sourceKey'] ?? '').toString(),
+  );
+  return entrySourceKey == normalizeHistorySourceKey(sourceKey);
+}
+
+ExploreComic historyComicFromEntry(
+  Map<String, dynamic> entry, {
+  required String fallbackSourceKey,
+}) {
+  final sourceKey = normalizeHistorySourceKey(
+    (entry['sourceKey'] ?? fallbackSourceKey).toString(),
+  );
+  return ExploreComic(
+    id: (entry['id'] ?? '').toString(),
+    title: (entry['title'] ?? '').toString(),
+    cover: (entry['cover'] ?? '').toString(),
+    subTitle: (entry['subTitle'] ?? '').toString(),
+    sourceKey: sourceKey,
+  );
+}
 
 class HistoryPage extends StatefulWidget {
   const HistoryPage({
@@ -38,6 +68,9 @@ class _HistoryPageState extends State<HistoryPage> {
   bool _selectionMode = false;
   bool _showBackToTop = false;
   final Set<String> _selectedIds = {};
+
+  String get _activeSourceKey =>
+      normalizeHistorySourceKey(sl<HazukiSourceService>().activeSourceKey);
 
   @override
   void initState() {
@@ -84,28 +117,20 @@ class _HistoryPageState extends State<HistoryPage> {
     if (jsonStr != null) {
       try {
         final List<dynamic> jsonList = jsonDecode(jsonStr);
-        // 调试：逐条解析并打印原始字段，用于排查历史条目渲染异常
         final history = <ExploreComic>[];
-        for (var i = 0; i < jsonList.length; i++) {
-          final e = jsonList[i] as Map<String, dynamic>;
-          debugPrint(
-            '[history] #$i '
-            'id=${e["id"]} (${e["id"]?.runtimeType}) '
-            'title=${e["title"]} '
-            'cover=${e["cover"]} '
-            'sourceKey=${e["sourceKey"]}',
-          );
+        final activeSourceKey = _activeSourceKey;
+        for (final rawEntry in jsonList) {
+          if (rawEntry is! Map) {
+            continue;
+          }
+          final entry = Map<String, dynamic>.from(rawEntry);
+          if (!historyEntryBelongsToSource(entry, activeSourceKey)) {
+            continue;
+          }
           history.add(
-            ExploreComic(
-              id: (e['id'] ?? '').toString(),
-              title: (e['title'] ?? '').toString(),
-              cover: (e['cover'] ?? '').toString(),
-              subTitle: (e['subTitle'] ?? '').toString(),
-              sourceKey: (e['sourceKey'] ?? '').toString(),
-            ),
+            historyComicFromEntry(entry, fallbackSourceKey: activeSourceKey),
           );
         }
-        debugPrint('[history] total ${history.length} entries loaded');
         if (mounted) {
           setState(() {
             _history = history;
@@ -127,37 +152,50 @@ class _HistoryPageState extends State<HistoryPage> {
 
   Future<void> _saveHistory(List<ExploreComic> history) async {
     final prefs = await SharedPreferences.getInstance();
-    // 璇诲彇鍘熷JSON浠ヤ繚鐣檛imestamp绛夐澶栧瓧娈碉紝閬垮厤浜戝悓姝ュ悎骞舵椂涓㈠け鏃跺簭淇℃伅
+    final activeSourceKey = _activeSourceKey;
     final existingStr = prefs.getString('hazuki_read_history');
     final existingById = <String, Map<String, dynamic>>{};
+    final preservedOtherSourceEntries = <Map<String, dynamic>>[];
     if (existingStr != null) {
       try {
         final List<dynamic> existing = jsonDecode(existingStr);
-        for (final e in existing) {
-          final id = (e['id'] as String?) ?? '';
-          final sourceKey = (e['sourceKey'] as String?) ?? '';
+        for (final rawEntry in existing) {
+          if (rawEntry is! Map) {
+            continue;
+          }
+          final e = Map<String, dynamic>.from(rawEntry);
+          final id = (e['id'] ?? '').toString();
+          final sourceKey = normalizeHistorySourceKey(
+            (e['sourceKey'] ?? '').toString(),
+          );
           if (id.isNotEmpty) {
-            existingById[SourceScopedComicId(
+            final storageKey = SourceScopedComicId(
               sourceKey: sourceKey,
               comicId: id,
-            ).storageKey] = Map<String, dynamic>.from(
-              e as Map,
-            );
+            ).storageKey;
+            existingById[storageKey] = e;
+          }
+          if (!historyEntryBelongsToSource(e, activeSourceKey)) {
+            preservedOtherSourceEntries.add(e);
           }
         }
       } catch (_) {}
     }
-    final jsonList = history.map((e) {
+    final currentSourceEntries = history.map((e) {
       final base = existingById[e.scopedId.storageKey] ?? <String, dynamic>{};
       return <String, dynamic>{
         ...base,
         'id': e.id,
-        'sourceKey': e.sourceKey,
+        'sourceKey': normalizeHistorySourceKey(e.sourceKey),
         'title': e.title,
         'cover': e.cover,
         'subTitle': e.subTitle,
       };
     }).toList();
+    final jsonList = <Map<String, dynamic>>[
+      ...currentSourceEntries,
+      ...preservedOtherSourceEntries,
+    ];
     await prefs.setString('hazuki_read_history', jsonEncode(jsonList));
   }
 
@@ -263,14 +301,6 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 
   Widget _buildItem(ExploreComic comic, int index) {
-    // 调试：打印每条渲染时的字段，确认 title/cover/sourceKey 是否正确
-    debugPrint(
-      '[history._buildItem] #$index '
-      'id=${comic.id} '
-      'title="${comic.title}" '
-      'cover="${comic.cover}" '
-      'sourceKey=${comic.sourceKey}',
-    );
     final heroTag = widget.comicCoverHeroTagBuilder(comic, salt: 'history');
     return HistoryComicListItem(
       key: ValueKey(comic.scopedId.storageKey),

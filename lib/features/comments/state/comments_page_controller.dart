@@ -14,12 +14,18 @@ class CommentsPageController {
   final HazukiSourceService _sourceService;
   final CommentFilterService _filterService;
 
-  bool get isLogged => _sourceService.isLogged;
-  bool get supportCommentSend => _sourceService.supportCommentSend;
+  bool isLogged(String sourceKey) => sourceKey.trim().isEmpty
+      ? _sourceService.isLogged
+      : _sourceService.isLoggedForSource(sourceKey);
+
+  bool supportCommentSend(String sourceKey) => sourceKey.trim().isEmpty
+      ? _sourceService.supportCommentSend
+      : _sourceService.supportCommentSendForSource(sourceKey);
 
   Future<ComicCommentsPageResult> loadCommentsPage({
     required String comicId,
     String? subId,
+    String sourceKey = '',
     required int page,
     required int pageSize,
     required Duration timeout,
@@ -28,6 +34,7 @@ class CommentsPageController {
         .loadCommentsPage(
           comicId: comicId,
           subId: subId,
+          sourceKey: sourceKey,
           page: page,
           pageSize: pageSize,
         )
@@ -37,12 +44,14 @@ class CommentsPageController {
   Future<void> sendComment({
     required String comicId,
     String? subId,
+    String sourceKey = '',
     required String content,
     String? replyTo,
   }) {
     return _sourceService.sendComment(
       comicId: comicId,
       subId: subId,
+      sourceKey: sourceKey,
       content: content,
       replyTo: replyTo,
     );
@@ -72,14 +81,12 @@ class CommentsPageController {
 
   bool isCollapsedComment(String content) =>
       _filterService.mode == CommentFilterMode.collapse &&
-      _filterService.isFiltered(normalizeCommentText(content));
+      _filterService.isFiltered(commentFilterText(content));
 
   List<ComicCommentData> visibleComments(List<ComicCommentData> all) {
     if (!filterModeIsHide) return all;
     return all
-        .where(
-          (c) => !_filterService.isFiltered(normalizeCommentText(c.content)),
-        )
+        .where((c) => !_filterService.isFiltered(commentFilterText(c.content)))
         .toList();
   }
 }

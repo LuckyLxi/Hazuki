@@ -14,7 +14,7 @@ const discoverSearchHeroTag = 'discover_search_to_search_page';
 const discoverDailyHeroSaltPrefix = 'discover-daily-';
 
 String comicCoverHeroTag(ExploreComic comic, {String? salt}) {
-  final key = comic.id.isEmpty ? comic.title : comic.id;
+  final key = comic.id.isEmpty ? comic.title : comic.scopedId.storageKey;
   if (salt == null || salt.isEmpty) {
     return 'comic-cover-$key';
   }

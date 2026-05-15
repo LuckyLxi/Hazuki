@@ -10,6 +10,7 @@ import '../../../services/hazuki_source_service.dart';
 import '../../../shared/navigation_tags.dart';
 import '../../../widgets/widgets.dart';
 import '../../../widgets/windows_comic_detail_host.dart';
+import '../support/category_tag_navigation.dart';
 import 'discover_section_page.dart';
 
 class TagCategoryPage extends StatefulWidget {
@@ -257,18 +258,17 @@ class _TagCategoryPageState extends State<TagCategoryPage> {
 
   void _openTag(CategoryTagGroup group, int index) {
     final tag = group.tags[index];
-    if (group.opensCategory) {
-      final param = group.paramForIndex(index);
-      final viewMoreUrl = param == null
-          ? 'category:$tag'
-          : 'category:$tag@$param';
+    final target = resolveCategoryTagNavigationTarget(<CategoryTagGroup>[
+      group,
+    ], tag);
+    if (target != null) {
       Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (_) => DiscoverSectionPage(
             section: ExploreSection(
-              title: tag,
+              title: target.title,
               comics: const <ExploreComic>[],
-              viewMoreUrl: viewMoreUrl,
+              viewMoreUrl: target.viewMoreUrl,
             ),
             comicDetailPageBuilder: widget.comicDetailPageBuilder,
           ),

@@ -45,6 +45,10 @@ class ComicDetailRepository implements FavoriteFoldersRepository {
     String sourceKey = '',
   }) => _source.loadComicDetails(id, sourceKey: sourceKey);
 
+  Future<List<CategoryTagGroup>> loadCategoryTagGroups() {
+    return _source.loadCategoryTagGroups();
+  }
+
   Future<Uint8List> downloadImageBytes(
     String url, {
     bool keepInMemory = false,

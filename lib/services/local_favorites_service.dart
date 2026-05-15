@@ -38,6 +38,13 @@ class LocalFavoritesService extends ChangeNotifier {
   static const String _legacyLocalFavoriteSourceKey = 'jm';
   static const int _tombstoneTtlMs = 90 * 24 * 60 * 60 * 1000;
   static const int _pageSize = 24;
+  static const Set<String> _supportedSortOrders = <String>{
+    'mr',
+    'mp',
+    '-datetime_updated',
+    '-datetime_modifier',
+    '-datetime_browse',
+  };
 
   void onExternalDataChanged() {
     notifyListeners();
@@ -46,12 +53,13 @@ class LocalFavoritesService extends ChangeNotifier {
   Future<String> loadSortOrder() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_sortOrderKey)?.trim();
-    return raw == 'mp' ? 'mp' : 'mr';
+    return _supportedSortOrders.contains(raw) ? raw! : 'mr';
   }
 
   Future<void> saveSortOrder(String order) async {
     final prefs = await SharedPreferences.getInstance();
-    final normalized = order.trim() == 'mp' ? 'mp' : 'mr';
+    final raw = order.trim();
+    final normalized = _supportedSortOrders.contains(raw) ? raw : 'mr';
     await prefs.setString(_sortOrderKey, normalized);
   }
 
@@ -149,8 +157,9 @@ class LocalFavoritesService extends ChangeNotifier {
     if (normalizedFolderId.isEmpty) {
       return const FavoriteComicsResult.success(<ExploreComic>[], maxPage: 1);
     }
-    final normalizedSortOrder =
-        (sortOrder ?? await loadSortOrder()).trim() == 'mp' ? 'mp' : 'mr';
+    final normalizedSortOrder = _normalizeSortOrder(
+      (sortOrder ?? await loadSortOrder()).trim(),
+    );
 
     final filteredEntries = store.entries
         .where(
@@ -161,7 +170,8 @@ class LocalFavoritesService extends ChangeNotifier {
         .toList();
 
     filteredEntries.sort((a, b) {
-      if (normalizedSortOrder == 'mp') {
+      if (normalizedSortOrder == 'mp' ||
+          normalizedSortOrder == '-datetime_updated') {
         final updateCompare = b.updateTime.compareTo(a.updateTime);
         if (updateCompare != 0) {
           return updateCompare;
@@ -187,6 +197,11 @@ class LocalFavoritesService extends ChangeNotifier {
         .toList(growable: false);
 
     return FavoriteComicsResult.success(comics, maxPage: maxPage);
+  }
+
+  String _normalizeSortOrder(String order) {
+    final normalized = order.trim();
+    return _supportedSortOrders.contains(normalized) ? normalized : 'mr';
   }
 
   Future<void> addFavoriteFolder(String name, {String sourceKey = ''}) {

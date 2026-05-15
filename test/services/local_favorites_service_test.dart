@@ -72,6 +72,84 @@ void main() {
     });
   });
 
+  group('LocalFavoritesService favorite sort order', () {
+    late LocalFavoritesService service;
+
+    setUp(() {
+      SharedPreferences.setMockInitialValues(const {});
+      service = sl<LocalFavoritesService>();
+    });
+
+    test('preserves CopyManga sort orders', () async {
+      await service.saveSortOrder('-datetime_updated');
+      expect(await service.loadSortOrder(), '-datetime_updated');
+
+      await service.saveSortOrder('-datetime_modifier');
+      expect(await service.loadSortOrder(), '-datetime_modifier');
+
+      await service.saveSortOrder('-datetime_browse');
+      expect(await service.loadSortOrder(), '-datetime_browse');
+    });
+
+    test('sorts CopyManga local favorites by update time', () async {
+      await service.addFavoriteFolder('Copy', sourceKey: 'copy_manga');
+      final folder = (await service.loadFavoriteFolders(
+        sourceKey: 'copy_manga',
+      )).folders.single;
+
+      await service.toggleFavorite(
+        details: const ComicDetailsData(
+          id: 'newer',
+          sourceKey: 'copy_manga',
+          title: 'Newer',
+          subTitle: '',
+          cover: '',
+          description: '',
+          updateTime: '2026-05-16',
+          likesCount: '',
+          chapters: {},
+          tags: {},
+          recommend: [],
+          isFavorite: false,
+          subId: '',
+        ),
+        isAdding: true,
+        folderId: folder.id,
+      );
+      await service.toggleFavorite(
+        details: const ComicDetailsData(
+          id: 'older',
+          sourceKey: 'copy_manga',
+          title: 'Older',
+          subTitle: '',
+          cover: '',
+          description: '',
+          updateTime: '2026-05-15',
+          likesCount: '',
+          chapters: {},
+          tags: {},
+          recommend: [],
+          isFavorite: false,
+          subId: '',
+        ),
+        isAdding: true,
+        folderId: folder.id,
+      );
+
+      final comics = await service.loadFavoriteComics(
+        page: 1,
+        folderId: folder.id,
+        sortOrder: '-datetime_updated',
+        sourceKey: 'copy_manga',
+      );
+
+      expect(comics.comics.map((comic) => comic.id), <String>[
+        'newer',
+        'older',
+      ]);
+    });
+  });
+
   group('LocalFavoritesService source-scoped entries', () {
     late LocalFavoritesService service;
 

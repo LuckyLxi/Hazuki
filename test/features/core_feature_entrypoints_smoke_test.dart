@@ -138,6 +138,30 @@ void main() {
     expect(comments.comicId, 'comic-id');
     expect(downloads.readerPageBuilder, isNotNull);
     expect(history.comicCoverHeroTagBuilder(comic), comicCoverHeroTag(comic));
+    expect(
+      comicCoverHeroTag(
+        const ExploreComic(
+          id: 'same-id',
+          title: 'JM',
+          subTitle: '',
+          cover: '',
+          sourceKey: 'jm',
+        ),
+        salt: 'history',
+      ),
+      isNot(
+        comicCoverHeroTag(
+          const ExploreComic(
+            id: 'same-id',
+            title: 'Copy',
+            subTitle: '',
+            cover: '',
+            sourceKey: 'copy_manga',
+          ),
+          salt: 'history',
+        ),
+      ),
+    );
     expect(settings.appearanceSettings.themeMode, ThemeMode.system);
     expect(reader.images, const ['a', 'b']);
     expect(reader.chapterIndex, 0);

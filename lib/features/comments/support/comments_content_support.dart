@@ -114,6 +114,8 @@ String commentPreviewText(String content) {
       .trim();
 }
 
+String commentFilterText(String content) => commentPreviewText(content);
+
 String normalizeCommentText(String rawText) {
   if (rawText.isEmpty) {
     return '';

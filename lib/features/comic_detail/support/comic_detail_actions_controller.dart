@@ -8,6 +8,8 @@ import 'package:flutter/services.dart';
 
 import 'package:hazuki/shared/chapter_title_resolver.dart';
 import 'package:hazuki/app/windows/windows_title_bar_controller.dart';
+import 'package:hazuki/features/discover/support/category_tag_navigation.dart';
+import 'package:hazuki/features/discover/view/discover_section_page.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/manga_download/manga_download_service.dart';
@@ -28,6 +30,7 @@ class ComicDetailActionsController extends ChangeNotifier {
     required ComicDetailChaptersPanelBuilder chaptersPanelBuilder,
     required ComicDetailReaderPageBuilder readerPageBuilder,
     required ComicDetailSearchPageBuilder searchPageBuilder,
+    required ComicDetailNestedPageBuilder comicDetailPageBuilder,
     required MethodChannel mediaChannel,
   }) : _repository = repository,
        _comic = comic,
@@ -39,6 +42,7 @@ class ComicDetailActionsController extends ChangeNotifier {
        _chaptersPanelBuilder = chaptersPanelBuilder,
        _readerPageBuilder = readerPageBuilder,
        _searchPageBuilder = searchPageBuilder,
+       _comicDetailPageBuilder = comicDetailPageBuilder,
        _mediaChannel = mediaChannel;
 
   final ComicDetailRepository _repository;
@@ -51,6 +55,7 @@ class ComicDetailActionsController extends ChangeNotifier {
   final ComicDetailChaptersPanelBuilder _chaptersPanelBuilder;
   final ComicDetailReaderPageBuilder _readerPageBuilder;
   final ComicDetailSearchPageBuilder _searchPageBuilder;
+  final ComicDetailNestedPageBuilder _comicDetailPageBuilder;
   final MethodChannel _mediaChannel;
 
   bool _disposed = false;
@@ -237,6 +242,42 @@ class ComicDetailActionsController extends ChangeNotifier {
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => _searchPageBuilder(trimmedValue)),
     );
+  }
+
+  Future<void> openTagValue(BuildContext context, String value) async {
+    final trimmedValue = value.trim();
+    if (trimmedValue.isEmpty) return;
+
+    try {
+      final groups = await _repository.loadCategoryTagGroups();
+      if (_disposed) {
+        return;
+      }
+      final target = resolveCategoryTagNavigationTarget(groups, trimmedValue);
+      if (target != null) {
+        await Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => DiscoverSectionPage(
+              section: ExploreSection(
+                title: target.title,
+                comics: const <ExploreComic>[],
+                viewMoreUrl: target.viewMoreUrl,
+              ),
+              comicDetailPageBuilder: _comicDetailPageBuilder,
+            ),
+          ),
+        );
+        return;
+      }
+    } catch (_) {
+      // Fall back to the legacy search behavior when category metadata is not
+      // available for the current source.
+    }
+
+    if (_disposed) {
+      return;
+    }
+    openSearchForKeyword(context, trimmedValue);
   }
 
   Future<void> copyMetaValue(BuildContext context, String value) async {
