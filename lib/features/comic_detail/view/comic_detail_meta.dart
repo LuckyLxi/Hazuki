@@ -60,12 +60,14 @@ class ComicDetailMetaSection extends StatelessWidget {
   const ComicDetailMetaSection({
     super.key,
     required this.details,
+    this.showComicId = true,
     required this.onCopyId,
     required this.onMetaValuePressed,
     required this.onMetaValueLongPress,
   });
 
   final ComicDetailsData details;
+  final bool showComicId;
   final ValueChanged<String> onCopyId;
   final ValueChanged<String> onMetaValuePressed;
   final ValueChanged<String> onMetaValueLongPress;
@@ -79,7 +81,8 @@ class ComicDetailMetaSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        ComicDetailIdRow(id: details.id, onCopy: () => onCopyId(details.id)),
+        if (showComicId)
+          ComicDetailIdRow(id: details.id, onCopy: () => onCopyId(details.id)),
         ComicDetailMetaRow(
           label: authorLabel,
           values: normalizeComicMetaValues(

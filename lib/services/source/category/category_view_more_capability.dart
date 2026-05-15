@@ -4,6 +4,15 @@ extension HazukiSourceServiceCategoryViewMoreCapability on HazukiSourceService {
   Future<List<CategoryRankingOption>> loadCategoryRankingOptionsByViewMore({
     required String viewMoreUrl,
   }) async {
+    final groups = await loadCategoryOptionGroupsByViewMore(
+      viewMoreUrl: viewMoreUrl,
+    );
+    return groups.isEmpty ? const <CategoryRankingOption>[] : groups.first;
+  }
+
+  Future<List<List<CategoryRankingOption>>> loadCategoryOptionGroupsByViewMore({
+    required String viewMoreUrl,
+  }) async {
     final facade = this.facade;
     await facade.ensureInitialized();
 
@@ -18,16 +27,40 @@ extension HazukiSourceServiceCategoryViewMoreCapability on HazukiSourceService {
 
     dynamic resolved;
     try {
-      final dynamic result = engine.evaluate(
-        'this.__hazuki_source.categoryComics.optionLoader($categoryJson, $paramJson)',
-        name: 'source_category_view_more_options.js',
+      final hasOptionLoader = facade.js.asBool(
+        engine.evaluate('!!this.__hazuki_source.categoryComics?.optionLoader'),
       );
+      final dynamic result = hasOptionLoader
+          ? engine.evaluate(
+              'this.__hazuki_source.categoryComics.optionLoader($categoryJson, $paramJson)',
+              name: 'source_category_view_more_options.js',
+            )
+          : engine.evaluate('''(() => {
+              const category = $categoryJson;
+              const param = $paramJson;
+              const raw = this.__hazuki_source.categoryComics?.optionList;
+              if (!Array.isArray(raw)) return [];
+              return raw.filter((group) => {
+                if (!group || typeof group !== 'object') return false;
+                const showWhen = Array.isArray(group.showWhen)
+                  ? group.showWhen.map((e) => String(e ?? ''))
+                  : null;
+                const notShowWhen = Array.isArray(group.notShowWhen)
+                  ? group.notShowWhen.map((e) => String(e ?? ''))
+                  : null;
+                const keys = [String(category ?? ''), String(param ?? '')];
+                const showMatch = !showWhen || keys.some((key) => showWhen.includes(key));
+                const hideMatch = !!notShowWhen && keys.some((key) => notShowWhen.includes(key));
+                return showMatch && !hideMatch;
+              });
+            })()''', name: 'source_category_view_more_option_list.js');
 
       resolved = await facade.js.resolve(result);
       if (resolved is! List) {
         return const [];
       }
 
+      final groups = <List<CategoryRankingOption>>[];
       for (final group in resolved) {
         if (group is! Map) {
           continue;
@@ -40,11 +73,11 @@ extension HazukiSourceServiceCategoryViewMoreCapability on HazukiSourceService {
 
         final options = _parseCategoryRankingOptionsList(rawOptions);
         if (options.isNotEmpty) {
-          return options;
+          groups.add(options);
         }
       }
 
-      return const [];
+      return groups;
     } catch (e) {
       rethrow;
     }
@@ -54,6 +87,7 @@ extension HazukiSourceServiceCategoryViewMoreCapability on HazukiSourceService {
     required String viewMoreUrl,
     required int page,
     String order = 'mr',
+    List<String>? orders,
   }) async {
     final facade = this.facade;
     await facade.ensureInitialized();
@@ -66,9 +100,17 @@ extension HazukiSourceServiceCategoryViewMoreCapability on HazukiSourceService {
     final parsed = _parseCategoryViewMoreUrl(viewMoreUrl);
     final normalizedPage = page < 1 ? 1 : page;
     final normalizedOrder = order.trim().isEmpty ? 'mr' : order.trim();
+    final normalizedOrders = orders == null || orders.isEmpty
+        ? <String>[normalizedOrder]
+        : orders
+              .map((value) => value.trim())
+              .where((value) => value.isNotEmpty)
+              .toList();
     final categoryJson = jsonEncode(parsed.category);
     final paramJson = parsed.param != null ? jsonEncode(parsed.param) : 'null';
-    final optionsJson = jsonEncode([normalizedOrder]);
+    final optionsJson = jsonEncode(
+      normalizedOrders.isEmpty ? <String>[normalizedOrder] : normalizedOrders,
+    );
 
     try {
       final dynamic result = engine.evaluate(

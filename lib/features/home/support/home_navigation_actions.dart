@@ -4,14 +4,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:hazuki/app/app.dart';
+import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/features/downloads/downloads.dart';
 import 'package:hazuki/features/history/history.dart';
 import 'package:hazuki/features/search/search.dart';
 import 'package:hazuki/features/settings/settings.dart';
 import 'package:hazuki/features/home/view/home_drawer.dart';
+import 'package:hazuki/features/discover/view/discover_section_page.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/features/discover/view/ranking_page.dart';
 import 'package:hazuki/features/discover/view/tag_category_page.dart';
+import 'package:hazuki/l10n/l10n.dart';
+import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
 import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 
@@ -76,11 +80,27 @@ class HomeNavigationActions {
       hideComicDetailPanel: true,
       (_) => TagCategoryPage(
         searchPageBuilder: (tag) => buildSearchPage(initialKeyword: tag),
+        comicDetailPageBuilder: buildComicDetailPage,
       ),
     );
   }
 
   Future<void> openRanking() async {
+    if (sl<HazukiSourceService>().isActiveCopyMangaSource) {
+      await _openDrawerDestination(
+        hideComicDetailPanel: true,
+        (_) => DiscoverSectionPage(
+          section: ExploreSection(
+            title: l10n(context).rankingTitle,
+            comics: const <ExploreComic>[],
+            viewMoreUrl: 'category:排行@ranking',
+          ),
+          comicDetailPageBuilder: buildComicDetailPage,
+        ),
+      );
+      return;
+    }
+
     await _openDrawerDestination(
       hideComicDetailPanel: true,
       (_) => RankingPage(comicDetailPageBuilder: buildComicDetailPage),

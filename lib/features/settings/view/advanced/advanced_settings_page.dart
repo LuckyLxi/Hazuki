@@ -25,6 +25,7 @@ class AdvancedSettingsPage extends StatefulWidget {
 }
 
 class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
+  final HazukiSourceService _sourceService = sl<HazukiSourceService>();
   bool _noImageMode = false;
   bool _softwareLogCaptureEnabled = false;
   bool _hasCustomEditedSource = false;
@@ -33,14 +34,27 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
   @override
   void initState() {
     super.initState();
+    _sourceService.addListener(_handleSourceChanged);
     _loadSettings();
+  }
+
+  @override
+  void dispose() {
+    _sourceService.removeListener(_handleSourceChanged);
+    super.dispose();
+  }
+
+  void _handleSourceChanged() {
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
-    final hasCustomEditedSource = await sl<HazukiSourceService>()
+    final hasCustomEditedSource = await _sourceService
         .hasCustomEditedJmSource();
-    final softwareLogCaptureEnabled = await sl<HazukiSourceService>()
+    final softwareLogCaptureEnabled = await _sourceService
         .loadSoftwareLogCaptureEnabled();
     if (!mounted) {
       return;
@@ -60,11 +74,11 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
 
   Future<void> _toggleSoftwareLogCaptureEnabled(bool value) async {
     setState(() => _softwareLogCaptureEnabled = value);
-    await sl<HazukiSourceService>().setSoftwareLogCaptureEnabled(value);
+    await _sourceService.setSoftwareLogCaptureEnabled(value);
   }
 
   Future<void> _refreshCustomEditedSourceState() async {
-    final hasCustomEditedSource = await sl<HazukiSourceService>()
+    final hasCustomEditedSource = await _sourceService
         .hasCustomEditedJmSource();
     if (!mounted) {
       return;
@@ -97,6 +111,26 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
     await showHazukiPrompt(context, strings.advancedRestoreSourceSuccess);
   }
 
+  Future<void> _clearCopyMangaDeviceInfo() async {
+    final strings = AppLocalizations.of(context)!;
+    try {
+      await _sourceService.clearCopyMangaDeviceInfo();
+      if (!mounted) {
+        return;
+      }
+      await showHazukiPrompt(context, strings.advancedCopyMangaDeviceCleared);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      await showHazukiPrompt(
+        context,
+        strings.lineSaveFailed('$error'),
+        isError: true,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final strings = AppLocalizations.of(context)!;
@@ -111,11 +145,13 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
           noImageMode: _noImageMode,
           softwareLogCaptureEnabled: _softwareLogCaptureEnabled,
           hasCustomEditedSource: _hasCustomEditedSource,
+          showCopyMangaSettings: _sourceService.isActiveCopyMangaSource,
           logsPageBuilder: widget.logsPageBuilder,
           onToggleNoImageMode: _toggleNoImageMode,
           onToggleSoftwareLogCaptureEnabled: _toggleSoftwareLogCaptureEnabled,
           onOpenComicSourceEditor: _openComicSourceEditor,
           onRestoreComicSource: _restoreComicSource,
+          onClearCopyMangaDeviceInfo: _clearCopyMangaDeviceInfo,
         ),
       ),
     );

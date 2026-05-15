@@ -85,14 +85,20 @@ extension HazukiSourceServiceCategoryCapability on HazukiSourceService {
         for (const part of parts) {
           if (!part || typeof part !== 'object') continue;
           const itemType = String(part.itemType ?? '').trim();
-          if (itemType !== 'search') continue;
+          if (itemType !== 'search' && itemType !== 'category') continue;
           const name = String(part.name ?? '').trim();
           const rawCategories = Array.isArray(part.categories) ? part.categories : [];
+          const rawParams = Array.isArray(part.categoryParams) ? part.categoryParams : [];
           const tags = rawCategories
             .map((e) => String(e ?? '').trim())
             .filter((e) => e.length > 0);
+          const params = rawCategories.map((_, index) => {
+            const value = rawParams[index];
+            if (value === undefined || value === null) return null;
+            return String(value);
+          });
           if (!name || tags.length === 0) continue;
-          groups.push({ name, tags });
+          groups.push({ name, tags, params, itemType });
         }
         return groups;
       })()''', name: 'source_category_tag_groups.js');
@@ -122,6 +128,7 @@ extension HazukiSourceServiceCategoryCapability on HazukiSourceService {
       }
       final map = Map<String, dynamic>.from(item);
       final name = map['name']?.toString().trim() ?? '';
+      final itemType = map['itemType']?.toString().trim() ?? 'search';
       final tagsRaw = map['tags'];
       if (name.isEmpty || tagsRaw is! List) {
         continue;
@@ -136,7 +143,22 @@ extension HazukiSourceServiceCategoryCapability on HazukiSourceService {
         continue;
       }
 
-      groups.add(CategoryTagGroup(name: name, tags: tags));
+      final paramsRaw = map['params'];
+      final params = <String?>[];
+      if (paramsRaw is List) {
+        for (final item in paramsRaw) {
+          params.add(item?.toString());
+        }
+      }
+
+      groups.add(
+        CategoryTagGroup(
+          name: name,
+          tags: tags,
+          params: params,
+          itemType: itemType,
+        ),
+      );
     }
 
     final cached = List<CategoryTagGroup>.unmodifiable(
@@ -144,6 +166,8 @@ extension HazukiSourceServiceCategoryCapability on HazukiSourceService {
         (group) => CategoryTagGroup(
           name: group.name,
           tags: List<String>.unmodifiable(group.tags),
+          params: List<String?>.unmodifiable(group.params),
+          itemType: group.itemType,
         ),
       ),
     );

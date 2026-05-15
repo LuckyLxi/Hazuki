@@ -375,6 +375,34 @@ class HazukiSourceService extends ChangeNotifier {
   Future<void> updateLineSetting(String key, dynamic value) =>
       lineSettings.updateSetting(key, value);
 
+  Object? loadActiveSourceSetting(String key) =>
+      facade.loadSourceSetting(activeSourceKey, key);
+
+  Future<void> updateActiveSourceSetting(String key, dynamic value) =>
+      facade.saveSourceSetting(activeSourceKey, key, value);
+
+  Future<void> clearCopyMangaDeviceInfo() async {
+    const sourceKey = 'copy_manga';
+    final handle = _handleFor(sourceKey);
+    await handle.facade.deleteSourceData(sourceKey, '_deviceinfo');
+    await handle.facade.deleteSourceData(sourceKey, '_device');
+    await handle.facade.deleteSourceData(sourceKey, '_pseudoid');
+
+    final engine = handle.runtime.engine;
+    if (engine != null && activeSourceKey == sourceKey) {
+      final hasRefreshAppApi = handle.facade.js.asBool(
+        engine.evaluate('!!this.__hazuki_source.refreshAppApi'),
+      );
+      if (hasRefreshAppApi) {
+        final dynamic result = engine.evaluate(
+          'this.__hazuki_source.refreshAppApi()',
+          name: 'copy_manga_refresh_app_api.js',
+        );
+        await handle.facade.js.resolve(result);
+      }
+    }
+  }
+
   Future<void> refreshLines({
     bool refreshApiDomains = true,
     bool refreshImageHost = true,
@@ -552,6 +580,8 @@ class HazukiSourceService extends ChangeNotifier {
   SourceMeta? get sourceMeta => _sourceMeta;
   String get activeSourceKey => _activeSourceKey;
   bool get isActiveJmSource => isHazukiJmSourceKey(_activeSourceKey);
+  bool get isActiveCopyMangaSource =>
+      isHazukiCopyMangaSourceKey(_activeSourceKey);
   bool get isInitialized => _engine != null && _sourceMeta != null;
   bool get softwareLogCaptureEnabled => _softwareLogCaptureEnabled;
 

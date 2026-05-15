@@ -79,6 +79,7 @@ class FavoritePageController extends ChangeNotifier {
         isLogged: _cloudFlow.isLogged,
         supportFavoriteSortOrder: _cloudFlow.supportsSortOrder,
         supportFavoriteFolderAdd: _cloudFlow.supportsFolderAdd,
+        favoriteSortOrders: _cloudFlow.sortOrders,
       );
 
   void resetForReload() {
@@ -418,7 +419,12 @@ class FavoritePageController extends ChangeNotifier {
     required String timeoutMessage,
     ValueChanged<String>? onFolderLoadError,
   }) async {
-    final normalized = order == 'mp' ? 'mp' : 'mr';
+    final allowedOrders = _state.mode == FavoritePageMode.local
+        ? const <String>['mr', 'mp']
+        : _cloudFlow.sortOrders;
+    final normalized = allowedOrders.contains(order)
+        ? order
+        : allowedOrders.firstOrNull ?? 'mr';
     if (normalized == _state.favoriteSortOrder) {
       return null;
     }

@@ -47,12 +47,14 @@ class FavoritePageData {
     required bool isLogged,
     required bool supportFavoriteSortOrder,
     required bool supportFavoriteFolderAdd,
+    required List<String> favoriteSortOrders,
   }) {
     if (mode == FavoritePageMode.local) {
       return FavoriteAppBarActionsState(
         showSort: true,
         showCreateFolder: true,
         currentSortOrder: favoriteSortOrder,
+        sortOrders: const <String>['mr', 'mp'],
         showModeToggle: true,
         currentMode: mode,
       );
@@ -62,6 +64,7 @@ class FavoritePageData {
       showSort: isLogged && supportFavoriteSortOrder,
       showCreateFolder: isLogged && supportFavoriteFolderAdd,
       currentSortOrder: favoriteSortOrder,
+      sortOrders: favoriteSortOrders,
       showModeToggle: true,
       currentMode: mode,
     );

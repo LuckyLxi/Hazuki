@@ -12,6 +12,9 @@ class LineSettingsController extends ChangeNotifier {
 
   String _selectedApiDomain = '1';
   String _selectedImageStream = '1';
+  String _copyMangaRegion = '0';
+  String _copyMangaBaseUrl = 'api.copy2000.online';
+  String _copyMangaSearchApi = 'baseAPI';
   bool _refreshDomainsOnStart = true;
 
   List<String> _apiDomains = const [];
@@ -22,8 +25,12 @@ class LineSettingsController extends ChangeNotifier {
 
   bool get loading => _loading;
   bool get refreshingStatus => _refreshingStatus;
+  bool get isCopyMangaSource => _sourceService.isActiveCopyMangaSource;
   String get selectedApiDomain => _selectedApiDomain;
   String get selectedImageStream => _selectedImageStream;
+  String get copyMangaRegion => _copyMangaRegion;
+  String get copyMangaBaseUrl => _copyMangaBaseUrl;
+  String get copyMangaSearchApi => _copyMangaSearchApi;
   bool get refreshDomainsOnStart => _refreshDomainsOnStart;
   List<String> get apiDomains => _apiDomains;
   int get imageStreamCount => _imageStreamCount;
@@ -41,6 +48,25 @@ class LineSettingsController extends ChangeNotifier {
     }
 
     try {
+      if (_sourceService.isActiveCopyMangaSource) {
+        final region =
+            _sourceService.loadActiveSourceSetting('region')?.toString() ?? '0';
+        _copyMangaRegion = {'0', '1'}.contains(region) ? region : '0';
+        final baseUrl =
+            _sourceService.loadActiveSourceSetting('base_url')?.toString() ??
+            'api.copy2000.online';
+        _copyMangaBaseUrl = baseUrl.trim().isEmpty
+            ? 'api.copy2000.online'
+            : baseUrl.trim();
+        final searchApi =
+            _sourceService.loadActiveSourceSetting('search_api')?.toString() ??
+            'baseAPI';
+        _copyMangaSearchApi = {'baseAPI', 'webAPI'}.contains(searchApi)
+            ? searchApi
+            : 'baseAPI';
+        return;
+      }
+
       final snapshot = await _sourceService.getLineSettingsSnapshot().timeout(
         const Duration(seconds: 20),
       );
@@ -98,6 +124,7 @@ class LineSettingsController extends ChangeNotifier {
 
   Future<void> refreshLineStatus() async {
     if (_disposed || _refreshingStatus) return;
+    if (_sourceService.isActiveCopyMangaSource) return;
     _refreshingStatus = true;
     _notify();
     try {
@@ -120,6 +147,31 @@ class LineSettingsController extends ChangeNotifier {
       refreshApiDomains: false,
       refreshImageHost: false,
     );
+  }
+
+  Future<void> setCopyMangaRegion(String value) async {
+    if (value == _copyMangaRegion) return;
+    _copyMangaRegion = value;
+    _notify();
+    await _sourceService.updateActiveSourceSetting('region', value);
+  }
+
+  Future<void> setCopyMangaBaseUrl(String value) async {
+    final normalized = value.trim();
+    if (normalized.isEmpty || normalized == _copyMangaBaseUrl) return;
+    _copyMangaBaseUrl = normalized;
+    _notify();
+    await _sourceService.updateActiveSourceSetting('base_url', normalized);
+  }
+
+  Future<void> setCopyMangaSearchApi(String value) async {
+    final normalized = {'baseAPI', 'webAPI'}.contains(value)
+        ? value
+        : 'baseAPI';
+    if (normalized == _copyMangaSearchApi) return;
+    _copyMangaSearchApi = normalized;
+    _notify();
+    await _sourceService.updateActiveSourceSetting('search_api', normalized);
   }
 
   Future<void> setImageStream(String value) async {

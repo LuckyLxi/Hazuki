@@ -82,6 +82,12 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
     unawaited(_controller.selectSortOption(value: value));
   }
 
+  void _onSelectSortOptionInGroup(int groupIndex, String value) {
+    unawaited(
+      _controller.selectSortOptionInGroup(groupIndex: groupIndex, value: value),
+    );
+  }
+
   void _onScroll() {
     if (!_scrollController.hasClients) return;
     final pos = _scrollController.position;
@@ -134,11 +140,17 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
               children: [
                 Column(
                   children: [
-                    if (_controller.sortOptions.isNotEmpty)
+                    if (_controller.sortOptions.isNotEmpty ||
+                        _controller.sortOptionGroups.any(
+                          (group) => group.isNotEmpty,
+                        ))
                       DiscoverSectionSortBar(
                         sortOptions: _controller.sortOptions,
+                        sortOptionGroups: _controller.sortOptionGroups,
                         selectedSortValue: _controller.selectedSortValue,
+                        selectedSortValues: _controller.selectedSortValues,
                         onSelectSortOption: _onSelectSortOption,
+                        onSelectSortOptionInGroup: _onSelectSortOptionInGroup,
                       ),
                     DiscoverSectionContent(
                       controller: _controller,

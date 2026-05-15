@@ -26,7 +26,10 @@ class DiscoverSectionPageController extends ChangeNotifier {
 
   List<ExploreComic> get comics => _state.comics;
   List<CategoryRankingOption> get sortOptions => _state.sortOptions;
+  List<List<CategoryRankingOption>> get sortOptionGroups =>
+      _state.sortOptionGroups;
   String? get selectedSortValue => _state.selectedSortValue;
+  List<String> get selectedSortValues => _state.selectedSortValues;
   bool get loadingMore => _state.loadingMore;
   bool get hasMore => _state.hasMore;
   int get currentPage => _state.currentPage;
@@ -49,13 +52,21 @@ class DiscoverSectionPageController extends ChangeNotifier {
     }
 
     try {
-      final options = await _sourceService.loadCategoryRankingOptionsByViewMore(
-        viewMoreUrl: url,
-      );
+      final optionGroups = await _sourceService
+          .loadCategoryOptionGroupsByViewMore(viewMoreUrl: url);
       if (_disposed) return;
 
-      _state.sortOptions = options;
-      _state.selectedSortValue = options.isEmpty ? null : options.first.value;
+      _state.sortOptionGroups = optionGroups;
+      _state.sortOptions = optionGroups.isEmpty
+          ? const <CategoryRankingOption>[]
+          : optionGroups.first;
+      _state.selectedSortValues = optionGroups
+          .map((group) => group.isEmpty ? '' : group.first.value)
+          .where((value) => value.isNotEmpty)
+          .toList();
+      _state.selectedSortValue = _state.selectedSortValues.isEmpty
+          ? null
+          : _state.selectedSortValues.first;
       _state.currentPage = 0;
       _state.hasMore = true;
       _state.errorMessage = null;
@@ -65,7 +76,9 @@ class DiscoverSectionPageController extends ChangeNotifier {
     } catch (_) {
       if (_disposed) return;
       _state.sortOptions = const <CategoryRankingOption>[];
+      _state.sortOptionGroups = const <List<CategoryRankingOption>>[];
       _state.selectedSortValue = 'mr';
+      _state.selectedSortValues = const <String>['mr'];
       _notify();
       await _loadPage();
     } finally {
@@ -85,6 +98,30 @@ class DiscoverSectionPageController extends ChangeNotifier {
     if (_state.selectedSortValue == value || _state.loadingMore) return;
 
     _state.selectedSortValue = value;
+    _state.errorMessage = null;
+    _state.currentPage = 0;
+    _state.hasMore = true;
+    _state.showLoadMoreFooter = false;
+    _state.comics.clear();
+    _notify();
+
+    await _loadPage();
+  }
+
+  Future<void> selectSortOptionInGroup({
+    required int groupIndex,
+    required String value,
+  }) async {
+    if (_state.loadingMore || groupIndex < 0) return;
+    final next = List<String>.of(_state.selectedSortValues);
+    while (next.length <= groupIndex) {
+      next.add('');
+    }
+    if (next[groupIndex] == value) return;
+
+    next[groupIndex] = value;
+    _state.selectedSortValues = next;
+    _state.selectedSortValue = next.isEmpty ? null : next.first;
     _state.errorMessage = null;
     _state.currentPage = 0;
     _state.hasMore = true;
@@ -121,6 +158,7 @@ class DiscoverSectionPageController extends ChangeNotifier {
         viewMoreUrl: url,
         page: nextPage,
         order: _state.selectedSortValue ?? 'mr',
+        orders: _state.selectedSortValues,
       );
 
       if (_disposed || requestVersion != _state.requestVersion) return;

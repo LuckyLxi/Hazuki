@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
+import 'package:hazuki/services/hazuki_source_service.dart';
 
 import '../support/comic_detail_scope.dart';
 import 'comic_detail_expandable_description.dart';
@@ -28,6 +29,7 @@ class ComicDetailInfoTab extends StatelessWidget {
     final actions = ComicDetailScope.of(context).actions;
     return ComicDetailMetaSection(
       details: details,
+      showComicId: !isHazukiCopyMangaSourceKey(details.sourceKey),
       onCopyId: (id) => unawaited(actions.copyComicId(context, id)),
       onMetaValuePressed: (v) => actions.openSearchForKeyword(context, v),
       onMetaValueLongPress: (v) => unawaited(actions.copyMetaValue(context, v)),
@@ -69,6 +71,10 @@ class ComicDetailInfoTab extends StatelessWidget {
     if (shouldAnimate) {
       uiState.markInfoEntranceAnimated();
     }
+    final showComicId = !isHazukiCopyMangaSourceKey(resolvedDetails.sourceKey);
+    final hasVisibleMeta =
+        (showComicId && resolvedDetails.id.trim().isNotEmpty) ||
+        resolvedDetails.tags.isNotEmpty;
 
     return CustomScrollView(
       key: const PageStorageKey<String>('comic-detail-info-tab'),
@@ -95,8 +101,7 @@ class ComicDetailInfoTab extends StatelessWidget {
                       text: resolvedDetails.description,
                     ),
                   ],
-                  if (resolvedDetails.id.trim().isNotEmpty ||
-                      resolvedDetails.tags.isNotEmpty) ...[
+                  if (hasVisibleMeta) ...[
                     const SizedBox(height: 12),
                     _buildMetaSection(context, resolvedDetails),
                   ],

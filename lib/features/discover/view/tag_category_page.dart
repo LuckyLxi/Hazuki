@@ -7,13 +7,20 @@ import 'package:flutter/material.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../models/hazuki_models.dart';
 import '../../../services/hazuki_source_service.dart';
+import '../../../shared/navigation_tags.dart';
 import '../../../widgets/widgets.dart';
 import '../../../widgets/windows_comic_detail_host.dart';
+import 'discover_section_page.dart';
 
 class TagCategoryPage extends StatefulWidget {
-  const TagCategoryPage({super.key, required this.searchPageBuilder});
+  const TagCategoryPage({
+    super.key,
+    required this.searchPageBuilder,
+    required this.comicDetailPageBuilder,
+  });
 
   final Widget Function(String tag) searchPageBuilder;
+  final ComicDetailPageBuilder comicDetailPageBuilder;
 
   @override
   State<TagCategoryPage> createState() => _TagCategoryPageState();
@@ -23,7 +30,7 @@ class _TagCategoryGroupCard extends StatelessWidget {
   const _TagCategoryGroupCard({required this.group, required this.onOpenTag});
 
   final CategoryTagGroup group;
-  final ValueChanged<String> onOpenTag;
+  final void Function(CategoryTagGroup group, int index) onOpenTag;
 
   @override
   Widget build(BuildContext context) {
@@ -45,10 +52,12 @@ class _TagCategoryGroupCard extends StatelessWidget {
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
-                  children: group.tags.map((tag) {
+                  children: group.tags.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final tag = entry.value;
                     return ActionChip(
                       label: Text(tag),
-                      onPressed: () => onOpenTag(tag),
+                      onPressed: () => onOpenTag(group, index),
                     );
                   }).toList(),
                 ),
@@ -246,7 +255,27 @@ class _TagCategoryPageState extends State<TagCategoryPage> {
     });
   }
 
-  void _openSearchByTag(String tag) {
+  void _openTag(CategoryTagGroup group, int index) {
+    final tag = group.tags[index];
+    if (group.opensCategory) {
+      final param = group.paramForIndex(index);
+      final viewMoreUrl = param == null
+          ? 'category:$tag'
+          : 'category:$tag@$param';
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => DiscoverSectionPage(
+            section: ExploreSection(
+              title: tag,
+              comics: const <ExploreComic>[],
+              viewMoreUrl: viewMoreUrl,
+            ),
+            comicDetailPageBuilder: widget.comicDetailPageBuilder,
+          ),
+        ),
+      );
+      return;
+    }
     Navigator.of(context).push(
       MaterialPageRoute<void>(builder: (_) => widget.searchPageBuilder(tag)),
     );
@@ -329,7 +358,7 @@ class _TagCategoryPageState extends State<TagCategoryPage> {
                   final group = _tagGroups[index - 1];
                   return _TagCategoryGroupCard(
                     group: group,
-                    onOpenTag: _openSearchByTag,
+                    onOpenTag: _openTag,
                   );
                 },
               ),

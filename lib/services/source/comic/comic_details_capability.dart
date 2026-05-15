@@ -149,11 +149,16 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
       fallbackComicId: normalizedComicId,
     );
     final recommend = _extractComicDetailsRecommendations(map);
+    final tags = _extractComicDetailsTags(map);
 
     final detailsComicId = map['id']?.toString().trim() ?? '';
     final finalComicId = detailsComicId.isEmpty
         ? normalizedComicId
         : detailsComicId;
+    final updateTime = _resolveComicDetailsUpdateTime(
+      map['updateTime']?.toString() ?? '',
+      tags,
+    );
 
     return ComicDetailsData(
       id: finalComicId,
@@ -161,10 +166,10 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
       subTitle: (map['subTitle'] ?? map['subtitle'] ?? '').toString(),
       cover: map['cover']?.toString() ?? '',
       description: map['description']?.toString() ?? '',
-      updateTime: map['updateTime']?.toString() ?? '',
+      updateTime: updateTime,
       likesCount: map['likesCount']?.toString() ?? '',
       chapters: chapters,
-      tags: _extractComicDetailsTags(map),
+      tags: _filterComicDetailsDisplayTags(tags),
       recommend: recommend,
       isFavorite: jsAsBool(map['isFavorite']),
       isLiked: jsAsBool(map['isLiked']),
@@ -350,4 +355,50 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
     }
     return recommend;
   }
+}
+
+String _resolveComicDetailsUpdateTime(
+  String explicitUpdateTime,
+  Map<String, List<String>> tags,
+) {
+  final trimmed = explicitUpdateTime.trim();
+  if (trimmed.isNotEmpty) {
+    return trimmed;
+  }
+  for (final entry in tags.entries) {
+    if (!_isComicDetailsUpdateTagKey(entry.key)) {
+      continue;
+    }
+    for (final value in entry.value) {
+      final text = value.trim();
+      if (text.isNotEmpty) {
+        return text;
+      }
+    }
+  }
+  return '';
+}
+
+Map<String, List<String>> _filterComicDetailsDisplayTags(
+  Map<String, List<String>> tags,
+) {
+  final filtered = <String, List<String>>{};
+  for (final entry in tags.entries) {
+    if (_isComicDetailsUpdateTagKey(entry.key)) {
+      continue;
+    }
+    filtered[entry.key] = entry.value;
+  }
+  return filtered;
+}
+
+bool _isComicDetailsUpdateTagKey(String key) {
+  final normalized = key.trim().toLowerCase();
+  return normalized == '更新' ||
+      normalized == '更新时间' ||
+      normalized == 'update' ||
+      normalized == 'updated' ||
+      normalized == 'time' ||
+      normalized == 'datetime' ||
+      normalized == 'datetime_updated';
 }

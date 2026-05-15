@@ -58,6 +58,17 @@ extension HazukiSourceServiceFavoritesCapability on HazukiSourceService {
     if (sourceMeta == null) {
       return 'mr';
     }
+    if (isHazukiCopyMangaSourceKey(sourceMeta.key)) {
+      final raw = facade.loadSourceSetting(
+        sourceMeta.key,
+        'favorites_ordering',
+      );
+      final normalized = raw?.toString().trim() ?? '';
+      if (favoriteSortOrders.contains(normalized)) {
+        return normalized;
+      }
+      return '-datetime_updated';
+    }
     final raw = facade.loadSourceSetting(sourceMeta.key, 'favoriteOrder');
     final normalized = raw?.toString().trim() ?? '';
     if (normalized == 'mp') {
@@ -71,8 +82,31 @@ extension HazukiSourceServiceFavoritesCapability on HazukiSourceService {
     if (sourceMeta == null) {
       throw Exception('source_not_initialized');
     }
+    if (isHazukiCopyMangaSourceKey(sourceMeta.key)) {
+      final normalized = favoriteSortOrders.contains(order.trim())
+          ? order.trim()
+          : '-datetime_updated';
+      await facade.saveSourceSetting(
+        sourceMeta.key,
+        'favorites_ordering',
+        normalized,
+      );
+      return;
+    }
     final normalized = order.trim() == 'mp' ? 'mp' : 'mr';
     await facade.saveSourceSetting(sourceMeta.key, 'favoriteOrder', normalized);
+  }
+
+  List<String> get favoriteSortOrders {
+    final sourceMeta = facade.sourceMeta;
+    if (sourceMeta != null && isHazukiCopyMangaSourceKey(sourceMeta.key)) {
+      return const <String>[
+        '-datetime_updated',
+        '-datetime_modifier',
+        '-datetime_browse',
+      ];
+    }
+    return const <String>['mr', 'mp'];
   }
 
   bool get supportFavoriteSortOrder {
@@ -81,7 +115,9 @@ extension HazukiSourceServiceFavoritesCapability on HazukiSourceService {
       return false;
     }
     return facade.js.asBool(
-      facade.js.evaluate('!!this.__hazuki_source.settings?.favoriteOrder'),
+      facade.js.evaluate(
+        '!!(this.__hazuki_source.settings?.favoriteOrder || this.__hazuki_source.settings?.favorites_ordering)',
+      ),
     );
   }
 

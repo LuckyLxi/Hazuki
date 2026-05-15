@@ -13,36 +13,68 @@ class DiscoverSectionSortBar extends StatelessWidget {
   const DiscoverSectionSortBar({
     super.key,
     required this.sortOptions,
+    this.sortOptionGroups = const <List<CategoryRankingOption>>[],
     required this.selectedSortValue,
+    this.selectedSortValues = const <String>[],
     required this.onSelectSortOption,
+    this.onSelectSortOptionInGroup,
   });
 
   final List<CategoryRankingOption> sortOptions;
+  final List<List<CategoryRankingOption>> sortOptionGroups;
   final String? selectedSortValue;
+  final List<String> selectedSortValues;
   final ValueChanged<String> onSelectSortOption;
+  final void Function(int groupIndex, String value)? onSelectSortOptionInGroup;
 
   @override
   Widget build(BuildContext context) {
+    final groups = sortOptionGroups.isEmpty
+        ? <List<CategoryRankingOption>>[sortOptions]
+        : sortOptionGroups;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              for (final option in sortOptions)
-                Padding(
-                  padding: const EdgeInsets.only(right: 8),
-                  child: ChoiceChip(
-                    label: Text(option.label),
-                    selected: selectedSortValue == option.value,
-                    onSelected: (_) => onSelectSortOption(option.value),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          for (var groupIndex = 0; groupIndex < groups.length; groupIndex++)
+            if (groups[groupIndex].isNotEmpty)
+              Padding(
+                padding: EdgeInsets.only(
+                  bottom: groupIndex == groups.length - 1 ? 0 : 8,
+                ),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        for (final option in groups[groupIndex])
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: ChoiceChip(
+                              label: Text(option.label),
+                              selected:
+                                  (selectedSortValues.length > groupIndex
+                                      ? selectedSortValues[groupIndex]
+                                      : selectedSortValue) ==
+                                  option.value,
+                              onSelected: (_) {
+                                final handler = onSelectSortOptionInGroup;
+                                if (handler != null) {
+                                  handler(groupIndex, option.value);
+                                  return;
+                                }
+                                onSelectSortOption(option.value);
+                              },
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
-            ],
-          ),
-        ),
+              ),
+        ],
       ),
     );
   }

@@ -14,6 +14,7 @@ class FavoriteCloudFlow {
   bool get supportsFolderLoad => sourceService.supportFavoriteFolderLoad;
   bool get supportsSortOrder => sourceService.supportFavoriteSortOrder;
   String get currentSortOrder => sourceService.favoriteSortOrder;
+  List<String> get sortOrders => sourceService.favoriteSortOrders;
 
   Future<void> ensureInitialized() {
     return sourceService.ensureInitialized();

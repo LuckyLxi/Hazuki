@@ -45,7 +45,7 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
 
   void _handleSourceChanged() {
     if (mounted) {
-      setState(() {});
+      unawaited(_loadSettings());
     }
   }
 
@@ -87,6 +87,13 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
       _snapshot = _snapshot.copyWith(discoverDailyRecommendationEnabled: value);
     });
     await OtherSettingsActions.toggleDiscoverDailyRecommendation(value);
+  }
+
+  Future<void> _setCopyMangaImageQuality(String value) async {
+    setState(() {
+      _snapshot = _snapshot.copyWith(copyMangaImageQuality: value);
+    });
+    await OtherSettingsActions.updateCopyMangaImageQuality(value);
   }
 
   @override
@@ -147,6 +154,9 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
                     discoverDailyRecommendationEnabled:
                         _snapshot.discoverDailyRecommendationEnabled,
                     showJmExclusiveSettings: _sourceService.isActiveJmSource,
+                    showCopyMangaSettings:
+                        _sourceService.isActiveCopyMangaSource,
+                    copyMangaImageQuality: _snapshot.copyMangaImageQuality,
                     useSystemTitleBar: _snapshot.useSystemTitleBar,
                     mangaDownloadsRootPath: _snapshot.mangaDownloadsRootPath,
                     showWindowsTitleBarToggle:
@@ -156,6 +166,11 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
                     onAutoSoftwareUpdateChanged: _toggleAutoSoftwareUpdateCheck,
                     onDiscoverDailyRecommendationChanged:
                         _toggleDiscoverDailyRecommendation,
+                    onCopyMangaImageQualityChanged: (value) {
+                      if (value != null) {
+                        unawaited(_setCopyMangaImageQuality(value));
+                      }
+                    },
                     onUseSystemTitleBarChanged: _toggleUseSystemTitleBar,
                     onEditMangaDownloadPath: () =>
                         unawaited(_editMangaDownloadPath()),

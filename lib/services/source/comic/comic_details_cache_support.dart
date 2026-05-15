@@ -137,16 +137,21 @@ extension HazukiSourceServiceComicDetailsCacheSupport on HazukiSourceService {
       }
     }
 
+    final updateTime = _resolveComicDetailsUpdateTime(
+      map['updateTime']?.toString() ?? '',
+      tags,
+    );
+
     return ComicDetailsData(
       id: id,
       title: map['title']?.toString() ?? '',
       subTitle: map['subTitle']?.toString() ?? '',
       cover: map['cover']?.toString() ?? '',
       description: map['description']?.toString() ?? '',
-      updateTime: map['updateTime']?.toString() ?? '',
+      updateTime: updateTime,
       likesCount: map['likesCount']?.toString() ?? '',
       chapters: chapters,
-      tags: tags,
+      tags: _filterComicDetailsDisplayTags(tags),
       recommend: recommend,
       isFavorite: jsAsBool(map['isFavorite']),
       isLiked: jsAsBool(map['isLiked']),

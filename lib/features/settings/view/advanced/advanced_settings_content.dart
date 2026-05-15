@@ -9,22 +9,26 @@ class AdvancedSettingsContent extends StatelessWidget {
     required this.noImageMode,
     required this.softwareLogCaptureEnabled,
     required this.hasCustomEditedSource,
+    required this.showCopyMangaSettings,
     required this.logsPageBuilder,
     required this.onToggleNoImageMode,
     required this.onToggleSoftwareLogCaptureEnabled,
     required this.onOpenComicSourceEditor,
     required this.onRestoreComicSource,
+    required this.onClearCopyMangaDeviceInfo,
   });
 
   final bool loading;
   final bool noImageMode;
   final bool softwareLogCaptureEnabled;
   final bool hasCustomEditedSource;
+  final bool showCopyMangaSettings;
   final WidgetBuilder logsPageBuilder;
   final ValueChanged<bool> onToggleNoImageMode;
   final ValueChanged<bool> onToggleSoftwareLogCaptureEnabled;
   final Future<void> Function() onOpenComicSourceEditor;
   final Future<void> Function() onRestoreComicSource;
+  final Future<void> Function() onClearCopyMangaDeviceInfo;
 
   @override
   Widget build(BuildContext context) {
@@ -66,6 +70,13 @@ class AdvancedSettingsContent extends StatelessWidget {
               value: softwareLogCaptureEnabled,
               onChanged: onToggleSoftwareLogCaptureEnabled,
             ),
+            if (showCopyMangaSettings)
+              ListTile(
+                leading: const Icon(Icons.phonelink_erase_outlined),
+                title: Text(strings.advancedCopyMangaClearDeviceTitle),
+                subtitle: Text(strings.advancedCopyMangaClearDeviceSubtitle),
+                onTap: onClearCopyMangaDeviceInfo,
+              ),
             ListTile(
               leading: const Icon(Icons.javascript_rounded),
               title: Text(strings.advancedEditSourceTitle),

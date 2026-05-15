@@ -18,6 +18,14 @@ class FavoriteAppBarActions extends StatelessWidget {
   final VoidCallback onCreateFolderPressed;
   final VoidCallback onModeTogglePressed;
 
+  String _sortLabel(BuildContext context, String order) {
+    return switch (order) {
+      'mp' || '-datetime_updated' => l10n(context).homeFavoriteSortByUpdateTime,
+      '-datetime_browse' => l10n(context).homeFavoriteSortByReadTime,
+      _ => l10n(context).homeFavoriteSortByFavoriteTime,
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
     final isLocalMode = state.currentMode == FavoritePageMode.local;
@@ -71,18 +79,15 @@ class FavoriteAppBarActions extends StatelessWidget {
             tooltip: l10n(context).homeSortTooltip,
             initialValue: state.currentSortOrder,
             onSelected: onSortSelected,
-            itemBuilder: (context) => [
-              CheckedPopupMenuItem<String>(
-                value: 'mr',
-                checked: state.currentSortOrder == 'mr',
-                child: Text(l10n(context).homeFavoriteSortByFavoriteTime),
-              ),
-              CheckedPopupMenuItem<String>(
-                value: 'mp',
-                checked: state.currentSortOrder == 'mp',
-                child: Text(l10n(context).homeFavoriteSortByUpdateTime),
-              ),
-            ],
+            itemBuilder: (context) => state.sortOrders
+                .map(
+                  (order) => CheckedPopupMenuItem<String>(
+                    value: order,
+                    checked: state.currentSortOrder == order,
+                    child: Text(_sortLabel(context, order)),
+                  ),
+                )
+                .toList(),
             icon: const Icon(Icons.sort_rounded),
           ),
         if (state.showCreateFolder)
