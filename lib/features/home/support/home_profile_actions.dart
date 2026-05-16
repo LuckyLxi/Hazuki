@@ -289,39 +289,57 @@ Future<void> showHomeLoginDialog(
                             ).textTheme.headlineSmall,
                           ),
                           const SizedBox(height: 20),
-                          TextField(
-                            controller: accountController,
-                            enabled: !loading,
-                            decoration: InputDecoration(
-                              labelText: strings.homeLoginAccountLabel,
-                              border: const OutlineInputBorder(),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          TextField(
-                            controller: passwordController,
-                            enabled: !loading,
-                            obscureText: !passwordVisible,
-                            decoration: InputDecoration(
-                              labelText: strings.homeLoginPasswordLabel,
-                              border: const OutlineInputBorder(),
-                              suffixIcon: IconButton(
-                                tooltip: passwordVisible
-                                    ? strings.homeLoginHidePassword
-                                    : strings.homeLoginShowPassword,
-                                onPressed: loading
-                                    ? null
-                                    : () {
-                                        setDialogState(() {
-                                          passwordVisible = !passwordVisible;
-                                        });
-                                      },
-                                icon: Icon(
-                                  passwordVisible
-                                      ? Icons.visibility_off_outlined
-                                      : Icons.visibility_outlined,
+                          // 用 AutofillGroup 包裹账号和密码字段，使系统密码填充服务能够识别并自动填充
+                          AutofillGroup(
+                            child: Column(
+                              children: [
+                                TextField(
+                                  controller: accountController,
+                                  enabled: !loading,
+                                  // 提示系统这是用户名/邮箱字段
+                                  autofillHints: const [
+                                    AutofillHints.username,
+                                    AutofillHints.email,
+                                  ],
+                                  textInputAction: TextInputAction.next,
+                                  keyboardType: TextInputType.emailAddress,
+                                  decoration: InputDecoration(
+                                    labelText: strings.homeLoginAccountLabel,
+                                    border: const OutlineInputBorder(),
+                                  ),
                                 ),
-                              ),
+                                const SizedBox(height: 16),
+                                TextField(
+                                  controller: passwordController,
+                                  enabled: !loading,
+                                  obscureText: !passwordVisible,
+                                  // 提示系统这是密码字段
+                                  autofillHints: const [AutofillHints.password],
+                                  textInputAction: TextInputAction.done,
+                                  decoration: InputDecoration(
+                                    labelText: strings.homeLoginPasswordLabel,
+                                    border: const OutlineInputBorder(),
+                                    suffixIcon: IconButton(
+                                      tooltip: passwordVisible
+                                          ? strings.homeLoginHidePassword
+                                          : strings.homeLoginShowPassword,
+                                      onPressed: loading
+                                          ? null
+                                          : () {
+                                              setDialogState(() {
+                                                passwordVisible =
+                                                    !passwordVisible;
+                                              });
+                                            },
+                                      icon: Icon(
+                                        passwordVisible
+                                            ? Icons.visibility_off_outlined
+                                            : Icons.visibility_outlined,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                           if (errorText != null) ...[
