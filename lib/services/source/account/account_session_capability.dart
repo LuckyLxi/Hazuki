@@ -31,14 +31,25 @@ extension HazukiSourceServiceAccountSessionCapability on HazukiSourceService {
       throw Exception('account_login_not_supported');
     }
 
-    final script =
-        'this.__hazuki_source.account.login(${jsonEncode(account)}, ${jsonEncode(password)})';
+    final script = isHazukiCopyMangaSourceKey(sourceMeta.key)
+        ? _copyMangaLoginScript(account: account, password: password)
+        : 'this.__hazuki_source.account.login(${jsonEncode(account)}, ${jsonEncode(password)})';
     final startedAt = DateTime.now();
     dynamic resolvedResult;
 
     try {
-      final result = engine.evaluate(script, name: 'source_login.js');
+      final result = engine.evaluate(
+        script,
+        name: isHazukiCopyMangaSourceKey(sourceMeta.key)
+            ? 'copy_manga_login.js'
+            : 'source_login.js',
+      );
       resolvedResult = await facade.js.resolve(result);
+      await _persistLoginSideData(
+        facade,
+        sourceKey: sourceMeta.key,
+        result: resolvedResult,
+      );
       facade.lastLoginDebugInfo = {
         'time': DateTime.now().toIso8601String(),
         'ok': true,
@@ -110,5 +121,110 @@ extension HazukiSourceServiceAccountSessionCapability on HazukiSourceService {
     }
 
     await facade.deleteSourceData(sourceMeta.key, 'account');
+    await facade.deleteSourceData(sourceMeta.key, 'avatar_url');
+    facade.runtime.transientAvatarUrl = null;
+    if (isHazukiCopyMangaSourceKey(sourceMeta.key)) {
+      await facade.deleteSourceData(sourceMeta.key, 'token');
+    }
+  }
+}
+
+String _copyMangaLoginScript({
+  required String account,
+  required String password,
+}) {
+  final accountJson = jsonEncode(account);
+  final passwordJson = jsonEncode(password);
+  return '''
+(async () => {
+  const source = this.__hazuki_source;
+  const account = $accountJson;
+  const password = $passwordJson;
+  const salt = Math.floor(Math.random() * 9000) + 1000;
+  const encodedPassword = Convert.encodeBase64(
+    Convert.encodeUtf8(password + "-" + salt)
+  );
+  const response = await Network.post(
+    source.apiUrl + "/api/v3/login",
+    {
+      ...source.headers,
+      "Content-Type": "application/x-www-form-urlencoded;charset=utf-8"
+    },
+    "username=" +
+      account +
+      "&password=" +
+      encodedPassword +
+      "\\n&salt=" +
+      salt +
+      "&authorization=Token+"
+  );
+  if (response.status !== 200) {
+    throw "Invalid Status Code " + response.status;
+  }
+  const data = JSON.parse(response.body);
+  const token = data && data.results && data.results.token;
+  if (token) {
+    source.saveData("token", token);
+  }
+  return data;
+})()
+''';
+}
+
+Future<void> _persistLoginSideData(
+  HazukiSourceFacade facade, {
+  required String sourceKey,
+  required dynamic result,
+}) async {
+  final safeResult = jsonSafe(result);
+  final results = safeResult is Map ? safeResult['results'] : null;
+  if (results is! Map) {
+    _logAvatarEvent(
+      facade,
+      level: 'warn',
+      title: 'Login side data missing',
+      content: {
+        'sourceKey': sourceKey,
+        'resultType': safeResult.runtimeType.toString(),
+      },
+    );
+    return;
+  }
+
+  final token = results['token'];
+  if (isHazukiCopyMangaSourceKey(sourceKey) &&
+      token is String &&
+      token.trim().isNotEmpty) {
+    await facade.saveSourceData(sourceKey, 'token', token.trim());
+  }
+
+  final avatarUrl = normalizeSourceAvatarUrl(
+    sourceKey: sourceKey,
+    avatar: results['avatar'],
+  );
+  if (avatarUrl != null) {
+    facade.runtime.transientAvatarUrl = avatarUrl;
+    _logAvatarEvent(
+      facade,
+      title: 'Login avatar parsed',
+      content: {
+        'sourceKey': sourceKey,
+        'avatar': results['avatar'],
+        'avatarUrl': avatarUrl,
+        'hasToken': token is String && token.trim().isNotEmpty,
+      },
+    );
+  } else {
+    _logAvatarEvent(
+      facade,
+      level: 'warn',
+      title: 'Login avatar missing',
+      content: {
+        'sourceKey': sourceKey,
+        'resultKeys': results.keys.map((key) => key.toString()).toList(),
+        'avatar': results['avatar'],
+        'hasToken': token is String && token.trim().isNotEmpty,
+      },
+    );
   }
 }

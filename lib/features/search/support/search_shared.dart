@@ -69,6 +69,17 @@ String? extractBestComicId(String text) {
   return null;
 }
 
+String? normalizeDirectComicIdKeyword(String keyword) {
+  final normalized = keyword.trim().toLowerCase();
+  if (RegExp(r'^\d{2,}$').hasMatch(normalized)) {
+    return normalized;
+  }
+  if (RegExp(r'^jm\d{2,}$').hasMatch(normalized)) {
+    return normalized;
+  }
+  return null;
+}
+
 Future<bool> isComicIdSearchEnhanceEnabled() async {
   final prefs = await SharedPreferences.getInstance();
   return prefs.getBool(hazukiComicIdSearchEnhancePreferenceKey) == true;

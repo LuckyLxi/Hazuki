@@ -21,12 +21,7 @@ class DebugLogCapability {
       type: _normalizeDebugLogType(type),
       level: level,
       title: title,
-      content: _compactGenericLogValue(
-        jsonSafe(content),
-        maxStringLength: DebugLogConstants.applicationStringKeep,
-        maxItems: 24,
-        maxDepth: 4,
-      ),
+      content: jsonSafe(content),
       source: source,
     );
   }
@@ -55,12 +50,7 @@ class DebugLogCapability {
       ),
       level: level,
       title: title,
-      content: _compactGenericLogValue(
-        jsonSafe(content),
-        maxStringLength: DebugLogConstants.applicationStringKeep,
-        maxItems: 24,
-        maxDepth: 4,
-      ),
+      content: jsonSafe(content),
       source: source,
     );
   }
@@ -89,11 +79,7 @@ class DebugLogCapability {
       ),
       level: level,
       title: title,
-      content: _compactReaderLogContent(
-        jsonSafe(content),
-        source: source,
-        level: level,
-      ),
+      content: jsonSafe(content),
       source: source,
     );
   }
@@ -137,14 +123,21 @@ class DebugLogCapability {
     final normalizedLevel = _normalizeDebugLevel(level);
     final sourceText = source.trim().isEmpty ? 'app' : source.trim();
     final titleText = title.trim().isEmpty ? 'Log' : title.trim();
-    final safeContent = jsonSafe(content);
+    final fullContent = jsonSafe(content);
+    final safeContent = _compactGenericLogValue(
+      fullContent,
+      maxStringLength: DebugLogConstants.applicationStringKeep,
+      maxItems: 24,
+      maxDepth: 4,
+    );
+    final fullContentText = toBodyFull(fullContent) ?? 'null';
     final contentText = toBodyFull(safeContent) ?? 'null';
     final dedupKey = [
       normalizedType,
       sourceText,
       normalizedLevel,
       titleText,
-      contentText,
+      fullContentText,
     ].join('|');
 
     final existingIndex = targetLogs.indexWhere(
@@ -156,6 +149,7 @@ class DebugLogCapability {
       existing['lastSeenAt'] = now.toIso8601String();
       existing['level'] = normalizedLevel;
       existing['content'] = safeContent;
+      existing['contentFull'] = fullContent;
       existing['contentPreview'] = toBodyPreview(contentText, keep: 320);
       return;
     }
@@ -170,6 +164,7 @@ class DebugLogCapability {
       'level': normalizedLevel,
       'title': titleText,
       'content': safeContent,
+      'contentFull': fullContent,
       'contentPreview': toBodyPreview(contentText, keep: 320),
     });
     if (targetLogs.length > DebugLogConstants.maxTypedLogsKept) {
@@ -474,10 +469,7 @@ class DebugLogCapability {
         ? _compactNetworkHeaders(jsonSafe(responseHeaders))
         : null;
     final responseBodyFull = keepResponseDetails
-        ? toBodyPreview(
-            toBodyFull(responseBody),
-            keep: DebugLogConstants.networkFullBodyKeep,
-          )
+        ? toBodyFull(responseBody)
         : null;
     final responseBodyPreviewSource = keepResponseDetails
         ? responseBodyFull

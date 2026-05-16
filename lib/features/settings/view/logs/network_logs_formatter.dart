@@ -39,7 +39,8 @@ class NetworkLogsFormatter {
       source: source,
       importantOnly: false,
       includeFullBody: true,
-      compactFullBodyForUnimportant: true,
+      compactFullBodyForUnimportant: false,
+      includeHeaders: true,
     );
     return const JsonEncoder.withIndent('  ').convert(exportData);
   }

@@ -102,7 +102,9 @@ class _LogsAppBarExportButtonState extends State<LogsAppBarExportButton> {
       final debugInfo = await collector(
         tabIndex,
       ).timeout(const Duration(seconds: 10));
-      final content = const JsonEncoder.withIndent('  ').convert(debugInfo);
+      final content = const JsonEncoder.withIndent(
+        '  ',
+      ).convert(_expandFullLogContentForExport(debugInfo));
       final type = (debugInfo['type'] ?? 'logs').toString();
       await _saveLogsFile(prefix: type, content: content);
     } catch (e) {
@@ -119,6 +121,29 @@ class _LogsAppBarExportButtonState extends State<LogsAppBarExportButton> {
         });
       }
     }
+  }
+
+  Map<String, dynamic> _expandFullLogContentForExport(
+    Map<String, dynamic> debugInfo,
+  ) {
+    final result = Map<String, dynamic>.from(debugInfo);
+    final logs = result['logs'];
+    if (logs is List) {
+      result['logs'] = logs
+          .map((entry) {
+            if (entry is! Map) {
+              return entry;
+            }
+            final log = Map<String, dynamic>.from(entry);
+            if (log.containsKey('contentFull')) {
+              log['content'] = log['contentFull'];
+              log.remove('contentFull');
+            }
+            return log;
+          })
+          .toList(growable: false);
+    }
+    return result;
   }
 
   @override

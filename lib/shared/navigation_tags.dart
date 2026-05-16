@@ -59,7 +59,13 @@ HazukiCachedImage? _findCachedImageInSubtree(BuildContext context) {
     element.visitChildren(visitor);
   }
 
-  context.visitChildElements(visitor);
+  try {
+    // shuttle builder 在 build 阶段执行，此时 visitChildElements 可能抛出断言，
+    // 捕获后返回 null，Hero 动画将 fallback 到 fromHero.child
+    context.visitChildElements(visitor);
+  } catch (_) {
+    return null;
+  }
   return result;
 }
 

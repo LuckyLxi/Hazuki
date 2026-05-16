@@ -764,6 +764,7 @@ class SourceRuntimeKernel {
   SourceMeta? sourceMeta;
   bool isRefreshingSource = false;
   DateTime? lastReloginAt;
+  String? transientAvatarUrl;
 
   bool shouldSkipRelogin(Duration minInterval) {
     final last = lastReloginAt;

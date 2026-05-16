@@ -1,31 +1,111 @@
 part of '../../hazuki_source_service.dart';
 
+@visibleForTesting
+String? normalizeSourceAvatarUrl({
+  required String sourceKey,
+  required Object? avatar,
+  String imageBase = '',
+}) {
+  final raw = avatar?.toString().trim();
+  if (raw == null || raw.isEmpty) {
+    return null;
+  }
+  if (raw.startsWith('http://') || raw.startsWith('https://')) {
+    return raw;
+  }
+
+  final normalizedPath = raw.replaceFirst(RegExp(r'^/+'), '');
+  final baseUri = Uri.tryParse(imageBase);
+  if (baseUri != null && baseUri.hasScheme && baseUri.host.isNotEmpty) {
+    return baseUri.resolve('/$normalizedPath').toString();
+  }
+
+  if (isHazukiCopyMangaSourceKey(sourceKey) &&
+      normalizedPath.startsWith('user/cover/')) {
+    return 'https://s3.mangafuna.xyz/$normalizedPath';
+  }
+
+  return null;
+}
+
+String _avatarUrlForDisplay({
+  required String sourceKey,
+  required String avatarUrl,
+}) {
+  final uri = Uri.tryParse(avatarUrl);
+  if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
+    return avatarUrl;
+  }
+  return uri
+      .replace(
+        queryParameters: {
+          ...uri.queryParameters,
+          'hazuki_avatar_refresh': DateTime.now().millisecondsSinceEpoch
+              .toString(),
+        },
+      )
+      .toString();
+}
+
 extension HazukiSourceServiceCommentsAvatarSupport on HazukiSourceService {
   Future<String?> loadCurrentAvatarUrl() async {
     final facade = this.facade;
+    final sourceKey = facade.sourceMeta?.key ?? facade.sourceKey;
+    _logAvatarEvent(
+      facade,
+      title: 'Avatar load started',
+      content: {
+        'sourceKey': sourceKey,
+        'isLogged': facade.isLogged,
+        'hasEngine': facade.js.engine != null,
+      },
+    );
     if (!facade.isLogged) {
+      _logAvatarEvent(
+        facade,
+        level: 'warn',
+        title: 'Avatar load skipped',
+        content: {'reason': 'not_logged', 'sourceKey': sourceKey},
+      );
       return null;
     }
 
     final engine = facade.js.engine;
     if (engine == null) {
+      _logAvatarEvent(
+        facade,
+        level: 'warn',
+        title: 'Avatar load skipped',
+        content: {'reason': 'missing_engine', 'sourceKey': sourceKey},
+      );
       return null;
     }
 
-    // 优先读取本地缓存的头像 URL（由 _tryFetchAvatarViaApi 写入）
-    try {
-      final cachedRaw = facade.js.evaluate(
-        'this.__hazuki_source.loadData("avatar_url")',
+    final transientAvatarUrl = facade.runtime.transientAvatarUrl?.trim();
+    if (transientAvatarUrl != null && transientAvatarUrl.isNotEmpty) {
+      final avatarUrl = _avatarUrlForDisplay(
+        sourceKey: sourceKey,
+        avatarUrl: transientAvatarUrl,
       );
-      final cached = (await facade.js.resolve(cachedRaw))?.toString().trim();
-      if (cached != null && cached.isNotEmpty) {
-        return cached;
-      }
-    } catch (_) {}
+      _logAvatarEvent(
+        facade,
+        title: 'Avatar resolved from login response',
+        content: {'sourceKey': sourceKey, 'avatarUrl': avatarUrl},
+      );
+      return avatarUrl;
+    }
 
-    // JM 源的头像 URL 构造方式（通过 uid + baseUrl 拼接）
     final baseUrl = facade.js.evaluateString('this.__hazuki_source.baseUrl');
     final imageUrl = facade.js.evaluateString('this.__hazuki_source.imageUrl');
+    _logAvatarEvent(
+      facade,
+      title: 'Avatar JM uid path check',
+      content: {
+        'sourceKey': sourceKey,
+        'hasBaseUrl': baseUrl.isNotEmpty,
+        'hasImageUrl': imageUrl.isNotEmpty,
+      },
+    );
     if (baseUrl.isNotEmpty) {
       final baseUri = Uri.tryParse(baseUrl);
       if (baseUri != null && baseUri.hasScheme && baseUri.host.isNotEmpty) {
@@ -38,70 +118,265 @@ extension HazukiSourceServiceCommentsAvatarSupport on HazukiSourceService {
               .toString()
               .trim();
           if (RegExp(r'^\d+$').hasMatch(storedUid)) {
-            return imageBaseUri
+            final avatarUrl = imageBaseUri
                 .resolve('/media/users/$storedUid.jpg')
                 .toString();
+            _logAvatarEvent(
+              facade,
+              title: 'Avatar resolved from uid',
+              content: {
+                'sourceKey': sourceKey,
+                'uid': storedUid,
+                'avatarUrl': avatarUrl,
+              },
+            );
+            return _avatarUrlForDisplay(
+              sourceKey: sourceKey,
+              avatarUrl: avatarUrl,
+            );
           }
-        } catch (_) {}
+          _logAvatarEvent(
+            facade,
+            title: 'Avatar uid unavailable',
+            content: {'sourceKey': sourceKey, 'uid': storedUid},
+          );
+        } catch (error) {
+          _logAvatarEvent(
+            facade,
+            level: 'warn',
+            title: 'Avatar uid read failed',
+            content: {'sourceKey': sourceKey, 'error': error.toString()},
+          );
+        }
       }
     }
 
-    // 兜底：通过 JS 引擎调用源的 /api/v3/me 接口动态获取头像 URL，
-    // 适用于拷贝漫画等拥有 apiUrl 属性但不使用 JM 风格头像的源
-    return _tryFetchAvatarViaApi(engine, facade);
+    final apiAvatarUrl = await _tryFetchAvatarViaApi(engine, facade);
+    if (apiAvatarUrl != null) {
+      return apiAvatarUrl;
+    }
+
+    if (isHazukiCopyMangaSourceKey(sourceKey)) {
+      return _tryRefreshCopyMangaAvatarViaLogin(facade);
+    }
+
+    return null;
   }
 
-  /// 通过 JS 引擎调用 /api/v3/me 接口获取头像 URL 并写入本地缓存
   Future<String?> _tryFetchAvatarViaApi(
-    // ignore: avoid_dynamic_calls
     dynamic engine,
     HazukiSourceFacade facade,
   ) async {
     final sourceMeta = facade.sourceMeta;
     if (sourceMeta == null) {
+      _logAvatarEvent(
+        facade,
+        level: 'warn',
+        title: 'Avatar API fetch skipped',
+        content: {'reason': 'missing_source_meta'},
+      );
       return null;
     }
 
     try {
-      // 使用 JS 引擎调用，自动携带源实现的请求签名头（含 token）
+      _logAvatarEvent(
+        facade,
+        title: 'Avatar API fetch started',
+        content: {'sourceKey': sourceMeta.key},
+      );
       final result = engine.evaluate(r'''
         (async () => {
           try {
             let apiUrl = this.__hazuki_source.apiUrl;
-            if (!apiUrl) return null;
+            if (!apiUrl) return "__NO_API_URL__";
             let res = await Network.get(
               apiUrl + "/api/v3/me",
               this.__hazuki_source.headers
             );
-            if (res.status !== 200) return null;
-            let data = JSON.parse(res.body);
-            let r = data && data.results;
-            if (!r) return null;
-            // 尝试多个常见的头像字段名
-            return r.avatar
-              || r.user_cover
-              || r.cover
-              || r.avatar_url
-              || r.user_avatar
-              || null;
-          } catch (_) {
-            return null;
+            return "__RAW__" + res.status + "|" + (res.body || "");
+          } catch (e) {
+            return "__ERR__" + String(e);
           }
         })()
         ''', name: 'fetch_avatar_url.js');
 
       final resolved = await facade.js.resolve(result);
-      final avatarUrl = resolved?.toString().trim();
-
-      if (avatarUrl != null &&
-          avatarUrl.isNotEmpty &&
-          avatarUrl.startsWith('http')) {
-        // 写入本地缓存，下次直接读取，无需重复请求
-        await facade.saveSourceData(sourceMeta.key, 'avatar_url', avatarUrl);
-        return avatarUrl;
+      final raw = resolved?.toString() ?? '';
+      if (!raw.startsWith('__RAW__')) {
+        _logAvatarEvent(
+          facade,
+          level: 'warn',
+          title: 'Avatar API fetch failed',
+          content: {
+            'sourceKey': sourceMeta.key,
+            'stage': 'js_result',
+            'raw': raw,
+          },
+        );
+        return null;
       }
-    } catch (_) {}
+
+      final payload = raw.substring('__RAW__'.length);
+      final sepIdx = payload.indexOf('|');
+      if (sepIdx < 0) {
+        _logAvatarEvent(
+          facade,
+          level: 'warn',
+          title: 'Avatar API response malformed',
+          content: {'sourceKey': sourceMeta.key, 'raw': raw},
+        );
+        return null;
+      }
+
+      final statusCode = int.tryParse(payload.substring(0, sepIdx)) ?? 0;
+      final body = payload.substring(sepIdx + 1);
+      if (statusCode != 200 || body.isEmpty) {
+        _logAvatarEvent(
+          facade,
+          level: 'warn',
+          title: 'Avatar API response unusable',
+          content: {
+            'sourceKey': sourceMeta.key,
+            'statusCode': statusCode,
+            'bodyLength': body.length,
+            'body': body,
+          },
+        );
+        return null;
+      }
+
+      final data = jsonDecode(body);
+      final results = data is Map ? data['results'] : null;
+      if (results is! Map) {
+        _logAvatarEvent(
+          facade,
+          level: 'warn',
+          title: 'Avatar API results missing',
+          content: {'sourceKey': sourceMeta.key, 'body': body},
+        );
+        return null;
+      }
+
+      final imageBase = facade.js.evaluateString(
+        'this.__hazuki_source.imageUrl',
+      );
+      final avatarUrl = normalizeSourceAvatarUrl(
+        sourceKey: sourceMeta.key,
+        avatar:
+            results['avatar'] ??
+            results['user_cover'] ??
+            results['cover'] ??
+            results['avatar_url'] ??
+            results['user_avatar'],
+        imageBase: imageBase,
+      );
+      if (avatarUrl == null) {
+        _logAvatarEvent(
+          facade,
+          level: 'warn',
+          title: 'Avatar URL normalize failed',
+          content: {
+            'sourceKey': sourceMeta.key,
+            'avatar':
+                results['avatar'] ??
+                results['user_cover'] ??
+                results['cover'] ??
+                results['avatar_url'] ??
+                results['user_avatar'],
+            'imageBase': imageBase,
+          },
+        );
+        return null;
+      }
+
+      _logAvatarEvent(
+        facade,
+        title: 'Avatar API fetch succeeded',
+        content: {'sourceKey': sourceMeta.key, 'avatarUrl': avatarUrl},
+      );
+      return _avatarUrlForDisplay(
+        sourceKey: sourceMeta.key,
+        avatarUrl: avatarUrl,
+      );
+    } catch (error) {
+      _logAvatarEvent(
+        facade,
+        level: 'error',
+        title: 'Avatar API fetch threw',
+        content: {'sourceKey': sourceMeta.key, 'error': error.toString()},
+      );
+    }
 
     return null;
   }
+
+  Future<String?> _tryRefreshCopyMangaAvatarViaLogin(
+    HazukiSourceFacade facade,
+  ) async {
+    final sourceMeta = facade.sourceMeta;
+    if (sourceMeta == null || !isHazukiCopyMangaSourceKey(sourceMeta.key)) {
+      return null;
+    }
+    if (facade.runtime.shouldSkipRelogin(const Duration(minutes: 2))) {
+      _logAvatarEvent(
+        facade,
+        level: 'warn',
+        title: 'Avatar relogin skipped',
+        content: {'sourceKey': sourceMeta.key, 'reason': 'recent_relogin'},
+      );
+      return null;
+    }
+
+    _logAvatarEvent(
+      facade,
+      title: 'Avatar relogin fallback started',
+      content: {'sourceKey': sourceMeta.key},
+    );
+    final reloginOk = await _tryReloginFromStoredAccount(force: true);
+    if (!reloginOk) {
+      _logAvatarEvent(
+        facade,
+        level: 'warn',
+        title: 'Avatar relogin fallback failed',
+        content: {'sourceKey': sourceMeta.key},
+      );
+      return null;
+    }
+
+    final refreshedAvatarUrl = facade.runtime.transientAvatarUrl?.trim();
+    if (refreshedAvatarUrl == null || refreshedAvatarUrl.isEmpty) {
+      _logAvatarEvent(
+        facade,
+        level: 'warn',
+        title: 'Avatar relogin returned no avatar',
+        content: {'sourceKey': sourceMeta.key},
+      );
+      return null;
+    }
+
+    final avatarUrl = _avatarUrlForDisplay(
+      sourceKey: sourceMeta.key,
+      avatarUrl: refreshedAvatarUrl,
+    );
+    _logAvatarEvent(
+      facade,
+      title: 'Avatar relogin fallback succeeded',
+      content: {'sourceKey': sourceMeta.key, 'avatarUrl': avatarUrl},
+    );
+    return avatarUrl;
+  }
+}
+
+void _logAvatarEvent(
+  HazukiSourceFacade facade, {
+  required String title,
+  Object? content,
+  String level = 'info',
+}) {
+  facade.addApplicationLog(
+    level: level,
+    title: title,
+    source: 'source_avatar',
+    content: content,
+  );
 }

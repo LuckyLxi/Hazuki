@@ -35,6 +35,11 @@ class HomeProfileController extends ChangeNotifier {
   bool get isCheckInAvailable => _sourceService.isActiveJmSource;
 
   Future<void> syncUserProfile(BuildContext context) async {
+    // 确保不在 initState() 内同步访问 InheritedWidget（如 l10n），
+    // 通过让出微任务将执行推迟到帧回调完成之后
+    await Future<void>.value();
+    // 异步等待后检查 context 是否仍然有效，防止 use_build_context_synchronously 警告
+    if (!context.mounted) return;
     if (!_sourceService.isInitialized) {
       _username = l10n(context).homeGuestUser;
       _avatarUrl = null;

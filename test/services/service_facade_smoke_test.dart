@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/cloud_sync_service.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/debug/debug_log_internals.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../support/test_service_locator.dart';
 
@@ -132,6 +133,42 @@ void main() {
     expect(registry.isAllowedSourceKey('not-allowed'), isFalse);
   });
 
+  test('CopyManga avatar path is normalized to its CDN URL', () {
+    expect(
+      normalizeSourceAvatarUrl(
+        sourceKey: 'copy_manga',
+        avatar: 'user/cover/d91eed225c6811efbb8d06be79e70c23/177130.jpg',
+      ),
+      'https://s3.mangafuna.xyz/user/cover/d91eed225c6811efbb8d06be79e70c23/177130.jpg',
+    );
+    expect(
+      normalizeSourceAvatarUrl(
+        sourceKey: 'copy_manga',
+        avatar:
+            'https://s3.mangafuna.xyz/user/cover/d91eed225c6811efbb8d06be79e70c23/177130.jpg',
+      ),
+      'https://s3.mangafuna.xyz/user/cover/d91eed225c6811efbb8d06be79e70c23/177130.jpg',
+    );
+  });
+
+  test('relative non-CopyManga avatar path uses image base when available', () {
+    expect(
+      normalizeSourceAvatarUrl(
+        sourceKey: hazukiDefaultSourceKey,
+        avatar: '/media/users/123.jpg',
+        imageBase: 'https://cdn.example.com/images/',
+      ),
+      'https://cdn.example.com/media/users/123.jpg',
+    );
+    expect(
+      normalizeSourceAvatarUrl(
+        sourceKey: hazukiDefaultSourceKey,
+        avatar: 'media/users/123.jpg',
+      ),
+      isNull,
+    );
+  });
+
   test(
     'legacy account and cookie session data is cleared on prefs init',
     () async {
@@ -160,4 +197,47 @@ void main() {
       expect(sourceData['settings'], {'favoriteOrder': 'mr'});
     },
   );
+
+  test('debug export data keeps full typed log content', () async {
+    final service = sl<HazukiSourceService>();
+    await service.setSoftwareLogCaptureEnabled(true);
+    final longMessage = 'avatar-${'x' * 520}';
+
+    service.addApplicationLog(
+      level: 'info',
+      title: 'Avatar diagnostic',
+      source: 'source_avatar',
+      content: {'message': longMessage},
+    );
+
+    final debugInfo = await service.collectTypedDebugInfo(debugLogTypeSystem);
+    final logs = (debugInfo['logs'] as List).cast<Map>();
+    final log = logs.last.cast<String, dynamic>();
+
+    expect(log['content'].toString(), contains('[omitted'));
+    expect(log['contentFull'], {'message': longMessage});
+  });
+
+  test('network debug export data keeps full response body', () async {
+    final service = sl<HazukiSourceService>();
+    await service.setSoftwareLogCaptureEnabled(true);
+    final longBody = '{"body":"${'y' * 1400}"}';
+
+    service.appendNetworkLogEntry(
+      method: 'POST',
+      url: 'source://account.login',
+      statusCode: 200,
+      error: null,
+      startedAt: DateTime.now(),
+      source: 'source_login',
+      responseBody: longBody,
+    );
+
+    final debugInfo = await service.collectNetworkDebugInfo();
+    final logs = (debugInfo['recentNetworkLogs'] as List).cast<Map>();
+    final log = logs.last.cast<String, dynamic>();
+
+    expect(log['responseBodyPreview'].toString(), contains('[omitted'));
+    expect(log['responseBodyFull'], longBody);
+  });
 }

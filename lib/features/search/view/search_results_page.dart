@@ -411,18 +411,11 @@ class _SearchResultsPageState extends State<SearchResultsPage>
   }
 
   String? _normalizeComicIdKeyword(String keyword) {
-    final normalized = keyword.trim().toLowerCase();
-    if (RegExp(r'^\d{2,}$').hasMatch(normalized)) {
-      return normalized;
-    }
-    if (RegExp(r'^jm\d{2,}$').hasMatch(normalized)) {
-      return normalized;
-    }
-    return null;
+    return normalizeDirectComicIdKeyword(keyword);
   }
 
   Future<bool> _tryOpenComicDetailByKeywordId(String keyword) async {
-    if (!_comicIdSearchEnhance || !_sourceService.isActiveJmSource) {
+    if (!_sourceService.isActiveJmSource) {
       return false;
     }
     final comicId = _normalizeComicIdKeyword(keyword);
@@ -494,7 +487,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
       return;
     }
 
-    final idKeyword = _comicIdSearchEnhance && _sourceService.isActiveJmSource
+    final idKeyword = _sourceService.isActiveJmSource
         ? _normalizeComicIdKeyword(keyword)
         : null;
     final requestToken = idKeyword != null
