@@ -13,6 +13,7 @@ PreferredSizeWidget hazukiFrostedAppBar({
   double elevation = 0,
   bool centerTitle = false,
   double backgroundAlpha = 0.72,
+  double? leadingWidth,
   double? titleSpacing,
   bool enableBlur = true,
 }) {
@@ -21,6 +22,7 @@ PreferredSizeWidget hazukiFrostedAppBar({
     title: title,
     actions: actions,
     leading: leading,
+    leadingWidth: leadingWidth,
     automaticallyImplyLeading: automaticallyImplyLeading,
     toolbarHeight: toolbarHeight,
     titleSpacing: titleSpacing,

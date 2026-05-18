@@ -58,6 +58,7 @@ class HomeNavigationActions {
   SearchPage buildSearchPage({String? initialKeyword}) {
     return SearchPage(
       initialKeyword: initialKeyword,
+      autoFocusOnOpen: initialKeyword == null,
       comicDetailPageBuilder: buildComicDetailPage,
     );
   }

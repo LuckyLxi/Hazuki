@@ -18,11 +18,13 @@ import '../support/search_shared.dart';
 class SearchEntryPage extends StatefulWidget {
   const SearchEntryPage({
     super.key,
+    this.autoFocusOnOpen = false,
     required this.comicDetailPageBuilder,
     required this.comicCoverHeroTagBuilder,
     this.searchPageLoader,
   });
 
+  final bool autoFocusOnOpen;
   final ComicDetailPageBuilder comicDetailPageBuilder;
   final ComicHeroTagBuilder comicCoverHeroTagBuilder;
   final SearchPageLoader? searchPageLoader;
@@ -56,6 +58,16 @@ class _SearchEntryPageState extends State<SearchEntryPage>
     WidgetsBinding.instance.addObserver(this);
     _sourceService.addListener(_handleSourceChanged);
     _focusCoordinator.primaryFocusNode.addListener(_handleSearchFocusChanged);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _focusCoordinator.attachRouteAutoFocus(
+      context,
+      showKeyboard: widget.autoFocusOnOpen,
+      forceShowKeyboard: true,
+    );
   }
 
   @override

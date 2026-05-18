@@ -10,12 +10,14 @@ class SearchPage extends StatelessWidget {
   const SearchPage({
     super.key,
     this.initialKeyword,
+    this.autoFocusOnOpen = false,
     required this.comicDetailPageBuilder,
     this.comicCoverHeroTagBuilder = comicCoverHeroTag,
     this.searchPageLoader,
   });
 
   final String? initialKeyword;
+  final bool autoFocusOnOpen;
   final ComicDetailPageBuilder comicDetailPageBuilder;
   final ComicHeroTagBuilder comicCoverHeroTagBuilder;
   final SearchPageLoader? searchPageLoader;
@@ -33,6 +35,7 @@ class SearchPage extends StatelessWidget {
       );
     }
     return SearchEntryPage(
+      autoFocusOnOpen: autoFocusOnOpen,
       comicDetailPageBuilder: comicDetailPageBuilder,
       comicCoverHeroTagBuilder: comicCoverHeroTagBuilder,
       searchPageLoader: searchPageLoader,

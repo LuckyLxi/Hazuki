@@ -8,6 +8,7 @@ import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/manga_download/manga_download_service.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
 import 'package:hazuki/shared/search_box_outline.dart';
 import 'package:hazuki/widgets/widgets.dart';
@@ -103,6 +104,7 @@ class HomeScaffoldShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final downloadService = sl<MangaDownloadService>();
     final homeContent = HomeContentStack(
       currentIndex: currentIndex,
       discoverChild: DiscoverPage(
@@ -202,53 +204,73 @@ class HomeScaffoldShell extends StatelessWidget {
         );
       },
       child: WindowsComicDetailHost(
-        child: Scaffold(
-          key: scaffoldKey,
-          extendBody: true,
-          appBar: hazukiFrostedAppBar(
-            context: context,
-            leading: Platform.isWindows
-                ? null
-                : _HomeAppBarProfileButton(
-                    avatarUrl: avatarUrl,
-                    profileLoading: profileLoading,
-                    username: username,
-                    onPressed: () {
-                      _openProfileDrawer(context, mobileDrawerContent);
-                    },
+        child: ListenableBuilder(
+          listenable: downloadService,
+          builder: (context, _) {
+            final hasDownloadTasks = downloadService.tasks.isNotEmpty;
+            return TweenAnimationBuilder<double>(
+              tween: Tween<double>(end: hasDownloadTasks ? 118 : 56),
+              duration: const Duration(milliseconds: 260),
+              curve: Curves.easeOutCubic,
+              builder: (context, leadingWidth, _) {
+                return Scaffold(
+                  key: scaffoldKey,
+                  extendBody: true,
+                  appBar: hazukiFrostedAppBar(
+                    context: context,
+                    leading: Platform.isWindows
+                        ? null
+                        : _HomeAppBarProfileButton(
+                            downloadService: downloadService,
+                            avatarUrl: avatarUrl,
+                            profileLoading: profileLoading,
+                            username: username,
+                            onPressed: () {
+                              _openProfileDrawer(context, mobileDrawerContent);
+                            },
+                          ),
+                    leadingWidth: Platform.isWindows ? null : leadingWidth,
+                    automaticallyImplyLeading: false,
+                    title: currentIndex == 1
+                        ? null
+                        : _HomeAppBarSearchBox(
+                            onOpenSearch: onOpenSearch,
+                            maxWidth: Platform.isWindows ? 320 : null,
+                          ),
+                    titleSpacing: Platform.isWindows ? null : 4,
+                    centerTitle: Platform.isWindows,
+                    enableBlur: currentIndex != 0 && currentIndex != 1,
+                    actions: [
+                      HomeAppBarActions(
+                        currentIndex: currentIndex,
+                        discoverSearchMorphProgress:
+                            discoverSearchMorphProgress,
+                        forceDiscoverSearchInAppBar: usePinnedDiscoverSearch,
+                        favoriteAppBarActions: favoriteAppBarActions,
+                        onOpenSearch: onOpenSearch,
+                        onFavoriteSortSelected: onFavoriteSortSelected,
+                        onFavoriteCreateFolderPressed:
+                            onFavoriteCreateFolderPressed,
+                        onFavoriteModeTogglePressed:
+                            onFavoriteModeTogglePressed,
+                      ),
+                    ],
                   ),
-            automaticallyImplyLeading: false,
-            title: _HomeAppBarSearchBox(
-              onOpenSearch: onOpenSearch,
-              maxWidth: Platform.isWindows ? 320 : null,
-            ),
-            titleSpacing: Platform.isWindows ? null : 4,
-            centerTitle: Platform.isWindows,
-            enableBlur: currentIndex != 0 && currentIndex != 1,
-            actions: [
-              HomeAppBarActions(
-                currentIndex: currentIndex,
-                discoverSearchMorphProgress: discoverSearchMorphProgress,
-                forceDiscoverSearchInAppBar: usePinnedDiscoverSearch,
-                favoriteAppBarActions: favoriteAppBarActions,
-                onOpenSearch: onOpenSearch,
-                onFavoriteSortSelected: onFavoriteSortSelected,
-                onFavoriteCreateFolderPressed: onFavoriteCreateFolderPressed,
-                onFavoriteModeTogglePressed: onFavoriteModeTogglePressed,
-              ),
-            ],
-          ),
-          drawerEnableOpenDragGesture: false,
-          drawer: null,
-          body: body,
-          bottomNavigationBar: Platform.isWindows
-              ? null
-              : HomeBottomNavigation(
-                  currentIndex: currentIndex,
-                  onDestinationSelected: onDestinationSelected,
-                  discoverLabel: l10n(context).homeTabDiscover,
-                  favoriteLabel: l10n(context).homeTabFavorite,
-                ),
+                  drawerEnableOpenDragGesture: false,
+                  drawer: null,
+                  body: body,
+                  bottomNavigationBar: Platform.isWindows
+                      ? null
+                      : HomeBottomNavigation(
+                          currentIndex: currentIndex,
+                          onDestinationSelected: onDestinationSelected,
+                          discoverLabel: l10n(context).homeTabDiscover,
+                          favoriteLabel: l10n(context).homeTabFavorite,
+                        ),
+                );
+              },
+            );
+          },
         ),
       ),
     );
@@ -290,39 +312,161 @@ class HomeScaffoldShell extends StatelessWidget {
   }
 }
 
-class _HomeAppBarProfileButton extends StatelessWidget {
+class _HomeAppBarProfileButton extends StatefulWidget {
   const _HomeAppBarProfileButton({
+    required this.downloadService,
     required this.avatarUrl,
     required this.profileLoading,
     required this.username,
     required this.onPressed,
   });
 
+  final MangaDownloadService downloadService;
   final String? avatarUrl;
   final bool profileLoading;
   final String username;
   final VoidCallback onPressed;
 
   @override
+  State<_HomeAppBarProfileButton> createState() =>
+      _HomeAppBarProfileButtonState();
+}
+
+class _HomeAppBarProfileButtonState extends State<_HomeAppBarProfileButton> {
+  int _lastVisibleTaskCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _syncLastVisibleTaskCount();
+  }
+
+  @override
+  void didUpdateWidget(covariant _HomeAppBarProfileButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _syncLastVisibleTaskCount();
+  }
+
+  void _syncLastVisibleTaskCount() {
+    final taskCount = widget.downloadService.tasks.length;
+    if (taskCount > 0) {
+      _lastVisibleTaskCount = taskCount;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     return Tooltip(
-      message: profileLoading ? l10n(context).commonLoading : username,
+      message: widget.profileLoading
+          ? l10n(context).commonLoading
+          : widget.username,
       child: Padding(
         padding: const EdgeInsets.only(left: 8),
         child: IconButton(
-          onPressed: onPressed,
+          onPressed: widget.onPressed,
           padding: EdgeInsets.zero,
-          icon: HomeProfileAvatar(
-            avatarUrl: avatarUrl,
-            loading: profileLoading,
-            size: 38,
-            borderWidth: 2,
-            borderColor: colorScheme.primary.withValues(alpha: 0.72),
-            backgroundColor: colorScheme.surfaceContainerHigh,
-            heroEnabled: true,
+          constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+          icon: TweenAnimationBuilder<double>(
+            tween: Tween<double>(
+              end: widget.downloadService.tasks.isNotEmpty ? 1 : 0,
+            ),
+            duration: const Duration(milliseconds: 260),
+            curve: Curves.easeOutCubic,
+            builder: (context, progress, _) {
+              final liveTaskCount = widget.downloadService.tasks.length;
+              final taskCount = liveTaskCount > 0
+                  ? liveTaskCount
+                  : _lastVisibleTaskCount;
+              final pillWidth = 38 + 58 * progress;
+              return SizedBox(
+                width: pillWidth,
+                height: 38,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: colorScheme.primaryContainer.withValues(
+                      alpha: 0.92 * progress,
+                    ),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                      color: colorScheme.primary.withValues(
+                        alpha: 0.26 * progress,
+                      ),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: colorScheme.shadow.withValues(
+                          alpha: 0.08 * progress,
+                        ),
+                        blurRadius: 10 * progress,
+                        offset: Offset(0, 3 * progress),
+                      ),
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      HomeProfileAvatar(
+                        avatarUrl: widget.avatarUrl,
+                        loading: widget.profileLoading,
+                        size: 38,
+                        borderWidth: 2,
+                        borderColor: colorScheme.primary.withValues(
+                          alpha: 0.72,
+                        ),
+                        backgroundColor: colorScheme.surfaceContainerHigh,
+                        heroEnabled: true,
+                      ),
+                      ClipRect(
+                        child: SizedBox(
+                          width: 58 * progress,
+                          child: Opacity(
+                            opacity: progress.clamp(0.0, 1.0),
+                            child: _HomeDownloadStatusContent(
+                              taskCount: taskCount,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _HomeDownloadStatusContent extends StatelessWidget {
+  const _HomeDownloadStatusContent({required this.taskCount});
+
+  final int taskCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(left: 7, right: 8),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            Icons.download_rounded,
+            size: 18,
+            color: colorScheme.onPrimaryContainer,
+          ),
+          const SizedBox(width: 3),
+          Text(
+            'x$taskCount',
+            maxLines: 1,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: colorScheme.onPrimaryContainer,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -376,11 +520,17 @@ class _HomeAppBarSearchBox extends StatelessWidget {
       ),
     );
     if (maxWidth == null) {
-      return searchBox;
+      return Padding(
+        padding: const EdgeInsets.only(right: 8),
+        child: searchBox,
+      );
     }
     return ConstrainedBox(
       constraints: BoxConstraints(maxWidth: maxWidth!),
-      child: searchBox,
+      child: Padding(
+        padding: const EdgeInsets.only(right: 8),
+        child: searchBox,
+      ),
     );
   }
 }
