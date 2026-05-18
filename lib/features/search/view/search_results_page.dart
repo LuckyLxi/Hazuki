@@ -1,7 +1,7 @@
 import 'dart:async';
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/models/hazuki_models.dart';
@@ -16,7 +16,6 @@ import '../state/search_results_controller.dart';
 import '../support/search_shared.dart';
 import 'search_bar_shell.dart';
 import 'search_id_extract_pill.dart';
-import 'search_results_shell_widgets.dart';
 import 'search_results_widgets.dart';
 
 class SearchResultsPage extends StatefulWidget {
@@ -42,7 +41,7 @@ class SearchResultsPage extends StatefulWidget {
 }
 
 class _SearchResultsPageState extends State<SearchResultsPage>
-    with WidgetsBindingObserver, TickerProviderStateMixin {
+    with WidgetsBindingObserver {
   late final SearchResultsController _resultsController;
   late final SearchFocusCoordinator _focusCoordinator = SearchFocusCoordinator(
     isMounted: () => mounted,
@@ -51,26 +50,18 @@ class _SearchResultsPageState extends State<SearchResultsPage>
   final HazukiSourceService _sourceService = sl<HazukiSourceService>();
 
   final ScrollController _scrollController = ScrollController();
-  final GlobalKey _collapsedSearchKey = GlobalKey();
 
   bool _showBackToTop = false;
-  double _searchRevealProgress = 0;
-  bool _flyingSearchToTop = false;
   bool _comicIdSearchEnhance = false;
   bool _pendingExtractedComicIdHide = false;
   String? _extractedComicId;
-  AnimationController? _flyController;
-  OverlayEntry? _flyOverlay;
 
-  bool get _showCollapsedSearch => _searchRevealProgress >= 0.94;
   String get _searchKeyword => _resultsController.searchKeyword;
   String? get _searchErrorMessage => _resultsController.searchErrorMessage;
   List<ExploreComic> get _searchComics => _resultsController.searchComics;
   bool get _searchLoading => _resultsController.searchLoading;
   bool get _searchLoadingMore => _resultsController.searchLoadingMore;
   String get _searchOrder => _resultsController.searchOrder;
-  bool get _collapsedSearchExpanded =>
-      _focusCoordinator.collapsedSearchExpanded;
   bool get _showKeyboardOnEnter => widget.entryIntent.showKeyboardOnEnter;
 
   @override
@@ -104,7 +95,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
       child: ListenableBuilder(
         listenable: Listenable.merge([_resultsController, _focusCoordinator]),
         builder: (context, _) => PopScope(
-          canPop: !_focusCoordinator.collapsedSearchExpanded,
+          canPop: true,
           onPopInvokedWithResult: _handlePopInvoked,
           child: Scaffold(
             backgroundColor: Theme.of(context).colorScheme.surface,
@@ -148,7 +139,6 @@ class _SearchResultsPageState extends State<SearchResultsPage>
     WidgetsBinding.instance.addObserver(this);
     _sourceService.addListener(_handleSourceChanged);
     _focusCoordinator.primaryFocusNode.addListener(_handleSearchFocusChanged);
-    _focusCoordinator.collapsedFocusNode.addListener(_handleSearchFocusChanged);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
@@ -174,9 +164,6 @@ class _SearchResultsPageState extends State<SearchResultsPage>
     _focusCoordinator.primaryFocusNode.removeListener(
       _handleSearchFocusChanged,
     );
-    _focusCoordinator.collapsedFocusNode.removeListener(
-      _handleSearchFocusChanged,
-    );
     _scrollController.removeListener(_onScroll);
     WidgetsBinding.instance.removeObserver(this);
     _sourceService.removeListener(_handleSourceChanged);
@@ -185,8 +172,6 @@ class _SearchResultsPageState extends State<SearchResultsPage>
     _scrollController.dispose();
     _resultsController.dispose();
     _focusCoordinator.dispose();
-    _flyController?.dispose();
-    _flyOverlay?.remove();
   }
 
   Future<void> _loadComicIdSearchEnhance() async {
@@ -218,9 +203,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
     }
   }
 
-  bool get _searchInputFocused =>
-      _focusCoordinator.primaryFocusNode.hasFocus ||
-      _focusCoordinator.collapsedFocusNode.hasFocus;
+  bool get _searchInputFocused => _focusCoordinator.primaryFocusNode.hasFocus;
 
   String? _extractComicIdFromFocusedInput(String value) {
     if (!_comicIdSearchEnhance || !_searchInputFocused) {
@@ -292,18 +275,34 @@ class _SearchResultsPageState extends State<SearchResultsPage>
     }
   }
 
-  Future<void> _requestExpandedSearchFocus({bool showKeyboard = true}) {
+  Future<void> _dismissSearchInputIfFocused() async {
+    if (!_searchInputFocused && !_focusCoordinator.keyboardVisible) {
+      return;
+    }
+    await _focusCoordinator.dismissKeyboard(context, parkOnPage: true);
+  }
+
+  bool _handleSearchResultsScrollNotification(ScrollNotification notification) {
+    if (notification.metrics.axis != Axis.vertical) {
+      return false;
+    }
+    final isDragStart =
+        notification is ScrollStartNotification &&
+        notification.dragDetails != null;
+    final isUserScroll =
+        notification is UserScrollNotification &&
+        notification.direction != ScrollDirection.idle;
+    if (isDragStart || isUserScroll) {
+      unawaited(_dismissSearchInputIfFocused());
+    }
+    return false;
+  }
+
+  Future<void> _requestSearchFocus({bool showKeyboard = true}) {
     return _focusCoordinator.requestPrimarySearchFocus(
       context,
       showKeyboard: showKeyboard,
     );
-  }
-
-  void _expandCollapsedSearch() {
-    if (!_showCollapsedSearch) {
-      return;
-    }
-    _focusCoordinator.enterCollapsedMode(context);
   }
 
   void _onScroll() {
@@ -312,24 +311,13 @@ class _SearchResultsPageState extends State<SearchResultsPage>
     }
 
     final position = _scrollController.position;
-    final nextReveal = (position.pixels / searchAppBarRevealOffset).clamp(
-      0.0,
-      1.0,
-    );
     final nextShowBackToTop = position.pixels > 520;
     final shouldLoadMore =
         position.maxScrollExtent > 0 &&
         position.pixels >= position.maxScrollExtent - 260;
 
-    final nextShowCollapsed = nextReveal >= 0.94;
-    if (!nextShowCollapsed && _focusCoordinator.collapsedSearchExpanded) {
-      _focusCoordinator.exitCollapsedMode();
-    }
-
-    if ((nextReveal - _searchRevealProgress).abs() >= 0.01 ||
-        nextShowBackToTop != _showBackToTop) {
+    if (nextShowBackToTop != _showBackToTop) {
       _updateSearchResultsState(() {
-        _searchRevealProgress = nextReveal;
         _showBackToTop = nextShowBackToTop;
       });
     }
@@ -348,7 +336,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
       );
     }
     if (focusSearch && mounted) {
-      await _requestExpandedSearchFocus();
+      await _requestSearchFocus();
     }
   }
 
@@ -356,8 +344,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
     _focusCoordinator.clearText();
     _hideExtractedComicId();
     _resultsController.clearSearchData();
-    unawaited(_requestExpandedSearchFocus());
-    _focusCoordinator.exitCollapsedMode();
+    unawaited(_requestSearchFocus());
   }
 
   Future<void> _onSearchOrderSelected(String order) async {
@@ -368,8 +355,6 @@ class _SearchResultsPageState extends State<SearchResultsPage>
     if (!orderLabels.containsKey(order) || order == _searchOrder) {
       return;
     }
-
-    _focusCoordinator.exitCollapsedMode();
 
     if (_scrollController.hasClients && _scrollController.offset > 0) {
       await _scrollToTop();
@@ -400,14 +385,9 @@ class _SearchResultsPageState extends State<SearchResultsPage>
 
   void _handlePopInvoked(bool didPop, Object? result) {
     if (didPop) {
+      unawaited(_focusCoordinator.dismissKeyboard(context));
       return;
     }
-    _focusCoordinator.exitCollapsedMode();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        Navigator.of(context).pop();
-      }
-    });
   }
 
   String? _normalizeComicIdKeyword(String keyword) {
@@ -472,12 +452,6 @@ class _SearchResultsPageState extends State<SearchResultsPage>
 
     _focusCoordinator.syncText(keyword);
 
-    final submittedFromCollapsed = _focusCoordinator.collapsedSearchExpanded;
-    _focusCoordinator.exitCollapsedMode();
-    if (submittedFromCollapsed) {
-      _animateSearchFlyToTop();
-    }
-
     if (!mounted) {
       return;
     }
@@ -515,102 +489,6 @@ class _SearchResultsPageState extends State<SearchResultsPage>
     await _resultsController.search(context, keyword: keyword, page: 1);
   }
 
-  void _animateSearchFlyToTop() {
-    final collapsedBox =
-        _collapsedSearchKey.currentContext?.findRenderObject() as RenderBox?;
-    if (collapsedBox == null || !collapsedBox.attached) {
-      unawaited(_scrollToTop());
-      return;
-    }
-
-    final startOffset = collapsedBox.localToGlobal(Offset.zero);
-    final startSize = collapsedBox.size;
-
-    final mediaQuery = MediaQuery.of(context);
-    final appBarHeight = kToolbarHeight + mediaQuery.padding.top;
-    const targetLeft = 16.0;
-    final targetTop = appBarHeight + 14.0;
-    final targetWidth = mediaQuery.size.width - 32.0;
-    const targetHeight = 56.0;
-
-    final bgColor = Theme.of(context).colorScheme.surfaceContainerHigh;
-    final textStyle = Theme.of(context).textTheme.bodyLarge;
-    final iconColor = Theme.of(context).colorScheme.onSurfaceVariant;
-    final searchText = _focusCoordinator.text;
-
-    _updateSearchResultsState(() {
-      _flyingSearchToTop = true;
-    });
-
-    _flyController?.dispose();
-    _flyController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 320),
-    );
-
-    _flyOverlay?.remove();
-    _flyOverlay = OverlayEntry(
-      builder: (_) => AnimatedBuilder(
-        animation: _flyController!,
-        builder: (context, _) {
-          final t = Curves.easeOutCubic.transform(_flyController!.value);
-          final left = lerpDouble(startOffset.dx, targetLeft, t)!;
-          final top = lerpDouble(startOffset.dy, targetTop, t)!;
-          final width = lerpDouble(startSize.width, targetWidth, t)!;
-          final height = lerpDouble(startSize.height, targetHeight, t)!;
-          final radius = lerpDouble(14, 16, t)!;
-          final padding = lerpDouble(12, 16, t)!;
-          final iconSize = lerpDouble(18, 24, t)!;
-
-          return Positioned(
-            left: left,
-            top: top,
-            child: Material(
-              type: MaterialType.transparency,
-              child: Container(
-                width: width,
-                height: height,
-                decoration: BoxDecoration(
-                  color: bgColor,
-                  borderRadius: BorderRadius.circular(radius),
-                ),
-                padding: EdgeInsets.symmetric(horizontal: padding),
-                alignment: Alignment.centerLeft,
-                child: Row(
-                  children: [
-                    Icon(Icons.search, size: iconSize, color: iconColor),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        searchText,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: textStyle,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-
-    Overlay.of(context).insert(_flyOverlay!);
-    unawaited(_scrollToTop());
-
-    _flyController!.forward().then((_) {
-      _flyOverlay?.remove();
-      _flyOverlay = null;
-      if (mounted) {
-        _updateSearchResultsState(() {
-          _flyingSearchToTop = false;
-        });
-      }
-    });
-  }
-
   Widget _buildSearchBar({
     Key? key,
     required TextEditingController controller,
@@ -640,47 +518,22 @@ class _SearchResultsPageState extends State<SearchResultsPage>
     _syncExtractedComicIdWithFocus(value);
   }
 
-  Widget _buildTopSearchBox() {
-    return SearchResultsTopSearchBox(
-      revealProgress: _searchRevealProgress,
-      showCollapsedSearch: _showCollapsedSearch,
-      flyingSearchToTop: _flyingSearchToTop,
-      searchBar: _buildSearchBar(
-        key: const ValueKey('search-results-primary-search-bar'),
+  Widget _buildSearchResultsAppBarTitle() {
+    return Hero(
+      tag: discoverSearchHeroTag,
+      child: _buildSearchBar(
+        key: const ValueKey('search-results-app-bar-search-bar'),
         controller: _focusCoordinator.primaryController,
         focusNode: _focusCoordinator.primaryFocusNode,
         clearKey: 'results-clear',
         submitKey: 'results-submit',
+        compact: true,
         onClear: _clearSearch,
         onChanged: (value) {
           _focusCoordinator.syncText(value, updatePrimary: false);
           _updateExtractedId(value);
         },
       ),
-    );
-  }
-
-  Widget _buildSearchResultsAppBarTitle() {
-    return SearchResultsAppBarTitle(
-      showCollapsedSearch: _showCollapsedSearch,
-      collapsedSearchExpanded: _collapsedSearchExpanded,
-      flyingSearchToTop: _flyingSearchToTop,
-      searchKeyword: _searchKeyword,
-      collapsedSearchKey: _collapsedSearchKey,
-      collapsedSearchBar: _buildSearchBar(
-        key: const ValueKey('search-results-collapsed-search-bar'),
-        controller: _focusCoordinator.collapsedController,
-        focusNode: _focusCoordinator.collapsedFocusNode,
-        clearKey: 'results-collapsed-clear',
-        submitKey: 'results-collapsed-submit',
-        compact: true,
-        onClear: _clearSearch,
-        onChanged: (value) {
-          _focusCoordinator.syncText(value, updateCollapsed: false);
-          _updateExtractedId(value);
-        },
-      ),
-      onExpandCollapsedSearch: _expandCollapsedSearch,
     );
   }
 
@@ -691,11 +544,15 @@ class _SearchResultsPageState extends State<SearchResultsPage>
       searchComics: _searchComics,
       searchErrorMessage: _searchErrorMessage,
       sourceRuntimeState: _resultsController.sourceRuntimeState,
-      onRetry: () {
+      onRetry: () async {
+        await _dismissSearchInputIfFocused();
+        if (!mounted) {
+          return;
+        }
         if (_resultsController.canRetry) {
           _resultsController.logRuntimeRetryRequested('search_results_page');
         }
-        return _resultsController.search(
+        await _resultsController.search(
           context,
           keyword: _searchKeyword,
           page: 1,
@@ -714,14 +571,18 @@ class _SearchResultsPageState extends State<SearchResultsPage>
       heroTag: heroTag,
       index: index,
       onTap: () {
-        unawaited(
-          openComicDetail(
+        unawaited(() async {
+          await _dismissSearchInputIfFocused();
+          if (!mounted) {
+            return;
+          }
+          await openComicDetail(
             context,
             comic: comic,
             heroTag: heroTag,
             pageBuilder: widget.comicDetailPageBuilder,
-          ),
-        );
+          );
+        }());
       },
     );
   }
@@ -738,7 +599,11 @@ class _SearchResultsPageState extends State<SearchResultsPage>
       actions: [
         PopupMenuButton<String>(
           tooltip: _currentSearchOrderLabel,
+          onOpened: () {
+            unawaited(_dismissSearchInputIfFocused());
+          },
           onSelected: (order) {
+            unawaited(_dismissSearchInputIfFocused());
             unawaited(_onSearchOrderSelected(order));
           },
           itemBuilder: (context) => [
@@ -781,6 +646,10 @@ class _SearchResultsPageState extends State<SearchResultsPage>
     final strings = AppLocalizations.of(context)!;
     return HazukiPullToRefresh(
       onRefresh: () async {
+        await _dismissSearchInputIfFocused();
+        if (!mounted) {
+          return;
+        }
         if (_searchKeyword.isEmpty) {
           await _submitSearch();
           return;
@@ -792,80 +661,89 @@ class _SearchResultsPageState extends State<SearchResultsPage>
           silentRefresh: _searchComics.isNotEmpty,
         );
       },
-      child: ListView(
-        controller: _scrollController,
-        physics: const AlwaysScrollableScrollPhysics(
-          parent: ClampingScrollPhysics(),
-        ),
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-        children: [
-          _buildTopSearchBox(),
-          const SizedBox(height: 6),
-          if (_searchComics.isNotEmpty) ...[
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12, left: 2, right: 2),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      _searchKeyword,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    _currentSearchOrderLabel,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-          _buildSearchResultState(),
-          if (_searchComics.isNotEmpty) ...[
-            for (int i = 0; i < _searchComics.length; i++)
-              _buildSearchComicItem(_searchComics[i], i),
-          ],
-          if (_searchLoadingMore) const HazukiLoadMoreFooter(),
-          if (_searchErrorMessage != null && _searchComics.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Material(
-                color: Theme.of(context).colorScheme.errorContainer,
-                borderRadius: BorderRadius.circular(16),
-                child: Padding(
-                  padding: const EdgeInsets.all(14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _searchErrorMessage!,
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onErrorContainer,
-                        ),
+      child: NotificationListener<ScrollNotification>(
+        onNotification: _handleSearchResultsScrollNotification,
+        child: ListView(
+          controller: _scrollController,
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: ClampingScrollPhysics(),
+          ),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+          children: [
+            if (_searchComics.isNotEmpty) ...[
+              Padding(
+                padding: const EdgeInsets.only(bottom: 12, left: 2, right: 2),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _searchKeyword,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleMedium,
                       ),
-                      const SizedBox(height: 8),
-                      FilledButton.tonal(
-                        onPressed: () => unawaited(
-                          _resultsController.search(
-                            context,
-                            keyword: _searchKeyword,
-                            page: 1,
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      _currentSearchOrderLabel,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            _buildSearchResultState(),
+            if (_searchComics.isNotEmpty) ...[
+              for (int i = 0; i < _searchComics.length; i++)
+                _buildSearchComicItem(_searchComics[i], i),
+            ],
+            if (_searchLoadingMore) const HazukiLoadMoreFooter(),
+            if (_searchErrorMessage != null && _searchComics.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Material(
+                  color: Theme.of(context).colorScheme.errorContainer,
+                  borderRadius: BorderRadius.circular(16),
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _searchErrorMessage!,
+                          style: TextStyle(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onErrorContainer,
                           ),
                         ),
-                        child: Text(strings.commonRetry),
-                      ),
-                    ],
+                        const SizedBox(height: 8),
+                        FilledButton.tonal(
+                          onPressed: () {
+                            unawaited(() async {
+                              await _dismissSearchInputIfFocused();
+                              if (!mounted) {
+                                return;
+                              }
+                              await _resultsController.search(
+                                context,
+                                keyword: _searchKeyword,
+                                page: 1,
+                              );
+                            }());
+                          },
+                          child: Text(strings.commonRetry),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-          SizedBox(height: _searchLoadingMore ? 16 : 80),
-        ],
+            SizedBox(height: _searchLoadingMore ? 16 : 80),
+          ],
+        ),
       ),
     );
   }
@@ -885,7 +763,15 @@ class _SearchResultsPageState extends State<SearchResultsPage>
             duration: const Duration(milliseconds: 180),
             curve: Curves.easeOutCubic,
             child: FloatingActionButton(
-              onPressed: () => unawaited(_scrollToTop()),
+              onPressed: () {
+                unawaited(() async {
+                  await _dismissSearchInputIfFocused();
+                  if (!mounted) {
+                    return;
+                  }
+                  await _scrollToTop();
+                }());
+              },
               child: const Icon(Icons.keyboard_arrow_up),
             ),
           ),

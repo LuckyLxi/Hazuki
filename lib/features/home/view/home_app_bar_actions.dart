@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import 'package:hazuki/features/favorite/favorite.dart';
 
-import 'discover_app_bar_actions.dart';
 import 'favorite_app_bar_actions.dart';
 
 class HomeAppBarActions extends StatelessWidget {
@@ -37,11 +36,6 @@ class HomeAppBarActions extends StatelessWidget {
         onModeTogglePressed: onFavoriteModeTogglePressed,
       );
     }
-    return DiscoverAppBarActions(
-      isActiveTab: currentIndex == 0,
-      morphProgress: discoverSearchMorphProgress,
-      forceInAppBar: forceDiscoverSearchInAppBar,
-      onOpenSearch: onOpenSearch,
-    );
+    return const SizedBox.shrink();
   }
 }

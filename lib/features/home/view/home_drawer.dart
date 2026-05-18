@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/l10n/l10n.dart';
+import 'package:hazuki/shared/navigation_tags.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
 enum HomeDrawerDestination {
@@ -25,6 +26,113 @@ double resolveHomeDrawerWidth(BuildContext context) {
 }
 
 double resolveHomeWindowsSidebarWidth(BuildContext context) => 80.0;
+
+class HomeProfileAvatar extends StatelessWidget {
+  const HomeProfileAvatar({
+    super.key,
+    required this.avatarUrl,
+    required this.loading,
+    required this.size,
+    this.borderWidth = 0,
+    this.borderColor,
+    this.backgroundColor,
+    this.heroEnabled = false,
+    this.borderRadius,
+  });
+
+  final String? avatarUrl;
+  final bool loading;
+  final double size;
+  final double borderWidth;
+  final Color? borderColor;
+  final Color? backgroundColor;
+  final bool heroEnabled;
+  final BorderRadius? borderRadius;
+
+  bool get _useRoundedRectangle => borderRadius != null;
+
+  @override
+  Widget build(BuildContext context) {
+    final resolvedAvatarUrl = (avatarUrl ?? '').trim();
+    final radius = size / 2;
+    final contentSize = (size - borderWidth * 2).clamp(0.0, size).toDouble();
+    final borderRadius = this.borderRadius;
+    final avatar = Container(
+      width: size,
+      height: size,
+      padding: EdgeInsets.all(borderWidth),
+      decoration: BoxDecoration(
+        shape: borderRadius == null ? BoxShape.circle : BoxShape.rectangle,
+        borderRadius: borderRadius,
+        color:
+            backgroundColor ??
+            Theme.of(context).colorScheme.surfaceContainerHighest,
+        border: borderWidth > 0
+            ? Border.all(
+                color:
+                    borderColor ?? Theme.of(context).colorScheme.outlineVariant,
+                width: borderWidth,
+              )
+            : null,
+      ),
+      child: ClipRRect(
+        borderRadius: borderRadius ?? BorderRadius.circular(radius),
+        child: loading || resolvedAvatarUrl.isEmpty
+            ? HazukiShimmerLoading(width: contentSize, height: contentSize)
+            : _useRoundedRectangle
+            ? HazukiCachedImage(
+                url: resolvedAvatarUrl,
+                width: contentSize,
+                height: contentSize,
+                fit: BoxFit.cover,
+                error: HazukiShimmerLoading(
+                  width: contentSize,
+                  height: contentSize,
+                ),
+                loading: HazukiShimmerLoading(
+                  width: contentSize,
+                  height: contentSize,
+                ),
+                ignoreNoImageMode: true,
+              )
+            : HazukiCachedCircleAvatar(
+                radius: contentSize / 2,
+                url: resolvedAvatarUrl,
+                useShimmerFallback: true,
+                ignoreNoImageMode: true,
+              ),
+      ),
+    );
+
+    return HeroMode(
+      enabled: heroEnabled,
+      child: Hero(
+        tag: homeProfileAvatarHeroTag,
+        child: Material(
+          type: MaterialType.transparency,
+          shape: borderRadius == null
+              ? CircleBorder(side: _heroBorderSide(context))
+              : RoundedRectangleBorder(
+                  borderRadius: borderRadius,
+                  side: _heroBorderSide(context),
+                ),
+          clipBehavior: Clip.antiAlias,
+          child: SizedBox(width: radius * 2, height: radius * 2, child: avatar),
+        ),
+      ),
+    );
+  }
+
+  BorderSide _heroBorderSide(BuildContext context) {
+    if (borderWidth <= 0) {
+      return BorderSide.none;
+    }
+    return BorderSide(
+      color: borderColor ?? Theme.of(context).colorScheme.outlineVariant,
+      width: borderWidth,
+    );
+  }
+}
 
 class HomeDrawer extends StatelessWidget {
   const HomeDrawer({
@@ -133,7 +241,6 @@ class HomeWindowsSidebar extends StatelessWidget {
   Widget _buildAvatar(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final tooltip = profileLoading ? l10n(context).commonLoading : username;
-    final resolvedAvatarUrl = (avatarUrl ?? '').trim();
     return Tooltip(
       message: tooltip,
       child: InkWell(
@@ -147,23 +254,12 @@ class HomeWindowsSidebar extends StatelessWidget {
             color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.70),
             borderRadius: BorderRadius.circular(16),
           ),
-          child: profileLoading || resolvedAvatarUrl.isEmpty
-              ? ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
-                  child: const HazukiShimmerLoading(width: 52, height: 52),
-                )
-              : ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
-                  child: HazukiCachedImage(
-                    url: resolvedAvatarUrl,
-                    width: 52,
-                    height: 52,
-                    fit: BoxFit.cover,
-                    error: const HazukiShimmerLoading(width: 52, height: 52),
-                    loading: const HazukiShimmerLoading(width: 52, height: 52),
-                    ignoreNoImageMode: true,
-                  ),
-                ),
+          child: HomeProfileAvatar(
+            avatarUrl: avatarUrl,
+            loading: profileLoading,
+            size: 52,
+            borderRadius: BorderRadius.circular(14),
+          ),
         ),
       ),
     );
@@ -525,23 +621,12 @@ class HomeDrawerContent extends StatelessWidget {
                       InkWell(
                         onTap: onProfileTap,
                         borderRadius: BorderRadius.circular(40),
-                        child: profileLoading || resolvedAvatarUrl.isEmpty
-                            ? const ClipOval(
-                                child: SizedBox(
-                                  width: 72,
-                                  height: 72,
-                                  child: HazukiShimmerLoading(
-                                    width: 72,
-                                    height: 72,
-                                  ),
-                                ),
-                              )
-                            : HazukiCachedCircleAvatar(
-                                radius: 36,
-                                url: resolvedAvatarUrl,
-                                useShimmerFallback: true,
-                                ignoreNoImageMode: true,
-                              ),
+                        child: HomeProfileAvatar(
+                          avatarUrl: avatarUrl,
+                          loading: profileLoading,
+                          size: 72,
+                          heroEnabled: true,
+                        ),
                       ),
                       const SizedBox(height: 16),
                       Text(

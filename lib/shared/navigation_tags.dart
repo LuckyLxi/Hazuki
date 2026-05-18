@@ -11,6 +11,7 @@ typedef ComicDetailPageBuilder =
     Widget Function(ExploreComic comic, String heroTag);
 
 const discoverSearchHeroTag = 'discover_search_to_search_page';
+const homeProfileAvatarHeroTag = 'home_profile_avatar_to_drawer';
 const discoverDailyHeroSaltPrefix = 'discover-daily-';
 
 String comicCoverHeroTag(ExploreComic comic, {String? salt}) {

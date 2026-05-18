@@ -8,6 +8,8 @@ import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/shared/navigation_tags.dart';
+import 'package:hazuki/shared/search_box_outline.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:hazuki/widgets/windows_comic_detail_host.dart';
 import 'package:hazuki/features/discover/discover.dart';
@@ -15,9 +17,7 @@ import 'package:hazuki/features/discover/discover.dart';
 import 'home_app_bar_actions.dart';
 import 'home_bottom_navigation.dart';
 import 'home_content_stack.dart';
-import 'discover_app_bar_actions.dart';
 import 'package:hazuki/features/home/view/home_drawer.dart';
-import 'package:hazuki/shared/navigation_tags.dart';
 
 class HomeScaffoldShell extends StatelessWidget {
   const HomeScaffoldShell({
@@ -107,7 +107,7 @@ class HomeScaffoldShell extends StatelessWidget {
       currentIndex: currentIndex,
       discoverChild: DiscoverPage(
         comicDetailPageBuilder: comicDetailPageBuilder,
-        usePinnedSearchInAppBar: usePinnedDiscoverSearch,
+        usePinnedSearchInAppBar: true,
         dailyRecommendationState: dailyRecommendationState,
         allowInitialLoad: allowDiscoverInitialLoad,
         hideLoadingUntilInitialLoadAllowed: hideDiscoverLoadingUntilAllowed,
@@ -122,7 +122,7 @@ class HomeScaffoldShell extends StatelessWidget {
         onComicTap: favoriteComicTapHandler,
       ),
     );
-    final drawerContent = HomeDrawerContent(
+    final mobileDrawerContent = HomeDrawerContent(
       isLogged: isLogged,
       profileLoading: profileLoading,
       avatarUrl: avatarUrl,
@@ -133,9 +133,9 @@ class HomeScaffoldShell extends StatelessWidget {
       checkedInToday: checkedInToday,
       onProfileTap:
           sl<HazukiSourceService>().sourceMeta?.supportsAccount == true
-          ? onProfileTap
+          ? _closeDrawerRouteThen(context, onProfileTap)
           : null,
-      onCheckInPressed: onCheckInPressed,
+      onCheckInPressed: _closeDrawerRouteThen(context, onCheckInPressed),
       onOpenHistory: onOpenHistory,
       onOpenCategories: onOpenCategories,
       onOpenRanking: onOpenRanking,
@@ -187,9 +187,6 @@ class HomeScaffoldShell extends StatelessWidget {
           )
         : HazukiDesktopPageContainer(child: homeContent);
 
-    final useWindowsCenteredDiscoverSearch =
-        Platform.isWindows && currentIndex == 0;
-
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
@@ -210,40 +207,39 @@ class HomeScaffoldShell extends StatelessWidget {
           extendBody: true,
           appBar: hazukiFrostedAppBar(
             context: context,
-            title: useWindowsCenteredDiscoverSearch
-                ? DiscoverAppBarActions(
-                    isActiveTab: true,
-                    morphProgress: discoverSearchMorphProgress,
-                    forceInAppBar: usePinnedDiscoverSearch,
-                    onOpenSearch: onOpenSearch,
-                    searchWidth: 320,
-                    trailingSpacing: 0,
-                  )
-                : Platform.isWindows
-                ? const SizedBox.shrink()
-                : const Text('Hazuki'),
-            centerTitle: useWindowsCenteredDiscoverSearch,
+            leading: Platform.isWindows
+                ? null
+                : _HomeAppBarProfileButton(
+                    avatarUrl: avatarUrl,
+                    profileLoading: profileLoading,
+                    username: username,
+                    onPressed: () {
+                      _openProfileDrawer(context, mobileDrawerContent);
+                    },
+                  ),
+            automaticallyImplyLeading: false,
+            title: _HomeAppBarSearchBox(
+              onOpenSearch: onOpenSearch,
+              maxWidth: Platform.isWindows ? 320 : null,
+            ),
+            titleSpacing: Platform.isWindows ? null : 4,
+            centerTitle: Platform.isWindows,
             enableBlur: currentIndex != 0 && currentIndex != 1,
             actions: [
-              if (!useWindowsCenteredDiscoverSearch)
-                HomeAppBarActions(
-                  currentIndex: currentIndex,
-                  discoverSearchMorphProgress: discoverSearchMorphProgress,
-                  forceDiscoverSearchInAppBar: usePinnedDiscoverSearch,
-                  favoriteAppBarActions: favoriteAppBarActions,
-                  onOpenSearch: onOpenSearch,
-                  onFavoriteSortSelected: onFavoriteSortSelected,
-                  onFavoriteCreateFolderPressed: onFavoriteCreateFolderPressed,
-                  onFavoriteModeTogglePressed: onFavoriteModeTogglePressed,
-                ),
+              HomeAppBarActions(
+                currentIndex: currentIndex,
+                discoverSearchMorphProgress: discoverSearchMorphProgress,
+                forceDiscoverSearchInAppBar: usePinnedDiscoverSearch,
+                favoriteAppBarActions: favoriteAppBarActions,
+                onOpenSearch: onOpenSearch,
+                onFavoriteSortSelected: onFavoriteSortSelected,
+                onFavoriteCreateFolderPressed: onFavoriteCreateFolderPressed,
+                onFavoriteModeTogglePressed: onFavoriteModeTogglePressed,
+              ),
             ],
           ),
-          drawer: Platform.isWindows
-              ? null
-              : Drawer(
-                  width: resolveHomeDrawerWidth(context),
-                  child: drawerContent,
-                ),
+          drawerEnableOpenDragGesture: false,
+          drawer: null,
           body: body,
           bottomNavigationBar: Platform.isWindows
               ? null
@@ -255,6 +251,217 @@ class HomeScaffoldShell extends StatelessWidget {
                 ),
         ),
       ),
+    );
+  }
+
+  VoidCallback? _closeDrawerRouteThen(
+    BuildContext context,
+    VoidCallback? next,
+  ) {
+    if (next == null) {
+      return null;
+    }
+    return () {
+      final navigator = Navigator.of(context);
+      if (navigator.canPop()) {
+        navigator.pop();
+      }
+      unawaited(() async {
+        await Future<void>.delayed(const Duration(milliseconds: 240));
+        if (!context.mounted) {
+          return;
+        }
+        next();
+      }());
+    };
+  }
+
+  void _openProfileDrawer(BuildContext context, Widget drawerContent) {
+    Navigator.of(context).push(
+      _HomeProfileDrawerRoute(
+        drawerWidth: resolveHomeDrawerWidth(context),
+        drawerColor:
+            DrawerTheme.of(context).backgroundColor ??
+            Theme.of(context).drawerTheme.backgroundColor ??
+            Theme.of(context).colorScheme.surface,
+        drawerContent: drawerContent,
+      ),
+    );
+  }
+}
+
+class _HomeAppBarProfileButton extends StatelessWidget {
+  const _HomeAppBarProfileButton({
+    required this.avatarUrl,
+    required this.profileLoading,
+    required this.username,
+    required this.onPressed,
+  });
+
+  final String? avatarUrl;
+  final bool profileLoading;
+  final String username;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Tooltip(
+      message: profileLoading ? l10n(context).commonLoading : username,
+      child: Padding(
+        padding: const EdgeInsets.only(left: 8),
+        child: IconButton(
+          onPressed: onPressed,
+          padding: EdgeInsets.zero,
+          icon: HomeProfileAvatar(
+            avatarUrl: avatarUrl,
+            loading: profileLoading,
+            size: 38,
+            borderWidth: 2,
+            borderColor: colorScheme.primary.withValues(alpha: 0.72),
+            backgroundColor: colorScheme.surfaceContainerHigh,
+            heroEnabled: true,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HomeAppBarSearchBox extends StatelessWidget {
+  const _HomeAppBarSearchBox({required this.onOpenSearch, this.maxWidth});
+
+  final VoidCallback onOpenSearch;
+  final double? maxWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final searchBox = Material(
+      color: theme.colorScheme.surfaceContainerHigh,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: hazukiSearchBoxOutlineSide(context),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onOpenSearch,
+        child: SizedBox(
+          height: 40,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.search,
+                  size: 20,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    l10n(context).homeSearchHint,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    if (maxWidth == null) {
+      return searchBox;
+    }
+    return ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: maxWidth!),
+      child: searchBox,
+    );
+  }
+}
+
+class _HomeProfileDrawerRoute extends PageRoute<void> {
+  _HomeProfileDrawerRoute({
+    required this.drawerWidth,
+    required this.drawerColor,
+    required this.drawerContent,
+  });
+
+  final double drawerWidth;
+  final Color drawerColor;
+  final Widget drawerContent;
+
+  @override
+  bool get opaque => false;
+
+  @override
+  bool get barrierDismissible => true;
+
+  @override
+  Color get barrierColor => Colors.black.withValues(alpha: 0.28);
+
+  @override
+  String? get barrierLabel => 'Dismiss';
+
+  @override
+  bool get maintainState => true;
+
+  @override
+  Duration get transitionDuration => const Duration(milliseconds: 320);
+
+  @override
+  Duration get reverseTransitionDuration => const Duration(milliseconds: 240);
+
+  @override
+  void didChangeNext(Route<dynamic>? nextRoute) {
+    super.didChangeNext(nextRoute);
+    if (nextRoute == null) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      navigator?.removeRoute(this);
+    });
+  }
+
+  @override
+  Widget buildPage(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+  ) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Drawer(
+        width: drawerWidth,
+        backgroundColor: drawerColor,
+        child: drawerContent,
+      ),
+    );
+  }
+
+  @override
+  Widget buildTransitions(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    final curved = CurvedAnimation(
+      parent: animation,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    );
+    return SlideTransition(
+      position: Tween<Offset>(
+        begin: const Offset(-1, 0),
+        end: Offset.zero,
+      ).animate(curved),
+      child: child,
     );
   }
 }

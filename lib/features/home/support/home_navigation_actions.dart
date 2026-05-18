@@ -65,7 +65,7 @@ class HomeNavigationActions {
   Future<void> openSearch() async {
     await Navigator.of(
       context,
-    ).push(MaterialPageRoute<void>(builder: (_) => buildSearchPage()));
+    ).push(buildSearchEntryPageRoute<void>(builder: (_) => buildSearchPage()));
   }
 
   Future<void> openHistory() async {

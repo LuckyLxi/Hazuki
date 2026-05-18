@@ -136,7 +136,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
       return;
     }
     Navigator.of(context).push(
-      MaterialPageRoute<void>(
+      buildSearchEntryPageRoute<void>(
         builder: (_) => SearchPage(
           initialKeyword: null,
           comicDetailPageBuilder: widget.comicDetailPageBuilder,

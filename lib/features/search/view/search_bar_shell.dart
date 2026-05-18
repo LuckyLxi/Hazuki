@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/shared/search_box_outline.dart';
 
 class SearchBarShell extends StatelessWidget {
   const SearchBarShell({
@@ -32,60 +33,78 @@ class SearchBarShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final strings = AppLocalizations.of(context)!;
-    final searchBar = SearchBar(
-      focusNode: focusNode,
-      controller: controller,
-      hintText: strings.searchHint,
-      autoFocus: autofocus,
-      onTap: () {
-        if (!focusNode.canRequestFocus) {
-          return;
-        }
-        onTap?.call();
-        focusNode.requestFocus();
-        final textLength = controller.text.length;
-        final selection = controller.selection;
-        if (!selection.isValid || selection.baseOffset > textLength) {
-          controller.selection = TextSelection.collapsed(offset: textLength);
-        }
+    return ListenableBuilder(
+      listenable: focusNode,
+      builder: (context, _) {
+        return TweenAnimationBuilder<double>(
+          tween: Tween<double>(end: focusNode.hasFocus ? 1 : 0),
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          builder: (context, focusProgress, _) {
+            final strings = AppLocalizations.of(context)!;
+            final searchBar = SearchBar(
+              focusNode: focusNode,
+              controller: controller,
+              hintText: strings.searchHint,
+              autoFocus: autofocus,
+              onTap: () {
+                if (!focusNode.canRequestFocus) {
+                  return;
+                }
+                onTap?.call();
+                focusNode.requestFocus();
+                final textLength = controller.text.length;
+                final selection = controller.selection;
+                if (!selection.isValid || selection.baseOffset > textLength) {
+                  controller.selection = TextSelection.collapsed(
+                    offset: textLength,
+                  );
+                }
+              },
+              elevation: const WidgetStatePropertyAll(0),
+              backgroundColor: WidgetStatePropertyAll(
+                Theme.of(context).colorScheme.surfaceContainerHigh,
+              ),
+              shape: WidgetStatePropertyAll(
+                RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(compact ? 14 : 16),
+                  side: hazukiSearchBoxOutlineSide(
+                    context,
+                    focusProgress: focusProgress,
+                  ),
+                ),
+              ),
+              padding: WidgetStatePropertyAll(
+                EdgeInsets.symmetric(horizontal: compact ? 12 : 16),
+              ),
+              textInputAction: TextInputAction.search,
+              leading: Icon(Icons.search, size: compact ? 20 : 24),
+              trailing: [
+                _SearchActionButton(
+                  showClearAction: controller.text.isNotEmpty,
+                  clearKey: clearKey,
+                  submitKey: submitKey,
+                  clearTooltip: strings.searchClearTooltip,
+                  submitTooltip: strings.searchSubmitTooltip,
+                  onClear: onClear,
+                  onSubmit: onSubmit,
+                ),
+              ],
+              onSubmitted: onSubmitted ?? (_) => onSubmit(),
+              onChanged: onChanged,
+            );
+
+            if (!compact) {
+              return SizedBox(height: 56, child: searchBar);
+            }
+
+            return ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 40),
+              child: searchBar,
+            );
+          },
+        );
       },
-      elevation: const WidgetStatePropertyAll(0),
-      backgroundColor: WidgetStatePropertyAll(
-        Theme.of(context).colorScheme.surfaceContainerHigh,
-      ),
-      shape: WidgetStatePropertyAll(
-        RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(compact ? 14 : 16),
-        ),
-      ),
-      padding: WidgetStatePropertyAll(
-        EdgeInsets.symmetric(horizontal: compact ? 12 : 16),
-      ),
-      textInputAction: TextInputAction.search,
-      leading: Icon(Icons.search, size: compact ? 20 : 24),
-      trailing: [
-        _SearchActionButton(
-          showClearAction: controller.text.isNotEmpty,
-          clearKey: clearKey,
-          submitKey: submitKey,
-          clearTooltip: strings.searchClearTooltip,
-          submitTooltip: strings.searchSubmitTooltip,
-          onClear: onClear,
-          onSubmit: onSubmit,
-        ),
-      ],
-      onSubmitted: onSubmitted ?? (_) => onSubmit(),
-      onChanged: onChanged,
-    );
-
-    if (!compact) {
-      return SizedBox(height: 56, child: searchBar);
-    }
-
-    return ConstrainedBox(
-      constraints: const BoxConstraints(maxHeight: 40),
-      child: searchBar,
     );
   }
 }

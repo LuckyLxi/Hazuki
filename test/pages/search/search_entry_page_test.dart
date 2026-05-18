@@ -41,7 +41,7 @@ void main() {
     final scaffold = tester.widget<Scaffold>(find.byType(Scaffold).first);
     final editableText = tester.widget<EditableText>(
       find.descendant(
-        of: find.byKey(const ValueKey('search-entry-primary-search-bar')),
+        of: find.byKey(const ValueKey('search-entry-app-bar-search-bar')),
         matching: find.byType(EditableText),
       ),
     );
@@ -74,13 +74,13 @@ void main() {
     await tester.pump();
 
     await tester.tap(
-      find.byKey(const ValueKey('search-entry-primary-search-bar')),
+      find.byKey(const ValueKey('search-entry-app-bar-search-bar')),
     );
     await _pumpSearchSettled(tester);
 
     final editableText = tester.widget<EditableText>(
       find.descendant(
-        of: find.byKey(const ValueKey('search-entry-primary-search-bar')),
+        of: find.byKey(const ValueKey('search-entry-app-bar-search-bar')),
         matching: find.byType(EditableText),
       ),
     );
@@ -136,14 +136,14 @@ void main() {
 
       await tester.enterText(
         find.descendant(
-          of: find.byKey(const ValueKey('search-entry-primary-search-bar')),
+          of: find.byKey(const ValueKey('search-entry-app-bar-search-bar')),
           matching: find.byType(EditableText),
         ),
         'submit-keyword',
       );
       await tester.tap(
         find.descendant(
-          of: find.byKey(const ValueKey('search-entry-primary-search-bar')),
+          of: find.byKey(const ValueKey('search-entry-app-bar-search-bar')),
           matching: find.byIcon(Icons.arrow_forward),
         ),
       );
@@ -175,7 +175,7 @@ void main() {
 
     await tester.enterText(
       find.descendant(
-        of: find.byKey(const ValueKey('search-entry-primary-search-bar')),
+        of: find.byKey(const ValueKey('search-entry-app-bar-search-bar')),
         matching: find.byType(EditableText),
       ),
       'abc123def',
@@ -192,7 +192,7 @@ void main() {
     expect(_currentExtractedId(tester), isNull);
 
     await tester.tap(
-      find.byKey(const ValueKey('search-results-primary-search-bar')),
+      find.byKey(const ValueKey('search-results-app-bar-search-bar')),
     );
     await tester.pump();
 
@@ -227,7 +227,7 @@ void main() {
 
     await tester.enterText(
       find.descendant(
-        of: find.byKey(const ValueKey('search-entry-primary-search-bar')),
+        of: find.byKey(const ValueKey('search-entry-app-bar-search-bar')),
         matching: find.byType(EditableText),
       ),
       'abc123def',
@@ -264,7 +264,7 @@ void main() {
 
     await tester.enterText(
       find.descendant(
-        of: find.byKey(const ValueKey('search-entry-primary-search-bar')),
+        of: find.byKey(const ValueKey('search-entry-app-bar-search-bar')),
         matching: find.byType(EditableText),
       ),
       'abc123def',
@@ -295,11 +295,10 @@ void main() {
     expect(tester.testTextInput.isVisible, isFalse);
   });
 
-  testWidgets('collapsed results search can be reopened and submitted', (
+  testWidgets('results search loses focus on outside interactions', (
     tester,
   ) async {
     SharedPreferences.setMockInitialValues(const {});
-    final requests = <String>[];
 
     await tester.pumpWidget(
       _buildTestApp(
@@ -307,38 +306,61 @@ void main() {
           initialKeyword: 'hazuki',
           comicDetailPageBuilder: _comicDetailPageBuilder,
           comicCoverHeroTagBuilder: (_, {String? salt}) => 'hero-$salt',
-          searchPageLoader: _recordingSearchPageLoader(requests),
+          searchPageLoader: _fakeSearchPageLoader,
         ),
       ),
     );
     await _pumpSearchSettled(tester);
 
-    await tester.drag(find.byType(ListView).first, const Offset(0, -420));
-    await tester.pumpAndSettle();
-
-    expect(
-      find.byKey(const ValueKey('search-results-collapsed-preview')),
-      findsOneWidget,
+    final resultsSearch = find.byKey(
+      const ValueKey('search-results-app-bar-search-bar'),
     );
 
-    await tester.tap(
-      find.byKey(const ValueKey('search-results-collapsed-preview')),
-    );
+    await tester.tap(resultsSearch);
     await _pumpSearchSettled(tester);
 
+    var editableText = tester.widget<EditableText>(
+      find.descendant(of: resultsSearch, matching: find.byType(EditableText)),
+    );
+    expect(editableText.focusNode.hasFocus, isTrue);
     expect(tester.testTextInput.isVisible, isTrue);
 
-    await tester.enterText(
-      find.descendant(
-        of: find.byKey(const ValueKey('search-results-collapsed-search-bar')),
-        matching: find.byType(EditableText),
-      ),
-      'hazuki-next',
+    await tester.tap(find.byType(PopupMenuButton<String>));
+    await tester.pumpAndSettle();
+
+    editableText = tester.widget<EditableText>(
+      find.descendant(of: resultsSearch, matching: find.byType(EditableText)),
     );
-    await tester.testTextInput.receiveAction(TextInputAction.search);
+    expect(editableText.focusNode.hasFocus, isFalse);
+    expect(tester.testTextInput.isVisible, isFalse);
+
+    await tester.tapAt(const Offset(4, 4));
+    await tester.pumpAndSettle();
+
+    await tester.tap(resultsSearch);
     await _pumpSearchSettled(tester);
 
-    expect(requests, contains('hazuki-next'));
+    editableText = tester.widget<EditableText>(
+      find.descendant(of: resultsSearch, matching: find.byType(EditableText)),
+    );
+    expect(editableText.focusNode.hasFocus, isTrue);
+
+    await tester.drag(find.byType(ListView).first, const Offset(0, -160));
+    await _pumpSearchSettled(tester);
+
+    editableText = tester.widget<EditableText>(
+      find.descendant(of: resultsSearch, matching: find.byType(EditableText)),
+    );
+    expect(editableText.focusNode.hasFocus, isFalse);
+    expect(tester.testTextInput.isVisible, isFalse);
+
+    await tester.tap(resultsSearch);
+    await _pumpSearchSettled(tester);
+
+    await tester.tap(find.text('Comic hazuki 3'));
+    await _pumpSearchSettled(tester);
+
+    expect(WindowsComicDetailController.instance.entry?.comic.id, 'hazuki-1-3');
     expect(tester.testTextInput.isVisible, isFalse);
   });
 }

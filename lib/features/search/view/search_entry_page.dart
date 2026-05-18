@@ -13,7 +13,6 @@ import 'search_id_extract_pill.dart';
 import 'search_results_page.dart';
 import '../state/search_focus_coordinator.dart';
 import '../support/search_history_service.dart';
-import '../support/search_reveal_support.dart';
 import '../support/search_shared.dart';
 
 class SearchEntryPage extends StatefulWidget {
@@ -41,19 +40,13 @@ class _SearchEntryPageState extends State<SearchEntryPage>
   final HazukiSourceService _sourceService = sl<HazukiSourceService>();
   final ScrollController _scrollController = ScrollController();
   final SearchHistoryService _historyService = SearchHistoryService();
-  late final SearchRevealSupport _revealSupport = SearchRevealSupport(
-    _scrollController,
-  );
 
   List<String> _historyList = <String>[];
   bool _historyEditMode = false;
   bool _historyExpanded = false;
-  double _searchRevealProgress = 0;
   bool _comicIdSearchEnhance = false;
   bool _pendingExtractedComicIdHide = false;
   String? _extractedComicId;
-
-  bool get _showCollapsedSearch => _revealSupport.showCollapsedSearch;
 
   @override
   void initState() {
@@ -62,9 +55,7 @@ class _SearchEntryPageState extends State<SearchEntryPage>
     unawaited(_loadComicIdSearchEnhance());
     WidgetsBinding.instance.addObserver(this);
     _sourceService.addListener(_handleSourceChanged);
-    _scrollController.addListener(_onScroll);
     _focusCoordinator.primaryFocusNode.addListener(_handleSearchFocusChanged);
-    _focusCoordinator.collapsedFocusNode.addListener(_handleSearchFocusChanged);
   }
 
   @override
@@ -72,15 +63,10 @@ class _SearchEntryPageState extends State<SearchEntryPage>
     _focusCoordinator.primaryFocusNode.removeListener(
       _handleSearchFocusChanged,
     );
-    _focusCoordinator.collapsedFocusNode.removeListener(
-      _handleSearchFocusChanged,
-    );
     // 页面退出时清除额外底部偏移，避免影响其他页面的提示药丸
     hazukiPromptPlacementController.setExtraBottomPadding(0);
     WidgetsBinding.instance.removeObserver(this);
     _sourceService.removeListener(_handleSourceChanged);
-    _revealSupport.dispose();
-    _scrollController.removeListener(_onScroll);
     _focusCoordinator.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -108,51 +94,6 @@ class _SearchEntryPageState extends State<SearchEntryPage>
     _logSearchEntryEvent('Search entry focus changed', stage: 'focus_listener');
   }
 
-  void _syncSearchRevealProgress(bool force) {
-    _revealSupport.sync(
-      mounted: mounted,
-      force: force,
-      applyProgress: (nextProgress) {
-        setState(() {
-          _searchRevealProgress = nextProgress;
-        });
-      },
-    );
-  }
-
-  void _scheduleSearchRevealSync(bool force) {
-    _revealSupport.schedule(
-      mounted: mounted,
-      force: force,
-      onSyncRequested: _syncSearchRevealProgress,
-    );
-  }
-
-  void _scheduleSearchRevealSyncBurst(bool force) {
-    _revealSupport.scheduleBurst(
-      mounted: mounted,
-      force: force,
-      onSyncRequested: _syncSearchRevealProgress,
-    );
-  }
-
-  void _onScroll() {
-    _syncSearchRevealProgress(false);
-  }
-
-  Future<void> _scrollToTop({bool focusSearch = false}) async {
-    if (_scrollController.hasClients) {
-      await _scrollController.animateTo(
-        0,
-        duration: const Duration(milliseconds: 320),
-        curve: Curves.easeOutCubic,
-      );
-    }
-    if (focusSearch && mounted) {
-      await _focusCoordinator.requestPrimarySearchFocus(context);
-    }
-  }
-
   Future<void> _loadHistory() async {
     final history = await _historyService.load();
     if (!mounted) {
@@ -164,7 +105,6 @@ class _SearchEntryPageState extends State<SearchEntryPage>
         _historyEditMode = false;
       }
     });
-    _scheduleSearchRevealSyncBurst(false);
   }
 
   Future<void> _loadComicIdSearchEnhance() async {
@@ -262,7 +202,6 @@ class _SearchEntryPageState extends State<SearchEntryPage>
         _historyEditMode = false;
       }
     });
-    _scheduleSearchRevealSyncBurst(false);
   }
 
   Future<void> _clearHistory() async {
@@ -275,7 +214,6 @@ class _SearchEntryPageState extends State<SearchEntryPage>
       _historyEditMode = false;
       _historyExpanded = false;
     });
-    _scheduleSearchRevealSyncBurst(false);
   }
 
   Future<void> _openResults(
@@ -460,7 +398,7 @@ class _SearchEntryPageState extends State<SearchEntryPage>
       content: {
         'stage': stage,
         ...?target == null ? null : {'target': target},
-        'showCollapsedSearch': _showCollapsedSearch,
+        'showCollapsedSearch': false,
         'keyboardVisible': _focusCoordinator.keyboardVisible,
         'viewInsetsBottom': view?.viewInsets.bottom ?? 0,
         'primaryHasFocus': _focusCoordinator.primaryFocusNode.hasFocus,
@@ -484,92 +422,6 @@ class _SearchEntryPageState extends State<SearchEntryPage>
       'extentOffset': selection.extentOffset,
       'isCollapsed': selection.isCollapsed,
     };
-  }
-
-  Widget _buildTopSearchBox() {
-    final hideProgress = Curves.easeOutCubic.transform(_searchRevealProgress);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(0, 14, 0, 10),
-      child: IgnorePointer(
-        ignoring: _showCollapsedSearch,
-        child: Opacity(
-          opacity: 1 - hideProgress,
-          child: Transform.translate(
-            offset: Offset(0, -10 * hideProgress),
-            child: Transform.scale(
-              scale: 1 - 0.04 * hideProgress,
-              alignment: Alignment.topCenter,
-              child: HeroMode(
-                enabled: !_showCollapsedSearch,
-                child: Hero(
-                  tag: discoverSearchHeroTag,
-                  child: _buildSearchBar(
-                    key: const ValueKey('search-entry-primary-search-bar'),
-                    clearKey: 'entry-clear',
-                    submitKey: 'entry-submit',
-                    logTarget: 'primary',
-                    autofocus: false,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCollapsedSearchBox() {
-    return HeroMode(
-      enabled: _showCollapsedSearch,
-      child: Hero(
-        tag: discoverSearchHeroTag,
-        child: ClipRect(
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 220),
-            curve: Curves.easeOutCubic,
-            width: _showCollapsedSearch ? 180 : 0,
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: AnimatedSlide(
-                offset: _showCollapsedSearch
-                    ? Offset.zero
-                    : const Offset(-0.08, 0),
-                duration: const Duration(milliseconds: 220),
-                curve: Curves.easeOutCubic,
-                child: AnimatedScale(
-                  scale: _showCollapsedSearch ? 1 : 0.94,
-                  duration: const Duration(milliseconds: 240),
-                  curve: Curves.easeOutBack,
-                  child: AnimatedOpacity(
-                    opacity: _showCollapsedSearch ? 1 : 0,
-                    duration: const Duration(milliseconds: 180),
-                    curve: Curves.easeOutCubic,
-                    child: IgnorePointer(
-                      ignoring: !_showCollapsedSearch,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(14),
-                        onTap: () => unawaited(_scrollToTop(focusSearch: true)),
-                        child: _buildSearchBar(
-                          key: const ValueKey(
-                            'search-entry-collapsed-search-bar',
-                          ),
-                          clearKey: 'entry-collapsed-clear',
-                          submitKey: 'entry-collapsed-submit',
-                          logTarget: 'collapsed',
-                          focusNode: _focusCoordinator.collapsedFocusNode,
-                          compact: true,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
   }
 
   @override
@@ -607,7 +459,6 @@ class _SearchEntryPageState extends State<SearchEntryPage>
                           setState(() {
                             _historyEditMode = !_historyEditMode;
                           });
-                          _scheduleSearchRevealSyncBurst(true);
                         },
                         child: Icon(
                           _historyEditMode ? Icons.done : Icons.delete_outline,
@@ -617,16 +468,17 @@ class _SearchEntryPageState extends State<SearchEntryPage>
                   : null,
               appBar: hazukiFrostedAppBar(
                 context: context,
-                title: Text(AppLocalizations.of(context)!.searchTitle),
-                enableBlur: false,
-                actions: [
-                  _buildCollapsedSearchBox(),
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 220),
-                    curve: Curves.easeOutCubic,
-                    width: _showCollapsedSearch ? 12 : 0,
+                title: Hero(
+                  tag: discoverSearchHeroTag,
+                  child: _buildSearchBar(
+                    key: const ValueKey('search-entry-app-bar-search-bar'),
+                    clearKey: 'entry-clear',
+                    submitKey: 'entry-submit',
+                    logTarget: 'app_bar',
+                    compact: true,
                   ),
-                ],
+                ),
+                enableBlur: false,
               ),
               body: Stack(
                 children: [
@@ -635,10 +487,8 @@ class _SearchEntryPageState extends State<SearchEntryPage>
                     physics: const AlwaysScrollableScrollPhysics(
                       parent: ClampingScrollPhysics(),
                     ),
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
                     children: [
-                      _buildTopSearchBox(),
-                      const SizedBox(height: 18),
                       SearchHistorySection(
                         historyList: _historyList,
                         historyEditMode: _historyEditMode,
@@ -657,9 +507,8 @@ class _SearchEntryPageState extends State<SearchEntryPage>
                           setState(() {
                             _historyExpanded = expanded;
                           });
-                          _scheduleSearchRevealSyncBurst(true);
                         },
-                        onLayoutChanged: () => _scheduleSearchRevealSync(true),
+                        onLayoutChanged: () {},
                       ),
                     ],
                   ),
