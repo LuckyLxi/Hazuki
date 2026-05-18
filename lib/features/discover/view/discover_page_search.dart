@@ -63,7 +63,7 @@ class _DiscoverSearchBox extends StatelessWidget {
             hintText: AppLocalizations.of(context)!.searchHint,
             elevation: const WidgetStatePropertyAll(0),
             backgroundColor: WidgetStatePropertyAll(
-              Theme.of(context).colorScheme.surfaceContainerHigh,
+              hazukiSearchBoxBackgroundColor(context),
             ),
             shape: WidgetStatePropertyAll(
               RoundedRectangleBorder(

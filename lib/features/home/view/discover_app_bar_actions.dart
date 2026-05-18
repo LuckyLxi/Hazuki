@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
+import 'package:hazuki/shared/search_box_outline.dart';
 
 class DiscoverAppBarActions extends StatefulWidget {
   const DiscoverAppBarActions({
@@ -97,7 +98,7 @@ class _DiscoverAppBarActionsState extends State<DiscoverAppBarActions> {
                         child: IgnorePointer(
                           ignoring: !showCollapsedSearch,
                           child: InkWell(
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: BorderRadius.circular(50),
                             onTap: widget.onOpenSearch,
                             child: Container(
                               height: 40,
@@ -105,10 +106,8 @@ class _DiscoverAppBarActionsState extends State<DiscoverAppBarActions> {
                                 horizontal: 12,
                               ),
                               decoration: BoxDecoration(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.surfaceContainerHigh,
-                                borderRadius: BorderRadius.circular(14),
+                                color: hazukiSearchBoxBackgroundColor(context),
+                                borderRadius: BorderRadius.circular(50),
                               ),
                               child: Row(
                                 children: [

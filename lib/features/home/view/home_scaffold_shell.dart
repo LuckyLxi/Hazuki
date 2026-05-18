@@ -133,7 +133,7 @@ class HomeScaffoldShell extends StatelessWidget {
       checkedInToday: checkedInToday,
       onProfileTap:
           sl<HazukiSourceService>().sourceMeta?.supportsAccount == true
-          ? _closeDrawerRouteThen(context, onProfileTap)
+          ? onProfileTap
           : null,
       onCheckInPressed: _closeDrawerRouteThen(context, onCheckInPressed),
       onOpenHistory: onOpenHistory,
@@ -338,14 +338,14 @@ class _HomeAppBarSearchBox extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final searchBox = Material(
-      color: theme.colorScheme.surfaceContainerHigh,
+      color: hazukiSearchBoxBackgroundColor(context),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(50),
         side: hazukiSearchBoxOutlineSide(context),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(50),
         onTap: onOpenSearch,
         child: SizedBox(
           height: 40,
@@ -420,7 +420,7 @@ class _HomeProfileDrawerRoute extends PageRoute<void> {
   @override
   void didChangeNext(Route<dynamic>? nextRoute) {
     super.didChangeNext(nextRoute);
-    if (nextRoute == null) {
+    if (nextRoute is! PageRoute<dynamic>) {
       return;
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {

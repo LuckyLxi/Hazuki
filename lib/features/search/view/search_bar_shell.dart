@@ -63,11 +63,14 @@ class SearchBarShell extends StatelessWidget {
               },
               elevation: const WidgetStatePropertyAll(0),
               backgroundColor: WidgetStatePropertyAll(
-                Theme.of(context).colorScheme.surfaceContainerHigh,
+                hazukiSearchBoxBackgroundColor(
+                  context,
+                  focusProgress: focusProgress,
+                ),
               ),
               shape: WidgetStatePropertyAll(
                 RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(compact ? 14 : 16),
+                  borderRadius: BorderRadius.circular(50),
                   side: hazukiSearchBoxOutlineSide(
                     context,
                     focusProgress: focusProgress,
