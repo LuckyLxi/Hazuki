@@ -488,7 +488,7 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
                 // 用透明 loading 占位来撑开 Stack 的布局尺寸
                 Opacity(opacity: 0.0, child: widget.loading!),
                 // shimmer 铺满整个占位区域
-                const _HazukiShimmerLoading(),
+                const HazukiShimmerLoading(),
               ],
             ),
           );
@@ -502,7 +502,7 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
         }
       } else {
         currentWidget = widget.useShimmerLoading
-            ? _HazukiShimmerLoading(
+            ? HazukiShimmerLoading(
                 key: const ValueKey('loading-shimmer'),
                 width: widget.width,
                 height: widget.height,
@@ -546,12 +546,14 @@ class HazukiCachedCircleAvatar extends StatefulWidget {
     required this.url,
     this.radius,
     this.fallbackIcon,
+    this.useShimmerFallback = false,
     this.ignoreNoImageMode = false,
   });
 
   final String url;
   final double? radius;
   final Icon? fallbackIcon;
+  final bool useShimmerFallback;
   final bool ignoreNoImageMode;
 
   @override
@@ -706,17 +708,25 @@ class _HazukiCachedCircleAvatarState extends State<HazukiCachedCircleAvatar> {
     } else if (_loading) {
       currentWidget = ClipOval(
         key: const ValueKey('loading-avatar'),
-        child: _HazukiShimmerLoading(
+        child: HazukiShimmerLoading(
           width: widget.radius != null ? widget.radius! * 2 : 40,
           height: widget.radius != null ? widget.radius! * 2 : 40,
         ),
       );
     } else {
-      currentWidget = CircleAvatar(
-        key: const ValueKey('fallback-avatar'),
-        radius: widget.radius,
-        child: fallback,
-      );
+      currentWidget = widget.useShimmerFallback
+          ? ClipOval(
+              key: const ValueKey('fallback-avatar-shimmer'),
+              child: HazukiShimmerLoading(
+                width: widget.radius != null ? widget.radius! * 2 : 40,
+                height: widget.radius != null ? widget.radius! * 2 : 40,
+              ),
+            )
+          : CircleAvatar(
+              key: const ValueKey('fallback-avatar'),
+              radius: widget.radius,
+              child: fallback,
+            );
     }
 
     return AnimatedSwitcher(
@@ -726,16 +736,16 @@ class _HazukiCachedCircleAvatarState extends State<HazukiCachedCircleAvatar> {
   }
 }
 
-class _HazukiShimmerLoading extends StatefulWidget {
-  const _HazukiShimmerLoading({super.key, this.width, this.height});
+class HazukiShimmerLoading extends StatefulWidget {
+  const HazukiShimmerLoading({super.key, this.width, this.height});
   final double? width;
   final double? height;
 
   @override
-  State<_HazukiShimmerLoading> createState() => _HazukiShimmerLoadingState();
+  State<HazukiShimmerLoading> createState() => _HazukiShimmerLoadingState();
 }
 
-class _HazukiShimmerLoadingState extends State<_HazukiShimmerLoading>
+class _HazukiShimmerLoadingState extends State<HazukiShimmerLoading>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
 

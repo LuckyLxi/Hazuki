@@ -161,6 +161,7 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
       animation: _coordinator,
       builder: (context, _) {
         final isLogged = _coordinator.isLogged;
+        final profileLoading = _coordinator.profileLoading;
         final profileFlow = _coordinator.createProfileFlow(
           context,
           isMounted: () => mounted,
@@ -171,6 +172,7 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
           drawerTransitionContentBuilder: () => Platform.isWindows
               ? HomeWindowsSidebar(
                   isLogged: _coordinator.isLogged,
+                  profileLoading: profileLoading,
                   avatarUrl: _coordinator.avatarUrl,
                   username: _coordinator.username,
                   currentIndex: _coordinator.currentIndex,
@@ -178,6 +180,7 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
                 )
               : HomeDrawerContent(
                   isLogged: _coordinator.isLogged,
+                  profileLoading: profileLoading,
                   avatarUrl: _coordinator.avatarUrl,
                   username: _coordinator.username,
                   autoCheckInEnabled: _coordinator.autoCheckInEnabled,
@@ -213,6 +216,7 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
           dailyRecommendationState: _coordinator.dailyRecommendationState,
           favoriteAppBarActions: _coordinator.favoriteAppBarActions,
           isLogged: isLogged,
+          profileLoading: profileLoading,
           avatarUrl: _coordinator.avatarUrl,
           username: _coordinator.username,
           autoCheckInEnabled: _coordinator.autoCheckInEnabled,
@@ -238,6 +242,9 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
             unawaited(_coordinator.toggleFavoriteMode());
           },
           onProfileTap: () {
+            if (profileLoading) {
+              return;
+            }
             if (isLogged) {
               unawaited(profileFlow.showAvatarCard());
             } else {

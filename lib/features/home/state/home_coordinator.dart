@@ -50,6 +50,7 @@ class HomeCoordinator extends ChangeNotifier {
   bool get autoCheckInEnabled => _profileController.autoCheckInEnabled;
   bool get checkInBusy => _profileController.checkInBusy;
   bool get checkedInToday => _profileController.checkedInToday;
+  bool get profileLoading => _profileController.profileLoading;
   bool get isCheckInAvailable => _profileController.isCheckInAvailable;
   int get authVersion => _profileController.authVersion;
   bool get isLogged => _profileController.isLogged;

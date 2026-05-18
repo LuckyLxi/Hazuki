@@ -30,6 +30,7 @@ class HomeDrawer extends StatelessWidget {
   const HomeDrawer({
     super.key,
     required this.isLogged,
+    required this.profileLoading,
     required this.avatarUrl,
     required this.username,
     required this.autoCheckInEnabled,
@@ -48,6 +49,7 @@ class HomeDrawer extends StatelessWidget {
   });
 
   final bool isLogged;
+  final bool profileLoading;
   final String? avatarUrl;
   final String username;
   final bool autoCheckInEnabled;
@@ -71,6 +73,7 @@ class HomeDrawer extends StatelessWidget {
       // 移除原有的 SafeArea，让头部背景延伸到状态栏
       child: HomeDrawerContent(
         isLogged: isLogged,
+        profileLoading: profileLoading,
         avatarUrl: avatarUrl,
         username: username,
         autoCheckInEnabled: autoCheckInEnabled,
@@ -95,6 +98,7 @@ class HomeWindowsSidebar extends StatelessWidget {
   const HomeWindowsSidebar({
     super.key,
     required this.isLogged,
+    required this.profileLoading,
     required this.avatarUrl,
     required this.username,
     required this.currentIndex,
@@ -111,6 +115,7 @@ class HomeWindowsSidebar extends StatelessWidget {
   });
 
   final bool isLogged;
+  final bool profileLoading;
   final String? avatarUrl;
   final String username;
   final int currentIndex;
@@ -127,8 +132,10 @@ class HomeWindowsSidebar extends StatelessWidget {
 
   Widget _buildAvatar(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final tooltip = profileLoading ? l10n(context).commonLoading : username;
+    final resolvedAvatarUrl = (avatarUrl ?? '').trim();
     return Tooltip(
-      message: username,
+      message: tooltip,
       child: InkWell(
         onTap: onProfileTap,
         borderRadius: BorderRadius.circular(16),
@@ -140,33 +147,20 @@ class HomeWindowsSidebar extends StatelessWidget {
             color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.70),
             borderRadius: BorderRadius.circular(16),
           ),
-          child: (!isLogged && (avatarUrl ?? '').trim().isEmpty)
+          child: profileLoading || resolvedAvatarUrl.isEmpty
               ? ClipRRect(
                   borderRadius: BorderRadius.circular(14),
-                  child: Image.asset(
-                    'assets/avatars/guest_avatar.png',
-                    width: 52,
-                    height: 52,
-                    fit: BoxFit.cover,
-                  ),
+                  child: const HazukiShimmerLoading(width: 52, height: 52),
                 )
               : ClipRRect(
                   borderRadius: BorderRadius.circular(14),
                   child: HazukiCachedImage(
-                    url: avatarUrl ?? '',
+                    url: resolvedAvatarUrl,
                     width: 52,
                     height: 52,
                     fit: BoxFit.cover,
-                    error: Icon(
-                      Icons.person,
-                      size: 28,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                    loading: Icon(
-                      Icons.person,
-                      size: 28,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
+                    error: const HazukiShimmerLoading(width: 52, height: 52),
+                    loading: const HazukiShimmerLoading(width: 52, height: 52),
                     ignoreNoImageMode: true,
                   ),
                 ),
@@ -321,6 +315,7 @@ class HomeDrawerContent extends StatelessWidget {
   const HomeDrawerContent({
     super.key,
     required this.isLogged,
+    required this.profileLoading,
     required this.avatarUrl,
     required this.username,
     required this.autoCheckInEnabled,
@@ -339,6 +334,7 @@ class HomeDrawerContent extends StatelessWidget {
   });
 
   final bool isLogged;
+  final bool profileLoading;
   final String? avatarUrl;
   final String username;
   final bool autoCheckInEnabled;
@@ -403,6 +399,10 @@ class HomeDrawerContent extends StatelessWidget {
     final topPadding = MediaQuery.paddingOf(context).top;
     final bottomPadding = MediaQuery.paddingOf(context).bottom;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final displayUsername = profileLoading
+        ? l10n(context).commonLoading
+        : username;
+    final resolvedAvatarUrl = (avatarUrl ?? '').trim();
 
     final topScrim = isDark
         ? Colors.white.withValues(alpha: 0.04)
@@ -436,13 +436,10 @@ class HomeDrawerContent extends StatelessWidget {
                 Positioned.fill(
                   child: ImageFiltered(
                     imageFilter: ImageFilter.blur(sigmaX: 9, sigmaY: 9),
-                    child: (!isLogged && (avatarUrl ?? '').trim().isEmpty)
-                        ? Image.asset(
-                            'assets/avatars/guest_avatar.png',
-                            fit: BoxFit.cover,
-                          )
+                    child: profileLoading || resolvedAvatarUrl.isEmpty
+                        ? ColoredBox(color: colorScheme.surfaceContainerHigh)
                         : HazukiCachedImage(
-                            url: avatarUrl ?? '',
+                            url: resolvedAvatarUrl,
                             fit: BoxFit.cover,
                             ignoreNoImageMode: true,
                           ),
@@ -528,26 +525,27 @@ class HomeDrawerContent extends StatelessWidget {
                       InkWell(
                         onTap: onProfileTap,
                         borderRadius: BorderRadius.circular(40),
-                        child: (!isLogged && (avatarUrl ?? '').trim().isEmpty)
-                            ? const CircleAvatar(
-                                radius: 36,
-                                backgroundImage: AssetImage(
-                                  'assets/avatars/guest_avatar.png',
+                        child: profileLoading || resolvedAvatarUrl.isEmpty
+                            ? const ClipOval(
+                                child: SizedBox(
+                                  width: 72,
+                                  height: 72,
+                                  child: HazukiShimmerLoading(
+                                    width: 72,
+                                    height: 72,
+                                  ),
                                 ),
                               )
                             : HazukiCachedCircleAvatar(
                                 radius: 36,
-                                url: avatarUrl ?? '',
-                                fallbackIcon: const Icon(
-                                  Icons.person,
-                                  size: 36,
-                                ),
+                                url: resolvedAvatarUrl,
+                                useShimmerFallback: true,
                                 ignoreNoImageMode: true,
                               ),
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        username,
+                        displayUsername,
                         style: textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.bold,
                           color: colorScheme.onSurface,
@@ -557,6 +555,7 @@ class HomeDrawerContent extends StatelessWidget {
                       ),
                       if (showCheckInActions &&
                           isLogged &&
+                          !profileLoading &&
                           !autoCheckInEnabled) ...[
                         const SizedBox(height: 16),
                         AnimatedSwitcher(

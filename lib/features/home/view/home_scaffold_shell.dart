@@ -29,6 +29,7 @@ class HomeScaffoldShell extends StatelessWidget {
     required this.dailyRecommendationState,
     required this.favoriteAppBarActions,
     required this.isLogged,
+    required this.profileLoading,
     required this.avatarUrl,
     required this.username,
     required this.autoCheckInEnabled,
@@ -68,6 +69,7 @@ class HomeScaffoldShell extends StatelessWidget {
   final DiscoverDailyRecommendationState dailyRecommendationState;
   final FavoriteAppBarActionsState favoriteAppBarActions;
   final bool isLogged;
+  final bool profileLoading;
   final String? avatarUrl;
   final String username;
   final bool autoCheckInEnabled;
@@ -122,6 +124,7 @@ class HomeScaffoldShell extends StatelessWidget {
     );
     final drawerContent = HomeDrawerContent(
       isLogged: isLogged,
+      profileLoading: profileLoading,
       avatarUrl: avatarUrl,
       username: username,
       autoCheckInEnabled: autoCheckInEnabled,
@@ -149,6 +152,7 @@ class HomeScaffoldShell extends StatelessWidget {
                 width: resolveHomeWindowsSidebarWidth(context),
                 child: HomeWindowsSidebar(
                   isLogged: isLogged,
+                  profileLoading: profileLoading,
                   avatarUrl: avatarUrl,
                   username: username,
                   currentIndex: currentIndex,

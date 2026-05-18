@@ -23,6 +23,9 @@ class HomeProfileController extends ChangeNotifier {
   bool _didAttemptStartupCheckIn = false;
   bool _checkInBusy = false;
   bool _checkedInToday = false;
+  bool _profileLoading = true;
+  bool _hasCompletedProfileSync = false;
+  int _profileSyncRevision = 0;
 
   String get username => _username;
   String? get avatarUrl => _avatarUrl;
@@ -31,26 +34,40 @@ class HomeProfileController extends ChangeNotifier {
   bool get autoCheckInEnabled => _autoCheckInEnabled;
   bool get checkInBusy => _checkInBusy;
   bool get checkedInToday => _checkedInToday;
+  bool get profileLoading => _profileLoading;
   bool get isLogged => _sourceService.isLogged;
   bool get isCheckInAvailable => _sourceService.isActiveJmSource;
 
   Future<void> syncUserProfile(BuildContext context) async {
+    final revision = ++_profileSyncRevision;
+    _profileLoading = true;
+    _notify();
     // 确保不在 initState() 内同步访问 InheritedWidget（如 l10n），
     // 通过让出微任务将执行推迟到帧回调完成之后
     await Future<void>.value();
+    try {
+      await _sourceService.loadActiveSourcePreference();
+    } catch (_) {}
     // 异步等待后检查 context 是否仍然有效，防止 use_build_context_synchronously 警告
-    if (!context.mounted) return;
+    if (!context.mounted || revision != _profileSyncRevision) return;
     if (!_sourceService.isInitialized) {
-      _username = l10n(context).homeGuestUser;
+      final strings = l10n(context);
+      _profileLoading =
+          !_sourceService.runtimeState.hasFailure &&
+          !_sourceService.runtimeState.isWaitingForRestart;
+      _username = _profileLoading
+          ? strings.commonLoading
+          : (_sourceService.currentAccount ?? strings.homeGuestUser);
       _avatarUrl = null;
       _notify();
       return;
     }
 
     final strings = l10n(context);
-    final username = _sourceService.currentAccount ?? strings.homeGuestUser;
+    var isLogged = _sourceService.isLogged;
+    var username = _sourceService.currentAccount ?? strings.homeGuestUser;
     String? avatar;
-    if (_sourceService.isLogged) {
+    if (isLogged) {
       try {
         avatar = await _sourceService.loadCurrentAvatarUrl();
       } catch (_) {
@@ -58,12 +75,39 @@ class HomeProfileController extends ChangeNotifier {
       }
     }
 
-    if (!context.mounted) {
+    if (!context.mounted || revision != _profileSyncRevision) {
       return;
+    }
+
+    if (!isLogged && !_hasCompletedProfileSync) {
+      await Future<void>.delayed(const Duration(milliseconds: 160));
+      if (!context.mounted || revision != _profileSyncRevision) {
+        return;
+      }
+      try {
+        await _sourceService.loadActiveSourcePreference();
+      } catch (_) {}
+      if (!context.mounted || revision != _profileSyncRevision) {
+        return;
+      }
+      isLogged = _sourceService.isLogged;
+      username = _sourceService.currentAccount ?? strings.homeGuestUser;
+      if (isLogged) {
+        try {
+          avatar = await _sourceService.loadCurrentAvatarUrl();
+        } catch (_) {
+          avatar = null;
+        }
+      }
+      if (!context.mounted || revision != _profileSyncRevision) {
+        return;
+      }
     }
 
     _username = username;
     _avatarUrl = avatar;
+    _profileLoading = false;
+    _hasCompletedProfileSync = true;
     _notify();
     await refreshCheckInState(context);
   }
@@ -187,13 +231,18 @@ class HomeProfileController extends ChangeNotifier {
   }
 
   void markAuthChanged() {
+    _profileSyncRevision++;
     _authVersion++;
+    _profileLoading = true;
     _notify();
   }
 
   void markLoggedOut() {
+    _profileSyncRevision++;
     _authVersion++;
     _checkedInToday = false;
+    _profileLoading = false;
+    _hasCompletedProfileSync = true;
     _notify();
   }
 
