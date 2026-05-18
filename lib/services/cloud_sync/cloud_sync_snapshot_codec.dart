@@ -330,6 +330,13 @@ class CloudSyncSnapshotCodec {
         .map((keyword) => jsonEncode({'keyword': keyword}))
         .join('\n');
 
+    // 仅当用户手动编辑过源文件时才将其上传到云端，
+    // 避免把自动下载的官方源错误地同步到其他设备。
+    final hasCustomSource = await _sourceService.hasCustomEditedJmSource();
+    final jmSource = hasCustomSource
+        ? await _sourceService.readLocalJmSourceIfExists()
+        : null;
+
     return CloudSyncLocalSnapshot(
       settings: settingsJson,
       reading: readingJson,
@@ -337,7 +344,7 @@ class CloudSyncSnapshotCodec {
       historyCount: history.length,
       progressCount: progress.length,
       searchCount: search.length,
-      jmSource: await _sourceService.readLocalJmSourceIfExists(),
+      jmSource: jmSource,
     );
   }
 
