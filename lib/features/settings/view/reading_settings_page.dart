@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/features/reader/reader.dart';
 import 'package:hazuki/features/reader/state/reader_settings_store.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'settings_group.dart';
 
@@ -14,6 +16,7 @@ class ReadingSettingsPage extends StatefulWidget {
 
 class _ReadingSettingsPageState extends State<ReadingSettingsPage> {
   static const _readerSettingsStore = ReaderSettingsStore();
+  late final HazukiSourceService _sourceService = sl<HazukiSourceService>();
 
   ReaderMode _readerMode = ReaderSettingsStore.defaultReaderMode;
   bool _doublePageMode = ReaderSettingsStore.defaultDoublePageMode;
@@ -26,6 +29,8 @@ class _ReadingSettingsPageState extends State<ReadingSettingsPage> {
   bool _pageIndicator = ReaderSettingsStore.defaultPageIndicator;
   bool _pinchToZoom = ReaderSettingsStore.defaultPinchToZoom;
   bool _longPressToSave = ReaderSettingsStore.defaultLongPressToSave;
+  String _copyMangaImageQuality = '1500';
+  String _picacgImageQuality = 'original';
 
   @override
   void initState() {
@@ -50,6 +55,19 @@ class _ReadingSettingsPageState extends State<ReadingSettingsPage> {
       _pageIndicator = settings.pageIndicator;
       _pinchToZoom = settings.pinchToZoom;
       _longPressToSave = settings.longPressToSave;
+
+      final cmQuality = _sourceService
+          .loadActiveSourceSetting('image_quality')
+          ?.toString();
+      _copyMangaImageQuality = {'800', '1200', '1500'}.contains(cmQuality)
+          ? cmQuality!
+          : '1500';
+      final picaQuality = _sourceService
+          .loadActiveSourceSetting('imageQuality')
+          ?.toString();
+      _picacgImageQuality = {'original', 'medium', 'low'}.contains(picaQuality)
+          ? picaQuality!
+          : 'original';
     });
   }
 
@@ -112,6 +130,22 @@ class _ReadingSettingsPageState extends State<ReadingSettingsPage> {
   Future<void> _toggleLongPressToSave(bool value) async {
     setState(() => _longPressToSave = value);
     await _readerSettingsStore.saveLongPressToSave(value);
+  }
+
+  Future<void> _updateCopyMangaImageQuality(String? value) async {
+    if (value == null || value == _copyMangaImageQuality) return;
+    setState(() {
+      _copyMangaImageQuality = value;
+    });
+    await _sourceService.updateActiveSourceSetting('image_quality', value);
+  }
+
+  Future<void> _updatePicacgImageQuality(String? value) async {
+    if (value == null || value == _picacgImageQuality) return;
+    setState(() {
+      _picacgImageQuality = value;
+    });
+    await _sourceService.updateActiveSourceSetting('imageQuality', value);
   }
 
   Widget _buildGroup(BuildContext context, {required List<Widget> children}) {
@@ -279,6 +313,76 @@ class _ReadingSettingsPageState extends State<ReadingSettingsPage> {
                 ),
               ],
             ),
+            if (_sourceService.isActiveCopyMangaSource)
+              _buildGroup(
+                context,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                    child: DropdownButtonFormField<String>(
+                      initialValue: _copyMangaImageQuality,
+                      decoration: InputDecoration(
+                        border: const OutlineInputBorder(),
+                        labelText: strings.otherCopyMangaImageQualityTitle,
+                        helperText: strings.otherCopyMangaImageQualitySubtitle,
+                        isDense: true,
+                      ),
+                      items: [
+                        DropdownMenuItem<String>(
+                          value: '800',
+                          child: Text(strings.otherCopyMangaImageQualityLow),
+                        ),
+                        DropdownMenuItem<String>(
+                          value: '1200',
+                          child: Text(strings.otherCopyMangaImageQualityMedium),
+                        ),
+                        DropdownMenuItem<String>(
+                          value: '1500',
+                          child: Text(strings.otherCopyMangaImageQualityHigh),
+                        ),
+                      ],
+                      onChanged: _updateCopyMangaImageQuality,
+                    ),
+                  ),
+                ],
+              ),
+            if (isHazukiPicacgSourceKey(_sourceService.activeSourceKey))
+              _buildGroup(
+                context,
+                children: [
+                  ListTile(
+                    leading: const Icon(Icons.photo_size_select_large_outlined),
+                    title: Text(strings.linePicacgImageQualityTitle),
+                    subtitle: Text(strings.linePicacgImageQualitySubtitle),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                    child: DropdownButtonFormField<String>(
+                      initialValue: _picacgImageQuality,
+                      decoration: InputDecoration(
+                        border: const OutlineInputBorder(),
+                        labelText: strings.linePicacgImageQualityLabel,
+                        isDense: true,
+                      ),
+                      items: [
+                        DropdownMenuItem<String>(
+                          value: 'original',
+                          child: Text(strings.linePicacgImageQualityOriginal),
+                        ),
+                        DropdownMenuItem<String>(
+                          value: 'medium',
+                          child: Text(strings.linePicacgImageQualityMedium),
+                        ),
+                        DropdownMenuItem<String>(
+                          value: 'low',
+                          child: Text(strings.linePicacgImageQualityLow),
+                        ),
+                      ],
+                      onChanged: _updatePicacgImageQuality,
+                    ),
+                  ),
+                ],
+              ),
           ],
         ),
       ),

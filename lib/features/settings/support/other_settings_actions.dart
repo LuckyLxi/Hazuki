@@ -5,7 +5,6 @@ import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/app/windows/windows_title_bar_controller.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/services/manga_download/manga_download_service.dart';
 import 'package:hazuki/services/manga_download/manga_download_storage_support.dart';
 import 'package:hazuki/widgets/widgets.dart';
@@ -19,7 +18,6 @@ class OtherSettingsSnapshot {
     required this.discoverDailyRecommendationEnabled,
     required this.useSystemTitleBar,
     required this.mangaDownloadsRootPath,
-    required this.copyMangaImageQuality,
     required this.loading,
   });
 
@@ -29,7 +27,6 @@ class OtherSettingsSnapshot {
   final bool discoverDailyRecommendationEnabled;
   final bool useSystemTitleBar;
   final String mangaDownloadsRootPath;
-  final String copyMangaImageQuality;
   final bool loading;
 
   OtherSettingsSnapshot copyWith({
@@ -39,7 +36,6 @@ class OtherSettingsSnapshot {
     bool? discoverDailyRecommendationEnabled,
     bool? useSystemTitleBar,
     String? mangaDownloadsRootPath,
-    String? copyMangaImageQuality,
     bool? loading,
   }) {
     return OtherSettingsSnapshot(
@@ -54,8 +50,6 @@ class OtherSettingsSnapshot {
       useSystemTitleBar: useSystemTitleBar ?? this.useSystemTitleBar,
       mangaDownloadsRootPath:
           mangaDownloadsRootPath ?? this.mangaDownloadsRootPath,
-      copyMangaImageQuality:
-          copyMangaImageQuality ?? this.copyMangaImageQuality,
       loading: loading ?? this.loading,
     );
   }
@@ -68,7 +62,6 @@ class OtherSettingsSnapshot {
       discoverDailyRecommendationEnabled: false,
       useSystemTitleBar: useSystemTitleBar,
       mangaDownloadsRootPath: MangaDownloadAccess.defaultDownloadsRootPath,
-      copyMangaImageQuality: '1500',
       loading: true,
     );
   }
@@ -81,10 +74,6 @@ class OtherSettingsActions {
     required bool initialUseSystemTitleBar,
   }) async {
     final prefs = await SharedPreferences.getInstance();
-    final sourceService = sl<HazukiSourceService>();
-    final copyMangaImageQuality =
-        sourceService.loadActiveSourceSetting('image_quality')?.toString() ??
-        '1500';
     final mangaDownloadsRootPath =
         await MangaDownloadAccess.loadDownloadsRootPath(prefs: prefs);
     return OtherSettingsSnapshot(
@@ -103,10 +92,6 @@ class OtherSettingsActions {
           false,
       useSystemTitleBar: initialUseSystemTitleBar,
       mangaDownloadsRootPath: mangaDownloadsRootPath,
-      copyMangaImageQuality:
-          {'800', '1200', '1500'}.contains(copyMangaImageQuality)
-          ? copyMangaImageQuality
-          : '1500',
       loading: false,
     );
   }
@@ -161,13 +146,6 @@ class OtherSettingsActions {
 
   static Future<void> toggleDiscoverDailyRecommendation(bool value) {
     return sl<DiscoverDailyRecommendationService>().setEnabled(value);
-  }
-
-  static Future<void> updateCopyMangaImageQuality(String value) {
-    return sl<HazukiSourceService>().updateActiveSourceSetting(
-      'image_quality',
-      value,
-    );
   }
 
   static Future<String?> editMangaDownloadPath(

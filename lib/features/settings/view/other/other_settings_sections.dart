@@ -9,8 +9,6 @@ class OtherSettingsGeneralSection extends StatelessWidget {
     required this.autoSoftwareUpdateCheckEnabled,
     required this.discoverDailyRecommendationEnabled,
     required this.showJmExclusiveSettings,
-    required this.showCopyMangaSettings,
-    required this.copyMangaImageQuality,
     required this.useSystemTitleBar,
     required this.mangaDownloadsRootPath,
     required this.showWindowsTitleBarToggle,
@@ -18,7 +16,6 @@ class OtherSettingsGeneralSection extends StatelessWidget {
     required this.onAutoSourceUpdateChanged,
     required this.onAutoSoftwareUpdateChanged,
     required this.onDiscoverDailyRecommendationChanged,
-    required this.onCopyMangaImageQualityChanged,
     required this.onUseSystemTitleBarChanged,
     required this.onEditMangaDownloadPath,
     required this.onCommentFilter,
@@ -29,8 +26,6 @@ class OtherSettingsGeneralSection extends StatelessWidget {
   final bool autoSoftwareUpdateCheckEnabled;
   final bool discoverDailyRecommendationEnabled;
   final bool showJmExclusiveSettings;
-  final bool showCopyMangaSettings;
-  final String copyMangaImageQuality;
   final bool useSystemTitleBar;
   final String mangaDownloadsRootPath;
   final bool showWindowsTitleBarToggle;
@@ -38,7 +33,6 @@ class OtherSettingsGeneralSection extends StatelessWidget {
   final ValueChanged<bool> onAutoSourceUpdateChanged;
   final ValueChanged<bool> onAutoSoftwareUpdateChanged;
   final ValueChanged<bool> onDiscoverDailyRecommendationChanged;
-  final ValueChanged<String?> onCopyMangaImageQualityChanged;
   final ValueChanged<bool> onUseSystemTitleBarChanged;
   final VoidCallback onEditMangaDownloadPath;
   final VoidCallback onCommentFilter;
@@ -77,34 +71,6 @@ class OtherSettingsGeneralSection extends StatelessWidget {
             subtitle: Text(strings.otherDiscoverDailyRecommendationSubtitle),
             value: discoverDailyRecommendationEnabled,
             onChanged: onDiscoverDailyRecommendationChanged,
-          ),
-        if (showCopyMangaSettings)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
-            child: DropdownButtonFormField<String>(
-              initialValue: copyMangaImageQuality,
-              decoration: InputDecoration(
-                border: const OutlineInputBorder(),
-                labelText: strings.otherCopyMangaImageQualityTitle,
-                helperText: strings.otherCopyMangaImageQualitySubtitle,
-                isDense: true,
-              ),
-              items: [
-                DropdownMenuItem<String>(
-                  value: '800',
-                  child: Text(strings.otherCopyMangaImageQualityLow),
-                ),
-                DropdownMenuItem<String>(
-                  value: '1200',
-                  child: Text(strings.otherCopyMangaImageQualityMedium),
-                ),
-                DropdownMenuItem<String>(
-                  value: '1500',
-                  child: Text(strings.otherCopyMangaImageQualityHigh),
-                ),
-              ],
-              onChanged: onCopyMangaImageQualityChanged,
-            ),
           ),
         if (showWindowsTitleBarToggle)
           SwitchListTile(

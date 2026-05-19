@@ -125,26 +125,6 @@ class _LineSettingsPageState extends State<LineSettingsPage> {
     ];
   }
 
-  List<DropdownMenuItem<String>> _buildPicacgImageQualityItems(
-    BuildContext context,
-  ) {
-    final strings = l10n(context);
-    return [
-      DropdownMenuItem<String>(
-        value: 'original',
-        child: Text(strings.linePicacgImageQualityOriginal),
-      ),
-      DropdownMenuItem<String>(
-        value: 'medium',
-        child: Text(strings.linePicacgImageQualityMedium),
-      ),
-      DropdownMenuItem<String>(
-        value: 'low',
-        child: Text(strings.linePicacgImageQualityLow),
-      ),
-    ];
-  }
-
   List<DropdownMenuItem<String>> _buildPicacgAppChannelItems(
     BuildContext context,
   ) {
@@ -252,26 +232,6 @@ class _LineSettingsPageState extends State<LineSettingsPage> {
       await _controller.setCopyMangaSearchApi(value);
       if (!mounted) return;
       unawaited(showHazukiPrompt(context, l10n(context).lineCopyMangaUpdated));
-    } catch (e) {
-      if (!mounted) return;
-      unawaited(
-        showHazukiPrompt(
-          context,
-          l10n(context).lineSaveFailed('$e'),
-          isError: true,
-        ),
-      );
-    }
-  }
-
-  Future<void> _onPicacgImageQualityChanged(String? value) async {
-    if (value == null || value == _controller.picacgImageQuality) {
-      return;
-    }
-    try {
-      await _controller.setPicacgImageQuality(value);
-      if (!mounted) return;
-      unawaited(showHazukiPrompt(context, l10n(context).linePicacgUpdated));
     } catch (e) {
       if (!mounted) return;
       unawaited(
@@ -460,39 +420,6 @@ class _LineSettingsPageState extends State<LineSettingsPage> {
             ],
           ),
         ),
-        const SizedBox(height: 12),
-        Card(
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-            side: BorderSide(color: colorScheme.outlineVariant),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.photo_size_select_large_outlined),
-                  title: Text(strings.linePicacgImageQualityTitle),
-                  subtitle: Text(strings.linePicacgImageQualitySubtitle),
-                ),
-                DropdownButtonFormField<String>(
-                  initialValue: _controller.picacgImageQuality,
-                  items: _buildPicacgImageQualityItems(context),
-                  decoration: InputDecoration(
-                    border: const OutlineInputBorder(),
-                    labelText: strings.linePicacgImageQualityLabel,
-                    isDense: true,
-                  ),
-                  onChanged: _onPicacgImageQualityChanged,
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
         Card(
           elevation: 0,
           shape: RoundedRectangleBorder(

@@ -16,7 +16,6 @@ class LineSettingsController extends ChangeNotifier {
   String _copyMangaBaseUrl = 'api.copy2000.online';
   String _copyMangaSearchApi = 'baseAPI';
   String _picacgBaseUrl = 'https://picaapi.picacomic.com';
-  String _picacgImageQuality = 'original';
   String _picacgAppChannel = '3';
   bool _refreshDomainsOnStart = true;
 
@@ -37,7 +36,6 @@ class LineSettingsController extends ChangeNotifier {
   String get copyMangaBaseUrl => _copyMangaBaseUrl;
   String get copyMangaSearchApi => _copyMangaSearchApi;
   String get picacgBaseUrl => _picacgBaseUrl;
-  String get picacgImageQuality => _picacgImageQuality;
   String get picacgAppChannel => _picacgAppChannel;
   bool get refreshDomainsOnStart => _refreshDomainsOnStart;
   List<String> get apiDomains => _apiDomains;
@@ -81,15 +79,6 @@ class LineSettingsController extends ChangeNotifier {
         _picacgBaseUrl = baseUrl.trim().isEmpty
             ? 'https://picaapi.picacomic.com'
             : baseUrl.trim();
-        final imageQuality =
-            _sourceService
-                .loadActiveSourceSetting('imageQuality')
-                ?.toString() ??
-            'original';
-        _picacgImageQuality =
-            {'original', 'medium', 'low'}.contains(imageQuality)
-            ? imageQuality
-            : 'original';
         final appChannel =
             _sourceService.loadActiveSourceSetting('appChannel')?.toString() ??
             '3';
@@ -212,16 +201,6 @@ class LineSettingsController extends ChangeNotifier {
     _picacgBaseUrl = normalized;
     _notify();
     await _sourceService.updateActiveSourceSetting('base_url', normalized);
-  }
-
-  Future<void> setPicacgImageQuality(String value) async {
-    final normalized = {'original', 'medium', 'low'}.contains(value)
-        ? value
-        : 'original';
-    if (normalized == _picacgImageQuality) return;
-    _picacgImageQuality = normalized;
-    _notify();
-    await _sourceService.updateActiveSourceSetting('imageQuality', normalized);
   }
 
   Future<void> setPicacgAppChannel(String value) async {
