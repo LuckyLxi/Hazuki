@@ -363,7 +363,10 @@
   "comicDetailNoChapterInfo": "No chapter information available",
   "comicDetailNoChapters": "This comic has no chapters yet",
   "comicDetailAuthor": "Author",
+  "comicDetailCategories": "Categories",
   "comicDetailTags": "Tags",
+  "comicDetailUploader": "Uploader",
+  "comicDetailChineseTeam": "Chinese team",
   "comicDetailCopiedId": "Copied ID",
   "comicDetailCopiedPrefix": "Copied: {value}",
   "@comicDetailCopiedPrefix": {
@@ -409,6 +412,12 @@
   },
   "comicDetailViewsCount": "{count} views",
   "@comicDetailViewsCount": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "comicDetailPagesCount": "{count} pages",
+  "@comicDetailPagesCount": {
     "placeholders": {
       "count": {}
     }
@@ -656,6 +665,27 @@
   "lineCopyMangaBaseUrlTitle": "API address",
   "lineCopyMangaBaseUrlLabel": "API domain",
   "lineCopyMangaUpdated": "CopyManga line settings updated",
+  "linePicacgIntro": "The current source is Picacg. You can adjust the API address, image quality, and app channel.",
+  "linePicacgImageQualityTitle": "Image quality",
+  "linePicacgImageQualitySubtitle": "Quality parameter used for Picacg image requests",
+  "linePicacgImageQualityLabel": "Select image quality",
+  "linePicacgImageQualityOriginal": "Original",
+  "linePicacgImageQualityMedium": "Medium",
+  "linePicacgImageQualityLow": "Low",
+  "linePicacgAppChannelTitle": "App channel",
+  "linePicacgAppChannelSubtitle": "app-channel used for Picacg API requests",
+  "linePicacgAppChannelSelectLabel": "Select app channel",
+  "linePicacgAppChannelLabel": "Channel {value}",
+  "@linePicacgAppChannelLabel": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "linePicacgBaseUrlTitle": "API address",
+  "linePicacgBaseUrlLabel": "API domain",
+  "linePicacgUpdated": "Picacg line settings updated",
+  "favoriteSortNewToOld": "New to old",
+  "favoriteSortOldToNew": "Old to new",
   "displayModeAndroidOnly": "Only Android supports refresh rate settings",
   "displayModeReadFailed": "Failed to read display modes: {error}",
   "@displayModeReadFailed": {

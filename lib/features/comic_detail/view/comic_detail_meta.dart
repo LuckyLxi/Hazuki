@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
+import 'package:hazuki/services/hazuki_source_service.dart';
 
 List<String> normalizeComicMetaValues(List<String> rawValues, {String? label}) {
   final values = <String>[];
@@ -56,6 +57,43 @@ bool isComicAuthorKey(String key) {
       key.trim() == '\u4f5c\u8005';
 }
 
+bool isComicCategoryKey(String key) {
+  final normalized = key.trim().toLowerCase();
+  return normalized == 'category' ||
+      normalized == 'categories' ||
+      key.trim() == '\u5206\u7c7b';
+}
+
+bool isComicTagKey(String key) {
+  final normalized = key.trim().toLowerCase();
+  return normalized == 'tag' ||
+      normalized == 'tags' ||
+      key.trim() == '\u6807\u7b7e';
+}
+
+bool isComicWorkKey(String key) {
+  final normalized = key.trim().toLowerCase();
+  return normalized == 'work' ||
+      normalized == 'works' ||
+      key.trim() == '\u4f5c\u54c1';
+}
+
+bool isComicActorKey(String key) {
+  final normalized = key.trim().toLowerCase();
+  return normalized == 'actor' ||
+      normalized == 'actors' ||
+      key.trim() == '\u89d2\u8272';
+}
+
+bool isComicChineseTeamKey(String key) {
+  final normalized = key.trim().toLowerCase();
+  return normalized == 'chinese team' ||
+      normalized == 'chineseteam' ||
+      normalized == 'scanlation' ||
+      normalized == 'translator' ||
+      key.trim() == '\u6c49\u5316\u7ec4';
+}
+
 class ComicDetailMetaSection extends StatelessWidget {
   const ComicDetailMetaSection({
     super.key,
@@ -76,7 +114,56 @@ class ComicDetailMetaSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final strings = l10n(context);
     final authorLabel = strings.comicDetailAuthor;
+    final categoryLabel = strings.comicDetailCategories;
     final tagLabel = strings.comicDetailTags;
+    final uploaderLabel = strings.comicDetailUploader;
+    final chineseTeamLabel = strings.comicDetailChineseTeam;
+    const jmWorkLabel = '\u4f5c\u54c1';
+    const jmActorLabel = '\u89d2\u8272';
+    final isJm = isHazukiJmSourceKey(details.sourceKey);
+    final isPicacg = isHazukiPicacgSourceKey(details.sourceKey);
+    final categoryValues = normalizeComicMetaValues(
+      details.tags.entries
+          .where((entry) => isComicCategoryKey(entry.key))
+          .expand((entry) => entry.value)
+          .toList(),
+      label: categoryLabel,
+    );
+    final tagValues = normalizeComicMetaValues(
+      details.tags.entries
+          .where(
+            (entry) => isPicacg
+                ? isComicTagKey(entry.key)
+                : !isComicAuthorKey(entry.key) &&
+                      !(isJm && isComicWorkKey(entry.key)) &&
+                      !(isJm && isComicActorKey(entry.key)) &&
+                      entry.key != details.tags.keys.lastOrNull,
+          )
+          .expand((entry) => entry.value)
+          .toList(),
+      label: tagLabel,
+    );
+    final workValues = normalizeComicMetaValues(
+      details.tags.entries
+          .where((entry) => isComicWorkKey(entry.key))
+          .expand((entry) => entry.value)
+          .toList(),
+      label: jmWorkLabel,
+    );
+    final actorValues = normalizeComicMetaValues(
+      details.tags.entries
+          .where((entry) => isComicActorKey(entry.key))
+          .expand((entry) => entry.value)
+          .toList(),
+      label: jmActorLabel,
+    );
+    final chineseTeamValues = normalizeComicMetaValues(
+      details.tags.entries
+          .where((entry) => isComicChineseTeamKey(entry.key))
+          .expand((entry) => entry.value)
+          .toList(),
+      label: chineseTeamLabel,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -95,22 +182,47 @@ class ComicDetailMetaSection extends StatelessWidget {
           onValuePressed: onTagValuePressed,
           onValueLongPress: onMetaValueLongPress,
         ),
+        if (isPicacg)
+          ComicDetailMetaRow(
+            label: categoryLabel,
+            values: categoryValues,
+            onValuePressed: onTagValuePressed,
+            onValueLongPress: onMetaValueLongPress,
+          ),
         ComicDetailMetaRow(
           label: tagLabel,
-          values: normalizeComicMetaValues(
-            details.tags.entries
-                .where(
-                  (entry) =>
-                      !isComicAuthorKey(entry.key) &&
-                      entry.key != details.tags.keys.lastOrNull,
-                )
-                .expand((entry) => entry.value)
-                .toList(),
-            label: tagLabel,
-          ),
+          values: tagValues,
           onValuePressed: onTagValuePressed,
           onValueLongPress: onMetaValueLongPress,
         ),
+        if (isJm)
+          ComicDetailMetaRow(
+            label: jmWorkLabel,
+            values: workValues,
+            onValuePressed: onTagValuePressed,
+            onValueLongPress: onMetaValueLongPress,
+          ),
+        if (isJm)
+          ComicDetailMetaRow(
+            label: jmActorLabel,
+            values: actorValues,
+            onValuePressed: onTagValuePressed,
+            onValueLongPress: onMetaValueLongPress,
+          ),
+        if (isPicacg)
+          ComicDetailMetaRow(
+            label: uploaderLabel,
+            values: normalizeComicMetaValues([details.uploader]),
+            onValuePressed: onTagValuePressed,
+            onValueLongPress: onMetaValueLongPress,
+          ),
+        if (isPicacg)
+          ComicDetailMetaRow(
+            label: chineseTeamLabel,
+            values: chineseTeamValues,
+            onValuePressed: onTagValuePressed,
+            onValueLongPress: onMetaValueLongPress,
+          ),
       ],
     );
   }

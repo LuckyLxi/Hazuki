@@ -15,6 +15,9 @@ class LineSettingsController extends ChangeNotifier {
   String _copyMangaRegion = '0';
   String _copyMangaBaseUrl = 'api.copy2000.online';
   String _copyMangaSearchApi = 'baseAPI';
+  String _picacgBaseUrl = 'https://picaapi.picacomic.com';
+  String _picacgImageQuality = 'original';
+  String _picacgAppChannel = '3';
   bool _refreshDomainsOnStart = true;
 
   List<String> _apiDomains = const [];
@@ -26,11 +29,16 @@ class LineSettingsController extends ChangeNotifier {
   bool get loading => _loading;
   bool get refreshingStatus => _refreshingStatus;
   bool get isCopyMangaSource => _sourceService.isActiveCopyMangaSource;
+  bool get isPicacgSource =>
+      isHazukiPicacgSourceKey(_sourceService.activeSourceKey);
   String get selectedApiDomain => _selectedApiDomain;
   String get selectedImageStream => _selectedImageStream;
   String get copyMangaRegion => _copyMangaRegion;
   String get copyMangaBaseUrl => _copyMangaBaseUrl;
   String get copyMangaSearchApi => _copyMangaSearchApi;
+  String get picacgBaseUrl => _picacgBaseUrl;
+  String get picacgImageQuality => _picacgImageQuality;
+  String get picacgAppChannel => _picacgAppChannel;
   bool get refreshDomainsOnStart => _refreshDomainsOnStart;
   List<String> get apiDomains => _apiDomains;
   int get imageStreamCount => _imageStreamCount;
@@ -64,6 +72,30 @@ class LineSettingsController extends ChangeNotifier {
         _copyMangaSearchApi = {'baseAPI', 'webAPI'}.contains(searchApi)
             ? searchApi
             : 'baseAPI';
+        return;
+      }
+      if (isPicacgSource) {
+        final baseUrl =
+            _sourceService.loadActiveSourceSetting('base_url')?.toString() ??
+            'https://picaapi.picacomic.com';
+        _picacgBaseUrl = baseUrl.trim().isEmpty
+            ? 'https://picaapi.picacomic.com'
+            : baseUrl.trim();
+        final imageQuality =
+            _sourceService
+                .loadActiveSourceSetting('imageQuality')
+                ?.toString() ??
+            'original';
+        _picacgImageQuality =
+            {'original', 'medium', 'low'}.contains(imageQuality)
+            ? imageQuality
+            : 'original';
+        final appChannel =
+            _sourceService.loadActiveSourceSetting('appChannel')?.toString() ??
+            '3';
+        _picacgAppChannel = {'1', '2', '3'}.contains(appChannel)
+            ? appChannel
+            : '3';
         return;
       }
 
@@ -172,6 +204,32 @@ class LineSettingsController extends ChangeNotifier {
     _copyMangaSearchApi = normalized;
     _notify();
     await _sourceService.updateActiveSourceSetting('search_api', normalized);
+  }
+
+  Future<void> setPicacgBaseUrl(String value) async {
+    final normalized = value.trim();
+    if (normalized.isEmpty || normalized == _picacgBaseUrl) return;
+    _picacgBaseUrl = normalized;
+    _notify();
+    await _sourceService.updateActiveSourceSetting('base_url', normalized);
+  }
+
+  Future<void> setPicacgImageQuality(String value) async {
+    final normalized = {'original', 'medium', 'low'}.contains(value)
+        ? value
+        : 'original';
+    if (normalized == _picacgImageQuality) return;
+    _picacgImageQuality = normalized;
+    _notify();
+    await _sourceService.updateActiveSourceSetting('imageQuality', normalized);
+  }
+
+  Future<void> setPicacgAppChannel(String value) async {
+    final normalized = {'1', '2', '3'}.contains(value) ? value : '3';
+    if (normalized == _picacgAppChannel) return;
+    _picacgAppChannel = normalized;
+    _notify();
+    await _sourceService.updateActiveSourceSetting('appChannel', normalized);
   }
 
   Future<void> setImageStream(String value) async {

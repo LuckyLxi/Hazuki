@@ -64,7 +64,7 @@ class HistoryComicListItem extends StatelessWidget {
                         child: SizeTransition(
                           sizeFactor: animation,
                           axis: Axis.horizontal,
-                          axisAlignment: -1.0,
+                          alignment: const AlignmentDirectional(-1.0, -1.0),
                           child: child,
                         ),
                       );

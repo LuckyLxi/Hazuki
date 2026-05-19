@@ -363,7 +363,10 @@
   "comicDetailNoChapterInfo": "暂无章节信息",
   "comicDetailNoChapters": "当前漫画暂无章节",
   "comicDetailAuthor": "作者",
+  "comicDetailCategories": "分类",
   "comicDetailTags": "标签",
+  "comicDetailUploader": "上传者",
+  "comicDetailChineseTeam": "汉化组",
   "comicDetailCopiedId": "已复制 ID",
   "comicDetailCopiedPrefix": "已复制：{value}",
   "@comicDetailCopiedPrefix": {
@@ -409,6 +412,12 @@
   },
   "comicDetailViewsCount": "{count}浏览量",
   "@comicDetailViewsCount": {
+    "placeholders": {
+      "count": {}
+    }
+  },
+  "comicDetailPagesCount": "{count}页",
+  "@comicDetailPagesCount": {
     "placeholders": {
       "count": {}
     }
@@ -656,6 +665,27 @@
   "lineCopyMangaBaseUrlTitle": "API 地址",
   "lineCopyMangaBaseUrlLabel": "API 域名",
   "lineCopyMangaUpdated": "拷贝漫画线路设置已更新",
+  "linePicacgIntro": "当前为哔咔漫画源，可以调整 API 地址、图片质量与分流。",
+  "linePicacgImageQualityTitle": "图片质量",
+  "linePicacgImageQualitySubtitle": "用于哔咔图片请求的质量参数",
+  "linePicacgImageQualityLabel": "选择图片质量",
+  "linePicacgImageQualityOriginal": "原图",
+  "linePicacgImageQualityMedium": "中等",
+  "linePicacgImageQualityLow": "低",
+  "linePicacgAppChannelTitle": "分流",
+  "linePicacgAppChannelSubtitle": "用于哔咔接口请求的 app-channel",
+  "linePicacgAppChannelSelectLabel": "选择分流",
+  "linePicacgAppChannelLabel": "分流 {value}",
+  "@linePicacgAppChannelLabel": {
+    "placeholders": {
+      "value": {}
+    }
+  },
+  "linePicacgBaseUrlTitle": "API 地址",
+  "linePicacgBaseUrlLabel": "API 域名",
+  "linePicacgUpdated": "哔咔漫画线路设置已更新",
+  "favoriteSortNewToOld": "新到旧",
+  "favoriteSortOldToNew": "旧到新",
   "displayModeAndroidOnly": "仅 Android 支持屏幕帧率设置",
   "displayModeReadFailed": "读取屏幕模式失败：{error}",
   "@displayModeReadFailed": {

@@ -91,6 +91,14 @@ void main() {
       expect(await service.loadSortOrder(), '-datetime_browse');
     });
 
+    test('preserves Picacg favorite sort orders', () async {
+      await service.saveSortOrder('dd');
+      expect(await service.loadSortOrder(), 'dd');
+
+      await service.saveSortOrder('da');
+      expect(await service.loadSortOrder(), 'da');
+    });
+
     test('sorts CopyManga local favorites by update time', () async {
       await service.addFavoriteFolder('Copy', sourceKey: 'copy_manga');
       final folder = (await service.loadFavoriteFolders(

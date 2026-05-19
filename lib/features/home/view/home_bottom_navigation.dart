@@ -235,7 +235,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
     final labelWidget = SizeTransition(
       sizeFactor: _labelAnims[index],
       axis: Axis.horizontal,
-      axisAlignment: labelOnRight ? -1.0 : 1.0,
+      alignment: AlignmentDirectional(labelOnRight ? -1.0 : 1.0, -1.0),
       child: SlideTransition(
         position: _labelSlideAnims[index],
         child: FadeTransition(

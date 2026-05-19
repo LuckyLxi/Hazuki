@@ -69,6 +69,14 @@ extension HazukiSourceServiceFavoritesCapability on HazukiSourceService {
       }
       return '-datetime_updated';
     }
+    if (isHazukiPicacgSourceKey(sourceMeta.key)) {
+      final raw = facade.loadSourceSetting(sourceMeta.key, 'favoriteSort');
+      final normalized = raw?.toString().trim() ?? '';
+      if (favoriteSortOrders.contains(normalized)) {
+        return normalized;
+      }
+      return 'dd';
+    }
     final raw = facade.loadSourceSetting(sourceMeta.key, 'favoriteOrder');
     final normalized = raw?.toString().trim() ?? '';
     if (normalized == 'mp') {
@@ -93,6 +101,17 @@ extension HazukiSourceServiceFavoritesCapability on HazukiSourceService {
       );
       return;
     }
+    if (isHazukiPicacgSourceKey(sourceMeta.key)) {
+      final normalized = favoriteSortOrders.contains(order.trim())
+          ? order.trim()
+          : 'dd';
+      await facade.saveSourceSetting(
+        sourceMeta.key,
+        'favoriteSort',
+        normalized,
+      );
+      return;
+    }
     final normalized = order.trim() == 'mp' ? 'mp' : 'mr';
     await facade.saveSourceSetting(sourceMeta.key, 'favoriteOrder', normalized);
   }
@@ -106,6 +125,9 @@ extension HazukiSourceServiceFavoritesCapability on HazukiSourceService {
         '-datetime_browse',
       ];
     }
+    if (sourceMeta != null && isHazukiPicacgSourceKey(sourceMeta.key)) {
+      return const <String>['dd', 'da'];
+    }
     return const <String>['mr', 'mp'];
   }
 
@@ -116,7 +138,7 @@ extension HazukiSourceServiceFavoritesCapability on HazukiSourceService {
     }
     return facade.js.asBool(
       facade.js.evaluate(
-        '!!(this.__hazuki_source.settings?.favoriteOrder || this.__hazuki_source.settings?.favorites_ordering)',
+        '!!(this.__hazuki_source.settings?.favoriteOrder || this.__hazuki_source.settings?.favorites_ordering || this.__hazuki_source.settings?.favoriteSort)',
       ),
     );
   }

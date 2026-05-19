@@ -143,7 +143,7 @@ class _TagCategoryPageState extends State<TagCategoryPage> {
           (sum, group) => sum + group.tags.length,
         ),
         if (_errorMessage != null) 'errorMessage': _errorMessage,
-        if (content != null) ...content,
+        ...?content,
       },
     );
   }

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:hazuki/features/favorite/favorite.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
+import 'package:hazuki/services/hazuki_source_service.dart';
 
 import '../support/comic_detail_scope.dart';
 import 'comic_detail_view_primitives.dart';
@@ -32,12 +33,16 @@ class ComicDetailHeaderFavoriteRow extends StatelessWidget {
     final scope = ComicDetailScope.of(context);
     final favorite = scope.favorite;
     final theme = Theme.of(context);
-    final showLikeButton = scope.supportsJmExclusiveActions;
+    final showLikeButton = scope.supportsComicLikeAction;
     final detailsReady = details != null;
+    final isPicacg = isHazukiPicacgSourceKey(details?.sourceKey ?? '');
     final statsText = [
       if (details?.likesCount.isNotEmpty ?? false)
         l10n(context).comicDetailLikesCount(details!.likesCount),
-      if (viewsText.isNotEmpty) l10n(context).comicDetailViewsCount(viewsText),
+      if (isPicacg && (details?.pageCount.isNotEmpty ?? false))
+        l10n(context).comicDetailPagesCount(details!.pageCount)
+      else if (viewsText.isNotEmpty)
+        l10n(context).comicDetailViewsCount(viewsText),
     ].join(' / ');
     final favoriteActive =
         favorite.favoriteOverride ?? details?.isFavorite ?? false;

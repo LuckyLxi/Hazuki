@@ -45,7 +45,7 @@ class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
         'route': 'appearance_settings',
         'themeModeSetting': widget.settings.themeMode.name,
         'effectiveBrightness': Theme.of(context).brightness.name,
-        if (content != null) ...content,
+        ...?content,
       },
     );
   }

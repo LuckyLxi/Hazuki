@@ -28,7 +28,7 @@ extension _DiscoverDailyRecommendationCarouselInteraction
         'usingMixedSnapshots': _usingMixedSnapshots,
         'protectedVisibleItemCount': _protectedVisibleItems.length,
         'hasPendingRecommendations': _hasPendingRecommendations,
-        if (content != null) ...content,
+        ...?content,
       },
     );
   }

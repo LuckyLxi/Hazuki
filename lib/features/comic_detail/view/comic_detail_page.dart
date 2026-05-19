@@ -65,6 +65,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
   late final ComicDetailActionsController _actionsController;
   late final ComicDetailFavoriteController _favoriteController;
   late final bool _supportsJmExclusiveActions;
+  late final bool _supportsComicLikeAction;
 
   @override
   void initState() {
@@ -78,6 +79,9 @@ class _ComicDetailPageState extends State<ComicDetailPage>
         ? widget.comic.sourceKey
         : sl<HazukiSourceService>().activeSourceKey;
     _supportsJmExclusiveActions = isHazukiJmSourceKey(comicSourceKey);
+    _supportsComicLikeAction =
+        isHazukiJmSourceKey(comicSourceKey) ||
+        isHazukiPicacgSourceKey(comicSourceKey);
     _initializeControllers();
     _uiStateController.initialize(initialAppBarTitle: widget.comic.title);
     _sessionController.initialize();
@@ -215,6 +219,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
       actions: _actionsController,
       favorite: _favoriteController,
       supportsJmExclusiveActions: _supportsJmExclusiveActions,
+      supportsComicLikeAction: _supportsComicLikeAction,
       child: AnimatedTheme(
         data: theme,
         duration: const Duration(milliseconds: 360),

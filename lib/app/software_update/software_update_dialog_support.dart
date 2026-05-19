@@ -303,7 +303,7 @@ class _SoftwareUpdateDialogCardState extends State<_SoftwareUpdateDialogCard> {
                           opacity: animation,
                           child: SizeTransition(
                             sizeFactor: animation,
-                            axisAlignment: 0,
+                            alignment: const AlignmentDirectional(-1.0, 0.0),
                             child: child,
                           ),
                         );

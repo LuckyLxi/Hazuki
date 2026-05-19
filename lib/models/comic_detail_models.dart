@@ -15,6 +15,8 @@ class ComicDetailsData {
     required this.recommend,
     required this.isFavorite,
     required this.subId,
+    this.uploader = '',
+    this.pageCount = '',
     this.isLiked = false,
     this.sourceKey = '',
   });
@@ -31,6 +33,8 @@ class ComicDetailsData {
   final List<ExploreComic> recommend;
   final bool isFavorite;
   final String subId;
+  final String uploader;
+  final String pageCount;
   final bool isLiked;
   final String sourceKey;
 
@@ -50,6 +54,8 @@ class ComicDetailsData {
     List<ExploreComic>? recommend,
     bool? isFavorite,
     String? subId,
+    String? uploader,
+    String? pageCount,
     bool? isLiked,
     String? sourceKey,
   }) {
@@ -66,6 +72,8 @@ class ComicDetailsData {
       recommend: recommend ?? this.recommend,
       isFavorite: isFavorite ?? this.isFavorite,
       subId: subId ?? this.subId,
+      uploader: uploader ?? this.uploader,
+      pageCount: pageCount ?? this.pageCount,
       isLiked: isLiked ?? this.isLiked,
       sourceKey: sourceKey ?? this.sourceKey,
     );

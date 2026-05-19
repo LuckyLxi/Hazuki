@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 
 import 'package:hazuki/features/reader/reader.dart';
 import 'package:hazuki/features/reader/state/reader_image_pipeline_state.dart';
@@ -94,7 +95,9 @@ class ReaderImageViews {
           'reader-list-$comicId-$epId-${runtimeState.readerSpreadSize}',
         ),
         padding: EdgeInsets.zero,
-        cacheExtent: imagePipelineController.readerListCacheExtent(context),
+        scrollCacheExtent: ScrollCacheExtent.pixels(
+          imagePipelineController.readerListCacheExtent(context),
+        ),
         itemCount: runtimeState.readerSpreadCount,
         controller: scrollController,
         physics: runtimeState.zoomGestureActive

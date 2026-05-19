@@ -81,7 +81,7 @@ class _SourceUpdateDialogCardState extends State<SourceUpdateDialogCard> {
                   child: SizeTransition(
                     sizeFactor: curved,
                     axis: Axis.vertical,
-                    axisAlignment: 0,
+                    alignment: const AlignmentDirectional(-1.0, 0.0),
                     child: child,
                   ),
                 ),

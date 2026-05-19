@@ -173,6 +173,8 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
       recommend: recommend,
       isFavorite: jsAsBool(map['isFavorite']),
       isLiked: jsAsBool(map['isLiked']),
+      uploader: map['uploader']?.toString() ?? '',
+      pageCount: (map['pageCount'] ?? map['maxPage'] ?? '').toString(),
       subId: map['subId']?.toString() ?? '',
       sourceKey: sourceKey,
     );

@@ -273,7 +273,7 @@ class _HazukiAppState extends State<HazukiApp>
         'platformBrightness':
             WidgetsBinding.instance.platformDispatcher.platformBrightness.name,
         'mounted': mounted,
-        if (content != null) ...content,
+        ...?content,
       },
     );
   }

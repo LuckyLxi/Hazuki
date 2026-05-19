@@ -20,6 +20,8 @@ class FavoriteAppBarActions extends StatelessWidget {
 
   String _sortLabel(BuildContext context, String order) {
     return switch (order) {
+      'dd' => l10n(context).favoriteSortNewToOld,
+      'da' => l10n(context).favoriteSortOldToNew,
       'mp' || '-datetime_updated' => l10n(context).homeFavoriteSortByUpdateTime,
       '-datetime_browse' => l10n(context).homeFavoriteSortByReadTime,
       _ => l10n(context).homeFavoriteSortByFavoriteTime,

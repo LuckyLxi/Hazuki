@@ -41,6 +41,8 @@ class LocalFavoritesService extends ChangeNotifier {
   static const Set<String> _supportedSortOrders = <String>{
     'mr',
     'mp',
+    'dd',
+    'da',
     '-datetime_updated',
     '-datetime_modifier',
     '-datetime_browse',
@@ -179,6 +181,9 @@ class LocalFavoritesService extends ChangeNotifier {
       }
       final aMs = a.folderSavedAtMs[normalizedFolderId] ?? 0;
       final bMs = b.folderSavedAtMs[normalizedFolderId] ?? 0;
+      if (normalizedSortOrder == 'da') {
+        return aMs.compareTo(bMs);
+      }
       return bMs.compareTo(aMs);
     });
 

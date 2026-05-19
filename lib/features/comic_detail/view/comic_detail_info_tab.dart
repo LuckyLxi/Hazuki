@@ -29,7 +29,7 @@ class ComicDetailInfoTab extends StatelessWidget {
     final actions = ComicDetailScope.of(context).actions;
     return ComicDetailMetaSection(
       details: details,
-      showComicId: !isHazukiCopyMangaSourceKey(details.sourceKey),
+      showComicId: isHazukiJmSourceKey(details.sourceKey),
       onCopyId: (id) => unawaited(actions.copyComicId(context, id)),
       onTagValuePressed: (v) => unawaited(actions.openTagValue(context, v)),
       onMetaValueLongPress: (v) => unawaited(actions.copyMetaValue(context, v)),
@@ -71,10 +71,12 @@ class ComicDetailInfoTab extends StatelessWidget {
     if (shouldAnimate) {
       uiState.markInfoEntranceAnimated();
     }
-    final showComicId = !isHazukiCopyMangaSourceKey(resolvedDetails.sourceKey);
+    final showComicId = isHazukiJmSourceKey(resolvedDetails.sourceKey);
+    final isPicacg = isHazukiPicacgSourceKey(resolvedDetails.sourceKey);
     final hasVisibleMeta =
         (showComicId && resolvedDetails.id.trim().isNotEmpty) ||
-        resolvedDetails.tags.isNotEmpty;
+        resolvedDetails.tags.isNotEmpty ||
+        (isPicacg && resolvedDetails.uploader.trim().isNotEmpty);
 
     return CustomScrollView(
       key: const PageStorageKey<String>('comic-detail-info-tab'),

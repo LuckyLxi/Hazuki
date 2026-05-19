@@ -125,6 +125,46 @@ class _LineSettingsPageState extends State<LineSettingsPage> {
     ];
   }
 
+  List<DropdownMenuItem<String>> _buildPicacgImageQualityItems(
+    BuildContext context,
+  ) {
+    final strings = l10n(context);
+    return [
+      DropdownMenuItem<String>(
+        value: 'original',
+        child: Text(strings.linePicacgImageQualityOriginal),
+      ),
+      DropdownMenuItem<String>(
+        value: 'medium',
+        child: Text(strings.linePicacgImageQualityMedium),
+      ),
+      DropdownMenuItem<String>(
+        value: 'low',
+        child: Text(strings.linePicacgImageQualityLow),
+      ),
+    ];
+  }
+
+  List<DropdownMenuItem<String>> _buildPicacgAppChannelItems(
+    BuildContext context,
+  ) {
+    final strings = l10n(context);
+    return [
+      DropdownMenuItem<String>(
+        value: '1',
+        child: Text(strings.linePicacgAppChannelLabel('1')),
+      ),
+      DropdownMenuItem<String>(
+        value: '2',
+        child: Text(strings.linePicacgAppChannelLabel('2')),
+      ),
+      DropdownMenuItem<String>(
+        value: '3',
+        child: Text(strings.linePicacgAppChannelLabel('3')),
+      ),
+    ];
+  }
+
   Future<void> _onApiChanged(String? value) async {
     if (value == null || value == _controller.selectedApiDomain) {
       return;
@@ -224,6 +264,46 @@ class _LineSettingsPageState extends State<LineSettingsPage> {
     }
   }
 
+  Future<void> _onPicacgImageQualityChanged(String? value) async {
+    if (value == null || value == _controller.picacgImageQuality) {
+      return;
+    }
+    try {
+      await _controller.setPicacgImageQuality(value);
+      if (!mounted) return;
+      unawaited(showHazukiPrompt(context, l10n(context).linePicacgUpdated));
+    } catch (e) {
+      if (!mounted) return;
+      unawaited(
+        showHazukiPrompt(
+          context,
+          l10n(context).lineSaveFailed('$e'),
+          isError: true,
+        ),
+      );
+    }
+  }
+
+  Future<void> _onPicacgAppChannelChanged(String? value) async {
+    if (value == null || value == _controller.picacgAppChannel) {
+      return;
+    }
+    try {
+      await _controller.setPicacgAppChannel(value);
+      if (!mounted) return;
+      unawaited(showHazukiPrompt(context, l10n(context).linePicacgUpdated));
+    } catch (e) {
+      if (!mounted) return;
+      unawaited(
+        showHazukiPrompt(
+          context,
+          l10n(context).lineSaveFailed('$e'),
+          isError: true,
+        ),
+      );
+    }
+  }
+
   Future<void> _editCopyMangaBaseUrl() async {
     final strings = l10n(context);
     final controller = TextEditingController(
@@ -274,6 +354,54 @@ class _LineSettingsPageState extends State<LineSettingsPage> {
     }
   }
 
+  Future<void> _editPicacgBaseUrl() async {
+    final strings = l10n(context);
+    final controller = TextEditingController(text: _controller.picacgBaseUrl);
+    final value = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(strings.linePicacgBaseUrlTitle),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: InputDecoration(
+              border: const OutlineInputBorder(),
+              labelText: strings.linePicacgBaseUrlLabel,
+            ),
+            textInputAction: TextInputAction.done,
+            onSubmitted: (value) => Navigator.of(context).pop(value),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(strings.commonCancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(controller.text),
+              child: Text(strings.commonSave),
+            ),
+          ],
+        );
+      },
+    );
+    controller.dispose();
+    final normalized = value?.trim();
+    if (normalized == null || normalized.isEmpty) {
+      return;
+    }
+    try {
+      await _controller.setPicacgBaseUrl(normalized);
+      if (!mounted) return;
+      unawaited(showHazukiPrompt(context, strings.linePicacgUpdated));
+    } catch (e) {
+      if (!mounted) return;
+      unawaited(
+        showHazukiPrompt(context, strings.lineSaveFailed('$e'), isError: true),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final strings = l10n(context);
@@ -299,9 +427,119 @@ class _LineSettingsPageState extends State<LineSettingsPage> {
           ),
           body: _controller.isCopyMangaSource
               ? _buildCopyMangaBody(context, colorScheme)
+              : _controller.isPicacgSource
+              ? _buildPicacgBody(context, colorScheme)
               : _buildJmBody(context, colorScheme),
         );
       },
+    );
+  }
+
+  Widget _buildPicacgBody(BuildContext context, ColorScheme colorScheme) {
+    final strings = l10n(context);
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 20),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: colorScheme.primaryContainer.withValues(alpha: 0.45),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.route_outlined, color: colorScheme.onPrimaryContainer),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  strings.linePicacgIntro,
+                  style: TextStyle(color: colorScheme.onPrimaryContainer),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        Card(
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: colorScheme.outlineVariant),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.photo_size_select_large_outlined),
+                  title: Text(strings.linePicacgImageQualityTitle),
+                  subtitle: Text(strings.linePicacgImageQualitySubtitle),
+                ),
+                DropdownButtonFormField<String>(
+                  initialValue: _controller.picacgImageQuality,
+                  items: _buildPicacgImageQualityItems(context),
+                  decoration: InputDecoration(
+                    border: const OutlineInputBorder(),
+                    labelText: strings.linePicacgImageQualityLabel,
+                    isDense: true,
+                  ),
+                  onChanged: _onPicacgImageQualityChanged,
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Card(
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: colorScheme.outlineVariant),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  leading: const Icon(Icons.alt_route_outlined),
+                  title: Text(strings.linePicacgAppChannelTitle),
+                  subtitle: Text(strings.linePicacgAppChannelSubtitle),
+                ),
+                DropdownButtonFormField<String>(
+                  initialValue: _controller.picacgAppChannel,
+                  items: _buildPicacgAppChannelItems(context),
+                  decoration: InputDecoration(
+                    border: const OutlineInputBorder(),
+                    labelText: strings.linePicacgAppChannelSelectLabel,
+                    isDense: true,
+                  ),
+                  onChanged: _onPicacgAppChannelChanged,
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Card(
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: colorScheme.outlineVariant),
+          ),
+          child: ListTile(
+            leading: const Icon(Icons.dns_outlined),
+            title: Text(strings.linePicacgBaseUrlTitle),
+            subtitle: Text(_controller.picacgBaseUrl),
+            trailing: const Icon(Icons.chevron_right_rounded),
+            onTap: () => unawaited(_editPicacgBaseUrl()),
+          ),
+        ),
+      ],
     );
   }
 

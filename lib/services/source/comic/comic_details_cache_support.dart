@@ -74,6 +74,8 @@ extension HazukiSourceServiceComicDetailsCacheSupport on HazukiSourceService {
           .toList(),
       'isFavorite': details.isFavorite,
       'isLiked': details.isLiked,
+      'uploader': details.uploader,
+      'pageCount': details.pageCount,
       'subId': details.subId,
     };
   }
@@ -155,6 +157,8 @@ extension HazukiSourceServiceComicDetailsCacheSupport on HazukiSourceService {
       recommend: recommend,
       isFavorite: jsAsBool(map['isFavorite']),
       isLiked: jsAsBool(map['isLiked']),
+      uploader: map['uploader']?.toString() ?? '',
+      pageCount: (map['pageCount'] ?? map['maxPage'] ?? '').toString(),
       subId: map['subId']?.toString() ?? '',
       sourceKey: sourceKey,
     );

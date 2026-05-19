@@ -13,7 +13,7 @@ extension HazukiSourceServiceCategoryCapability on HazukiSourceService {
       source: 'source_category_tags',
       content: {
         'durationMs': DateTime.now().difference(startedAt).inMilliseconds,
-        if (content != null) ...content,
+        ...?content,
       },
     );
   }

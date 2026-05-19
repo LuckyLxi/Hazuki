@@ -179,7 +179,7 @@ class _CommentsPageState extends State<CommentsPage>
         'currentPage': _currentPage,
         'commentCount': _comments.length,
         'hasMore': _hasMore,
-        if (content != null) ...content,
+        ...?content,
       },
       source: widget.isTabView ? 'comic_detail_comments' : 'comments',
     );
@@ -227,8 +227,8 @@ class _CommentsPageState extends State<CommentsPage>
         'innerMinScrollExtent': _lastInnerScrollMin?.round(),
         'innerMaxScrollExtent': _lastInnerScrollMax?.round(),
         'innerViewportDimension': _lastInnerViewportDimension?.round(),
-        if (outerState != null) ...outerState,
-        if (extra != null) ...extra,
+        ...?outerState,
+        ...?extra,
       },
     );
   }
