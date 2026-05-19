@@ -36,12 +36,17 @@ class ComicDetailHeaderFavoriteRow extends StatelessWidget {
     final showLikeButton = scope.supportsComicLikeAction;
     final detailsReady = details != null;
     final isPicacg = isHazukiPicacgSourceKey(details?.sourceKey ?? '');
+    final copyMangaStatusText =
+        isHazukiCopyMangaSourceKey(details?.sourceKey ?? '')
+        ? _copyMangaStatusText(details)
+        : '';
     final statsText = [
+      if (copyMangaStatusText.isNotEmpty) copyMangaStatusText,
       if (details?.likesCount.isNotEmpty ?? false)
         l10n(context).comicDetailLikesCount(details!.likesCount),
       if (isPicacg && (details?.pageCount.isNotEmpty ?? false))
         l10n(context).comicDetailPagesCount(details!.pageCount)
-      else if (viewsText.isNotEmpty)
+      else if (viewsText.isNotEmpty && copyMangaStatusText.isEmpty)
         l10n(context).comicDetailViewsCount(viewsText),
     ].join(' / ');
     final favoriteActive =
@@ -194,4 +199,26 @@ class ComicDetailHeaderFavoriteRow extends StatelessWidget {
       ),
     );
   }
+}
+
+String _copyMangaStatusText(ComicDetailsData? details) {
+  if (details == null) {
+    return '';
+  }
+
+  for (final entry in details.tags.entries) {
+    final key = entry.key.trim().toLowerCase();
+    if (key != 'status' && entry.key.trim() != '状态') {
+      continue;
+    }
+
+    for (final value in entry.value) {
+      final text = value.trim();
+      if (text.isNotEmpty) {
+        return text;
+      }
+    }
+  }
+
+  return '';
 }
