@@ -14,9 +14,11 @@ class DiscoverStateView extends StatelessWidget {
     required this.sections,
     required this.errorMessage,
     required this.sourceRuntimeState,
+    required this.showLoginRequired,
     required this.allowInitialLoad,
     required this.hideLoadingUntilInitialLoadAllowed,
     required this.onRetry,
+    this.onLoginPressed,
   });
 
   final bool initialLoading;
@@ -24,9 +26,11 @@ class DiscoverStateView extends StatelessWidget {
   final List<ExploreSection> sections;
   final String? errorMessage;
   final SourceRuntimeState sourceRuntimeState;
+  final bool showLoginRequired;
   final bool allowInitialLoad;
   final bool hideLoadingUntilInitialLoadAllowed;
   final Future<void> Function() onRetry;
+  final VoidCallback? onLoginPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -35,7 +39,25 @@ class DiscoverStateView extends StatelessWidget {
         initialLoading || (refreshing && sections.isEmpty);
     late final Widget child;
 
-    if (showBlockingLoading) {
+    if (showLoginRequired) {
+      child = SizedBox(
+        key: const ValueKey('discover-login-required'),
+        height: 360,
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(strings.discoverLoginRequired),
+              const SizedBox(height: 12),
+              FilledButton(
+                onPressed: onLoginPressed,
+                child: Text(strings.homeLoginTitle),
+              ),
+            ],
+          ),
+        ),
+      );
+    } else if (showBlockingLoading) {
       if (shouldShowSourceRuntimeStatusCard(sourceRuntimeState)) {
         child = SourceRuntimeStatusCard(
           key: const ValueKey('discover-source-runtime-loading'),

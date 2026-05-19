@@ -307,17 +307,19 @@ class DebugLogCapability {
     final now = DateTime.now();
     final normalizedLevel = level.trim().isEmpty ? 'info' : level.trim();
     final titleText = title.trim().isEmpty ? 'Reader' : title.trim();
+    final fullContent = jsonSafe(content);
     final safeContent = _compactReaderLogContent(
-      jsonSafe(content),
+      fullContent,
       source: source,
       level: normalizedLevel,
     );
+    final fullContentText = toBodyFull(fullContent) ?? 'null';
     final contentText = toBodyFull(safeContent) ?? 'null';
     final dedupKey = [
       source,
       normalizedLevel.toLowerCase(),
       titleText,
-      contentText,
+      fullContentText,
     ].join('|');
 
     final existingIndex = recentReaderLogs.indexWhere(
@@ -330,6 +332,7 @@ class DebugLogCapability {
       existing['level'] = normalizedLevel;
       existing['title'] = titleText;
       existing['content'] = safeContent;
+      existing['contentFull'] = fullContent;
       existing['contentPreview'] = toBodyPreview(contentText);
       return;
     }
@@ -343,6 +346,7 @@ class DebugLogCapability {
       'level': normalizedLevel,
       'title': titleText,
       'content': safeContent,
+      'contentFull': fullContent,
       'contentPreview': toBodyPreview(contentText),
     });
     if (recentReaderLogs.length > DebugLogConstants.maxReaderLogsKept) {
@@ -363,18 +367,20 @@ class DebugLogCapability {
     final now = DateTime.now();
     final normalizedLevel = level.trim().isEmpty ? 'info' : level.trim();
     final titleText = title.trim().isEmpty ? 'Application' : title.trim();
+    final fullContent = jsonSafe(content);
     final safeContent = _compactGenericLogValue(
-      jsonSafe(content),
+      fullContent,
       maxStringLength: DebugLogConstants.applicationStringKeep,
       maxItems: 20,
       maxDepth: 4,
     );
+    final fullContentText = toBodyFull(fullContent) ?? 'null';
     final contentText = toBodyFull(safeContent) ?? 'null';
     final dedupKey = [
       source,
       normalizedLevel.toLowerCase(),
       titleText,
-      contentText,
+      fullContentText,
     ].join('|');
 
     final existingIndex = recentApplicationLogs.indexWhere(
@@ -387,6 +393,7 @@ class DebugLogCapability {
       existing['level'] = normalizedLevel;
       existing['title'] = titleText;
       existing['content'] = safeContent;
+      existing['contentFull'] = fullContent;
       existing['contentPreview'] = toBodyPreview(contentText);
       return;
     }
@@ -400,6 +407,7 @@ class DebugLogCapability {
       'level': normalizedLevel,
       'title': titleText,
       'content': safeContent,
+      'contentFull': fullContent,
       'contentPreview': toBodyPreview(contentText),
     });
     if (recentApplicationLogs.length >

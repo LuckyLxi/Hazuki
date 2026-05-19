@@ -115,19 +115,27 @@ void main() {
     expect(registry.allowedSources.map((source) => source.key), [
       'jm',
       'copy_manga',
+      'picacg',
     ]);
     expect(
-      registry.allowedSources.first.matchesIndexEntry({
-        'key': 'jm',
-        'fileName': 'jm.js',
-      }),
+      registry.allowedSources
+          .firstWhere((s) => s.key == 'jm')
+          .matchesIndexEntry({'key': 'jm', 'fileName': 'jm.js'}),
       isTrue,
     );
     expect(
-      registry.allowedSources.last.matchesIndexEntry({
-        'key': 'copy_manga',
-        'fileName': 'copy_manga.js',
-      }),
+      registry.allowedSources
+          .firstWhere((s) => s.key == 'copy_manga')
+          .matchesIndexEntry({
+            'key': 'copy_manga',
+            'fileName': 'copy_manga.js',
+          }),
+      isTrue,
+    );
+    expect(
+      registry.allowedSources
+          .firstWhere((s) => s.key == 'picacg')
+          .matchesIndexEntry({'key': 'picacg', 'fileName': 'picacg.js'}),
       isTrue,
     );
     expect(registry.isAllowedSourceKey('not-allowed'), isFalse);
@@ -166,6 +174,31 @@ void main() {
         avatar: 'media/users/123.jpg',
       ),
       isNull,
+    );
+  });
+
+  test('Picacg avatar object uses fullUrl or fileServer static path', () {
+    expect(
+      normalizeSourceAvatarUrl(
+        sourceKey: 'picacg',
+        avatar: {
+          'fullUrl': 'https://storage-b.picacomic.com/static/tobs/avatar.jpg',
+          'path': 'ignored.jpg',
+          'fileServer': 'https://unused.example.com',
+        },
+      ),
+      'https://storage-b.picacomic.com/static/tobs/avatar.jpg',
+    );
+
+    expect(
+      normalizeSourceAvatarUrl(
+        sourceKey: 'picacg',
+        avatar: {
+          'path': 'tobs/94d06234-fe51-4194-b8fb-434e02b5dae2.jpg',
+          'fileServer': 'https://storage-b.picacomic.com',
+        },
+      ),
+      'https://storage-b.picacomic.com/static/tobs/94d06234-fe51-4194-b8fb-434e02b5dae2.jpg',
     );
   });
 
@@ -216,6 +249,26 @@ void main() {
 
     expect(log['content'].toString(), contains('[omitted'));
     expect(log['contentFull'], {'message': longMessage});
+  });
+
+  test('application debug export data keeps full log content', () async {
+    final service = sl<HazukiSourceService>();
+    await service.setSoftwareLogCaptureEnabled(true);
+    final longMessage = 'picacg-${'u' * 520}';
+
+    service.addApplicationLog(
+      level: 'info',
+      title: 'Picacg login server response',
+      source: 'source_login',
+      content: {'body': longMessage},
+    );
+
+    final debugInfo = await service.collectApplicationDebugInfo();
+    final logs = (debugInfo['recentApplicationLogs'] as List).cast<Map>();
+    final log = logs.last.cast<String, dynamic>();
+
+    expect(log['content'].toString(), contains('[omitted'));
+    expect(log['contentFull'], {'body': longMessage});
   });
 
   test('network debug export data keeps full response body', () async {

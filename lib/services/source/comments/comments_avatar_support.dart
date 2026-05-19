@@ -6,6 +6,31 @@ String? normalizeSourceAvatarUrl({
   required Object? avatar,
   String imageBase = '',
 }) {
+  if (avatar is Map) {
+    final fullUrl = avatar['fullUrl']?.toString().trim();
+    if (fullUrl != null && fullUrl.isNotEmpty) {
+      return normalizeSourceAvatarUrl(
+        sourceKey: sourceKey,
+        avatar: fullUrl,
+        imageBase: imageBase,
+      );
+    }
+    final fileServer = avatar['fileServer']?.toString().trim() ?? '';
+    final path = avatar['path']?.toString().trim();
+    if (path != null && path.isNotEmpty) {
+      final normalizedPath = path.replaceFirst(RegExp(r'^/+'), '');
+      final baseUri = Uri.tryParse(fileServer);
+      if (baseUri != null && baseUri.hasScheme && baseUri.host.isNotEmpty) {
+        return baseUri.resolve('/static/$normalizedPath').toString();
+      }
+      return normalizeSourceAvatarUrl(
+        sourceKey: sourceKey,
+        avatar: normalizedPath,
+        imageBase: imageBase,
+      );
+    }
+  }
+
   final raw = avatar?.toString().trim();
   if (raw == null || raw.isEmpty) {
     return null;
@@ -90,6 +115,23 @@ extension HazukiSourceServiceCommentsAvatarSupport on HazukiSourceService {
       _logAvatarEvent(
         facade,
         title: 'Avatar resolved from login response',
+        content: {'sourceKey': sourceKey, 'avatarUrl': avatarUrl},
+      );
+      return avatarUrl;
+    }
+
+    final storedAvatarUrl = facade
+        .loadSourceData(sourceKey, 'avatar_url')
+        ?.toString()
+        .trim();
+    if (storedAvatarUrl != null && storedAvatarUrl.isNotEmpty) {
+      final avatarUrl = _avatarUrlForDisplay(
+        sourceKey: sourceKey,
+        avatarUrl: storedAvatarUrl,
+      );
+      _logAvatarEvent(
+        facade,
+        title: 'Avatar resolved from stored profile',
         content: {'sourceKey': sourceKey, 'avatarUrl': avatarUrl},
       );
       return avatarUrl;

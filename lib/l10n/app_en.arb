@@ -286,6 +286,7 @@
     }
   },
   "discoverEmpty": "No discover content is available for the current source",
+  "discoverLoginRequired": "Please sign in to your account first",
   "discoverMore": "See more",
   "aboutThirdPartyLicensesTitle": "Third-party licenses",
   "aboutThirdPartyLicensesSubtitle": "View the open-source libraries used by this app",

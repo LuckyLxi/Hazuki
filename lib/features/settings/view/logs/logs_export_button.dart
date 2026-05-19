@@ -138,6 +138,7 @@ class _LogsAppBarExportButtonState extends State<LogsAppBarExportButton> {
             if (log.containsKey('contentFull')) {
               log['content'] = log['contentFull'];
               log.remove('contentFull');
+              log.remove('contentPreview');
             }
             return log;
           })

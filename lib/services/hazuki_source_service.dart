@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:crypto/crypto.dart';
@@ -71,6 +72,10 @@ const _copyMangaSourceUrls = [
   'https://cdn.jsdelivr.net/gh/venera-app/venera-configs@main/copy_manga.js',
 ];
 
+const _picacgSourceUrls = [
+  'https://cdn.jsdelivr.net/gh/venera-app/venera-configs@main/picacg.js',
+];
+
 const _sourceIndexUrls = [
   'https://cdn.jsdelivr.net/gh/venera-app/venera-configs@main/index.json',
 ];
@@ -84,6 +89,10 @@ bool isHazukiJmSourceKey(String sourceKey) {
 
 bool isHazukiCopyMangaSourceKey(String sourceKey) {
   return sourceKey.trim() == 'copy_manga';
+}
+
+bool isHazukiPicacgSourceKey(String sourceKey) {
+  return sourceKey.trim() == 'picacg';
 }
 
 Dio _createSourceDio() {
@@ -145,6 +154,12 @@ const List<SourceCatalogEntry> hazukiAllowedSourceCatalog = [
     name: 'CopyManga',
     fileName: 'copy_manga.js',
     directUrls: _copyMangaSourceUrls,
+  ),
+  SourceCatalogEntry(
+    key: 'picacg',
+    name: 'Picacg',
+    fileName: 'picacg.js',
+    directUrls: _picacgSourceUrls,
   ),
 ];
 
@@ -651,6 +666,13 @@ class HazukiSourceService extends ChangeNotifier {
 
   String? currentAccountForSource(String sourceKey) {
     final handle = _handleFor(sourceKey);
+    final displayName = handle.session
+        .loadSourceData(handle.sourceKey, 'display_name')
+        ?.toString()
+        .trim();
+    if (displayName != null && displayName.isNotEmpty) {
+      return displayName;
+    }
     final accountData = handle.session.loadAccountDataSync(
       handle.runtime.sourceMeta,
       fallbackSourceKey: handle.sourceKey,
@@ -751,6 +773,10 @@ class HazukiSourceService extends ChangeNotifier {
     if (isHazukiCopyMangaSourceKey(sourceKey)) {
       const copySearchModes = {'-', 'name', 'author', 'local'};
       return copySearchModes.contains(normalized) ? normalized : '-';
+    }
+    if (isHazukiPicacgSourceKey(sourceKey)) {
+      const picacgSortModes = {'dd', 'da', 'ld', 'vd'};
+      return picacgSortModes.contains(normalized) ? normalized : 'dd';
     }
     return normalized.isEmpty ? 'mr' : normalized;
   }

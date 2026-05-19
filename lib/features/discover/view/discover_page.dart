@@ -23,6 +23,7 @@ class DiscoverPage extends StatefulWidget {
         const DiscoverDailyRecommendationState.disabled(),
     this.onSearchMorphProgressChanged,
     this.onSearchTap,
+    this.onRequestLogin,
     this.allowInitialLoad = true,
     this.hideLoadingUntilInitialLoadAllowed = false,
     this.comicCoverHeroTagBuilder = comicCoverHeroTag,
@@ -33,6 +34,7 @@ class DiscoverPage extends StatefulWidget {
   final DiscoverDailyRecommendationState dailyRecommendationState;
   final ValueChanged<double>? onSearchMorphProgressChanged;
   final VoidCallback? onSearchTap;
+  final Future<void> Function()? onRequestLogin;
   final bool allowInitialLoad;
   final bool hideLoadingUntilInitialLoadAllowed;
   final ComicHeroTagBuilder comicCoverHeroTagBuilder;
@@ -146,6 +148,20 @@ class _DiscoverPageState extends State<DiscoverPage> {
     );
   }
 
+  Future<void> _requestLogin() async {
+    final requestLogin = widget.onRequestLogin;
+    if (requestLogin == null) {
+      return;
+    }
+    await requestLogin();
+    if (!mounted || _controller.showLoginRequired) {
+      return;
+    }
+    if (_controller.sections.isEmpty) {
+      await _triggerRefresh();
+    }
+  }
+
   bool get _showRecommendationCarousel =>
       widget.usePinnedSearchInAppBar &&
       widget.dailyRecommendationState.displayedRecommendations.isNotEmpty;
@@ -194,6 +210,11 @@ class _DiscoverPageState extends State<DiscoverPage> {
       headerItemCount: _headerItemCount,
       headerItemBuilder: _buildHeaderItem,
       onRefresh: _triggerRefresh,
+      onLoginPressed: widget.onRequestLogin == null
+          ? null
+          : () {
+              unawaited(_requestLogin());
+            },
       allowInitialLoad: widget.allowInitialLoad,
       hideLoadingUntilInitialLoadAllowed:
           widget.hideLoadingUntilInitialLoadAllowed,

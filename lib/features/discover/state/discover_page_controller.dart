@@ -45,11 +45,23 @@ class DiscoverPageController extends ChangeNotifier {
   bool get initialLoading => _state.initialLoading;
   bool get refreshing => _state.refreshing;
   int get visibleSectionCount => _state.visibleSectionCount;
+  bool get showLoginRequired =>
+      isHazukiPicacgSourceKey(_sourceService.activeSourceKey) &&
+      !_sourceService.isLogged;
 
   Future<void> loadInitial({
     required String timeoutMessage,
     required String Function(String) loadFailedMessage,
   }) async {
+    if (showLoginRequired) {
+      _state.sections = const [];
+      _state.errorMessage = null;
+      _state.visibleSectionCount = 0;
+      _state.initialLoading = false;
+      _notify();
+      return;
+    }
+
     List<ExploreSection>? loadedSections;
     String? error;
     try {
@@ -93,6 +105,15 @@ class DiscoverPageController extends ChangeNotifier {
     required String Function(String) loadFailedMessage,
   }) async {
     if (_state.refreshing) return;
+    if (showLoginRequired) {
+      _state.sections = const [];
+      _state.errorMessage = null;
+      _state.visibleSectionCount = 0;
+      _state.initialLoading = false;
+      _state.refreshing = false;
+      _notify();
+      return;
+    }
     if (_sourceService.sourceRuntimeState.canRetry) {
       _sourceService.logRuntimeRetryRequested('discover_page');
     }

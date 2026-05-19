@@ -5,7 +5,10 @@ import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/features/discover/view/discover_page.dart';
+import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../support/test_service_locator.dart';
 
 const double _selectedIndicatorRenderWidth = 28;
@@ -14,6 +17,7 @@ const double _unselectedIndicatorRenderWidth = 14;
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() async {
+    SharedPreferences.setMockInitialValues(const {});
     await ensureTestServiceLocator();
   });
 
@@ -22,6 +26,29 @@ void main() {
   });
 
   group('Discover daily recommendation carousel', () {
+    testWidgets('shows login action for Picacg discover before sign in', (
+      tester,
+    ) async {
+      await sl<HazukiSourceService>().activateSource('picacg');
+      var loginRequests = 0;
+
+      await tester.pumpWidget(
+        _buildDiscoverPage(
+          const <DiscoverDailyRecommendationEntry>[],
+          onRequestLogin: () async {
+            loginRequests++;
+          },
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('Please sign in to your account first'), findsOneWidget);
+      await tester.tap(find.text('Sign in'));
+      await tester.pump();
+
+      expect(loginRequests, 1);
+    });
+
     testWidgets(
       'renders carousel and indicator count for multiple recommendations',
       (tester) async {
@@ -231,8 +258,9 @@ void main() {
 }
 
 Widget _buildDiscoverPage(
-  List<DiscoverDailyRecommendationEntry> recommendations,
-) {
+  List<DiscoverDailyRecommendationEntry> recommendations, {
+  Future<void> Function()? onRequestLogin,
+}) {
   return MaterialApp(
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
@@ -247,6 +275,7 @@ Widget _buildDiscoverPage(
         ),
         allowInitialLoad: false,
         hideLoadingUntilInitialLoadAllowed: true,
+        onRequestLogin: onRequestLogin,
       ),
     ),
   );

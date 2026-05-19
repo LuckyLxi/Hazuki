@@ -32,21 +32,41 @@ extension HazukiSourceServiceExploreCapability on HazukiSourceService {
         (engine.evaluate('this.__hazuki_source.explore?.[0]?.type') ?? '')
             .toString();
     if (exploreType != 'multiPartPage' &&
-        exploreType != 'singlePageWithMultiPart') {
+        exploreType != 'singlePageWithMultiPart' &&
+        exploreType != 'multiPageComicList') {
       throw Exception('explore_type_not_supported:$exploreType');
     }
 
-    final dynamic result = engine.evaluate(
-      exploreType == 'multiPartPage'
-          ? 'this.__hazuki_source.explore[0].load(null)'
-          : 'this.__hazuki_source.explore[0].load()',
-      name: 'source_explore_load.js',
-    );
+    final dynamic result = engine.evaluate(switch (exploreType) {
+      'multiPartPage' => 'this.__hazuki_source.explore[0].load(null)',
+      'singlePageWithMultiPart' => 'this.__hazuki_source.explore[0].load()',
+      _ =>
+        '''
+Promise.all(
+  this.__hazuki_source.explore
+    .filter((section) => section?.type === "multiPageComicList")
+    .map(async (section) => {
+      try {
+        return {
+          title: section.title ?? "__untitled_section__",
+          ...(await section.load(1))
+        };
+      } catch (_) {
+        return null;
+      }
+    })
+).then((sections) => sections.filter((section) => section != null))
+''',
+    }, name: 'source_explore_load.js');
 
     final dynamic resolved = await facade.js.resolve(result);
-    final sections = exploreType == 'multiPartPage'
-        ? _parseMultiPartExploreSections(resolved)
-        : _parseSinglePageWithMultiPartExploreSections(resolved);
+    final sections = switch (exploreType) {
+      'multiPartPage' => _parseMultiPartExploreSections(resolved),
+      'singlePageWithMultiPart' => _parseSinglePageWithMultiPartExploreSections(
+        resolved,
+      ),
+      _ => _parseMultiPageComicListExploreSections(resolved),
+    };
 
     exploreCache.putSections(sections);
     return List<ExploreSection>.unmodifiable(sections);
@@ -103,6 +123,36 @@ extension HazukiSourceServiceExploreCapability on HazukiSourceService {
           ExploreSection(title: entry.key.toString(), comics: comics),
         );
       }
+    }
+    return sections;
+  }
+
+  List<ExploreSection> _parseMultiPageComicListExploreSections(
+    dynamic resolved,
+  ) {
+    if (resolved is! List) {
+      return const [];
+    }
+    final sections = <ExploreSection>[];
+    for (final item in resolved) {
+      if (item is! Map) {
+        continue;
+      }
+      final map = Map<String, dynamic>.from(item);
+      final comicsRaw = map['comics'];
+      if (comicsRaw is! List) {
+        continue;
+      }
+      final comics = _parseExploreComics(comicsRaw);
+      if (comics.isEmpty) {
+        continue;
+      }
+      sections.add(
+        ExploreSection(
+          title: map['title']?.toString() ?? '__untitled_section__',
+          comics: comics,
+        ),
+      );
     }
     return sections;
   }

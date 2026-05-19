@@ -286,6 +286,7 @@
     }
   },
   "discoverEmpty": "当前漫画源暂无发现页内容",
+  "discoverLoginRequired": "请先登录账号",
   "discoverMore": "查看更多",
   "aboutThirdPartyLicensesTitle": "第三方库许可",
   "aboutThirdPartyLicensesSubtitle": "查看本应用使用的开源库",

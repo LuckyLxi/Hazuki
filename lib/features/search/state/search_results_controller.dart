@@ -58,6 +58,9 @@ class SearchResultsController extends ChangeNotifier {
     if (sourceKey.trim() == copyMangaSourceKey) {
       return copyMangaSearchModeKeys.contains(normalized) ? normalized : '-';
     }
+    if (sourceKey.trim() == picacgSourceKey) {
+      return picacgSearchOrderKeys.contains(normalized) ? normalized : 'dd';
+    }
     return searchOrderKeys.contains(normalized) ? normalized : 'mr';
   }
 

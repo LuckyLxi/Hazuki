@@ -21,6 +21,8 @@ const searchOrderKeys = <String>{
 };
 const copyMangaSourceKey = 'copy_manga';
 const copyMangaSearchModeKeys = <String>{'-', 'name', 'author', 'local'};
+const picacgSourceKey = 'picacg';
+const picacgSearchOrderKeys = <String>{'dd', 'da', 'ld', 'vd'};
 
 enum SearchEntryIntent {
   editFromEntry,
@@ -47,6 +49,15 @@ Map<String, String> searchOrderLabels(
 }) {
   if (sourceKey.trim() == copyMangaSourceKey) {
     return const {'-': '全部', 'name': '名称', 'author': '作者', 'local': '汉化组'};
+  }
+
+  if (sourceKey.trim() == picacgSourceKey) {
+    return const {
+      'dd': 'New to old',
+      'da': 'Old to new',
+      'ld': 'Most likes',
+      'vd': 'Most nominated',
+    };
   }
 
   final strings = AppLocalizations.of(context)!;

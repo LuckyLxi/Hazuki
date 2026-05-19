@@ -159,7 +159,7 @@ class NetworkLogsFormatter {
           log['responseHeaders'],
           compactStrings: false,
         ),
-      if (_hasMeaningfulValue(log['responseBodyPreview']))
+      if (!includeFullBody && _hasMeaningfulValue(log['responseBodyPreview']))
         'responseBodyPreview': _toCompactBody(
           log['responseBodyPreview'],
           keep: isImportant ? 320 : 160,

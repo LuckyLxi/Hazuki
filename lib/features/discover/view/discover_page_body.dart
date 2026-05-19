@@ -16,6 +16,7 @@ class DiscoverPageBody extends StatelessWidget {
     required this.headerItemCount,
     required this.headerItemBuilder,
     required this.onRefresh,
+    this.onLoginPressed,
     required this.allowInitialLoad,
     required this.hideLoadingUntilInitialLoadAllowed,
     required this.comicDetailPageBuilder,
@@ -27,6 +28,7 @@ class DiscoverPageBody extends StatelessWidget {
   final int headerItemCount;
   final IndexedWidgetBuilder headerItemBuilder;
   final Future<void> Function() onRefresh;
+  final VoidCallback? onLoginPressed;
   final bool allowInitialLoad;
   final bool hideLoadingUntilInitialLoadAllowed;
   final ComicDetailPageBuilder comicDetailPageBuilder;
@@ -66,10 +68,12 @@ class DiscoverPageBody extends StatelessWidget {
                   sections: controller.sections,
                   errorMessage: controller.errorMessage,
                   sourceRuntimeState: controller.sourceRuntimeState,
+                  showLoginRequired: controller.showLoginRequired,
                   allowInitialLoad: allowInitialLoad,
                   hideLoadingUntilInitialLoadAllowed:
                       hideLoadingUntilInitialLoadAllowed,
                   onRetry: onRefresh,
+                  onLoginPressed: onLoginPressed,
                 );
               }
               final sectionIndex = index - headerItemCount;

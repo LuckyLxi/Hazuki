@@ -210,6 +210,17 @@ extension HazukiSourceServiceFavoritesCollectionCapability
           engine.evaluate('!!this.__hazuki_source.favorites?.loadFolders'),
         );
         if (!hasLoadFolders) {
+          final hasLoadComics = facade.js.asBool(
+            engine.evaluate('!!this.__hazuki_source.favorites?.loadComics'),
+          );
+          if (hasLoadComics) {
+            return (
+              const <FavoriteFolder>[
+                FavoriteFolder(id: '0', name: '__favorite_all__'),
+              ],
+              const <String>{},
+            );
+          }
           throw Exception('favorite_folders_not_supported');
         }
 
