@@ -64,6 +64,10 @@ class ReaderPage extends StatefulWidget {
 class _ReaderPageState extends State<ReaderPage>
     with SingleTickerProviderStateMixin {
   static const _readerSettingsStore = ReaderSettingsStore();
+  late final HazukiSourceService _sourceService = sl<HazukiSourceService>();
+
+  String _copyMangaImageQuality = '1500';
+  String _picacgImageQuality = 'original';
 
   final ScrollController _scrollController = ScrollController();
   final PageController _pageController = PageController();
@@ -233,6 +237,19 @@ class _ReaderPageState extends State<ReaderPage>
   void initState() {
     super.initState();
     _sessionController.initialize();
+
+    final cmQuality = _sourceService
+        .loadActiveSourceSetting('image_quality')
+        ?.toString();
+    _copyMangaImageQuality = {'800', '1200', '1500'}.contains(cmQuality)
+        ? cmQuality!
+        : '1500';
+    final picaQuality = _sourceService
+        .loadActiveSourceSetting('imageQuality')
+        ?.toString();
+    _picacgImageQuality = {'original', 'medium', 'low'}.contains(picaQuality)
+        ? picaQuality!
+        : 'original';
   }
 
   @override
@@ -418,6 +435,26 @@ class _ReaderPageState extends State<ReaderPage>
       onBrightnessChangeEnd: _runtimeState.customBrightness
           ? _settingsController.handleBrightnessChangeEnd
           : null,
+      isActiveCopyMangaSource: _sourceService.isActiveCopyMangaSource,
+      isActivePicacgSource: isHazukiPicacgSourceKey(
+        _sourceService.activeSourceKey,
+      ),
+      copyMangaImageQuality: _copyMangaImageQuality,
+      picacgImageQuality: _picacgImageQuality,
+      onCopyMangaImageQualityChanged: (value) async {
+        if (value == null || value == _copyMangaImageQuality) return;
+        setState(() {
+          _copyMangaImageQuality = value;
+        });
+        await _sourceService.updateActiveSourceSetting('image_quality', value);
+      },
+      onPicacgImageQualityChanged: (value) async {
+        if (value == null || value == _picacgImageQuality) return;
+        setState(() {
+          _picacgImageQuality = value;
+        });
+        await _sourceService.updateActiveSourceSetting('imageQuality', value);
+      },
     );
   }
 

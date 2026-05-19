@@ -41,6 +41,12 @@ Widget buildReaderSettingsDrawer({
   required ValueChanged<bool> onCustomBrightnessChanged,
   required ValueChanged<double>? onBrightnessChanged,
   required ValueChanged<double>? onBrightnessChangeEnd,
+  required bool isActiveCopyMangaSource,
+  required bool isActivePicacgSource,
+  required String copyMangaImageQuality,
+  required String picacgImageQuality,
+  required ValueChanged<String?> onCopyMangaImageQualityChanged,
+  required ValueChanged<String?> onPicacgImageQualityChanged,
 }) {
   final drawerWidth = math.min(MediaQuery.sizeOf(context).width * 0.88, 360.0);
 
@@ -74,6 +80,12 @@ Widget buildReaderSettingsDrawer({
             onCustomBrightnessChanged: onCustomBrightnessChanged,
             onBrightnessChanged: onBrightnessChanged,
             onBrightnessChangeEnd: onBrightnessChangeEnd,
+            isActiveCopyMangaSource: isActiveCopyMangaSource,
+            isActivePicacgSource: isActivePicacgSource,
+            copyMangaImageQuality: copyMangaImageQuality,
+            picacgImageQuality: picacgImageQuality,
+            onCopyMangaImageQualityChanged: onCopyMangaImageQualityChanged,
+            onPicacgImageQualityChanged: onPicacgImageQualityChanged,
             onClose: () => Navigator.of(drawerContext).pop(),
           ),
         );

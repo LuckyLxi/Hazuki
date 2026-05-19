@@ -61,6 +61,12 @@ class ReaderSettingsDrawerContent extends StatelessWidget {
     required this.onCustomBrightnessChanged,
     required this.onBrightnessChanged,
     required this.onBrightnessChangeEnd,
+    required this.isActiveCopyMangaSource,
+    required this.isActivePicacgSource,
+    required this.copyMangaImageQuality,
+    required this.picacgImageQuality,
+    required this.onCopyMangaImageQualityChanged,
+    required this.onPicacgImageQualityChanged,
     required this.onClose,
   });
 
@@ -87,6 +93,12 @@ class ReaderSettingsDrawerContent extends StatelessWidget {
   final ValueChanged<bool> onCustomBrightnessChanged;
   final ValueChanged<double>? onBrightnessChanged;
   final ValueChanged<double>? onBrightnessChangeEnd;
+  final bool isActiveCopyMangaSource;
+  final bool isActivePicacgSource;
+  final String copyMangaImageQuality;
+  final String picacgImageQuality;
+  final ValueChanged<String?> onCopyMangaImageQualityChanged;
+  final ValueChanged<String?> onPicacgImageQualityChanged;
   final VoidCallback onClose;
 
   @override
@@ -315,6 +327,75 @@ class ReaderSettingsDrawerContent extends StatelessWidget {
               ),
             ],
           ),
+
+          // 分组 4: 图源特定设置
+          if (isActiveCopyMangaSource || isActivePicacgSource)
+            ReaderSettingsGroup(
+              theme: theme,
+              children: [
+                if (isActiveCopyMangaSource)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                    child: DropdownButtonFormField<String>(
+                      initialValue: copyMangaImageQuality,
+                      decoration: InputDecoration(
+                        border: const OutlineInputBorder(),
+                        labelText: strings.otherCopyMangaImageQualityTitle,
+                        helperText: strings.otherCopyMangaImageQualitySubtitle,
+                        isDense: true,
+                      ),
+                      items: [
+                        DropdownMenuItem<String>(
+                          value: '800',
+                          child: Text(strings.otherCopyMangaImageQualityLow),
+                        ),
+                        DropdownMenuItem<String>(
+                          value: '1200',
+                          child: Text(strings.otherCopyMangaImageQualityMedium),
+                        ),
+                        DropdownMenuItem<String>(
+                          value: '1500',
+                          child: Text(strings.otherCopyMangaImageQualityHigh),
+                        ),
+                      ],
+                      onChanged: onCopyMangaImageQualityChanged,
+                    ),
+                  ),
+                if (isActivePicacgSource) ...[
+                  ListTile(
+                    leading: const Icon(Icons.photo_size_select_large_outlined),
+                    title: Text(strings.linePicacgImageQualityTitle),
+                    subtitle: Text(strings.linePicacgImageQualitySubtitle),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+                    child: DropdownButtonFormField<String>(
+                      initialValue: picacgImageQuality,
+                      decoration: InputDecoration(
+                        border: const OutlineInputBorder(),
+                        labelText: strings.linePicacgImageQualityLabel,
+                        isDense: true,
+                      ),
+                      items: [
+                        DropdownMenuItem<String>(
+                          value: 'original',
+                          child: Text(strings.linePicacgImageQualityOriginal),
+                        ),
+                        DropdownMenuItem<String>(
+                          value: 'medium',
+                          child: Text(strings.linePicacgImageQualityMedium),
+                        ),
+                        DropdownMenuItem<String>(
+                          value: 'low',
+                          child: Text(strings.linePicacgImageQualityLow),
+                        ),
+                      ],
+                      onChanged: onPicacgImageQualityChanged,
+                    ),
+                  ),
+                ],
+              ],
+            ),
         ],
       ),
     );
