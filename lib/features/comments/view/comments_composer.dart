@@ -41,7 +41,7 @@ class _CommentsBottomComposer extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _CommentsReplyBanner(
+            _AnimatedCommentsReplyBanner(
               replyToComment: replyToComment,
               onClearReply: onClearReply,
             ),
@@ -135,6 +135,103 @@ class _CommentsBottomComposer extends StatelessWidget {
               },
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AnimatedCommentsReplyBanner extends StatefulWidget {
+  const _AnimatedCommentsReplyBanner({
+    required this.replyToComment,
+    required this.onClearReply,
+  });
+
+  final ComicCommentData? replyToComment;
+  final VoidCallback onClearReply;
+
+  @override
+  State<_AnimatedCommentsReplyBanner> createState() =>
+      _AnimatedCommentsReplyBannerState();
+}
+
+class _AnimatedCommentsReplyBannerState
+    extends State<_AnimatedCommentsReplyBanner>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _animation;
+  ComicCommentData? _displayedReplyTo;
+
+  @override
+  void initState() {
+    super.initState();
+    _displayedReplyTo = widget.replyToComment;
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 220),
+      reverseDuration: const Duration(milliseconds: 220),
+      value: _displayedReplyTo == null ? 0.0 : 1.0,
+    );
+    _animation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    );
+  }
+
+  @override
+  void didUpdateWidget(covariant _AnimatedCommentsReplyBanner oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final next = widget.replyToComment;
+    if (next != null) {
+      setState(() {
+        _displayedReplyTo = next;
+      });
+      unawaited(_controller.forward());
+      return;
+    }
+    if (_displayedReplyTo != null && oldWidget.replyToComment != null) {
+      unawaited(
+        _controller.reverse().then((_) {
+          if (mounted && widget.replyToComment == null) {
+            setState(() {
+              _displayedReplyTo = null;
+            });
+          }
+        }),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final replyTo = _displayedReplyTo;
+    if (replyTo == null) {
+      return const SizedBox.shrink();
+    }
+
+    return ClipRect(
+      child: FadeTransition(
+        opacity: _animation,
+        child: SizeTransition(
+          sizeFactor: _animation,
+          alignment: Alignment.topCenter,
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0, 0.12),
+              end: Offset.zero,
+            ).animate(_animation),
+            child: _CommentsReplyBanner(
+              replyToComment: replyTo,
+              onClearReply: widget.onClearReply,
+            ),
+          ),
         ),
       ),
     );

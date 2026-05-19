@@ -69,9 +69,18 @@ class _CommentsPageState extends State<CommentsPage>
   bool _hasMore = true;
   bool _sendingComment = false;
   bool _hideFilterLoadMoreQueued = false;
+  bool _supportCommentLike = false;
+  bool _supportCommentReplies = false;
   int _currentPage = 1;
   int? _maxPage;
   ComicCommentData? _replyToComment;
+  final Set<String> _likingCommentIds = <String>{};
+  final Set<String> _expandedReplyIds = <String>{};
+  final Set<String> _loadingReplyIds = <String>{};
+  final Map<String, List<ComicCommentData>> _replyComments = {};
+  final Map<String, int> _replyPages = {};
+  final Map<String, int?> _replyMaxPages = {};
+  final Map<String, bool> _replyHasMore = {};
   bool? _tabScrollAtTop;
   int _fullscreenRequestEpoch = 0;
   final List<Timer> _fullscreenSyncTimers = [];
@@ -96,7 +105,15 @@ class _CommentsPageState extends State<CommentsPage>
     WidgetsBinding.instance.addObserver(this);
     _commentFocusNode.addListener(_handleCommentFocusChanged);
     _controller.addFilterListener(_onFilterChanged);
+    _refreshCommentCapabilities();
     unawaited(_loadInitial());
+  }
+
+  void _refreshCommentCapabilities() {
+    _supportCommentLike = _controller.supportCommentLike(widget.sourceKey);
+    _supportCommentReplies = _controller.supportCommentReplies(
+      widget.sourceKey,
+    );
   }
 
   @override
@@ -154,7 +171,11 @@ class _CommentsPageState extends State<CommentsPage>
       'Comment input focus changed',
       extra: {'hasFocus': _commentFocusNode.hasFocus},
     );
-    setState(() {});
+    setState(() {
+      if (!_commentFocusNode.hasFocus) {
+        _replyToComment = null;
+      }
+    });
   }
 
   void _updateCommentsState(VoidCallback update) {
@@ -463,6 +484,7 @@ class _CommentsPageState extends State<CommentsPage>
       _updateCommentsState(() {
         _comments = pageResult.comments;
         _errorMessage = null;
+        _refreshCommentCapabilities();
         _currentPage = 1;
         _maxPage = pageResult.maxPage;
         _hasMore = _computeHasMore(
@@ -586,6 +608,8 @@ class _CommentsPageState extends State<CommentsPage>
     _updateCommentsState(() {
       _replyToComment = comment;
     });
+    _scheduleFullscreenSyncAttempts();
+    _commentFocusNode.requestFocus();
   }
 
   void _clearReplyTarget() {
@@ -595,6 +619,153 @@ class _CommentsPageState extends State<CommentsPage>
     _updateCommentsState(() {
       _replyToComment = null;
     });
+  }
+
+  ComicCommentData _withToggledLike(ComicCommentData comment, bool nextLiked) {
+    final wasLiked = comment.isLiked ?? false;
+    final currentScore = comment.score ?? 0;
+    final nextScore = nextLiked == wasLiked
+        ? currentScore
+        : currentScore + (nextLiked ? 1 : -1);
+    return comment.copyWith(isLiked: nextLiked, score: math.max(0, nextScore));
+  }
+
+  void _updateCommentById(
+    String commentId,
+    ComicCommentData Function(ComicCommentData comment) update,
+  ) {
+    _comments = _comments
+        .map((comment) => comment.id == commentId ? update(comment) : comment)
+        .toList();
+    for (final entry in _replyComments.entries) {
+      _replyComments[entry.key] = entry.value
+          .map((comment) => comment.id == commentId ? update(comment) : comment)
+          .toList();
+    }
+  }
+
+  Future<void> _toggleCommentLike(ComicCommentData comment) async {
+    final commentId = comment.id;
+    if (commentId == null || _likingCommentIds.contains(commentId)) {
+      return;
+    }
+
+    final nextLiked = !(comment.isLiked ?? false);
+    _updateCommentsState(() {
+      _likingCommentIds.add(commentId);
+      _updateCommentById(
+        commentId,
+        (current) => _withToggledLike(current, nextLiked),
+      );
+    });
+
+    try {
+      await _controller.likeComment(
+        comicId: widget.comicId,
+        subId: widget.subId,
+        sourceKey: widget.sourceKey,
+        commentId: commentId,
+        isLike: nextLiked,
+      );
+      if (mounted) {
+        unawaited(
+          showHazukiPrompt(
+            context,
+            nextLiked
+                ? l10n(context).commentsLiked
+                : l10n(context).commentsUnliked,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        _updateCommentsState(() {
+          _updateCommentById(commentId, (_) => comment);
+        });
+        unawaited(
+          showHazukiPrompt(
+            context,
+            l10n(context).commentsLikeFailed('$e'),
+            isError: true,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        _updateCommentsState(() {
+          _likingCommentIds.remove(commentId);
+        });
+      }
+    }
+  }
+
+  Future<void> _toggleReplies(ComicCommentData comment) async {
+    final commentId = comment.id;
+    if (commentId == null) {
+      return;
+    }
+    if (_expandedReplyIds.contains(commentId)) {
+      _updateCommentsState(() {
+        _expandedReplyIds.remove(commentId);
+      });
+      return;
+    }
+
+    _updateCommentsState(() {
+      _expandedReplyIds.add(commentId);
+    });
+    if (_replyComments[commentId]?.isNotEmpty == true) {
+      return;
+    }
+    await _loadReplies(commentId, page: 1);
+  }
+
+  Future<void> _loadMoreReplies(String commentId) async {
+    final nextPage = (_replyPages[commentId] ?? 0) + 1;
+    await _loadReplies(commentId, page: nextPage);
+  }
+
+  Future<void> _loadReplies(String commentId, {required int page}) async {
+    if (_loadingReplyIds.contains(commentId)) {
+      return;
+    }
+    _updateCommentsState(() {
+      _loadingReplyIds.add(commentId);
+    });
+    try {
+      final pageResult = await _controller.loadCommentsPage(
+        comicId: widget.comicId,
+        subId: widget.subId,
+        sourceKey: widget.sourceKey,
+        page: page,
+        pageSize: _pageSize,
+        timeout: _commentsLoadTimeout,
+        replyTo: commentId,
+      );
+      if (!mounted) {
+        return;
+      }
+      _updateCommentsState(() {
+        final existing = page == 1
+            ? const <ComicCommentData>[]
+            : (_replyComments[commentId] ?? const <ComicCommentData>[]);
+        final merged = _mergeComments(existing, pageResult.comments);
+        _replyComments[commentId] = merged;
+        _replyPages[commentId] = page;
+        _replyMaxPages[commentId] = pageResult.maxPage;
+        _replyHasMore[commentId] = _computeHasMore(
+          page: page,
+          fetchedCount: pageResult.comments.length,
+          maxPage: pageResult.maxPage,
+        );
+      });
+    } finally {
+      if (mounted) {
+        _updateCommentsState(() {
+          _loadingReplyIds.remove(commentId);
+        });
+      }
+    }
   }
 
   Future<void> _submitComment() async {
@@ -674,7 +845,23 @@ class _CommentsPageState extends State<CommentsPage>
       index: index,
       collapsedByFilter: _controller.isCollapsedComment(comment.content),
       animatedCommentKeys: _animatedCommentKeys,
+      supportLike: _supportCommentLike,
+      supportReply: _controller.supportCommentSend(widget.sourceKey),
+      supportReplies: _supportCommentReplies,
+      isLiking: comment.id != null && _likingCommentIds.contains(comment.id),
+      replies: comment.id == null
+          ? const []
+          : (_replyComments[comment.id] ?? const []),
+      repliesExpanded:
+          comment.id != null && _expandedReplyIds.contains(comment.id),
+      repliesLoading:
+          comment.id != null && _loadingReplyIds.contains(comment.id),
+      repliesHasMore:
+          comment.id != null && (_replyHasMore[comment.id] ?? false),
       onReply: _setReplyTarget,
+      onLike: (comment) => unawaited(_toggleCommentLike(comment)),
+      onToggleReplies: (comment) => unawaited(_toggleReplies(comment)),
+      onLoadMoreReplies: (commentId) => unawaited(_loadMoreReplies(commentId)),
     );
   }
 

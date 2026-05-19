@@ -987,6 +987,18 @@
       "count": {}
     }
   },
+  "commentsLikeTooltip": "点赞",
+  "commentsUnlikeTooltip": "取消点赞",
+  "commentsLiked": "已点赞",
+  "commentsUnliked": "已取消点赞",
+  "commentsLikeFailed": "点赞失败：{error}",
+  "@commentsLikeFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "commentsLoadReplies": "查看回复",
+  "commentsHideReplies": "收起回复",
   "commentsReplyTooltip": "回复",
   "commentsReplyToUser": "回复 @{name}",
   "@commentsReplyToUser": {

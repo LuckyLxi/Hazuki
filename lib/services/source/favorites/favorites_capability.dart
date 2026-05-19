@@ -182,4 +182,14 @@ extension HazukiSourceServiceFavoritesCapability on HazukiSourceService {
       facade.js.evaluate('!!this.__hazuki_source.comic?.sendComment'),
     );
   }
+
+  bool get supportCommentLike {
+    final engine = facade.js.engine;
+    if (engine == null) {
+      return false;
+    }
+    return facade.js.asBool(
+      facade.js.evaluate('!!this.__hazuki_source.comic?.likeComment'),
+    );
+  }
 }

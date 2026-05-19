@@ -121,6 +121,39 @@ extension HazukiSourceServiceCommentsCapability on HazukiSourceService {
     }
   }
 
+  Future<void> likeComment({
+    required String comicId,
+    String? subId,
+    String sourceKey = '',
+    required String commentId,
+    required bool isLike,
+  }) async {
+    final resolvedSourceKey = _resolveActiveSourceKey(sourceKey);
+    final facade = _handleFor(resolvedSourceKey).facade;
+    await facade.ensureInitialized();
+
+    final engine = facade.js.engine;
+    if (engine == null) {
+      throw Exception('source_not_initialized');
+    }
+
+    final subIdArg = subId == null ? 'null' : jsonEncode(subId);
+
+    Future<void> runLike() async {
+      final dynamic result = engine.evaluate(
+        'this.__hazuki_source.comic.likeComment(${jsonEncode(comicId)}, $subIdArg, ${jsonEncode(commentId)}, $isLike)',
+        name: 'source_like_comment.js',
+      );
+      await facade.js.resolve(result);
+    }
+
+    if (resolvedSourceKey == activeSourceKey) {
+      await _runWithReloginRetry(runLike);
+    } else {
+      await runLike();
+    }
+  }
+
   bool supportCommentSendForSource(String sourceKey) {
     final resolvedSourceKey = _resolveActiveSourceKey(sourceKey);
     final facade = _handleFor(resolvedSourceKey).facade;
@@ -130,6 +163,34 @@ extension HazukiSourceServiceCommentsCapability on HazukiSourceService {
     }
     return facade.js.asBool(
       facade.js.evaluate('!!this.__hazuki_source.comic?.sendComment'),
+    );
+  }
+
+  bool supportCommentLikeForSource(String sourceKey) {
+    final resolvedSourceKey = _resolveActiveSourceKey(sourceKey);
+    final facade = _handleFor(resolvedSourceKey).facade;
+    final engine = facade.js.engine;
+    if (engine == null) {
+      return false;
+    }
+    return facade.js.asBool(
+      facade.js.evaluate('!!this.__hazuki_source.comic?.likeComment'),
+    );
+  }
+
+  bool supportCommentRepliesForSource(String sourceKey) {
+    final resolvedSourceKey = _resolveActiveSourceKey(sourceKey);
+    if (!isHazukiPicacgSourceKey(resolvedSourceKey) &&
+        !isHazukiCopyMangaSourceKey(resolvedSourceKey)) {
+      return false;
+    }
+    final facade = _handleFor(resolvedSourceKey).facade;
+    final engine = facade.js.engine;
+    if (engine == null) {
+      return false;
+    }
+    return facade.js.asBool(
+      facade.js.evaluate('!!this.__hazuki_source.comic?.loadComments'),
     );
   }
 }

@@ -20,6 +20,30 @@ class ComicCommentData {
   final bool? isLiked;
   final int? score;
   final int? voteStatus;
+
+  ComicCommentData copyWith({
+    String? avatar,
+    String? userName,
+    String? time,
+    String? content,
+    String? id,
+    int? replyCount,
+    bool? isLiked,
+    int? score,
+    int? voteStatus,
+  }) {
+    return ComicCommentData(
+      avatar: avatar ?? this.avatar,
+      userName: userName ?? this.userName,
+      time: time ?? this.time,
+      content: content ?? this.content,
+      id: id ?? this.id,
+      replyCount: replyCount ?? this.replyCount,
+      isLiked: isLiked ?? this.isLiked,
+      score: score ?? this.score,
+      voteStatus: voteStatus ?? this.voteStatus,
+    );
+  }
 }
 
 class ComicCommentsPageResult {

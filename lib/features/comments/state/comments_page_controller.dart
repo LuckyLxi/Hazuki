@@ -22,6 +22,14 @@ class CommentsPageController {
       ? _sourceService.supportCommentSend
       : _sourceService.supportCommentSendForSource(sourceKey);
 
+  bool supportCommentLike(String sourceKey) => sourceKey.trim().isEmpty
+      ? _sourceService.supportCommentLike
+      : _sourceService.supportCommentLikeForSource(sourceKey);
+
+  bool supportCommentReplies(String sourceKey) => sourceKey.trim().isEmpty
+      ? _sourceService.supportCommentRepliesForSource(sourceKey)
+      : _sourceService.supportCommentRepliesForSource(sourceKey);
+
   Future<ComicCommentsPageResult> loadCommentsPage({
     required String comicId,
     String? subId,
@@ -29,6 +37,7 @@ class CommentsPageController {
     required int page,
     required int pageSize,
     required Duration timeout,
+    String? replyTo,
   }) {
     return _sourceService
         .loadCommentsPage(
@@ -37,8 +46,25 @@ class CommentsPageController {
           sourceKey: sourceKey,
           page: page,
           pageSize: pageSize,
+          replyTo: replyTo,
         )
         .timeout(timeout);
+  }
+
+  Future<void> likeComment({
+    required String comicId,
+    String? subId,
+    String sourceKey = '',
+    required String commentId,
+    required bool isLike,
+  }) {
+    return _sourceService.likeComment(
+      comicId: comicId,
+      subId: subId,
+      sourceKey: sourceKey,
+      commentId: commentId,
+      isLike: isLike,
+    );
   }
 
   Future<void> sendComment({

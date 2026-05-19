@@ -987,6 +987,18 @@
       "count": {}
     }
   },
+  "commentsLikeTooltip": "Like",
+  "commentsUnlikeTooltip": "Unlike",
+  "commentsLiked": "Liked",
+  "commentsUnliked": "Like removed",
+  "commentsLikeFailed": "Failed to like: {error}",
+  "@commentsLikeFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
+  "commentsLoadReplies": "View replies",
+  "commentsHideReplies": "Hide replies",
   "commentsReplyTooltip": "Reply",
   "commentsReplyToUser": "Reply to @{name}",
   "@commentsReplyToUser": {
