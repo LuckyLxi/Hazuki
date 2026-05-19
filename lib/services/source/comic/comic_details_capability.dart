@@ -149,7 +149,7 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
       fallbackComicId: normalizedComicId,
     );
     final recommend = _extractComicDetailsRecommendations(map);
-    final tags = _extractComicDetailsTags(map);
+    final tags = _extractComicDetailsTags(map, sourceKey: sourceKey);
 
     final detailsComicId = map['id']?.toString().trim() ?? '';
     final finalComicId = detailsComicId.isEmpty
@@ -308,14 +308,22 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
     return chapters;
   }
 
-  Map<String, List<String>> _extractComicDetailsTags(Map<String, dynamic> map) {
+  Map<String, List<String>> _extractComicDetailsTags(
+    Map<String, dynamic> map, {
+    required String sourceKey,
+  }) {
     final tags = <String, List<String>>{};
     final tagsRaw = map['tags'];
     if (tagsRaw is Map) {
       for (final entry in tagsRaw.entries) {
         final value = entry.value;
         if (value is List) {
-          tags[entry.key.toString()] = value.map((e) => e.toString()).toList();
+          tags[_translateSourceText(
+            entry.key.toString(),
+            sourceKey: sourceKey,
+          )] = value
+              .map((e) => e.toString())
+              .toList();
         }
       }
     }

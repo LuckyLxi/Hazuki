@@ -52,11 +52,13 @@ Map<String, String> searchOrderLabels(
   }
 
   if (sourceKey.trim() == picacgSourceKey) {
-    return const {
-      'dd': 'New to old',
-      'da': 'Old to new',
-      'ld': 'Most likes',
-      'vd': 'Most nominated',
+    final locale = Localizations.localeOf(context);
+    final useChinese = locale.languageCode == 'zh';
+    return {
+      'dd': useChinese ? '新到旧' : 'New to old',
+      'da': useChinese ? '旧到新' : 'Old to new',
+      'ld': useChinese ? '最多喜欢' : 'Most likes',
+      'vd': useChinese ? '最多指名' : 'Most nominated',
     };
   }
 

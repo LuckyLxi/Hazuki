@@ -17,6 +17,7 @@ import 'package:pointycastle/block/aes.dart';
 import 'package:pointycastle/block/modes/ecb.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../app/app_preferences.dart';
 import '../shared/chapter_title_resolver.dart';
 import '../models/hazuki_models.dart';
 import 'source/common/source_json_coerce.dart';
@@ -662,6 +663,52 @@ class HazukiSourceService extends ChangeNotifier {
     await prefs.setString(SourcePrefsKeys.activeSourceKey, normalized);
     notifyListeners();
     runtimeRegistry._notify();
+  }
+
+  void clearLocalizedSourceTextCaches() {
+    exploreCache.clearMemory();
+    facade.cache.clearCategoryTagGroupsMemoryCache();
+  }
+
+  String _translateSourceText(String text, {String sourceKey = ''}) {
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) {
+      return text;
+    }
+
+    final resolvedSourceKey = sourceKey.trim().isEmpty
+        ? activeSourceKey
+        : sourceKey.trim();
+    final handle = _handleFor(resolvedSourceKey);
+    final engine = handle.runtime.engine;
+    if (engine == null) {
+      return text;
+    }
+
+    final localeTag = _sourceTranslationLocaleTag(handle.session.prefs);
+    if (localeTag == null) {
+      return text;
+    }
+
+    try {
+      final translated = engine.evaluate(
+        'this.__hazuki_source.translation?.[${jsonEncode(localeTag)}]?.[${jsonEncode(trimmed)}]',
+      );
+      final value = translated?.toString().trim() ?? '';
+      return value.isEmpty ? text : value;
+    } catch (_) {
+      return text;
+    }
+  }
+
+  String? _sourceTranslationLocaleTag(SharedPreferences? prefs) {
+    final saved = prefs?.getString(hazukiLocalePreferenceKey);
+    final languageCode = switch (saved) {
+      'zh' => 'zh',
+      'en' => 'en',
+      _ => PlatformDispatcher.instance.locale.languageCode,
+    };
+    return languageCode == 'zh' ? 'zh_CN' : null;
   }
 
   String? currentAccountForSource(String sourceKey) {

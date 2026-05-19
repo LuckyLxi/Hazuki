@@ -16,7 +16,6 @@ class HazukiAppSettingsStore {
   static const String _comicDetailDynamicColorKey =
       'appearance_comic_detail_dynamic_color';
   static const String _useSystemFontKey = 'appearance_use_system_font';
-  static const String _localeKey = 'app_locale';
 
   Future<AppearanceSettingsData> loadAppearance() async {
     final prefs = await SharedPreferences.getInstance();
@@ -61,7 +60,7 @@ class HazukiAppSettingsStore {
 
   Future<Locale?> loadLocalePreference() async {
     final prefs = await SharedPreferences.getInstance();
-    final localeTag = prefs.getString(_localeKey);
+    final localeTag = prefs.getString(hazukiLocalePreferenceKey);
     return _localeFromTag(localeTag);
   }
 
@@ -72,7 +71,7 @@ class HazukiAppSettingsStore {
       'en' => 'en',
       _ => 'system',
     };
-    await prefs.setString(_localeKey, localeTag);
+    await prefs.setString(hazukiLocalePreferenceKey, localeTag);
     return localeTag == 'system' ? null : locale;
   }
 

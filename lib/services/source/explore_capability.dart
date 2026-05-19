@@ -82,7 +82,9 @@ Promise.all(
         continue;
       }
       final map = Map<String, dynamic>.from(item);
-      final title = map['title']?.toString() ?? '__untitled_section__';
+      final title = _translateSourceText(
+        map['title']?.toString() ?? '__untitled_section__',
+      );
       final list = map['comics'];
       if (list is! List) {
         continue;
@@ -120,7 +122,10 @@ Promise.all(
       final comics = _parseExploreComics(list);
       if (comics.isNotEmpty) {
         sections.add(
-          ExploreSection(title: entry.key.toString(), comics: comics),
+          ExploreSection(
+            title: _translateSourceText(entry.key.toString()),
+            comics: comics,
+          ),
         );
       }
     }
@@ -149,7 +154,9 @@ Promise.all(
       }
       sections.add(
         ExploreSection(
-          title: map['title']?.toString() ?? '__untitled_section__',
+          title: _translateSourceText(
+            map['title']?.toString() ?? '__untitled_section__',
+          ),
           comics: comics,
         ),
       );

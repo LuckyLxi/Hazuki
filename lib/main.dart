@@ -175,6 +175,7 @@ class _HazukiAppState extends State<HazukiApp>
     setState(() {
       _locale = effectiveLocale;
     });
+    sl<HazukiSourceService>().clearLocalizedSourceTextCaches();
   }
 
   Future<void> _reloadLocalePreference() async {
@@ -186,6 +187,7 @@ class _HazukiAppState extends State<HazukiApp>
     setState(() {
       _locale = locale;
     });
+    sl<HazukiSourceService>().clearLocalizedSourceTextCaches();
   }
 
   Brightness _resolveThemeBrightness(ThemeMode mode) {

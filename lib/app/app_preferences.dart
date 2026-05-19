@@ -6,6 +6,7 @@ const hazukiAutoSoftwareUpdateCheckEnabledPreferenceKey =
 const hazukiDiscoverDailyRecommendationEnabledPreferenceKey =
     'other_discover_daily_recommendation_enabled';
 const hazukiUseSystemTitleBarPreferenceKey = 'other_use_system_title_bar';
+const hazukiLocalePreferenceKey = 'app_locale';
 const hazukiWindowsAdaptationNoticeAcceptedPreferenceKey =
     'windows_adaptation_notice_accepted';
 const hazukiComicIdSearchEnhancePreferenceKey =

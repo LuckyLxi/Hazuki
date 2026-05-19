@@ -47,7 +47,9 @@ extension HazukiSourceServiceCategoryRankingCapability on HazukiSourceService {
       if (value.isEmpty || label.isEmpty) {
         continue;
       }
-      options.add(CategoryRankingOption(value: value, label: label));
+      options.add(
+        CategoryRankingOption(value: value, label: _translateSourceText(label)),
+      );
     }
 
     return options;

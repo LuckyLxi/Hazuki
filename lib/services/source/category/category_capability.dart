@@ -153,7 +153,7 @@ extension HazukiSourceServiceCategoryCapability on HazukiSourceService {
 
       groups.add(
         CategoryTagGroup(
-          name: name,
+          name: _translateSourceText(name),
           tags: tags,
           params: params,
           itemType: itemType,
@@ -221,12 +221,14 @@ extension HazukiSourceServiceCategoryCapability on HazukiSourceService {
       }
       final idx = text.indexOf('-');
       if (idx <= 0 || idx >= text.length - 1) {
-        options.add(CategoryRankingOption(value: text, label: text));
+        options.add(
+          CategoryRankingOption(value: text, label: _translateSourceText(text)),
+        );
       } else {
         options.add(
           CategoryRankingOption(
             value: text.substring(0, idx),
-            label: text.substring(idx + 1),
+            label: _translateSourceText(text.substring(idx + 1)),
           ),
         );
       }
