@@ -242,12 +242,7 @@ extension HazukiSourceServiceCategoryCapability on HazukiSourceService {
         ? _parseExploreComics(comicsRaw)
         : const <ExploreComic>[];
 
-    final maxPageRaw = map['maxPage'];
-    final maxPage = switch (maxPageRaw) {
-      int value => value,
-      num value => value.toInt(),
-      _ => int.tryParse(maxPageRaw?.toString() ?? ''),
-    };
+    final maxPage = _parseSourcePageCount(map['maxPage']);
 
     return CategoryComicsResult(comics: comics, maxPage: maxPage);
   }

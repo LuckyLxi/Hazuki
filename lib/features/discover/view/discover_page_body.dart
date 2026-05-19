@@ -80,6 +80,9 @@ class DiscoverPageBody extends StatelessWidget {
               return DiscoverSectionBlock(
                 section: controller.sections[sectionIndex],
                 sectionIndex: sectionIndex,
+                loadingMore: controller.isSectionLoadingMore(sectionIndex),
+                hasMore: controller.sectionHasMore(sectionIndex),
+                onLoadMore: () => controller.loadMoreSection(sectionIndex),
                 comicDetailPageBuilder: comicDetailPageBuilder,
                 comicCoverHeroTagBuilder: comicCoverHeroTagBuilder,
               );

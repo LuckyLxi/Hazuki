@@ -7,4 +7,7 @@ class DiscoverPageState {
   bool refreshing = false;
   int visibleSectionCount = 0;
   int sectionRevealGeneration = 0;
+  final Map<int, int> sectionPages = <int, int>{};
+  final Set<int> sectionLoadingMore = <int>{};
+  final Set<int> sectionNoMore = <int>{};
 }

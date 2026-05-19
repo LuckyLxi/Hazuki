@@ -8,19 +8,56 @@ import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 import 'discover_comic_tile.dart';
 import 'discover_section_page.dart';
 
-class DiscoverSectionBlock extends StatelessWidget {
+class DiscoverSectionBlock extends StatefulWidget {
   const DiscoverSectionBlock({
     super.key,
     required this.section,
     required this.sectionIndex,
+    required this.loadingMore,
+    required this.hasMore,
+    required this.onLoadMore,
     required this.comicDetailPageBuilder,
     required this.comicCoverHeroTagBuilder,
   });
 
   final ExploreSection section;
   final int sectionIndex;
+  final bool loadingMore;
+  final bool hasMore;
+  final Future<void> Function() onLoadMore;
   final ComicDetailPageBuilder comicDetailPageBuilder;
   final ComicHeroTagBuilder comicCoverHeroTagBuilder;
+
+  @override
+  State<DiscoverSectionBlock> createState() => _DiscoverSectionBlockState();
+}
+
+class _DiscoverSectionBlockState extends State<DiscoverSectionBlock> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients ||
+        widget.loadingMore ||
+        !widget.hasMore) {
+      return;
+    }
+    final pos = _scrollController.position;
+    if (pos.pixels >= pos.maxScrollExtent - 320) {
+      widget.onLoadMore();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -38,17 +75,21 @@ class DiscoverSectionBlock extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: Text(section.title, style: theme.textTheme.titleMedium),
+                child: Text(
+                  widget.section.title,
+                  style: theme.textTheme.titleMedium,
+                ),
               ),
-              if (section.comics.isNotEmpty)
+              if (widget.section.comics.isNotEmpty)
                 TextButton(
                   onPressed: () {
                     Navigator.of(context).push(
                       MaterialPageRoute<void>(
                         builder: (_) => DiscoverSectionPage(
-                          section: section,
-                          comicDetailPageBuilder: comicDetailPageBuilder,
-                          comicCoverHeroTagBuilder: comicCoverHeroTagBuilder,
+                          section: widget.section,
+                          comicDetailPageBuilder: widget.comicDetailPageBuilder,
+                          comicCoverHeroTagBuilder:
+                              widget.comicCoverHeroTagBuilder,
                         ),
                       ),
                     );
@@ -61,17 +102,26 @@ class DiscoverSectionBlock extends StatelessWidget {
           SizedBox(
             height: 228,
             child: ListView.separated(
+              controller: _scrollController,
               key: PageStorageKey<String>(
-                'discover-section-$sectionIndex-${section.title}',
+                'discover-section-${widget.sectionIndex}-${widget.section.title}',
               ),
               scrollDirection: Axis.horizontal,
-              itemCount: section.comics.length,
+              itemCount:
+                  widget.section.comics.length + (widget.loadingMore ? 1 : 0),
               separatorBuilder: (_, _) => const SizedBox(width: 12),
               itemBuilder: (context, index) {
-                final comic = section.comics[index];
-                final heroTag = comicCoverHeroTagBuilder(
+                if (index >= widget.section.comics.length) {
+                  return const SizedBox(
+                    width: 48,
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                }
+                final comic = widget.section.comics[index];
+                final heroTag = widget.comicCoverHeroTagBuilder(
                   comic,
-                  salt: 'discover-$sectionIndex-${section.title}-$index',
+                  salt:
+                      'discover-${widget.sectionIndex}-${widget.section.title}-$index',
                 );
                 return SizedBox(
                   width: 130,
@@ -84,7 +134,7 @@ class DiscoverSectionBlock extends StatelessWidget {
                       context,
                       comic: comic,
                       heroTag: heroTag,
-                      pageBuilder: comicDetailPageBuilder,
+                      pageBuilder: widget.comicDetailPageBuilder,
                     ),
                   ),
                 );

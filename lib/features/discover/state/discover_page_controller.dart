@@ -45,6 +45,9 @@ class DiscoverPageController extends ChangeNotifier {
   bool get initialLoading => _state.initialLoading;
   bool get refreshing => _state.refreshing;
   int get visibleSectionCount => _state.visibleSectionCount;
+  bool isSectionLoadingMore(int index) =>
+      _state.sectionLoadingMore.contains(index);
+  bool sectionHasMore(int index) => !_state.sectionNoMore.contains(index);
   bool get showLoginRequired =>
       isHazukiPicacgSourceKey(_sourceService.activeSourceKey) &&
       !_sourceService.isLogged;
@@ -81,6 +84,7 @@ class DiscoverPageController extends ChangeNotifier {
     final generation = _state.sectionRevealGeneration;
     if (loadedSections != null) {
       _state.sections = loadedSections;
+      _resetSectionPaging();
       _state.errorMessage = null;
       _state.visibleSectionCount = math.min(
         _initialVisibleSectionCount,
@@ -144,6 +148,7 @@ class DiscoverPageController extends ChangeNotifier {
 
     if (refreshedSections != null) {
       _state.sections = refreshedSections;
+      _resetSectionPaging();
       _state.errorMessage = null;
       _state.visibleSectionCount = revealProgressively
           ? math.min(_initialVisibleSectionCount, refreshedSections.length)
@@ -175,6 +180,82 @@ class DiscoverPageController extends ChangeNotifier {
         _scheduleRemainingSectionReveal(generation);
       }
     });
+  }
+
+  Future<void> loadMoreSection(int index) async {
+    if (index < 0 || index >= _state.sections.length) return;
+    if (_state.sectionLoadingMore.contains(index) ||
+        _state.sectionNoMore.contains(index)) {
+      return;
+    }
+
+    final section = _state.sections[index];
+    final viewMoreUrl = section.viewMoreUrl;
+    if (viewMoreUrl == null || viewMoreUrl.isEmpty) return;
+
+    final currentPage = _state.sectionPages[index] ?? 1;
+    final maxPage = section.maxPage;
+    if (maxPage != null && currentPage >= maxPage) {
+      _state.sectionNoMore.add(index);
+      return;
+    }
+
+    _state.sectionLoadingMore.add(index);
+    _notify();
+
+    final nextPage = currentPage + 1;
+    try {
+      final result = await _sourceService.loadCategoryComicsByViewMore(
+        viewMoreUrl: viewMoreUrl,
+        page: nextPage,
+      );
+      if (_disposed || index >= _state.sections.length) return;
+
+      final latest = _state.sections[index];
+      final existingIds = latest.comics
+          .map((comic) => comic.id)
+          .where((id) => id.isNotEmpty)
+          .toSet();
+      final incoming = result.comics
+          .where((comic) => comic.id.isEmpty || !existingIds.contains(comic.id))
+          .toList();
+
+      if (incoming.isEmpty) {
+        _state.sectionNoMore.add(index);
+      } else {
+        final nextSections = List<ExploreSection>.of(_state.sections);
+        nextSections[index] = latest.copyWith(
+          comics: <ExploreComic>[...latest.comics, ...incoming],
+          maxPage: result.maxPage ?? latest.maxPage,
+        );
+        _state.sections = nextSections;
+        _state.sectionPages[index] = nextPage;
+        final nextMaxPage = result.maxPage ?? latest.maxPage;
+        if (nextMaxPage != null && nextPage >= nextMaxPage) {
+          _state.sectionNoMore.add(index);
+        }
+      }
+    } catch (_) {
+      // Keep horizontal discovery passive; users can use "More" for errors.
+    } finally {
+      if (!_disposed) {
+        _state.sectionLoadingMore.remove(index);
+        _notify();
+      }
+    }
+  }
+
+  void _resetSectionPaging() {
+    _state.sectionPages.clear();
+    _state.sectionLoadingMore.clear();
+    _state.sectionNoMore.clear();
+    for (var i = 0; i < _state.sections.length; i++) {
+      _state.sectionPages[i] = 1;
+      final maxPage = _state.sections[i].maxPage;
+      if (_state.sections[i].viewMoreUrl == null || maxPage == 1) {
+        _state.sectionNoMore.add(i);
+      }
+    }
   }
 
   void _notify() {

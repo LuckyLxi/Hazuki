@@ -5,6 +5,7 @@ class ExploreSection {
     required this.title,
     required this.comics,
     this.viewMoreUrl,
+    this.maxPage,
   });
 
   final String title;
@@ -12,6 +13,22 @@ class ExploreSection {
 
   /// jm.js 专栏 viewMore 字段，如 "category:禁漫天堂@0"，可用于分页加载更多
   final String? viewMoreUrl;
+
+  final int? maxPage;
+
+  ExploreSection copyWith({
+    String? title,
+    List<ExploreComic>? comics,
+    String? viewMoreUrl,
+    int? maxPage,
+  }) {
+    return ExploreSection(
+      title: title ?? this.title,
+      comics: comics ?? this.comics,
+      viewMoreUrl: viewMoreUrl ?? this.viewMoreUrl,
+      maxPage: maxPage ?? this.maxPage,
+    );
+  }
 }
 
 class ExploreComic {

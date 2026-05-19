@@ -21,6 +21,11 @@ extension HazukiSourceServiceCategoryViewMoreCapability on HazukiSourceService {
       throw Exception('source_not_initialized');
     }
 
+    final exploreIndex = _parseExploreViewMoreIndex(viewMoreUrl);
+    if (exploreIndex != null) {
+      return const <List<CategoryRankingOption>>[];
+    }
+
     final parsed = _parseCategoryViewMoreUrl(viewMoreUrl);
     final categoryJson = jsonEncode(parsed.category);
     final paramJson = parsed.param != null ? jsonEncode(parsed.param) : 'null';
@@ -97,7 +102,6 @@ extension HazukiSourceServiceCategoryViewMoreCapability on HazukiSourceService {
       throw Exception('source_not_initialized');
     }
 
-    final parsed = _parseCategoryViewMoreUrl(viewMoreUrl);
     final normalizedPage = page < 1 ? 1 : page;
     final normalizedOrder = order.trim().isEmpty ? 'mr' : order.trim();
     final normalizedOrders = orders == null || orders.isEmpty
@@ -106,13 +110,36 @@ extension HazukiSourceServiceCategoryViewMoreCapability on HazukiSourceService {
               .map((value) => value.trim())
               .where((value) => value.isNotEmpty)
               .toList();
-    final categoryJson = jsonEncode(parsed.category);
-    final paramJson = parsed.param != null ? jsonEncode(parsed.param) : 'null';
     final optionsJson = jsonEncode(
       normalizedOrders.isEmpty ? <String>[normalizedOrder] : normalizedOrders,
     );
 
     try {
+      final exploreIndex = _parseExploreViewMoreIndex(viewMoreUrl);
+      if (exploreIndex != null) {
+        final dynamic result = engine.evaluate('''(() => {
+            const section = this.__hazuki_source.explore?.[$exploreIndex];
+            if (!section || section.type !== "multiPageComicList" || typeof section.load !== "function") {
+              return null;
+            }
+            return Promise.resolve(section.load($normalizedPage)).then((value) => ({
+              title: section.title ?? "__untitled_section__",
+              ...(value ?? {})
+            }));
+          })()''', name: 'source_explore_view_more_load.js');
+
+        final dynamic resolved = await facade.js.resolve(result);
+        if (resolved is! Map) {
+          return const CategoryComicsResult(comics: [], maxPage: null);
+        }
+        return _parseCategoryComicsResult(Map<String, dynamic>.from(resolved));
+      }
+
+      final parsed = _parseCategoryViewMoreUrl(viewMoreUrl);
+      final categoryJson = jsonEncode(parsed.category);
+      final paramJson = parsed.param != null
+          ? jsonEncode(parsed.param)
+          : 'null';
       final dynamic result = engine.evaluate(
         'this.__hazuki_source.categoryComics.load($categoryJson, $paramJson, $optionsJson, $normalizedPage)',
         name: 'source_category_view_more_load.js',
@@ -130,5 +157,12 @@ extension HazukiSourceServiceCategoryViewMoreCapability on HazukiSourceService {
     } catch (e) {
       rethrow;
     }
+  }
+
+  int? _parseExploreViewMoreIndex(String rawUrl) {
+    final raw = rawUrl.trim();
+    if (!raw.startsWith('explore:')) return null;
+    final index = int.tryParse(raw.substring('explore:'.length));
+    return index == null || index < 0 ? null : index;
   }
 }

@@ -158,10 +158,20 @@ Promise.all(
             map['title']?.toString() ?? '__untitled_section__',
           ),
           comics: comics,
+          viewMoreUrl: 'explore:${sections.length}',
+          maxPage: _parseSourcePageCount(map['maxPage']),
         ),
       );
     }
     return sections;
+  }
+
+  int? _parseSourcePageCount(dynamic value) {
+    return switch (value) {
+      int value => value,
+      num value => value.toInt(),
+      _ => int.tryParse(value?.toString() ?? ''),
+    };
   }
 
   List<ExploreComic> _parseExploreComics(List list) {
