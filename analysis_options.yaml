@@ -14,6 +14,7 @@ analyzer:
     - third_party/flutter_qjs/example/**
     - third_party/flutter_qjs/lib/**
     - third_party/flutter_qjs/test/**
+    - third_party/pub_overrides/**
 
 linter:
   # The lint rules applied to this project can be customized in the

@@ -72,6 +72,18 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
 
+dependency_overrides:
+  device_info_plus:
+    path: third_party/pub_overrides/device_info_plus
+  dynamic_color:
+    path: third_party/pub_overrides/dynamic_color
+  file_selector_android:
+    path: third_party/pub_overrides/file_selector_android
+  package_info_plus:
+    path: third_party/pub_overrides/package_info_plus
+  shared_preferences_android:
+    path: third_party/pub_overrides/shared_preferences_android
+
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
