@@ -146,6 +146,8 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
                         _snapshot.autoSoftwareUpdateCheckEnabled,
                     discoverDailyRecommendationEnabled:
                         _snapshot.discoverDailyRecommendationEnabled,
+                    showAutoCheckInSetting:
+                        _sourceService.isActiveDailyCheckInSource,
                     showJmExclusiveSettings: _sourceService.isActiveJmSource,
                     useSystemTitleBar: _snapshot.useSystemTitleBar,
                     mangaDownloadsRootPath: _snapshot.mangaDownloadsRootPath,

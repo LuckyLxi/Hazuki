@@ -614,6 +614,9 @@ class HazukiSourceService extends ChangeNotifier {
   bool get isActiveJmSource => isHazukiJmSourceKey(_activeSourceKey);
   bool get isActiveCopyMangaSource =>
       isHazukiCopyMangaSourceKey(_activeSourceKey);
+  bool get isActiveDailyCheckInSource =>
+      isHazukiJmSourceKey(_activeSourceKey) ||
+      isHazukiPicacgSourceKey(_activeSourceKey);
   bool get isInitialized => _engine != null && _sourceMeta != null;
   bool get softwareLogCaptureEnabled => _softwareLogCaptureEnabled;
 

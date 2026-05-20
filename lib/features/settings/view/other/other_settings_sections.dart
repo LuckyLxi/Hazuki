@@ -8,6 +8,7 @@ class OtherSettingsGeneralSection extends StatelessWidget {
     required this.autoSourceUpdateCheckEnabled,
     required this.autoSoftwareUpdateCheckEnabled,
     required this.discoverDailyRecommendationEnabled,
+    required this.showAutoCheckInSetting,
     required this.showJmExclusiveSettings,
     required this.useSystemTitleBar,
     required this.mangaDownloadsRootPath,
@@ -25,6 +26,7 @@ class OtherSettingsGeneralSection extends StatelessWidget {
   final bool autoSourceUpdateCheckEnabled;
   final bool autoSoftwareUpdateCheckEnabled;
   final bool discoverDailyRecommendationEnabled;
+  final bool showAutoCheckInSetting;
   final bool showJmExclusiveSettings;
   final bool useSystemTitleBar;
   final String mangaDownloadsRootPath;
@@ -42,7 +44,7 @@ class OtherSettingsGeneralSection extends StatelessWidget {
     final strings = AppLocalizations.of(context)!;
     return _OtherSettingsGroup(
       children: [
-        if (showJmExclusiveSettings)
+        if (showAutoCheckInSetting)
           SwitchListTile(
             secondary: const Icon(Icons.event_available_outlined),
             title: Text(strings.otherAutoCheckInTitle),
