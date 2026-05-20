@@ -20,6 +20,7 @@ import 'package:hazuki/features/reader/support/reader_page_context.dart';
 import 'package:hazuki/features/reader/support/reader_save_image_controller.dart';
 import 'package:hazuki/features/reader/support/reader_session_controller.dart';
 import 'package:hazuki/features/reader/support/reader_settings_controller.dart';
+import 'package:hazuki/features/reader/support/reader_source_image_quality_settings.dart';
 import 'package:hazuki/features/reader/support/reader_zoom_controller.dart';
 import 'package:hazuki/features/reader/view/reader_image_views.dart';
 import 'package:hazuki/features/reader/view/reader_overlay_builders.dart';
@@ -66,8 +67,8 @@ class _ReaderPageState extends State<ReaderPage>
   static const _readerSettingsStore = ReaderSettingsStore();
   late final HazukiSourceService _sourceService = sl<HazukiSourceService>();
 
-  String _copyMangaImageQuality = '1500';
-  String _picacgImageQuality = 'original';
+  ReaderSourceImageQualitySnapshot _sourceImageQuality =
+      ReaderSourceImageQualitySnapshot.defaults;
 
   final ScrollController _scrollController = ScrollController();
   final PageController _pageController = PageController();
@@ -237,19 +238,7 @@ class _ReaderPageState extends State<ReaderPage>
   void initState() {
     super.initState();
     _sessionController.initialize();
-
-    final cmQuality = _sourceService
-        .loadActiveSourceSetting('image_quality')
-        ?.toString();
-    _copyMangaImageQuality = {'800', '1200', '1500'}.contains(cmQuality)
-        ? cmQuality!
-        : '1500';
-    final picaQuality = _sourceService
-        .loadActiveSourceSetting('imageQuality')
-        ?.toString();
-    _picacgImageQuality = {'original', 'medium', 'low'}.contains(picaQuality)
-        ? picaQuality!
-        : 'original';
+    _sourceImageQuality = ReaderSourceImageQualitySettings.load(_sourceService);
   }
 
   @override
@@ -435,25 +424,38 @@ class _ReaderPageState extends State<ReaderPage>
       onBrightnessChangeEnd: _runtimeState.customBrightness
           ? _settingsController.handleBrightnessChangeEnd
           : null,
-      isActiveCopyMangaSource: _sourceService.isActiveCopyMangaSource,
-      isActivePicacgSource: isHazukiPicacgSourceKey(
-        _sourceService.activeSourceKey,
-      ),
-      copyMangaImageQuality: _copyMangaImageQuality,
-      picacgImageQuality: _picacgImageQuality,
+      sourceImageQuality: _sourceImageQuality,
       onCopyMangaImageQualityChanged: (value) async {
-        if (value == null || value == _copyMangaImageQuality) return;
+        if (value == null) return;
+        final normalized =
+            ReaderSourceImageQualitySettings.normalizeCopyMangaImageQuality(
+              value,
+            );
+        if (normalized == _sourceImageQuality.copyMangaImageQuality) return;
         setState(() {
-          _copyMangaImageQuality = value;
+          _sourceImageQuality = _sourceImageQuality.copyWith(
+            copyMangaImageQuality: normalized,
+          );
         });
-        await _sourceService.updateActiveSourceSetting('image_quality', value);
+        await ReaderSourceImageQualitySettings.updateCopyMangaImageQuality(
+          _sourceService,
+          normalized,
+        );
       },
       onPicacgImageQualityChanged: (value) async {
-        if (value == null || value == _picacgImageQuality) return;
+        if (value == null) return;
+        final normalized =
+            ReaderSourceImageQualitySettings.normalizePicacgImageQuality(value);
+        if (normalized == _sourceImageQuality.picacgImageQuality) return;
         setState(() {
-          _picacgImageQuality = value;
+          _sourceImageQuality = _sourceImageQuality.copyWith(
+            picacgImageQuality: normalized,
+          );
         });
-        await _sourceService.updateActiveSourceSetting('imageQuality', value);
+        await ReaderSourceImageQualitySettings.updatePicacgImageQuality(
+          _sourceService,
+          normalized,
+        );
       },
     );
   }

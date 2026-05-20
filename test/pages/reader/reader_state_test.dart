@@ -16,7 +16,9 @@ import 'package:hazuki/features/reader/support/reader_navigation_controller.dart
 import 'package:hazuki/features/reader/support/reader_page_context.dart';
 import 'package:hazuki/features/reader/support/reader_session_controller.dart';
 import 'package:hazuki/features/reader/support/reader_settings_controller.dart';
+import 'package:hazuki/features/reader/support/reader_source_image_quality_settings.dart';
 import 'package:hazuki/features/reader/support/reader_zoom_controller.dart';
+import 'package:hazuki/features/settings/state/reading_settings_controller.dart';
 import 'package:hazuki/features/reader/view/reader_overlay_layout.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
@@ -315,6 +317,79 @@ void main() {
         expect(logEvents, contains('Reader double page mode toggled'));
       },
     );
+  });
+
+  group('ReaderSourceImageQualitySettings', () {
+    test('normalizes source image quality values', () {
+      expect(
+        ReaderSourceImageQualitySettings.normalizeCopyMangaImageQuality('800'),
+        '800',
+      );
+      expect(
+        ReaderSourceImageQualitySettings.normalizeCopyMangaImageQuality('1200'),
+        '1200',
+      );
+      expect(
+        ReaderSourceImageQualitySettings.normalizeCopyMangaImageQuality('bad'),
+        '1500',
+      );
+      expect(
+        ReaderSourceImageQualitySettings.normalizePicacgImageQuality(
+          'original',
+        ),
+        'original',
+      );
+      expect(
+        ReaderSourceImageQualitySettings.normalizePicacgImageQuality('medium'),
+        'medium',
+      );
+      expect(
+        ReaderSourceImageQualitySettings.normalizePicacgImageQuality(null),
+        'original',
+      );
+    });
+  });
+
+  group('ReadingSettingsController', () {
+    test('persists reading settings to existing preference keys', () async {
+      SharedPreferences.setMockInitialValues({});
+      final controller = ReadingSettingsController(
+        sourceService: sl<HazukiSourceService>(),
+      );
+      addTearDown(controller.dispose);
+
+      await controller.loadSettings();
+      await controller.updateReaderMode(ReaderMode.rightToLeft);
+      await controller.toggleDoublePageMode(true);
+      await controller.toggleTapToTurnPage(true);
+      await controller.toggleVolumeButtonTurnPage(true);
+      await controller.toggleImmersiveMode(false);
+      await controller.toggleKeepScreenOn(false);
+      await controller.toggleCustomBrightness(true);
+      await controller.updateBrightness(1.4);
+      await controller.togglePageIndicator(true);
+      await controller.togglePinchToZoom(true);
+      await controller.toggleLongPressToSave(true);
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(
+        prefs.getString(ReaderSettingsStore.readingModeKey),
+        ReaderMode.rightToLeft.prefsValue,
+      );
+      expect(prefs.getBool(ReaderSettingsStore.doublePageModeKey), isTrue);
+      expect(prefs.getBool(ReaderSettingsStore.tapToTurnPageKey), isTrue);
+      expect(
+        prefs.getBool(ReaderSettingsStore.volumeButtonTurnPageKey),
+        isTrue,
+      );
+      expect(prefs.getBool(ReaderSettingsStore.immersiveModeKey), isFalse);
+      expect(prefs.getBool(ReaderSettingsStore.keepScreenOnKey), isFalse);
+      expect(prefs.getBool(ReaderSettingsStore.customBrightnessKey), isTrue);
+      expect(prefs.getDouble(ReaderSettingsStore.brightnessValueKey), 1.0);
+      expect(prefs.getBool(ReaderSettingsStore.pageIndicatorKey), isTrue);
+      expect(prefs.getBool(ReaderSettingsStore.pinchToZoomKey), isTrue);
+      expect(prefs.getBool(ReaderSettingsStore.longPressToSaveKey), isTrue);
+    });
   });
 
   group('ReaderPageContext', () {

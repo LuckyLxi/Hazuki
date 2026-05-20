@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import 'package:hazuki/features/reader/reader.dart';
 import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
+import 'package:hazuki/features/reader/support/reader_source_image_quality_settings.dart';
 import 'package:hazuki/features/reader/view/reader_overlay_controls.dart';
 import 'package:hazuki/features/reader/view/reader_settings_drawer_content.dart';
 import 'package:hazuki/l10n/l10n.dart';
@@ -41,10 +42,7 @@ Widget buildReaderSettingsDrawer({
   required ValueChanged<bool> onCustomBrightnessChanged,
   required ValueChanged<double>? onBrightnessChanged,
   required ValueChanged<double>? onBrightnessChangeEnd,
-  required bool isActiveCopyMangaSource,
-  required bool isActivePicacgSource,
-  required String copyMangaImageQuality,
-  required String picacgImageQuality,
+  required ReaderSourceImageQualitySnapshot sourceImageQuality,
   required ValueChanged<String?> onCopyMangaImageQualityChanged,
   required ValueChanged<String?> onPicacgImageQualityChanged,
 }) {
@@ -80,10 +78,7 @@ Widget buildReaderSettingsDrawer({
             onCustomBrightnessChanged: onCustomBrightnessChanged,
             onBrightnessChanged: onBrightnessChanged,
             onBrightnessChangeEnd: onBrightnessChangeEnd,
-            isActiveCopyMangaSource: isActiveCopyMangaSource,
-            isActivePicacgSource: isActivePicacgSource,
-            copyMangaImageQuality: copyMangaImageQuality,
-            picacgImageQuality: picacgImageQuality,
+            sourceImageQuality: sourceImageQuality,
             onCopyMangaImageQualityChanged: onCopyMangaImageQualityChanged,
             onPicacgImageQualityChanged: onPicacgImageQualityChanged,
             onClose: () => Navigator.of(drawerContext).pop(),

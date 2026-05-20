@@ -1,10 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+
 import 'package:hazuki/app/service_locator.dart';
-import 'package:hazuki/features/reader/reader.dart';
-import 'package:hazuki/features/reader/state/reader_settings_store.dart';
+import 'package:hazuki/features/reader/state/reader_mode.dart';
+import 'package:hazuki/features/reader/view/reader_settings_content.dart';
+import 'package:hazuki/features/settings/state/reading_settings_controller.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
+
 import 'settings_group.dart';
 
 class ReadingSettingsPage extends StatefulWidget {
@@ -15,166 +20,25 @@ class ReadingSettingsPage extends StatefulWidget {
 }
 
 class _ReadingSettingsPageState extends State<ReadingSettingsPage> {
-  static const _readerSettingsStore = ReaderSettingsStore();
-  late final HazukiSourceService _sourceService = sl<HazukiSourceService>();
-
-  ReaderMode _readerMode = ReaderSettingsStore.defaultReaderMode;
-  bool _doublePageMode = ReaderSettingsStore.defaultDoublePageMode;
-  bool _tapToTurnPage = ReaderSettingsStore.defaultTapToTurnPage;
-  bool _volumeButtonTurnPage = ReaderSettingsStore.defaultVolumeButtonTurnPage;
-  bool _immersiveMode = ReaderSettingsStore.defaultImmersiveMode;
-  bool _keepScreenOn = ReaderSettingsStore.defaultKeepScreenOn;
-  bool _customBrightness = ReaderSettingsStore.defaultCustomBrightness;
-  double _brightnessValue = ReaderSettingsStore.defaultBrightnessValue;
-  bool _pageIndicator = ReaderSettingsStore.defaultPageIndicator;
-  bool _pinchToZoom = ReaderSettingsStore.defaultPinchToZoom;
-  bool _longPressToSave = ReaderSettingsStore.defaultLongPressToSave;
-  String _copyMangaImageQuality = '1500';
-  String _picacgImageQuality = 'original';
+  late final ReadingSettingsController _controller = ReadingSettingsController(
+    sourceService: sl<HazukiSourceService>(),
+  );
 
   @override
   void initState() {
     super.initState();
-    _loadSettings();
+    unawaited(_controller.loadSettings());
   }
 
-  Future<void> _loadSettings() async {
-    final settings = await _readerSettingsStore.load();
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _readerMode = settings.readerMode;
-      _doublePageMode = settings.doublePageMode;
-      _tapToTurnPage = settings.tapToTurnPage;
-      _volumeButtonTurnPage = settings.volumeButtonTurnPage;
-      _immersiveMode = settings.immersiveMode;
-      _keepScreenOn = settings.keepScreenOn;
-      _customBrightness = settings.customBrightness;
-      _brightnessValue = settings.brightnessValue;
-      _pageIndicator = settings.pageIndicator;
-      _pinchToZoom = settings.pinchToZoom;
-      _longPressToSave = settings.longPressToSave;
-
-      final cmQuality = _sourceService
-          .loadActiveSourceSetting('image_quality')
-          ?.toString();
-      _copyMangaImageQuality = {'800', '1200', '1500'}.contains(cmQuality)
-          ? cmQuality!
-          : '1500';
-      final picaQuality = _sourceService
-          .loadActiveSourceSetting('imageQuality')
-          ?.toString();
-      _picacgImageQuality = {'original', 'medium', 'low'}.contains(picaQuality)
-          ? picaQuality!
-          : 'original';
-    });
-  }
-
-  Future<void> _updateReaderMode(ReaderMode? value) async {
-    if (value == null) {
-      return;
-    }
-    setState(() {
-      _readerMode = value;
-    });
-    await _readerSettingsStore.saveReaderMode(value);
-  }
-
-  Future<void> _toggleTapToTurnPage(bool value) async {
-    setState(() => _tapToTurnPage = value);
-    await _readerSettingsStore.saveTapToTurnPage(value);
-  }
-
-  Future<void> _toggleDoublePageMode(bool value) async {
-    setState(() => _doublePageMode = value);
-    await _readerSettingsStore.saveDoublePageMode(value);
-  }
-
-  Future<void> _toggleVolumeButtonTurnPage(bool value) async {
-    setState(() => _volumeButtonTurnPage = value);
-    await _readerSettingsStore.saveVolumeButtonTurnPage(value);
-  }
-
-  Future<void> _toggleImmersiveMode(bool value) async {
-    setState(() => _immersiveMode = value);
-    await _readerSettingsStore.saveImmersiveMode(value);
-  }
-
-  Future<void> _toggleKeepScreenOn(bool value) async {
-    setState(() => _keepScreenOn = value);
-    await _readerSettingsStore.saveKeepScreenOn(value);
-  }
-
-  Future<void> _toggleCustomBrightness(bool value) async {
-    setState(() => _customBrightness = value);
-    await _readerSettingsStore.saveCustomBrightness(value);
-  }
-
-  Future<void> _updateBrightness(double value) async {
-    final normalized = ReaderSettingsStore.normalizeBrightnessValue(value);
-    setState(() => _brightnessValue = normalized);
-    await _readerSettingsStore.saveBrightnessValue(normalized);
-  }
-
-  Future<void> _togglePageIndicator(bool value) async {
-    setState(() => _pageIndicator = value);
-    await _readerSettingsStore.savePageIndicator(value);
-  }
-
-  Future<void> _togglePinchToZoom(bool value) async {
-    setState(() => _pinchToZoom = value);
-    await _readerSettingsStore.savePinchToZoom(value);
-  }
-
-  Future<void> _toggleLongPressToSave(bool value) async {
-    setState(() => _longPressToSave = value);
-    await _readerSettingsStore.saveLongPressToSave(value);
-  }
-
-  Future<void> _updateCopyMangaImageQuality(String? value) async {
-    if (value == null || value == _copyMangaImageQuality) return;
-    setState(() {
-      _copyMangaImageQuality = value;
-    });
-    await _sourceService.updateActiveSourceSetting('image_quality', value);
-  }
-
-  Future<void> _updatePicacgImageQuality(String? value) async {
-    if (value == null || value == _picacgImageQuality) return;
-    setState(() {
-      _picacgImageQuality = value;
-    });
-    await _sourceService.updateActiveSourceSetting('imageQuality', value);
-  }
-
-  Widget _buildGroup(BuildContext context, {required List<Widget> children}) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.4),
-        ),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: children,
-      ),
-    );
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final strings = AppLocalizations.of(context)!;
-    final brightnessText = (_brightnessValue * 100).round().toString();
-    final sliderActiveColor = Theme.of(context).colorScheme.primary;
-    final sliderInactiveColor = Theme.of(
-      context,
-    ).colorScheme.onSurface.withValues(alpha: 0.24);
 
     return Scaffold(
       appBar: hazukiFrostedAppBar(
@@ -182,208 +46,45 @@ class _ReadingSettingsPageState extends State<ReadingSettingsPage> {
         title: Text(strings.readingSettingsTitle),
       ),
       body: HazukiSettingsPageBody(
-        child: ListView(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          physics: const AlwaysScrollableScrollPhysics(),
-          children: [
-            _buildGroup(
-              context,
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.chrome_reader_mode_outlined),
-                  title: Text(strings.readingModeTitle),
-                  subtitle: Text(strings.readingModeSubtitle),
-                  trailing: DropdownButtonHideUnderline(
-                    child: DropdownButton<ReaderMode>(
-                      value: _readerMode,
-                      borderRadius: BorderRadius.circular(18),
-                      onChanged: _updateReaderMode,
-                      items: [
-                        DropdownMenuItem(
-                          value: ReaderMode.topToBottom,
-                          child: Text(strings.readingModeTopToBottom),
-                        ),
-                        DropdownMenuItem(
-                          value: ReaderMode.rightToLeft,
-                          child: Text(strings.readingModeRightToLeft),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                SwitchListTile(
-                  secondary: const Icon(Icons.auto_stories_outlined),
-                  title: Text(strings.readingDoublePageModeTitle),
-                  subtitle: Text(strings.readingDoublePageModeSubtitle),
-                  value: _doublePageMode,
-                  onChanged: _toggleDoublePageMode,
-                ),
-                SwitchListTile(
-                  secondary: const Icon(Icons.touch_app_outlined),
-                  title: Text(strings.readingTapToTurnPageTitle),
-                  subtitle: Text(strings.readingTapToTurnPageSubtitle),
-                  value: _tapToTurnPage,
-                  onChanged: _readerMode == ReaderMode.rightToLeft
-                      ? _toggleTapToTurnPage
-                      : null,
-                ),
-                SwitchListTile(
-                  secondary: const Icon(Icons.volume_up_outlined),
-                  title: Text(strings.readingVolumeButtonTurnPageTitle),
-                  subtitle: Text(strings.readingVolumeButtonTurnPageSubtitle),
-                  value: _volumeButtonTurnPage,
-                  onChanged: _toggleVolumeButtonTurnPage,
-                ),
-                SwitchListTile(
-                  secondary: const Icon(Icons.zoom_in_outlined),
-                  title: Text(strings.readingPinchToZoomTitle),
-                  subtitle: Text(strings.readingPinchToZoomSubtitle),
-                  value: _pinchToZoom,
-                  onChanged: _togglePinchToZoom,
-                ),
-                SwitchListTile(
-                  secondary: const Icon(Icons.save_alt_outlined),
-                  title: Text(strings.readingLongPressSaveTitle),
-                  subtitle: Text(strings.readingLongPressSaveSubtitle),
-                  value: _longPressToSave,
-                  onChanged: _toggleLongPressToSave,
-                ),
-              ],
-            ),
-            _buildGroup(
-              context,
-              children: [
-                SwitchListTile(
-                  secondary: const Icon(Icons.fullscreen_outlined),
-                  title: Text(strings.readingImmersiveModeTitle),
-                  subtitle: Text(strings.readingImmersiveModeSubtitle),
-                  value: _immersiveMode,
-                  onChanged: _toggleImmersiveMode,
-                ),
-                SwitchListTile(
-                  secondary: const Icon(Icons.screen_lock_portrait_outlined),
-                  title: Text(strings.readingKeepScreenOnTitle),
-                  subtitle: Text(strings.readingKeepScreenOnSubtitle),
-                  value: _keepScreenOn,
-                  onChanged: _toggleKeepScreenOn,
-                ),
-                SwitchListTile(
-                  secondary: const Icon(Icons.format_list_numbered_outlined),
-                  title: Text(strings.readingPageIndicatorTitle),
-                  subtitle: Text(strings.readingPageIndicatorSubtitle),
-                  value: _pageIndicator,
-                  onChanged: _togglePageIndicator,
-                ),
-                const Divider(height: 1, indent: 16, endIndent: 16),
-                SwitchListTile(
-                  secondary: const Icon(Icons.brightness_medium_outlined),
-                  title: Text(strings.readingCustomBrightnessTitle),
-                  subtitle: Text(strings.readingCustomBrightnessSubtitle),
-                  value: _customBrightness,
-                  onChanged: _toggleCustomBrightness,
-                ),
-                ListTile(
-                  leading: Icon(
-                    Icons.wb_sunny_outlined,
-                    color: _customBrightness
-                        ? Theme.of(context).colorScheme.onSurface
-                        : Theme.of(
-                            context,
-                          ).colorScheme.onSurface.withValues(alpha: 0.38),
-                  ),
-                  title: Text(
-                    strings.readingBrightnessLabel(brightnessText),
-                    style: TextStyle(
-                      color: _customBrightness
-                          ? Theme.of(context).colorScheme.onSurface
-                          : Theme.of(
-                              context,
-                            ).colorScheme.onSurface.withValues(alpha: 0.38),
-                    ),
-                  ),
-                  subtitle: Slider(
-                    value: _brightnessValue,
-                    min: 0,
-                    max: 1,
-                    divisions: 100,
-                    onChanged: _customBrightness ? _updateBrightness : null,
-                    activeColor: sliderActiveColor,
-                    inactiveColor: sliderInactiveColor,
-                  ),
-                ),
-              ],
-            ),
-            if (_sourceService.isActiveCopyMangaSource)
-              _buildGroup(
-                context,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-                    child: DropdownButtonFormField<String>(
-                      initialValue: _copyMangaImageQuality,
-                      decoration: InputDecoration(
-                        border: const OutlineInputBorder(),
-                        labelText: strings.otherCopyMangaImageQualityTitle,
-                        helperText: strings.otherCopyMangaImageQualitySubtitle,
-                        isDense: true,
-                      ),
-                      items: [
-                        DropdownMenuItem<String>(
-                          value: '800',
-                          child: Text(strings.otherCopyMangaImageQualityLow),
-                        ),
-                        DropdownMenuItem<String>(
-                          value: '1200',
-                          child: Text(strings.otherCopyMangaImageQualityMedium),
-                        ),
-                        DropdownMenuItem<String>(
-                          value: '1500',
-                          child: Text(strings.otherCopyMangaImageQualityHigh),
-                        ),
-                      ],
-                      onChanged: _updateCopyMangaImageQuality,
-                    ),
-                  ),
-                ],
-              ),
-            if (isHazukiPicacgSourceKey(_sourceService.activeSourceKey))
-              _buildGroup(
-                context,
-                children: [
-                  ListTile(
-                    leading: const Icon(Icons.photo_size_select_large_outlined),
-                    title: Text(strings.linePicacgImageQualityTitle),
-                    subtitle: Text(strings.linePicacgImageQualitySubtitle),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-                    child: DropdownButtonFormField<String>(
-                      initialValue: _picacgImageQuality,
-                      decoration: InputDecoration(
-                        border: const OutlineInputBorder(),
-                        labelText: strings.linePicacgImageQualityLabel,
-                        isDense: true,
-                      ),
-                      items: [
-                        DropdownMenuItem<String>(
-                          value: 'original',
-                          child: Text(strings.linePicacgImageQualityOriginal),
-                        ),
-                        DropdownMenuItem<String>(
-                          value: 'medium',
-                          child: Text(strings.linePicacgImageQualityMedium),
-                        ),
-                        DropdownMenuItem<String>(
-                          value: 'low',
-                          child: Text(strings.linePicacgImageQualityLow),
-                        ),
-                      ],
-                      onChanged: _updatePicacgImageQuality,
-                    ),
-                  ),
-                ],
-              ),
-          ],
+        child: ListenableBuilder(
+          listenable: _controller,
+          builder: (context, _) {
+            return ReaderSettingsContent(
+              surface: ReaderSettingsSurface.page,
+              readerMode: _controller.readerMode,
+              doublePageMode: _controller.doublePageMode,
+              tapToTurnPage: _controller.tapToTurnPage,
+              volumeButtonTurnPage: _controller.volumeButtonTurnPage,
+              pinchToZoom: _controller.pinchToZoom,
+              longPressToSave: _controller.longPressToSave,
+              immersiveMode: _controller.immersiveMode,
+              keepScreenOn: _controller.keepScreenOn,
+              pageIndicator: _controller.pageIndicator,
+              customBrightness: _controller.customBrightness,
+              brightnessValue: _controller.brightnessValue,
+              sourceImageQuality: _controller.sourceImageQuality,
+              onReaderModeChanged: _controller.updateReaderMode,
+              onDoublePageModeChanged: _controller.toggleDoublePageMode,
+              onTapToTurnPageChanged:
+                  _controller.readerMode == ReaderMode.rightToLeft
+                  ? _controller.toggleTapToTurnPage
+                  : null,
+              onVolumeButtonTurnPageChanged:
+                  _controller.toggleVolumeButtonTurnPage,
+              onPinchToZoomChanged: _controller.togglePinchToZoom,
+              onLongPressToSaveChanged: _controller.toggleLongPressToSave,
+              onImmersiveModeChanged: _controller.toggleImmersiveMode,
+              onKeepScreenOnChanged: _controller.toggleKeepScreenOn,
+              onPageIndicatorChanged: _controller.togglePageIndicator,
+              onCustomBrightnessChanged: _controller.toggleCustomBrightness,
+              onBrightnessChanged: _controller.customBrightness
+                  ? _controller.updateBrightness
+                  : null,
+              onCopyMangaImageQualityChanged:
+                  _controller.updateCopyMangaImageQuality,
+              onPicacgImageQualityChanged: _controller.updatePicacgImageQuality,
+            );
+          },
         ),
       ),
     );
