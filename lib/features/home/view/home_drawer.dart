@@ -500,22 +500,9 @@ class HomeDrawerContent extends StatelessWidget {
         : username;
     final resolvedAvatarUrl = (avatarUrl ?? '').trim();
 
-    final topScrim = isDark
-        ? Colors.white.withValues(alpha: 0.04)
-        : Colors.white.withValues(alpha: 0.22);
-    final midScrim = isDark
-        ? colorScheme.surface.withValues(alpha: 0.10)
-        : Colors.white.withValues(alpha: 0.12);
-    final bottomScrim = isDark
-        ? drawerBackground.withValues(alpha: 0.55)
-        : colorScheme.surface.withValues(alpha: 0.7);
     final darkModeDim = isDark
-        ? Colors.black.withValues(alpha: 0.30)
+        ? Colors.black.withValues(alpha: 0.18)
         : Colors.transparent;
-    final highlightColor = isDark
-        ? Colors.white.withValues(alpha: 0.12)
-        : Colors.white.withValues(alpha: 0.34);
-    final transparentHighlightColor = highlightColor.withValues(alpha: 0);
     final outlineColor = isDark
         ? Colors.white.withValues(alpha: 0.09)
         : Colors.white.withValues(alpha: 0.42);
@@ -530,20 +517,35 @@ class HomeDrawerContent extends StatelessWidget {
               children: [
                 Positioned.fill(child: ColoredBox(color: drawerBackground)),
                 Positioned.fill(
-                  child: ClipRect(
-                    child: ImageFiltered(
-                      imageFilter: ImageFilter.blur(sigmaX: 9, sigmaY: 9),
-                      child: Transform.scale(
-                        scale: 1.08,
-                        child: profileLoading || resolvedAvatarUrl.isEmpty
-                            ? ColoredBox(
-                                color: colorScheme.surfaceContainerHigh,
-                              )
-                            : HazukiCachedImage(
-                                url: resolvedAvatarUrl,
-                                fit: BoxFit.cover,
-                                ignoreNoImageMode: true,
-                              ),
+                  child: ShaderMask(
+                    blendMode: BlendMode.dstIn,
+                    shaderCallback: (bounds) {
+                      return const LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black,
+                          Colors.black,
+                          Colors.transparent,
+                        ],
+                        stops: [0.0, 0.74, 1.0],
+                      ).createShader(bounds);
+                    },
+                    child: ClipRect(
+                      child: ImageFiltered(
+                        imageFilter: ImageFilter.blur(sigmaX: 9, sigmaY: 9),
+                        child: Transform.scale(
+                          scale: 1.08,
+                          child: profileLoading || resolvedAvatarUrl.isEmpty
+                              ? ColoredBox(
+                                  color: colorScheme.surfaceContainerHigh,
+                                )
+                              : HazukiCachedImage(
+                                  url: resolvedAvatarUrl,
+                                  fit: BoxFit.cover,
+                                  ignoreNoImageMode: true,
+                                ),
+                        ),
                       ),
                     ),
                   ),
@@ -564,24 +566,14 @@ class HomeDrawerContent extends StatelessWidget {
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-                          topScrim,
-                          midScrim,
-                          bottomScrim.withValues(alpha: isDark ? 0.58 : 0.8),
-                          bottomScrim,
+                          Colors.transparent,
+                          Colors.transparent,
+                          drawerBackground.withValues(
+                            alpha: isDark ? 0.48 : 0.42,
+                          ),
+                          drawerBackground,
                         ],
-                        stops: const [0.0, 0.3, 0.76, 1.0],
-                      ),
-                    ),
-                  ),
-                ),
-                Positioned.fill(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: RadialGradient(
-                        center: const Alignment(-0.78, -0.92),
-                        radius: 1.18,
-                        colors: [highlightColor, transparentHighlightColor],
-                        stops: const [0.0, 0.62],
+                        stops: const [0.0, 0.68, 0.88, 1.0],
                       ),
                     ),
                   ),
@@ -605,16 +597,16 @@ class HomeDrawerContent extends StatelessWidget {
                           colors: [
                             Colors.transparent,
                             Colors.transparent,
-                            drawerBackground.withValues(alpha: 0.06),
+                            drawerBackground.withValues(alpha: 0.04),
                             drawerBackground.withValues(
-                              alpha: isDark ? 0.22 : 0.18,
+                              alpha: isDark ? 0.18 : 0.14,
                             ),
                             drawerBackground.withValues(
-                              alpha: isDark ? 0.52 : 0.46,
+                              alpha: isDark ? 0.48 : 0.42,
                             ),
                             drawerBackground,
                           ],
-                          stops: const [0.0, 0.48, 0.64, 0.78, 0.90, 1.0],
+                          stops: const [0.0, 0.62, 0.74, 0.84, 0.94, 1.0],
                         ),
                       ),
                     ),

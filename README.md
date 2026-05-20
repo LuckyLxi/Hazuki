@@ -22,7 +22,7 @@
 ## 致谢
 
 - [Venera](https://github.com/venera-app/venera) — 参考了部分实现
-- [venera-configs](https://github.com/venera-app/venera-configs) — 使用了 JMComic 漫画源脚本
+- [venera-configs](https://github.com/venera-app/venera-configs) — 使用了漫画源脚本
 - [Animeko](https://github.com/open-ani/animeko) — 参考了部分 UI 设计
 - [flutter_qjs](https://github.com/ekibun/flutter_qjs)
 
