@@ -453,6 +453,12 @@
   "comicDetailSaveImage": "保存图片",
   "comicDetailRemindLaterToday": "今日不再提醒",
   "sourceUpdateAvailableTitle": "漫画源有更新",
+  "sourceUpdateDiscoveredVersion": "发现新版本 {version}",
+  "@sourceUpdateDiscoveredVersion": {
+    "placeholders": {
+      "version": {}
+    }
+  },
   "sourceUpdateLocalVersion": "本地漫画源版本号：{version}",
   "@sourceUpdateLocalVersion": {
     "placeholders": {

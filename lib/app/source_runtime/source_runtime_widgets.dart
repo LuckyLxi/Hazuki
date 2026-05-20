@@ -38,10 +38,12 @@ class _SourceUpdateDialogCardState extends State<SourceUpdateDialogCard> {
     final restartTitle = strings.sourceUpdateRestartTitle;
     final restartMessage = strings.sourceUpdateRestartMessage;
     final localVersionLabel = strings.sourceUpdateLocalLabel;
-    final remoteVersionLabel = strings.sourceUpdateCloudLabel;
 
     const dialogMaxWidth = 360.0;
-    final availableMessage = strings.sourceUpdateAvailableMessage;
+    final availableTitle = strings.sourceUpdateDiscoveredVersion(
+      widget.check.remoteVersion,
+    );
+    final sourceName = widget.check.sourceName;
     final downloadingMessage = strings.sourceUpdateDownloadingMessage;
     final restartHint = strings.sourceUpdateRestartHint;
 
@@ -97,12 +99,9 @@ class _SourceUpdateDialogCardState extends State<SourceUpdateDialogCard> {
                     colorScheme: colorScheme,
                     textTheme: textTheme,
                     icon: Icons.system_update_alt_rounded,
-                    title: strings.sourceUpdateAvailableTitle,
-                    subtitle: availableMessage,
+                    title: availableTitle,
+                    subtitle: sourceName,
                     accent: colorScheme.primary,
-                    badgeText: strings.sourceUpdateRemoteVersion(
-                      widget.check.remoteVersion,
-                    ),
                   ),
                   const SizedBox(height: 18),
                   buildSourceUpdatePanel(
@@ -117,23 +116,6 @@ class _SourceUpdateDialogCardState extends State<SourceUpdateDialogCard> {
                           accent: colorScheme.onSurfaceVariant,
                           label: localVersionLabel,
                           value: widget.check.localVersion,
-                        ),
-                        const SizedBox(height: 12),
-                        Divider(
-                          height: 1,
-                          thickness: 1,
-                          color: colorScheme.outlineVariant.withValues(
-                            alpha: 0.32,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        buildSourceUpdateVersionRow(
-                          colorScheme: colorScheme,
-                          textTheme: textTheme,
-                          icon: Icons.cloud_download_outlined,
-                          accent: colorScheme.primary,
-                          label: remoteVersionLabel,
-                          value: widget.check.remoteVersion,
                         ),
                       ],
                     ),
@@ -220,7 +202,7 @@ class _SourceUpdateDialogCardState extends State<SourceUpdateDialogCard> {
                           textTheme: textTheme,
                           icon: Icons.cloud_done_rounded,
                           accent: colorScheme.tertiary,
-                          label: remoteVersionLabel,
+                          label: strings.sourceUpdateCloudLabel,
                           value: widget.check.remoteVersion,
                         ),
                         const SizedBox(height: 12),

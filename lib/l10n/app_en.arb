@@ -453,6 +453,12 @@
   "comicDetailSaveImage": "Save image",
   "comicDetailRemindLaterToday": "Don't remind again today",
   "sourceUpdateAvailableTitle": "Source update available",
+  "sourceUpdateDiscoveredVersion": "New version {version} found",
+  "@sourceUpdateDiscoveredVersion": {
+    "placeholders": {
+      "version": {}
+    }
+  },
   "sourceUpdateLocalVersion": "Local source version: {version}",
   "@sourceUpdateLocalVersion": {
     "placeholders": {

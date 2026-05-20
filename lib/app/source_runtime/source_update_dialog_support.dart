@@ -21,7 +21,7 @@ class SourceUpdateDialogSupport {
     bool respectSkipPreference = true,
   }) async {
     final check = await sl<HazukiSourceService>()
-        .checkJmSourceVersionFromCloud();
+        .checkActiveSourceVersionFromCloud();
     if (!isMounted() || check == null || !check.hasUpdate) {
       return null;
     }
@@ -110,7 +110,9 @@ class SourceUpdateDialogSupport {
       final date = map['date']?.toString();
       final localVersion = map['localVersion']?.toString();
       final remoteVersion = map['remoteVersion']?.toString();
+      final sourceKey = map['sourceKey']?.toString();
       return date == _formatTodayKey() &&
+          sourceKey == check.sourceKey &&
           localVersion == check.localVersion &&
           remoteVersion == check.remoteVersion;
     } catch (_) {
@@ -121,6 +123,7 @@ class SourceUpdateDialogSupport {
   String _buildSourceUpdateSkipPayload(SourceVersionCheckResult check) {
     return jsonEncode({
       'date': _formatTodayKey(),
+      'sourceKey': check.sourceKey,
       'localVersion': check.localVersion,
       'remoteVersion': check.remoteVersion,
     });

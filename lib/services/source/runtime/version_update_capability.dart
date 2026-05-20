@@ -1,13 +1,22 @@
 part of '../../hazuki_source_service.dart';
 
 extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
+  Future<SourceVersionCheckResult?> checkActiveSourceVersionFromCloud() async {
+    return checkJmSourceVersionFromCloud();
+  }
+
   Future<SourceVersionCheckResult?> checkJmSourceVersionFromCloud() async {
     final facade = this.facade;
+    final sourceKey = activeSourceKey;
+    final sourceDefinition = _definitionForSourceKey(sourceKey);
+    final sourceName = _sourceUpdateDisplayName(sourceDefinition);
     final sourceDir = await _getSourceStorageDirectory();
     final jmFile = File('${sourceDir.path}/source.js');
     if (!await jmFile.exists()) {
       facade.lastSourceVersionDebugInfo = {
         'checkedAt': DateTime.now().toIso8601String(),
+        'sourceKey': sourceKey,
+        'sourceName': sourceName,
         'sourceDir': sourceDir.path,
         'localJmExists': false,
         'outcome': 'local_jm_missing',
@@ -16,11 +25,17 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
     }
 
     final localVersion = await _readJmVersionFromFile(jmFile);
-    final remoteVersionDirect = await _resolveRemoteJmVersion();
+    final remoteVersionDirect = await _resolveRemoteJmVersion(
+      sourceKey: sourceKey,
+      sourceName: sourceName,
+      sourceDefinition: sourceDefinition,
+    );
     if (remoteVersionDirect != null && remoteVersionDirect.isNotEmpty) {
       final hasUpdate = _isVersionGreater(remoteVersionDirect, localVersion);
       facade.lastSourceVersionDebugInfo = {
         'checkedAt': DateTime.now().toIso8601String(),
+        'sourceKey': sourceKey,
+        'sourceName': sourceName,
         'sourceDir': sourceDir.path,
         'localJmExists': true,
         'localVersion': localVersion,
@@ -31,6 +46,8 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
         'outcome': hasUpdate ? 'update_available' : 'no_update',
       };
       return SourceVersionCheckResult(
+        sourceKey: sourceKey,
+        sourceName: sourceName,
         localVersion: localVersion,
         remoteVersion: remoteVersionDirect,
         hasUpdate: hasUpdate,
@@ -41,6 +58,8 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
     if (indexRaw == null || indexRaw.trim().isEmpty) {
       facade.lastSourceVersionDebugInfo = {
         'checkedAt': DateTime.now().toIso8601String(),
+        'sourceKey': sourceKey,
+        'sourceName': sourceName,
         'sourceDir': sourceDir.path,
         'localJmExists': true,
         'localVersion': localVersion,
@@ -55,6 +74,8 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
     } catch (_) {
       facade.lastSourceVersionDebugInfo = {
         'checkedAt': DateTime.now().toIso8601String(),
+        'sourceKey': sourceKey,
+        'sourceName': sourceName,
         'sourceDir': sourceDir.path,
         'localJmExists': true,
         'localVersion': localVersion,
@@ -65,6 +86,8 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
     if (decoded is! List) {
       facade.lastSourceVersionDebugInfo = {
         'checkedAt': DateTime.now().toIso8601String(),
+        'sourceKey': sourceKey,
+        'sourceName': sourceName,
         'sourceDir': sourceDir.path,
         'localJmExists': true,
         'localVersion': localVersion,
@@ -79,7 +102,7 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
         continue;
       }
       final map = Map<String, dynamic>.from(item);
-      if (!_definitionForSourceKey(activeSourceKey).matchesIndexEntry(map)) {
+      if (!sourceDefinition.matchesIndexEntry(map)) {
         continue;
       }
       remoteVersion = map['version']?.toString().trim();
@@ -89,6 +112,8 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
     if (remoteVersion == null || remoteVersion.isEmpty) {
       facade.lastSourceVersionDebugInfo = {
         'checkedAt': DateTime.now().toIso8601String(),
+        'sourceKey': sourceKey,
+        'sourceName': sourceName,
         'sourceDir': sourceDir.path,
         'localJmExists': true,
         'localVersion': localVersion,
@@ -100,6 +125,8 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
     final hasUpdate = _isVersionGreater(remoteVersion, localVersion);
     facade.lastSourceVersionDebugInfo = {
       'checkedAt': DateTime.now().toIso8601String(),
+      'sourceKey': sourceKey,
+      'sourceName': sourceName,
       'sourceDir': sourceDir.path,
       'localJmExists': true,
       'localVersion': localVersion,
@@ -110,6 +137,8 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
     };
 
     return SourceVersionCheckResult(
+      sourceKey: sourceKey,
+      sourceName: sourceName,
       localVersion: localVersion,
       remoteVersion: remoteVersion,
       hasUpdate: hasUpdate,
@@ -193,7 +222,11 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
     return _extractSourceVersion(content);
   }
 
-  Future<String?> _resolveRemoteJmVersion() async {
+  Future<String?> _resolveRemoteJmVersion({
+    required String sourceKey,
+    required String sourceName,
+    required SourceCatalogEntry sourceDefinition,
+  }) async {
     final indexRaw = await _downloadFromUrls(
       _sourceIndexUrls,
       source: 'source_version_index',
@@ -214,9 +247,7 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
               'key': key,
               'fileName': fileName,
             };
-            if (!_definitionForSourceKey(
-              activeSourceKey,
-            ).matchesIndexEntry(normalizedMap)) {
+            if (!sourceDefinition.matchesIndexEntry(normalizedMap)) {
               continue;
             }
             final version = map['version']?.toString().trim();
@@ -224,6 +255,8 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
               facade.lastSourceVersionDebugInfo = {
                 'checkedAt': DateTime.now().toIso8601String(),
                 'resolvedFrom': 'index_json',
+                'sourceKey': sourceKey,
+                'sourceName': sourceName,
                 'matchedKey': key,
                 'matchedFileName': fileName,
                 'remoteVersion': version,
@@ -236,13 +269,15 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
     }
 
     final remoteScript = await _downloadFromUrls(
-      _jmSourceUrls,
-      source: 'source_version_jm_script',
+      await _resolveSourceVersionDownloadUrls(sourceDefinition),
+      source: 'source_version_script',
     );
     if (remoteScript == null || remoteScript.trim().isEmpty) {
       facade.lastSourceVersionDebugInfo = {
         'checkedAt': DateTime.now().toIso8601String(),
         'resolvedFrom': 'failed',
+        'sourceKey': sourceKey,
+        'sourceName': sourceName,
         'outcome': 'remote_script_empty',
       };
       return null;
@@ -250,10 +285,68 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
     final version = _extractSourceVersion(remoteScript);
     facade.lastSourceVersionDebugInfo = {
       'checkedAt': DateTime.now().toIso8601String(),
-      'resolvedFrom': 'jm_script',
+      'resolvedFrom': 'source_script',
+      'sourceKey': sourceKey,
+      'sourceName': sourceName,
       'remoteVersion': version,
     };
     return version;
+  }
+
+  Future<List<String>> _resolveSourceVersionDownloadUrls(
+    SourceCatalogEntry definition,
+  ) async {
+    final directUrls = definition.directUrls
+        .map((url) => url.trim())
+        .where((url) => url.isNotEmpty)
+        .toList(growable: false);
+    if (directUrls.isNotEmpty) {
+      return directUrls;
+    }
+
+    final indexRaw = await _downloadFromUrls(
+      _sourceIndexUrls,
+      source: 'source_version_download_index',
+    );
+    if (indexRaw == null || indexRaw.trim().isEmpty) {
+      return definition.fallbackUrls();
+    }
+
+    try {
+      final decoded = jsonDecode(indexRaw);
+      if (decoded is List) {
+        for (final item in decoded) {
+          if (item is! Map) {
+            continue;
+          }
+          final map = Map<String, dynamic>.from(item);
+          if (!definition.matchesIndexEntry(map)) {
+            continue;
+          }
+          final rawUrl = map['url']?.toString().trim();
+          if (rawUrl != null && rawUrl.isNotEmpty) {
+            return [rawUrl];
+          }
+          final fileName =
+              map['fileName']?.toString().trim() ?? definition.fileName;
+          if (fileName.isNotEmpty) {
+            return [
+              'https://cdn.jsdelivr.net/gh/venera-app/venera-configs@main/$fileName',
+            ];
+          }
+        }
+      }
+    } catch (_) {}
+
+    return definition.fallbackUrls();
+  }
+
+  String _sourceUpdateDisplayName(SourceCatalogEntry definition) {
+    final metaName = sourceMeta?.name.trim() ?? '';
+    if (metaName.isNotEmpty) {
+      return metaName;
+    }
+    return definition.name;
   }
 
   String _extractSourceVersion(String script) {
@@ -283,11 +376,15 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
 
 class SourceVersionCheckResult {
   const SourceVersionCheckResult({
+    required this.sourceKey,
+    required this.sourceName,
     required this.localVersion,
     required this.remoteVersion,
     required this.hasUpdate,
   });
 
+  final String sourceKey;
+  final String sourceName;
   final String localVersion;
   final String remoteVersion;
   final bool hasUpdate;
