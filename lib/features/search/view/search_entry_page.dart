@@ -44,17 +44,17 @@ class _SearchEntryPageState extends State<SearchEntryPage>
   final SearchHistoryService _historyService = SearchHistoryService();
 
   List<String> _historyList = <String>[];
+  Animation<double>? _initialDataLoadRouteAnimation;
   bool _historyEditMode = false;
   bool _historyExpanded = false;
   bool _comicIdSearchEnhance = false;
+  bool _initialDataLoadScheduled = false;
   bool _pendingExtractedComicIdHide = false;
   String? _extractedComicId;
 
   @override
   void initState() {
     super.initState();
-    unawaited(_loadHistory());
-    unawaited(_loadComicIdSearchEnhance());
     WidgetsBinding.instance.addObserver(this);
     _sourceService.addListener(_handleSourceChanged);
     _focusCoordinator.primaryFocusNode.addListener(_handleSearchFocusChanged);
@@ -68,10 +68,16 @@ class _SearchEntryPageState extends State<SearchEntryPage>
       showKeyboard: widget.autoFocusOnOpen,
       forceShowKeyboard: true,
     );
+    _scheduleInitialDataLoadAfterRouteAnimation();
   }
 
   @override
   void dispose() {
+    final routeAnimation = _initialDataLoadRouteAnimation;
+    if (routeAnimation != null) {
+      routeAnimation.removeStatusListener(_handleInitialDataLoadRouteStatus);
+      _initialDataLoadRouteAnimation = null;
+    }
     _focusCoordinator.primaryFocusNode.removeListener(
       _handleSearchFocusChanged,
     );
@@ -95,6 +101,40 @@ class _SearchEntryPageState extends State<SearchEntryPage>
     if (wasKeyboardVisible && !_focusCoordinator.keyboardVisible) {
       _scheduleHideExtractedComicIdIfUnfocused();
     }
+  }
+
+  void _scheduleInitialDataLoadAfterRouteAnimation() {
+    if (_initialDataLoadScheduled || !mounted) {
+      return;
+    }
+    _initialDataLoadScheduled = true;
+    final animation = ModalRoute.of(context)?.animation;
+    if (animation == null || animation.isCompleted) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          unawaited(_loadInitialData());
+        }
+      });
+      return;
+    }
+    _initialDataLoadRouteAnimation = animation;
+    animation.addStatusListener(_handleInitialDataLoadRouteStatus);
+  }
+
+  void _handleInitialDataLoadRouteStatus(AnimationStatus status) {
+    if (status != AnimationStatus.completed) {
+      return;
+    }
+    final animation = _initialDataLoadRouteAnimation;
+    animation?.removeStatusListener(_handleInitialDataLoadRouteStatus);
+    _initialDataLoadRouteAnimation = null;
+    if (mounted) {
+      unawaited(_loadInitialData());
+    }
+  }
+
+  Future<void> _loadInitialData() async {
+    await Future.wait([_loadHistory(), _loadComicIdSearchEnhance()]);
   }
 
   void _handleSearchFocusChanged() {

@@ -10,7 +10,10 @@ Route<T> buildSearchEntryPageRoute<T>({required WidgetBuilder builder}) {
         begin: const Offset(1, 0),
         end: Offset.zero,
       ).chain(CurveTween(curve: Curves.easeOutCubic)).animate(animation);
-      return SlideTransition(position: offset, child: child);
+      return SlideTransition(
+        position: offset,
+        child: RepaintBoundary(child: child),
+      );
     },
   );
 }
