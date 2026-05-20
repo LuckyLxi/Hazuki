@@ -57,6 +57,7 @@ class _CommentFilterSheetState extends State<_CommentFilterSheet>
   late List<String> _userKeywords;
   final _addController = TextEditingController();
   final _addFocusNode = FocusNode();
+  String? _addKeywordError;
 
   // 关键词列表展开/收起
   bool _keywordsExpanded = false;
@@ -92,19 +93,59 @@ class _CommentFilterSheetState extends State<_CommentFilterSheet>
   }
 
   void _addKeyword() {
+    final strings = AppLocalizations.of(context)!;
     final word = _addController.text.trim();
-    if (word.isEmpty || _userKeywords.contains(word)) {
+    if (word.isEmpty) {
+      setState(() => _addKeywordError = strings.commentFilterEmptyKeywordError);
+      _addFocusNode.requestFocus();
+      return;
+    }
+    if (_userKeywords.contains(word)) {
       _addController.clear();
+      setState(() => _addKeywordError = null);
       return;
     }
     setState(() {
       _userKeywords.add(word);
       _addController.clear();
+      _addKeywordError = null;
     });
   }
 
-  void _removeKeyword(String word) {
+  void _removeKeyword(String word) async {
+    final shouldRemove = await _showRemoveKeywordDialog(word);
+    if (!mounted || shouldRemove != true) {
+      return;
+    }
     setState(() => _userKeywords.remove(word));
+  }
+
+  Future<bool?> _showRemoveKeywordDialog(String word) {
+    final strings = AppLocalizations.of(context)!;
+    return showGeneralDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+      barrierColor: Colors.black.withValues(alpha: 0.55),
+      transitionDuration: const Duration(milliseconds: 240),
+      pageBuilder: (context, animation, secondaryAnimation) {
+        return _RemoveKeywordDialog(strings: strings, keyword: word);
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        final curved = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutBack,
+          reverseCurve: Curves.easeInCubic,
+        );
+        return ScaleTransition(
+          scale: curved.drive(Tween(begin: 0.88, end: 1.0)),
+          child: FadeTransition(
+            opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+            child: child,
+          ),
+        );
+      },
+    );
   }
 
   void _showEditKeywordDialog(String word, int index) {
@@ -250,26 +291,13 @@ class _CommentFilterSheetState extends State<_CommentFilterSheet>
                             ),
                           ),
                           const SizedBox(height: 10),
-                          SegmentedButton<CommentFilterMode>(
-                            style: SegmentedButton.styleFrom(
-                              backgroundColor: colorScheme.surfaceContainer,
-                            ),
-                            segments: [
-                              ButtonSegment(
-                                value: CommentFilterMode.collapse,
-                                label: Text(strings.commentFilterModeCollapse),
-                                icon: const Icon(Icons.unfold_less_rounded),
-                              ),
-                              ButtonSegment(
-                                value: CommentFilterMode.hide,
-                                label: Text(strings.commentFilterModeHide),
-                                icon: const Icon(Icons.visibility_off_outlined),
-                              ),
-                            ],
-                            selected: {_mode},
-                            onSelectionChanged: (s) {
-                              unawaited(_setMode(s.first));
-                            },
+                          _FilterModeSlider(
+                            mode: _mode,
+                            colorScheme: colorScheme,
+                            theme: theme,
+                            collapseLabel: strings.commentFilterModeCollapse,
+                            hideLabel: strings.commentFilterModeHide,
+                            onChanged: (mode) => unawaited(_setMode(mode)),
                           ),
                           const SizedBox(height: 20),
                           // 添加关键词
@@ -288,6 +316,7 @@ class _CommentFilterSheetState extends State<_CommentFilterSheet>
                                   focusNode: _addFocusNode,
                                   decoration: InputDecoration(
                                     hintText: strings.commentFilterAddHint,
+                                    errorText: _addKeywordError,
                                     isDense: true,
                                     filled: true,
                                     fillColor: colorScheme.surfaceContainer,
@@ -310,6 +339,11 @@ class _CommentFilterSheetState extends State<_CommentFilterSheet>
                                   onSubmitted: (_) {
                                     _addKeyword();
                                     _addFocusNode.requestFocus();
+                                  },
+                                  onChanged: (_) {
+                                    if (_addKeywordError != null) {
+                                      setState(() => _addKeywordError = null);
+                                    }
                                   },
                                 ),
                               ),
@@ -386,6 +420,149 @@ class _CommentFilterSheetState extends State<_CommentFilterSheet>
                 ],
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FilterModeSlider extends StatelessWidget {
+  const _FilterModeSlider({
+    required this.mode,
+    required this.colorScheme,
+    required this.theme,
+    required this.collapseLabel,
+    required this.hideLabel,
+    required this.onChanged,
+  });
+
+  final CommentFilterMode mode;
+  final ColorScheme colorScheme;
+  final ThemeData theme;
+  final String collapseLabel;
+  final String hideLabel;
+  final ValueChanged<CommentFilterMode> onChanged;
+
+  bool get _hideSelected => mode == CommentFilterMode.hide;
+
+  @override
+  Widget build(BuildContext context) {
+    final activeTextColor = colorScheme.onSecondaryContainer;
+    final inactiveTextColor = colorScheme.onSurfaceVariant;
+
+    return SizedBox(
+      height: 48,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final itemWidth = constraints.maxWidth / 2;
+          return Material(
+            color: colorScheme.surfaceContainer,
+            borderRadius: BorderRadius.circular(14),
+            child: Stack(
+              children: [
+                AnimatedPositioned(
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.easeOutCubic,
+                  left: _hideSelected ? itemWidth : 2,
+                  top: 2,
+                  bottom: 2,
+                  width: itemWidth - 2,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: colorScheme.secondaryContainer,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: colorScheme.shadow.withValues(alpha: 0.08),
+                          blurRadius: 10,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _FilterModeSliderItem(
+                        icon: Icons.unfold_less_rounded,
+                        label: collapseLabel,
+                        selected: mode == CommentFilterMode.collapse,
+                        activeTextColor: activeTextColor,
+                        inactiveTextColor: inactiveTextColor,
+                        theme: theme,
+                        onTap: () => onChanged(CommentFilterMode.collapse),
+                      ),
+                    ),
+                    Expanded(
+                      child: _FilterModeSliderItem(
+                        icon: Icons.visibility_off_outlined,
+                        label: hideLabel,
+                        selected: mode == CommentFilterMode.hide,
+                        activeTextColor: activeTextColor,
+                        inactiveTextColor: inactiveTextColor,
+                        theme: theme,
+                        onTap: () => onChanged(CommentFilterMode.hide),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _FilterModeSliderItem extends StatelessWidget {
+  const _FilterModeSliderItem({
+    required this.icon,
+    required this.label,
+    required this.selected,
+    required this.activeTextColor,
+    required this.inactiveTextColor,
+    required this.theme,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final Color activeTextColor;
+  final Color inactiveTextColor;
+  final ThemeData theme;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = selected ? activeTextColor : inactiveTextColor;
+    return InkWell(
+      borderRadius: BorderRadius.circular(14),
+      onTap: onTap,
+      child: Center(
+        child: AnimatedDefaultTextStyle(
+          duration: const Duration(milliseconds: 160),
+          curve: Curves.easeOutCubic,
+          style: theme.textTheme.labelLarge!.copyWith(
+            color: color,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 18, color: color),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -630,6 +807,67 @@ class _EditKeywordDialog extends StatelessWidget {
                   child: Text(
                     MaterialLocalizations.of(context).saveButtonLabel,
                   ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _RemoveKeywordDialog extends StatelessWidget {
+  const _RemoveKeywordDialog({required this.strings, required this.keyword});
+
+  final AppLocalizations strings;
+  final String keyword;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return Dialog(
+      backgroundColor: colorScheme.surfaceContainerLow,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 20, 24, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              strings.commentFilterRemoveKeywordTitle,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              strings.commentFilterRemoveKeywordMessage(keyword),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 18),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: Text(
+                    MaterialLocalizations.of(context).cancelButtonLabel,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                FilledButton.tonal(
+                  onPressed: () => Navigator.pop(context, true),
+                  style: FilledButton.styleFrom(
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: Text(strings.commentFilterRemoveKeywordAction),
                 ),
               ],
             ),

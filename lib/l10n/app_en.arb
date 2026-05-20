@@ -147,9 +147,18 @@
   "commentFilterModeHide": "Hide",
   "commentFilterUserKeywordsLabel": "Custom block list",
   "commentFilterAddHint": "Type a keyword and press Enter to add",
+  "commentFilterEmptyKeywordError": "Enter a keyword before adding",
   "commentFilterNoUserKeywords": "No custom keywords yet",
   "commentFilterPreviewHint": "Tap the area above to view or edit the full list",
   "commentFilterEditKeywordTitle": "Edit keyword",
+  "commentFilterRemoveKeywordTitle": "Delete keyword",
+  "commentFilterRemoveKeywordMessage": "Delete \"{keyword}\" from the block list?",
+  "@commentFilterRemoveKeywordMessage": {
+    "placeholders": {
+      "keyword": {}
+    }
+  },
+  "commentFilterRemoveKeywordAction": "Delete",
   "commentFilterBackTooltip": "Back",
   "commentFilterKeywordListTitle": "Added keywords",
   "commentFilterCollapseKeywordList": "Collapse",

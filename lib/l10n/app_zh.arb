@@ -147,9 +147,18 @@
   "commentFilterModeHide": "隐藏",
   "commentFilterUserKeywordsLabel": "自定义屏蔽词",
   "commentFilterAddHint": "输入屏蔽词后按回车添加",
+  "commentFilterEmptyKeywordError": "请先输入关键词",
   "commentFilterNoUserKeywords": "暂无自定义屏蔽词",
   "commentFilterPreviewHint": "点击上方区域查看或编辑完整列表",
   "commentFilterEditKeywordTitle": "编辑关键词",
+  "commentFilterRemoveKeywordTitle": "删除关键词",
+  "commentFilterRemoveKeywordMessage": "确定从屏蔽词列表中删除“{keyword}”吗？",
+  "@commentFilterRemoveKeywordMessage": {
+    "placeholders": {
+      "keyword": {}
+    }
+  },
+  "commentFilterRemoveKeywordAction": "删除",
   "commentFilterBackTooltip": "返回",
   "commentFilterKeywordListTitle": "已添加的关键词",
   "commentFilterCollapseKeywordList": "收起",
