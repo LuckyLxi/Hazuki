@@ -1,19 +1,20 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
-import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/app/service_locator.dart';
+import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:hazuki/widgets/windows_comic_detail_host.dart';
 
-import 'search_bar_shell.dart';
-import 'search_history_section.dart';
-import 'search_id_extract_pill.dart';
-import 'search_results_page.dart';
 import '../state/search_focus_coordinator.dart';
+import '../state/search_id_extract_controller.dart';
 import '../support/search_history_service.dart';
 import '../support/search_shared.dart';
+import 'search_bar_shell.dart';
+import 'search_entry_widgets.dart';
+import 'search_results_page.dart';
 
 class SearchEntryPage extends StatefulWidget {
   const SearchEntryPage({
@@ -40,6 +41,13 @@ class _SearchEntryPageState extends State<SearchEntryPage>
     allowCollapsedFocus: false,
   );
   final HazukiSourceService _sourceService = sl<HazukiSourceService>();
+  late final SearchIdExtractController _idExtractController =
+      SearchIdExtractController(
+        sourceService: _sourceService,
+        isMounted: () => mounted,
+        isInputFocused: () => _searchInputFocused,
+        currentText: () => _focusCoordinator.text,
+      );
   final ScrollController _scrollController = ScrollController();
   final SearchHistoryService _historyService = SearchHistoryService();
 
@@ -47,16 +55,12 @@ class _SearchEntryPageState extends State<SearchEntryPage>
   Animation<double>? _initialDataLoadRouteAnimation;
   bool _historyEditMode = false;
   bool _historyExpanded = false;
-  bool _comicIdSearchEnhance = false;
   bool _initialDataLoadScheduled = false;
-  bool _pendingExtractedComicIdHide = false;
-  String? _extractedComicId;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _sourceService.addListener(_handleSourceChanged);
     _focusCoordinator.primaryFocusNode.addListener(_handleSearchFocusChanged);
   }
 
@@ -81,10 +85,8 @@ class _SearchEntryPageState extends State<SearchEntryPage>
     _focusCoordinator.primaryFocusNode.removeListener(
       _handleSearchFocusChanged,
     );
-    // 页面退出时清除额外底部偏移，避免影响其他页面的提示药丸
-    hazukiPromptPlacementController.setExtraBottomPadding(0);
     WidgetsBinding.instance.removeObserver(this);
-    _sourceService.removeListener(_handleSourceChanged);
+    _idExtractController.dispose();
     _focusCoordinator.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -99,7 +101,7 @@ class _SearchEntryPageState extends State<SearchEntryPage>
     final wasKeyboardVisible = _focusCoordinator.keyboardVisible;
     _focusCoordinator.syncKeyboardVisibility();
     if (wasKeyboardVisible && !_focusCoordinator.keyboardVisible) {
-      _scheduleHideExtractedComicIdIfUnfocused();
+      _idExtractController.scheduleHideIfUnfocused();
     }
   }
 
@@ -134,14 +136,14 @@ class _SearchEntryPageState extends State<SearchEntryPage>
   }
 
   Future<void> _loadInitialData() async {
-    await Future.wait([_loadHistory(), _loadComicIdSearchEnhance()]);
+    await Future.wait([_loadHistory(), _idExtractController.load()]);
   }
 
   void _handleSearchFocusChanged() {
     if (_searchInputFocused) {
-      _syncExtractedComicIdWithFocus(_focusCoordinator.text);
+      _idExtractController.syncWithFocus(_focusCoordinator.text);
     } else {
-      _scheduleHideExtractedComicIdIfUnfocused();
+      _idExtractController.scheduleHideIfUnfocused();
     }
     _logSearchEntryEvent('Search entry focus changed', stage: 'focus_listener');
   }
@@ -159,89 +161,9 @@ class _SearchEntryPageState extends State<SearchEntryPage>
     });
   }
 
-  Future<void> _loadComicIdSearchEnhance() async {
-    final enabled = await isComicIdSearchEnhanceEnabled();
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _comicIdSearchEnhance = enabled && _sourceService.isActiveJmSource;
-      _extractedComicId = _extractComicIdFromFocusedInput(
-        _focusCoordinator.text,
-      );
-    });
-  }
-
-  void _handleSourceChanged() {
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      if (!_sourceService.isActiveJmSource) {
-        _comicIdSearchEnhance = false;
-        _extractedComicId = null;
-        _syncPromptAnchor(false);
-      }
-    });
-    if (_sourceService.isActiveJmSource) {
-      unawaited(_loadComicIdSearchEnhance());
-    }
-  }
-
   bool get _searchInputFocused =>
       _focusCoordinator.primaryFocusNode.hasFocus ||
       _focusCoordinator.collapsedFocusNode.hasFocus;
-
-  String? _extractComicIdFromFocusedInput(String value) {
-    if (!_comicIdSearchEnhance || !_searchInputFocused) {
-      return null;
-    }
-    return extractBestComicId(value);
-  }
-
-  void _hideExtractedComicId() {
-    _pendingExtractedComicIdHide = false;
-    if (_extractedComicId == null) {
-      _syncPromptAnchor(false);
-      return;
-    }
-    setState(() => _extractedComicId = null);
-    _syncPromptAnchor(false);
-  }
-
-  /// 同步提示药丸的底部偏移，避免被搜索 ID 药丸遮挡
-  void _syncPromptAnchor(bool pillVisible) {
-    // 药丸高度约 36px + 底部定位 12px，间距约 6px
-    hazukiPromptPlacementController.setExtraBottomPadding(
-      pillVisible ? 36.0 : 0.0,
-    );
-  }
-
-  void _scheduleHideExtractedComicIdIfUnfocused() {
-    if (_pendingExtractedComicIdHide) {
-      return;
-    }
-    _pendingExtractedComicIdHide = true;
-    // 延迟需大于 InkWell 的点击响应时间，避免药丸 onTap 前状态已被清空
-    Future<void>.delayed(const Duration(milliseconds: 300), () {
-      if (!mounted || !_pendingExtractedComicIdHide) {
-        return;
-      }
-      _pendingExtractedComicIdHide = false;
-      if (!_searchInputFocused) {
-        _hideExtractedComicId();
-      }
-    });
-  }
-
-  void _syncExtractedComicIdWithFocus(String value) {
-    _pendingExtractedComicIdHide = false;
-    final id = _extractComicIdFromFocusedInput(value);
-    if (id != _extractedComicId) {
-      setState(() => _extractedComicId = id);
-      _syncPromptAnchor(id != null);
-    }
-  }
 
   Future<void> _removeHistory(String keyword) async {
     final newHistory = await _historyService.remove(keyword);
@@ -272,7 +194,7 @@ class _SearchEntryPageState extends State<SearchEntryPage>
     String rawKeyword, {
     required SearchEntryIntent intent,
   }) async {
-    _hideExtractedComicId();
+    _idExtractController.hide();
     await _focusCoordinator.dismissKeyboard(context, parkOnPage: true);
     _focusCoordinator.syncText(rawKeyword);
     final keyword = await normalizeSubmittedKeyword(
@@ -378,7 +300,7 @@ class _SearchEntryPageState extends State<SearchEntryPage>
       onTap: () => _handleSearchBarTap(logTarget),
       onClear: () {
         _focusCoordinator.clearText();
-        _hideExtractedComicId();
+        _idExtractController.hide();
         unawaited(_focusCoordinator.requestPrimarySearchFocus(context));
       },
       onSubmit: () => unawaited(
@@ -396,13 +318,13 @@ class _SearchEntryPageState extends State<SearchEntryPage>
         } else {
           _focusCoordinator.syncText(value, updatePrimary: false);
         }
-        _syncExtractedComicIdWithFocus(value);
+        _idExtractController.syncWithFocus(value);
       },
     );
   }
 
   void _handleSearchBarTap(String target) {
-    _syncExtractedComicIdWithFocus(_focusCoordinator.text);
+    _idExtractController.syncWithFocus(_focusCoordinator.text);
     _logSearchEntryEvent(
       'Search entry bar tapped',
       stage: 'tap_start',
@@ -476,11 +398,26 @@ class _SearchEntryPageState extends State<SearchEntryPage>
     };
   }
 
+  void _toggleHistoryEditMode() {
+    unawaited(_focusCoordinator.dismissKeyboard(context, parkOnPage: true));
+    setState(() {
+      _historyEditMode = !_historyEditMode;
+    });
+  }
+
+  void _applyExtractedComicId() {
+    final id = _idExtractController.captureApplyId();
+    if (id == null) return;
+    _focusCoordinator.syncText(id);
+    _idExtractController.hide();
+    unawaited(_openResults(id, intent: SearchEntryIntent.submitFromEntry));
+  }
+
   @override
   Widget build(BuildContext context) {
     return WindowsComicDetailHost(
       child: ListenableBuilder(
-        listenable: _focusCoordinator,
+        listenable: Listenable.merge([_focusCoordinator, _idExtractController]),
         builder: (context, _) => PopScope(
           canPop: true,
           onPopInvokedWithResult: (didPop, result) {
@@ -498,24 +435,10 @@ class _SearchEntryPageState extends State<SearchEntryPage>
               floatingActionButtonAnimator:
                   FloatingActionButtonAnimator.noAnimation,
               floatingActionButton: _historyList.isNotEmpty
-                  ? GestureDetector(
+                  ? SearchEntryHistoryEditFab(
+                      editMode: _historyEditMode,
+                      onPressed: _toggleHistoryEditMode,
                       onLongPress: _confirmClearHistory,
-                      child: FloatingActionButton(
-                        onPressed: () {
-                          unawaited(
-                            _focusCoordinator.dismissKeyboard(
-                              context,
-                              parkOnPage: true,
-                            ),
-                          );
-                          setState(() {
-                            _historyEditMode = !_historyEditMode;
-                          });
-                        },
-                        child: Icon(
-                          _historyEditMode ? Icons.done : Icons.delete_outline,
-                        ),
-                      ),
                     )
                   : null,
               appBar: hazukiFrostedAppBar(
@@ -532,61 +455,28 @@ class _SearchEntryPageState extends State<SearchEntryPage>
                 ),
                 enableBlur: false,
               ),
-              body: Stack(
-                children: [
-                  ListView(
-                    controller: _scrollController,
-                    physics: const AlwaysScrollableScrollPhysics(
-                      parent: ClampingScrollPhysics(),
+              body: SearchEntryBody(
+                scrollController: _scrollController,
+                historyList: _historyList,
+                historyEditMode: _historyEditMode,
+                historyExpanded: _historyExpanded,
+                extractedComicId: _idExtractController.extractedId,
+                onKeywordPressed: (keyword) {
+                  unawaited(
+                    _openResults(
+                      keyword,
+                      intent: SearchEntryIntent.historySelection,
                     ),
-                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                    children: [
-                      SearchHistorySection(
-                        historyList: _historyList,
-                        historyEditMode: _historyEditMode,
-                        historyExpanded: _historyExpanded,
-                        onKeywordPressed: (keyword) {
-                          unawaited(
-                            _openResults(
-                              keyword,
-                              intent: SearchEntryIntent.historySelection,
-                            ),
-                          );
-                        },
-                        onKeywordDeleted: (keyword) =>
-                            unawaited(_removeHistory(keyword)),
-                        onExpandedChanged: (expanded) {
-                          setState(() {
-                            _historyExpanded = expanded;
-                          });
-                        },
-                        onLayoutChanged: () {},
-                      ),
-                    ],
-                  ),
-                  Positioned(
-                    left: 16,
-                    right: 16,
-                    bottom: 12,
-                    child: SearchIdExtractPill(
-                      extractedId: _extractedComicId,
-                      onApply: () {
-                        // 提前捕获，防止计时器并发时状态已为 null
-                        final id = _extractedComicId;
-                        if (id == null) return;
-                        _pendingExtractedComicIdHide = false;
-                        _focusCoordinator.syncText(id);
-                        _hideExtractedComicId();
-                        unawaited(
-                          _openResults(
-                            id,
-                            intent: SearchEntryIntent.submitFromEntry,
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
+                  );
+                },
+                onKeywordDeleted: (keyword) =>
+                    unawaited(_removeHistory(keyword)),
+                onHistoryExpandedChanged: (expanded) {
+                  setState(() {
+                    _historyExpanded = expanded;
+                  });
+                },
+                onApplyExtractedComicId: _applyExtractedComicId,
               ),
             ),
           ),

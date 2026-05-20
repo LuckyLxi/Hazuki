@@ -7,7 +7,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'search_history_service.dart';
 
 const searchLoadTimeout = Duration(seconds: 25);
-const searchAppBarRevealOffset = 68.0;
 const searchHistoryCollapsedMaxRows = 4;
 const searchHistoryChipSpacing = 8.0;
 const searchOrderKeys = <String>{
