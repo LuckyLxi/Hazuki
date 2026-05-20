@@ -2,20 +2,20 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/app/service_locator.dart';
+import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
 import 'package:hazuki/shared/windows/windows_comic_detail.dart';
-import 'package:hazuki/widgets/widgets.dart';
 import 'package:hazuki/widgets/windows_comic_detail_host.dart';
 
 import '../state/search_focus_coordinator.dart';
+import '../state/search_id_extract_controller.dart';
 import '../state/search_results_controller.dart';
 import '../support/search_shared.dart';
 import 'search_bar_shell.dart';
-import 'search_id_extract_pill.dart';
+import 'search_results_page_widgets.dart';
 import 'search_results_widgets.dart';
 
 class SearchResultsPage extends StatefulWidget {
@@ -48,13 +48,17 @@ class _SearchResultsPageState extends State<SearchResultsPage>
     initialText: widget.initialKeyword,
   );
   final HazukiSourceService _sourceService = sl<HazukiSourceService>();
+  late final SearchIdExtractController _idExtractController =
+      SearchIdExtractController(
+        sourceService: _sourceService,
+        isMounted: () => mounted,
+        isInputFocused: () => _searchInputFocused,
+        currentText: () => _focusCoordinator.text,
+      );
 
   final ScrollController _scrollController = ScrollController();
 
   bool _showBackToTop = false;
-  bool _comicIdSearchEnhance = false;
-  bool _pendingExtractedComicIdHide = false;
-  String? _extractedComicId;
 
   String get _searchKeyword => _resultsController.searchKeyword;
   String? get _searchErrorMessage => _resultsController.searchErrorMessage;
@@ -93,7 +97,11 @@ class _SearchResultsPageState extends State<SearchResultsPage>
   Widget build(BuildContext context) {
     return WindowsComicDetailHost(
       child: ListenableBuilder(
-        listenable: Listenable.merge([_resultsController, _focusCoordinator]),
+        listenable: Listenable.merge([
+          _resultsController,
+          _focusCoordinator,
+          _idExtractController,
+        ]),
         builder: (context, _) => PopScope(
           canPop: true,
           onPopInvokedWithResult: _handlePopInvoked,
@@ -103,23 +111,13 @@ class _SearchResultsPageState extends State<SearchResultsPage>
             body: Stack(
               children: [
                 _buildSearchResultsBody(),
-                _buildSearchBackToTopButton(),
-                Positioned(
-                  left: 16,
-                  right: 16,
-                  bottom: 12,
-                  child: SearchIdExtractPill(
-                    extractedId: _extractedComicId,
-                    onApply: () {
-                      // 提前捕获，防止计时器并发时状态已为 null
-                      final id = _extractedComicId;
-                      if (id == null) return;
-                      _pendingExtractedComicIdHide = false;
-                      _focusCoordinator.syncText(id);
-                      _hideExtractedComicId();
-                      unawaited(_submitSearch(submittedText: id));
-                    },
-                  ),
+                SearchResultsBackToTopButton(
+                  visible: _showBackToTop,
+                  onPressed: _handleBackToTopPressed,
+                ),
+                SearchResultsIdExtractPill(
+                  extractedId: _idExtractController.extractedId,
+                  onApply: _applyExtractedComicId,
                 ),
               ],
             ),
@@ -137,7 +135,6 @@ class _SearchResultsPageState extends State<SearchResultsPage>
     );
     _scrollController.addListener(_onScroll);
     WidgetsBinding.instance.addObserver(this);
-    _sourceService.addListener(_handleSourceChanged);
     _focusCoordinator.primaryFocusNode.addListener(_handleSearchFocusChanged);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -151,7 +148,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
         forceShowKeyboard: true,
       );
       unawaited(
-        _loadComicIdSearchEnhance().whenComplete(() {
+        _idExtractController.load().whenComplete(() {
           if (mounted) {
             unawaited(_submitSearch());
           }
@@ -166,101 +163,19 @@ class _SearchResultsPageState extends State<SearchResultsPage>
     );
     _scrollController.removeListener(_onScroll);
     WidgetsBinding.instance.removeObserver(this);
-    _sourceService.removeListener(_handleSourceChanged);
-    // 页面退出时清除额外底部偏移，避免影响其他页面的提示药丸
-    hazukiPromptPlacementController.setExtraBottomPadding(0);
+    _idExtractController.dispose();
     _scrollController.dispose();
     _resultsController.dispose();
     _focusCoordinator.dispose();
   }
 
-  Future<void> _loadComicIdSearchEnhance() async {
-    final enabled = await isComicIdSearchEnhanceEnabled();
-    if (!mounted) {
-      return;
-    }
-    _updateSearchResultsState(() {
-      _comicIdSearchEnhance = enabled && _sourceService.isActiveJmSource;
-      _extractedComicId = _extractComicIdFromFocusedInput(
-        _focusCoordinator.text,
-      );
-    });
-  }
-
-  void _handleSourceChanged() {
-    if (!mounted) {
-      return;
-    }
-    _updateSearchResultsState(() {
-      if (!_sourceService.isActiveJmSource) {
-        _comicIdSearchEnhance = false;
-        _extractedComicId = null;
-        _syncPromptAnchor(false);
-      }
-    });
-    if (_sourceService.isActiveJmSource) {
-      unawaited(_loadComicIdSearchEnhance());
-    }
-  }
-
   bool get _searchInputFocused => _focusCoordinator.primaryFocusNode.hasFocus;
-
-  String? _extractComicIdFromFocusedInput(String value) {
-    if (!_comicIdSearchEnhance || !_searchInputFocused) {
-      return null;
-    }
-    return extractBestComicId(value);
-  }
-
-  void _hideExtractedComicId() {
-    _pendingExtractedComicIdHide = false;
-    if (_extractedComicId == null) {
-      _syncPromptAnchor(false);
-      return;
-    }
-    _updateSearchResultsState(() => _extractedComicId = null);
-    _syncPromptAnchor(false);
-  }
-
-  /// 同步提示药丸的底部偏移，避免被搜索 ID 药丸遮挡
-  void _syncPromptAnchor(bool pillVisible) {
-    // 药丸高度约 36px + 底部定位 12px，间距约 6px
-    hazukiPromptPlacementController.setExtraBottomPadding(
-      pillVisible ? 36.0 : 0.0,
-    );
-  }
-
-  void _scheduleHideExtractedComicIdIfUnfocused() {
-    if (_pendingExtractedComicIdHide) {
-      return;
-    }
-    _pendingExtractedComicIdHide = true;
-    // 延迟需大于 InkWell 的点击响应时间，避免药丸 onTap 前状态已被清空
-    Future<void>.delayed(const Duration(milliseconds: 300), () {
-      if (!mounted || !_pendingExtractedComicIdHide) {
-        return;
-      }
-      _pendingExtractedComicIdHide = false;
-      if (!_searchInputFocused) {
-        _hideExtractedComicId();
-      }
-    });
-  }
-
-  void _syncExtractedComicIdWithFocus(String value) {
-    _pendingExtractedComicIdHide = false;
-    final id = _extractComicIdFromFocusedInput(value);
-    if (id != _extractedComicId) {
-      _updateSearchResultsState(() => _extractedComicId = id);
-      _syncPromptAnchor(id != null);
-    }
-  }
 
   void _handleSearchFocusChanged() {
     if (_searchInputFocused) {
-      _syncExtractedComicIdWithFocus(_focusCoordinator.text);
+      _idExtractController.syncWithFocus(_focusCoordinator.text);
     } else {
-      _scheduleHideExtractedComicIdIfUnfocused();
+      _idExtractController.scheduleHideIfUnfocused();
     }
   }
 
@@ -271,7 +186,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
     final wasKeyboardVisible = _focusCoordinator.keyboardVisible;
     _focusCoordinator.syncKeyboardVisibility();
     if (wasKeyboardVisible && !_focusCoordinator.keyboardVisible) {
-      _scheduleHideExtractedComicIdIfUnfocused();
+      _idExtractController.scheduleHideIfUnfocused();
     }
   }
 
@@ -342,7 +257,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
 
   void _clearSearch() {
     _focusCoordinator.clearText();
-    _hideExtractedComicId();
+    _idExtractController.hide();
     _resultsController.clearSearchData();
     unawaited(_requestSearchFocus());
   }
@@ -441,7 +356,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
   }
 
   Future<void> _submitSearch({String? submittedText}) async {
-    _hideExtractedComicId();
+    _idExtractController.hide();
     final activeController = _focusCoordinator.activeController;
     final rawKeyword = submittedText ?? activeController.text;
     _focusCoordinator.syncText(rawKeyword);
@@ -506,16 +421,12 @@ class _SearchResultsPageState extends State<SearchResultsPage>
       clearKey: clearKey,
       submitKey: submitKey,
       compact: compact,
-      onTap: () => _syncExtractedComicIdWithFocus(controller.text),
+      onTap: () => _idExtractController.syncWithFocus(controller.text),
       onClear: onClear,
       onSubmit: () => unawaited(_submitSearch()),
       onSubmitted: (value) => unawaited(_submitSearch(submittedText: value)),
       onChanged: onChanged,
     );
-  }
-
-  void _updateExtractedId(String value) {
-    _syncExtractedComicIdWithFocus(value);
   }
 
   Widget _buildSearchResultsAppBarTitle() {
@@ -531,7 +442,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
         onClear: _clearSearch,
         onChanged: (value) {
           _focusCoordinator.syncText(value, updatePrimary: false);
-          _updateExtractedId(value);
+          _idExtractController.syncWithFocus(value);
         },
       ),
     );
@@ -545,20 +456,20 @@ class _SearchResultsPageState extends State<SearchResultsPage>
       searchErrorMessage: _searchErrorMessage,
       sourceRuntimeState: _resultsController.sourceRuntimeState,
       onRetry: () async {
-        await _dismissSearchInputIfFocused();
-        if (!mounted) {
-          return;
-        }
-        if (_resultsController.canRetry) {
-          _resultsController.logRuntimeRetryRequested('search_results_page');
-        }
-        await _resultsController.search(
-          context,
-          keyword: _searchKeyword,
-          page: 1,
-        );
+        await _retrySearchFromCurrentKeyword();
       },
     );
+  }
+
+  Future<void> _retrySearchFromCurrentKeyword() async {
+    await _dismissSearchInputIfFocused();
+    if (!mounted) {
+      return;
+    }
+    if (_resultsController.canRetry) {
+      _resultsController.logRuntimeRetryRequested('search_results_page');
+    }
+    await _resultsController.search(context, keyword: _searchKeyword, page: 1);
   }
 
   Widget _buildSearchComicItem(ExploreComic comic, int index) {
@@ -588,195 +499,72 @@ class _SearchResultsPageState extends State<SearchResultsPage>
   }
 
   PreferredSizeWidget _buildSearchResultsAppBar() {
-    final orderLabels = searchOrderLabels(
-      context,
-      sourceKey: _sourceService.activeSourceKey,
-    );
-    return hazukiFrostedAppBar(
-      context: context,
-      enableBlur: false,
+    return SearchResultsAppBar(
       title: _buildSearchResultsAppBarTitle(),
-      actions: [
-        PopupMenuButton<String>(
-          tooltip: _currentSearchOrderLabel,
-          onOpened: () {
-            unawaited(_dismissSearchInputIfFocused());
-          },
-          onSelected: (order) {
-            unawaited(_dismissSearchInputIfFocused());
-            unawaited(_onSearchOrderSelected(order));
-          },
-          itemBuilder: (context) => [
-            for (final entry in orderLabels.entries)
-              PopupMenuItem<String>(
-                value: entry.key,
-                child: Row(
-                  children: [
-                    Expanded(child: Text(entry.value)),
-                    if (entry.key == _searchOrder)
-                      Icon(
-                        Icons.check,
-                        size: 18,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                  ],
-                ),
-              ),
-          ],
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  _currentSearchOrderLabel,
-                  style: Theme.of(context).textTheme.labelLarge,
-                ),
-                const SizedBox(width: 4),
-                const Icon(Icons.swap_vert, size: 18),
-              ],
-            ),
-          ),
-        ),
-      ],
+      orderLabels: searchOrderLabels(
+        context,
+        sourceKey: _sourceService.activeSourceKey,
+      ),
+      currentOrderLabel: _currentSearchOrderLabel,
+      searchOrder: _searchOrder,
+      onOrderMenuOpened: () {
+        unawaited(_dismissSearchInputIfFocused());
+      },
+      onOrderSelected: (order) {
+        unawaited(_dismissSearchInputIfFocused());
+        unawaited(_onSearchOrderSelected(order));
+      },
     );
   }
 
   Widget _buildSearchResultsBody() {
-    final strings = AppLocalizations.of(context)!;
-    return HazukiPullToRefresh(
-      onRefresh: () async {
-        await _dismissSearchInputIfFocused();
-        if (!mounted) {
-          return;
-        }
-        if (_searchKeyword.isEmpty) {
-          await _submitSearch();
-          return;
-        }
-        await _resultsController.search(
-          context,
-          keyword: _searchKeyword,
-          page: 1,
-          silentRefresh: _searchComics.isNotEmpty,
-        );
-      },
-      child: NotificationListener<ScrollNotification>(
-        onNotification: _handleSearchResultsScrollNotification,
-        child: ListView(
-          controller: _scrollController,
-          physics: const AlwaysScrollableScrollPhysics(
-            parent: ClampingScrollPhysics(),
-          ),
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-          children: [
-            if (_searchComics.isNotEmpty) ...[
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12, left: 2, right: 2),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        _searchKeyword,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      _currentSearchOrderLabel,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-            _buildSearchResultState(),
-            if (_searchComics.isNotEmpty) ...[
-              for (int i = 0; i < _searchComics.length; i++)
-                _buildSearchComicItem(_searchComics[i], i),
-            ],
-            if (_searchLoadingMore) const HazukiLoadMoreFooter(),
-            if (_searchErrorMessage != null && _searchComics.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Material(
-                  color: Theme.of(context).colorScheme.errorContainer,
-                  borderRadius: BorderRadius.circular(16),
-                  child: Padding(
-                    padding: const EdgeInsets.all(14),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _searchErrorMessage!,
-                          style: TextStyle(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onErrorContainer,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        FilledButton.tonal(
-                          onPressed: () {
-                            unawaited(() async {
-                              await _dismissSearchInputIfFocused();
-                              if (!mounted) {
-                                return;
-                              }
-                              await _resultsController.search(
-                                context,
-                                keyword: _searchKeyword,
-                                page: 1,
-                              );
-                            }());
-                          },
-                          child: Text(strings.commonRetry),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            SizedBox(height: _searchLoadingMore ? 16 : 80),
-          ],
-        ),
-      ),
+    return SearchResultsBody(
+      scrollController: _scrollController,
+      searchKeyword: _searchKeyword,
+      searchComics: _searchComics,
+      searchLoadingMore: _searchLoadingMore,
+      searchErrorMessage: _searchErrorMessage,
+      currentSearchOrderLabel: _currentSearchOrderLabel,
+      resultState: _buildSearchResultState(),
+      onRefresh: _refreshSearchResults,
+      onScrollNotification: _handleSearchResultsScrollNotification,
+      itemBuilder: _buildSearchComicItem,
+      onRetryPartialError: _retrySearchFromCurrentKeyword,
     );
   }
 
-  Widget _buildSearchBackToTopButton() {
-    return Positioned(
-      right: 16,
-      bottom: 16,
-      child: IgnorePointer(
-        ignoring: !_showBackToTop,
-        child: AnimatedSlide(
-          offset: _showBackToTop ? Offset.zero : const Offset(0, 1.2),
-          duration: const Duration(milliseconds: 220),
-          curve: Curves.easeOutCubic,
-          child: AnimatedOpacity(
-            opacity: _showBackToTop ? 1 : 0,
-            duration: const Duration(milliseconds: 180),
-            curve: Curves.easeOutCubic,
-            child: FloatingActionButton(
-              onPressed: () {
-                unawaited(() async {
-                  await _dismissSearchInputIfFocused();
-                  if (!mounted) {
-                    return;
-                  }
-                  await _scrollToTop();
-                }());
-              },
-              child: const Icon(Icons.keyboard_arrow_up),
-            ),
-          ),
-        ),
-      ),
+  Future<void> _refreshSearchResults() async {
+    await _dismissSearchInputIfFocused();
+    if (!mounted) {
+      return;
+    }
+    if (_searchKeyword.isEmpty) {
+      await _submitSearch();
+      return;
+    }
+    await _resultsController.search(
+      context,
+      keyword: _searchKeyword,
+      page: 1,
+      silentRefresh: _searchComics.isNotEmpty,
     );
+  }
+
+  void _handleBackToTopPressed() {
+    unawaited(() async {
+      await _dismissSearchInputIfFocused();
+      if (!mounted) {
+        return;
+      }
+      await _scrollToTop();
+    }());
+  }
+
+  void _applyExtractedComicId() {
+    final id = _idExtractController.captureApplyId();
+    if (id == null) return;
+    _focusCoordinator.syncText(id);
+    _idExtractController.hide();
+    unawaited(_submitSearch(submittedText: id));
   }
 }
