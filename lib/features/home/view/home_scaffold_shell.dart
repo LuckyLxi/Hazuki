@@ -227,9 +227,7 @@ class HomeScaffoldShell extends StatelessWidget {
                             avatarUrl: avatarUrl,
                             profileLoading: profileLoading,
                             username: username,
-                            onPressed: () {
-                              _openProfileDrawer(context, mobileDrawerContent);
-                            },
+                            drawerContent: mobileDrawerContent,
                           ),
                     leadingWidth: Platform.isWindows ? null : leadingWidth,
                     automaticallyImplyLeading: false,
@@ -300,18 +298,6 @@ class HomeScaffoldShell extends StatelessWidget {
     };
   }
 
-  void _openProfileDrawer(BuildContext context, Widget drawerContent) {
-    Navigator.of(context).push(
-      _HomeProfileDrawerRoute(
-        drawerWidth: resolveHomeDrawerWidth(context),
-        drawerColor:
-            DrawerTheme.of(context).backgroundColor ??
-            Theme.of(context).drawerTheme.backgroundColor ??
-            Theme.of(context).colorScheme.surface,
-        drawerContent: drawerContent,
-      ),
-    );
-  }
 }
 
 class _HomeAppBarProfileButton extends StatefulWidget {
@@ -320,14 +306,14 @@ class _HomeAppBarProfileButton extends StatefulWidget {
     required this.avatarUrl,
     required this.profileLoading,
     required this.username,
-    required this.onPressed,
+    required this.drawerContent,
   });
 
   final MangaDownloadService downloadService;
   final String? avatarUrl;
   final bool profileLoading;
   final String username;
-  final VoidCallback onPressed;
+  final Widget drawerContent;
 
   @override
   State<_HomeAppBarProfileButton> createState() =>
@@ -335,6 +321,7 @@ class _HomeAppBarProfileButton extends StatefulWidget {
 }
 
 class _HomeAppBarProfileButtonState extends State<_HomeAppBarProfileButton> {
+  final ValueNotifier<int> _drawerContentRevision = ValueNotifier<int>(0);
   int _lastVisibleTaskCount = 0;
 
   @override
@@ -347,6 +334,15 @@ class _HomeAppBarProfileButtonState extends State<_HomeAppBarProfileButton> {
   void didUpdateWidget(covariant _HomeAppBarProfileButton oldWidget) {
     super.didUpdateWidget(oldWidget);
     _syncLastVisibleTaskCount();
+    if (oldWidget.drawerContent != widget.drawerContent) {
+      _drawerContentRevision.value++;
+    }
+  }
+
+  @override
+  void dispose() {
+    _drawerContentRevision.dispose();
+    super.dispose();
   }
 
   void _syncLastVisibleTaskCount() {
@@ -366,7 +362,7 @@ class _HomeAppBarProfileButtonState extends State<_HomeAppBarProfileButton> {
       child: Padding(
         padding: const EdgeInsets.only(left: 8),
         child: IconButton(
-          onPressed: widget.onPressed,
+          onPressed: _openProfileDrawer,
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
           icon: TweenAnimationBuilder<double>(
@@ -436,6 +432,21 @@ class _HomeAppBarProfileButtonState extends State<_HomeAppBarProfileButton> {
             },
           ),
         ),
+      ),
+    );
+  }
+
+  void _openProfileDrawer() {
+    final context = this.context;
+    Navigator.of(context).push(
+      _HomeProfileDrawerRoute(
+        drawerWidth: resolveHomeDrawerWidth(context),
+        drawerColor:
+            DrawerTheme.of(context).backgroundColor ??
+            Theme.of(context).drawerTheme.backgroundColor ??
+            Theme.of(context).colorScheme.surface,
+        drawerContentListenable: _drawerContentRevision,
+        drawerContentBuilder: (_) => widget.drawerContent,
       ),
     );
   }
@@ -541,12 +552,14 @@ class _HomeProfileDrawerRoute extends PageRoute<void> {
   _HomeProfileDrawerRoute({
     required this.drawerWidth,
     required this.drawerColor,
-    required this.drawerContent,
+    required this.drawerContentBuilder,
+    required this.drawerContentListenable,
   });
 
   final double drawerWidth;
   final Color drawerColor;
-  final Widget drawerContent;
+  final WidgetBuilder drawerContentBuilder;
+  final Listenable drawerContentListenable;
 
   @override
   bool get opaque => false;
@@ -591,7 +604,10 @@ class _HomeProfileDrawerRoute extends PageRoute<void> {
       child: Drawer(
         width: drawerWidth,
         backgroundColor: drawerColor,
-        child: drawerContent,
+        child: AnimatedBuilder(
+          animation: drawerContentListenable,
+          builder: (context, _) => drawerContentBuilder(context),
+        ),
       ),
     );
   }

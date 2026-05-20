@@ -533,7 +533,7 @@ class HomeDrawerContent extends StatelessWidget {
                     },
                     child: ClipRect(
                       child: ImageFiltered(
-                        imageFilter: ImageFilter.blur(sigmaX: 9, sigmaY: 9),
+                        imageFilter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
                         child: Transform.scale(
                           scale: 1.08,
                           child: profileLoading || resolvedAvatarUrl.isEmpty
@@ -573,7 +573,7 @@ class HomeDrawerContent extends StatelessWidget {
                           ),
                           drawerBackground,
                         ],
-                        stops: const [0.0, 0.68, 0.88, 1.0],
+                        stops: const [0.0, 0.56, 0.82, 1.0],
                       ),
                     ),
                   ),
@@ -606,7 +606,7 @@ class HomeDrawerContent extends StatelessWidget {
                             ),
                             drawerBackground,
                           ],
-                          stops: const [0.0, 0.62, 0.74, 0.84, 0.94, 1.0],
+                          stops: const [0.0, 0.50, 0.66, 0.80, 0.91, 1.0],
                         ),
                       ),
                     ),
