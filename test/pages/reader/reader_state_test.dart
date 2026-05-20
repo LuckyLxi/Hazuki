@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'package:hazuki/app/service_locator.dart';
-import 'dart:typed_data';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -315,6 +315,115 @@ void main() {
         expect(runtimeState.currentPageIndex, 0);
         expect(runtimeState.readerSpreadSize, 2);
         expect(logEvents, contains('Reader double page mode toggled'));
+      },
+    );
+  });
+
+  group('ReaderSessionController', () {
+    testWidgets('turning off immersive mode shows system overlays', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({});
+      await tester.pumpWidget(const SizedBox.shrink());
+      final platformCalls = <MethodCall>[];
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+            platformCalls.add(call);
+            return null;
+          });
+      addTearDown(() {
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(SystemChannels.platform, null);
+      });
+
+      await ReaderDisplayBridge.controller.apply(
+        immersiveMode: false,
+        keepScreenOn: false,
+        customBrightness: false,
+        brightnessValue: 0.5,
+      );
+
+      final overlayCalls = platformCalls.where(
+        (call) => call.method == 'SystemChrome.setEnabledSystemUIOverlays',
+      );
+      expect(overlayCalls, isNotEmpty);
+      expect(
+        overlayCalls.last.arguments,
+        containsAll(['SystemUiOverlay.top', 'SystemUiOverlay.bottom']),
+      );
+    });
+
+    testWidgets(
+      'does not reapply immersive mode after the reader closes',
+      (tester) async {
+        SharedPreferences.setMockInitialValues({
+          ReaderSettingsStore.immersiveModeKey: true,
+        });
+        await tester.pumpWidget(const SizedBox.shrink());
+        final platformCalls = <MethodCall>[];
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+              platformCalls.add(call);
+              return null;
+            });
+        addTearDown(() {
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+              .setMockMethodCallHandler(SystemChannels.platform, null);
+        });
+
+        final runtimeState = ReaderRuntimeState();
+        final scrollController = ScrollController();
+        final pageController = PageController();
+        final focusNode = FocusNode();
+        final transformationController = TransformationController();
+        final sessionController = ReaderSessionController(
+          runtimeState: runtimeState,
+          displayBridge: ReaderDisplayBridge(
+            onVolumeButtonPressed: (_) async {},
+          ),
+          settingsStore: const ReaderSettingsStore(),
+          scrollController: scrollController,
+          pageController: pageController,
+          readerKeyFocusNode: focusNode,
+          zoomController: transformationController,
+          applyInitialImages: (_, {required trigger}) {},
+          loadChapterImages: ({trigger = 'manual'}) async {},
+          onNoImageModeChanged: () {},
+          isMounted: () => true,
+          updateState: (update) => update(),
+          logEvent: (_, {level = 'info', source = 'reader_ui', content}) {},
+          logPayload: ([extra]) => extra ?? <String, dynamic>{},
+          onScrollPositionChanged: () {},
+          onZoomChanged: () {},
+          comicId: 'comic',
+          epId: 'ep',
+          chapterTitle: 'Chapter 1',
+          chapterIndex: 0,
+          widgetImages: const [],
+          sourceService: sl<HazukiSourceService>(),
+        );
+
+        sessionController.initialize();
+        sessionController.dispose();
+        await tester.pump();
+
+        final immersiveModeCalls = platformCalls.where(
+          (call) =>
+              call.method == 'SystemChrome.setEnabledSystemUIMode' &&
+              call.arguments == 'SystemUiMode.immersiveSticky',
+        );
+        final overlayRestoreCalls = platformCalls.where(
+          (call) => call.method == 'SystemChrome.setEnabledSystemUIOverlays',
+        );
+        expect(overlayRestoreCalls, isNotEmpty);
+        expect(
+          immersiveModeCalls,
+          isEmpty,
+        );
+        expect(
+          overlayRestoreCalls.last.arguments,
+          containsAll(['SystemUiOverlay.top', 'SystemUiOverlay.bottom']),
+        );
       },
     );
   });

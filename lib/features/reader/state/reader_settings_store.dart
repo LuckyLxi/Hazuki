@@ -161,7 +161,10 @@ class ReaderDisplayController {
     if (immersiveMode) {
       await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     } else {
-      await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      await SystemChrome.setEnabledSystemUIMode(
+        SystemUiMode.manual,
+        overlays: SystemUiOverlay.values,
+      );
     }
 
     if (!Platform.isAndroid) {
@@ -197,7 +200,10 @@ class ReaderDisplayController {
   }
 
   Future<void> restore({required String sessionId}) async {
-    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    await SystemChrome.setEnabledSystemUIMode(
+      SystemUiMode.manual,
+      overlays: SystemUiOverlay.values,
+    );
     await syncVolumeButtonPaging(enabled: false, sessionId: sessionId);
 
     if (!Platform.isAndroid) {

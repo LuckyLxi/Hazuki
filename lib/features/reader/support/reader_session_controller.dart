@@ -86,6 +86,8 @@ class ReaderSessionController {
   final int _chapterIndex;
   final List<String> _widgetImages;
   final HazukiSourceService _sourceService;
+  Future<void> _displayOperation = Future<void>.value();
+  bool _closed = false;
 
   Future<ComicDetailsData> loadComicDetails(
     String comicId, {
@@ -155,6 +157,7 @@ class ReaderSessionController {
   }
 
   void dispose() {
+    _closed = true;
     final lastVisiblePageIndex = _runtimeState.pageIndexNotifier.value;
     _displayBridge.detach();
     hazukiNoImageModeNotifier.removeListener(_onNoImageModeChanged);
@@ -181,7 +184,7 @@ class ReaderSessionController {
 
   Future<void> loadReadingSettings() async {
     final settings = await _settingsStore.load();
-    if (!_isMounted()) {
+    if (_closed || !_isMounted()) {
       return;
     }
     _updateState(() {
@@ -193,19 +196,27 @@ class ReaderSessionController {
       content: _logPayload({'settingsLoaded': true}),
     );
     await applyReaderDisplaySettings();
+    if (_closed) {
+      return;
+    }
     await syncVolumeButtonPagingPlatformState();
   }
 
   Future<void> applyReaderDisplaySettings() {
-    return ReaderDisplayBridge.controller.apply(
-      immersiveMode: _runtimeState.immersiveMode,
-      keepScreenOn: _runtimeState.keepScreenOn,
-      customBrightness: _runtimeState.customBrightness,
-      brightnessValue: _runtimeState.brightnessValue,
+    return _queueDisplayOperation(
+      () => ReaderDisplayBridge.controller.apply(
+        immersiveMode: _runtimeState.immersiveMode,
+        keepScreenOn: _runtimeState.keepScreenOn,
+        customBrightness: _runtimeState.customBrightness,
+        brightnessValue: _runtimeState.brightnessValue,
+      ),
     );
   }
 
   Future<void> syncVolumeButtonPagingPlatformState({bool? enabled}) {
+    if (_closed) {
+      return Future<void>.value();
+    }
     return ReaderDisplayBridge.controller.syncVolumeButtonPaging(
       enabled: enabled ?? _runtimeState.volumeButtonTurnPage,
       sessionId: _displayBridge.sessionId,
@@ -213,9 +224,30 @@ class ReaderSessionController {
   }
 
   Future<void> restoreReaderDisplay() {
-    return ReaderDisplayBridge.controller.restore(
-      sessionId: _displayBridge.sessionId,
+    return _queueDisplayOperation(
+      () => ReaderDisplayBridge.controller.restore(
+        sessionId: _displayBridge.sessionId,
+      ),
+      allowAfterClosed: true,
     );
+  }
+
+  Future<void> _queueDisplayOperation(
+    Future<void> Function() operation, {
+    bool allowAfterClosed = false,
+  }) {
+    final previous = _displayOperation;
+    final next = () async {
+      try {
+        await previous;
+      } catch (_) {}
+      if (_closed && !allowAfterClosed) {
+        return;
+      }
+      await operation();
+    }();
+    _displayOperation = next;
+    return next;
   }
 
   Future<void> _recordReadingProgress({int lastPageIndex = 0}) async {
