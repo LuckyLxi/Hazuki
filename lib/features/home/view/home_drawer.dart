@@ -530,15 +530,22 @@ class HomeDrawerContent extends StatelessWidget {
               children: [
                 Positioned.fill(child: ColoredBox(color: drawerBackground)),
                 Positioned.fill(
-                  child: ImageFiltered(
-                    imageFilter: ImageFilter.blur(sigmaX: 9, sigmaY: 9),
-                    child: profileLoading || resolvedAvatarUrl.isEmpty
-                        ? ColoredBox(color: colorScheme.surfaceContainerHigh)
-                        : HazukiCachedImage(
-                            url: resolvedAvatarUrl,
-                            fit: BoxFit.cover,
-                            ignoreNoImageMode: true,
-                          ),
+                  child: ClipRect(
+                    child: ImageFiltered(
+                      imageFilter: ImageFilter.blur(sigmaX: 9, sigmaY: 9),
+                      child: Transform.scale(
+                        scale: 1.08,
+                        child: profileLoading || resolvedAvatarUrl.isEmpty
+                            ? ColoredBox(
+                                color: colorScheme.surfaceContainerHigh,
+                              )
+                            : HazukiCachedImage(
+                                url: resolvedAvatarUrl,
+                                fit: BoxFit.cover,
+                                ignoreNoImageMode: true,
+                              ),
+                      ),
+                    ),
                   ),
                 ),
                 Positioned.fill(child: ColoredBox(color: darkModeDim)),
