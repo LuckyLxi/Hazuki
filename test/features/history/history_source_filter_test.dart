@@ -1,53 +1,138 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hazuki/features/history/view/history_page.dart';
+import 'package:hazuki/app/service_locator.dart';
+import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/read_history_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+import '../../support/test_service_locator.dart';
 
 void main() {
-  group('history source filtering', () {
-    test('treats legacy empty sourceKey entries as JM history', () {
-      final entry = <String, dynamic>{
-        'id': 'legacy-id',
-        'title': 'Legacy',
-        'cover': 'https://example.test/cover.jpg',
-        'subTitle': 'Old',
-      };
+  TestWidgetsFlutterBinding.ensureInitialized();
 
-      expect(
-        historyEntryBelongsToSource(entry, hazukiDefaultSourceKey),
-        isTrue,
-      );
-      expect(historyEntryBelongsToSource(entry, 'copy_manga'), isFalse);
+  setUp(() async {
+    SharedPreferences.setMockInitialValues(const {});
+    await ensureTestServiceLocator();
+  });
 
-      final comic = historyComicFromEntry(
-        entry,
-        fallbackSourceKey: hazukiDefaultSourceKey,
+  group('ReadHistoryService source filtering', () {
+    test('treats legacy empty sourceKey entries as JM history', () async {
+      final service = sl<ReadHistoryService>();
+
+      await service.importJsonList([
+        {
+          'id': 'legacy-id',
+          'title': 'Legacy',
+          'cover': 'https://example.test/cover.jpg',
+          'subTitle': 'Old',
+          'sourceKey': '',
+          'timestamp': 12,
+        },
+      ], replace: true);
+
+      final jmHistory = await service.loadHistory(
+        sourceKey: hazukiDefaultSourceKey,
       );
-      expect(comic.sourceKey, hazukiDefaultSourceKey);
-      expect(comic.id, 'legacy-id');
+      final copyHistory = await service.loadHistory(sourceKey: 'copy_manga');
+
+      expect(jmHistory, hasLength(1));
+      expect(jmHistory.single.id, 'legacy-id');
+      expect(jmHistory.single.sourceKey, hazukiDefaultSourceKey);
+      expect(copyHistory, isEmpty);
     });
 
-    test('matches only the requested source for scoped history entries', () {
-      final copyEntry = <String, dynamic>{
-        'id': 'same-id',
-        'title': 'Copy',
-        'sourceKey': 'copy_manga',
-      };
-      final jmEntry = <String, dynamic>{
-        'id': 'same-id',
-        'title': 'JM',
-        'sourceKey': hazukiDefaultSourceKey,
-      };
+    test(
+      'matches only the requested source for scoped history entries',
+      () async {
+        final service = sl<ReadHistoryService>();
 
-      expect(historyEntryBelongsToSource(copyEntry, 'copy_manga'), isTrue);
-      expect(
-        historyEntryBelongsToSource(copyEntry, hazukiDefaultSourceKey),
-        isFalse,
+        await service.importJsonList([
+          {
+            'id': 'same-id',
+            'title': 'Copy',
+            'sourceKey': 'copy_manga',
+            'timestamp': 2,
+          },
+          {
+            'id': 'same-id',
+            'title': 'JM',
+            'sourceKey': hazukiDefaultSourceKey,
+            'timestamp': 1,
+          },
+        ], replace: true);
+
+        final copyHistory = await service.loadHistory(sourceKey: 'copy_manga');
+        final jmHistory = await service.loadHistory(
+          sourceKey: hazukiDefaultSourceKey,
+        );
+
+        expect(copyHistory, hasLength(1));
+        expect(copyHistory.single.title, 'Copy');
+        expect(copyHistory.single.sourceKey, 'copy_manga');
+        expect(jmHistory, hasLength(1));
+        expect(jmHistory.single.title, 'JM');
+        expect(jmHistory.single.sourceKey, hazukiDefaultSourceKey);
+      },
+    );
+
+    test('replaces only the requested source history', () async {
+      final service = sl<ReadHistoryService>();
+
+      await service.importJsonList([
+        {
+          'id': 'copy-old',
+          'title': 'Copy old',
+          'sourceKey': 'copy_manga',
+          'timestamp': 2,
+        },
+        {
+          'id': 'jm-old',
+          'title': 'JM old',
+          'sourceKey': hazukiDefaultSourceKey,
+          'timestamp': 1,
+        },
+      ], replace: true);
+
+      await service.replaceSourceHistory(
+        sourceKey: 'copy_manga',
+        history: const [
+          ExploreComic(
+            id: 'copy-new',
+            title: 'Copy new',
+            subTitle: '',
+            cover: '',
+            sourceKey: 'copy_manga',
+          ),
+        ],
       );
-      expect(
-        historyEntryBelongsToSource(jmEntry, hazukiDefaultSourceKey),
-        isTrue,
+
+      final copyHistory = await service.loadHistory(sourceKey: 'copy_manga');
+      final jmHistory = await service.loadHistory(
+        sourceKey: hazukiDefaultSourceKey,
       );
-      expect(historyEntryBelongsToSource(jmEntry, 'copy_manga'), isFalse);
+
+      expect(copyHistory.map((comic) => comic.id), ['copy-new']);
+      expect(jmHistory.map((comic) => comic.id), ['jm-old']);
+    });
+
+    test('exports sourceKey and timestamp metadata', () async {
+      final service = sl<ReadHistoryService>();
+
+      await service.importJsonList([
+        {
+          'id': 'comic-id',
+          'title': 'Comic',
+          'sourceKey': 'copy_manga',
+          'timestamp': 123,
+        },
+      ], replace: true);
+
+      final exported = await service.exportJsonList();
+
+      expect(exported, hasLength(1));
+      expect(exported.single['id'], 'comic-id');
+      expect(exported.single['sourceKey'], 'copy_manga');
+      expect(exported.single['timestamp'], 123);
     });
   });
 }
