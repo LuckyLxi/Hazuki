@@ -62,26 +62,46 @@ class _DownloadsCompletedTabState extends State<DownloadsCompletedTab> {
     final nextById = <String, DownloadedMangaComic>{
       for (final comic in widget.comics) comic.storageKey: comic,
     };
-    final retainedIds = <String>{};
+    final currentById = <String, _AnimatedDownloadedComicEntry>{
+      for (final entry in _visibleComics) entry.comic.storageKey: entry,
+    };
+    final exitingEntries =
+        <({int index, _AnimatedDownloadedComicEntry entry})>[];
     final nextVisible = <_AnimatedDownloadedComicEntry>[];
 
-    for (final entry in _visibleComics) {
+    for (int i = 0; i < _visibleComics.length; i++) {
+      final entry = _visibleComics[i];
       final nextComic = nextById[entry.comic.storageKey];
-      if (nextComic != null) {
-        nextVisible.add(_AnimatedDownloadedComicEntry(comic: nextComic));
-        retainedIds.add(entry.comic.storageKey);
+      if (nextComic == null) {
+        final exitingEntry = entry.copyWith(exiting: true, entering: false);
+        exitingEntries.add((index: i, entry: exitingEntry));
+        if (!entry.exiting) {
+          _scheduleRemoval(entry.comic.storageKey);
+        }
         continue;
-      }
-      nextVisible.add(entry.copyWith(exiting: true));
-      if (!entry.exiting) {
-        _scheduleRemoval(entry.comic.storageKey);
       }
     }
 
     for (final comic in widget.comics) {
-      if (retainedIds.add(comic.storageKey)) {
-        nextVisible.add(_AnimatedDownloadedComicEntry(comic: comic));
+      final currentEntry = currentById[comic.storageKey];
+      if (currentEntry == null) {
+        nextVisible.add(
+          _AnimatedDownloadedComicEntry(comic: comic, entering: true),
+        );
+        _scheduleEnterComplete(comic.storageKey);
+        continue;
       }
+      nextVisible.add(
+        _AnimatedDownloadedComicEntry(
+          comic: comic,
+          entering: currentEntry.entering,
+        ),
+      );
+    }
+
+    for (final exiting in exitingEntries) {
+      final index = exiting.index.clamp(0, nextVisible.length);
+      nextVisible.insert(index, exiting.entry);
     }
 
     if (!_sameEntries(_visibleComics, nextVisible)) {
@@ -101,11 +121,31 @@ class _DownloadsCompletedTabState extends State<DownloadsCompletedTab> {
     for (int i = 0; i < current.length; i++) {
       final a = current[i];
       final b = next[i];
-      if (a.comic != b.comic || a.exiting != b.exiting) {
+      if (a.comic != b.comic ||
+          a.exiting != b.exiting ||
+          a.entering != b.entering) {
         return false;
       }
     }
     return true;
+  }
+
+  void _scheduleEnterComplete(String storageKey) {
+    Future<void>.delayed(DownloadsCompletedTab.dismissDuration, () {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _visibleComics = _visibleComics
+            .map((entry) {
+              if (entry.comic.storageKey != storageKey || entry.exiting) {
+                return entry;
+              }
+              return entry.copyWith(entering: false);
+            })
+            .toList(growable: false);
+      });
+    });
   }
 
   void _scheduleRemoval(String storageKey) {
@@ -196,7 +236,10 @@ class _AnimatedDownloadedComicCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return TweenAnimationBuilder<double>(
-      tween: Tween<double>(end: entry.exiting ? 0 : 1),
+      tween: Tween<double>(
+        begin: entry.entering ? 0 : null,
+        end: entry.exiting ? 0 : 1,
+      ),
       duration: DownloadsCompletedTab.dismissDuration,
       curve: entry.exiting ? Curves.easeInCubic : Curves.easeOutCubic,
       builder: (context, value, child) {
@@ -377,18 +420,22 @@ class _DownloadedComicCardContent extends StatelessWidget {
 class _AnimatedDownloadedComicEntry {
   const _AnimatedDownloadedComicEntry({
     required this.comic,
+    this.entering = false,
     this.exiting = false,
   });
 
   final DownloadedMangaComic comic;
+  final bool entering;
   final bool exiting;
 
   _AnimatedDownloadedComicEntry copyWith({
     DownloadedMangaComic? comic,
+    bool? entering,
     bool? exiting,
   }) {
     return _AnimatedDownloadedComicEntry(
       comic: comic ?? this.comic,
+      entering: entering ?? this.entering,
       exiting: exiting ?? this.exiting,
     );
   }

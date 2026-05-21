@@ -297,7 +297,6 @@ class HomeScaffoldShell extends StatelessWidget {
       }());
     };
   }
-
 }
 
 class _HomeAppBarProfileButton extends StatefulWidget {
