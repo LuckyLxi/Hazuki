@@ -76,9 +76,10 @@ class ReadingProgressService {
       sourceKey: _normalizeSourceKey(sourceKey),
       comicId: normalizedComicId,
     );
-    final row = await (_database.select(_database.readingProgressEntries)
-          ..where((entry) => entry.storageKey.equals(scoped.storageKey)))
-        .getSingleOrNull();
+    final row =
+        await (_database.select(_database.readingProgressEntries)
+              ..where((entry) => entry.storageKey.equals(scoped.storageKey)))
+            .getSingleOrNull();
     if (row == null) {
       return null;
     }
@@ -104,24 +105,28 @@ class ReadingProgressService {
         sourceKey: normalizedSourceKey,
         comicId: normalizedComicId,
       );
-      await _database.into(_database.readingProgressEntries).insertOnConflictUpdate(
-        ReadingProgressEntriesCompanion.insert(
-          storageKey: scoped.storageKey,
-          comicId: normalizedComicId,
-          sourceKey: normalizedSourceKey,
-          epId: epId,
-          title: title,
-          chapterIndex: chapterIndex,
-          pageIndex: Value(pageIndex),
-          timestampMs: DateTime.now().millisecondsSinceEpoch,
-        ),
-      );
+      await _database
+          .into(_database.readingProgressEntries)
+          .insertOnConflictUpdate(
+            ReadingProgressEntriesCompanion.insert(
+              storageKey: scoped.storageKey,
+              comicId: normalizedComicId,
+              sourceKey: normalizedSourceKey,
+              epId: epId,
+              title: title,
+              chapterIndex: chapterIndex,
+              pageIndex: Value(pageIndex),
+              timestampMs: DateTime.now().millisecondsSinceEpoch,
+            ),
+          );
     });
   }
 
   Future<List<Map<String, dynamic>>> exportJsonList() async {
     await _ensureMigrated();
-    final rows = await (_database.select(_database.readingProgressEntries)).get();
+    final rows = await (_database.select(
+      _database.readingProgressEntries,
+    )).get();
     return rows.map(_rowToCloudJson).toList(growable: false);
   }
 
@@ -167,9 +172,9 @@ class ReadingProgressService {
           sourceKey: sourceKey,
           comicId: comicId,
         ).storageKey;
-        final existing = await (_database.select(_database.readingProgressEntries)
-              ..where((row) => row.storageKey.equals(storageKey)))
-            .getSingleOrNull();
+        final existing = await (_database.select(
+          _database.readingProgressEntries,
+        )..where((row) => row.storageKey.equals(storageKey))).getSingleOrNull();
         final incomingTs = (entry['timestamp'] as num?)?.toInt() ?? 0;
         if (existing != null && existing.timestampMs >= incomingTs) {
           continue;
@@ -199,18 +204,20 @@ class ReadingProgressService {
       sourceKey: sourceKey,
       comicId: scoped.comicId,
     );
-    await _database.into(_database.readingProgressEntries).insertOnConflictUpdate(
-      ReadingProgressEntriesCompanion.insert(
-        storageKey: resolved.storageKey,
-        comicId: resolved.comicId,
-        sourceKey: resolved.sourceKey,
-        epId: (data['epId'] ?? '').toString(),
-        title: (data['title'] ?? '').toString(),
-        chapterIndex: (data['index'] as num?)?.toInt() ?? 0,
-        pageIndex: Value((data['pageIndex'] as num?)?.toInt() ?? 0),
-        timestampMs: (data['timestamp'] as num?)?.toInt() ?? 0,
-      ),
-    );
+    await _database
+        .into(_database.readingProgressEntries)
+        .insertOnConflictUpdate(
+          ReadingProgressEntriesCompanion.insert(
+            storageKey: resolved.storageKey,
+            comicId: resolved.comicId,
+            sourceKey: resolved.sourceKey,
+            epId: (data['epId'] ?? '').toString(),
+            title: (data['title'] ?? '').toString(),
+            chapterIndex: (data['index'] as num?)?.toInt() ?? 0,
+            pageIndex: Value((data['pageIndex'] as num?)?.toInt() ?? 0),
+            timestampMs: (data['timestamp'] as num?)?.toInt() ?? 0,
+          ),
+        );
   }
 
   Future<void> _markMigrated() async {

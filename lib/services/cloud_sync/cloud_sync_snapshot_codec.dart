@@ -56,14 +56,15 @@ class CloudSyncSnapshotCodec {
     final localHistorySnapshot = jsonEncode(
       await _readHistoryService.exportJsonList(),
     );
-    final localProgressSnapshot = await _readingProgressService.exportJsonList();
+    final localProgressSnapshot = await _readingProgressService
+        .exportJsonList();
     final localSearchSnapshot = await _searchHistoryService.load();
     final localCommentFilterKeywordsSnapshot =
         prefs.getStringList(hazukiCommentFilterKeywordsKey) ?? const <String>[];
-    final localFoldersSnapshot =
-        await _localFavoritesService.exportFoldersJsonString();
-    final localEntriesSnapshot =
-        await _localFavoritesService.exportEntriesJsonString();
+    final localFoldersSnapshot = await _localFavoritesService
+        .exportFoldersJsonString();
+    final localEntriesSnapshot = await _localFavoritesService
+        .exportEntriesJsonString();
 
     if (readingText != null) {
       Map<String, dynamic>? readingMap;
@@ -157,9 +158,10 @@ class CloudSyncSnapshotCodec {
                   .trim();
           entry['sourceKey'] = sourceKey;
           localProgress[SourceScopedComicId(
-            sourceKey: sourceKey,
-            comicId: comicId,
-          ).storageKey] = entry;
+                sourceKey: sourceKey,
+                comicId: comicId,
+              ).storageKey] =
+              entry;
         }
 
         final allStorageKeys = {...localProgress.keys, ...remoteProgress.keys};
@@ -274,8 +276,8 @@ class CloudSyncSnapshotCodec {
       'data': settingsMap,
     });
 
-    List<Map<String, dynamic>> history =
-        await _readHistoryService.exportJsonList();
+    List<Map<String, dynamic>> history = await _readHistoryService
+        .exportJsonList();
     if (history.length > hazukiReadHistoryMaxCount) {
       history = history.sublist(0, hazukiReadHistoryMaxCount);
     }

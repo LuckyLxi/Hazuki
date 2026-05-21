@@ -231,6 +231,7 @@ class HomeScaffoldShell extends StatelessWidget {
                         ? null
                         : _HomeAppBarProfileButton(
                             downloadService: downloadService,
+                            activeSourceKey: sourceService.activeSourceKey,
                             avatarUrl: avatarUrl,
                             profileLoading: profileLoading,
                             username: username,
@@ -309,6 +310,7 @@ class HomeScaffoldShell extends StatelessWidget {
 class _HomeAppBarProfileButton extends StatefulWidget {
   const _HomeAppBarProfileButton({
     required this.downloadService,
+    required this.activeSourceKey,
     required this.avatarUrl,
     required this.profileLoading,
     required this.username,
@@ -316,6 +318,7 @@ class _HomeAppBarProfileButton extends StatefulWidget {
   });
 
   final MangaDownloadService downloadService;
+  final String activeSourceKey;
   final String? avatarUrl;
   final bool profileLoading;
   final String username;
@@ -409,6 +412,12 @@ class _HomeAppBarProfileButtonState extends State<_HomeAppBarProfileButton> {
                   child: Row(
                     children: [
                       HomeProfileAvatar(
+                        key: ValueKey(
+                          'home-appbar-avatar-${widget.activeSourceKey}|'
+                          '${widget.avatarUrl ?? ''}|'
+                          '${widget.profileLoading}|'
+                          '${widget.username}',
+                        ),
                         avatarUrl: widget.avatarUrl,
                         loading: widget.profileLoading,
                         size: 38,

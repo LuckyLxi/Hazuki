@@ -19,7 +19,8 @@ class ReadHistoryService extends ChangeNotifier {
   Future<void> _opQueue = Future.value();
 
   static const String _legacyHistoryKey = 'hazuki_read_history';
-  static const String _migrationDoneKey = 'hazuki_read_history_drift_migrated_v1';
+  static const String _migrationDoneKey =
+      'hazuki_read_history_drift_migrated_v1';
 
   Future<T> _serialized<T>(Future<T> Function() fn) {
     final completer = Completer<T>();
@@ -39,7 +40,10 @@ class ReadHistoryService extends ChangeNotifier {
       if (prefs.getBool(_migrationDoneKey) == true) {
         return;
       }
-      await _importJsonString(prefs.getString(_legacyHistoryKey), replace: false);
+      await _importJsonString(
+        prefs.getString(_legacyHistoryKey),
+        replace: false,
+      );
       await prefs.setBool(_migrationDoneKey, true);
     });
     return _migration;
@@ -47,10 +51,14 @@ class ReadHistoryService extends ChangeNotifier {
 
   Future<List<ExploreComic>> loadHistory({required String sourceKey}) async {
     await _ensureMigrated();
-    final entries = await ((_database.select(_database.readHistoryEntries)
-          ..where((entry) => entry.sourceKey.equals(_normalizeSourceKey(sourceKey)))
-          ..orderBy([(entry) => OrderingTerm.desc(entry.timestampMs)]))
-        .get());
+    final entries =
+        await ((_database.select(_database.readHistoryEntries)
+              ..where(
+                (entry) =>
+                    entry.sourceKey.equals(_normalizeSourceKey(sourceKey)),
+              )
+              ..orderBy([(entry) => OrderingTerm.desc(entry.timestampMs)]))
+            .get());
     return entries
         .map(
           (entry) => ExploreComic(
@@ -72,8 +80,9 @@ class ReadHistoryService extends ChangeNotifier {
       await _ensureMigrated();
       final normalizedSourceKey = _normalizeSourceKey(sourceKey);
       await _database.transaction(() async {
-        await (_database.delete(_database.readHistoryEntries)
-          ..where((entry) => entry.sourceKey.equals(normalizedSourceKey))).go();
+        await (_database.delete(
+          _database.readHistoryEntries,
+        )..where((entry) => entry.sourceKey.equals(normalizedSourceKey))).go();
         var index = 0;
         final now = DateTime.now().millisecondsSinceEpoch;
         for (final comic in history.take(hazukiReadHistoryMaxCount)) {
@@ -85,17 +94,19 @@ class ReadHistoryService extends ChangeNotifier {
             sourceKey: _normalizeSourceKey(comic.sourceKey),
             comicId: comicId,
           );
-          await _database.into(_database.readHistoryEntries).insertOnConflictUpdate(
-            ReadHistoryEntriesCompanion.insert(
-              storageKey: scoped.storageKey,
-              comicId: comicId,
-              sourceKey: scoped.sourceKey,
-              title: comic.title,
-              cover: comic.cover,
-              subTitle: comic.subTitle,
-              timestampMs: now - index,
-            ),
-          );
+          await _database
+              .into(_database.readHistoryEntries)
+              .insertOnConflictUpdate(
+                ReadHistoryEntriesCompanion.insert(
+                  storageKey: scoped.storageKey,
+                  comicId: comicId,
+                  sourceKey: scoped.sourceKey,
+                  title: comic.title,
+                  cover: comic.cover,
+                  subTitle: comic.subTitle,
+                  timestampMs: now - index,
+                ),
+              );
           index++;
         }
       });
@@ -109,26 +120,39 @@ class ReadHistoryService extends ChangeNotifier {
   }) {
     return _serialized(() async {
       await _ensureMigrated();
-      final comicId = details.id.trim().isNotEmpty ? details.id.trim() : comic.id.trim();
+      final comicId = details.id.trim().isNotEmpty
+          ? details.id.trim()
+          : comic.id.trim();
       if (comicId.isEmpty) {
         return;
       }
       final sourceKey = _normalizeSourceKey(
-        details.sourceKey.trim().isNotEmpty ? details.sourceKey : comic.sourceKey,
+        details.sourceKey.trim().isNotEmpty
+            ? details.sourceKey
+            : comic.sourceKey,
       );
-      final scoped = SourceScopedComicId(sourceKey: sourceKey, comicId: comicId);
+      final scoped = SourceScopedComicId(
+        sourceKey: sourceKey,
+        comicId: comicId,
+      );
       await _database.transaction(() async {
-        await _database.into(_database.readHistoryEntries).insertOnConflictUpdate(
-          ReadHistoryEntriesCompanion.insert(
-            storageKey: scoped.storageKey,
-            comicId: comicId,
-            sourceKey: sourceKey,
-            title: details.title.isNotEmpty ? details.title : comic.title,
-            cover: details.cover.trim().isNotEmpty ? details.cover : comic.cover,
-            subTitle: details.subTitle.isNotEmpty ? details.subTitle : comic.subTitle,
-            timestampMs: DateTime.now().millisecondsSinceEpoch,
-          ),
-        );
+        await _database
+            .into(_database.readHistoryEntries)
+            .insertOnConflictUpdate(
+              ReadHistoryEntriesCompanion.insert(
+                storageKey: scoped.storageKey,
+                comicId: comicId,
+                sourceKey: sourceKey,
+                title: details.title.isNotEmpty ? details.title : comic.title,
+                cover: details.cover.trim().isNotEmpty
+                    ? details.cover
+                    : comic.cover,
+                subTitle: details.subTitle.isNotEmpty
+                    ? details.subTitle
+                    : comic.subTitle,
+                timestampMs: DateTime.now().millisecondsSinceEpoch,
+              ),
+            );
         await _trimHistoryLocked();
       });
       notifyListeners();
@@ -137,10 +161,11 @@ class ReadHistoryService extends ChangeNotifier {
 
   Future<List<Map<String, dynamic>>> exportJsonList() async {
     await _ensureMigrated();
-    final entries = await ((_database.select(_database.readHistoryEntries)
-          ..orderBy([(entry) => OrderingTerm.desc(entry.timestampMs)])
-          ..limit(hazukiReadHistoryMaxCount))
-        .get());
+    final entries =
+        await ((_database.select(_database.readHistoryEntries)
+              ..orderBy([(entry) => OrderingTerm.desc(entry.timestampMs)])
+              ..limit(hazukiReadHistoryMaxCount))
+            .get());
     return entries
         .map(
           (entry) => <String, dynamic>{
@@ -171,7 +196,10 @@ class ReadHistoryService extends ChangeNotifier {
       final decoded = jsonDecode(raw);
       if (decoded is List) {
         await importJsonList(
-          decoded.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList(),
+          decoded
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList(),
           replace: replace,
         );
       }
@@ -195,18 +223,23 @@ class ReadHistoryService extends ChangeNotifier {
           final sourceKey = _normalizeSourceKey(
             (entry['sourceKey'] ?? hazukiDefaultSourceKey).toString(),
           );
-          final scoped = SourceScopedComicId(sourceKey: sourceKey, comicId: comicId);
-          await _database.into(_database.readHistoryEntries).insertOnConflictUpdate(
-            ReadHistoryEntriesCompanion.insert(
-              storageKey: scoped.storageKey,
-              comicId: comicId,
-              sourceKey: sourceKey,
-              title: (entry['title'] ?? '').toString(),
-              cover: (entry['cover'] ?? '').toString(),
-              subTitle: (entry['subTitle'] ?? '').toString(),
-              timestampMs: (entry['timestamp'] as num?)?.toInt() ?? 0,
-            ),
+          final scoped = SourceScopedComicId(
+            sourceKey: sourceKey,
+            comicId: comicId,
           );
+          await _database
+              .into(_database.readHistoryEntries)
+              .insertOnConflictUpdate(
+                ReadHistoryEntriesCompanion.insert(
+                  storageKey: scoped.storageKey,
+                  comicId: comicId,
+                  sourceKey: sourceKey,
+                  title: (entry['title'] ?? '').toString(),
+                  cover: (entry['cover'] ?? '').toString(),
+                  subTitle: (entry['subTitle'] ?? '').toString(),
+                  timestampMs: (entry['timestamp'] as num?)?.toInt() ?? 0,
+                ),
+              );
         }
         await _trimHistoryLocked();
       });
@@ -215,13 +248,15 @@ class ReadHistoryService extends ChangeNotifier {
   }
 
   Future<void> _trimHistoryLocked() async {
-    final extra = await ((_database.select(_database.readHistoryEntries)
-          ..orderBy([(entry) => OrderingTerm.desc(entry.timestampMs)])
-          ..limit(-1, offset: hazukiReadHistoryMaxCount))
-        .get());
+    final extra =
+        await ((_database.select(_database.readHistoryEntries)
+              ..orderBy([(entry) => OrderingTerm.desc(entry.timestampMs)])
+              ..limit(-1, offset: hazukiReadHistoryMaxCount))
+            .get());
     for (final entry in extra) {
-      await (_database.delete(_database.readHistoryEntries)
-        ..where((row) => row.storageKey.equals(entry.storageKey))).go();
+      await (_database.delete(
+        _database.readHistoryEntries,
+      )..where((row) => row.storageKey.equals(entry.storageKey))).go();
     }
   }
 

@@ -129,15 +129,20 @@ void main() {
         }),
       );
 
-      final entries = jsonDecode(
-        await sl<LocalFavoritesService>().exportEntriesJsonString(),
-      ) as List<dynamic>;
+      final entries =
+          jsonDecode(
+                await sl<LocalFavoritesService>().exportEntriesJsonString(),
+              )
+              as List<dynamic>;
       expect(entries, hasLength(1));
       expect((entries.single as Map<String, dynamic>)['sourceKey'], 'other');
 
-      final tombstones = jsonDecode(
-        await sl<LocalFavoritesService>().exportEntryTombstonesJsonString(),
-      ) as List<dynamic>;
+      final tombstones =
+          jsonDecode(
+                await sl<LocalFavoritesService>()
+                    .exportEntryTombstonesJsonString(),
+              )
+              as List<dynamic>;
       final tombstone = tombstones.single as Map<String, dynamic>;
       expect(tombstone['comicId'], '123');
       expect(tombstone['sourceKey'], 'jm');

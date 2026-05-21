@@ -507,7 +507,7 @@ class HomeDrawerContent extends StatelessWidget {
         : username;
     final resolvedAvatarUrl = (avatarUrl ?? '').trim();
     final visualStateKey =
-        '${sl<HazukiSourceService>().activeSourceKey}|$resolvedAvatarUrl|$profileLoading';
+        '${sl<HazukiSourceService>().activeSourceKey}|$resolvedAvatarUrl|$profileLoading|$displayUsername';
     final usernameStyle = textTheme.titleLarge?.copyWith(
       fontWeight: FontWeight.bold,
       color: colorScheme.onSurface,

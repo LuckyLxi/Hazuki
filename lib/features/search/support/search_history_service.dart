@@ -91,9 +91,9 @@ class SearchHistoryService {
   }
 
   Future<List<String>> _loadFromDatabase() async {
-    final rows = await ((_database.select(_database.searchHistoryEntries)
-          ..orderBy([(entry) => OrderingTerm.asc(entry.position)]))
-        .get());
+    final rows = await ((_database.select(
+      _database.searchHistoryEntries,
+    )..orderBy([(entry) => OrderingTerm.asc(entry.position)])).get());
     return rows.map((entry) => entry.keyword).toList(growable: false);
   }
 
@@ -113,12 +113,14 @@ class SearchHistoryService {
     await _database.transaction(() async {
       await _database.delete(_database.searchHistoryEntries).go();
       for (var i = 0; i < next.length; i++) {
-        await _database.into(_database.searchHistoryEntries).insert(
-          SearchHistoryEntriesCompanion.insert(
-            keyword: next[i],
-            position: i,
-          ),
-        );
+        await _database
+            .into(_database.searchHistoryEntries)
+            .insert(
+              SearchHistoryEntriesCompanion.insert(
+                keyword: next[i],
+                position: i,
+              ),
+            );
       }
     });
   }
