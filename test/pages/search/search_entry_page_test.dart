@@ -31,7 +31,7 @@ void main() {
       _buildTestApp(
         SearchEntryPage(
           comicDetailPageBuilder: _comicDetailPageBuilder,
-          comicCoverHeroTagBuilder: (_, {String? salt}) => 'hero-$salt',
+          comicCoverHeroTagBuilder: _testComicCoverHeroTag,
           searchPageLoader: _fakeSearchPageLoader,
         ),
       ),
@@ -63,7 +63,7 @@ void main() {
       _buildTestApp(
         SearchEntryPage(
           comicDetailPageBuilder: _comicDetailPageBuilder,
-          comicCoverHeroTagBuilder: (_, {String? salt}) => 'hero-$salt',
+          comicCoverHeroTagBuilder: _testComicCoverHeroTag,
           searchPageLoader: _fakeSearchPageLoader,
         ),
       ),
@@ -104,7 +104,7 @@ void main() {
       _buildTestApp(
         SearchEntryPage(
           comicDetailPageBuilder: _comicDetailPageBuilder,
-          comicCoverHeroTagBuilder: (_, {String? salt}) => 'hero-$salt',
+          comicCoverHeroTagBuilder: _testComicCoverHeroTag,
           searchPageLoader: _fakeSearchPageLoader,
         ),
       ),
@@ -127,7 +127,7 @@ void main() {
         _buildTestApp(
           SearchEntryPage(
             comicDetailPageBuilder: _comicDetailPageBuilder,
-            comicCoverHeroTagBuilder: (_, {String? salt}) => 'hero-$salt',
+            comicCoverHeroTagBuilder: _testComicCoverHeroTag,
             searchPageLoader: _fakeSearchPageLoader,
           ),
         ),
@@ -166,7 +166,7 @@ void main() {
       _buildTestApp(
         SearchEntryPage(
           comicDetailPageBuilder: _comicDetailPageBuilder,
-          comicCoverHeroTagBuilder: (_, {String? salt}) => 'hero-$salt',
+          comicCoverHeroTagBuilder: _testComicCoverHeroTag,
           searchPageLoader: _recordingSearchPageLoader(requests),
         ),
       ),
@@ -218,7 +218,7 @@ void main() {
       _buildTestApp(
         SearchEntryPage(
           comicDetailPageBuilder: _comicDetailPageBuilder,
-          comicCoverHeroTagBuilder: (_, {String? salt}) => 'hero-$salt',
+          comicCoverHeroTagBuilder: _testComicCoverHeroTag,
           searchPageLoader: _recordingSearchPageLoader(requests),
         ),
       ),
@@ -255,7 +255,7 @@ void main() {
       _buildTestApp(
         SearchEntryPage(
           comicDetailPageBuilder: _comicDetailPageBuilder,
-          comicCoverHeroTagBuilder: (_, {String? salt}) => 'hero-$salt',
+          comicCoverHeroTagBuilder: _testComicCoverHeroTag,
           searchPageLoader: _fakeSearchPageLoader,
         ),
       ),
@@ -284,7 +284,7 @@ void main() {
         SearchPage(
           initialKeyword: 'external-tag',
           comicDetailPageBuilder: _comicDetailPageBuilder,
-          comicCoverHeroTagBuilder: (_, {String? salt}) => 'hero-$salt',
+          comicCoverHeroTagBuilder: _testComicCoverHeroTag,
           searchPageLoader: _fakeSearchPageLoader,
         ),
       ),
@@ -305,7 +305,7 @@ void main() {
         SearchPage(
           initialKeyword: 'hazuki',
           comicDetailPageBuilder: _comicDetailPageBuilder,
-          comicCoverHeroTagBuilder: (_, {String? salt}) => 'hero-$salt',
+          comicCoverHeroTagBuilder: _testComicCoverHeroTag,
           searchPageLoader: _fakeSearchPageLoader,
         ),
       ),
@@ -371,6 +371,10 @@ Widget _buildTestApp(Widget home) {
     supportedLocales: AppLocalizations.supportedLocales,
     home: home,
   );
+}
+
+String _testComicCoverHeroTag(ExploreComic comic, {String? salt}) {
+  return 'hero-${salt ?? 'search'}-${comic.id}';
 }
 
 Future<void> _pumpSearchSettled(WidgetTester tester) async {
