@@ -193,13 +193,13 @@ extension HazukiSourceServiceCommentsAvatarSupport on HazukiSourceService {
       }
     }
 
+    if (isHazukiCopyMangaSourceKey(sourceKey)) {
+      return _tryRefreshCopyMangaAvatarViaLogin(facade);
+    }
+
     final apiAvatarUrl = await _tryFetchAvatarViaApi(engine, facade);
     if (apiAvatarUrl != null) {
       return apiAvatarUrl;
-    }
-
-    if (isHazukiCopyMangaSourceKey(sourceKey)) {
-      return _tryRefreshCopyMangaAvatarViaLogin(facade);
     }
 
     return null;
@@ -356,7 +356,20 @@ extension HazukiSourceServiceCommentsAvatarSupport on HazukiSourceService {
     HazukiSourceFacade facade,
   ) async {
     final sourceMeta = facade.sourceMeta;
-    if (sourceMeta == null || !isHazukiCopyMangaSourceKey(sourceMeta.key)) {
+    final engine = facade.js.engine;
+    if (sourceMeta == null ||
+        engine == null ||
+        !isHazukiCopyMangaSourceKey(sourceMeta.key)) {
+      return null;
+    }
+    final accountData = facade.loadAccountDataSync();
+    if (accountData == null || accountData.length < 2) {
+      _logAvatarEvent(
+        facade,
+        level: 'warn',
+        title: 'Avatar relogin skipped',
+        content: {'sourceKey': sourceMeta.key, 'reason': 'missing_account'},
+      );
       return null;
     }
     if (facade.runtime.shouldSkipRelogin(const Duration(minutes: 2))) {
@@ -374,16 +387,31 @@ extension HazukiSourceServiceCommentsAvatarSupport on HazukiSourceService {
       title: 'Avatar relogin fallback started',
       content: {'sourceKey': sourceMeta.key},
     );
-    final reloginOk = await _tryReloginFromStoredAccount(force: true);
-    if (!reloginOk) {
+    final result = engine.evaluate(
+      _copyMangaAvatarRefreshScript(
+        account: accountData[0],
+        password: accountData[1],
+      ),
+      name: 'copy_manga_avatar_refresh.js',
+    );
+    final resolved = jsonSafe(await facade.js.resolve(result));
+    if (resolved is! Map || resolved['ok'] != true) {
       _logAvatarEvent(
         facade,
         level: 'warn',
         title: 'Avatar relogin fallback failed',
-        content: {'sourceKey': sourceMeta.key},
+        content: {'sourceKey': sourceMeta.key, 'result': resolved},
       );
       return null;
     }
+
+    final loginResult = resolved['result'];
+    await _persistLoginSideData(
+      facade,
+      sourceKey: sourceMeta.key,
+      result: loginResult,
+    );
+    facade.lastReloginAt = DateTime.now();
 
     final refreshedAvatarUrl = facade.runtime.transientAvatarUrl?.trim();
     if (refreshedAvatarUrl == null || refreshedAvatarUrl.isEmpty) {
@@ -407,6 +435,63 @@ extension HazukiSourceServiceCommentsAvatarSupport on HazukiSourceService {
     );
     return avatarUrl;
   }
+}
+
+String _copyMangaAvatarRefreshScript({
+  required String account,
+  required String password,
+}) {
+  final accountJson = jsonEncode(account);
+  final passwordJson = jsonEncode(password);
+  return '''
+(async () => {
+  const source = this.__hazuki_source;
+  const account = $accountJson;
+  const password = $passwordJson;
+  const salt = Math.floor(Math.random() * 9000) + 1000;
+  const encodedPassword = Convert.encodeBase64(
+    Convert.encodeUtf8(password + "-" + salt)
+  );
+  try {
+    const response = await Network.post(
+      source.apiUrl + "/api/v3/login",
+      {
+        ...source.headers,
+        "Content-Type": "application/x-www-form-urlencoded;charset=utf-8"
+      },
+      "username=" +
+        account +
+        "&password=" +
+        encodedPassword +
+        "\\n&salt=" +
+        salt +
+        "&authorization=Token+"
+    );
+    if (!response || response.status !== 200) {
+      return {
+        ok: false,
+        status: response && response.status,
+        body: response && response.body
+      };
+    }
+    const data = JSON.parse(response.body);
+    const token = data && data.results && data.results.token;
+    if (token) {
+      source.saveData("token", token);
+    }
+    return {
+      ok: true,
+      status: response.status,
+      result: data
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: String(error)
+    };
+  }
+})()
+''';
 }
 
 void _logAvatarEvent(

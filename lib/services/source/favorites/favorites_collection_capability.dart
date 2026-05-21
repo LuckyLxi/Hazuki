@@ -8,7 +8,10 @@ extension HazukiSourceServiceFavoritesCollectionCapability
   }) async {
     try {
       final facade = this.facade;
-      await _ensureFavoriteSessionReady();
+      final sessionReady = await _ensureFavoriteSessionReady();
+      if (!sessionReady) {
+        throw Exception('login_expired');
+      }
       final result = await _runWithReloginRetry(() async {
         final engine = facade.js.engine;
         if (engine == null) {
@@ -82,7 +85,10 @@ extension HazukiSourceServiceFavoritesCollectionCapability
             ) async {
               try {
                 return await loadComicsByFolderArg(folderArg, scriptName);
-              } catch (_) {
+              } catch (error) {
+                if (_isLoginExpiredError(error)) {
+                  rethrow;
+                }
                 return null;
               }
             }
@@ -192,7 +198,10 @@ extension HazukiSourceServiceFavoritesCollectionCapability
   Future<FavoriteFoldersResult> loadFavoriteFolders({String? comicId}) async {
     try {
       final facade = this.facade;
-      await _ensureFavoriteSessionReady();
+      final sessionReady = await _ensureFavoriteSessionReady();
+      if (!sessionReady) {
+        throw Exception('login_expired');
+      }
       final result = await _runWithReloginRetry(() async {
         final engine = facade.js.engine;
         if (engine == null) {

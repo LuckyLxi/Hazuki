@@ -19,19 +19,19 @@ extension HazukiSourceServiceAccountSessionRetrySupport on HazukiSourceService {
     }
   }
 
-  Future<void> _ensureFavoriteSessionReady() async {
+  Future<bool> _ensureFavoriteSessionReady() async {
     final facade = this.facade;
     await facade.ensureInitialized();
 
     if (!facade.isLogged) {
-      return;
+      return true;
     }
 
     if (facade.runtime.shouldSkipRelogin(const Duration(minutes: 8))) {
-      return;
+      return true;
     }
 
-    await _tryReloginFromStoredAccount();
+    return _tryReloginFromStoredAccount();
   }
 
   bool _isLoginExpiredError(Object error) {
