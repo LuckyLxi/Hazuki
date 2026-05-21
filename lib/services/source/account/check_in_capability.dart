@@ -254,14 +254,20 @@ extension HazukiSourceServiceCheckInCapability on HazukiSourceService {
       method: normalizedMethod,
       token: token,
     );
-    final dio = _createSourceDio();
     final startedAt = DateTime.now();
     try {
       final response = normalizedMethod == 'GET'
-          ? await dio.get<String>(url, options: Options(headers: signedHeaders))
-          : await dio.post<String>(
+          ? await facade.httpGateway.request<String>(
               url,
               options: Options(headers: signedHeaders),
+              withCookies: false,
+            )
+          : await facade.httpGateway.request<String>(
+              url,
+              method: 'POST',
+              options: Options(headers: signedHeaders),
+              retryPolicy: HazukiNetworkRetryPolicy.none,
+              withCookies: false,
             );
       final body = response.data ?? '';
       facade.networkLogSink.append(

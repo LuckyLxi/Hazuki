@@ -7,7 +7,6 @@ import 'dart:ui';
 
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
-import 'package:dio/io.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_qjs/flutter_qjs.dart';
@@ -29,6 +28,7 @@ import 'source/http/source_http_gateway.dart';
 import 'source/image/image_cache_capability.dart';
 import 'source/runtime/explore_cache_capability.dart';
 import 'source/runtime/line_settings_capability.dart';
+import 'network/hazuki_network.dart';
 
 part 'source/explore_capability.dart';
 
@@ -97,8 +97,8 @@ bool isHazukiPicacgSourceKey(String sourceKey) {
 }
 
 Dio _createSourceDio() {
-  return Dio(
-    BaseOptions(
+  return createHazukiDio(
+    baseOptions: BaseOptions(
       responseType: ResponseType.plain,
       validateStatus: (status) => true,
       connectTimeout: const Duration(seconds: 35),

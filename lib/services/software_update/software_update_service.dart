@@ -6,6 +6,7 @@ import 'package:device_info_plus/device_info_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
+import '../network/hazuki_network.dart';
 import 'software_update_version_utils.dart';
 
 class SoftwareUpdateService {
@@ -18,18 +19,20 @@ class SoftwareUpdateService {
   static const _latestReleaseUrl =
       'https://api.github.com/repos/LuckyLxi/Hazuki/releases/latest';
 
-  final Dio _dio = Dio(
-    BaseOptions(
-      connectTimeout: const Duration(seconds: 3),
-      receiveTimeout: const Duration(seconds: 4),
-      sendTimeout: const Duration(seconds: 3),
-      responseType: ResponseType.plain,
-      headers: const {
-        'Accept': 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2022-11-28',
-      },
-      validateStatus: (status) =>
-          status != null && status >= 200 && status < 300,
+  final HazukiNetworkClient _client = HazukiNetworkClient(
+    dio: createHazukiDio(
+      baseOptions: BaseOptions(
+        connectTimeout: const Duration(seconds: 3),
+        receiveTimeout: const Duration(seconds: 4),
+        sendTimeout: const Duration(seconds: 3),
+        responseType: ResponseType.plain,
+        headers: const {
+          'Accept': 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28',
+        },
+        validateStatus: (status) =>
+            status != null && status >= 200 && status < 300,
+      ),
     ),
   );
 
@@ -95,7 +98,7 @@ class SoftwareUpdateService {
 
   Future<Map<String, dynamic>?> _getJsonMap(String url) async {
     try {
-      final response = await _dio.get<String>(url);
+      final response = await _client.get<String>(url);
       final body = response.data?.trim();
       if (body == null || body.isEmpty) {
         return null;
