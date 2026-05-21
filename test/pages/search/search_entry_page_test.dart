@@ -360,7 +360,17 @@ void main() {
     await tester.tap(find.text('Comic hazuki 3'));
     await _pumpSearchSettled(tester);
 
-    expect(WindowsComicDetailController.instance.entry?.comic.id, 'hazuki-1-3');
+    if (useWindowsComicDetailPanel) {
+      expect(
+        WindowsComicDetailController.instance.entry?.comic.id,
+        'hazuki-1-3',
+      );
+    } else {
+      expect(
+        find.text('detail:hazuki-1-3-hero-search-results-hazuki-1-3'),
+        findsOneWidget,
+      );
+    }
     expect(tester.testTextInput.isVisible, isFalse);
   });
 }
