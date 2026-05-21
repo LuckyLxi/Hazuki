@@ -106,7 +106,9 @@ class FavoritePageController extends ChangeNotifier {
   }) async {
     if (_state.isFirstLoad) {
       _state.isFirstLoad = false;
-      final savedMode = await _localFlow.loadFavoritePageMode();
+      final savedMode = await _localFlow.loadFavoritePageMode(
+        sourceKey: _activeSourceKey,
+      );
       _state.selectedCloudFolderId = await _localFlow.loadSelectedFolderId(
         FavoritePageMode.cloud,
       );
@@ -175,7 +177,10 @@ class FavoritePageController extends ChangeNotifier {
           ? FavoritePageMode.local
           : FavoritePageMode.cloud,
     );
-    await _localFlow.saveFavoritePageMode(_state.mode);
+    await _localFlow.saveFavoritePageMode(
+      _state.mode,
+      sourceKey: _activeSourceKey,
+    );
     _state.resetForModeChange();
     _notify();
 
@@ -514,11 +519,26 @@ class FavoritePageController extends ChangeNotifier {
       _state.favoriteSortOrder,
       allowedOrders: _favoriteSortOrders,
     );
+    unawaited(_restoreModeForActiveSource());
+  }
+
+  Future<void> _restoreModeForActiveSource() async {
+    final sourceKey = _activeSourceKey;
+    final savedMode = await _localFlow.loadFavoritePageMode(
+      sourceKey: sourceKey,
+    );
+    if (_disposed || sourceKey != _activeSourceKey) {
+      return;
+    }
+    if (_state.mode != savedMode) {
+      _state.setMode(savedMode);
+    }
     if (_state.mode == FavoritePageMode.local) {
+      _state.resetForModeChange();
+      _notify();
       unawaited(_syncLocalFavoritesAfterExternalChange());
       return;
     }
-    // 切换到新源后，云端模式需要重置状态并后台重新加载收藏数据
     _state.resetForReload();
     _notify();
     unawaited(_backgroundRefreshCloud());

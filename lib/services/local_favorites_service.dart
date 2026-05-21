@@ -31,6 +31,7 @@ class LocalFavoritesService extends ChangeNotifier {
       'local_favorite_entry_tombstones_v1';
   static const String _sortOrderKey = 'local_favorite_sort_order_v1';
   static const String _pageModeKey = 'favorite_page_mode_v1';
+  static const String _pageModeSourcePrefix = 'favorite_page_mode_source_v1_';
   static const String _selectedCloudFolderKey =
       'favorite_selected_cloud_folder_v1';
   static const String _selectedLocalFolderKey =
@@ -65,18 +66,33 @@ class LocalFavoritesService extends ChangeNotifier {
     await prefs.setString(_sortOrderKey, normalized);
   }
 
-  Future<FavoritePageMode> loadFavoritePageMode() async {
+  Future<FavoritePageMode> loadFavoritePageMode({String sourceKey = ''}) async {
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_pageModeKey);
+    final sourceScopedKey = _pageModeKeyForSource(sourceKey);
+    final raw = sourceScopedKey == null
+        ? prefs.getString(_pageModeKey)
+        : prefs.getString(sourceScopedKey) ?? prefs.getString(_pageModeKey);
     return raw == 'local' ? FavoritePageMode.local : FavoritePageMode.cloud;
   }
 
-  Future<void> saveFavoritePageMode(FavoritePageMode mode) async {
+  Future<void> saveFavoritePageMode(
+    FavoritePageMode mode, {
+    String sourceKey = '',
+  }) async {
     final prefs = await SharedPreferences.getInstance();
+    final sourceScopedKey = _pageModeKeyForSource(sourceKey);
     await prefs.setString(
-      _pageModeKey,
+      sourceScopedKey ?? _pageModeKey,
       mode == FavoritePageMode.local ? 'local' : 'cloud',
     );
+  }
+
+  String? _pageModeKeyForSource(String sourceKey) {
+    final normalized = sourceKey.trim();
+    if (normalized.isEmpty) {
+      return null;
+    }
+    return '$_pageModeSourcePrefix${Uri.encodeComponent(normalized)}';
   }
 
   Future<String> loadSelectedFavoriteFolderId(FavoritePageMode mode) async {

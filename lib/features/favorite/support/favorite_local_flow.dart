@@ -14,12 +14,18 @@ class FavoriteLocalFlow {
     return localFavoritesService.saveSortOrder(order);
   }
 
-  Future<FavoritePageMode> loadFavoritePageMode() {
-    return localFavoritesService.loadFavoritePageMode();
+  Future<FavoritePageMode> loadFavoritePageMode({String sourceKey = ''}) {
+    return localFavoritesService.loadFavoritePageMode(sourceKey: sourceKey);
   }
 
-  Future<void> saveFavoritePageMode(FavoritePageMode mode) {
-    return localFavoritesService.saveFavoritePageMode(mode);
+  Future<void> saveFavoritePageMode(
+    FavoritePageMode mode, {
+    String sourceKey = '',
+  }) {
+    return localFavoritesService.saveFavoritePageMode(
+      mode,
+      sourceKey: sourceKey,
+    );
   }
 
   Future<String> loadSelectedFolderId(FavoritePageMode mode) {

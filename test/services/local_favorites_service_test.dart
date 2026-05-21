@@ -72,6 +72,58 @@ void main() {
     });
   });
 
+  group('LocalFavoritesService favorite page mode persistence', () {
+    late LocalFavoritesService service;
+
+    setUp(() {
+      SharedPreferences.setMockInitialValues(const {});
+      service = sl<LocalFavoritesService>();
+    });
+
+    test('saves and restores favorite page mode per source', () async {
+      await service.saveFavoritePageMode(
+        FavoritePageMode.local,
+        sourceKey: 'jm',
+      );
+      await service.saveFavoritePageMode(
+        FavoritePageMode.cloud,
+        sourceKey: 'copy_manga',
+      );
+
+      expect(
+        await service.loadFavoritePageMode(sourceKey: 'jm'),
+        FavoritePageMode.local,
+      );
+      expect(
+        await service.loadFavoritePageMode(sourceKey: 'copy_manga'),
+        FavoritePageMode.cloud,
+      );
+    });
+
+    test('falls back to the legacy global favorite page mode', () async {
+      await service.saveFavoritePageMode(FavoritePageMode.local);
+
+      expect(
+        await service.loadFavoritePageMode(sourceKey: 'picacg'),
+        FavoritePageMode.local,
+      );
+
+      await service.saveFavoritePageMode(
+        FavoritePageMode.cloud,
+        sourceKey: 'picacg',
+      );
+
+      expect(
+        await service.loadFavoritePageMode(sourceKey: 'picacg'),
+        FavoritePageMode.cloud,
+      );
+      expect(
+        await service.loadFavoritePageMode(sourceKey: 'jm'),
+        FavoritePageMode.local,
+      );
+    });
+  });
+
   group('LocalFavoritesService favorite sort order', () {
     late LocalFavoritesService service;
 
