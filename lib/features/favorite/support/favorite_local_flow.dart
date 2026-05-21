@@ -28,12 +28,26 @@ class FavoriteLocalFlow {
     );
   }
 
-  Future<String> loadSelectedFolderId(FavoritePageMode mode) {
-    return localFavoritesService.loadSelectedFavoriteFolderId(mode);
+  Future<String> loadSelectedFolderId(
+    FavoritePageMode mode, {
+    String sourceKey = '',
+  }) {
+    return localFavoritesService.loadSelectedFavoriteFolderId(
+      mode,
+      sourceKey: sourceKey,
+    );
   }
 
-  Future<void> saveSelectedFolderId(FavoritePageMode mode, String folderId) {
-    return localFavoritesService.saveSelectedFavoriteFolderId(mode, folderId);
+  Future<void> saveSelectedFolderId(
+    FavoritePageMode mode,
+    String folderId, {
+    String sourceKey = '',
+  }) {
+    return localFavoritesService.saveSelectedFavoriteFolderId(
+      mode,
+      folderId,
+      sourceKey: sourceKey,
+    );
   }
 
   Future<FavoriteFoldersResult> loadFolders() {

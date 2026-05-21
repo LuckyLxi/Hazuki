@@ -36,6 +36,10 @@ class LocalFavoritesService extends ChangeNotifier {
       'favorite_selected_cloud_folder_v1';
   static const String _selectedLocalFolderKey =
       'favorite_selected_local_folder_v1';
+  static const String _selectedCloudFolderSourcePrefix =
+      'favorite_selected_cloud_folder_source_v1_';
+  static const String _selectedLocalFolderSourcePrefix =
+      'favorite_selected_local_folder_source_v1_';
   static const String _legacyLocalFavoriteSourceKey = 'jm';
   static const int _tombstoneTtlMs = 90 * 24 * 60 * 60 * 1000;
   static const int _pageSize = 24;
@@ -95,12 +99,22 @@ class LocalFavoritesService extends ChangeNotifier {
     return '$_pageModeSourcePrefix${Uri.encodeComponent(normalized)}';
   }
 
-  Future<String> loadSelectedFavoriteFolderId(FavoritePageMode mode) async {
+  Future<String> loadSelectedFavoriteFolderId(
+    FavoritePageMode mode, {
+    String sourceKey = '',
+  }) async {
     final prefs = await SharedPreferences.getInstance();
-    final key = mode == FavoritePageMode.local
+    final legacyKey = mode == FavoritePageMode.local
         ? _selectedLocalFolderKey
         : _selectedCloudFolderKey;
-    final raw = prefs.getString(key)?.trim() ?? '';
+    final sourceScopedKey = _selectedFolderKeyForSource(mode, sourceKey);
+    final raw =
+        (sourceScopedKey == null
+                ? prefs.getString(legacyKey)
+                : prefs.getString(sourceScopedKey) ??
+                      prefs.getString(legacyKey))
+            ?.trim() ??
+        '';
     if (mode == FavoritePageMode.cloud && raw.isEmpty) {
       return '0';
     }
@@ -109,12 +123,15 @@ class LocalFavoritesService extends ChangeNotifier {
 
   Future<void> saveSelectedFavoriteFolderId(
     FavoritePageMode mode,
-    String folderId,
-  ) async {
+    String folderId, {
+    String sourceKey = '',
+  }) async {
     final prefs = await SharedPreferences.getInstance();
-    final key = mode == FavoritePageMode.local
-        ? _selectedLocalFolderKey
-        : _selectedCloudFolderKey;
+    final key =
+        _selectedFolderKeyForSource(mode, sourceKey) ??
+        (mode == FavoritePageMode.local
+            ? _selectedLocalFolderKey
+            : _selectedCloudFolderKey);
     final normalized = folderId.trim();
     if (mode == FavoritePageMode.local && normalized.isEmpty) {
       await prefs.remove(key);
@@ -124,6 +141,17 @@ class LocalFavoritesService extends ChangeNotifier {
       key,
       mode == FavoritePageMode.cloud && normalized.isEmpty ? '0' : normalized,
     );
+  }
+
+  String? _selectedFolderKeyForSource(FavoritePageMode mode, String sourceKey) {
+    final normalized = sourceKey.trim();
+    if (normalized.isEmpty) {
+      return null;
+    }
+    final prefix = mode == FavoritePageMode.local
+        ? _selectedLocalFolderSourcePrefix
+        : _selectedCloudFolderSourcePrefix;
+    return '$prefix${Uri.encodeComponent(normalized)}';
   }
 
   Future<FavoriteFoldersResult> loadFavoriteFolders({

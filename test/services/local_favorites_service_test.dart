@@ -53,6 +53,105 @@ void main() {
       },
     );
 
+    test('saves and restores selected folder ids per source', () async {
+      await service.saveSelectedFavoriteFolderId(
+        FavoritePageMode.cloud,
+        'cloud-jm',
+        sourceKey: 'jm',
+      );
+      await service.saveSelectedFavoriteFolderId(
+        FavoritePageMode.local,
+        'local-jm',
+        sourceKey: 'jm',
+      );
+      await service.saveSelectedFavoriteFolderId(
+        FavoritePageMode.cloud,
+        'cloud-copy',
+        sourceKey: 'copy_manga',
+      );
+      await service.saveSelectedFavoriteFolderId(
+        FavoritePageMode.local,
+        'local-copy',
+        sourceKey: 'copy_manga',
+      );
+
+      expect(
+        await service.loadSelectedFavoriteFolderId(
+          FavoritePageMode.cloud,
+          sourceKey: 'jm',
+        ),
+        'cloud-jm',
+      );
+      expect(
+        await service.loadSelectedFavoriteFolderId(
+          FavoritePageMode.local,
+          sourceKey: 'jm',
+        ),
+        'local-jm',
+      );
+      expect(
+        await service.loadSelectedFavoriteFolderId(
+          FavoritePageMode.cloud,
+          sourceKey: 'copy_manga',
+        ),
+        'cloud-copy',
+      );
+      expect(
+        await service.loadSelectedFavoriteFolderId(
+          FavoritePageMode.local,
+          sourceKey: 'copy_manga',
+        ),
+        'local-copy',
+      );
+    });
+
+    test('falls back to legacy selected folder ids', () async {
+      await service.saveSelectedFavoriteFolderId(
+        FavoritePageMode.cloud,
+        'legacy-cloud',
+      );
+      await service.saveSelectedFavoriteFolderId(
+        FavoritePageMode.local,
+        'legacy-local',
+      );
+
+      expect(
+        await service.loadSelectedFavoriteFolderId(
+          FavoritePageMode.cloud,
+          sourceKey: 'picacg',
+        ),
+        'legacy-cloud',
+      );
+      expect(
+        await service.loadSelectedFavoriteFolderId(
+          FavoritePageMode.local,
+          sourceKey: 'picacg',
+        ),
+        'legacy-local',
+      );
+
+      await service.saveSelectedFavoriteFolderId(
+        FavoritePageMode.local,
+        'picacg-local',
+        sourceKey: 'picacg',
+      );
+
+      expect(
+        await service.loadSelectedFavoriteFolderId(
+          FavoritePageMode.local,
+          sourceKey: 'picacg',
+        ),
+        'picacg-local',
+      );
+      expect(
+        await service.loadSelectedFavoriteFolderId(
+          FavoritePageMode.local,
+          sourceKey: 'jm',
+        ),
+        'legacy-local',
+      );
+    });
+
     test('normalizes empty cloud ids and clears empty local ids', () async {
       await service.saveSelectedFavoriteFolderId(FavoritePageMode.cloud, '');
       await service.saveSelectedFavoriteFolderId(

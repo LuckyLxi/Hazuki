@@ -111,9 +111,11 @@ class FavoritePageController extends ChangeNotifier {
       );
       _state.selectedCloudFolderId = await _localFlow.loadSelectedFolderId(
         FavoritePageMode.cloud,
+        sourceKey: _activeSourceKey,
       );
       _state.selectedLocalFolderId = await _localFlow.loadSelectedFolderId(
         FavoritePageMode.local,
+        sourceKey: _activeSourceKey,
       );
       if (savedMode != _state.mode) {
         _state.setMode(savedMode);
@@ -530,18 +532,33 @@ class FavoritePageController extends ChangeNotifier {
     if (_disposed || sourceKey != _activeSourceKey) {
       return;
     }
+    await _restoreSelectedFolderIdsForSource(sourceKey);
+    if (_disposed || sourceKey != _activeSourceKey) {
+      return;
+    }
     if (_state.mode != savedMode) {
       _state.setMode(savedMode);
     }
     if (_state.mode == FavoritePageMode.local) {
       _state.resetForModeChange();
       _notify();
-      unawaited(_syncLocalFavoritesAfterExternalChange());
+      unawaited(_loadInitialLocal());
       return;
     }
     _state.resetForReload();
     _notify();
     unawaited(_backgroundRefreshCloud());
+  }
+
+  Future<void> _restoreSelectedFolderIdsForSource(String sourceKey) async {
+    _state.selectedCloudFolderId = await _localFlow.loadSelectedFolderId(
+      FavoritePageMode.cloud,
+      sourceKey: sourceKey,
+    );
+    _state.selectedLocalFolderId = await _localFlow.loadSelectedFolderId(
+      FavoritePageMode.local,
+      sourceKey: sourceKey,
+    );
   }
 
   void _handleLocalFavoritesChanged() {
@@ -772,6 +789,10 @@ class FavoritePageController extends ChangeNotifier {
     FavoritePageMode mode,
     String folderId,
   ) async {
-    await _localFlow.saveSelectedFolderId(mode, folderId);
+    await _localFlow.saveSelectedFolderId(
+      mode,
+      folderId,
+      sourceKey: _activeSourceKey,
+    );
   }
 }
