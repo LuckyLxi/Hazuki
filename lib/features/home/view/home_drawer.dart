@@ -3,7 +3,9 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
+import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/l10n/l10n.dart';
+import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
@@ -147,6 +149,7 @@ class HomeDrawer extends StatelessWidget {
     required this.checkedInToday,
     required this.onProfileTap,
     required this.onCheckInPressed,
+    required this.onSwitchSourcePressed,
     required this.onOpenHistory,
     required this.onOpenCategories,
     required this.onOpenRanking,
@@ -166,6 +169,7 @@ class HomeDrawer extends StatelessWidget {
   final bool checkedInToday;
   final VoidCallback? onProfileTap;
   final VoidCallback? onCheckInPressed;
+  final VoidCallback? onSwitchSourcePressed;
   final VoidCallback onOpenHistory;
   final VoidCallback onOpenCategories;
   final VoidCallback onOpenRanking;
@@ -190,6 +194,7 @@ class HomeDrawer extends StatelessWidget {
         checkedInToday: checkedInToday,
         onProfileTap: onProfileTap,
         onCheckInPressed: onCheckInPressed,
+        onSwitchSourcePressed: onSwitchSourcePressed,
         onOpenHistory: onOpenHistory,
         onOpenCategories: onOpenCategories,
         onOpenRanking: onOpenRanking,
@@ -420,6 +425,7 @@ class HomeDrawerContent extends StatelessWidget {
     required this.checkedInToday,
     this.onProfileTap,
     this.onCheckInPressed,
+    this.onSwitchSourcePressed,
     this.onOpenHistory,
     this.onOpenCategories,
     this.onOpenRanking,
@@ -439,6 +445,7 @@ class HomeDrawerContent extends StatelessWidget {
   final bool checkedInToday;
   final VoidCallback? onProfileTap;
   final VoidCallback? onCheckInPressed;
+  final VoidCallback? onSwitchSourcePressed;
   final VoidCallback? onOpenHistory;
   final VoidCallback? onOpenCategories;
   final VoidCallback? onOpenRanking;
@@ -499,6 +506,12 @@ class HomeDrawerContent extends StatelessWidget {
         ? l10n(context).commonLoading
         : username;
     final resolvedAvatarUrl = (avatarUrl ?? '').trim();
+    final visualStateKey =
+        '${sl<HazukiSourceService>().activeSourceKey}|$resolvedAvatarUrl|$profileLoading';
+    final usernameStyle = textTheme.titleLarge?.copyWith(
+      fontWeight: FontWeight.bold,
+      color: colorScheme.onSurface,
+    );
 
     final darkModeDim = isDark
         ? Colors.black.withValues(alpha: 0.18)
@@ -541,6 +554,7 @@ class HomeDrawerContent extends StatelessWidget {
                                   color: colorScheme.surfaceContainerHigh,
                                 )
                               : HazukiCachedImage(
+                                  key: ValueKey('drawer-bg-$visualStateKey'),
                                   url: resolvedAvatarUrl,
                                   fit: BoxFit.cover,
                                   ignoreNoImageMode: true,
@@ -621,6 +635,7 @@ class HomeDrawerContent extends StatelessWidget {
                         onTap: onProfileTap,
                         borderRadius: BorderRadius.circular(40),
                         child: HomeProfileAvatar(
+                          key: ValueKey('drawer-avatar-$visualStateKey'),
                           avatarUrl: avatarUrl,
                           loading: profileLoading,
                           size: 72,
@@ -628,14 +643,25 @@ class HomeDrawerContent extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 16),
-                      Text(
-                        displayUsername,
-                        style: textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: colorScheme.onSurface,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              displayUsername,
+                              style: usernameStyle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 3),
+                          Transform.translate(
+                            offset: const Offset(0, 2),
+                            child: _HomeSourceSwitchPillButton(
+                              onPressed: onSwitchSourcePressed,
+                            ),
+                          ),
+                        ],
                       ),
                       if (showCheckInActions &&
                           isLogged &&
@@ -768,6 +794,53 @@ class HomeDrawerContent extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _HomeSourceSwitchPillButton extends StatelessWidget {
+  const _HomeSourceSwitchPillButton({required this.onPressed});
+
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final background = (isDark ? Colors.white : Colors.black).withValues(
+      alpha: isDark ? 0.10 : 0.08,
+    );
+    final borderColor = (isDark ? Colors.white : Colors.black).withValues(
+      alpha: isDark ? 0.13 : 0.10,
+    );
+
+    return Tooltip(
+      message: l10n(context).homeSourceSwitchTooltip,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(999),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+          child: Material(
+            color: background,
+            shape: StadiumBorder(side: BorderSide(color: borderColor)),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: onPressed,
+              child: SizedBox(
+                width: 32,
+                height: 22,
+                child: Icon(
+                  Icons.swap_horiz_rounded,
+                  size: 16,
+                  color: onPressed == null
+                      ? colorScheme.onSurfaceVariant.withValues(alpha: 0.45)
+                      : colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

@@ -701,7 +701,7 @@ class _HazukiCachedCircleAvatarState extends State<HazukiCachedCircleAvatar> {
       );
     } else if (_bytes != null) {
       currentWidget = CircleAvatar(
-        key: ValueKey('loaded-avatar-'),
+        key: ValueKey('loaded-avatar-${widget.url}'),
         radius: widget.radius,
         backgroundImage: MemoryImage(_bytes!),
       );

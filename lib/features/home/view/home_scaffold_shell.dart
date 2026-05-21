@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:ui';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/features/favorite/favorite.dart';
@@ -49,6 +50,7 @@ class HomeScaffoldShell extends StatelessWidget {
     required this.onFavoriteModeTogglePressed,
     required this.onProfileTap,
     required this.onCheckInPressed,
+    required this.onSwitchSourcePressed,
     required this.onOpenHistory,
     required this.onOpenCategories,
     required this.onOpenRanking,
@@ -89,6 +91,7 @@ class HomeScaffoldShell extends StatelessWidget {
   final VoidCallback onFavoriteModeTogglePressed;
   final VoidCallback? onProfileTap;
   final VoidCallback? onCheckInPressed;
+  final VoidCallback? onSwitchSourcePressed;
   final VoidCallback onOpenHistory;
   final VoidCallback onOpenCategories;
   final VoidCallback onOpenRanking;
@@ -106,6 +109,9 @@ class HomeScaffoldShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final downloadService = sl<MangaDownloadService>();
+    final sourceService = sl<HazukiSourceService>();
+    final drawerVisualKey =
+        '${sourceService.activeSourceKey}|${avatarUrl ?? ''}|$profileLoading|$isLogged|$username';
     final homeContent = HomeContentStack(
       currentIndex: currentIndex,
       discoverChild: DiscoverPage(
@@ -127,6 +133,7 @@ class HomeScaffoldShell extends StatelessWidget {
       ),
     );
     final mobileDrawerContent = HomeDrawerContent(
+      key: ValueKey('home-mobile-drawer-$drawerVisualKey'),
       isLogged: isLogged,
       profileLoading: profileLoading,
       avatarUrl: avatarUrl,
@@ -135,11 +142,11 @@ class HomeScaffoldShell extends StatelessWidget {
       showCheckInActions: showCheckInActions,
       checkInBusy: checkInBusy,
       checkedInToday: checkedInToday,
-      onProfileTap:
-          sl<HazukiSourceService>().sourceMeta?.supportsAccount == true
+      onProfileTap: sourceService.sourceMeta?.supportsAccount == true
           ? onProfileTap
           : null,
       onCheckInPressed: _closeDrawerRouteThen(context, onCheckInPressed),
+      onSwitchSourcePressed: onSwitchSourcePressed,
       onOpenHistory: onOpenHistory,
       onOpenCategories: onOpenCategories,
       onOpenRanking: onOpenRanking,
@@ -155,6 +162,7 @@ class HomeScaffoldShell extends StatelessWidget {
               SizedBox(
                 width: resolveHomeWindowsSidebarWidth(context),
                 child: HomeWindowsSidebar(
+                  key: ValueKey('home-windows-sidebar-$drawerVisualKey'),
                   isLogged: isLogged,
                   profileLoading: profileLoading,
                   avatarUrl: avatarUrl,
@@ -162,8 +170,7 @@ class HomeScaffoldShell extends StatelessWidget {
                   currentIndex: currentIndex,
                   selectedDestination: selectedDrawerDestination,
                   onProfileTap:
-                      sl<HazukiSourceService>().sourceMeta?.supportsAccount ==
-                          true
+                      sourceService.sourceMeta?.supportsAccount == true
                       ? onProfileTap
                       : null,
                   onSelectDiscover: () => onDestinationSelected(0),
@@ -320,7 +327,8 @@ class _HomeAppBarProfileButton extends StatefulWidget {
 }
 
 class _HomeAppBarProfileButtonState extends State<_HomeAppBarProfileButton> {
-  final ValueNotifier<int> _drawerContentRevision = ValueNotifier<int>(0);
+  late final ValueNotifier<Widget> _drawerContentNotifier =
+      ValueNotifier<Widget>(widget.drawerContent);
   int _lastVisibleTaskCount = 0;
 
   @override
@@ -333,14 +341,12 @@ class _HomeAppBarProfileButtonState extends State<_HomeAppBarProfileButton> {
   void didUpdateWidget(covariant _HomeAppBarProfileButton oldWidget) {
     super.didUpdateWidget(oldWidget);
     _syncLastVisibleTaskCount();
-    if (oldWidget.drawerContent != widget.drawerContent) {
-      _drawerContentRevision.value++;
-    }
+    _drawerContentNotifier.value = widget.drawerContent;
   }
 
   @override
   void dispose() {
-    _drawerContentRevision.dispose();
+    _drawerContentNotifier.dispose();
     super.dispose();
   }
 
@@ -444,8 +450,7 @@ class _HomeAppBarProfileButtonState extends State<_HomeAppBarProfileButton> {
             DrawerTheme.of(context).backgroundColor ??
             Theme.of(context).drawerTheme.backgroundColor ??
             Theme.of(context).colorScheme.surface,
-        drawerContentListenable: _drawerContentRevision,
-        drawerContentBuilder: (_) => widget.drawerContent,
+        drawerContentListenable: _drawerContentNotifier,
       ),
     );
   }
@@ -551,14 +556,12 @@ class _HomeProfileDrawerRoute extends PageRoute<void> {
   _HomeProfileDrawerRoute({
     required this.drawerWidth,
     required this.drawerColor,
-    required this.drawerContentBuilder,
     required this.drawerContentListenable,
   });
 
   final double drawerWidth;
   final Color drawerColor;
-  final WidgetBuilder drawerContentBuilder;
-  final Listenable drawerContentListenable;
+  final ValueListenable<Widget> drawerContentListenable;
 
   @override
   bool get opaque => false;
@@ -603,9 +606,9 @@ class _HomeProfileDrawerRoute extends PageRoute<void> {
       child: Drawer(
         width: drawerWidth,
         backgroundColor: drawerColor,
-        child: AnimatedBuilder(
-          animation: drawerContentListenable,
-          builder: (context, _) => drawerContentBuilder(context),
+        child: ValueListenableBuilder<Widget>(
+          valueListenable: drawerContentListenable,
+          builder: (context, drawerContent, _) => drawerContent,
         ),
       ),
     );

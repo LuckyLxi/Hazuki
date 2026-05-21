@@ -1088,6 +1088,17 @@
       "error": {}
     }
   },
+  "homeSourceSwitchTooltip": "Switch source",
+  "homeSourceSwitchTitle": "Switch source",
+  "homeSourceSwitchCurrent": "Current source",
+  "homeSourceSwitchLoadingTitle": "Switching source",
+  "homeSourceSwitchLoadingTo": "Switching to {sourceName}",
+  "@homeSourceSwitchLoadingTo": {
+    "placeholders": {
+      "sourceName": {}
+    }
+  },
+  "homeSourceSwitchLoadingMessage": "Please wait until the source is ready",
   "labSourceAccountNotDownloaded": "Not downloaded",
   "labSourceAccountDownloadSuccess": "Comic source downloaded",
   "labSourceAccountDownloadFailed": "Could not download comic source: {error}",

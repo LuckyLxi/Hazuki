@@ -1088,6 +1088,17 @@
       "error": {}
     }
   },
+  "homeSourceSwitchTooltip": "切换漫画源",
+  "homeSourceSwitchTitle": "切换漫画源",
+  "homeSourceSwitchCurrent": "当前来源",
+  "homeSourceSwitchLoadingTitle": "正在切换来源",
+  "homeSourceSwitchLoadingTo": "正在切换到 {sourceName}",
+  "@homeSourceSwitchLoadingTo": {
+    "placeholders": {
+      "sourceName": {}
+    }
+  },
+  "homeSourceSwitchLoadingMessage": "请等待漫画源准备完成",
   "labSourceAccountNotDownloaded": "未下载",
   "labSourceAccountDownloadSuccess": "漫画源已下载",
   "labSourceAccountDownloadFailed": "漫画源下载失败：{error}",

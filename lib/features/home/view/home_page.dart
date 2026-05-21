@@ -8,6 +8,7 @@ import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_page.dart';
 import 'package:hazuki/features/comments/comments.dart';
 import 'package:hazuki/features/home/home.dart';
+import 'package:hazuki/features/home/support/home_profile_actions.dart';
 import 'package:hazuki/features/reader/view/reader_page.dart';
 import 'package:hazuki/features/search/search.dart';
 import 'package:hazuki/models/hazuki_models.dart';
@@ -258,6 +259,18 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
                 triggeredAutomatically: false,
               ),
             );
+          },
+          onSwitchSourcePressed: () {
+            unawaited(() async {
+              await showHomeSourceSwitchDialog(
+                context,
+                onSourceSwitched: () => _coordinator.syncUserProfile(context),
+              );
+              if (!mounted) {
+                return;
+              }
+              setState(() {});
+            }());
           },
           onOpenHistory: () {
             setState(() {
