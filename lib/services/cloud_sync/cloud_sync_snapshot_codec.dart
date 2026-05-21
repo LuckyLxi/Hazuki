@@ -5,6 +5,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../app/app_preferences.dart';
 import '../hazuki_source_service.dart';
+import '../local_favorites_service.dart';
+import '../reading_progress_service.dart';
+import '../read_history_service.dart';
+import '../../features/search/support/search_history_service.dart';
 import '../../models/hazuki_models.dart';
 import 'cloud_sync_config_store.dart';
 import 'cloud_sync_models.dart';
@@ -14,9 +18,24 @@ class CloudSyncSnapshotCodec {
   CloudSyncSnapshotCodec({
     required CloudSyncConfigStore configStore,
     HazukiSourceService? sourceService,
-  }) : _sourceService = sourceService ?? sl<HazukiSourceService>();
+    ReadHistoryService? readHistoryService,
+    ReadingProgressService? readingProgressService,
+    LocalFavoritesService? localFavoritesService,
+    SearchHistoryService? searchHistoryService,
+  }) : _sourceService = sourceService ?? sl<HazukiSourceService>(),
+       _readHistoryService = readHistoryService ?? sl<ReadHistoryService>(),
+       _readingProgressService =
+           readingProgressService ?? sl<ReadingProgressService>(),
+       _localFavoritesService =
+           localFavoritesService ?? sl<LocalFavoritesService>(),
+       _searchHistoryService =
+           searchHistoryService ?? sl<SearchHistoryService>();
 
   final HazukiSourceService _sourceService;
+  final ReadHistoryService _readHistoryService;
+  final ReadingProgressService _readingProgressService;
+  final LocalFavoritesService _localFavoritesService;
+  final SearchHistoryService _searchHistoryService;
 
   Future<void> mergeRemoteIntoLocal(CloudSyncRemoteClient client) async {
     // Fetch remote files first, then snapshot local state — this ensures any
@@ -34,18 +53,17 @@ class CloudSyncSnapshotCodec {
 
     final prefs = await SharedPreferences.getInstance();
 
-    final localHistorySnapshot = prefs.getString('hazuki_read_history');
-    final localProgressSnapshot = <String, String>{};
-    for (final key in prefs.getKeys()) {
-      if (!key.startsWith('reading_progress_')) continue;
-      final raw = prefs.getString(key);
-      if (raw != null) localProgressSnapshot[key] = raw;
-    }
-    final localSearchSnapshot = prefs.getStringList('search_history');
+    final localHistorySnapshot = jsonEncode(
+      await _readHistoryService.exportJsonList(),
+    );
+    final localProgressSnapshot = await _readingProgressService.exportJsonList();
+    final localSearchSnapshot = await _searchHistoryService.load();
     final localCommentFilterKeywordsSnapshot =
         prefs.getStringList(hazukiCommentFilterKeywordsKey) ?? const <String>[];
-    final localFoldersSnapshot = prefs.getString('local_favorite_folders_v1');
-    final localEntriesSnapshot = prefs.getString('local_favorite_entries_v1');
+    final localFoldersSnapshot =
+        await _localFavoritesService.exportFoldersJsonString();
+    final localEntriesSnapshot =
+        await _localFavoritesService.exportEntriesJsonString();
 
     if (readingText != null) {
       Map<String, dynamic>? readingMap;
@@ -67,17 +85,15 @@ class CloudSyncSnapshotCodec {
         }
 
         List<Map<String, dynamic>> localHistory = const [];
-        if (localHistorySnapshot != null) {
-          try {
-            final decoded = jsonDecode(localHistorySnapshot);
-            if (decoded is List) {
-              localHistory = decoded
-                  .whereType<Map>()
-                  .map((e) => Map<String, dynamic>.from(e))
-                  .toList();
-            }
-          } catch (_) {}
-        }
+        try {
+          final decoded = jsonDecode(localHistorySnapshot);
+          if (decoded is List) {
+            localHistory = decoded
+                .whereType<Map>()
+                .map((e) => Map<String, dynamic>.from(e))
+                .toList();
+          }
+        } catch (_) {}
 
         final mergedHistory = <String, Map<String, dynamic>>{};
         for (final entry in [...localHistory, ...remoteHistory]) {
@@ -108,7 +124,7 @@ class CloudSyncSnapshotCodec {
         if (historyList.length > hazukiReadHistoryMaxCount) {
           historyList = historyList.sublist(0, hazukiReadHistoryMaxCount);
         }
-        await prefs.setString('hazuki_read_history', jsonEncode(historyList));
+        await _readHistoryService.importJsonList(historyList, replace: true);
 
         final remoteProgressRaw = readingMap['progress'];
         final remoteProgress = <String, Map<String, dynamic>>{};
@@ -132,22 +148,18 @@ class CloudSyncSnapshotCodec {
         }
 
         final localProgress = <String, Map<String, dynamic>>{};
-        for (final entry in localProgressSnapshot.entries) {
-          final storageKey = entry.key.substring('reading_progress_'.length);
-          try {
-            final decoded = jsonDecode(entry.value);
-            if (decoded is Map) {
-              final map = Map<String, dynamic>.from(decoded);
-              final scoped = SourceScopedComicId.fromStorageKey(
-                storageKey,
-                fallbackSourceKey: _sourceService.activeSourceKey,
-              );
-              map['sourceKey'] = (map['sourceKey'] ?? scoped.sourceKey)
+        for (final entry in localProgressSnapshot) {
+          final comicId = (entry['comicId'] ?? '').toString().trim();
+          if (comicId.isEmpty) continue;
+          final sourceKey =
+              (entry['sourceKey'] ?? _sourceService.activeSourceKey)
                   .toString()
                   .trim();
-              localProgress[scoped.storageKey] = map;
-            }
-          } catch (_) {}
+          entry['sourceKey'] = sourceKey;
+          localProgress[SourceScopedComicId(
+            sourceKey: sourceKey,
+            comicId: comicId,
+          ).storageKey] = entry;
         }
 
         final allStorageKeys = {...localProgress.keys, ...remoteProgress.keys};
@@ -174,16 +186,9 @@ class CloudSyncSnapshotCodec {
                 (winner['sourceKey'] ?? _sourceService.activeSourceKey)
                     .toString(),
           );
-          await prefs.setString(
-            'reading_progress_${scoped.storageKey}',
-            jsonEncode({
-              'sourceKey': scoped.sourceKey,
-              'epId': winner['epId'],
-              'title': winner['title'],
-              'index': winner['index'],
-              'timestamp': winner['timestamp'],
-            }),
-          );
+          winner['comicId'] = scoped.comicId;
+          winner['sourceKey'] = scoped.sourceKey;
+          await _readingProgressService.mergeJsonList([winner]);
         }
       }
     }
@@ -215,7 +220,7 @@ class CloudSyncSnapshotCodec {
         }
       } catch (_) {}
     }
-    final localKeywords = localSearchSnapshot ?? const <String>[];
+    final localKeywords = localSearchSnapshot;
     final merged = <String>[];
     final seen = <String>{};
     for (final keyword in [...localKeywords, ...remoteKeywords]) {
@@ -224,7 +229,7 @@ class CloudSyncSnapshotCodec {
     if (merged.length > hazukiSearchHistoryMaxCount) {
       merged.removeRange(hazukiSearchHistoryMaxCount, merged.length);
     }
-    await prefs.setStringList('search_history', merged);
+    await _searchHistoryService.replace(merged);
 
     if (settingsText != null) {
       try {
@@ -269,53 +274,13 @@ class CloudSyncSnapshotCodec {
       'data': settingsMap,
     });
 
-    final historyRaw = prefs.getString('hazuki_read_history');
-    List<Map<String, dynamic>> history = const [];
-    if (historyRaw != null && historyRaw.trim().isNotEmpty) {
-      try {
-        final decoded = jsonDecode(historyRaw);
-        if (decoded is List) {
-          history = decoded
-              .whereType<Map>()
-              .map((e) => Map<String, dynamic>.from(e))
-              .toList();
-        }
-      } catch (_) {}
-    }
+    List<Map<String, dynamic>> history =
+        await _readHistoryService.exportJsonList();
     if (history.length > hazukiReadHistoryMaxCount) {
       history = history.sublist(0, hazukiReadHistoryMaxCount);
     }
 
-    final progress = <Map<String, dynamic>>[];
-    for (final key in prefs.getKeys()) {
-      if (!key.startsWith('reading_progress_')) {
-        continue;
-      }
-      final comicId = key.substring('reading_progress_'.length);
-      final raw = prefs.getString(key);
-      if (raw == null || raw.trim().isEmpty) {
-        continue;
-      }
-      try {
-        final decoded = jsonDecode(raw);
-        if (decoded is Map) {
-          final map = Map<String, dynamic>.from(decoded);
-          final scoped = SourceScopedComicId.fromStorageKey(
-            comicId,
-            fallbackSourceKey:
-                (map['sourceKey'] ?? _sourceService.activeSourceKey).toString(),
-          );
-          progress.add({
-            'comicId': scoped.comicId,
-            'sourceKey': scoped.sourceKey,
-            'epId': map['epId'],
-            'title': map['title'],
-            'index': map['index'],
-            'timestamp': map['timestamp'],
-          });
-        }
-      } catch (_) {}
-    }
+    final progress = await _readingProgressService.exportJsonList();
 
     final readingJson = jsonEncode({
       'version': 1,
@@ -324,8 +289,9 @@ class CloudSyncSnapshotCodec {
       'progress': progress,
     });
 
-    final search = (prefs.getStringList('search_history') ?? const <String>[])
-        .take(hazukiSearchHistoryMaxCount);
+    final search = (await _searchHistoryService.load()).take(
+      hazukiSearchHistoryMaxCount,
+    );
     final lines = search
         .map((keyword) => jsonEncode({'keyword': keyword}))
         .join('\n');
@@ -386,7 +352,7 @@ class CloudSyncSnapshotCodec {
     // Merge folder tombstones from both sides
     final folderTombstones = _mergeTombstoneMaps(
       _decodeTombstoneMap(
-        prefs.getString(CloudSyncConfigStore.folderTombstonesKey),
+        await _localFavoritesService.exportFolderTombstonesJsonString(),
         'id',
       ),
       _decodeTombstoneMap(
@@ -400,7 +366,7 @@ class CloudSyncSnapshotCodec {
     // Merge entry tombstones from both sides
     final entryTombstones = _mergeTombstoneMaps(
       _decodeEntryTombstoneMap(
-        prefs.getString(CloudSyncConfigStore.entryTombstonesKey),
+        await _localFavoritesService.exportEntryTombstonesJsonString(),
       ),
       _decodeEntryTombstoneMap(
         remoteData[CloudSyncConfigStore.entryTombstonesKey] is String
@@ -410,8 +376,7 @@ class CloudSyncSnapshotCodec {
     );
 
     List<Map<String, dynamic>> localFolders = const [];
-    final localFoldersRaw =
-        localFoldersSnapshot ?? prefs.getString('local_favorite_folders_v1');
+    final localFoldersRaw = localFoldersSnapshot;
     if (localFoldersRaw != null) {
       try {
         final decoded = jsonDecode(localFoldersRaw);
@@ -465,8 +430,7 @@ class CloudSyncSnapshotCodec {
     }
 
     List<Map<String, dynamic>> localEntries = const [];
-    final localEntriesRaw =
-        localEntriesSnapshot ?? prefs.getString('local_favorite_entries_v1');
+    final localEntriesRaw = localEntriesSnapshot;
     if (localEntriesRaw != null) {
       try {
         final decoded = jsonDecode(localEntriesRaw);
@@ -554,23 +518,23 @@ class CloudSyncSnapshotCodec {
       }
     }
 
-    await prefs.setString(
-      'local_favorite_folders_v1',
-      jsonEncode(mergedFolders),
-    );
-    await prefs.setString(
-      'local_favorite_entries_v1',
-      jsonEncode(mergedEntries.values.toList()),
-    );
+    final mergedFoldersRaw = jsonEncode(mergedFolders);
+    final mergedEntriesRaw = jsonEncode(mergedEntries.values.toList());
 
     // Persist merged tombstones (pruned to 90 days)
-    await prefs.setString(
-      CloudSyncConfigStore.folderTombstonesKey,
-      _encodeTombstoneMap(folderTombstones, 'id', tombstoneCutoff),
-    );
-    await prefs.setString(
-      CloudSyncConfigStore.entryTombstonesKey,
-      _encodeEntryTombstoneMap(entryTombstones, tombstoneCutoff),
+    await _localFavoritesService.importJsonStrings(
+      foldersRaw: mergedFoldersRaw,
+      entriesRaw: mergedEntriesRaw,
+      folderTombstonesRaw: _encodeTombstoneMap(
+        folderTombstones,
+        'id',
+        tombstoneCutoff,
+      ),
+      entryTombstonesRaw: _encodeEntryTombstoneMap(
+        entryTombstones,
+        tombstoneCutoff,
+      ),
+      replace: true,
     );
   }
 

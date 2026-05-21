@@ -6,15 +6,23 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../app/app_preferences.dart';
 import '../hazuki_source_service.dart';
-import '../../models/hazuki_models.dart';
+import '../reading_progress_service.dart';
+import '../read_history_service.dart';
+import '../../features/search/support/search_history_service.dart';
 import 'cloud_sync_config_store.dart';
 import 'cloud_sync_models.dart';
 
 class CloudSyncRestoreApplier {
   CloudSyncRestoreApplier({HazukiSourceService? sourceService})
-    : _sourceService = sourceService ?? sl<HazukiSourceService>();
+    : _sourceService = sourceService ?? sl<HazukiSourceService>(),
+      _readHistoryService = sl<ReadHistoryService>(),
+      _readingProgressService = sl<ReadingProgressService>(),
+      _searchHistoryService = sl<SearchHistoryService>();
 
   final HazukiSourceService _sourceService;
+  final ReadHistoryService _readHistoryService;
+  final ReadingProgressService _readingProgressService;
+  final SearchHistoryService _searchHistoryService;
 
   Future<CloudSyncApplySettingsResult> applySettingsJson(String content) async {
     dynamic decoded;
@@ -78,8 +86,6 @@ class CloudSyncRestoreApplier {
       throw Exception('cloud_sync_reading_invalid_format');
     }
     final map = Map<String, dynamic>.from(decoded);
-    final prefs = await SharedPreferences.getInstance();
-
     final historyRaw = map['history'];
     if (historyRaw is List) {
       final history = historyRaw
@@ -89,16 +95,11 @@ class CloudSyncRestoreApplier {
       final trimmed = history.length > hazukiReadHistoryMaxCount
           ? history.sublist(0, hazukiReadHistoryMaxCount)
           : history;
-      await prefs.setString('hazuki_read_history', jsonEncode(trimmed));
-    }
-
-    for (final key in prefs.getKeys().toList()) {
-      if (key.startsWith('reading_progress_')) {
-        await prefs.remove(key);
-      }
+      await _readHistoryService.importJsonList(trimmed, replace: true);
     }
 
     final progressRaw = map['progress'];
+    final progressList = <Map<String, dynamic>>[];
     if (progressRaw is List) {
       for (final item in progressRaw) {
         if (item is! Map) {
@@ -113,20 +114,18 @@ class CloudSyncRestoreApplier {
             (progress['sourceKey'] ?? _sourceService.activeSourceKey)
                 .toString()
                 .trim();
-        final scopedKey = SourceScopedComicId(
-          sourceKey: sourceKey,
-          comicId: comicId,
-        ).storageKey;
-        final store = <String, dynamic>{
+        progressList.add(<String, dynamic>{
+          'comicId': comicId,
           'sourceKey': sourceKey,
           'epId': progress['epId'],
           'title': progress['title'],
           'index': progress['index'],
+          'pageIndex': progress['pageIndex'],
           'timestamp': progress['timestamp'],
-        };
-        await prefs.setString('reading_progress_$scopedKey', jsonEncode(store));
+        });
       }
     }
+    await _readingProgressService.replaceFromJsonList(progressList);
   }
 
   Future<void> applySearchHistoryJsonl(String content) async {
@@ -157,8 +156,7 @@ class CloudSyncRestoreApplier {
         }
       }
     }
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList('search_history', deduped);
+    await _searchHistoryService.replace(deduped);
   }
 
   Future<bool> applySourceFile({

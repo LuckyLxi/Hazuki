@@ -1,16 +1,14 @@
 import 'dart:async';
-import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/read_history_service.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
 import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:hazuki/widgets/windows_comic_detail_host.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../support/history_actions.dart';
 import '../support/history_favorite_support.dart';
@@ -112,91 +110,22 @@ class _HistoryPageState extends State<HistoryPage> {
   }
 
   Future<void> _loadHistory() async {
-    final prefs = await SharedPreferences.getInstance();
-    final jsonStr = prefs.getString('hazuki_read_history');
-    if (jsonStr != null) {
-      try {
-        final List<dynamic> jsonList = jsonDecode(jsonStr);
-        final history = <ExploreComic>[];
-        final activeSourceKey = _activeSourceKey;
-        for (final rawEntry in jsonList) {
-          if (rawEntry is! Map) {
-            continue;
-          }
-          final entry = Map<String, dynamic>.from(rawEntry);
-          if (!historyEntryBelongsToSource(entry, activeSourceKey)) {
-            continue;
-          }
-          history.add(
-            historyComicFromEntry(entry, fallbackSourceKey: activeSourceKey),
-          );
-        }
-        if (mounted) {
-          setState(() {
-            _history = history;
-            _loading = false;
-          });
-        }
-        return;
-      } catch (e, st) {
-        debugPrint('history: failed to parse history JSON: $e\n$st');
-      }
-    }
+    final history = await sl<ReadHistoryService>().loadHistory(
+      sourceKey: _activeSourceKey,
+    );
     if (mounted) {
       setState(() {
-        _history = [];
+        _history = history;
         _loading = false;
       });
     }
   }
 
   Future<void> _saveHistory(List<ExploreComic> history) async {
-    final prefs = await SharedPreferences.getInstance();
-    final activeSourceKey = _activeSourceKey;
-    final existingStr = prefs.getString('hazuki_read_history');
-    final existingById = <String, Map<String, dynamic>>{};
-    final preservedOtherSourceEntries = <Map<String, dynamic>>[];
-    if (existingStr != null) {
-      try {
-        final List<dynamic> existing = jsonDecode(existingStr);
-        for (final rawEntry in existing) {
-          if (rawEntry is! Map) {
-            continue;
-          }
-          final e = Map<String, dynamic>.from(rawEntry);
-          final id = (e['id'] ?? '').toString();
-          final sourceKey = normalizeHistorySourceKey(
-            (e['sourceKey'] ?? '').toString(),
-          );
-          if (id.isNotEmpty) {
-            final storageKey = SourceScopedComicId(
-              sourceKey: sourceKey,
-              comicId: id,
-            ).storageKey;
-            existingById[storageKey] = e;
-          }
-          if (!historyEntryBelongsToSource(e, activeSourceKey)) {
-            preservedOtherSourceEntries.add(e);
-          }
-        }
-      } catch (_) {}
-    }
-    final currentSourceEntries = history.map((e) {
-      final base = existingById[e.scopedId.storageKey] ?? <String, dynamic>{};
-      return <String, dynamic>{
-        ...base,
-        'id': e.id,
-        'sourceKey': normalizeHistorySourceKey(e.sourceKey),
-        'title': e.title,
-        'cover': e.cover,
-        'subTitle': e.subTitle,
-      };
-    }).toList();
-    final jsonList = <Map<String, dynamic>>[
-      ...currentSourceEntries,
-      ...preservedOtherSourceEntries,
-    ];
-    await prefs.setString('hazuki_read_history', jsonEncode(jsonList));
+    await sl<ReadHistoryService>().replaceSourceHistory(
+      sourceKey: _activeSourceKey,
+      history: history,
+    );
   }
 
   void _updateHistoryState(VoidCallback updater) {

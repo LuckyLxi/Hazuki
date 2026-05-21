@@ -8,6 +8,7 @@ import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/features/search/search.dart';
 import 'package:hazuki/features/search/view/search_entry_page.dart';
 import 'package:hazuki/features/search/view/search_id_extract_pill.dart';
+import 'package:hazuki/features/search/support/search_history_service.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../support/test_service_locator.dart';
@@ -26,6 +27,7 @@ void main() {
     SharedPreferences.setMockInitialValues({
       'search_history': <String>['hazuki'],
     });
+    await sl<SearchHistoryService>().load();
 
     await tester.pumpWidget(
       _buildTestApp(
@@ -58,6 +60,7 @@ void main() {
     SharedPreferences.setMockInitialValues({
       'search_history': <String>['hazuki'],
     });
+    await sl<SearchHistoryService>().load();
 
     await tester.pumpWidget(
       _buildTestApp(
@@ -99,6 +102,7 @@ void main() {
     SharedPreferences.setMockInitialValues({
       'search_history': <String>['hazuki'],
     });
+    await sl<SearchHistoryService>().load();
 
     await tester.pumpWidget(
       _buildTestApp(

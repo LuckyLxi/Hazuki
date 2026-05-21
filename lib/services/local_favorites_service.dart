@@ -1,14 +1,19 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/hazuki_models.dart';
+import 'storage/hazuki_database.dart';
 
 class LocalFavoritesService extends ChangeNotifier {
-  LocalFavoritesService();
+  LocalFavoritesService({HazukiDatabase? database})
+    : _database = database ?? HazukiDatabase();
 
+  final HazukiDatabase _database;
+  Future<void> _migration = Future.value();
   Future<void> _opQueue = Future.value();
 
   Future<T> _serialized<T>(Future<T> Function() fn) {
@@ -29,6 +34,7 @@ class LocalFavoritesService extends ChangeNotifier {
       'local_favorite_folder_tombstones_v1';
   static const String _entryTombstonesKey =
       'local_favorite_entry_tombstones_v1';
+  static const String _migrationDoneKey = 'local_favorite_drift_migrated_v1';
   static const String _sortOrderKey = 'local_favorite_sort_order_v1';
   static const String _pageModeKey = 'favorite_page_mode_v1';
   static const String _pageModeSourcePrefix = 'favorite_page_mode_source_v1_';
@@ -55,6 +61,24 @@ class LocalFavoritesService extends ChangeNotifier {
 
   void onExternalDataChanged() {
     notifyListeners();
+  }
+
+  Future<void> _ensureMigrated() {
+    _migration = _migration.then((_) async {
+      final prefs = await SharedPreferences.getInstance();
+      if (prefs.getBool(_migrationDoneKey) == true) {
+        return;
+      }
+      final store = _LocalFavoritesStore(
+        folders: _decodeFolders(prefs.getString(_foldersKey)),
+        entries: _decodeEntries(prefs.getString(_entriesKey)),
+      );
+      await _replaceStore(store);
+      await _importFolderTombstonesString(prefs.getString(_folderTombstonesKey));
+      await _importEntryTombstonesString(prefs.getString(_entryTombstonesKey));
+      await prefs.setBool(_migrationDoneKey, true);
+    });
+    return _migration;
   }
 
   Future<String> loadSortOrder() async {
@@ -159,6 +183,7 @@ class LocalFavoritesService extends ChangeNotifier {
     String sourceKey = '',
   }) async {
     final normalizedSourceKey = sourceKey.trim();
+    await _ensureMigrated();
     final store = await _loadStore();
     final folders = store.folders
         .where(
@@ -198,6 +223,7 @@ class LocalFavoritesService extends ChangeNotifier {
     String sourceKey = '',
   }) async {
     final normalizedSourceKey = sourceKey.trim();
+    await _ensureMigrated();
     final store = await _loadStore();
     final normalizedFolderId = folderId.trim();
     if (normalizedFolderId.isEmpty) {
@@ -259,6 +285,7 @@ class LocalFavoritesService extends ChangeNotifier {
       throw Exception('favorite_folder_name_required');
     }
     return _serialized(() async {
+      await _ensureMigrated();
       final store = await _loadStore();
       store.folders.add(
         _LocalFavoriteFolderRecord(
@@ -286,6 +313,7 @@ class LocalFavoritesService extends ChangeNotifier {
       throw Exception('favorite_folder_name_required');
     }
     return _serialized(() async {
+      await _ensureMigrated();
       final store = await _loadStore();
       final folderIndex = store.folders.indexWhere(
         (folder) =>
@@ -312,6 +340,7 @@ class LocalFavoritesService extends ChangeNotifier {
       return Future.value();
     }
     return _serialized(() async {
+      await _ensureMigrated();
       final store = await _loadStore();
       store.folders.removeWhere(
         (folder) =>
@@ -348,6 +377,7 @@ class LocalFavoritesService extends ChangeNotifier {
       throw Exception('favorite_comic_id_required');
     }
     return _serialized(() async {
+      await _ensureMigrated();
       final store = await _loadStore();
 
       final existingIndex = store.entries.indexWhere(
@@ -407,6 +437,7 @@ class LocalFavoritesService extends ChangeNotifier {
     if (normalizedComicId.isEmpty) {
       return false;
     }
+    await _ensureMigrated();
     final store = await _loadStore();
     final entry = store.findEntry(
       normalizedComicId,
@@ -429,49 +460,35 @@ class LocalFavoritesService extends ChangeNotifier {
   }
 
   Future<void> _appendFolderTombstone(String folderId) async {
-    final prefs = await SharedPreferences.getInstance();
     final now = DateTime.now().millisecondsSinceEpoch;
-    final tombstones = _decodeTombstones(prefs.getString(_folderTombstonesKey));
-    tombstones.removeWhere((t) => t['id'] == folderId);
-    tombstones.add({'id': folderId, 'deletedAtMs': now});
-    final cutoff = now - _tombstoneTtlMs;
-    tombstones.removeWhere(
-      (t) => ((t['deletedAtMs'] as num?)?.toInt() ?? 0) < cutoff,
+    await _database.into(_database.localFavoriteFolderTombstones).insertOnConflictUpdate(
+      LocalFavoriteFolderTombstonesCompanion.insert(
+        folderId: folderId,
+        deletedAtMs: now,
+      ),
     );
-    await prefs.setString(_folderTombstonesKey, jsonEncode(tombstones));
+    await _pruneTombstones();
   }
 
   Future<void> _appendEntryTombstone(
     String comicId, {
     String sourceKey = '',
   }) async {
-    final prefs = await SharedPreferences.getInstance();
     final now = DateTime.now().millisecondsSinceEpoch;
-    final tombstones = _decodeTombstones(prefs.getString(_entryTombstonesKey));
     final normalizedSourceKey = sourceKey.trim();
     final storageKey = SourceScopedComicId(
       sourceKey: normalizedSourceKey,
       comicId: comicId,
     ).storageKey;
-    tombstones.removeWhere((t) {
-      final tombstoneComicId = (t['comicId'] ?? '').toString().trim();
-      final tombstoneSourceKey = (t['sourceKey'] ?? '').toString().trim();
-      return SourceScopedComicId(
-            sourceKey: tombstoneSourceKey,
-            comicId: tombstoneComicId,
-          ).storageKey ==
-          storageKey;
-    });
-    tombstones.add({
-      'comicId': comicId,
-      if (normalizedSourceKey.isNotEmpty) 'sourceKey': normalizedSourceKey,
-      'deletedAtMs': now,
-    });
-    final cutoff = now - _tombstoneTtlMs;
-    tombstones.removeWhere(
-      (t) => ((t['deletedAtMs'] as num?)?.toInt() ?? 0) < cutoff,
+    await _database.into(_database.localFavoriteEntryTombstones).insertOnConflictUpdate(
+      LocalFavoriteEntryTombstonesCompanion.insert(
+        storageKey: storageKey,
+        comicId: comicId,
+        sourceKey: Value(normalizedSourceKey),
+        deletedAtMs: now,
+      ),
     );
-    await prefs.setString(_entryTombstonesKey, jsonEncode(tombstones));
+    await _pruneTombstones();
   }
 
   List<Map<String, dynamic>> _decodeTombstones(String? raw) {
@@ -489,23 +506,226 @@ class LocalFavoritesService extends ChangeNotifier {
   }
 
   Future<_LocalFavoritesStore> _loadStore() async {
-    final prefs = await SharedPreferences.getInstance();
+    final folders = await (_database.select(_database.localFavoriteFolders)).get();
+    final comics = await (_database.select(_database.localFavoriteComics)).get();
+    final joins = await (_database.select(_database.localFavoriteComicFolders)).get();
+    final folderSavedAtByComic = <String, Map<String, int>>{};
+    for (final item in joins) {
+      (folderSavedAtByComic[item.comicStorageKey] ??= <String, int>{})[
+          item.folderId] = item.savedAtMs;
+    }
     return _LocalFavoritesStore(
-      folders: _decodeFolders(prefs.getString(_foldersKey)),
-      entries: _decodeEntries(prefs.getString(_entriesKey)),
+      folders: folders
+          .map(
+            (folder) => _LocalFavoriteFolderRecord(
+              id: folder.id,
+              name: folder.name,
+              sourceKey: folder.sourceKey,
+            ),
+          )
+          .toList(growable: true),
+      entries: comics
+          .map(
+            (comic) => _LocalFavoriteComicRecord(
+              comicId: comic.comicId,
+              sourceKey: comic.sourceKey,
+              title: comic.title,
+              subTitle: comic.subTitle,
+              cover: comic.cover,
+              updateTime: comic.updateTime,
+              folderSavedAtMs:
+                  folderSavedAtByComic[comic.storageKey] ?? <String, int>{},
+            ),
+          )
+          .where((entry) => entry.comicId.isNotEmpty && entry.folderIds.isNotEmpty)
+          .toList(growable: true),
     );
   }
 
   Future<void> _saveStore(_LocalFavoritesStore store) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _foldersKey,
-      jsonEncode(store.folders.map((folder) => folder.toJson()).toList()),
+    await _replaceStore(store);
+  }
+
+  Future<void> _replaceStore(_LocalFavoritesStore store) async {
+    await _database.transaction(() async {
+      await _database.delete(_database.localFavoriteComicFolders).go();
+      await _database.delete(_database.localFavoriteComics).go();
+      await _database.delete(_database.localFavoriteFolders).go();
+      for (final folder in store.folders) {
+        await _database.into(_database.localFavoriteFolders).insertOnConflictUpdate(
+          LocalFavoriteFoldersCompanion.insert(
+            id: folder.id,
+            name: folder.name,
+            sourceKey: Value(folder.sourceKey),
+          ),
+        );
+      }
+      for (final entry in store.entries) {
+        if (entry.comicId.isEmpty || entry.folderSavedAtMs.isEmpty) {
+          continue;
+        }
+        final storageKey = SourceScopedComicId(
+          sourceKey: entry.sourceKey,
+          comicId: entry.comicId,
+        ).storageKey;
+        await _database.into(_database.localFavoriteComics).insertOnConflictUpdate(
+          LocalFavoriteComicsCompanion.insert(
+            storageKey: storageKey,
+            comicId: entry.comicId,
+            sourceKey: Value(entry.sourceKey),
+            title: entry.title,
+            subTitle: entry.subTitle,
+            cover: entry.cover,
+            updateTime: entry.updateTime,
+          ),
+        );
+        for (final saved in entry.folderSavedAtMs.entries) {
+          await _database.into(_database.localFavoriteComicFolders).insertOnConflictUpdate(
+            LocalFavoriteComicFoldersCompanion.insert(
+              comicStorageKey: storageKey,
+              folderId: saved.key,
+              savedAtMs: saved.value,
+            ),
+          );
+        }
+      }
+    });
+  }
+
+  Future<String> exportFoldersJsonString() async {
+    await _ensureMigrated();
+    final store = await _loadStore();
+    return jsonEncode(store.folders.map((folder) => folder.toJson()).toList());
+  }
+
+  Future<String> exportEntriesJsonString() async {
+    await _ensureMigrated();
+    final store = await _loadStore();
+    return jsonEncode(store.entries.map((entry) => entry.toJson()).toList());
+  }
+
+  Future<String> exportFolderTombstonesJsonString() async {
+    await _ensureMigrated();
+    await _pruneTombstones();
+    final rows = await (_database.select(_database.localFavoriteFolderTombstones)).get();
+    return jsonEncode(
+      rows
+          .map((row) => {'id': row.folderId, 'deletedAtMs': row.deletedAtMs})
+          .toList(),
     );
-    await prefs.setString(
-      _entriesKey,
-      jsonEncode(store.entries.map((entry) => entry.toJson()).toList()),
+  }
+
+  Future<String> exportEntryTombstonesJsonString() async {
+    await _ensureMigrated();
+    await _pruneTombstones();
+    final rows = await (_database.select(_database.localFavoriteEntryTombstones)).get();
+    return jsonEncode(
+      rows
+          .map(
+            (row) => {
+              'comicId': row.comicId,
+              if (row.sourceKey.isNotEmpty) 'sourceKey': row.sourceKey,
+              'deletedAtMs': row.deletedAtMs,
+            },
+          )
+          .toList(),
     );
+  }
+
+  Future<void> importJsonStrings({
+    String? foldersRaw,
+    String? entriesRaw,
+    String? folderTombstonesRaw,
+    String? entryTombstonesRaw,
+    required bool replace,
+  }) async {
+    await _ensureMigrated();
+    final folders = _decodeFolders(foldersRaw);
+    final entries = _decodeEntries(entriesRaw);
+    if (replace) {
+      await _replaceStore(_LocalFavoritesStore(folders: folders, entries: entries));
+    } else {
+      final store = await _loadStore();
+      final folderById = <String, _LocalFavoriteFolderRecord>{
+        for (final folder in store.folders) folder.id: folder,
+      };
+      for (final folder in folders) {
+        folderById.putIfAbsent(folder.id, () => folder);
+      }
+      final entryByKey = <String, _LocalFavoriteComicRecord>{
+        for (final entry in store.entries)
+          SourceScopedComicId(sourceKey: entry.sourceKey, comicId: entry.comicId).storageKey:
+              entry,
+      };
+      for (final entry in entries) {
+        final key = SourceScopedComicId(
+          sourceKey: entry.sourceKey,
+          comicId: entry.comicId,
+        ).storageKey;
+        final existing = entryByKey[key];
+        if (existing == null || entry.savedAtMs > existing.savedAtMs) {
+          entryByKey[key] = entry;
+        }
+      }
+      await _replaceStore(
+        _LocalFavoritesStore(
+          folders: folderById.values.toList(growable: true),
+          entries: entryByKey.values.toList(growable: true),
+        ),
+      );
+    }
+    await _importFolderTombstonesString(folderTombstonesRaw);
+    await _importEntryTombstonesString(entryTombstonesRaw);
+    notifyListeners();
+  }
+
+  Future<void> _importFolderTombstonesString(String? raw) async {
+    for (final item in _decodeTombstones(raw)) {
+      final id = (item['id'] ?? '').toString().trim();
+      final deletedAtMs = (item['deletedAtMs'] as num?)?.toInt() ?? 0;
+      if (id.isEmpty || deletedAtMs <= 0) {
+        continue;
+      }
+      await _database.into(_database.localFavoriteFolderTombstones).insertOnConflictUpdate(
+        LocalFavoriteFolderTombstonesCompanion.insert(
+          folderId: id,
+          deletedAtMs: deletedAtMs,
+        ),
+      );
+    }
+    await _pruneTombstones();
+  }
+
+  Future<void> _importEntryTombstonesString(String? raw) async {
+    for (final item in _decodeTombstones(raw)) {
+      final comicId = (item['comicId'] ?? '').toString().trim();
+      final sourceKey = (item['sourceKey'] ?? '').toString().trim();
+      final deletedAtMs = (item['deletedAtMs'] as num?)?.toInt() ?? 0;
+      if (comicId.isEmpty || deletedAtMs <= 0) {
+        continue;
+      }
+      final storageKey = SourceScopedComicId(
+        sourceKey: sourceKey,
+        comicId: comicId,
+      ).storageKey;
+      await _database.into(_database.localFavoriteEntryTombstones).insertOnConflictUpdate(
+        LocalFavoriteEntryTombstonesCompanion.insert(
+          storageKey: storageKey,
+          comicId: comicId,
+          sourceKey: Value(sourceKey),
+          deletedAtMs: deletedAtMs,
+        ),
+      );
+    }
+    await _pruneTombstones();
+  }
+
+  Future<void> _pruneTombstones() async {
+    final cutoff = DateTime.now().millisecondsSinceEpoch - _tombstoneTtlMs;
+    await (_database.delete(_database.localFavoriteFolderTombstones)
+      ..where((row) => row.deletedAtMs.isSmallerThanValue(cutoff))).go();
+    await (_database.delete(_database.localFavoriteEntryTombstones)
+      ..where((row) => row.deletedAtMs.isSmallerThanValue(cutoff))).go();
   }
 
   List<_LocalFavoriteFolderRecord> _decodeFolders(String? raw) {

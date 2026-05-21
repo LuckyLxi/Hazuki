@@ -1,14 +1,15 @@
-import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:hazuki/app/app_preferences.dart';
+import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/features/favorite/favorite.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/services/local_favorites_service.dart';
 import 'package:hazuki/services/manga_download/manga_download_service.dart';
+import 'package:hazuki/services/reading_progress_service.dart';
+import 'package:hazuki/services/read_history_service.dart';
 
 class ComicDetailRepository implements FavoriteFoldersRepository {
   const ComicDetailRepository({
@@ -168,20 +169,10 @@ class ComicDetailRepository implements FavoriteFoldersRepository {
   // ── Persistence ──────────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>?> loadReadingProgress(String comicId) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final scopedKey = SourceScopedComicId(
-        sourceKey: _source.activeSourceKey,
-        comicId: comicId,
-      ).storageKey;
-      final jsonStr =
-          prefs.getString('reading_progress_$scopedKey') ??
-          prefs.getString('reading_progress_$comicId');
-      if (jsonStr == null) return null;
-      return jsonDecode(jsonStr) as Map<String, dynamic>?;
-    } catch (_) {
-      return null;
-    }
+    return sl<ReadingProgressService>().load(
+      comicId: comicId,
+      sourceKey: _source.activeSourceKey,
+    );
   }
 
   Future<bool> loadComicDynamicColorEnabled() async {
@@ -192,55 +183,5 @@ class ComicDetailRepository implements FavoriteFoldersRepository {
   Future<void> recordHistory({
     required ExploreComic comic,
     required ComicDetailsData details,
-  }) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      var history = <Map<String, dynamic>>[];
-      final jsonStr = prefs.getString('hazuki_read_history');
-      if (jsonStr != null) {
-        try {
-          final List<dynamic> jsonList = jsonDecode(jsonStr);
-          history = jsonList.cast<Map<String, dynamic>>();
-        } catch (_) {}
-      }
-
-      final comicId = details.id.trim().isNotEmpty ? details.id : comic.id;
-      final sourceKey = details.sourceKey.trim().isNotEmpty
-          ? details.sourceKey
-          : comic.sourceKey;
-      final storageKey = SourceScopedComicId(
-        sourceKey: sourceKey,
-        comicId: comicId,
-      ).storageKey;
-      final coverUrl = details.cover.trim().isNotEmpty
-          ? details.cover
-          : comic.cover;
-
-      history.removeWhere((e) {
-        final entryId = (e['id'] ?? '').toString();
-        final entrySourceKey = (e['sourceKey'] ?? '').toString();
-        return SourceScopedComicId(
-              sourceKey: entrySourceKey,
-              comicId: entryId,
-            ).storageKey ==
-            storageKey;
-      });
-      history.insert(0, {
-        'id': comicId,
-        'sourceKey': sourceKey,
-        'title': details.title.isNotEmpty ? details.title : comic.title,
-        'cover': coverUrl,
-        'subTitle': details.subTitle.isNotEmpty
-            ? details.subTitle
-            : comic.subTitle,
-        'timestamp': DateTime.now().millisecondsSinceEpoch,
-      });
-
-      if (history.length > hazukiReadHistoryMaxCount) {
-        history = history.sublist(0, hazukiReadHistoryMaxCount);
-      }
-
-      await prefs.setString('hazuki_read_history', jsonEncode(history));
-    } catch (_) {}
-  }
+  }) => sl<ReadHistoryService>().recordHistory(comic: comic, details: details);
 }
