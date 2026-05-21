@@ -107,6 +107,7 @@ Future<void> showHomeSourceSwitchDialog(
 
   var switching = false;
   SourceCatalogEntry? switchingSource;
+  _HomeSourceSwitchBusyPhase busyPhase = _HomeSourceSwitchBusyPhase.switching;
   String? errorText;
 
   await showHomeAnimatedDialog<void>(
@@ -118,14 +119,38 @@ Future<void> showHomeSourceSwitchDialog(
           if (switching || source.normalizedKey == registry.activeSourceKey) {
             return;
           }
+          final previousSourceKey = registry.activeSourceKey;
           setDialogState(() {
             switching = true;
             switchingSource = source;
+            busyPhase = _HomeSourceSwitchBusyPhase.switching;
             errorText = null;
           });
 
           try {
-            await registry.activateSource(source.normalizedKey);
+            final wasDownloaded = await sourceService.hasLocalSourceFile(
+              source.normalizedKey,
+            );
+            if (!dialogContext.mounted) {
+              return;
+            }
+            setDialogState(() {
+              busyPhase = wasDownloaded
+                  ? _HomeSourceSwitchBusyPhase.switching
+                  : _HomeSourceSwitchBusyPhase.downloading;
+            });
+
+            if (!wasDownloaded) {
+              await sourceService.downloadSourceFile(source.normalizedKey);
+              if (!dialogContext.mounted) {
+                return;
+              }
+              setDialogState(() {
+                busyPhase = _HomeSourceSwitchBusyPhase.switching;
+              });
+            } else {
+              await registry.activateSource(source.normalizedKey);
+            }
             await sourceService.ensureInitialized(
               sourceKey: source.normalizedKey,
             );
@@ -142,12 +167,16 @@ Future<void> showHomeSourceSwitchDialog(
               strings.labSourceAccountSwitchSuccess,
             );
           } catch (error) {
+            try {
+              await registry.activateSource(previousSourceKey);
+            } catch (_) {}
             if (!dialogContext.mounted) {
               return;
             }
             setDialogState(() {
               switching = false;
               switchingSource = null;
+              busyPhase = _HomeSourceSwitchBusyPhase.switching;
               errorText = strings.labSourceAccountSwitchFailed('$error');
             });
           }
@@ -181,6 +210,7 @@ Future<void> showHomeSourceSwitchDialog(
                     ? _HomeSourceSwitchBusyPane(
                         key: const ValueKey('source-switch-busy'),
                         sourceName: switchingSource?.name ?? '',
+                        phase: busyPhase,
                       )
                     : _HomeSourceSwitchPickerPane(
                         key: const ValueKey('source-switch-picker'),
@@ -238,6 +268,8 @@ Future<void> saveHomeAvatarToDownloads(
     );
   }
 }
+
+enum _HomeSourceSwitchBusyPhase { downloading, switching }
 
 class _HomeSourceSwitchPickerPane extends StatelessWidget {
   const _HomeSourceSwitchPickerPane({
@@ -320,16 +352,28 @@ class _HomeSourceSwitchPickerPane extends StatelessWidget {
 }
 
 class _HomeSourceSwitchBusyPane extends StatelessWidget {
-  const _HomeSourceSwitchBusyPane({super.key, required this.sourceName});
+  const _HomeSourceSwitchBusyPane({
+    super.key,
+    required this.sourceName,
+    required this.phase,
+  });
 
   final String sourceName;
+  final _HomeSourceSwitchBusyPhase phase;
 
   @override
   Widget build(BuildContext context) {
     final strings = l10n(context);
-    final title = sourceName.trim().isEmpty
-        ? strings.homeSourceSwitchLoadingTitle
-        : strings.homeSourceSwitchLoadingTo(sourceName);
+    final title = switch (phase) {
+      _HomeSourceSwitchBusyPhase.downloading =>
+        sourceName.trim().isEmpty
+            ? strings.sourceBootstrapDownloading
+            : strings.homeSourceSwitchDownloadingSource(sourceName),
+      _HomeSourceSwitchBusyPhase.switching =>
+        sourceName.trim().isEmpty
+            ? strings.homeSourceSwitchLoadingTitle
+            : strings.homeSourceSwitchLoadingTo(sourceName),
+    };
 
     return SizedBox(
       width: 300,

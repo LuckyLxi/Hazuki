@@ -1098,6 +1098,12 @@
       "sourceName": {}
     }
   },
+  "homeSourceSwitchDownloadingSource": "正在下载 {sourceName}",
+  "@homeSourceSwitchDownloadingSource": {
+    "placeholders": {
+      "sourceName": {}
+    }
+  },
   "homeSourceSwitchLoadingMessage": "请等待漫画源准备完成",
   "labSourceAccountNotDownloaded": "未下载",
   "labSourceAccountDownloadSuccess": "漫画源已下载",

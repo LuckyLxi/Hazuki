@@ -1098,6 +1098,12 @@
       "sourceName": {}
     }
   },
+  "homeSourceSwitchDownloadingSource": "Downloading {sourceName}",
+  "@homeSourceSwitchDownloadingSource": {
+    "placeholders": {
+      "sourceName": {}
+    }
+  },
   "homeSourceSwitchLoadingMessage": "Please wait until the source is ready",
   "labSourceAccountNotDownloaded": "Not downloaded",
   "labSourceAccountDownloadSuccess": "Comic source downloaded",
