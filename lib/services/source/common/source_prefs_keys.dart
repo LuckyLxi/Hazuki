@@ -10,6 +10,8 @@ class SourcePrefsKeys {
       'advanced_software_log_capture_enabled';
   static const String sourceSessionScopeMigration =
       'source_session_scope_migration_v1';
+  static const String sourceSecureSessionMigration =
+      'source_secure_session_migration_v1';
 
   static const int defaultCacheMaxBytes = 400 * 1024 * 1024;
   static const String defaultAutoCleanMode = 'size_overflow';

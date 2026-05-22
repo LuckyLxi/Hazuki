@@ -62,6 +62,7 @@ dependencies:
   window_manager: ^0.5.1
   loading_indicator_m3e: ^0.1.1
   get_it: ^9.2.1
+  flutter_secure_storage: ^10.2.0
 
 dev_dependencies:
   flutter_test:

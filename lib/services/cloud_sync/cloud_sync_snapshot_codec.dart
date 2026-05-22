@@ -724,6 +724,7 @@ class CloudSyncSnapshotCodec {
       }
       final sanitized = Map<String, dynamic>.from(decoded);
       sanitized.remove('account');
+      sanitized.remove('token');
       return jsonEncode(sanitized);
     } catch (_) {
       return raw;

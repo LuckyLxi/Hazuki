@@ -1,4 +1,6 @@
 import 'package:hazuki/app/service_locator.dart';
+import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
 import 'package:hazuki/services/storage/hazuki_database.dart';
 
 /// 重置并重新注册用于测试的生产服务图。
@@ -10,6 +12,11 @@ Future<void> ensureTestServiceLocator() async {
   sl.registerLazySingleton<HazukiDatabase>(
     () => HazukiDatabase.memory(),
     dispose: (database) => database.close(),
+  );
+  sl.registerLazySingleton<HazukiSourceService>(
+    () => HazukiSourceService(
+      secureSessionStorage: MemorySourceSecureSessionStorage(),
+    ),
   );
   registerServices();
 }

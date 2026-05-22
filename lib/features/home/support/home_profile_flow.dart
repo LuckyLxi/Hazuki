@@ -7,6 +7,7 @@ import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:hazuki/features/home/support/home_profile_actions.dart';
+import 'package:hazuki/features/home/support/home_source_account_login.dart';
 import 'package:hazuki/features/home/state/home_profile_controller.dart';
 
 class HomeProfileFlow {
@@ -30,23 +31,29 @@ class HomeProfileFlow {
     String account,
     String password,
   ) async {
-    await sourceService.login(account: account, password: password);
+    final profile = await loginSourceAccountForDialog(
+      sourceService: sourceService,
+      account: account,
+      password: password,
+      afterLogin: () async {
+        if (!isMounted()) {
+          throw StateError('Home page disposed');
+        }
 
-    if (!isMounted()) {
-      throw StateError('Home page disposed');
-    }
-
-    profileController.markAuthChanged();
-    await syncUserProfile();
+        profileController.markAuthChanged();
+        await syncUserProfile();
+        if (!isMounted() || !context.mounted) {
+          throw StateError('Home page disposed');
+        }
+      },
+      usernameFallback: () => profileController.username,
+      avatarUrlFallback: () => profileController.avatarUrl,
+    );
     if (!isMounted() || !context.mounted) {
       throw StateError('Home page disposed');
     }
-
     unawaited(showHazukiPrompt(context, l10n(context).homeLoginSuccess));
-    return HomeLoginDialogProfile(
-      username: sourceService.currentAccount ?? profileController.username,
-      avatarUrl: (profileController.avatarUrl ?? '').trim(),
-    );
+    return profile;
   }
 
   Future<void> showLoginDialog() async {

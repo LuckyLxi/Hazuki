@@ -5,6 +5,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/services/network/hazuki_network.dart';
+import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -133,7 +134,8 @@ void main() {
     });
 
     test('keeps JS response shape and source-scoped cookies', () async {
-      final service = HazukiSourceService();
+      final secureStorage = MemorySourceSecureSessionStorage();
+      final service = HazukiSourceService(secureSessionStorage: secureStorage);
       final handle = SourceRuntimeHandle(service: service, sourceKey: 'jm');
       await handle.facade.ensurePrefs();
       handle.facade.httpGateway.configureCookieBridge();
@@ -170,8 +172,17 @@ void main() {
       );
 
       final prefs = await SharedPreferences.getInstance();
-      expect(prefs.getString('cookie_store_v2_jm'), contains('sid'));
-      expect(prefs.getString('cookie_store_v2_copy_manga'), isNull);
+      expect(prefs.getString('cookie_store_v2_jm'), isNull);
+      expect(
+        secureStorage.values[SourceSecureSessionStorageKeys.cookies('jm')],
+        contains('sid'),
+      );
+      expect(
+        secureStorage.values[SourceSecureSessionStorageKeys.cookies(
+          'copy_manga',
+        )],
+        isNull,
+      );
     });
   });
 }

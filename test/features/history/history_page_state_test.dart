@@ -54,17 +54,14 @@ void main() {
       expect(data.selectedStorageKeys, isEmpty);
     });
 
-    test(
-      'reload does not re-enable entry animation after detail navigation',
-      () {
-        final data = HistoryPageData();
+    test('reload re-enables entry animation after detail navigation', () {
+      final data = HistoryPageData();
 
-        data.disableEntryAnimation();
-        data.applyLoaded(const [_comicA]);
+      data.disableEntryAnimation();
+      data.applyLoaded(const [_comicA]);
 
-        expect(data.playItemEntryAnimation, isFalse);
-      },
-    );
+      expect(data.playItemEntryAnimation, isTrue);
+    });
   });
 }
 

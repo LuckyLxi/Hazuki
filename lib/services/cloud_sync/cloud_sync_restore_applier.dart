@@ -219,15 +219,7 @@ class CloudSyncRestoreApplier {
       }
       final sanitized = Map<String, dynamic>.from(decoded);
       sanitized.remove('account');
-      final existingRaw = prefs.getString(normalizedKey);
-      if (existingRaw != null && existingRaw.trim().isNotEmpty) {
-        try {
-          final existingDecoded = jsonDecode(existingRaw);
-          if (existingDecoded is Map && existingDecoded['account'] != null) {
-            sanitized['account'] = existingDecoded['account'];
-          }
-        } catch (_) {}
-      }
+      sanitized.remove('token');
       return jsonEncode(sanitized);
     } catch (_) {
       return value;

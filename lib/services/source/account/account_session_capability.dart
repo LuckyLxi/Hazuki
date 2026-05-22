@@ -126,32 +126,34 @@ extension HazukiSourceServiceAccountSessionCapability on HazukiSourceService {
     final facade = this.facade;
     final engine = facade.js.engine;
     final sourceMeta = facade.sourceMeta;
-    if (engine == null || sourceMeta == null) {
+    final sourceKey = (sourceMeta?.key ?? facade.sourceKey).trim();
+
+    if (engine != null && sourceMeta != null) {
+      final hasLogout = facade.js.asBool(
+        facade.js.evaluate('!!this.__hazuki_source.account?.logout'),
+      );
+
+      if (hasLogout) {
+        try {
+          final result = engine.evaluate(
+            'this.__hazuki_source.account.logout()',
+            name: 'source_logout.js',
+          );
+          await facade.js.resolve(result);
+        } catch (_) {}
+      }
+    }
+
+    if (sourceKey.isEmpty) {
       return;
     }
 
-    final hasLogout = facade.js.asBool(
-      facade.js.evaluate('!!this.__hazuki_source.account?.logout'),
-    );
-
-    if (hasLogout) {
-      try {
-        final result = engine.evaluate(
-          'this.__hazuki_source.account.logout()',
-          name: 'source_logout.js',
-        );
-        await facade.js.resolve(result);
-      } catch (_) {}
-    }
-
-    await facade.deleteSourceData(sourceMeta.key, 'account');
-    await facade.deleteSourceData(sourceMeta.key, 'avatar_url');
-    await facade.deleteSourceData(sourceMeta.key, 'display_name');
+    await facade.deleteSourceData(sourceKey, 'account');
+    await facade.deleteSourceData(sourceKey, 'avatar_url');
+    await facade.deleteSourceData(sourceKey, 'display_name');
+    await facade._saveCookieStore(const []);
     facade.runtime.transientAvatarUrl = null;
-    if (isHazukiCopyMangaSourceKey(sourceMeta.key) ||
-        isHazukiPicacgSourceKey(sourceMeta.key)) {
-      await facade.deleteSourceData(sourceMeta.key, 'token');
-    }
+    await facade.deleteSourceData(sourceKey, 'token');
   }
 }
 
