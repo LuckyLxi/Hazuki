@@ -137,15 +137,16 @@ class HistoryComicListItem extends StatelessWidget {
       ),
     );
 
-    if (!animateEntry) {
-      return item;
-    }
-
     return TweenAnimationBuilder<double>(
-      tween: Tween<double>(begin: 0.0, end: 1.0),
-      duration: Duration(milliseconds: 350 + (index.clamp(0, 10)) * 60),
+      tween: Tween<double>(begin: animateEntry ? 0.0 : 1.0, end: 1.0),
+      duration: animateEntry
+          ? Duration(milliseconds: 350 + (index.clamp(0, 10)) * 60)
+          : Duration.zero,
       curve: Curves.easeOutBack,
       builder: (context, value, child) {
+        if (value == 1.0) {
+          return child!;
+        }
         return Transform.scale(
           scale: 0.85 + 0.15 * value,
           alignment: Alignment.bottomCenter,

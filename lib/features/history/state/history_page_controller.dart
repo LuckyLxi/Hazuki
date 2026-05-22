@@ -106,6 +106,15 @@ class HistoryPageController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 恢复交错入场动画
+  void enableEntryAnimation() {
+    if (_state.playItemEntryAnimation) {
+      return;
+    }
+    _state.enableEntryAnimation();
+    notifyListeners();
+  }
+
   Future<void> _loadHistory({required bool markLoading}) async {
     final requestVersion = ++_requestVersion;
     final sourceKey = _activeSourceKey;
