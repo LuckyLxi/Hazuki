@@ -437,8 +437,8 @@ class _CommentRepliesList extends StatelessWidget {
                 padding: EdgeInsets.symmetric(vertical: 8),
                 child: Center(
                   child: SizedBox.square(
-                    dimension: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    dimension: 36,
+                    child: LoadingIndicatorM3E(),
                   ),
                 ),
               )

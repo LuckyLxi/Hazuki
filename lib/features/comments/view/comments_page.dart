@@ -13,6 +13,7 @@ import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/comment_filter_service.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
+import 'package:loading_indicator_m3e/loading_indicator_m3e.dart';
 
 import 'comments_widgets.dart';
 
