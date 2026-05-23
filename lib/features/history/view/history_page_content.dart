@@ -8,7 +8,9 @@ import 'package:hazuki/widgets/widgets.dart';
 
 import 'history_comic_list_item.dart';
 
-class HistoryPageContent extends StatelessWidget {
+const Duration _historyItemRemovalDuration = Duration(milliseconds: 240);
+
+class HistoryPageContent extends StatefulWidget {
   const HistoryPageContent({
     super.key,
     required this.loading,
@@ -46,24 +48,90 @@ class HistoryPageContent extends StatelessWidget {
   final Future<void> Function() onBackToTopPressed;
 
   @override
+  State<HistoryPageContent> createState() => _HistoryPageContentState();
+}
+
+class _HistoryPageContentState extends State<HistoryPageContent> {
+  late List<ExploreComic> _visibleHistory;
+  final Set<String> _removingStorageKeys = <String>{};
+  int _syncVersion = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _visibleHistory = List<ExploreComic>.of(widget.history);
+  }
+
+  @override
+  void didUpdateWidget(covariant HistoryPageContent oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _syncVisibleHistory();
+  }
+
+  void _syncVisibleHistory() {
+    final nextByKey = <String, ExploreComic>{
+      for (final comic in widget.history) comic.scopedId.storageKey: comic,
+    };
+    final nextKeys = nextByKey.keys.toSet();
+    final visibleKeys = _visibleHistory
+        .map((comic) => comic.scopedId.storageKey)
+        .toSet();
+    final removedKeys = visibleKeys.difference(nextKeys);
+    final addedKeys = nextKeys.difference(visibleKeys);
+
+    if (removedKeys.isEmpty && _removingStorageKeys.isEmpty) {
+      _visibleHistory = List<ExploreComic>.of(widget.history);
+      return;
+    }
+
+    if (removedKeys.isNotEmpty) {
+      _removingStorageKeys.addAll(removedKeys);
+      _scheduleRemovalCleanup();
+    }
+
+    _visibleHistory = <ExploreComic>[
+      for (final comic in _visibleHistory)
+        nextByKey[comic.scopedId.storageKey] ?? comic,
+      for (final comic in widget.history)
+        if (addedKeys.contains(comic.scopedId.storageKey)) comic,
+    ];
+  }
+
+  void _scheduleRemovalCleanup() {
+    final version = ++_syncVersion;
+    Future<void>.delayed(_historyItemRemovalDuration, () {
+      if (!mounted || version != _syncVersion) {
+        return;
+      }
+      setState(() {
+        final currentKeys = widget.history
+            .map((comic) => comic.scopedId.storageKey)
+            .toSet();
+        _removingStorageKeys.removeWhere(currentKeys.contains);
+        _visibleHistory = List<ExploreComic>.of(widget.history);
+      });
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Stack(
       children: [
         _buildBody(context),
         HistoryBackToTopButton(
-          visible: showBackToTop,
-          onPressed: onBackToTopPressed,
+          visible: widget.showBackToTop,
+          onPressed: widget.onBackToTopPressed,
         ),
       ],
     );
   }
 
   Widget _buildBody(BuildContext context) {
-    if (loading) {
+    if (widget.loading) {
       return _buildLoadingState();
     }
-    if (history.isEmpty) {
-      return Center(child: Text(strings.historyEmpty));
+    if (widget.history.isEmpty && _visibleHistory.isEmpty) {
+      return Center(child: Text(widget.strings.historyEmpty));
     }
     return _buildHistoryList();
   }
@@ -75,7 +143,7 @@ class HistoryPageContent extends StatelessWidget {
         children: [
           const HazukiSandyLoadingIndicator(size: 136),
           const SizedBox(height: 10),
-          Text(strings.commonLoading),
+          Text(widget.strings.commonLoading),
         ],
       ),
     );
@@ -83,39 +151,52 @@ class HistoryPageContent extends StatelessWidget {
 
   Widget _buildHistoryList() {
     return ListView.builder(
-      controller: scrollController,
+      controller: widget.scrollController,
       physics: const AlwaysScrollableScrollPhysics(
         parent: ClampingScrollPhysics(),
       ),
       padding: const EdgeInsets.all(16),
-      itemCount: history.length,
+      itemCount: _visibleHistory.length,
+      findChildIndexCallback: (key) {
+        if (key is! ValueKey<String>) {
+          return null;
+        }
+        final storageKey = key.value;
+        final index = _visibleHistory.indexWhere(
+          (comic) => comic.scopedId.storageKey == storageKey,
+        );
+        return index == -1 ? null : index;
+      },
       itemBuilder: (context, index) {
-        return _buildItem(history[index], index);
+        return _buildItem(_visibleHistory[index], index);
       },
     );
   }
 
   Widget _buildItem(ExploreComic comic, int index) {
     final storageKey = comic.scopedId.storageKey;
-    final heroTag = comicCoverHeroTagBuilder(comic, salt: 'history');
+    final heroTag = widget.comicCoverHeroTagBuilder(comic, salt: 'history');
     return HistoryComicListItem(
       key: ValueKey(storageKey),
       comic: comic,
       index: index,
       heroTag: heroTag,
-      animateEntry: playItemEntryAnimation,
-      selectionMode: selectionMode,
-      selected: selectedStorageKeys.contains(storageKey),
+      animateEntry:
+          widget.playItemEntryAnimation &&
+          !_removingStorageKeys.contains(storageKey),
+      removing: _removingStorageKeys.contains(storageKey),
+      selectionMode: widget.selectionMode,
+      selected: widget.selectedStorageKeys.contains(storageKey),
       onShowMenu: (globalPosition, itemContext) =>
-          onShowMenu(comic, globalPosition, itemContext),
+          widget.onShowMenu(comic, globalPosition, itemContext),
       onToggleSelection: (selected) =>
-          onToggleSelection(storageKey, selected: selected),
+          widget.onToggleSelection(storageKey, selected: selected),
       onTap: () async {
-        if (selectionMode) {
-          onToggleSelection(storageKey);
+        if (widget.selectionMode) {
+          widget.onToggleSelection(storageKey);
           return;
         }
-        await onOpenComic(comic, heroTag);
+        await widget.onOpenComic(comic, heroTag);
       },
     );
   }

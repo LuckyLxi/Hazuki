@@ -11,11 +11,32 @@ class HistoryPageData {
     loading = true;
   }
 
-  void applyLoaded(List<ExploreComic> value) {
+  void applyLoaded(List<ExploreComic> value, {bool playEntryAnimation = true}) {
     history = List<ExploreComic>.unmodifiable(value);
+    _finishApplyingLoadedHistory(playEntryAnimation: playEntryAnimation);
+  }
+
+  void applyLoadedPreservingExistingOrder(
+    List<ExploreComic> value, {
+    bool playEntryAnimation = true,
+  }) {
+    final loadedByKey = <String, ExploreComic>{
+      for (final comic in value) comic.scopedId.storageKey: comic,
+    };
+    final ordered = <ExploreComic>[
+      for (final comic in history)
+        if (loadedByKey.containsKey(comic.scopedId.storageKey))
+          loadedByKey.remove(comic.scopedId.storageKey)!,
+      ...loadedByKey.values,
+    ];
+    history = List<ExploreComic>.unmodifiable(ordered);
+    _finishApplyingLoadedHistory(playEntryAnimation: playEntryAnimation);
+  }
+
+  void _finishApplyingLoadedHistory({required bool playEntryAnimation}) {
     loading = false;
     // Keep animation reset batched with loaded data to avoid an extra rebuild.
-    playItemEntryAnimation = true;
+    playItemEntryAnimation = playEntryAnimation;
 
     final validKeys = history.map((comic) => comic.scopedId.storageKey).toSet();
     selectedStorageKeys.removeWhere((key) => !validKeys.contains(key));

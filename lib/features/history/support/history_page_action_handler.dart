@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
@@ -77,16 +79,56 @@ class HistoryPageActionHandler {
     ExploreComic comic,
     String heroTag,
   ) async {
-    _controller.disableEntryAnimation();
-    await openComicDetail(
-      context,
-      comic: comic,
-      heroTag: heroTag,
-      pageBuilder: _comicDetailPageBuilder,
-    );
+    _controller.pauseAutoReloads();
+    try {
+      await openComicDetail(
+        context,
+        comic: comic,
+        heroTag: heroTag,
+        pageBuilder: _comicDetailPageBuilder,
+      );
+      if (context.mounted) {
+        await _waitForCoveringRouteToDismiss(context);
+      }
+    } finally {
+      _controller.resumeAutoReloads();
+    }
     if (!context.mounted) {
       return;
     }
-    await _controller.reload();
+    await _controller.reload(preserveExistingOrder: true);
   }
+}
+
+Future<void> _waitForCoveringRouteToDismiss(BuildContext context) async {
+  final secondaryAnimation = ModalRoute.of(context)?.secondaryAnimation;
+  if (secondaryAnimation == null ||
+      secondaryAnimation.status == AnimationStatus.dismissed ||
+      secondaryAnimation.value == 0) {
+    await WidgetsBinding.instance.endOfFrame;
+    return;
+  }
+
+  final completer = Completer<void>();
+  late final AnimationStatusListener listener;
+  listener = (status) {
+    if (status == AnimationStatus.dismissed && !completer.isCompleted) {
+      completer.complete();
+    }
+  };
+
+  secondaryAnimation.addStatusListener(listener);
+  try {
+    if (secondaryAnimation.status == AnimationStatus.dismissed ||
+        secondaryAnimation.value == 0) {
+      return;
+    }
+    await completer.future.timeout(
+      const Duration(milliseconds: 500),
+      onTimeout: () {},
+    );
+  } finally {
+    secondaryAnimation.removeStatusListener(listener);
+  }
+  await WidgetsBinding.instance.endOfFrame;
 }

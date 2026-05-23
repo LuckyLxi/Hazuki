@@ -114,6 +114,26 @@ class ReadHistoryService extends ChangeNotifier {
     });
   }
 
+  Future<void> deleteSourceHistoryEntries({
+    required String sourceKey,
+    required Set<String> storageKeys,
+  }) {
+    if (storageKeys.isEmpty) {
+      return Future<void>.value();
+    }
+    return _serialized(() async {
+      await _ensureMigrated();
+      final normalizedSourceKey = _normalizeSourceKey(sourceKey);
+      await (_database.delete(_database.readHistoryEntries)..where(
+            (entry) =>
+                entry.sourceKey.equals(normalizedSourceKey) &
+                entry.storageKey.isIn(storageKeys),
+          ))
+          .go();
+      notifyListeners();
+    });
+  }
+
   Future<void> recordHistory({
     required ExploreComic comic,
     required ComicDetailsData details,

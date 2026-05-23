@@ -111,6 +111,40 @@ void main() {
     expect(toggledStorageKey, _comicA.scopedId.storageKey);
     expect(toggledSelected, isNull);
   });
+
+  testWidgets('keeps deleted row briefly so following rows slide up', (
+    tester,
+  ) async {
+    final scrollController = ScrollController();
+    addTearDown(scrollController.dispose);
+
+    await tester.pumpWidget(
+      _wrapContent(
+        scrollController: scrollController,
+        loading: false,
+        history: const <ExploreComic>[_comicA, _comicB, _comicC],
+      ),
+    );
+
+    expect(find.text('Comic B'), findsOneWidget);
+    expect(find.text('Comic C'), findsOneWidget);
+
+    await tester.pumpWidget(
+      _wrapContent(
+        scrollController: scrollController,
+        loading: false,
+        history: const <ExploreComic>[_comicA, _comicC],
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Comic B'), findsOneWidget);
+
+    await tester.pump(const Duration(milliseconds: 260));
+
+    expect(find.text('Comic B'), findsNothing);
+    expect(find.text('Comic C'), findsOneWidget);
+  });
 }
 
 Widget _wrapContent({
@@ -161,6 +195,14 @@ const _comicA = ExploreComic(
 const _comicB = ExploreComic(
   id: 'b',
   title: 'Comic B',
+  subTitle: '',
+  cover: '',
+  sourceKey: 'jm',
+);
+
+const _comicC = ExploreComic(
+  id: 'c',
+  title: 'Comic C',
   subTitle: '',
   cover: '',
   sourceKey: 'jm',

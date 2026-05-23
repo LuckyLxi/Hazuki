@@ -115,6 +115,50 @@ void main() {
       expect(jmHistory.map((comic) => comic.id), ['jm-old']);
     });
 
+    test('deletes entries without rewriting remaining timestamps', () async {
+      final service = sl<ReadHistoryService>();
+
+      await service.importJsonList([
+        {
+          'id': 'oldest',
+          'title': 'Oldest',
+          'sourceKey': hazukiDefaultSourceKey,
+          'timestamp': 1,
+        },
+        {
+          'id': 'middle',
+          'title': 'Middle',
+          'sourceKey': hazukiDefaultSourceKey,
+          'timestamp': 2,
+        },
+        {
+          'id': 'newest',
+          'title': 'Newest',
+          'sourceKey': hazukiDefaultSourceKey,
+          'timestamp': 3,
+        },
+      ], replace: true);
+
+      await service.deleteSourceHistoryEntries(
+        sourceKey: hazukiDefaultSourceKey,
+        storageKeys: {
+          const ExploreComic(
+            id: 'middle',
+            title: 'Middle',
+            subTitle: '',
+            cover: '',
+            sourceKey: hazukiDefaultSourceKey,
+          ).scopedId.storageKey,
+        },
+      );
+
+      final history = await service.loadHistory(
+        sourceKey: hazukiDefaultSourceKey,
+      );
+
+      expect(history.map((comic) => comic.id), ['newest', 'oldest']);
+    });
+
     test('exports sourceKey and timestamp metadata', () async {
       final service = sl<ReadHistoryService>();
 

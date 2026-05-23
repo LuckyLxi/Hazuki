@@ -24,6 +24,8 @@ class HistoryPageController extends ChangeNotifier {
 
   bool _disposed = false;
   int _requestVersion = 0;
+  int _autoReloadPauseDepth = 0;
+  bool _hasDeferredHistoryChange = false;
   String _activeSourceKey;
 
   List<ExploreComic> get history => _state.history;
@@ -39,18 +41,45 @@ class HistoryPageController extends ChangeNotifier {
     return _loadHistory(markLoading: true);
   }
 
-  Future<void> reload() {
-    return _loadHistory(markLoading: false);
+  Future<void> reload({
+    bool playEntryAnimation = true,
+    bool preserveExistingOrder = false,
+  }) {
+    return _loadHistory(
+      markLoading: false,
+      playEntryAnimation: playEntryAnimation,
+      preserveExistingOrder: preserveExistingOrder,
+    );
+  }
+
+  void pauseAutoReloads() {
+    _autoReloadPauseDepth += 1;
+  }
+
+  bool resumeAutoReloads() {
+    if (_autoReloadPauseDepth == 0) {
+      return false;
+    }
+    _autoReloadPauseDepth -= 1;
+    if (_autoReloadPauseDepth > 0) {
+      return false;
+    }
+    final hadDeferredChange = _hasDeferredHistoryChange;
+    _hasDeferredHistoryChange = false;
+    return hadDeferredChange;
   }
 
   Future<void> deleteComic(ExploreComic comic) async {
     final sourceKey = _activeSourceKey;
-    final nextHistory = _state.history
-        .where(
-          (entry) => entry.scopedId.storageKey != comic.scopedId.storageKey,
-        )
-        .toList(growable: false);
-    await _replaceSourceHistory(sourceKey: sourceKey, history: nextHistory);
+    pauseAutoReloads();
+    try {
+      await _deleteSourceHistoryEntries(
+        sourceKey: sourceKey,
+        storageKeys: {comic.scopedId.storageKey},
+      );
+    } finally {
+      resumeAutoReloads();
+    }
     if (_disposed || sourceKey != _activeSourceKey) {
       return;
     }
@@ -64,10 +93,15 @@ class HistoryPageController extends ChangeNotifier {
     }
     final sourceKey = _activeSourceKey;
     final selected = Set<String>.of(_state.selectedStorageKeys);
-    final nextHistory = _state.history
-        .where((entry) => !selected.contains(entry.scopedId.storageKey))
-        .toList(growable: false);
-    await _replaceSourceHistory(sourceKey: sourceKey, history: nextHistory);
+    pauseAutoReloads();
+    try {
+      await _deleteSourceHistoryEntries(
+        sourceKey: sourceKey,
+        storageKeys: selected,
+      );
+    } finally {
+      resumeAutoReloads();
+    }
     if (_disposed || sourceKey != _activeSourceKey) {
       return;
     }
@@ -115,7 +149,11 @@ class HistoryPageController extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> _loadHistory({required bool markLoading}) async {
+  Future<void> _loadHistory({
+    required bool markLoading,
+    bool playEntryAnimation = true,
+    bool preserveExistingOrder = false,
+  }) async {
     final requestVersion = ++_requestVersion;
     final sourceKey = _activeSourceKey;
     if (markLoading && !_state.loading) {
@@ -129,7 +167,14 @@ class HistoryPageController extends ChangeNotifier {
         sourceKey != _activeSourceKey) {
       return;
     }
-    _state.applyLoaded(history);
+    if (preserveExistingOrder) {
+      _state.applyLoadedPreservingExistingOrder(
+        history,
+        playEntryAnimation: playEntryAnimation,
+      );
+    } else {
+      _state.applyLoaded(history, playEntryAnimation: playEntryAnimation);
+    }
     notifyListeners();
   }
 
@@ -143,7 +188,21 @@ class HistoryPageController extends ChangeNotifier {
     );
   }
 
+  Future<void> _deleteSourceHistoryEntries({
+    required String sourceKey,
+    required Set<String> storageKeys,
+  }) {
+    return _readHistoryService.deleteSourceHistoryEntries(
+      sourceKey: sourceKey,
+      storageKeys: storageKeys,
+    );
+  }
+
   void _handleReadHistoryChanged() {
+    if (_autoReloadPauseDepth > 0) {
+      _hasDeferredHistoryChange = true;
+      return;
+    }
     unawaited(reload());
   }
 
