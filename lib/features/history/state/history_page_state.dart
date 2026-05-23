@@ -14,7 +14,7 @@ class HistoryPageData {
   void applyLoaded(List<ExploreComic> value) {
     history = List<ExploreComic>.unmodifiable(value);
     loading = false;
-    // 与数据更新合并，避免单独恢复动画标志触发多余的中间重建
+    // Keep animation reset batched with loaded data to avoid an extra rebuild.
     playItemEntryAnimation = true;
 
     final validKeys = history.map((comic) => comic.scopedId.storageKey).toSet();
@@ -78,7 +78,7 @@ class HistoryPageData {
     playItemEntryAnimation = false;
   }
 
-  /// 恢复交错入场动画，供从其他页面返回时重新播放动画
+  /// Re-enables item entry animation after returning from another page.
   void enableEntryAnimation() {
     playItemEntryAnimation = true;
   }

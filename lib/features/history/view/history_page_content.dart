@@ -47,39 +47,51 @@ class HistoryPageContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bodyContent = loading
-        ? Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const HazukiSandyLoadingIndicator(size: 136),
-                const SizedBox(height: 10),
-                Text(strings.commonLoading),
-              ],
-            ),
-          )
-        : history.isEmpty
-        ? Center(child: Text(strings.historyEmpty))
-        : ListView.builder(
-            controller: scrollController,
-            physics: const AlwaysScrollableScrollPhysics(
-              parent: ClampingScrollPhysics(),
-            ),
-            padding: const EdgeInsets.all(16),
-            itemCount: history.length,
-            itemBuilder: (context, index) {
-              return _buildItem(history[index], index);
-            },
-          );
-
     return Stack(
       children: [
-        bodyContent,
+        _buildBody(context),
         HistoryBackToTopButton(
           visible: showBackToTop,
           onPressed: onBackToTopPressed,
         ),
       ],
+    );
+  }
+
+  Widget _buildBody(BuildContext context) {
+    if (loading) {
+      return _buildLoadingState();
+    }
+    if (history.isEmpty) {
+      return Center(child: Text(strings.historyEmpty));
+    }
+    return _buildHistoryList();
+  }
+
+  Widget _buildLoadingState() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const HazukiSandyLoadingIndicator(size: 136),
+          const SizedBox(height: 10),
+          Text(strings.commonLoading),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHistoryList() {
+    return ListView.builder(
+      controller: scrollController,
+      physics: const AlwaysScrollableScrollPhysics(
+        parent: ClampingScrollPhysics(),
+      ),
+      padding: const EdgeInsets.all(16),
+      itemCount: history.length,
+      itemBuilder: (context, index) {
+        return _buildItem(history[index], index);
+      },
     );
   }
 

@@ -106,7 +106,7 @@ class HistoryPageController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 恢复交错入场动画
+  /// Re-enables item entry animation for the next loaded history list.
   void enableEntryAnimation() {
     if (_state.playItemEntryAnimation) {
       return;
