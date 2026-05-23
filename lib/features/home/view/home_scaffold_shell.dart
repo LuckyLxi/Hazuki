@@ -132,8 +132,7 @@ class HomeScaffoldShell extends StatelessWidget {
         onComicTap: favoriteComicTapHandler,
       ),
     );
-    final mobileDrawerContent = HomeDrawerContent(
-      key: ValueKey('home-mobile-drawer-$drawerVisualKey'),
+    final sidebarProfile = HomeSidebarProfileState(
       isLogged: isLogged,
       profileLoading: profileLoading,
       avatarUrl: avatarUrl,
@@ -142,17 +141,26 @@ class HomeScaffoldShell extends StatelessWidget {
       showCheckInActions: showCheckInActions,
       checkInBusy: checkInBusy,
       checkedInToday: checkedInToday,
+    );
+    final sidebarActions = HomeSidebarActions(
       onProfileTap: sourceService.sourceMeta?.supportsAccount == true
           ? onProfileTap
           : null,
       onCheckInPressed: _closeDrawerRouteThen(context, onCheckInPressed),
       onSwitchSourcePressed: onSwitchSourcePressed,
+      onSelectDiscover: () => onDestinationSelected(0),
+      onSelectFavorite: () => onDestinationSelected(1),
       onOpenHistory: onOpenHistory,
       onOpenCategories: onOpenCategories,
       onOpenRanking: onOpenRanking,
       onOpenDownloads: onOpenDownloads,
       onOpenSettings: onOpenSettings,
       onOpenLines: onOpenLines,
+    );
+    final mobileDrawerContent = HomeDrawerContent(
+      key: ValueKey('home-mobile-drawer-$drawerVisualKey'),
+      profile: sidebarProfile,
+      actions: sidebarActions,
       selectedDestination: selectedDrawerDestination,
     );
     final body = Platform.isWindows
@@ -163,24 +171,10 @@ class HomeScaffoldShell extends StatelessWidget {
                 width: resolveHomeWindowsSidebarWidth(context),
                 child: HomeWindowsSidebar(
                   key: ValueKey('home-windows-sidebar-$drawerVisualKey'),
-                  isLogged: isLogged,
-                  profileLoading: profileLoading,
-                  avatarUrl: avatarUrl,
-                  username: username,
+                  profile: sidebarProfile,
+                  actions: sidebarActions,
                   currentIndex: currentIndex,
                   selectedDestination: selectedDrawerDestination,
-                  onProfileTap:
-                      sourceService.sourceMeta?.supportsAccount == true
-                      ? onProfileTap
-                      : null,
-                  onSelectDiscover: () => onDestinationSelected(0),
-                  onSelectFavorite: () => onDestinationSelected(1),
-                  onOpenHistory: onOpenHistory,
-                  onOpenCategories: onOpenCategories,
-                  onOpenRanking: onOpenRanking,
-                  onOpenDownloads: onOpenDownloads,
-                  onOpenLines: onOpenLines,
-                  onOpenSettings: onOpenSettings,
                 ),
               ),
               Expanded(
@@ -231,6 +225,7 @@ class HomeScaffoldShell extends StatelessWidget {
                         ? null
                         : _HomeAppBarProfileButton(
                             downloadService: downloadService,
+                            activeSourceKey: sourceService.activeSourceKey,
                             avatarUrl: avatarUrl,
                             profileLoading: profileLoading,
                             username: username,
@@ -309,6 +304,7 @@ class HomeScaffoldShell extends StatelessWidget {
 class _HomeAppBarProfileButton extends StatefulWidget {
   const _HomeAppBarProfileButton({
     required this.downloadService,
+    required this.activeSourceKey,
     required this.avatarUrl,
     required this.profileLoading,
     required this.username,
@@ -316,6 +312,7 @@ class _HomeAppBarProfileButton extends StatefulWidget {
   });
 
   final MangaDownloadService downloadService;
+  final String activeSourceKey;
   final String? avatarUrl;
   final bool profileLoading;
   final String username;
@@ -409,6 +406,12 @@ class _HomeAppBarProfileButtonState extends State<_HomeAppBarProfileButton> {
                   child: Row(
                     children: [
                       HomeProfileAvatar(
+                        key: ValueKey(
+                          'home-appbar-avatar-${widget.activeSourceKey}|'
+                          '${widget.avatarUrl ?? ''}|'
+                          '${widget.profileLoading}|'
+                          '${widget.username}',
+                        ),
                         avatarUrl: widget.avatarUrl,
                         loading: widget.profileLoading,
                         size: 38,

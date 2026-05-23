@@ -5,7 +5,6 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
-import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../../models/hazuki_models.dart';
@@ -256,13 +255,10 @@ class ImageCacheCapability {
       headers['cookie'] = cookie;
     }
 
-    final response = await _facade.httpGateway.dio.get<List<int>>(
+    final response = await _facade.httpGateway.getBytes(
       url,
-      options: Options(
-        responseType: ResponseType.bytes,
-        headers: headers,
-        extra: {'hazukiLogCategory': 'image_download'},
-      ),
+      headers: headers,
+      category: 'image_download',
     );
 
     final data = response.data;

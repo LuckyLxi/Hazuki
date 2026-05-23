@@ -1,9 +1,8 @@
 import 'dart:io';
 import 'package:hazuki/app/service_locator.dart';
 
-import 'package:dio/dio.dart';
-
 import '../hazuki_source_service.dart';
+import '../network/hazuki_network.dart';
 import 'manga_download_models.dart';
 import 'manga_download_storage_support.dart';
 
@@ -401,22 +400,8 @@ class MangaDownloadQueueExecutor {
   }
 
   bool _isTransientDownloadError(Object error) {
-    if (error is SocketException) {
+    if (isHazukiTransientNetworkFailure(error)) {
       return true;
-    }
-    if (error is DioException) {
-      if (error.type == DioExceptionType.connectionError ||
-          error.type == DioExceptionType.connectionTimeout) {
-        return true;
-      }
-      if (error.error is SocketException) {
-        return true;
-      }
-      final message = error.message?.toLowerCase() ?? '';
-      if (message.contains('failed host lookup') ||
-          message.contains('connection error')) {
-        return true;
-      }
     }
 
     final text = error.toString().toLowerCase();

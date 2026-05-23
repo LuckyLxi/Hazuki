@@ -7,8 +7,12 @@ import '../services/hazuki_source_service.dart';
 import '../services/local_favorites_service.dart';
 import '../services/manga_download/manga_download_service.dart';
 import '../services/password_lock_service.dart';
+import '../services/reading_progress_service.dart';
+import '../services/read_history_service.dart';
 import '../services/software_update/software_update_download_service.dart';
 import '../services/software_update/software_update_service.dart';
+import '../services/storage/hazuki_database.dart';
+import '../features/search/support/search_history_service.dart';
 
 final GetIt sl = GetIt.instance;
 
@@ -16,6 +20,12 @@ final GetIt sl = GetIt.instance;
 ///
 /// Called once during startup, before any service `.instance` accessor is used.
 void registerServices() {
+  if (!sl.isRegistered<HazukiDatabase>()) {
+    sl.registerLazySingleton<HazukiDatabase>(
+      () => HazukiDatabase(),
+      dispose: (database) => database.close(),
+    );
+  }
   if (!sl.isRegistered<CommentFilterService>()) {
     sl.registerLazySingleton<CommentFilterService>(
       () => CommentFilterService(),
@@ -23,7 +33,22 @@ void registerServices() {
   }
   if (!sl.isRegistered<LocalFavoritesService>()) {
     sl.registerLazySingleton<LocalFavoritesService>(
-      () => LocalFavoritesService(),
+      () => LocalFavoritesService(database: sl<HazukiDatabase>()),
+    );
+  }
+  if (!sl.isRegistered<ReadHistoryService>()) {
+    sl.registerLazySingleton<ReadHistoryService>(
+      () => ReadHistoryService(database: sl<HazukiDatabase>()),
+    );
+  }
+  if (!sl.isRegistered<ReadingProgressService>()) {
+    sl.registerLazySingleton<ReadingProgressService>(
+      () => ReadingProgressService(database: sl<HazukiDatabase>()),
+    );
+  }
+  if (!sl.isRegistered<SearchHistoryService>()) {
+    sl.registerLazySingleton<SearchHistoryService>(
+      () => SearchHistoryService(database: sl<HazukiDatabase>()),
     );
   }
   if (!sl.isRegistered<PasswordLockService>()) {

@@ -4,6 +4,7 @@ import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
 import 'package:hazuki/shared/windows/windows_comic_detail.dart';
+import 'package:loading_indicator_m3e/loading_indicator_m3e.dart';
 
 import 'discover_comic_tile.dart';
 import 'discover_section_page.dart';
@@ -113,8 +114,16 @@ class _DiscoverSectionBlockState extends State<DiscoverSectionBlock> {
               itemBuilder: (context, index) {
                 if (index >= widget.section.comics.length) {
                   return const SizedBox(
-                    width: 48,
-                    child: Center(child: CircularProgressIndicator()),
+                    width: 64,
+                    child: Padding(
+                      padding: EdgeInsets.only(bottom: 56),
+                      child: Center(
+                        child: SizedBox.square(
+                          dimension: 48,
+                          child: LoadingIndicatorM3E(),
+                        ),
+                      ),
+                    ),
                   );
                 }
                 final comic = widget.section.comics[index];

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hazuki/app/app.dart';
+import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -110,5 +111,5 @@ Future<String> normalizeSubmittedKeyword(
 }
 
 Future<void> addSearchHistory(String keyword) async {
-  await SearchHistoryService().add(keyword);
+  await sl<SearchHistoryService>().add(keyword);
 }

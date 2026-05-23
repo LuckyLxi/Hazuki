@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../network/hazuki_network.dart';
 import 'software_update_service.dart';
 
 enum SoftwareUpdateDownloadStage { idle, downloading, success, failed }
@@ -26,15 +27,17 @@ class SoftwareUpdateDownloadService extends ChangeNotifier {
     'hazuki.comics/media',
   );
 
-  final Dio _dio = Dio(
-    BaseOptions(
-      connectTimeout: const Duration(seconds: 12),
-      receiveTimeout: const Duration(minutes: 20),
-      sendTimeout: const Duration(seconds: 12),
-      followRedirects: true,
-      maxRedirects: 5,
-      validateStatus: (status) =>
-          status != null && status >= 200 && status < 400,
+  final HazukiNetworkClient _client = HazukiNetworkClient(
+    dio: createHazukiDio(
+      baseOptions: BaseOptions(
+        connectTimeout: const Duration(seconds: 12),
+        receiveTimeout: const Duration(minutes: 20),
+        sendTimeout: const Duration(seconds: 12),
+        followRedirects: true,
+        maxRedirects: 5,
+        validateStatus: (status) =>
+            status != null && status >= 200 && status < 400,
+      ),
     ),
   );
 
@@ -133,7 +136,7 @@ class SoftwareUpdateDownloadService extends ChangeNotifier {
       var lastTickMillis = 0;
       var lastReceivedBytes = 0;
 
-      await _dio.download(
+      await _client.download(
         downloadUrl,
         targetFile.path,
         cancelToken: _cancelToken,

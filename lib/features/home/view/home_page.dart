@@ -163,6 +163,16 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
       builder: (context, _) {
         final isLogged = _coordinator.isLogged;
         final profileLoading = _coordinator.profileLoading;
+        final sidebarProfile = HomeSidebarProfileState(
+          isLogged: _coordinator.isLogged,
+          profileLoading: profileLoading,
+          avatarUrl: _coordinator.avatarUrl,
+          username: _coordinator.username,
+          autoCheckInEnabled: _coordinator.autoCheckInEnabled,
+          showCheckInActions: _coordinator.isCheckInAvailable,
+          checkInBusy: _coordinator.checkInBusy,
+          checkedInToday: _coordinator.checkedInToday,
+        );
         final profileFlow = _coordinator.createProfileFlow(
           context,
           isMounted: () => mounted,
@@ -172,22 +182,14 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
           scaffoldKey: _coordinator.scaffoldKey,
           drawerTransitionContentBuilder: () => Platform.isWindows
               ? HomeWindowsSidebar(
-                  isLogged: _coordinator.isLogged,
-                  profileLoading: profileLoading,
-                  avatarUrl: _coordinator.avatarUrl,
-                  username: _coordinator.username,
+                  profile: sidebarProfile,
+                  actions: const HomeSidebarActions(),
                   currentIndex: _coordinator.currentIndex,
                   selectedDestination: _selectedDrawerDestination,
                 )
               : HomeDrawerContent(
-                  isLogged: _coordinator.isLogged,
-                  profileLoading: profileLoading,
-                  avatarUrl: _coordinator.avatarUrl,
-                  username: _coordinator.username,
-                  autoCheckInEnabled: _coordinator.autoCheckInEnabled,
-                  showCheckInActions: _coordinator.isCheckInAvailable,
-                  checkInBusy: _coordinator.checkInBusy,
-                  checkedInToday: _coordinator.checkedInToday,
+                  profile: sidebarProfile,
+                  actions: const HomeSidebarActions(),
                   selectedDestination: _selectedDrawerDestination,
                 ),
           appearanceSettings: widget.appearanceSettings,

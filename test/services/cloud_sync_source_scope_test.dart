@@ -2,11 +2,16 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/app/app_preferences.dart';
+import 'package:hazuki/app/service_locator.dart';
+import 'package:hazuki/features/search/support/search_history_service.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_config_store.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_models.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_remote_client.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_restore_applier.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_snapshot_codec.dart';
+import 'package:hazuki/services/local_favorites_service.dart';
+import 'package:hazuki/services/reading_progress_service.dart';
+import 'package:hazuki/services/read_history_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../support/test_service_locator.dart';
 
@@ -65,14 +70,15 @@ void main() {
           }),
         );
 
-        final prefs = await SharedPreferences.getInstance();
-        final progressRaw = prefs.getString('reading_progress_jm::123');
-        final historyRaw = prefs.getString('hazuki_read_history');
+        final progress = await sl<ReadingProgressService>().load(
+          comicId: '123',
+          sourceKey: 'jm',
+        );
+        final history = await sl<ReadHistoryService>().exportJsonList();
 
-        expect(progressRaw, isNotNull);
-        expect(jsonDecode(progressRaw!)['sourceKey'], 'jm');
-        final history = jsonDecode(historyRaw!) as List<dynamic>;
-        expect((history.single as Map<String, dynamic>)['sourceKey'], 'jm');
+        expect(progress, isNotNull);
+        expect(progress!['sourceKey'], 'jm');
+        expect(history.single['sourceKey'], 'jm');
       },
     );
 
@@ -123,15 +129,19 @@ void main() {
         }),
       );
 
-      final prefs = await SharedPreferences.getInstance();
       final entries =
-          jsonDecode(prefs.getString('local_favorite_entries_v1')!)
+          jsonDecode(
+                await sl<LocalFavoritesService>().exportEntriesJsonString(),
+              )
               as List<dynamic>;
       expect(entries, hasLength(1));
       expect((entries.single as Map<String, dynamic>)['sourceKey'], 'other');
 
       final tombstones =
-          jsonDecode(prefs.getString('local_favorite_entry_tombstones_v1')!)
+          jsonDecode(
+                await sl<LocalFavoritesService>()
+                    .exportEntryTombstonesJsonString(),
+              )
               as List<dynamic>;
       final tombstone = tombstones.single as Map<String, dynamic>;
       expect(tombstone['comicId'], '123');
@@ -183,8 +193,7 @@ void main() {
         }),
       );
 
-      final prefs = await SharedPreferences.getInstance();
-      final history = prefs.getStringList('search_history')!;
+      final history = await sl<SearchHistoryService>().load();
       expect(history, hasLength(hazukiSearchHistoryMaxCount));
       expect(history.take(10), List.generate(10, (index) => 'local-$index'));
       expect(history[10], 'remote-0');
@@ -201,8 +210,7 @@ void main() {
         backupSearchHistory,
       );
 
-      final prefs = await SharedPreferences.getInstance();
-      final history = prefs.getStringList('search_history')!;
+      final history = await sl<SearchHistoryService>().load();
       expect(history, hasLength(hazukiSearchHistoryMaxCount));
       expect(history.first, 'keyword-0');
       expect(history.last, 'keyword-${hazukiSearchHistoryMaxCount - 1}');

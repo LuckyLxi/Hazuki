@@ -1,15 +1,15 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/features/reader/support/reader_controller_support.dart';
 import 'package:hazuki/features/reader/support/reader_display_bridge.dart';
 import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
 import 'package:hazuki/features/reader/state/reader_settings_store.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/reading_progress_service.dart';
 import 'package:hazuki/shared/ui_flags.dart';
 
 class ReaderSessionController {
@@ -252,22 +252,13 @@ class ReaderSessionController {
 
   Future<void> _recordReadingProgress({int lastPageIndex = 0}) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final progress = {
-        'sourceKey': _sourceKey,
-        'epId': _epId,
-        'title': _chapterTitle,
-        'index': _chapterIndex,
-        'pageIndex': lastPageIndex,
-        'timestamp': DateTime.now().millisecondsSinceEpoch,
-      };
-      final scopedKey = SourceScopedComicId(
-        sourceKey: _sourceKey,
+      await sl<ReadingProgressService>().save(
         comicId: _comicId,
-      ).storageKey;
-      await prefs.setString(
-        'reading_progress_$scopedKey',
-        jsonEncode(progress),
+        sourceKey: _sourceKey,
+        epId: _epId,
+        title: _chapterTitle,
+        chapterIndex: _chapterIndex,
+        pageIndex: lastPageIndex,
       );
     } catch (_) {}
   }

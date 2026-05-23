@@ -251,6 +251,15 @@ class HomeProfileController extends ChangeNotifier {
     _didAttemptStartupCheckIn = false;
   }
 
+  void markSourceChanged() {
+    _profileSyncRevision++;
+    _authVersion++;
+    _profileLoading = true;
+    _avatarUrl = null;
+    _hasCompletedProfileSync = false;
+    _notify();
+  }
+
   void _notify() {
     if (!_disposed) {
       notifyListeners();

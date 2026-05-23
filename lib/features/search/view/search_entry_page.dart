@@ -49,7 +49,7 @@ class _SearchEntryPageState extends State<SearchEntryPage>
         currentText: () => _focusCoordinator.text,
       );
   final ScrollController _scrollController = ScrollController();
-  final SearchHistoryService _historyService = SearchHistoryService();
+  final SearchHistoryService _historyService = sl<SearchHistoryService>();
 
   List<String> _historyList = <String>[];
   Animation<double>? _initialDataLoadRouteAnimation;

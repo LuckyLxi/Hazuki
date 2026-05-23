@@ -7,7 +7,6 @@ import 'dart:ui';
 
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
-import 'package:dio/io.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_qjs/flutter_qjs.dart';
@@ -29,6 +28,8 @@ import 'source/http/source_http_gateway.dart';
 import 'source/image/image_cache_capability.dart';
 import 'source/runtime/explore_cache_capability.dart';
 import 'source/runtime/line_settings_capability.dart';
+import 'source/runtime/source_secure_session_storage.dart';
+import 'network/hazuki_network.dart';
 
 part 'source/explore_capability.dart';
 
@@ -97,8 +98,8 @@ bool isHazukiPicacgSourceKey(String sourceKey) {
 }
 
 Dio _createSourceDio() {
-  return Dio(
-    BaseOptions(
+  return createHazukiDio(
+    baseOptions: BaseOptions(
       responseType: ResponseType.plain,
       validateStatus: (status) => true,
       connectTimeout: const Duration(seconds: 35),
@@ -320,6 +321,7 @@ class SourceRuntimeHandle {
   final SourceRuntimeKernel runtime = SourceRuntimeKernel();
   late final SourceSessionStore session = SourceSessionStore(
     sourceKey: sourceKey,
+    secureStorage: service._secureSessionStorage,
   );
   final SourceCacheStore cache = SourceCacheStore();
   final SourceDebugLogStore debug = SourceDebugLogStore();
@@ -353,11 +355,14 @@ class SourceRuntimeHandle {
 }
 
 class HazukiSourceService extends ChangeNotifier {
-  HazukiSourceService() {
+  HazukiSourceService({SourceSecureSessionStorage? secureSessionStorage})
+    : _secureSessionStorage =
+          secureSessionStorage ?? FlutterSourceSecureSessionStorage() {
     runtimeRegistry._bind(this);
   }
 
   final SourceRuntimeRegistry runtimeRegistry = SourceRuntimeRegistry._();
+  final SourceSecureSessionStorage _secureSessionStorage;
   final Map<String, SourceRuntimeHandle> _runtimeHandles =
       <String, SourceRuntimeHandle>{};
   String _activeSourceKey = hazukiDefaultSourceKey;
@@ -648,7 +653,9 @@ class HazukiSourceService extends ChangeNotifier {
   Future<void> loadActiveSourcePreference() async {
     final prefs = await _activeHandle.session.ensurePrefs();
     for (final source in hazukiAllowedSourceCatalog) {
-      _handleFor(source.key).session.prefs = prefs;
+      final session = _handleFor(source.key).session;
+      session.prefs = prefs;
+      await session.ensurePrefs();
     }
     final saved = prefs.getString(SourcePrefsKeys.activeSourceKey);
     if (saved != null && saved.trim().isNotEmpty) {
@@ -852,14 +859,21 @@ class SourceRuntimeKernel {
 }
 
 class SourceSessionStore {
-  SourceSessionStore({required this.sourceKey});
+  SourceSessionStore({
+    required this.sourceKey,
+    required SourceSecureSessionStorage secureStorage,
+  }) : _secureStorage = secureStorage;
 
   final String sourceKey;
+  final SourceSecureSessionStorage _secureStorage;
+  final Map<String, _SecureSourceSessionData> _secureCache =
+      <String, _SecureSourceSessionData>{};
   SharedPreferences? prefs;
 
   Future<SharedPreferences> ensurePrefs() async {
     final current = prefs ??= await SharedPreferences.getInstance();
     await _migrateLegacySessionData(current);
+    await _loadSecureSessionData(sourceKey);
     return current;
   }
 
@@ -895,10 +909,19 @@ class SourceSessionStore {
   }
 
   dynamic loadSourceData(String sourceKey, String dataKey) {
-    if (sourceKey.isEmpty || dataKey.isEmpty) {
+    final normalizedSourceKey = sourceKey.trim();
+    if (normalizedSourceKey.isEmpty || dataKey.isEmpty) {
       return null;
     }
-    return loadSourceStore(sourceKey)[dataKey];
+    if (dataKey == 'account') {
+      return _secureDataFor(normalizedSourceKey).account ??
+          loadSourceStore(normalizedSourceKey)['account'];
+    }
+    if (dataKey == 'token') {
+      return _secureDataFor(normalizedSourceKey).token ??
+          loadSourceStore(normalizedSourceKey)['token'];
+    }
+    return loadSourceStore(normalizedSourceKey)[dataKey];
   }
 
   Future<void> saveSourceData(
@@ -906,21 +929,67 @@ class SourceSessionStore {
     String dataKey,
     dynamic data,
   ) async {
-    if (sourceKey.isEmpty || dataKey.isEmpty) {
+    final normalizedSourceKey = sourceKey.trim();
+    if (normalizedSourceKey.isEmpty || dataKey.isEmpty) {
       return;
     }
-    final store = loadSourceStore(sourceKey);
+    if (dataKey == 'account') {
+      final accountData = _normalizeAccountData(data);
+      if (accountData == null) {
+        await deleteSourceData(normalizedSourceKey, dataKey);
+        return;
+      }
+      await _secureStorage.write(
+        SourceSecureSessionStorageKeys.account(normalizedSourceKey),
+        jsonEncode(accountData),
+      );
+      _secureDataFor(normalizedSourceKey).account = accountData;
+      await _removeLegacySourceDataKey(normalizedSourceKey, dataKey);
+      return;
+    }
+    if (dataKey == 'token') {
+      final token = data?.toString();
+      if (token == null || token.isEmpty) {
+        await deleteSourceData(normalizedSourceKey, dataKey);
+        return;
+      }
+      await _secureStorage.write(
+        SourceSecureSessionStorageKeys.token(normalizedSourceKey),
+        token,
+      );
+      _secureDataFor(normalizedSourceKey).token = token;
+      await _removeLegacySourceDataKey(normalizedSourceKey, dataKey);
+      return;
+    }
+    final store = loadSourceStore(normalizedSourceKey);
     store[dataKey] = data;
-    await saveSourceStore(sourceKey, store);
+    await saveSourceStore(normalizedSourceKey, store);
   }
 
   Future<void> deleteSourceData(String sourceKey, String dataKey) async {
-    if (sourceKey.isEmpty || dataKey.isEmpty) {
+    final normalizedSourceKey = sourceKey.trim();
+    if (normalizedSourceKey.isEmpty || dataKey.isEmpty) {
       return;
     }
-    final store = loadSourceStore(sourceKey);
+    if (dataKey == 'account') {
+      await _secureStorage.delete(
+        SourceSecureSessionStorageKeys.account(normalizedSourceKey),
+      );
+      _secureDataFor(normalizedSourceKey).account = null;
+      await _removeLegacySourceDataKey(normalizedSourceKey, dataKey);
+      return;
+    }
+    if (dataKey == 'token') {
+      await _secureStorage.delete(
+        SourceSecureSessionStorageKeys.token(normalizedSourceKey),
+      );
+      _secureDataFor(normalizedSourceKey).token = null;
+      await _removeLegacySourceDataKey(normalizedSourceKey, dataKey);
+      return;
+    }
+    final store = loadSourceStore(normalizedSourceKey);
     store.remove(dataKey);
-    await saveSourceStore(sourceKey, store);
+    await saveSourceStore(normalizedSourceKey, store);
   }
 
   dynamic loadSourceSetting({
@@ -980,12 +1049,9 @@ class SourceSessionStore {
   }
 
   List<_Cookie> _loadCookieStore() {
-    final currentPrefs = prefs;
-    if (currentPrefs == null) {
-      return [];
-    }
-
-    final raw = currentPrefs.getString(_cookieStoreKey);
+    final raw =
+        _secureDataFor(sourceKey).cookiesRaw ??
+        prefs?.getString(_cookieStoreKey);
     if (raw == null || raw.isEmpty) {
       return [];
     }
@@ -1003,43 +1069,197 @@ class SourceSessionStore {
   }
 
   Future<void> _saveCookieStore(List<_Cookie> cookies) async {
-    final currentPrefs = prefs;
-    if (currentPrefs == null) {
+    if (cookies.isEmpty) {
+      await _secureStorage.delete(
+        SourceSecureSessionStorageKeys.cookies(sourceKey),
+      );
+      _secureDataFor(sourceKey).cookiesRaw = null;
+      await prefs?.remove(_cookieStoreKey);
       return;
     }
-    await currentPrefs.setString(
-      _cookieStoreKey,
-      jsonEncode(cookies.map((e) => e.toMap()).toList()),
+    final raw = jsonEncode(cookies.map((e) => e.toMap()).toList());
+    await _secureStorage.write(
+      SourceSecureSessionStorageKeys.cookies(sourceKey),
+      raw,
     );
+    _secureDataFor(sourceKey).cookiesRaw = raw;
+    await prefs?.remove(_cookieStoreKey);
   }
 
   String get _cookieStoreKey => 'cookie_store_v2_${sourceKey.trim()}';
 
-  static Future<void> _migrateLegacySessionData(SharedPreferences prefs) async {
-    if (prefs.getBool(SourcePrefsKeys.sourceSessionScopeMigration) == true) {
+  Future<void> _migrateLegacySessionData(SharedPreferences prefs) async {
+    await prefs.remove('cookie_store_v1');
+    if (prefs.getBool(SourcePrefsKeys.sourceSecureSessionMigration) == true) {
       return;
     }
 
-    await prefs.remove('cookie_store_v1');
-    for (final key in prefs.getKeys().where(
-      (key) => key.startsWith('source_data_'),
-    )) {
+    var migrationComplete = true;
+
+    for (final key in prefs.getKeys().where(_isSourceDataPrefsKey).toList()) {
       final raw = prefs.getString(key);
       if (raw == null || raw.trim().isEmpty) {
         continue;
       }
+      final migratedSourceKey = key.substring('source_data_'.length);
       try {
         final decoded = jsonDecode(raw);
-        if (decoded is! Map || !decoded.containsKey('account')) {
+        if (decoded is! Map) {
           continue;
         }
         final sanitized = Map<String, dynamic>.from(decoded);
-        sanitized.remove('account');
-        await prefs.setString(key, jsonEncode(sanitized));
-      } catch (_) {}
+        var changed = false;
+
+        if (sanitized.containsKey('account')) {
+          final accountData = _normalizeAccountData(sanitized['account']);
+          if (accountData != null) {
+            try {
+              await _secureStorage.write(
+                SourceSecureSessionStorageKeys.account(migratedSourceKey),
+                jsonEncode(accountData),
+              );
+              _secureDataFor(migratedSourceKey).account = accountData;
+              sanitized.remove('account');
+              changed = true;
+            } catch (_) {
+              migrationComplete = false;
+            }
+          } else {
+            sanitized.remove('account');
+            changed = true;
+          }
+        }
+
+        if (sanitized.containsKey('token')) {
+          final token = sanitized['token']?.toString();
+          if (token != null && token.isNotEmpty) {
+            try {
+              await _secureStorage.write(
+                SourceSecureSessionStorageKeys.token(migratedSourceKey),
+                token,
+              );
+              _secureDataFor(migratedSourceKey).token = token;
+              sanitized.remove('token');
+              changed = true;
+            } catch (_) {
+              migrationComplete = false;
+            }
+          } else {
+            sanitized.remove('token');
+            changed = true;
+          }
+        }
+
+        if (changed) {
+          await prefs.setString(key, jsonEncode(sanitized));
+        }
+      } catch (_) {
+        migrationComplete = false;
+      }
     }
-    await prefs.setBool(SourcePrefsKeys.sourceSessionScopeMigration, true);
+
+    for (final key in prefs.getKeys().where(_isCookiePrefsKey).toList()) {
+      final raw = prefs.getString(key);
+      if (raw == null || raw.trim().isEmpty) {
+        await prefs.remove(key);
+        continue;
+      }
+      final migratedSourceKey = key.substring('cookie_store_v2_'.length);
+      try {
+        await _secureStorage.write(
+          SourceSecureSessionStorageKeys.cookies(migratedSourceKey),
+          raw,
+        );
+        _secureDataFor(migratedSourceKey).cookiesRaw = raw;
+        await prefs.remove(key);
+      } catch (_) {
+        migrationComplete = false;
+      }
+    }
+
+    if (migrationComplete) {
+      await prefs.setBool(SourcePrefsKeys.sourceSecureSessionMigration, true);
+      await prefs.setBool(SourcePrefsKeys.sourceSessionScopeMigration, true);
+    }
   }
+
+  Future<void> _loadSecureSessionData(String sourceKey) async {
+    final normalizedSourceKey = sourceKey.trim();
+    if (normalizedSourceKey.isEmpty) {
+      return;
+    }
+    final data = _secureDataFor(normalizedSourceKey);
+    data.account = _decodeAccountData(
+      await _safeRead(
+        SourceSecureSessionStorageKeys.account(normalizedSourceKey),
+      ),
+    );
+    data.token = await _safeRead(
+      SourceSecureSessionStorageKeys.token(normalizedSourceKey),
+    );
+    data.cookiesRaw = await _safeRead(
+      SourceSecureSessionStorageKeys.cookies(normalizedSourceKey),
+    );
+  }
+
+  Future<String?> _safeRead(String key) async {
+    try {
+      return await _secureStorage.read(key);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _removeLegacySourceDataKey(
+    String sourceKey,
+    String dataKey,
+  ) async {
+    final store = loadSourceStore(sourceKey);
+    if (!store.containsKey(dataKey)) {
+      return;
+    }
+    store.remove(dataKey);
+    await saveSourceStore(sourceKey, store);
+  }
+
+  _SecureSourceSessionData _secureDataFor(String sourceKey) {
+    return _secureCache.putIfAbsent(
+      sourceKey.trim(),
+      _SecureSourceSessionData.new,
+    );
+  }
+
+  static bool _isSourceDataPrefsKey(String key) {
+    return key.startsWith('source_data_');
+  }
+
+  static bool _isCookiePrefsKey(String key) {
+    return key.startsWith('cookie_store_v2_');
+  }
+
+  static List<String>? _normalizeAccountData(dynamic value) {
+    if (value is! List || value.length < 2) {
+      return null;
+    }
+    return [value[0].toString(), value[1].toString()];
+  }
+
+  static List<String>? _decodeAccountData(String? raw) {
+    if (raw == null || raw.trim().isEmpty) {
+      return null;
+    }
+    try {
+      return _normalizeAccountData(jsonDecode(raw));
+    } catch (_) {
+      return null;
+    }
+  }
+}
+
+class _SecureSourceSessionData {
+  List<String>? account;
+  String? token;
+  String? cookiesRaw;
 }
 
 class SourceCacheStore {

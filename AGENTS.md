@@ -1,74 +1,66 @@
 # AGENTS.md
 
-This file provides guidance to Codex (Codex.ai/code) when working with code in this repository.
+Compact guidance for future OpenCode sessions in this repository.
 
 ## Commands
 
 ```bash
-# Run on device/emulator
-flutter run
+# First setup / after dependency changes
+flutter pub get
+flutter gen-l10n
 
-# Build Android APK
-flutter build apk --split-per-abi --target-platform android-arm64
-
-# Analyze
+# CI app quality path
+dart format --output=none --set-exit-if-changed lib test
 flutter analyze
+flutter test --coverage --reporter expanded
 
-# Run tests
-flutter test
-
-# Run a single test file
+# Focused test
 flutter test test/path/to/test_file.dart
+
+# App smoke builds used by CI
+flutter build apk --debug
+flutter build windows --debug
+
+# Android release shape used by release CI
+flutter build apk --release --split-per-abi --target-platform android-arm64
+
+# Drift codegen when lib/services/storage/hazuki_database.dart changes
+dart run build_runner build --delete-conflicting-outputs
 ```
+
+`third_party/flutter_qjs` is a separate Flutter package with its own `pubspec.yaml`; run its quality checks from that directory: `flutter pub get`, `dart format --output=none --set-exit-if-changed lib test`, `flutter analyze`, `flutter test --reporter expanded`.
+
+## Build And Tooling Notes
+
+- CI uses Flutter stable. Android jobs use Java 17 for app quality/CI and Java 21 for debug smoke/release builds.
+- Localization is generated from `lib/l10n/app_en.arb` and `lib/l10n/app_zh.arb`; run `flutter gen-l10n` after ARB changes. Generated `lib/l10n/app_localizations*.dart` files are present in the tree.
+- Drift generates `lib/services/storage/hazuki_database.g.dart` from `lib/services/storage/hazuki_database.dart`; bump migrations/schema deliberately when changing tables.
+- `analysis_options.yaml` excludes `third_party/flutter_qjs/**` and `third_party/pub_overrides/**` from the app analyzer; check `flutter_qjs` separately when touching it.
+- `pubspec.yaml` uses local dependency overrides under `third_party/pub_overrides/`; do not replace them with hosted packages unless the override is intentionally removed.
 
 ## Architecture
 
-Hazuki is a Flutter manga reader app targeting Android. It fetches and renders manga from a third-party JavaScript source script (JMComic via [venera-configs](https://github.com/venera-app/venera-configs/blob/main/jm.js)).
+- Entry point: `lib/main.dart` calls `bootstrapApp()` in `lib/app/startup/app_bootstrap.dart`, which registers `get_it` services, loads source/runtime preferences, initializes downloads/password-lock/comment filters, then builds `HazukiApp`.
+- App-level services are registered in `lib/app/service_locator.dart` through `sl`; many services still expose or rely on singleton-style access, so keep service registration order in mind during tests/startup changes.
+- Manga content comes from JavaScript source scripts from `venera-configs` (`jm`, `copy_manga`, `picacg`) executed through QuickJS via `flutter_qjs`.
+- `HazukiSourceService` (`lib/services/hazuki_source_service.dart`) owns the source runtime. Closely coupled source capabilities are `part` files under `lib/services/source/`; newer decoupled capabilities live as normal classes under the same tree.
+- `SourceRuntimeCoordinator` (`lib/app/source_runtime/source_runtime_coordinator.dart`) handles first-run source download/load, network recovery, and source update prompts.
+- `assets/init.js` is the JS bridge injected before source scripts; source-runtime changes often need Dart and JS bridge changes together.
+- Persistent app data uses Drift in `HazukiDatabase`; runtime/source preferences and settings use `SharedPreferences`, with keys centralized in `lib/app/app_preferences.dart` and `lib/services/source/common/source_prefs_keys.dart`.
 
-### Core concept: JS source runtime
+## Feature Structure
 
-All manga data (browse, search, favorites, chapters, images) flows through a JavaScript runtime powered by `flutter_qjs` (QuickJS embedded in Flutter, at `third_party/flutter_qjs`). The JS source file is downloaded at first launch and stored locally.
+- Features live under `lib/features/<feature>/` with `view/`, `state/`, and/or `support/` code plus a public barrel such as `features/search/search.dart`.
+- State is plain Flutter: controllers extend `ChangeNotifier`, expose immutable-ish state snapshots, and are consumed with `ListenableBuilder`/`AnimatedBuilder`; no Provider/Riverpod/GetX is used.
+- Main shell is `HazukiHomePage`/`HomeCoordinator`; platform navigation differs: Android uses bottom/drawer-style UI, Windows has sidebar/title-bar adaptations.
+- Shared non-feature UI/helpers belong in `lib/widgets/` or `lib/shared/`; shared models belong in `lib/models/`.
 
-- **`HazukiSourceService`** (`lib/services/hazuki_source_service.dart`) — the central singleton. It owns the JS engine and exposes all capabilities as `part` files under `lib/services/source/`. Each capability (e.g. `favorites_capability.dart`, `image_prepare_capability.dart`) is a `part` of this class.
-- **`SourceRuntimeCoordinator`** (`lib/app/source_runtime_coordinator.dart`) — orchestrates bootstrap (downloading/loading the JS file), connectivity recovery, and source update checks.
-- **`assets/init.js`** — the JS bridge library injected into the QuickJS runtime before the source script. Provides `sendMessage`, `Convert`, `Network`, etc. to the JS source.
+## Testing Conventions
 
-### State & settings
+- Tests under `test/` mirror `lib/` where practical. Common patterns are smoke construction tests for feature entry widgets and controller/service unit tests with mocked preferences or in-memory database state.
+- For service tests that touch Drift, prefer `HazukiDatabase.memory()` rather than the real app database.
 
-- **`HazukiThemeController`** — `ChangeNotifier` holding current `AppearanceSettingsData`; consumed via `HazukiThemeControllerScope` (InheritedWidget).
-- **`HazukiAppSettingsStore`** — serializes/deserializes appearance and locale to `SharedPreferences`.
-- App-level preference keys live in `lib/app/app_preferences.dart`.
+## Release Notes
 
-### Feature modules
-
-The app uses a bottom-nav shell (`HazukiHomePage` → `HomeCoordinator`). Features live under `lib/features/`, each with `view/`, `state/`, and `support/` subdirectories and a public barrel export (e.g. `home.dart`):
-
-| Feature | Purpose |
-|---|---|
-| `home/` | Shell, nav bar, drawer, profile flow |
-| `discover/` | Browse/explore from source |
-| `favorite/` | Cloud + local favorites |
-| `reader/` | Chapter image reader (zoom, settings, image pipeline) |
-| `comic_detail/` | Comic info, chapter list |
-| `search/` | Search UI |
-| `settings/` | App settings pages |
-| `downloads/` | Download queue/history |
-| `history/` | Read history |
-| `comments/` | Chapter comments |
-
-**State pattern**: feature controllers are `ChangeNotifier`s consumed via `ListenableBuilder` or `AnimatedBuilder`. `HomeCoordinator` owns `HomeShellController` (tab/app bar) and `HomeProfileController` (login/profile). Access services via static singletons: `HazukiSourceService.instance`, `MangaDownloadService.instance`, etc.
-
-### Services
-
-- **`MangaDownloadService`** — download queue, storage layout, recovery on restart.
-- **`CloudSyncService`** — syncs favorites/history with the source account.
-- **`PasswordLockService`** — app-level PIN lock (blocks the whole UI via an overlay).
-- **`SoftwareUpdateService`** / **`SoftwareUpdateDownloadService`** — self-update from `update.json`.
-
-### Theme switching
-
-Light/dark switching uses a circular reveal animation (`_ThemeRevealOverlay` in `main.dart`): the old theme is rasterized into a `ui.Image` via `RepaintBoundary.toImage()`, then a `CustomPainter` clips a growing circle away to reveal the new theme underneath.
-
-### Localization
-
-ARB files live in `lib/l10n/`. Helper: `l10n(context)` from `lib/l10n/l10n.dart` returns `AppLocalizations.of(context)!`.
+- Release workflow requires annotated `v*` tags; tag annotation text becomes GitHub release notes and `update.json` changelog.
+- `update.json` is generated and committed by release CI after tagged releases; avoid hand-editing it unless intentionally overriding release metadata.

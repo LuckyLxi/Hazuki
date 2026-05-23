@@ -448,26 +448,33 @@ String _copyMangaAvatarRefreshScript({
   const source = this.__hazuki_source;
   const account = $accountJson;
   const password = $passwordJson;
+  const previousToken = source.loadData("token");
   const salt = Math.floor(Math.random() * 9000) + 1000;
   const encodedPassword = Convert.encodeBase64(
     Convert.encodeUtf8(password + "-" + salt)
   );
+  const headers = {
+    ...source.headers,
+    "Content-Type": "application/x-www-form-urlencoded;charset=utf-8"
+  };
+  const body =
+    "username=" +
+    account +
+    "&password=" +
+    encodedPassword +
+    "\\n&salt=" +
+    salt +
+    "&authorization=Token+";
   try {
     const response = await Network.post(
       source.apiUrl + "/api/v3/login",
-      {
-        ...source.headers,
-        "Content-Type": "application/x-www-form-urlencoded;charset=utf-8"
-      },
-      "username=" +
-        account +
-        "&password=" +
-        encodedPassword +
-        "\\n&salt=" +
-        salt +
-        "&authorization=Token+"
+      headers,
+      body
     );
     if (!response || response.status !== 200) {
+      if (previousToken) {
+        source.saveData("token", previousToken);
+      }
       return {
         ok: false,
         status: response && response.status,

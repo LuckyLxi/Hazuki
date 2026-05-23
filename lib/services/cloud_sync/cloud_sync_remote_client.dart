@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart';
 
+import '../network/hazuki_network.dart';
 import 'cloud_sync_config_store.dart';
 import 'cloud_sync_models.dart';
 
@@ -10,20 +11,22 @@ class CloudSyncRemoteClient {
     CloudSyncConfig config, {
     required CloudSyncConfigStore configStore,
   }) : rootUrl = configStore.rootUrl(config.url),
-       _dio = Dio(
-         BaseOptions(
-           connectTimeout: const Duration(seconds: 25),
-           receiveTimeout: const Duration(seconds: 40),
-           sendTimeout: const Duration(seconds: 40),
-           validateStatus: (status) => true,
-           headers: {
-             'authorization':
-                 'Basic ${base64Encode(utf8.encode('${config.username.trim()}:${config.password}'))}',
-           },
+       _client = HazukiNetworkClient(
+         dio: createHazukiDio(
+           baseOptions: BaseOptions(
+             connectTimeout: const Duration(seconds: 25),
+             receiveTimeout: const Duration(seconds: 40),
+             sendTimeout: const Duration(seconds: 40),
+             validateStatus: (status) => true,
+             headers: {
+               'authorization':
+                   'Basic ${base64Encode(utf8.encode('${config.username.trim()}:${config.password}'))}',
+             },
+           ),
          ),
        );
 
-  final Dio _dio;
+  final HazukiNetworkClient _client;
   final String rootUrl;
 
   String get backupDirUrl => '$rootUrl/backup';
@@ -113,9 +116,10 @@ class CloudSyncRemoteClient {
   }
 
   Future<void> _ensureDir(String url) async {
-    final response = await _dio.request<dynamic>(
+    final response = await _client.request<dynamic>(
       url,
-      options: Options(method: 'MKCOL'),
+      method: 'MKCOL',
+      retryPolicy: HazukiNetworkRetryPolicy.none,
     );
     final code = response.statusCode ?? 0;
     if (code == 201 || code == 301 || code == 302 || code == 405) {
@@ -128,10 +132,12 @@ class CloudSyncRemoteClient {
   }
 
   Future<void> _putString(String url, String content) async {
-    final response = await _dio.put<dynamic>(
+    final response = await _client.request<dynamic>(
       url,
+      method: 'PUT',
       data: utf8.encode(content),
       options: Options(headers: {'content-type': 'application/octet-stream'}),
+      retryPolicy: HazukiNetworkRetryPolicy.none,
     );
     final code = response.statusCode ?? 0;
     if (code < 200 || code >= 300) {
@@ -140,7 +146,11 @@ class CloudSyncRemoteClient {
   }
 
   Future<void> _deleteIfExists(String url) async {
-    final response = await _dio.delete<dynamic>(url);
+    final response = await _client.request<dynamic>(
+      url,
+      method: 'DELETE',
+      retryPolicy: HazukiNetworkRetryPolicy.none,
+    );
     final code = response.statusCode ?? 0;
     if (code == 404 || code == 405) {
       return;
@@ -152,7 +162,7 @@ class CloudSyncRemoteClient {
   }
 
   Future<String> _getString(String url) async {
-    final response = await _dio.get<List<int>>(
+    final response = await _client.get<List<int>>(
       url,
       options: Options(responseType: ResponseType.bytes),
     );
@@ -165,7 +175,7 @@ class CloudSyncRemoteClient {
   }
 
   Future<String?> _tryGetString(String url) async {
-    final response = await _dio.get<List<int>>(
+    final response = await _client.get<List<int>>(
       url,
       options: Options(responseType: ResponseType.bytes),
     );

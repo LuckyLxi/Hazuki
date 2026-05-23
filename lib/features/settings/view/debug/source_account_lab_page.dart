@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/features/home/support/home_profile_actions.dart';
+import 'package:hazuki/features/home/support/home_source_account_login.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
@@ -155,11 +156,10 @@ class _SourceAccountLabPageState extends State<SourceAccountLabPage> {
   }
 
   Future<HomeLoginDialogProfile> _login(String account, String password) async {
-    await _sourceService.login(account: account, password: password);
-    final avatarUrl = (await _sourceService.loadCurrentAvatarUrl()) ?? '';
-    return HomeLoginDialogProfile(
-      username: _sourceService.currentAccount ?? account,
-      avatarUrl: avatarUrl.trim(),
+    return loginSourceAccountForDialog(
+      sourceService: _sourceService,
+      account: account,
+      password: password,
     );
   }
 

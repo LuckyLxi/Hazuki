@@ -7,7 +7,9 @@ list(APPEND FLUTTER_PLUGIN_LIST
   dynamic_color
   file_selector_windows
   flutter_qjs
+  flutter_secure_storage_windows
   screen_retriever_windows
+  sqlite3_flutter_libs
   url_launcher_windows
   window_manager
 )

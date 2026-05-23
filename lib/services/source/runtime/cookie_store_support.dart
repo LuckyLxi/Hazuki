@@ -187,6 +187,14 @@ extension CookieStoreSupport on HazukiSourceService {
     await _setCookiesForHandle(handle, url, parsed);
   }
 
+  Future<void> saveCookiesFromHeadersForHandle(
+    SourceRuntimeHandle handle,
+    String url,
+    Map<String, List<String>> headers,
+  ) {
+    return _saveCookiesFromHeadersForHandle(handle, url, headers);
+  }
+
   String _normalizeCookieUrl(String rawUrl) {
     final trimmed = rawUrl.trim();
     final uri = Uri.tryParse(trimmed);

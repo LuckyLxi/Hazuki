@@ -11,7 +11,7 @@ extension HazukiSourceServiceFavoritesDebugCapability on HazukiSourceService {
     }
     facade.debug.isWarmingUpFavoritesDebug = true;
     try {
-      await _collectFavoritesDebugInfoCore();
+      await _collectFavoritesDebugInfoCore(includeNetworkCalls: false);
     } catch (_) {
       // Ignore background warmup failures.
     } finally {
@@ -29,17 +29,22 @@ extension HazukiSourceServiceFavoritesDebugCapability on HazukiSourceService {
     if (!forceRefresh && facade.favoritesDebugCache != null) {
       return facade.favoritesDebugCache!;
     }
-    return _collectFavoritesDebugInfoCore();
+    return _collectFavoritesDebugInfoCore(includeNetworkCalls: true);
   }
 
-  Future<Map<String, dynamic>> _collectFavoritesDebugInfoCore() async {
+  Future<Map<String, dynamic>> _collectFavoritesDebugInfoCore({
+    required bool includeNetworkCalls,
+  }) async {
     final facade = this.facade;
     if (!facade.softwareLogCaptureEnabled) {
       return _buildDisabledFavoritesDebugInfo();
     }
     final engine = facade.js.engine;
     if (engine == null) {
-      throw Exception('婕敾婧愬皻鏈垵濮嬪寲瀹屾垚');
+      throw Exception('漫画源尚未初始化完成');
+    }
+    if (includeNetworkCalls && facade.isLogged) {
+      await _ensureFavoriteSessionReady();
     }
 
     final info = <String, dynamic>{
@@ -58,6 +63,11 @@ extension HazukiSourceServiceFavoritesDebugCapability on HazukiSourceService {
       'calls': <String, dynamic>{},
       'favoritePageLoadResult': <String, dynamic>{},
     };
+
+    if (!includeNetworkCalls) {
+      info['skippedNetworkCalls'] = true;
+      info['skipReason'] = 'background_warmup';
+    }
 
     final checks = info['checks'] as Map<String, dynamic>;
     checks['hasSource'] = facade.js.asBool(
@@ -78,6 +88,11 @@ extension HazukiSourceServiceFavoritesDebugCapability on HazukiSourceService {
     checks['hasLoadNext'] = facade.js.asBool(
       facade.js.evaluate('!!this.__hazuki_source?.favorites?.loadNext'),
     );
+
+    if (!includeNetworkCalls) {
+      facade.favoritesDebugCache = info;
+      return info;
+    }
 
     final calls = info['calls'] as Map<String, dynamic>;
     calls['loadFolders(null)'] = await _debugJsCall(

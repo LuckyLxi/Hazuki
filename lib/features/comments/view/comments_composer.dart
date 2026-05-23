@@ -60,70 +60,52 @@ class _CommentsBottomComposer extends StatelessWidget {
                   duration: const Duration(milliseconds: 260),
                   curve: Curves.easeOutCubic,
                   width: composerWidth,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(24),
-                    child: BackdropFilter(
-                      filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.surface.withAlpha(176),
-                          borderRadius: BorderRadius.circular(24),
-                          border: Border.all(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.outlineVariant.withAlpha(150),
+                  child: _CommentsComposerGlassSurface(
+                    child: _SuppressShowOnScreen(
+                      child: TextField(
+                        controller: commentController,
+                        focusNode: commentFocusNode,
+                        onTap: onInputTap,
+                        onTapOutside: (_) => commentFocusNode.unfocus(),
+                        scrollPadding: EdgeInsets.zero,
+                        minLines: 1,
+                        maxLines: 3,
+                        textInputAction: TextInputAction.send,
+                        onSubmitted: (_) => onSubmit(),
+                        decoration: InputDecoration(
+                          hintText: hint,
+                          border: InputBorder.none,
+                          enabledBorder: InputBorder.none,
+                          focusedBorder: InputBorder.none,
+                          contentPadding: const EdgeInsets.only(
+                            left: 16,
+                            top: 10,
+                            bottom: 10,
+                            right: 4,
                           ),
-                        ),
-                        child: _SuppressShowOnScreen(
-                          child: TextField(
-                            controller: commentController,
-                            focusNode: commentFocusNode,
-                            onTap: onInputTap,
-                            onTapOutside: (_) => commentFocusNode.unfocus(),
-                            scrollPadding: EdgeInsets.zero,
-                            minLines: 1,
-                            maxLines: 3,
-                            textInputAction: TextInputAction.send,
-                            onSubmitted: (_) => onSubmit(),
-                            decoration: InputDecoration(
-                              hintText: hint,
-                              border: InputBorder.none,
-                              enabledBorder: InputBorder.none,
-                              focusedBorder: InputBorder.none,
-                              contentPadding: const EdgeInsets.only(
-                                left: 16,
-                                top: 10,
-                                bottom: 10,
-                                right: 4,
-                              ),
-                              isDense: true,
-                              suffixIcon: Padding(
+                          isDense: true,
+                          suffixIcon: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 4,
+                              vertical: 4,
+                            ),
+                            child: FilledButton(
+                              onPressed: sendingComment ? null : onSubmit,
+                              style: FilledButton.styleFrom(
+                                minimumSize: Size.zero,
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 4,
-                                  vertical: 4,
+                                  horizontal: 14,
+                                  vertical: 0,
                                 ),
-                                child: FilledButton(
-                                  onPressed: sendingComment ? null : onSubmit,
-                                  style: FilledButton.styleFrom(
-                                    minimumSize: Size.zero,
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 14,
-                                      vertical: 0,
-                                    ),
-                                    tapTargetSize:
-                                        MaterialTapTargetSize.shrinkWrap,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                  ),
-                                  child: Text(
-                                    sendingComment
-                                        ? l10n(context).commentsSending
-                                        : l10n(context).commentsSend,
-                                  ),
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20),
                                 ),
+                              ),
+                              child: Text(
+                                sendingComment
+                                    ? l10n(context).commentsSending
+                                    : l10n(context).commentsSend,
                               ),
                             ),
                           ),
@@ -137,6 +119,26 @@ class _CommentsBottomComposer extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _CommentsComposerGlassSurface extends StatelessWidget {
+  const _CommentsComposerGlassSurface({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(24);
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: hazukiSearchBoxBackgroundColor(context),
+        borderRadius: radius,
+        border: Border.fromBorderSide(hazukiSearchBoxOutlineSide(context)),
+      ),
+      child: child,
     );
   }
 }

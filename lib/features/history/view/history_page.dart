@@ -1,49 +1,18 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
-import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/read_history_service.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
-import 'package:hazuki/shared/windows/windows_comic_detail.dart';
-import 'package:hazuki/widgets/widgets.dart';
 import 'package:hazuki/widgets/windows_comic_detail_host.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
-import '../support/history_actions.dart';
-import '../support/history_favorite_support.dart';
-import '../support/history_menu_support.dart';
-import 'history_comic_list_item.dart';
-
-String normalizeHistorySourceKey(String sourceKey) {
-  final normalized = sourceKey.trim();
-  return normalized.isEmpty ? hazukiDefaultSourceKey : normalized;
-}
-
-bool historyEntryBelongsToSource(Map<String, dynamic> entry, String sourceKey) {
-  final entrySourceKey = normalizeHistorySourceKey(
-    (entry['sourceKey'] ?? '').toString(),
-  );
-  return entrySourceKey == normalizeHistorySourceKey(sourceKey);
-}
-
-ExploreComic historyComicFromEntry(
-  Map<String, dynamic> entry, {
-  required String fallbackSourceKey,
-}) {
-  final sourceKey = normalizeHistorySourceKey(
-    (entry['sourceKey'] ?? fallbackSourceKey).toString(),
-  );
-  return ExploreComic(
-    id: (entry['id'] ?? '').toString(),
-    title: (entry['title'] ?? '').toString(),
-    cover: (entry['cover'] ?? '').toString(),
-    subTitle: (entry['subTitle'] ?? '').toString(),
-    sourceKey: sourceKey,
-  );
-}
+import '../state/history_page_controller.dart';
+import '../support/history_page_action_handler.dart';
+import '../support/history_page_scroll_coordinator.dart';
+import 'history_page_app_bar.dart';
+import 'history_page_content.dart';
 
 class HistoryPage extends StatefulWidget {
   const HistoryPage({
@@ -60,370 +29,84 @@ class HistoryPage extends StatefulWidget {
 }
 
 class _HistoryPageState extends State<HistoryPage> {
-  final ScrollController _scrollController = ScrollController();
-
-  List<ExploreComic> _history = [];
-  bool _loading = true;
-  bool _playItemEntryAnimation = true;
-  bool _selectionMode = false;
-  bool _showBackToTop = false;
-  final Set<String> _selectedIds = {};
-
-  String get _activeSourceKey =>
-      normalizeHistorySourceKey(sl<HazukiSourceService>().activeSourceKey);
+  late final HistoryPageController _controller;
+  late final HistoryPageScrollCoordinator _scrollCoordinator;
+  late final Listenable _pageListenable;
+  late HistoryPageActionHandler _actions;
 
   @override
   void initState() {
     super.initState();
-    _scrollController.addListener(_onScroll);
-    _loadHistory();
+    _controller = HistoryPageController(
+      readHistoryService: sl<ReadHistoryService>(),
+      sourceService: sl<HazukiSourceService>(),
+    );
+    _scrollCoordinator = HistoryPageScrollCoordinator();
+    _pageListenable = Listenable.merge([_controller, _scrollCoordinator]);
+    _actions = HistoryPageActionHandler(
+      controller: _controller,
+      comicDetailPageBuilder: widget.comicDetailPageBuilder,
+    );
+    unawaited(_controller.loadInitial());
+  }
+
+  @override
+  void didUpdateWidget(covariant HistoryPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _actions = HistoryPageActionHandler(
+      controller: _controller,
+      comicDetailPageBuilder: widget.comicDetailPageBuilder,
+    );
   }
 
   @override
   void dispose() {
-    _scrollController
-      ..removeListener(_onScroll)
-      ..dispose();
+    _scrollCoordinator.dispose();
+    _controller.dispose();
     super.dispose();
-  }
-
-  void _onScroll() {
-    if (!_scrollController.hasClients) {
-      return;
-    }
-    final position = _scrollController.position;
-    final nextShowBackToTop = position.pixels > 520;
-    if (nextShowBackToTop != _showBackToTop && mounted) {
-      setState(() {
-        _showBackToTop = nextShowBackToTop;
-      });
-    }
-  }
-
-  Future<void> _scrollToTop() async {
-    if (!_scrollController.hasClients) {
-      return;
-    }
-    await _scrollController.animateTo(
-      0,
-      duration: const Duration(milliseconds: 360),
-      curve: Curves.easeOutCubic,
-    );
-  }
-
-  Future<void> _loadHistory() async {
-    final prefs = await SharedPreferences.getInstance();
-    final jsonStr = prefs.getString('hazuki_read_history');
-    if (jsonStr != null) {
-      try {
-        final List<dynamic> jsonList = jsonDecode(jsonStr);
-        final history = <ExploreComic>[];
-        final activeSourceKey = _activeSourceKey;
-        for (final rawEntry in jsonList) {
-          if (rawEntry is! Map) {
-            continue;
-          }
-          final entry = Map<String, dynamic>.from(rawEntry);
-          if (!historyEntryBelongsToSource(entry, activeSourceKey)) {
-            continue;
-          }
-          history.add(
-            historyComicFromEntry(entry, fallbackSourceKey: activeSourceKey),
-          );
-        }
-        if (mounted) {
-          setState(() {
-            _history = history;
-            _loading = false;
-          });
-        }
-        return;
-      } catch (e, st) {
-        debugPrint('history: failed to parse history JSON: $e\n$st');
-      }
-    }
-    if (mounted) {
-      setState(() {
-        _history = [];
-        _loading = false;
-      });
-    }
-  }
-
-  Future<void> _saveHistory(List<ExploreComic> history) async {
-    final prefs = await SharedPreferences.getInstance();
-    final activeSourceKey = _activeSourceKey;
-    final existingStr = prefs.getString('hazuki_read_history');
-    final existingById = <String, Map<String, dynamic>>{};
-    final preservedOtherSourceEntries = <Map<String, dynamic>>[];
-    if (existingStr != null) {
-      try {
-        final List<dynamic> existing = jsonDecode(existingStr);
-        for (final rawEntry in existing) {
-          if (rawEntry is! Map) {
-            continue;
-          }
-          final e = Map<String, dynamic>.from(rawEntry);
-          final id = (e['id'] ?? '').toString();
-          final sourceKey = normalizeHistorySourceKey(
-            (e['sourceKey'] ?? '').toString(),
-          );
-          if (id.isNotEmpty) {
-            final storageKey = SourceScopedComicId(
-              sourceKey: sourceKey,
-              comicId: id,
-            ).storageKey;
-            existingById[storageKey] = e;
-          }
-          if (!historyEntryBelongsToSource(e, activeSourceKey)) {
-            preservedOtherSourceEntries.add(e);
-          }
-        }
-      } catch (_) {}
-    }
-    final currentSourceEntries = history.map((e) {
-      final base = existingById[e.scopedId.storageKey] ?? <String, dynamic>{};
-      return <String, dynamic>{
-        ...base,
-        'id': e.id,
-        'sourceKey': normalizeHistorySourceKey(e.sourceKey),
-        'title': e.title,
-        'cover': e.cover,
-        'subTitle': e.subTitle,
-      };
-    }).toList();
-    final jsonList = <Map<String, dynamic>>[
-      ...currentSourceEntries,
-      ...preservedOtherSourceEntries,
-    ];
-    await prefs.setString('hazuki_read_history', jsonEncode(jsonList));
-  }
-
-  void _updateHistoryState(VoidCallback updater) {
-    if (!mounted) {
-      return;
-    }
-    setState(updater);
-  }
-
-  Future<void> _deleteSelected() async {
-    if (_selectedIds.isEmpty) {
-      return;
-    }
-
-    final confirm = await showDeleteSelectedHistoryDialog(
-      context,
-      selectedCount: _selectedIds.length,
-    );
-    if (confirm != true) {
-      return;
-    }
-
-    final newHistory = _history
-        .where((e) => !_selectedIds.contains(e.scopedId.storageKey))
-        .toList();
-    await _saveHistory(newHistory);
-    _updateHistoryState(() {
-      _history = newHistory;
-      _selectedIds.clear();
-      _selectionMode = false;
-    });
-  }
-
-  Future<void> _clearAll() async {
-    final confirm = await showClearHistoryDialog(context);
-    if (confirm != true) {
-      return;
-    }
-
-    await _saveHistory([]);
-    _updateHistoryState(() {
-      _history = [];
-      _selectionMode = false;
-      _selectedIds.clear();
-    });
-  }
-
-  Future<void> _handleCopyComicId(ExploreComic comic) async {
-    await copyHistoryComicId(context, comic.id);
-  }
-
-  Future<void> _handleDeleteHistoryItem(ExploreComic comic) async {
-    final newHistory = _history
-        .where((e) => e.scopedId.storageKey != comic.scopedId.storageKey)
-        .toList();
-    await _saveHistory(newHistory);
-    _updateHistoryState(() {
-      _history = newHistory;
-    });
-  }
-
-  Future<void> _handleToggleFavoriteFromHistory(ExploreComic comic) async {
-    await toggleFavoriteFromHistory(context, comic);
-  }
-
-  Future<void> _showComicMenu(
-    ExploreComic comic,
-    Offset globalPosition,
-    BuildContext itemContext,
-  ) async {
-    final action = await showHistoryComicMenu(
-      context: context,
-      itemContext: itemContext,
-      globalPosition: globalPosition,
-    );
-
-    if (!mounted || action == null) {
-      return;
-    }
-
-    switch (action) {
-      case HistoryComicMenuAction.copy:
-        await _handleCopyComicId(comic);
-        break;
-      case HistoryComicMenuAction.favorite:
-        await _handleToggleFavoriteFromHistory(comic);
-        break;
-      case HistoryComicMenuAction.delete:
-        await _handleDeleteHistoryItem(comic);
-        break;
-    }
-  }
-
-  void _toggleSelection(String storageKey, {bool? selected}) {
-    _updateHistoryState(() {
-      if (selected ?? !_selectedIds.contains(storageKey)) {
-        _selectedIds.add(storageKey);
-      } else {
-        _selectedIds.remove(storageKey);
-      }
-    });
-  }
-
-  Widget _buildItem(ExploreComic comic, int index) {
-    final heroTag = widget.comicCoverHeroTagBuilder(comic, salt: 'history');
-    return HistoryComicListItem(
-      key: ValueKey(comic.scopedId.storageKey),
-      comic: comic,
-      index: index,
-      heroTag: heroTag,
-      animateEntry: _playItemEntryAnimation,
-      selectionMode: _selectionMode,
-      selected: _selectedIds.contains(comic.scopedId.storageKey),
-      onShowMenu: (globalPosition, itemContext) =>
-          _showComicMenu(comic, globalPosition, itemContext),
-      onToggleSelection: (selected) =>
-          _toggleSelection(comic.scopedId.storageKey, selected: selected),
-      onTap: () async {
-        if (_selectionMode) {
-          _toggleSelection(comic.scopedId.storageKey);
-          return;
-        }
-        _playItemEntryAnimation = false;
-        await openComicDetail(
-          context,
-          comic: comic,
-          heroTag: heroTag,
-          pageBuilder: widget.comicDetailPageBuilder,
-        );
-        if (!mounted) {
-          return;
-        }
-        await _loadHistory();
-      },
-    );
   }
 
   @override
   Widget build(BuildContext context) {
     final strings = AppLocalizations.of(context)!;
-    final bodyContent = _loading
-        ? Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const HazukiSandyLoadingIndicator(size: 136),
-                const SizedBox(height: 10),
-                Text(strings.commonLoading),
-              ],
-            ),
-          )
-        : _history.isEmpty
-        ? Center(child: Text(strings.historyEmpty))
-        : ListView.builder(
-            controller: _scrollController,
-            physics: const AlwaysScrollableScrollPhysics(
-              parent: ClampingScrollPhysics(),
-            ),
-            padding: const EdgeInsets.all(16),
-            itemCount: _history.length,
-            itemBuilder: (context, index) {
-              return _buildItem(_history[index], index);
-            },
-          );
 
-    return WindowsComicDetailHost(
-      child: Scaffold(
-        appBar: hazukiFrostedAppBar(
-          context: context,
-          title: Text(strings.historyTitle),
-          actions: [
-            if (_history.isNotEmpty)
-              IconButton(
-                tooltip: _selectionMode
-                    ? strings.historySelectionCancelTooltip
-                    : strings.historySelectionEnterTooltip,
-                icon: Icon(_selectionMode ? Icons.close : Icons.checklist),
-                onPressed: () {
-                  _updateHistoryState(() {
-                    _selectionMode = !_selectionMode;
-                    _selectedIds.clear();
-                  });
-                },
-              ),
-            if (_history.isNotEmpty)
-              IconButton(
-                tooltip: _selectionMode
-                    ? strings.historyDeleteSelectedTooltip
-                    : strings.historyClearAllTooltip,
-                icon: const Icon(Icons.delete_outline),
-                onPressed: _selectionMode ? _deleteSelected : _clearAll,
-              ),
-          ],
-        ),
-        body: Stack(
-          children: [
-            bodyContent,
-            Positioned(
-              right: 16,
-              bottom: 16,
-              child: AnimatedSlide(
-                offset: _showBackToTop ? Offset.zero : const Offset(0, 0.24),
-                duration: const Duration(milliseconds: 220),
-                curve: Curves.easeOutCubic,
-                child: AnimatedScale(
-                  scale: _showBackToTop ? 1 : 0.86,
-                  duration: const Duration(milliseconds: 220),
-                  curve: Curves.easeOutCubic,
-                  child: AnimatedOpacity(
-                    opacity: _showBackToTop ? 1 : 0,
-                    duration: const Duration(milliseconds: 200),
-                    curve: Curves.easeOutCubic,
-                    child: IgnorePointer(
-                      ignoring: !_showBackToTop,
-                      child: FloatingActionButton(
-                        heroTag: 'history_back_to_top',
-                        onPressed: _scrollToTop,
-                        child: const Icon(Icons.vertical_align_top_rounded),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+    return AnimatedBuilder(
+      animation: _pageListenable,
+      builder: (context, _) {
+        return WindowsComicDetailHost(
+          child: Scaffold(
+            appBar: HistoryPageAppBar(
+              hasHistory: _controller.hasHistory,
+              selectionMode: _controller.selectionMode,
+              onToggleSelectionMode: _controller.toggleSelectionMode,
+              onDeleteSelected: () => _actions.deleteSelected(context),
+              onClearAll: () => _actions.clearAll(context),
             ),
-          ],
-        ),
-      ),
+            body: HistoryPageContent(
+              loading: _controller.loading,
+              history: _controller.history,
+              scrollController: _scrollCoordinator.controller,
+              showBackToTop: _scrollCoordinator.showBackToTop,
+              playItemEntryAnimation: _controller.playItemEntryAnimation,
+              selectionMode: _controller.selectionMode,
+              selectedStorageKeys: _controller.selectedStorageKeys,
+              strings: strings,
+              comicCoverHeroTagBuilder: widget.comicCoverHeroTagBuilder,
+              onOpenComic: (comic, heroTag) =>
+                  _actions.openComic(context, comic, heroTag),
+              onToggleSelection: _controller.toggleSelection,
+              onShowMenu: (comic, globalPosition, itemContext) =>
+                  _actions.showComicMenu(
+                    context: context,
+                    comic: comic,
+                    globalPosition: globalPosition,
+                    itemContext: itemContext,
+                  ),
+              onBackToTopPressed: _scrollCoordinator.scrollToTop,
+            ),
+          ),
+        );
+      },
     );
   }
 }

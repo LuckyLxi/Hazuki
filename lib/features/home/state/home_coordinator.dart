@@ -187,6 +187,7 @@ class HomeCoordinator extends ChangeNotifier {
       _lastSourceKey = nextSourceKey;
       _awaitingSourceInit = !_sourceService.isInitialized;
       _profileController.resetStartupCheckInAttempt();
+      _profileController.markSourceChanged();
       final context = _context;
       if (context != null && context.mounted) {
         unawaited(syncUserProfile(context));
@@ -195,6 +196,7 @@ class HomeCoordinator extends ChangeNotifier {
     } else if (_awaitingSourceInit && _sourceService.isInitialized) {
       // 新源初始化完成，重新同步以获取正确的登录状态和头像
       _awaitingSourceInit = false;
+      _profileController.markSourceChanged();
       final context = _context;
       if (context != null && context.mounted) {
         unawaited(syncUserProfile(context));

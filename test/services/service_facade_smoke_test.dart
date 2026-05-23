@@ -7,6 +7,7 @@ import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/cloud_sync_service.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/services/source/debug/debug_log_internals.dart';
+import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../support/test_service_locator.dart';
 
@@ -203,31 +204,163 @@ void main() {
   });
 
   test(
-    'legacy account and cookie session data is cleared on prefs init',
+    'legacy source secrets migrate to secure storage on prefs init',
     () async {
+      final legacyCookies = jsonEncode([
+        {
+          'name': 'sid',
+          'value': 'legacy',
+          'domain': 'example.com',
+          'path': '/',
+        },
+      ]);
       SharedPreferences.setMockInitialValues({
-        'cookie_store_v1': jsonEncode([
-          {
-            'name': 'sid',
-            'value': 'legacy',
-            'domain': 'example.com',
-            'path': '/',
-          },
-        ]),
+        'cookie_store_v1': legacyCookies,
+        'cookie_store_v2_jm': legacyCookies,
         'source_data_jm': jsonEncode({
           'account': ['user', 'pass'],
+          'token': 'source-token',
           'settings': {'favoriteOrder': 'mr'},
         }),
       });
+      final secureStorage = MemorySourceSecureSessionStorage();
+      final service = HazukiSourceService(secureSessionStorage: secureStorage);
 
-      final service = sl<HazukiSourceService>();
       final prefs = await service.facade.ensurePrefs();
       final sourceData = jsonDecode(prefs.getString('source_data_jm')!);
 
       expect(prefs.getString('cookie_store_v1'), isNull);
+      expect(prefs.getString('cookie_store_v2_jm'), isNull);
       expect(sourceData, isA<Map>());
       expect((sourceData as Map).containsKey('account'), isFalse);
+      expect(sourceData.containsKey('token'), isFalse);
       expect(sourceData['settings'], {'favoriteOrder': 'mr'});
+      expect(
+        secureStorage.values[SourceSecureSessionStorageKeys.account('jm')],
+        jsonEncode(['user', 'pass']),
+      );
+      expect(
+        secureStorage.values[SourceSecureSessionStorageKeys.token('jm')],
+        'source-token',
+      );
+      expect(
+        secureStorage.values[SourceSecureSessionStorageKeys.cookies('jm')],
+        legacyCookies,
+      );
+      expect(service.facade.loadAccountDataSync(), ['user', 'pass']);
+      expect(service.facade.loadSourceData('jm', 'token'), 'source-token');
+    },
+  );
+
+  test(
+    'legacy source secrets are retained when secure migration fails',
+    () async {
+      final legacyCookies = jsonEncode([
+        {
+          'name': 'sid',
+          'value': 'legacy',
+          'domain': 'example.com',
+          'path': '/',
+        },
+      ]);
+      SharedPreferences.setMockInitialValues({
+        'cookie_store_v2_jm': legacyCookies,
+        'source_data_jm': jsonEncode({
+          'account': ['user', 'pass'],
+          'token': 'source-token',
+          'settings': {'favoriteOrder': 'mr'},
+        }),
+      });
+      final secureStorage = MemorySourceSecureSessionStorage()
+        ..failWrites = true;
+      final service = HazukiSourceService(secureSessionStorage: secureStorage);
+
+      final prefs = await service.facade.ensurePrefs();
+      final sourceData = jsonDecode(prefs.getString('source_data_jm')!);
+
+      expect((sourceData as Map)['account'], ['user', 'pass']);
+      expect(sourceData['token'], 'source-token');
+      expect(prefs.getString('cookie_store_v2_jm'), legacyCookies);
+      expect(service.facade.loadAccountDataSync(), ['user', 'pass']);
+      expect(service.facade.loadSourceData('jm', 'token'), 'source-token');
+
+      await expectLater(
+        service.facade.saveSourceData('jm', 'account', ['next', 'secret']),
+        throwsStateError,
+      );
+      final afterFailedLoginSave = jsonDecode(
+        prefs.getString('source_data_jm')!,
+      );
+      expect((afterFailedLoginSave as Map)['account'], ['user', 'pass']);
+    },
+  );
+
+  test(
+    'loads secure account state for non-active sources on startup',
+    () async {
+      SharedPreferences.setMockInitialValues({
+        'source_secure_session_migration_v1': true,
+      });
+      final secureStorage = MemorySourceSecureSessionStorage(
+        initialValues: {
+          SourceSecureSessionStorageKeys.account('copy_manga'): jsonEncode([
+            'copy-user',
+            'copy-pass',
+          ]),
+        },
+      );
+      final service = HazukiSourceService(secureSessionStorage: secureStorage);
+
+      await service.loadActiveSourcePreference();
+
+      expect(service.activeSourceKey, hazukiDefaultSourceKey);
+      expect(service.currentAccountForSource('copy_manga'), 'copy-user');
+      expect(service.isLoggedForSource('copy_manga'), isTrue);
+    },
+  );
+
+  test(
+    'logout deletes secure source secrets without clearing settings',
+    () async {
+      SharedPreferences.setMockInitialValues({
+        'source_data_jm': jsonEncode({
+          'settings': {'favoriteOrder': 'mr'},
+          'display_name': 'Display',
+        }),
+      });
+      final secureStorage = MemorySourceSecureSessionStorage();
+      final service = HazukiSourceService(secureSessionStorage: secureStorage);
+      await service.facade.ensurePrefs();
+      await service.facade.saveSourceData('jm', 'account', ['user', 'pass']);
+      await service.facade.saveSourceData('jm', 'token', 'source-token');
+      await service.saveCookiesFromHeadersForHandle(
+        service.facade.handle,
+        'https://example.com/path',
+        {
+          'set-cookie': ['sid=abc; Path=/'],
+        },
+      );
+
+      await service.logout();
+      final prefs = await SharedPreferences.getInstance();
+      final sourceData = jsonDecode(prefs.getString('source_data_jm')!);
+
+      expect(service.facade.loadAccountDataSync(), isNull);
+      expect(service.facade.loadSourceData('jm', 'token'), isNull);
+      expect(
+        secureStorage.values[SourceSecureSessionStorageKeys.account('jm')],
+        isNull,
+      );
+      expect(
+        secureStorage.values[SourceSecureSessionStorageKeys.token('jm')],
+        isNull,
+      );
+      expect(
+        secureStorage.values[SourceSecureSessionStorageKeys.cookies('jm')],
+        isNull,
+      );
+      expect(sourceData['settings'], {'favoriteOrder': 'mr'});
+      expect(sourceData.containsKey('display_name'), isFalse);
     },
   );
 

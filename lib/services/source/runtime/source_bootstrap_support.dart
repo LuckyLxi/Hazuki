@@ -138,9 +138,10 @@ extension SourceBootstrapSupport on HazukiSourceService {
 
     Future<String?> requestOnce(String url) async {
       final startedAt = DateTime.now();
+      final requestUrl = facade.httpGateway.normalizeUrl(url);
       try {
-        final response = await dio.get<String>(
-          url,
+        final response = await facade.httpGateway.request<String>(
+          requestUrl,
           options: Options(
             responseType: ResponseType.plain,
             headers: {'cache-control': 'no-cache'},
@@ -150,7 +151,7 @@ extension SourceBootstrapSupport on HazukiSourceService {
         facade.networkLogSink.append(
           source: source,
           method: 'GET',
-          url: url,
+          url: requestUrl,
           statusCode: response.statusCode,
           error: null,
           startedAt: startedAt,
@@ -166,7 +167,7 @@ extension SourceBootstrapSupport on HazukiSourceService {
         facade.networkLogSink.append(
           source: source,
           method: 'GET',
-          url: url,
+          url: requestUrl,
           statusCode: null,
           error: e.toString(),
           startedAt: startedAt,
@@ -211,9 +212,10 @@ extension SourceBootstrapSupport on HazukiSourceService {
   }) async {
     for (final url in urls) {
       final startedAt = DateTime.now();
+      final requestUrl = facade.httpGateway.normalizeUrl(url);
       try {
-        final response = await dio.get<String>(
-          url,
+        final response = await facade.httpGateway.request<String>(
+          requestUrl,
           options: Options(
             responseType: ResponseType.plain,
             headers: {'cache-control': 'no-cache'},
@@ -224,7 +226,7 @@ extension SourceBootstrapSupport on HazukiSourceService {
         facade.networkLogSink.append(
           source: source,
           method: 'GET',
-          url: url,
+          url: requestUrl,
           statusCode: response.statusCode,
           error: null,
           startedAt: startedAt,
@@ -240,7 +242,7 @@ extension SourceBootstrapSupport on HazukiSourceService {
         facade.networkLogSink.append(
           source: source,
           method: 'GET',
-          url: url,
+          url: requestUrl,
           statusCode: null,
           error: e.toString(),
           startedAt: startedAt,
