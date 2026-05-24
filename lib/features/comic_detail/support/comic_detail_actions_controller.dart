@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:hazuki/shared/chapter_title_resolver.dart';
+import 'package:hazuki/shared/navigation_tags.dart';
 import 'package:hazuki/app/windows/windows_title_bar_controller.dart';
 import 'package:hazuki/features/discover/support/category_tag_navigation.dart';
 import 'package:hazuki/features/discover/view/discover_section_page.dart';
@@ -64,6 +65,23 @@ class ComicDetailActionsController extends ChangeNotifier {
     final normalized = imageUrl.trim();
     if (normalized.isEmpty) return;
     FocusManager.instance.primaryFocus?.unfocus();
+    final devicePixelRatio = MediaQuery.devicePixelRatioOf(context);
+    await precacheComicCoverHeroImages(
+      context,
+      url: normalized,
+      sourceKey: _comic.sourceKey,
+      sourceCacheWidth: (135 * devicePixelRatio)
+          .round()
+          .clamp(135, 640)
+          .toInt(),
+      sourceCacheHeight: (190 * devicePixelRatio)
+          .round()
+          .clamp(190, 900)
+          .toInt(),
+    );
+    if (!context.mounted) {
+      return;
+    }
 
     await Navigator.of(context).push(
       PageRouteBuilder<void>(

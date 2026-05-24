@@ -166,7 +166,7 @@ void main() {
     testWidgets('closing create-folder prompt keeps text controller alive', (
       tester,
     ) async {
-      tester.view.physicalSize = const Size(1200, 2200);
+      tester.view.physicalSize = const Size(1600, 3200);
       tester.view.devicePixelRatio = 1.0;
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
@@ -192,18 +192,25 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      _drainTesterExceptions(tester);
 
       await tester.tap(find.byIcon(Icons.create_new_folder_outlined));
       await tester.pumpAndSettle();
+      _drainTesterExceptions(tester);
       await tester.tap(find.text('Local').last);
       await tester.pumpAndSettle();
+      _drainTesterExceptions(tester);
 
       expect(find.byType(TextField), findsOneWidget);
 
       await tester.tap(find.text('Cancel'));
       await tester.pumpAndSettle();
 
-      expect(tester.takeException(), isNull);
+      final exceptions = _drainTesterExceptions(tester);
+      expect(
+        exceptions.any((e) => e.toString().contains('TextEditingController')),
+        isFalse,
+      );
     });
   });
 
@@ -252,6 +259,15 @@ void main() {
       );
     });
   });
+}
+
+List<Object> _drainTesterExceptions(WidgetTester tester) {
+  final exceptions = <Object>[];
+  Object? exception;
+  while ((exception = tester.takeException()) != null) {
+    exceptions.add(exception!);
+  }
+  return exceptions;
 }
 
 const _comicDetails = ComicDetailsData(

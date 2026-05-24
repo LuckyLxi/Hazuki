@@ -4,6 +4,7 @@ import 'package:hazuki/app/service_locator.dart';
 import '../models/hazuki_models.dart';
 import '../services/hazuki_source_service.dart';
 import '../widgets/cached_image_widgets.dart';
+import 'ui_flags.dart';
 
 typedef ComicHeroTagBuilder =
     String Function(ExploreComic comic, {String? salt});
@@ -27,6 +28,54 @@ double comicCoverHeroBorderRadius(String heroTag, {double fallback = 10}) {
     return 28;
   }
   return fallback;
+}
+
+Future<void> precacheComicCoverHeroImages(
+  BuildContext context, {
+  required String url,
+  required String sourceKey,
+  int? sourceCacheWidth,
+  int? sourceCacheHeight,
+}) async {
+  final normalized = url.trim();
+  if (normalized.isEmpty || hazukiNoImageModeNotifier.value) {
+    return;
+  }
+  final resolvedSourceKey = sourceKey.trim().isNotEmpty
+      ? sourceKey.trim()
+      : sl<HazukiSourceService>().activeSourceKey;
+  try {
+    var bytes =
+        peekHazukiWidgetImageMemory(normalized, sourceKey: resolvedSourceKey) ??
+        sl<HazukiSourceService>().peekImageBytesFromMemory(
+          normalized,
+          sourceKey: resolvedSourceKey,
+        );
+    bytes ??= await sl<HazukiSourceService>().downloadImageBytes(
+      normalized,
+      keepInMemory: true,
+      sourceKey: resolvedSourceKey,
+    );
+    putHazukiWidgetImageMemory(normalized, bytes, sourceKey: resolvedSourceKey);
+    if (!context.mounted) {
+      return;
+    }
+
+    final baseProvider = MemoryImage(bytes);
+    await precacheImage(baseProvider, context);
+    if (!context.mounted ||
+        (sourceCacheWidth == null && sourceCacheHeight == null)) {
+      return;
+    }
+    await precacheImage(
+      ResizeImage.resizeIfNeeded(
+        sourceCacheWidth,
+        sourceCacheHeight,
+        baseProvider,
+      ),
+      context,
+    );
+  } catch (_) {}
 }
 
 Widget buildComicCoverHeroPlaceholder(
