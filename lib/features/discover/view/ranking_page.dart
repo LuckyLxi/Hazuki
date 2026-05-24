@@ -52,7 +52,12 @@ class _RankingPageState extends State<RankingPage> {
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
-    unawaited(_loadInitial());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      unawaited(_loadInitial());
+    });
   }
 
   @override
