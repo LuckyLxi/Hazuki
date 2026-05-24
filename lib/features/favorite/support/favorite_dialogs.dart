@@ -4,6 +4,14 @@ import 'package:hazuki/l10n/app_localizations.dart';
 AppLocalizations _strings(BuildContext context) =>
     AppLocalizations.of(context)!;
 
+Color _favoriteDialogBackgroundColor(BuildContext context) {
+  final colorScheme = Theme.of(context).colorScheme;
+  final brightness = ThemeData.estimateBrightnessForColor(colorScheme.surface);
+  return brightness == Brightness.dark
+      ? colorScheme.surfaceContainerLow
+      : colorScheme.surfaceContainerHigh;
+}
+
 Future<T?> _showAnimatedFolderDialog<T>({
   required BuildContext context,
   required WidgetBuilder builder,
@@ -48,6 +56,7 @@ Future<String?> showFavoriteCreateFolderDialog(BuildContext context) {
         builder: (dialogContext, setDialogState) {
           final strings = _strings(dialogContext);
           return AlertDialog(
+            backgroundColor: _favoriteDialogBackgroundColor(dialogContext),
             title: Text(strings.favoriteCreateFolderTitle),
             content: TextField(
               controller: controller,

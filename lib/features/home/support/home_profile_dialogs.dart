@@ -46,6 +46,14 @@ Future<T?> showHomeAnimatedDialog<T>(
   );
 }
 
+Color homeDialogBackgroundColor(BuildContext context) {
+  final colorScheme = Theme.of(context).colorScheme;
+  final brightness = ThemeData.estimateBrightnessForColor(colorScheme.surface);
+  return brightness == Brightness.dark
+      ? colorScheme.surfaceContainerLow
+      : colorScheme.surfaceContainerHigh;
+}
+
 Future<bool> showHomeLogoutConfirmDialog(BuildContext context) async {
   final strings = l10n(context);
   final result = await showHomeAnimatedDialog<bool>(
@@ -191,6 +199,7 @@ Future<void> showHomeLoginDialog(
     child: StatefulBuilder(
       builder: (dialogContext, setDialogState) {
         return Dialog(
+          backgroundColor: homeDialogBackgroundColor(dialogContext),
           clipBehavior: Clip.antiAlias,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(28),

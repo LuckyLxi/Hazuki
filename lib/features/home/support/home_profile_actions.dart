@@ -104,6 +104,7 @@ Future<void> showHomeSourceSwitchDialog(
         return PopScope(
           canPop: !switching,
           child: Dialog(
+            backgroundColor: homeDialogBackgroundColor(dialogContext),
             clipBehavior: Clip.antiAlias,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(switching ? 18 : 28),
