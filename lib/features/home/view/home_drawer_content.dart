@@ -29,26 +29,30 @@ class HomeDrawerContent extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
-      child: ListTile(
-        leading: Icon(
-          item.icon,
-          color: selected ? selectedForeground : colorScheme.onSurfaceVariant,
-        ),
-        title: Text(
-          item.title(context),
-          style: TextStyle(
-            color: selected ? selectedForeground : colorScheme.onSurface,
-            fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(28),
+        child: ListTile(
+          leading: Icon(
+            item.icon,
+            color: selected ? selectedForeground : colorScheme.onSurfaceVariant,
           ),
+          title: Text(
+            item.title(context),
+            style: TextStyle(
+              color: selected ? selectedForeground : colorScheme.onSurface,
+              fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+            ),
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(28),
+          ),
+          hoverColor: Colors.transparent,
+          focusColor: Colors.transparent,
+          splashColor: Colors.transparent,
+          selected: selected,
+          onTap: item.resolveTap(actions),
         ),
-        tileColor: Colors.transparent,
-        selectedTileColor: Colors.transparent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
-        hoverColor: Colors.transparent,
-        focusColor: Colors.transparent,
-        splashColor: Colors.transparent,
-        selected: selected,
-        onTap: item.resolveTap(actions),
       ),
     );
   }

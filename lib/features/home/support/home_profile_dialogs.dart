@@ -139,10 +139,13 @@ class HomeProfileCardContent extends StatelessWidget {
         Text(firstUseText, style: Theme.of(context).textTheme.bodySmall),
         const SizedBox(height: 8),
         const Divider(height: 1),
-        ListTile(
-          leading: const Icon(Icons.logout),
-          title: Text(l10n(context).homeLogoutTitle),
-          onTap: onLogoutTap,
+        Material(
+          color: Colors.transparent,
+          child: ListTile(
+            leading: const Icon(Icons.logout),
+            title: Text(l10n(context).homeLogoutTitle),
+            onTap: onLogoutTap,
+          ),
         ),
       ],
     );
