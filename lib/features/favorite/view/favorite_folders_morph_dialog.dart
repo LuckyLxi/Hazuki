@@ -521,7 +521,7 @@ class _FavoriteFoldersMorphDialogState
             ),
           ),
           const SizedBox(height: 16),
-          _buildDialogBody(context),
+          Flexible(child: _buildDialogBody(context)),
           const SizedBox(height: 18),
           Row(
             children: [
@@ -612,7 +612,7 @@ class _FavoriteFoldersMorphDialogState
                     minHeight: expanded ? 0 : 196,
                     maxHeight: expanded
                         ? math.min(size.height * 0.78, 520)
-                        : 220,
+                        : math.min(size.height * 0.62, 280),
                   ),
                   clipBehavior: Clip.antiAlias,
                   decoration: BoxDecoration(
