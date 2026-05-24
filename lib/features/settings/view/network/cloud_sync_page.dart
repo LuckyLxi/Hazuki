@@ -162,22 +162,7 @@ class _CloudSyncPageState extends State<CloudSyncPage> {
   }
 
   Widget _buildGroup(BuildContext context, {required List<Widget> children}) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.4),
-        ),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: children,
-      ),
-    );
+    return SettingsGroup(children: children);
   }
 
   ({String text, Color color}) _resolveStatusDisplay(

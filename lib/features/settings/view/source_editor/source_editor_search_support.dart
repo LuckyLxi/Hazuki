@@ -85,7 +85,6 @@ Future<void> showSourceSearchResultsDialog({
               child: Container(
                 margin: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: colorScheme.surface,
                   borderRadius: BorderRadius.circular(28),
                   boxShadow: [
                     BoxShadow(
@@ -98,78 +97,86 @@ Future<void> showSourceSearchResultsDialog({
                     color: colorScheme.outlineVariant.withValues(alpha: 0.36),
                   ),
                 ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 22, 24, 8),
-                      child: Text(
-                        strings.sourceEditorSearchResultCount(matches.length),
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                    Flexible(
-                      child: ListView.separated(
-                        shrinkWrap: true,
-                        itemCount: matches.length,
-                        separatorBuilder: (context, index) => Divider(
-                          height: 1,
-                          color: colorScheme.outlineVariant.withValues(
-                            alpha: 0.45,
+                child: Material(
+                  color: colorScheme.surface,
+                  borderRadius: BorderRadius.circular(28),
+                  clipBehavior: Clip.antiAlias,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 22, 24, 8),
+                        child: Text(
+                          strings.sourceEditorSearchResultCount(matches.length),
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
-                        itemBuilder: (context, index) {
-                          final match = matches[index];
-                          return ListTile(
-                            dense: true,
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 2,
+                      ),
+                      Flexible(
+                        child: ListView.separated(
+                          shrinkWrap: true,
+                          itemCount: matches.length,
+                          separatorBuilder: (context, index) => Divider(
+                            height: 1,
+                            color: colorScheme.outlineVariant.withValues(
+                              alpha: 0.45,
                             ),
-                            title: Text(
-                              '\u7b2c${match.lineIndex + 1} \u884c\uff0c\u7b2c${match.columnIndex + 1} \u5217',
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w700,
+                          ),
+                          itemBuilder: (context, index) {
+                            final match = matches[index];
+                            return ListTile(
+                              dense: true,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 2,
                               ),
-                            ),
-                            subtitle: Padding(
-                              padding: const EdgeInsets.only(top: 4),
-                              child: Text(
-                                buildSourceSearchSnippet(match.lineText, query),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  fontFamily: 'monospace',
-                                  color: colorScheme.onSurfaceVariant,
+                              title: Text(
+                                '\u7b2c${match.lineIndex + 1} \u884c\uff0c\u7b2c${match.columnIndex + 1} \u5217',
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
-                            ),
-                            onTap: () {
-                              Navigator.of(dialogContext).pop();
-                              onSelected(match);
-                            },
-                          );
-                        },
+                              subtitle: Padding(
+                                padding: const EdgeInsets.only(top: 4),
+                                child: Text(
+                                  buildSourceSearchSnippet(
+                                    match.lineText,
+                                    query,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    fontFamily: 'monospace',
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ),
+                              onTap: () {
+                                Navigator.of(dialogContext).pop();
+                                onSelected(match);
+                              },
+                            );
+                          },
+                        ),
                       ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                      child: Align(
-                        alignment: Alignment.centerRight,
-                        child: TextButton(
-                          onPressed: () => Navigator.of(dialogContext).pop(),
-                          child: Text(
-                            MaterialLocalizations.of(
-                              dialogContext,
-                            ).closeButtonLabel,
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                        child: Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton(
+                            onPressed: () => Navigator.of(dialogContext).pop(),
+                            child: Text(
+                              MaterialLocalizations.of(
+                                dialogContext,
+                              ).closeButtonLabel,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
             ),

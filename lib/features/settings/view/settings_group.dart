@@ -36,19 +36,22 @@ class SettingsGroup extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Container(
-      margin: margin,
-      decoration: BoxDecoration(
+    final borderRadius = BorderRadius.circular(20);
+    return Padding(
+      padding: margin,
+      child: Material(
         color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+        shape: RoundedRectangleBorder(
+          borderRadius: borderRadius,
+          side: BorderSide(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+          ),
         ),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: children,
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: children,
+        ),
       ),
     );
   }

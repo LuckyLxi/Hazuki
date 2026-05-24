@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 
+import '../settings_group.dart';
+
 class OtherSettingsGeneralSection extends StatelessWidget {
   const OtherSettingsGeneralSection({
     super.key,
@@ -42,7 +44,7 @@ class OtherSettingsGeneralSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final strings = AppLocalizations.of(context)!;
-    return _OtherSettingsGroup(
+    return SettingsGroup(
       children: [
         if (showAutoCheckInSetting)
           SwitchListTile(
@@ -97,32 +99,6 @@ class OtherSettingsGeneralSection extends StatelessWidget {
           onTap: onCommentFilter,
         ),
       ],
-    );
-  }
-}
-
-class _OtherSettingsGroup extends StatelessWidget {
-  const _OtherSettingsGroup({required this.children});
-
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.4),
-        ),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: children,
-      ),
     );
   }
 }

@@ -568,20 +568,23 @@ class _PageSettingsGroup extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final borderRadius = BorderRadius.circular(20);
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Material(
         color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+        shape: RoundedRectangleBorder(
+          borderRadius: borderRadius,
+          side: BorderSide(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+          ),
         ),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: children,
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: children,
+        ),
       ),
     );
   }
@@ -596,20 +599,23 @@ class _DrawerSettingsGroup extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = theme.colorScheme;
+    final borderRadius = BorderRadius.circular(24);
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Material(
         color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+        shape: RoundedRectangleBorder(
+          borderRadius: borderRadius,
+          side: BorderSide(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+          ),
         ),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: children,
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: children,
+        ),
       ),
     );
   }

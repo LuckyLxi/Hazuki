@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:re_editor/re_editor.dart';
@@ -42,6 +43,7 @@ class _SourceEditorContentState extends State<SourceEditorContent>
   late final Animation<double> _highlightOpacity;
   late final SourceSearchHighlightCodeLineController _editorController;
   SourceSearchHighlight? _activeHighlight;
+  bool _controllerRebuildScheduled = false;
 
   SourceCodeEditingController get _controller => widget.controller;
   AppLocalizations get _strings => widget.strings;
@@ -75,16 +77,48 @@ class _SourceEditorContentState extends State<SourceEditorContent>
       highlightGetter: () => _activeHighlight,
       highlightOpacityGetter: () => _highlightOpacity.value,
     );
+    _controller.addListener(_handleControllerChanged);
+  }
+
+  @override
+  void didUpdateWidget(covariant SourceEditorContent oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.controller, widget.controller)) {
+      oldWidget.controller.removeListener(_handleControllerChanged);
+      _controller.addListener(_handleControllerChanged);
+    }
   }
 
   @override
   void dispose() {
+    _controller.removeListener(_handleControllerChanged);
     _highlightAnimationController
       ..removeListener(_handleHighlightAnimationTick)
       ..removeStatusListener(_handleHighlightAnimationStatusChanged)
       ..dispose();
     _searchController.dispose();
     super.dispose();
+  }
+
+  void _handleControllerChanged() {
+    if (!mounted) {
+      return;
+    }
+    if (SchedulerBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
+      if (_controllerRebuildScheduled) {
+        return;
+      }
+      _controllerRebuildScheduled = true;
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        _controllerRebuildScheduled = false;
+        if (mounted) {
+          setState(() {});
+        }
+      });
+      return;
+    }
+    setState(() {});
   }
 
   void _handleHighlightAnimationTick() {
@@ -222,67 +256,62 @@ class _SourceEditorContentState extends State<SourceEditorContent>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          ListenableBuilder(
-            listenable: _controller,
-            builder: (context, _) {
-              return Row(
-                children: [
-                  Expanded(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 360),
-                      child: TextField(
-                        controller: _searchController,
-                        enabled: !widget.saving,
-                        onSubmitted: (_) => _performSearch(),
-                        textInputAction: TextInputAction.search,
-                        decoration: InputDecoration(
-                          hintText: _strings.sourceEditorSearchHint,
-                          prefixIcon: const Icon(Icons.search_rounded),
-                          suffixIcon: IconButton(
-                            onPressed: widget.saving ? null : _performSearch,
-                            icon: const Icon(Icons.arrow_forward_rounded),
-                            tooltip: MaterialLocalizations.of(
-                              context,
-                            ).searchFieldLabel,
-                          ),
-                          isDense: true,
-                          filled: true,
-                          fillColor: colorScheme.surfaceContainerHigh,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: BorderSide(
-                              color: colorScheme.outlineVariant.withValues(
-                                alpha: 0.48,
-                              ),
-                            ),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: BorderSide(
-                              color: colorScheme.outlineVariant.withValues(
-                                alpha: 0.48,
-                              ),
-                            ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(14),
-                            borderSide: BorderSide(color: colorScheme.primary),
+          Row(
+            children: [
+              Expanded(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 360),
+                  child: TextField(
+                    controller: _searchController,
+                    enabled: !widget.saving,
+                    onSubmitted: (_) => _performSearch(),
+                    textInputAction: TextInputAction.search,
+                    decoration: InputDecoration(
+                      hintText: _strings.sourceEditorSearchHint,
+                      prefixIcon: const Icon(Icons.search_rounded),
+                      suffixIcon: IconButton(
+                        onPressed: widget.saving ? null : _performSearch,
+                        icon: const Icon(Icons.arrow_forward_rounded),
+                        tooltip: MaterialLocalizations.of(
+                          context,
+                        ).searchFieldLabel,
+                      ),
+                      isDense: true,
+                      filled: true,
+                      fillColor: colorScheme.surfaceContainerHigh,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide(
+                          color: colorScheme.outlineVariant.withValues(
+                            alpha: 0.48,
                           ),
                         ),
                       ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide(
+                          color: colorScheme.outlineVariant.withValues(
+                            alpha: 0.48,
+                          ),
+                        ),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: BorderSide(color: colorScheme.primary),
+                      ),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Text(
-                    _strings.sourceEditorLineCount(_controller.lineCount),
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              );
-            },
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                _strings.sourceEditorLineCount(_controller.lineCount),
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
           ),
           if (widget.inlineErrorText != null) ...[
             const SizedBox(height: 12),

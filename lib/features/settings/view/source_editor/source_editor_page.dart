@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/l10n/l10n.dart';
@@ -24,6 +25,7 @@ class _ComicSourceEditorPageState extends State<ComicSourceEditorPage> {
   String? _inlineErrorText;
   bool _loading = true;
   bool _saving = false;
+  bool _controllerRebuildScheduled = false;
 
   AppLocalizations get _strings => l10n(context);
   bool get _hasChanges => _controller.text != _initialContent;
@@ -41,13 +43,41 @@ class _ComicSourceEditorPageState extends State<ComicSourceEditorPage> {
   @override
   void initState() {
     super.initState();
-    _loadSource();
+    _controller.addListener(_handleControllerChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      _loadSource();
+    });
   }
 
   @override
   void dispose() {
+    _controller.removeListener(_handleControllerChanged);
     _controller.dispose();
     super.dispose();
+  }
+
+  void _handleControllerChanged() {
+    if (!mounted) {
+      return;
+    }
+    if (SchedulerBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
+      if (_controllerRebuildScheduled) {
+        return;
+      }
+      _controllerRebuildScheduled = true;
+      SchedulerBinding.instance.addPostFrameCallback((_) {
+        _controllerRebuildScheduled = false;
+        if (mounted) {
+          setState(() {});
+        }
+      });
+      return;
+    }
+    setState(() {});
   }
 
   Future<void> _loadSource() async {
@@ -164,24 +194,20 @@ class _ComicSourceEditorPageState extends State<ComicSourceEditorPage> {
           context: context,
           title: Text(_pageTitle),
           actions: [
-            ListenableBuilder(
-              listenable: _controller,
-              builder: (context, _) {
-                final saveEnabled = !_loading && !_saving && _hasChanges;
-                return TextButton(
-                  onPressed: saveEnabled ? _saveSource : null,
-                  child: _saving
-                      ? SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2.2,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                        )
-                      : Text(_saveLabel),
-                );
-              },
+            TextButton(
+              onPressed: !_loading && !_saving && _hasChanges
+                  ? _saveSource
+                  : null,
+              child: _saving
+                  ? SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.2,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    )
+                  : Text(_saveLabel),
             ),
             const SizedBox(width: 4),
           ],

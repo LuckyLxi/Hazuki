@@ -5,6 +5,7 @@ import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/services/password_lock_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'password_lock_pages.dart';
+import '../settings_group.dart';
 
 class PrivacySettingsPage extends StatefulWidget {
   const PrivacySettingsPage({super.key});
@@ -178,22 +179,7 @@ class _PrivacySettingsPageState extends State<PrivacySettingsPage> {
   }
 
   Widget _buildGroup(BuildContext context, {required List<Widget> children}) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.4),
-        ),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: children,
-      ),
-    );
+    return SettingsGroup(children: children);
   }
 
   @override
