@@ -147,7 +147,7 @@ class HomeScaffoldShell extends StatelessWidget {
       onProfileTap: sourceService.sourceMeta?.supportsAccount == true
           ? onProfileTap
           : null,
-      onCheckInPressed: _closeDrawerRouteThen(context, onCheckInPressed),
+      onCheckInPressed: onCheckInPressed,
       onSwitchSourcePressed: onSwitchSourcePressed,
       onSelectDiscover: () => onDestinationSelected(0),
       onSelectFavorite: () => onDestinationSelected(1),
@@ -277,28 +277,6 @@ class HomeScaffoldShell extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  VoidCallback? _closeDrawerRouteThen(
-    BuildContext context,
-    VoidCallback? next,
-  ) {
-    if (next == null) {
-      return null;
-    }
-    return () {
-      final navigator = Navigator.of(context);
-      if (navigator.canPop()) {
-        navigator.pop();
-      }
-      unawaited(() async {
-        await Future<void>.delayed(const Duration(milliseconds: 240));
-        if (!context.mounted) {
-          return;
-        }
-        next();
-      }());
-    };
   }
 }
 
