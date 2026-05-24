@@ -1,6 +1,8 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/favorite/favorite.dart';
 import 'package:hazuki/features/favorite/state/favorite_page_state.dart';
+import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 
 void main() {
@@ -159,6 +161,49 @@ void main() {
       expect(repository.localLoadSourceKeys, everyElement('source-a'));
       expect(repository.localAddSourceKeys, ['source-a']);
       expect(repository.localDeleteSourceKeys, ['source-a']);
+    });
+
+    testWidgets('closing create-folder prompt keeps text controller alive', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(1200, 2200);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final repository = _RecordingFavoriteFoldersRepository();
+      final viewModel = FavoriteFoldersViewModel(
+        repository: repository,
+        details: _comicDetails,
+        cloudFavoriteOverride: null,
+        initialIsFavorite: false,
+        singleFolderOnly: false,
+      );
+      addTearDown(viewModel.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: FavoriteFoldersMorphDialog(viewModel: viewModel),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byIcon(Icons.create_new_folder_outlined));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Local').last);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(TextField), findsOneWidget);
+
+      await tester.tap(find.text('Cancel'));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
     });
   });
 

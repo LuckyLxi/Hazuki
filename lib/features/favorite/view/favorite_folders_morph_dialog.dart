@@ -98,57 +98,9 @@ class _FavoriteFoldersMorphDialogState
   }
 
   Future<String?> _promptFolderName(FavoriteFolderSource target) {
-    final strings = AppLocalizations.of(context)!;
-    final controller = TextEditingController();
     return _showAnimatedDialog<String>(
-      builder: (dialogContext) {
-        String? errorText;
-        return StatefulBuilder(
-          builder: (dialogContext, setDialogState) {
-            return AlertDialog(
-              title: Text(
-                '${strings.favoriteCreateFolderTitle} - '
-                '${_folderSourceLabel(dialogContext, target)}',
-              ),
-              content: TextField(
-                controller: controller,
-                autofocus: true,
-                decoration: InputDecoration(
-                  hintText: strings.comicDetailFavoriteFolderNameHint,
-                  border: const OutlineInputBorder(),
-                  errorText: errorText,
-                ),
-                onChanged: (_) {
-                  if (errorText != null) {
-                    setDialogState(() => errorText = null);
-                  }
-                },
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(dialogContext),
-                  child: Text(strings.commonCancel),
-                ),
-                FilledButton(
-                  onPressed: () {
-                    final text = controller.text.trim();
-                    if (text.isEmpty) {
-                      setDialogState(
-                        () => errorText =
-                            strings.comicDetailFavoriteFolderNameRequired,
-                      );
-                      return;
-                    }
-                    Navigator.pop(dialogContext, text);
-                  },
-                  child: Text(strings.commonConfirm),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    ).whenComplete(controller.dispose);
+      builder: (dialogContext) => _FavoriteFolderNameDialog(target: target),
+    );
   }
 
   Future<void> _addFolder() async {
@@ -223,13 +175,6 @@ class _FavoriteFoldersMorphDialogState
       return;
     }
     Navigator.of(context).pop(_vm.buildSaveResult());
-  }
-
-  String _folderSourceLabel(BuildContext context, FavoriteFolderSource source) {
-    final strings = AppLocalizations.of(context)!;
-    return source == FavoriteFolderSource.local
-        ? strings.favoriteModeLocal
-        : strings.favoriteModeCloud;
   }
 
   Widget _buildLoadingContent(BuildContext context) {
@@ -677,6 +622,75 @@ class _FavoriteFoldersMorphDialogState
           ),
         );
       },
+    );
+  }
+}
+
+class _FavoriteFolderNameDialog extends StatefulWidget {
+  const _FavoriteFolderNameDialog({required this.target});
+
+  final FavoriteFolderSource target;
+
+  @override
+  State<_FavoriteFolderNameDialog> createState() =>
+      _FavoriteFolderNameDialogState();
+}
+
+class _FavoriteFolderNameDialogState extends State<_FavoriteFolderNameDialog> {
+  final TextEditingController _controller = TextEditingController();
+  String? _errorText;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit(AppLocalizations strings) {
+    final text = _controller.text.trim();
+    if (text.isEmpty) {
+      setState(() {
+        _errorText = strings.comicDetailFavoriteFolderNameRequired;
+      });
+      return;
+    }
+    Navigator.pop(context, text);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context)!;
+    final sourceLabel = widget.target == FavoriteFolderSource.local
+        ? strings.favoriteModeLocal
+        : strings.favoriteModeCloud;
+
+    return AlertDialog(
+      title: Text('${strings.favoriteCreateFolderTitle} - $sourceLabel'),
+      content: TextField(
+        controller: _controller,
+        autofocus: true,
+        decoration: InputDecoration(
+          hintText: strings.comicDetailFavoriteFolderNameHint,
+          border: const OutlineInputBorder(),
+          errorText: _errorText,
+        ),
+        onChanged: (_) {
+          if (_errorText != null) {
+            setState(() => _errorText = null);
+          }
+        },
+        onSubmitted: (_) => _submit(strings),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(strings.commonCancel),
+        ),
+        FilledButton(
+          onPressed: () => _submit(strings),
+          child: Text(strings.commonConfirm),
+        ),
+      ],
     );
   }
 }
