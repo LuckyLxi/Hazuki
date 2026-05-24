@@ -33,6 +33,11 @@ class HomeProfileAvatar extends StatelessWidget {
     final radius = size / 2;
     final contentSize = (size - borderWidth * 2).clamp(0.0, size).toDouble();
     final borderRadius = this.borderRadius;
+    final fallbackIcon = Icon(
+      Icons.person_outline,
+      size: contentSize * 0.58,
+      color: Theme.of(context).colorScheme.onSurfaceVariant,
+    );
     final avatar = Container(
       width: size,
       height: size,
@@ -53,8 +58,10 @@ class HomeProfileAvatar extends StatelessWidget {
       ),
       child: ClipRRect(
         borderRadius: borderRadius ?? BorderRadius.circular(radius),
-        child: loading || resolvedAvatarUrl.isEmpty
+        child: loading
             ? HazukiShimmerLoading(width: contentSize, height: contentSize)
+            : resolvedAvatarUrl.isEmpty
+            ? Center(child: fallbackIcon)
             : _useRoundedRectangle
             ? HazukiCachedImage(
                 url: resolvedAvatarUrl,
