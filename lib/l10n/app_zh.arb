@@ -1119,7 +1119,7 @@
   "advancedCopyMangaClearDeviceSubtitle": "清除伪装客户端的设备标识，下次请求会重新生成",
   "advancedCopyMangaDeviceCleared": "拷贝漫画设备信息已清除",
   "advancedEditSourceTitle": "编辑漫画源",
-  "advancedEditSourceSubtitle": "打开轻量编辑器，修改并保存 jm.js",
+  "advancedEditSourceSubtitle": "打开轻量编辑器，修改并保存漫画源",
   "advancedRestoreSourceLabel": "还原漫画源",
   "advancedRestoreSourceSuccess": "漫画源已还原",
   "sourceEditorLoading": "正在读取漫画源…",

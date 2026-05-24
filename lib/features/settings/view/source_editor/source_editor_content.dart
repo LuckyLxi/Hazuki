@@ -227,8 +227,6 @@ class _SourceEditorContentState extends State<SourceEditorContent>
             builder: (context, _) {
               return Row(
                 children: [
-                  const SourceEditorFileBadge(fileBadge: 'jm.js'),
-                  const SizedBox(width: 12),
                   Expanded(
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(maxWidth: 360),

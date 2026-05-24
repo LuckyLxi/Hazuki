@@ -2,30 +2,53 @@ part of '../../hazuki_source_service.dart';
 
 extension HazukiSourceServiceSourceFileManagementCapability
     on HazukiSourceService {
-  Future<String?> readLocalJmSourceIfExists() async {
-    final File jmFile;
+  Future<String?> readLocalActiveSourceIfExists() async {
+    return readLocalSourceIfExists(activeSourceKey);
+  }
+
+  Future<String?> readLocalSourceIfExists(String sourceKey) async {
+    final normalizedSourceKey = _normalizeAllowedSourceKey(sourceKey);
+    final File sourceFile;
     try {
-      final sourceDir = await _getSourceStorageDirectory();
-      jmFile = File('${sourceDir.path}/source.js');
+      final sourceDir = await _getSourceStorageDirectory(
+        sourceKey: normalizedSourceKey,
+      );
+      sourceFile = File('${sourceDir.path}/source.js');
     } catch (_) {
       return null;
     }
-    if (!await jmFile.exists()) {
+    if (!await sourceFile.exists()) {
       return null;
     }
-    return jmFile.readAsString();
+    return sourceFile.readAsString();
   }
 
-  Future<String> loadEditableJmSource() async {
+  Future<String?> readLocalJmSourceIfExists() async {
+    return readLocalActiveSourceIfExists();
+  }
+
+  Future<String> loadEditableActiveSource() async {
     return loadEditableSource(activeSourceKey);
   }
 
-  Future<void> writeLocalJmSource(String content) async {
+  Future<String> loadEditableJmSource() async {
+    return loadEditableActiveSource();
+  }
+
+  Future<void> writeLocalActiveSource(String content) async {
     await writeLocalSource(activeSourceKey, content);
   }
 
-  Future<void> saveEditedJmSource(String content) async {
+  Future<void> writeLocalJmSource(String content) async {
+    await writeLocalActiveSource(content);
+  }
+
+  Future<void> saveEditedActiveSource(String content) async {
     await saveEditedSource(activeSourceKey, content);
+  }
+
+  Future<void> saveEditedJmSource(String content) async {
+    await saveEditedActiveSource(content);
   }
 
   Future<String> loadEditableSource(String sourceKey) async {
@@ -42,12 +65,16 @@ extension HazukiSourceServiceSourceFileManagementCapability
   }
 
   Future<void> writeLocalSource(String sourceKey, String content) async {
-    final sourceDir = await _getSourceStorageDirectory(sourceKey: sourceKey);
+    final normalizedSourceKey = _normalizeAllowedSourceKey(sourceKey);
+    final sourceDir = await _getSourceStorageDirectory(
+      sourceKey: normalizedSourceKey,
+    );
     if (!await sourceDir.exists()) {
       await sourceDir.create(recursive: true);
     }
     final file = File('${sourceDir.path}/source.js');
     await file.writeAsString(content, flush: true);
+    await _setCustomEditedSourceFlag(normalizedSourceKey, true);
   }
 
   Future<void> saveEditedSource(String sourceKey, String content) async {
@@ -57,8 +84,7 @@ extension HazukiSourceServiceSourceFileManagementCapability
       final facade = this.facade;
       final result = await _downloadOrLoadSourceFiles();
       await result.jmFile.writeAsString(content, flush: true);
-      final prefs = await facade.ensurePrefs();
-      await prefs.setBool(SourcePrefsKeys.customEditedJmSource, true);
+      await _setCustomEditedSourceFlag(activeSourceKey, true);
       facade.lastSourceVersionDebugInfo = {
         'checkedAt': DateTime.now().toIso8601String(),
         'resolvedFrom': 'local_source_editor',
@@ -107,8 +133,7 @@ extension HazukiSourceServiceSourceFileManagementCapability
       exploreCache.clearMemory();
       facade.cache.clearCategoryTagGroupsMemoryCache();
       final result = await _downloadSourceFiles(onProgress: onProgress);
-      final prefs = await facade.ensurePrefs();
-      await prefs.setBool(SourcePrefsKeys.customEditedJmSource, false);
+      await _setCustomEditedSourceFlag(activeSourceKey, false);
       facade.lastSourceVersionDebugInfo = {
         'checkedAt': DateTime.now().toIso8601String(),
         'resolvedFrom': 'manual_source_download',
@@ -123,9 +148,37 @@ extension HazukiSourceServiceSourceFileManagementCapability
     }
   }
 
-  Future<bool> hasCustomEditedJmSource() async {
+  Future<bool> hasCustomEditedActiveSource() async {
+    return hasCustomEditedSource(activeSourceKey);
+  }
+
+  Future<bool> hasCustomEditedSource(String sourceKey) async {
+    final normalizedSourceKey = _normalizeAllowedSourceKey(sourceKey);
     final prefs = await facade.ensurePrefs();
-    return prefs.getBool(SourcePrefsKeys.customEditedJmSource) ?? false;
+    final scopedKey = SourcePrefsKeys.customEditedSource(normalizedSourceKey);
+    if (prefs.containsKey(scopedKey)) {
+      return prefs.getBool(scopedKey) ?? false;
+    }
+    if (normalizedSourceKey == hazukiDefaultSourceKey) {
+      return prefs.getBool(SourcePrefsKeys.customEditedJmSource) ?? false;
+    }
+    return false;
+  }
+
+  Future<bool> hasCustomEditedJmSource() async {
+    return hasCustomEditedActiveSource();
+  }
+
+  Future<void> _setCustomEditedSourceFlag(String sourceKey, bool value) async {
+    final normalizedSourceKey = _normalizeAllowedSourceKey(sourceKey);
+    final prefs = await facade.ensurePrefs();
+    await prefs.setBool(
+      SourcePrefsKeys.customEditedSource(normalizedSourceKey),
+      value,
+    );
+    if (normalizedSourceKey == hazukiDefaultSourceKey) {
+      await prefs.setBool(SourcePrefsKeys.customEditedJmSource, value);
+    }
   }
 
   Future<void> reloadFromLocalSourceFiles() async {

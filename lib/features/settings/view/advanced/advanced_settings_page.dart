@@ -53,7 +53,7 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
     final hasCustomEditedSource = await _sourceService
-        .hasCustomEditedJmSource();
+        .hasCustomEditedActiveSource();
     final softwareLogCaptureEnabled = await _sourceService
         .loadSoftwareLogCaptureEnabled();
     if (!mounted) {
@@ -79,7 +79,7 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
 
   Future<void> _refreshCustomEditedSourceState() async {
     final hasCustomEditedSource = await _sourceService
-        .hasCustomEditedJmSource();
+        .hasCustomEditedActiveSource();
     if (!mounted) {
       return;
     }

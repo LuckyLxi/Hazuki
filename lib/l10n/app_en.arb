@@ -1119,7 +1119,7 @@
   "advancedCopyMangaClearDeviceSubtitle": "Clear the disguised client's device identifiers. They will be regenerated on the next request.",
   "advancedCopyMangaDeviceCleared": "CopyManga device info cleared",
   "advancedEditSourceTitle": "Edit comic source",
-  "advancedEditSourceSubtitle": "Open a lightweight editor to edit and save jm.js",
+  "advancedEditSourceSubtitle": "Open a lightweight editor to edit and save the comic source",
   "advancedRestoreSourceLabel": "Restore comic source",
   "advancedRestoreSourceSuccess": "Comic source restored",
   "sourceEditorLoading": "Loading comic source…",

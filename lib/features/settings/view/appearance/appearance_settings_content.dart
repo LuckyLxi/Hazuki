@@ -125,56 +125,128 @@ class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
     );
   }
 
-  Widget _buildThemeOption({
-    required ThemeMode value,
-    required IconData icon,
+  Alignment get _themeSliderAlignment {
+    return switch (widget.settings.themeMode) {
+      ThemeMode.light => Alignment.centerLeft,
+      ThemeMode.dark => Alignment.center,
+      ThemeMode.system => Alignment.centerRight,
+    };
+  }
+
+  IconData _themeModeIcon(ThemeMode mode) {
+    return switch (mode) {
+      ThemeMode.light => Icons.light_mode_rounded,
+      ThemeMode.dark => Icons.dark_mode_rounded,
+      ThemeMode.system => Icons.settings_suggest_outlined,
+    };
+  }
+
+  Widget _buildThemeSliderOption({
+    required ThemeMode mode,
     required String label,
-    required bool isSelected,
     required ColorScheme colorScheme,
   }) {
+    final selected = widget.settings.themeMode == mode;
     return Expanded(
-      child: GestureDetector(
-        onTap: () => unawaited(_applyThemeMode(value)),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOutCubic,
-          padding: const EdgeInsets.symmetric(vertical: 12),
-          decoration: BoxDecoration(
-            color: isSelected
-                ? colorScheme.primaryContainer
-                : colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isSelected
-                  ? colorScheme.primary
-                  : colorScheme.outlineVariant.withValues(alpha: 0.3),
-              width: isSelected ? 1.5 : 1.0,
-            ),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: () => unawaited(_applyThemeMode(mode)),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
-                icon,
-                color: isSelected
-                    ? colorScheme.primary
+                _themeModeIcon(mode),
+                size: 18,
+                color: selected
+                    ? colorScheme.onPrimaryContainer
                     : colorScheme.onSurfaceVariant,
-                size: 22,
               ),
-              const SizedBox(height: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-                  color: isSelected
-                      ? colorScheme.primary
-                      : colorScheme.onSurfaceVariant,
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                    color: selected
+                        ? colorScheme.onPrimaryContainer
+                        : colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildThemeModeSlider({
+    required AppLocalizations strings,
+    required ColorScheme colorScheme,
+  }) {
+    return Container(
+      height: 52,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.65),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.45),
+        ),
+      ),
+      child: Stack(
+        children: [
+          AnimatedAlign(
+            alignment: _themeSliderAlignment,
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOutCubic,
+            child: FractionallySizedBox(
+              widthFactor: 1 / 3,
+              heightFactor: 1,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: colorScheme.primaryContainer,
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: [
+                    BoxShadow(
+                      color: colorScheme.shadow.withValues(alpha: 0.10),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Positioned.fill(
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _buildThemeSliderOption(
+                  mode: ThemeMode.light,
+                  label: strings.displayThemeLight,
+                  colorScheme: colorScheme,
+                ),
+                _buildThemeSliderOption(
+                  mode: ThemeMode.dark,
+                  label: strings.displayThemeDark,
+                  colorScheme: colorScheme,
+                ),
+                _buildThemeSliderOption(
+                  mode: ThemeMode.system,
+                  label: strings.displayThemeSystem,
+                  colorScheme: colorScheme,
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -222,32 +294,9 @@ class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: Row(
-                children: [
-                  _buildThemeOption(
-                    value: ThemeMode.light,
-                    icon: Icons.light_mode_rounded,
-                    label: strings.displayThemeLight,
-                    isSelected: widget.settings.themeMode == ThemeMode.light,
-                    colorScheme: colorScheme,
-                  ),
-                  const SizedBox(width: 8),
-                  _buildThemeOption(
-                    value: ThemeMode.dark,
-                    icon: Icons.dark_mode_rounded,
-                    label: strings.displayThemeDark,
-                    isSelected: widget.settings.themeMode == ThemeMode.dark,
-                    colorScheme: colorScheme,
-                  ),
-                  const SizedBox(width: 8),
-                  _buildThemeOption(
-                    value: ThemeMode.system,
-                    icon: Icons.settings_suggest_outlined,
-                    label: strings.displayThemeSystem,
-                    isSelected: widget.settings.themeMode == ThemeMode.system,
-                    colorScheme: colorScheme,
-                  ),
-                ],
+              child: _buildThemeModeSlider(
+                strings: strings,
+                colorScheme: colorScheme,
               ),
             ),
             const Divider(height: 1, indent: 16, endIndent: 16),

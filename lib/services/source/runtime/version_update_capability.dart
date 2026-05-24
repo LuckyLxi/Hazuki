@@ -145,7 +145,7 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
     );
   }
 
-  Future<bool> downloadJmSourceAndReload({
+  Future<bool> downloadActiveSourceAndReload({
     void Function(int received, int total)? onProgress,
   }) async {
     final facade = this.facade;
@@ -165,8 +165,7 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
 
     final downloadedVersion = _extractSourceVersion(jmScript);
     await jmFile.writeAsString(jmScript);
-    final prefs = await facade.ensurePrefs();
-    await prefs.setBool(SourcePrefsKeys.customEditedJmSource, false);
+    await _setCustomEditedSourceFlag(activeSourceKey, false);
 
     facade.lastSourceVersionDebugInfo = {
       'checkedAt': DateTime.now().toIso8601String(),
@@ -179,6 +178,12 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
       debugDetail: 'downloaded_jm_script',
     );
     return true;
+  }
+
+  Future<bool> downloadJmSourceAndReload({
+    void Function(int received, int total)? onProgress,
+  }) {
+    return downloadActiveSourceAndReload(onProgress: onProgress);
   }
 
   Future<bool> refreshSourceOnNetworkRecovery() async {

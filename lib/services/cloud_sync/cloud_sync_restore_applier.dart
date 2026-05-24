@@ -164,7 +164,7 @@ class CloudSyncRestoreApplier {
     required bool manifestHasSource,
   }) async {
     if (sourceText != null && sourceText.trim().isNotEmpty) {
-      await _sourceService.writeLocalJmSource(sourceText);
+      await _sourceService.writeLocalActiveSource(sourceText);
       return true;
     }
     if (manifestHasSource) {

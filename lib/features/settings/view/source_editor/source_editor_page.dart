@@ -57,7 +57,8 @@ class _ComicSourceEditorPageState extends State<ComicSourceEditorPage> {
       _inlineErrorText = null;
     });
     try {
-      final content = await sl<HazukiSourceService>().loadEditableJmSource();
+      final content = await sl<HazukiSourceService>()
+          .loadEditableActiveSource();
       if (!mounted) {
         return;
       }
@@ -88,7 +89,7 @@ class _ComicSourceEditorPageState extends State<ComicSourceEditorPage> {
     });
     try {
       final content = _controller.text;
-      await sl<HazukiSourceService>().saveEditedJmSource(content);
+      await sl<HazukiSourceService>().saveEditedActiveSource(content);
       if (!mounted) {
         return;
       }

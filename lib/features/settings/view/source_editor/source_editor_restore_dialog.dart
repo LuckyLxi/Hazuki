@@ -88,7 +88,7 @@ Future<bool> showSourceEditorRestoreDialog(BuildContext context) async {
                         });
 
                         final ok = await sl<HazukiSourceService>()
-                            .downloadJmSourceAndReload(
+                            .downloadActiveSourceAndReload(
                               onProgress: (received, total) {
                                 if (!dialogContext.mounted) {
                                   return;

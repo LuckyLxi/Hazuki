@@ -300,9 +300,9 @@ class CloudSyncSnapshotCodec {
 
     // 仅当用户手动编辑过源文件时才将其上传到云端，
     // 避免把自动下载的官方源错误地同步到其他设备。
-    final hasCustomSource = await _sourceService.hasCustomEditedJmSource();
+    final hasCustomSource = await _sourceService.hasCustomEditedActiveSource();
     final jmSource = hasCustomSource
-        ? await _sourceService.readLocalJmSourceIfExists()
+        ? await _sourceService.readLocalActiveSourceIfExists()
         : null;
 
     return CloudSyncLocalSnapshot(
