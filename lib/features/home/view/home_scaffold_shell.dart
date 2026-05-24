@@ -4,6 +4,7 @@ import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 import 'package:hazuki/features/favorite/favorite.dart';
 import 'package:hazuki/app/service_locator.dart';
@@ -327,6 +328,8 @@ class _HomeAppBarProfileButtonState extends State<_HomeAppBarProfileButton> {
   late final ValueNotifier<Widget> _drawerContentNotifier =
       ValueNotifier<Widget>(widget.drawerContent);
   int _lastVisibleTaskCount = 0;
+  Widget? _pendingDrawerContent;
+  bool _drawerContentUpdateScheduled = false;
 
   @override
   void initState() {
@@ -338,7 +341,7 @@ class _HomeAppBarProfileButtonState extends State<_HomeAppBarProfileButton> {
   void didUpdateWidget(covariant _HomeAppBarProfileButton oldWidget) {
     super.didUpdateWidget(oldWidget);
     _syncLastVisibleTaskCount();
-    _drawerContentNotifier.value = widget.drawerContent;
+    _syncDrawerContent();
   }
 
   @override
@@ -352,6 +355,28 @@ class _HomeAppBarProfileButtonState extends State<_HomeAppBarProfileButton> {
     if (taskCount > 0) {
       _lastVisibleTaskCount = taskCount;
     }
+  }
+
+  void _syncDrawerContent() {
+    if (SchedulerBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
+      _pendingDrawerContent = widget.drawerContent;
+      if (_drawerContentUpdateScheduled) {
+        return;
+      }
+      _drawerContentUpdateScheduled = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _drawerContentUpdateScheduled = false;
+        final drawerContent = _pendingDrawerContent;
+        _pendingDrawerContent = null;
+        if (!mounted || drawerContent == null) {
+          return;
+        }
+        _drawerContentNotifier.value = drawerContent;
+      });
+      return;
+    }
+    _drawerContentNotifier.value = widget.drawerContent;
   }
 
   @override
