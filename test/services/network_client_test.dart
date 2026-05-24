@@ -36,6 +36,28 @@ void main() {
   });
 
   group('HazukiNetworkClient conservative retry', () {
+    test('accepts JSON content types with dangling semicolon', () async {
+      final adapter = _FakeAdapter((options, _) {
+        return ResponseBody.fromString(
+          '{"ok":true}',
+          200,
+          headers: {
+            Headers.contentTypeHeader: ['application/json; charset=utf-8;'],
+          },
+        );
+      });
+      final dio = createHazukiDio(
+        baseOptions: BaseOptions(validateStatus: (status) => true),
+        configureIoAdapter: false,
+      )..httpClientAdapter = adapter;
+
+      final response = await dio.get<Map<String, dynamic>>(
+        'https://example.test/data',
+      );
+
+      expect(response.data, {'ok': true});
+    });
+
     test('retries transient GET failures once', () async {
       late _FakeAdapter adapter;
       adapter = _FakeAdapter((options, callCount) {
