@@ -145,7 +145,6 @@ class _SearchEntryPageState extends State<SearchEntryPage>
     } else {
       _idExtractController.scheduleHideIfUnfocused();
     }
-    _logSearchEntryEvent('Search entry focus changed', stage: 'focus_listener');
   }
 
   Future<void> _loadHistory() async {
@@ -284,7 +283,6 @@ class _SearchEntryPageState extends State<SearchEntryPage>
     Key? key,
     required String clearKey,
     required String submitKey,
-    required String logTarget,
     FocusNode? focusNode,
     bool compact = false,
     bool autofocus = false,
@@ -297,7 +295,7 @@ class _SearchEntryPageState extends State<SearchEntryPage>
       submitKey: submitKey,
       compact: compact,
       autofocus: autofocus,
-      onTap: () => _handleSearchBarTap(logTarget),
+      onTap: _handleSearchBarTap,
       onClear: () {
         _focusCoordinator.clearText();
         _idExtractController.hide();
@@ -323,79 +321,8 @@ class _SearchEntryPageState extends State<SearchEntryPage>
     );
   }
 
-  void _handleSearchBarTap(String target) {
+  void _handleSearchBarTap() {
     _idExtractController.syncWithFocus(_focusCoordinator.text);
-    _logSearchEntryEvent(
-      'Search entry bar tapped',
-      stage: 'tap_start',
-      target: target,
-    );
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) {
-        return;
-      }
-      _logSearchEntryEvent(
-        'Search entry bar tapped',
-        stage: 'tap_post_frame',
-        target: target,
-      );
-    });
-    unawaited(_logSearchEntryTapDelayed(target));
-  }
-
-  Future<void> _logSearchEntryTapDelayed(String target) async {
-    await Future<void>.delayed(const Duration(milliseconds: 120));
-    if (!mounted) {
-      return;
-    }
-    _logSearchEntryEvent(
-      'Search entry bar tapped',
-      stage: 'tap_after_120ms',
-      target: target,
-    );
-  }
-
-  void _logSearchEntryEvent(
-    String title, {
-    required String stage,
-    String? target,
-  }) {
-    final view = WidgetsBinding.instance.platformDispatcher.views.isNotEmpty
-        ? WidgetsBinding.instance.platformDispatcher.views.first
-        : null;
-    final primarySelection = _focusCoordinator.primaryController.selection;
-    final collapsedSelection = _focusCoordinator.collapsedController.selection;
-    _sourceService.addApplicationLog(
-      level: 'info',
-      title: title,
-      source: 'search_entry_focus',
-      content: {
-        'stage': stage,
-        ...?target == null ? null : {'target': target},
-        'showCollapsedSearch': false,
-        'keyboardVisible': _focusCoordinator.keyboardVisible,
-        'viewInsetsBottom': view?.viewInsets.bottom ?? 0,
-        'primaryHasFocus': _focusCoordinator.primaryFocusNode.hasFocus,
-        'collapsedHasFocus': _focusCoordinator.collapsedFocusNode.hasFocus,
-        'pageHasFocus': _focusCoordinator.pageFocusNode.hasFocus,
-        'primaryTextLength': _focusCoordinator.primaryController.text.length,
-        'collapsedTextLength':
-            _focusCoordinator.collapsedController.text.length,
-        'primarySelection': _selectionSnapshot(primarySelection),
-        'collapsedSelection': _selectionSnapshot(collapsedSelection),
-        'focusManagerPrimary':
-            FocusManager.instance.primaryFocus?.debugLabel ?? 'null',
-      },
-    );
-  }
-
-  Map<String, Object?> _selectionSnapshot(TextSelection selection) {
-    return {
-      'valid': selection.isValid,
-      'baseOffset': selection.baseOffset,
-      'extentOffset': selection.extentOffset,
-      'isCollapsed': selection.isCollapsed,
-    };
   }
 
   void _toggleHistoryEditMode() {
@@ -449,7 +376,6 @@ class _SearchEntryPageState extends State<SearchEntryPage>
                     key: const ValueKey('search-entry-app-bar-search-bar'),
                     clearKey: 'entry-clear',
                     submitKey: 'entry-submit',
-                    logTarget: 'app_bar',
                     compact: true,
                   ),
                 ),
