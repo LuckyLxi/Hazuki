@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/models/hazuki_models.dart';
+import 'package:hazuki/shared/navigation_tags.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
 import 'favorite_view_support.dart';
@@ -79,6 +80,8 @@ class _FavoriteComicTileState extends State<FavoriteComicTile> {
           children: [
             Hero(
               tag: widget.heroTag,
+              flightShuttleBuilder: buildComicCoverHeroFlightShuttle,
+              placeholderBuilder: buildComicCoverHeroPlaceholder,
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(8),
                 child: widget.comic.cover.isEmpty

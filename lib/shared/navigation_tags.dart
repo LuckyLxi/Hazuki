@@ -1,3 +1,6 @@
+import 'dart:async';
+import 'dart:typed_data';
+
 import 'package:flutter/widgets.dart';
 import 'package:hazuki/app/service_locator.dart';
 
@@ -119,6 +122,19 @@ HazukiCachedImage? _findCachedImageInSubtree(BuildContext context) {
   return result;
 }
 
+void _precacheHeroDestinationImage(
+  BuildContext context,
+  Uint8List bytes,
+  HazukiCachedImage cachedImage,
+) {
+  final provider = ResizeImage.resizeIfNeeded(
+    cachedImage.cacheWidth,
+    cachedImage.cacheHeight,
+    MemoryImage(bytes),
+  );
+  unawaited(precacheImage(provider, context).catchError((_) {}));
+}
+
 /// 漫画封面 Hero 飞行动画构建器
 ///
 /// 从 fromHeroContext 的 widget tree 中提取 [HazukiCachedImage] 的 url、
@@ -160,6 +176,14 @@ Widget buildComicCoverHeroFlightShuttle(
         }
       }
       if (bytes != null) {
+        final destinationCachedImage = _findCachedImageInSubtree(toHeroContext);
+        if (destinationCachedImage != null) {
+          _precacheHeroDestinationImage(
+            flightContext,
+            bytes,
+            destinationCachedImage,
+          );
+        }
         return ClipRRect(
           borderRadius: BorderRadius.circular(borderRadius),
           child: SizedBox.expand(
