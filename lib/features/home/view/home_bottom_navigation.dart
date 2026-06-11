@@ -13,7 +13,7 @@ class HomeBottomNavigation extends StatefulWidget {
     required this.favoriteLabel,
   });
 
-  static const double floatingBarHeight = 64;
+  static const double floatingBarHeight = 56;
   static const double bottomSpacing = 10;
   static const double promptGap = 10;
   static const double promptBottomPadding =
@@ -154,10 +154,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
                     ),
                   ],
                 ),
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 10,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTapDown: (details) {
