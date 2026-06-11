@@ -49,11 +49,19 @@ class DownloadsPageController extends ChangeNotifier {
 
   void toggleSelectionMode(int tabIndex) {
     if (selectionModeForTab(tabIndex)) {
-      _clearSelection(notify: true);
+      exitSelectionMode(tabIndex);
       return;
     }
     _selectionEnabled = true;
     _notify();
+  }
+
+  bool exitSelectionMode(int tabIndex) {
+    if (!selectionModeForTab(tabIndex)) {
+      return false;
+    }
+    _clearSelection(notify: true);
+    return true;
   }
 
   Future<void> deleteSelected(BuildContext context) async {
