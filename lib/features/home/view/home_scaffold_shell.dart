@@ -23,6 +23,16 @@ import 'home_bottom_navigation.dart';
 import 'home_content_stack.dart';
 import 'package:hazuki/features/home/view/home_drawer.dart';
 
+@visibleForTesting
+Future<void> handleHomePopRequest({
+  required Future<bool> Function() onWillPop,
+  required Future<void> Function() onExitRequested,
+}) async {
+  if (await onWillPop()) {
+    await onExitRequested();
+  }
+}
+
 class HomeScaffoldShell extends StatelessWidget {
   const HomeScaffoldShell({
     super.key,
@@ -45,6 +55,7 @@ class HomeScaffoldShell extends StatelessWidget {
     required this.allowDiscoverInitialLoad,
     required this.hideDiscoverLoadingUntilAllowed,
     required this.onWillPop,
+    required this.onExitRequested,
     required this.onOpenSearch,
     required this.onFavoriteSortSelected,
     required this.onFavoriteCreateFolderPressed,
@@ -86,6 +97,7 @@ class HomeScaffoldShell extends StatelessWidget {
   final bool allowDiscoverInitialLoad;
   final bool hideDiscoverLoadingUntilAllowed;
   final Future<bool> Function() onWillPop;
+  final Future<void> Function() onExitRequested;
   final VoidCallback onOpenSearch;
   final ValueChanged<String> onFavoriteSortSelected;
   final VoidCallback onFavoriteCreateFolderPressed;
@@ -200,11 +212,15 @@ class HomeScaffoldShell extends StatelessWidget {
           return;
         }
         unawaited(
-          onWillPop().then((shouldPop) {
-            if (shouldPop && context.mounted) {
-              Navigator.of(context).pop();
-            }
-          }),
+          handleHomePopRequest(
+            onWillPop: onWillPop,
+            onExitRequested: () {
+              if (!context.mounted) {
+                return Future<void>.value();
+              }
+              return onExitRequested();
+            },
+          ),
         );
       },
       child: WindowsComicDetailHost(

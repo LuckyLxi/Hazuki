@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'package:hazuki/app/app.dart';
 import 'package:hazuki/app/service_locator.dart';
@@ -232,6 +233,7 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
           hideDiscoverLoadingUntilAllowed:
               widget.hideDiscoverLoadingUntilAllowed,
           onWillPop: () => _coordinator.handleWillPop(context),
+          onExitRequested: SystemNavigator.pop,
           onOpenSearch: () {
             unawaited(navigation.openSearch());
           },
