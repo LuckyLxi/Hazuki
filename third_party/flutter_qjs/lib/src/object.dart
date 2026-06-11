@@ -15,8 +15,8 @@ abstract class JSInvokable extends JSRef {
     return func is JSInvokable
         ? func
         : func is Function
-            ? _DartFunction(func)
-            : func;
+        ? _DartFunction(func)
+        : func;
   }
 }
 
@@ -26,8 +26,9 @@ class _DartFunction extends JSInvokable {
 
   @override
   invoke(List args, [thisVal]) {
-    final passThis =
-        RegExp(r'\{[^}]*\bthisVal\b').hasMatch(_func.runtimeType.toString());
+    final passThis = RegExp(
+      r'\{[^}]*\bthisVal\b',
+    ).hasMatch(_func.runtimeType.toString());
     try {
       return Function.apply(_func, args, passThis ? {#thisVal: thisVal} : null);
     } finally {
@@ -108,10 +109,7 @@ class JSError extends _IsolateEncodable {
 
   @override
   Map _encode() {
-    return {
-      #jsError: message,
-      #jsErrorStack: stack,
-    };
+    return {#jsError: message, #jsErrorStack: stack};
   }
 }
 
@@ -172,11 +170,7 @@ class _JSFunction extends _JSObject implements JSInvokable, _IsolateEncodable {
     if (ctx == null || val == null) {
       throw JSError("InternalError: JSValue released");
     }
-    final args = arguments
-        .map(
-          (e) => _dartToJs(ctx, e),
-        )
-        .toList();
+    final args = arguments.map((e) => _dartToJs(ctx, e)).toList();
     final jsThis = _dartToJs(ctx, thisVal);
     final jsRet = jsCall(ctx, val, jsThis, args);
     jsFreeValue(ctx, jsThis);
@@ -222,9 +216,7 @@ class IsolateFunction extends JSInvokable implements _IsolateEncodable {
         } catch (e) {
           final err = _encodeData(e);
           if (msgPort != null) {
-            msgPort.send({
-              #error: err,
-            });
+            msgPort.send({#error: err});
           }
         }
       });
@@ -236,11 +228,7 @@ class IsolateFunction extends JSInvokable implements _IsolateEncodable {
     final port = _port;
     if (port == null) return _handle(msg);
     final evaluatePort = ReceivePort();
-    port.send({
-      #handler: _isolateId,
-      #msg: msg,
-      #port: evaluatePort.sendPort,
-    });
+    port.send({#handler: _isolateId, #msg: msg, #port: evaluatePort.sendPort});
     final result = await evaluatePort.first;
     if (result is Map && result.containsKey(#error)) {
       throw _decodeData(result[#error]);
@@ -276,18 +264,12 @@ class IsolateFunction extends JSInvokable implements _IsolateEncodable {
   Future invoke(List positionalArguments, [thisVal]) async {
     final List dArgs = _encodeData(positionalArguments);
     final dThisVal = _encodeData(thisVal);
-    return _send({
-      #args: dArgs,
-      #thisVal: dThisVal,
-    });
+    return _send({#args: dArgs, #thisVal: dThisVal});
   }
 
   static IsolateFunction? _decode(Map obj) {
     if (obj.containsKey(#jsFunctionPort)) {
-      return IsolateFunction._fromId(
-        obj[#jsFunctionId],
-        obj[#jsFunctionPort],
-      );
+      return IsolateFunction._fromId(obj[#jsFunctionId], obj[#jsFunctionPort]);
     }
     return null;
   }

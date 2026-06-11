@@ -8,10 +8,7 @@
 part of '../flutter_qjs.dart';
 
 typedef _Decode = dynamic Function(Map obj);
-List<_Decode> _decoders = [
-  JSError._decode,
-  IsolateFunction._decode,
-];
+List<_Decode> _decoders = [JSError._decode, IsolateFunction._decode];
 
 const Duration _modulePollInterval = Duration(milliseconds: 1);
 const Duration _moduleResponseTimeout = Duration(seconds: 30);
@@ -39,27 +36,30 @@ dynamic _encodeData(dynamic data, {Map<dynamic, dynamic>? cache}) {
     final ret = {};
     cache[data] = ret;
     for (final entry in data.entries) {
-      ret[_encodeData(entry.key, cache: cache)] =
-          _encodeData(entry.value, cache: cache);
+      ret[_encodeData(entry.key, cache: cache)] = _encodeData(
+        entry.value,
+        cache: cache,
+      );
     }
     return ret;
   }
   if (data is Future) {
     final futurePort = ReceivePort();
-    data.then((value) {
-      futurePort.first.then((port) {
-        futurePort.close();
-        (port as SendPort).send(_encodeData(value));
-      });
-    }, onError: (e) {
-      futurePort.first.then((port) {
-        futurePort.close();
-        (port as SendPort).send({#error: _encodeData(e)});
-      });
-    });
-    return {
-      #jsFuturePort: futurePort.sendPort,
-    };
+    data.then(
+      (value) {
+        futurePort.first.then((port) {
+          futurePort.close();
+          (port as SendPort).send(_encodeData(value));
+        });
+      },
+      onError: (e) {
+        futurePort.first.then((port) {
+          futurePort.close();
+          (port as SendPort).send({#error: _encodeData(e)});
+        });
+      },
+    );
+    return {#jsFuturePort: futurePort.sendPort};
   }
   return data;
 }
@@ -99,8 +99,10 @@ dynamic _decodeData(dynamic data, {Map<dynamic, dynamic>? cache}) {
     final ret = {};
     cache[data] = ret;
     for (final entry in data.entries) {
-      ret[_decodeData(entry.key, cache: cache)] =
-          _decodeData(entry.value, cache: cache);
+      ret[_decodeData(entry.key, cache: cache)] = _decodeData(
+        entry.value,
+        cache: cache,
+      );
     }
     return ret;
   }
@@ -124,11 +126,7 @@ void _runJsIsolate(Map spawnMessage) async {
     moduleHandler: (name) {
       final ptr = calloc<Pointer<Utf8>>();
       ptr.value = Pointer.fromAddress(ptr.address);
-      sendPort.send({
-        #type: #module,
-        #name: name,
-        #ptr: ptr.address,
-      });
+      sendPort.send({#type: #module, #name: name, #ptr: ptr.address});
       final wait = Stopwatch()..start();
       while (ptr.value.address == ptr.address) {
         if (wait.elapsed >= _moduleResponseTimeout) {
@@ -168,9 +166,7 @@ void _runJsIsolate(Map spawnMessage) async {
       if (msgPort != null) msgPort.send(_encodeData(data));
     } catch (e) {
       if (msgPort != null) {
-        msgPort.send({
-          #error: _encodeData(e),
-        });
+        msgPort.send({#error: _encodeData(e)});
       }
     }
   });
@@ -212,50 +208,49 @@ class IsolateQjs {
   void _ensureEngine() {
     if (_sendPort != null) return;
     ReceivePort port = ReceivePort();
-    Isolate.spawn(
-      _runJsIsolate,
-      {
-        #port: port.sendPort,
-        #stackSize: stackSize,
-        #timeout: timeout,
-        #memoryLimit: memoryLimit,
-      },
-      errorsAreFatal: true,
-    );
+    Isolate.spawn(_runJsIsolate, {
+      #port: port.sendPort,
+      #stackSize: stackSize,
+      #timeout: timeout,
+      #memoryLimit: memoryLimit,
+    }, errorsAreFatal: true);
     final completer = Completer<SendPort>();
-    port.listen((msg) async {
-      if (msg is SendPort && !completer.isCompleted) {
-        completer.complete(msg);
-        return;
-      }
-      switch (msg[#type]) {
-        case #hostPromiseRejection:
-          try {
-            final err = _decodeData(msg[#reason]);
-            if (hostPromiseRejectionHandler != null) {
-              hostPromiseRejectionHandler!(err);
-            } else {
-              print('unhandled promise rejection: $err');
+    port.listen(
+      (msg) async {
+        if (msg is SendPort && !completer.isCompleted) {
+          completer.complete(msg);
+          return;
+        }
+        switch (msg[#type]) {
+          case #hostPromiseRejection:
+            try {
+              final err = _decodeData(msg[#reason]);
+              if (hostPromiseRejectionHandler != null) {
+                hostPromiseRejectionHandler!(err);
+              } else {
+                print('unhandled promise rejection: $err');
+              }
+            } catch (e) {
+              print('host Promise Rejection Handler error: $e');
             }
-          } catch (e) {
-            print('host Promise Rejection Handler error: $e');
-          }
-          break;
-        case #module:
-          final ptr = Pointer<Pointer>.fromAddress(msg[#ptr]);
-          try {
-            ptr.value = (await moduleHandler!(msg[#name])).toNativeUtf8();
-          } catch (e) {
-            ptr.value = Pointer.fromAddress(-1);
-          }
-          break;
-      }
-    }, onDone: () {
-      close();
-      if (!completer.isCompleted) {
-        completer.completeError(JSError('isolate close'));
-      }
-    });
+            break;
+          case #module:
+            final ptr = Pointer<Pointer>.fromAddress(msg[#ptr]);
+            try {
+              ptr.value = (await moduleHandler!(msg[#name])).toNativeUtf8();
+            } catch (e) {
+              ptr.value = Pointer.fromAddress(-1);
+            }
+            break;
+        }
+      },
+      onDone: () {
+        close();
+        if (!completer.isCompleted) {
+          completer.completeError(JSError('isolate close'));
+        }
+      },
+    );
     _sendPort = completer.future;
   }
 
@@ -266,10 +261,7 @@ class IsolateQjs {
     if (sendPort == null) return Future.value(null);
     final ret = sendPort.then((sendPort) async {
       final closePort = ReceivePort();
-      sendPort.send({
-        #type: #close,
-        #port: closePort.sendPort,
-      });
+      sendPort.send({#type: #close, #port: closePort.sendPort});
       final result = await closePort.first;
       closePort.close();
       if (result is Map && result.containsKey(#error)) {

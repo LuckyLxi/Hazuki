@@ -300,6 +300,9 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
             });
             unawaited(navigation.openDownloads());
           },
+          onOpenDownloadTasks: () {
+            unawaited(navigation.openDownloadsWithDefaultTransition());
+          },
           onOpenSettings: () {
             setState(() {
               _selectedDrawerDestination = HomeDrawerDestination.settings;

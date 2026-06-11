@@ -40,8 +40,11 @@ Future testEvaluate(qjs) async {
   }
   final jsError = JSError('test Error');
   final wrapJsError = await testWrap.invoke([jsError]);
-  expect(jsError.message, (wrapJsError as JSError).message,
-      reason: 'wrap JSError');
+  expect(
+    jsError.message,
+    (wrapJsError as JSError).message,
+    reason: 'wrap JSError',
+  );
 
   expect(wrapNull, null, reason: 'wrap null');
   final a = {};
@@ -60,7 +63,7 @@ Future testEvaluate(qjs) async {
     await qjs.evaluate(
       '[Promise.reject("reject"), Promise.resolve("resolve"), new Promise(() => {})]',
       name: '<promises>',
-    )
+    ),
   ]);
   await testWrap.free();
   for (final promise in promises) {
@@ -83,10 +86,7 @@ void main() async {
     if (platform.isWindows) {
       final stdio = Stdio();
       final logger = StdoutLogger(
-        terminal: AnsiTerminal(
-          stdio: stdio,
-          platform: platform,
-        ),
+        terminal: AnsiTerminal(stdio: stdio, platform: platform),
         stdio: stdio,
         outputPreferences: OutputPreferences(
           wrapText: stdio.hasTerminal,
@@ -95,16 +95,17 @@ void main() async {
         ),
       );
       final vs = VisualStudio(
+        fileSystem: const LocalFileSystem(),
+        processManager: const LocalProcessManager(),
+        platform: platform,
+        logger: logger,
+        osUtils: OperatingSystemUtils(
           fileSystem: const LocalFileSystem(),
-          processManager: const LocalProcessManager(),
-          platform: platform,
           logger: logger,
-          osUtils: OperatingSystemUtils(
-            fileSystem: const LocalFileSystem(),
-            logger: logger,
-            platform: platform,
-            processManager: const LocalProcessManager(),
-          ));
+          platform: platform,
+          processManager: const LocalProcessManager(),
+        ),
+      );
       cmakePath = vs.cmakePath!;
     }
     final buildDir = './build';
@@ -131,9 +132,7 @@ void main() async {
     expect(result.exitCode, 0);
   });
   test('infinite loop', () async {
-    final qjs = FlutterQjs(
-      timeout: 1000,
-    );
+    final qjs = FlutterQjs(timeout: 1000);
     qjs.dispatch();
     var result = await qjs.evaluate('1');
     expect(result, 1, reason: 'eval module');
@@ -141,22 +140,26 @@ void main() async {
       await qjs.evaluate('while(true) {}');
       throw 'Error not throw';
     } on JSError catch (e) {
-      expect(e.message, startsWith('InternalError: interrupted'),
-          reason: 'throw interrupted');
+      expect(
+        e.message,
+        startsWith('InternalError: interrupted'),
+        reason: 'throw interrupted',
+      );
     }
     qjs.close();
   });
   test('memory leak', () async {
-    final qjs = FlutterQjs(
-      memoryLimit: 1000000,
-    );
+    final qjs = FlutterQjs(memoryLimit: 1000000);
     qjs.dispatch();
     try {
       await qjs.evaluate('new Array(1000000).fill(0)');
       throw 'Error not throw';
     } on JSError catch (e) {
-      expect(e.message, startsWith('InternalError: out of memory'),
-          reason: 'throw interrupted');
+      expect(
+        e.message,
+        startsWith('InternalError: out of memory'),
+        reason: 'throw interrupted',
+      );
     }
     qjs.close();
   });
@@ -166,28 +169,28 @@ void main() async {
         return 'export default "test module"';
       },
     );
-    await qjs.evaluate('''
+    await qjs.evaluate(
+      '''
       import handlerData from 'test';
       export default {
         data: handlerData
       };
-      ''', name: 'evalModule', evalFlags: JSEvalFlag.MODULE);
+      ''',
+      name: 'evalModule',
+      evalFlags: JSEvalFlag.MODULE,
+    );
     var result = await qjs.evaluate('import("evalModule")');
     expect(result['default']['data'], 'test module', reason: 'eval module');
     qjs.close();
   });
   test('data conversion', () async {
-    final qjs = FlutterQjs(
-      hostPromiseRejectionHandler: (_) {},
-    );
+    final qjs = FlutterQjs(hostPromiseRejectionHandler: (_) {});
     qjs.dispatch();
     await testEvaluate(qjs);
     qjs.close();
   });
   test('dart callback NoSuchMethodError is not retried', () async {
-    final qjs = FlutterQjs(
-      hostPromiseRejectionHandler: (_) {},
-    );
+    final qjs = FlutterQjs(hostPromiseRejectionHandler: (_) {});
     qjs.dispatch();
     final testThis = qjs.evaluate(
       '(function (func, arg) { return func.call(this, arg) })',
@@ -201,12 +204,7 @@ void main() async {
     }
 
     try {
-      await testThis.invoke([
-        noSuchMethodCallback,
-        'arg',
-      ], {
-        'name': 'this'
-      });
+      await testThis.invoke([noSuchMethodCallback, 'arg'], {'name': 'this'});
       throw 'NoSuchMethodError not throw';
     } catch (e) {
       expect(noSuchMethodCalls, 1, reason: 'callback should not be retried');
@@ -215,17 +213,17 @@ void main() async {
     qjs.close();
   });
   test('isolate conversion', () async {
-    final qjs = IsolateQjs(
-      hostPromiseRejectionHandler: (_) {},
-    );
+    final qjs = IsolateQjs(hostPromiseRejectionHandler: (_) {});
     await testEvaluate(qjs);
     await qjs.close();
   });
   test('isolate bind this', () async {
     final qjs = IsolateQjs();
     JSInvokable? localVar;
-    JSInvokable setToGlobal = await qjs
-        .evaluate('(name, func)=>{ this[name] = func }', name: '<eval>');
+    JSInvokable setToGlobal = await qjs.evaluate(
+      '(name, func)=>{ this[name] = func }',
+      name: '<eval>',
+    );
     final func = IsolateFunction((args) {
       localVar = args..dup();
       return args.invoke([]);
@@ -246,8 +244,11 @@ void main() async {
       qjs.close();
       throw 'Error not throw';
     } on JSError catch (e) {
-      expect(e.message, startsWith('reference leak:'),
-          reason: 'throw reference leak');
+      expect(
+        e.message,
+        startsWith('reference leak:'),
+        reason: 'throw reference leak',
+      );
     }
   });
   test('stack overflow', () async {
@@ -256,8 +257,11 @@ void main() async {
       qjs.evaluate('a=()=>a();a();', name: '<eval>');
       throw 'Error not throw';
     } on JSError catch (e) {
-      expect(e.message, 'InternalError: stack overflow',
-          reason: 'throw stack overflow');
+      expect(
+        e.message,
+        'InternalError: stack overflow',
+        reason: 'throw stack overflow',
+      );
     }
     qjs.close();
   });
@@ -270,28 +274,38 @@ void main() async {
     );
     qjs.dispatch();
     qjs.evaluate(
-        '(() => { Promise.resolve().then(() => { throw "unhandle" }) })()',
-        name: '<eval>');
+      '(() => { Promise.resolve().then(() => { throw "unhandle" }) })()',
+      name: '<eval>',
+    );
     Future.delayed(Duration(seconds: 10)).then((value) {
       if (!completer.isCompleted) completer.completeError('not host reject');
     });
-    expect(await completer.future, 'unhandle',
-        reason: 'host promise rejection');
-    qjs.close();
-  });
-  test('close drains pending promise rejection before freeing context',
-      () async {
-    final completer = Completer();
-    final qjs = FlutterQjs(
-      hostPromiseRejectionHandler: (reason) {
-        completer.complete(reason);
-      },
+    expect(
+      await completer.future,
+      'unhandle',
+      reason: 'host promise rejection',
     );
-    qjs.evaluate(
-        '(() => { Promise.resolve().then(() => { throw "close-unhandle" }) })()',
-        name: '<eval>');
     qjs.close();
-    expect(await completer.future, 'close-unhandle',
-        reason: 'close drains pending promise jobs');
   });
+  test(
+    'close drains pending promise rejection before freeing context',
+    () async {
+      final completer = Completer();
+      final qjs = FlutterQjs(
+        hostPromiseRejectionHandler: (reason) {
+          completer.complete(reason);
+        },
+      );
+      qjs.evaluate(
+        '(() => { Promise.resolve().then(() => { throw "close-unhandle" }) })()',
+        name: '<eval>',
+      );
+      qjs.close();
+      expect(
+        await completer.future,
+        'close-unhandle',
+        reason: 'close drains pending promise jobs',
+      );
+    },
+  );
 }

@@ -115,6 +115,15 @@ class HomeNavigationActions {
     );
   }
 
+  Future<void> openDownloadsWithDefaultTransition() async {
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            DownloadsPage(readerPageBuilder: downloadsReaderPageBuilder),
+      ),
+    );
+  }
+
   Future<void> openSettings() async {
     await _openDrawerDestination(
       hideComicDetailPanel: true,

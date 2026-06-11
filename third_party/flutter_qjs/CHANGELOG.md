@@ -8,6 +8,7 @@
 
 ## Unreleased (Hazuki maintenance)
 
+* migrate the Android plugin to AGP built-in Kotlin.
 * document the split QuickJS maintenance strategy used by Hazuki.
 * confirm upstream QuickJS `2025-09-13` remains the current non-MSVC runtime.
 * keep Windows/MSVC on the legacy fallback snapshot until a dedicated

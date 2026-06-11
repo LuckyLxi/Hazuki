@@ -67,6 +67,7 @@ class HomeScaffoldShell extends StatelessWidget {
     required this.onOpenCategories,
     required this.onOpenRanking,
     required this.onOpenDownloads,
+    required this.onOpenDownloadTasks,
     required this.onOpenSettings,
     required this.onOpenLines,
     this.selectedDrawerDestination,
@@ -109,6 +110,7 @@ class HomeScaffoldShell extends StatelessWidget {
   final VoidCallback onOpenCategories;
   final VoidCallback onOpenRanking;
   final VoidCallback onOpenDownloads;
+  final VoidCallback onOpenDownloadTasks;
   final VoidCallback onOpenSettings;
   final VoidCallback onOpenLines;
   final HomeDrawerDestination? selectedDrawerDestination;
@@ -247,6 +249,7 @@ class HomeScaffoldShell extends StatelessWidget {
                             profileLoading: profileLoading,
                             username: username,
                             drawerContent: mobileDrawerContent,
+                            onOpenDownloads: onOpenDownloadTasks,
                           ),
                     leadingWidth: Platform.isWindows ? null : leadingWidth,
                     automaticallyImplyLeading: false,
@@ -304,6 +307,7 @@ class _HomeAppBarProfileButton extends StatefulWidget {
     required this.profileLoading,
     required this.username,
     required this.drawerContent,
+    required this.onOpenDownloads,
   });
 
   final MangaDownloadService downloadService;
@@ -312,6 +316,7 @@ class _HomeAppBarProfileButton extends StatefulWidget {
   final bool profileLoading;
   final String username;
   final Widget drawerContent;
+  final VoidCallback onOpenDownloads;
 
   @override
   State<_HomeAppBarProfileButton> createState() =>
@@ -446,8 +451,15 @@ class _HomeAppBarProfileButtonState extends State<_HomeAppBarProfileButton> {
                           width: 58 * progress,
                           child: Opacity(
                             opacity: progress.clamp(0.0, 1.0),
-                            child: _HomeDownloadStatusContent(
-                              taskCount: taskCount,
+                            child: GestureDetector(
+                              key: const ValueKey<String>(
+                                'home-appbar-download-status',
+                              ),
+                              behavior: HitTestBehavior.opaque,
+                              onTap: widget.onOpenDownloads,
+                              child: _HomeDownloadStatusContent(
+                                taskCount: taskCount,
+                              ),
                             ),
                           ),
                         ),
