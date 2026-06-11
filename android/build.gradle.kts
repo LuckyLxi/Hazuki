@@ -2,11 +2,11 @@ import com.android.build.gradle.LibraryExtension
 
 allprojects {
     repositories {
-        // 优先使用阿里云镜像源加速国内 Gradle 库依赖的下载
-        maven { url = uri("https://maven.aliyun.com/repository/google") }
-        maven { url = uri("https://maven.aliyun.com/repository/public") }
         google()
         mavenCentral()
+        // 国内环境无法访问官方仓库时，使用阿里云镜像作为回退。
+        maven { url = uri("https://maven.aliyun.com/repository/google") }
+        maven { url = uri("https://maven.aliyun.com/repository/public") }
     }
 }
 
