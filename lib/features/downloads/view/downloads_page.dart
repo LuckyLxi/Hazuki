@@ -89,6 +89,9 @@ class _DownloadsPageState extends State<DownloadsPage>
                   tabController: _tabController,
                   selectionMode: _selectionMode,
                   selectedCount: _controller.selectedCount,
+                  onToggleSelectionMode: () {
+                    _controller.toggleSelectionMode(_tabController.index);
+                  },
                 ),
                 body: !ready
                     ? const Center(child: CircularProgressIndicator())
@@ -118,11 +121,6 @@ class _DownloadsPageState extends State<DownloadsPage>
                             comicsWithIntegrityIssues:
                                 _controller.comicsWithIntegrityIssues,
                             onToggleSelection: _controller.toggleSelection,
-                            onToggleSelectionMode: () {
-                              _controller.toggleSelectionMode(
-                                _tabController.index,
-                              );
-                            },
                             onDeleteSelected: () {
                               unawaited(_controller.deleteSelected(context));
                             },

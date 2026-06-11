@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/widgets/widgets.dart';
@@ -9,11 +10,13 @@ class DownloadsPageAppBar extends StatelessWidget
     required this.tabController,
     required this.selectionMode,
     required this.selectedCount,
+    required this.onToggleSelectionMode,
   });
 
   final TabController tabController;
   final bool selectionMode;
   final int selectedCount;
+  final VoidCallback onToggleSelectionMode;
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight + 46);
@@ -28,6 +31,29 @@ class DownloadsPageAppBar extends StatelessWidget
         selectedCount: selectedCount,
         tabIndex: tabController.index,
       ),
+      actions: [
+        AnimatedBuilder(
+          animation: tabController.animation!,
+          builder: (context, child) {
+            final animationValue = tabController.animation!.value;
+            final downloadedTabIsActive = tabController.indexIsChanging
+                ? tabController.index == 1
+                : tabController.index == 1
+                ? animationValue >= 1 - precisionErrorTolerance
+                : animationValue > precisionErrorTolerance;
+            return downloadedTabIsActive ? child! : const SizedBox.shrink();
+          },
+          child: IconButton(
+            tooltip: selectionMode
+                ? l10n(context).commonClose
+                : l10n(context).downloadsActionSelect,
+            icon: Icon(
+              selectionMode ? Icons.close_rounded : Icons.checklist_rounded,
+            ),
+            onPressed: onToggleSelectionMode,
+          ),
+        ),
+      ],
       bottom: TabBar(
         controller: tabController,
         tabs: [
@@ -42,24 +68,42 @@ class DownloadsPageAppBar extends StatelessWidget
 class DownloadsScanButton extends StatelessWidget {
   const DownloadsScanButton({
     super.key,
+    required this.selectionMode,
     required this.scanning,
-    required this.onPressed,
+    required this.selectedCount,
+    required this.onDeleteSelected,
+    required this.onScanDownloaded,
   });
 
+  final bool selectionMode;
   final bool scanning;
-  final VoidCallback onPressed;
+  final int selectedCount;
+  final VoidCallback onDeleteSelected;
+  final VoidCallback onScanDownloaded;
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return FloatingActionButton(
       heroTag: 'downloads_scan_button',
-      tooltip: l10n(context).downloadsScanTooltip,
-      onPressed: scanning ? null : onPressed,
+      tooltip: selectionMode
+          ? l10n(context).comicDetailDelete
+          : l10n(context).downloadsScanTooltip,
+      backgroundColor: selectionMode ? colorScheme.errorContainer : null,
+      foregroundColor: selectionMode ? colorScheme.onErrorContainer : null,
+      onPressed: selectionMode
+          ? (selectedCount > 0 ? onDeleteSelected : null)
+          : (scanning ? null : onScanDownloaded),
       child: AnimatedSwitcher(
         duration: const Duration(milliseconds: 180),
         switchInCurve: Curves.easeOutCubic,
         switchOutCurve: Curves.easeInCubic,
-        child: scanning
+        child: selectionMode
+            ? const Icon(
+                Icons.delete_outline_rounded,
+                key: ValueKey<String>('delete_icon'),
+              )
+            : scanning
             ? SizedBox(
                 key: const ValueKey<String>('scan_loading'),
                 width: 20,

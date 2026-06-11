@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/manga_download/manga_download_service.dart';
-import 'downloads_action_dock.dart';
 import 'downloads_cover_widgets.dart';
+import 'downloads_shell_widgets.dart';
 
 class DownloadsCompletedTab extends StatefulWidget {
   const DownloadsCompletedTab({
@@ -14,7 +14,6 @@ class DownloadsCompletedTab extends StatefulWidget {
     required this.selectedComicIds,
     required this.comicsWithIntegrityIssues,
     required this.onToggleSelection,
-    required this.onToggleSelectionMode,
     required this.onDeleteSelected,
     required this.onScanDownloaded,
     required this.onOpenComic,
@@ -28,7 +27,6 @@ class DownloadsCompletedTab extends StatefulWidget {
   final Set<String> selectedComicIds;
   final Set<String> comicsWithIntegrityIssues;
   final ValueChanged<String> onToggleSelection;
-  final VoidCallback onToggleSelectionMode;
   final VoidCallback onDeleteSelected;
   final VoidCallback onScanDownloaded;
   final ValueChanged<DownloadedMangaComic> onOpenComic;
@@ -169,7 +167,7 @@ class _DownloadsCompletedTabState extends State<DownloadsCompletedTab> {
     final content = _visibleComics.isEmpty
         ? Center(child: Text(l10n(context).downloadsEmptyDownloaded))
         : ListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 176),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
             itemCount: _visibleComics.length,
             itemBuilder: (context, index) {
               final entry = _visibleComics[index];
@@ -197,11 +195,10 @@ class _DownloadsCompletedTabState extends State<DownloadsCompletedTab> {
         Positioned(
           right: 16,
           bottom: 16 + bottomInset,
-          child: DownloadsActionDock(
+          child: DownloadsScanButton(
             selectionMode: widget.selectionMode,
             scanning: widget.scanning,
             selectedCount: widget.selectedCount,
-            onToggleSelectionMode: widget.onToggleSelectionMode,
             onDeleteSelected: widget.onDeleteSelected,
             onScanDownloaded: widget.onScanDownloaded,
           ),
