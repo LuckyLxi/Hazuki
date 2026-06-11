@@ -1,12 +1,12 @@
 {
-  "version": "1.1.1",
-  "releaseUrl": "https://github.com/LuckyLxi/Hazuki/releases/tag/v1.1.1",
+  "version": "1.1.2",
+  "releaseUrl": "https://github.com/LuckyLxi/Hazuki/releases/tag/v1.1.2",
   "apkUrls": {
-    "arm64-v8a": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.1.1/app-arm64-v8a-release.apk"
+    "arm64-v8a": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.1.2/app-arm64-v8a-release.apk"
   },
   "windowsUrls": {
-    "x64_zip": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.1.1/hazuki-windows-x64-v1.1.1.zip",
-    "x64_exe": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.1.1/hazuki-windows-x64-v1.1.1-setup.exe"
+    "x64_zip": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.1.2/hazuki-windows-x64-v1.1.2.zip",
+    "x64_exe": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.1.2/hazuki-windows-x64-v1.1.2-setup.exe"
   },
-  "changelog": "v1.1.1\n\n- 新增 Picacg（哔咔）漫画源\n- 新增 Picacg 每日自动/手动签到功能\n- 新增拷贝漫画（Copy Manga）漫画源\n- 优化了漫画源更新检查及弹窗 UI，并在侧边抽屉新增切换漫画源的入口\n- 登录弹窗添加了自动填充\n- 应用栏新增下载状态的动画药丸指示器\n- 搜索页打开时自动聚焦输入框\n- 支持按不同漫画源分别持久化保存当前选中的文件夹 ID 及收藏夹显示模式（本地/云端）\n- 为重命名文件夹操作添加了触觉震动反馈\n- 哔咔支持点赞评论\n- 哔咔和拷贝漫画支持展示嵌套子回复\n- 哔咔和拷贝漫画支持修改图片质量等级\n- 改进了评论过滤 UI，移除过滤关键词时新增二次确认弹窗\n- 发现页探索分区支持左滑加载更多漫画\n- 优化了侧边栏模糊背景\n- 适配 Flutter 3.44"
+  "changelog": "Hazuki v1.1.2\n\n- 优化下载页面已完成任务的滑动操作、选择模式与操作栏\n- 优化历史记录页面删除动画与返回交互\n- 将历史记录、阅读进度、收藏夹及搜索历史迁移至 Drift 数据库\n- 优化漫画封面 Hero 动画与图片预加载\n- 修复收藏夹弹窗溢出、发现页加载时序等问题"
 }
