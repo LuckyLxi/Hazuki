@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/manga_download/manga_download_service.dart';
@@ -8,6 +10,7 @@ class DownloadsCompletedTab extends StatefulWidget {
   const DownloadsCompletedTab({
     super.key,
     required this.comics,
+    required this.active,
     required this.selectionMode,
     required this.scanning,
     required this.selectedCount,
@@ -21,6 +24,7 @@ class DownloadsCompletedTab extends StatefulWidget {
   });
 
   final List<DownloadedMangaComic> comics;
+  final bool active;
   final bool selectionMode;
   final bool scanning;
   final int selectedCount;
@@ -39,8 +43,10 @@ class DownloadsCompletedTab extends StatefulWidget {
 }
 
 class _DownloadsCompletedTabState extends State<DownloadsCompletedTab> {
+  final GlobalKey _stackKey = GlobalKey();
   List<_AnimatedDownloadedComicEntry> _visibleComics =
       const <_AnimatedDownloadedComicEntry>[];
+  _DownloadedComicSwipeReveal? _swipeReveal;
 
   @override
   void initState() {
@@ -53,7 +59,35 @@ class _DownloadsCompletedTabState extends State<DownloadsCompletedTab> {
   @override
   void didUpdateWidget(covariant DownloadsCompletedTab oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if ((!widget.active && oldWidget.active) ||
+        (widget.selectionMode && !oldWidget.selectionMode)) {
+      _swipeReveal = null;
+    }
     _syncVisibleComics();
+  }
+
+  void _handleSwipeReveal(_DownloadedComicSwipeReveal reveal) {
+    final activeStorageKey = _swipeReveal?.comic.storageKey;
+    if (!reveal.claimActive &&
+        activeStorageKey != null &&
+        activeStorageKey != reveal.comic.storageKey) {
+      return;
+    }
+    final nextReveal = reveal.progress <= precisionErrorTolerance
+        ? null
+        : reveal;
+    setState(() {
+      _swipeReveal = nextReveal;
+    });
+  }
+
+  bool _handleScrollNotification(ScrollNotification notification) {
+    if (notification is ScrollStartNotification && _swipeReveal != null) {
+      setState(() {
+        _swipeReveal = null;
+      });
+    }
+    return false;
   }
 
   void _syncVisibleComics() {
@@ -166,32 +200,51 @@ class _DownloadsCompletedTabState extends State<DownloadsCompletedTab> {
   Widget build(BuildContext context) {
     final content = _visibleComics.isEmpty
         ? Center(child: Text(l10n(context).downloadsEmptyDownloaded))
-        : ListView.builder(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
-            itemCount: _visibleComics.length,
-            itemBuilder: (context, index) {
-              final entry = _visibleComics[index];
-              return _AnimatedDownloadedComicCard(
-                key: ValueKey<String>('downloaded_${entry.comic.storageKey}'),
-                entry: entry,
-                bottomSpacing: index == _visibleComics.length - 1 ? 0 : 12,
-                selectionMode: widget.selectionMode,
-                selected: widget.selectedComicIds.contains(
-                  entry.comic.storageKey,
-                ),
-                hasIntegrityIssue: widget.comicsWithIntegrityIssues.contains(
-                  entry.comic.storageKey,
-                ),
-                onToggleSelection: widget.onToggleSelection,
-                onOpenComic: widget.onOpenComic,
-                onDeleteComic: widget.onDeleteComic,
-              );
-            },
+        : NotificationListener<ScrollNotification>(
+            onNotification: _handleScrollNotification,
+            child: ListView.builder(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+              itemCount: _visibleComics.length,
+              itemBuilder: (context, index) {
+                final entry = _visibleComics[index];
+                return _AnimatedDownloadedComicCard(
+                  key: ValueKey<String>('downloaded_${entry.comic.storageKey}'),
+                  entry: entry,
+                  bottomSpacing: index == _visibleComics.length - 1 ? 0 : 12,
+                  selectionMode: widget.selectionMode,
+                  selected: widget.selectedComicIds.contains(
+                    entry.comic.storageKey,
+                  ),
+                  hasIntegrityIssue: widget.comicsWithIntegrityIssues.contains(
+                    entry.comic.storageKey,
+                  ),
+                  activeSwipeStorageKey: _swipeReveal?.comic.storageKey,
+                  swipeRevealStackKey: _stackKey,
+                  onSwipeRevealChanged: _handleSwipeReveal,
+                  onToggleSelection: widget.onToggleSelection,
+                  onOpenComic: widget.onOpenComic,
+                );
+              },
+            ),
           );
     final bottomInset = MediaQuery.paddingOf(context).bottom;
     return Stack(
+      key: _stackKey,
+      clipBehavior: Clip.none,
       children: [
         Positioned.fill(child: content),
+        if (_swipeReveal case final reveal?)
+          Positioned(
+            top: reveal.top,
+            right:
+                -_DownloadedComicEdgeDeleteButton.width * (1 - reveal.progress),
+            height: reveal.height,
+            child: _DownloadedComicEdgeDeleteButton(
+              comic: reveal.comic,
+              enabled: reveal.revealed,
+              onDeleteComic: widget.onDeleteComic,
+            ),
+          ),
         Positioned(
           right: 16,
           bottom: 16 + bottomInset,
@@ -216,9 +269,11 @@ class _AnimatedDownloadedComicCard extends StatelessWidget {
     required this.selectionMode,
     required this.selected,
     required this.hasIntegrityIssue,
+    required this.activeSwipeStorageKey,
+    required this.swipeRevealStackKey,
+    required this.onSwipeRevealChanged,
     required this.onToggleSelection,
     required this.onOpenComic,
-    required this.onDeleteComic,
   });
 
   final _AnimatedDownloadedComicEntry entry;
@@ -226,9 +281,11 @@ class _AnimatedDownloadedComicCard extends StatelessWidget {
   final bool selectionMode;
   final bool selected;
   final bool hasIntegrityIssue;
+  final String? activeSwipeStorageKey;
+  final GlobalKey swipeRevealStackKey;
+  final ValueChanged<_DownloadedComicSwipeReveal> onSwipeRevealChanged;
   final ValueChanged<String> onToggleSelection;
   final ValueChanged<DownloadedMangaComic> onOpenComic;
-  final ValueChanged<DownloadedMangaComic> onDeleteComic;
 
   @override
   Widget build(BuildContext context) {
@@ -258,8 +315,13 @@ class _AnimatedDownloadedComicCard extends StatelessWidget {
           ),
         );
       },
-      child: _DownloadedComicCard(
+      child: _SwipeRevealDownloadedComicCard(
+        comic: entry.comic,
         bottomSpacing: bottomSpacing,
+        selectionMode: selectionMode,
+        activeSwipeStorageKey: activeSwipeStorageKey,
+        swipeRevealStackKey: swipeRevealStackKey,
+        onSwipeRevealChanged: onSwipeRevealChanged,
         child: _DownloadedComicCardContent(
           comic: entry.comic,
           selectionMode: selectionMode,
@@ -267,7 +329,6 @@ class _AnimatedDownloadedComicCard extends StatelessWidget {
           hasIntegrityIssue: hasIntegrityIssue,
           onToggleSelection: onToggleSelection,
           onOpenComic: onOpenComic,
-          onDeleteComic: onDeleteComic,
         ),
       ),
     );
@@ -292,6 +353,319 @@ class _DownloadedComicCard extends StatelessWidget {
   }
 }
 
+class _SwipeRevealDownloadedComicCard extends StatefulWidget {
+  const _SwipeRevealDownloadedComicCard({
+    required this.comic,
+    required this.bottomSpacing,
+    required this.selectionMode,
+    required this.activeSwipeStorageKey,
+    required this.swipeRevealStackKey,
+    required this.onSwipeRevealChanged,
+    required this.child,
+  });
+
+  final DownloadedMangaComic comic;
+  final double bottomSpacing;
+  final bool selectionMode;
+  final String? activeSwipeStorageKey;
+  final GlobalKey swipeRevealStackKey;
+  final ValueChanged<_DownloadedComicSwipeReveal> onSwipeRevealChanged;
+  final Widget child;
+
+  @override
+  State<_SwipeRevealDownloadedComicCard> createState() =>
+      _SwipeRevealDownloadedComicCardState();
+}
+
+class _SwipeRevealDownloadedComicCardState
+    extends State<_SwipeRevealDownloadedComicCard>
+    with SingleTickerProviderStateMixin {
+  static const double _revealDistance = 42;
+
+  late final AnimationController _controller;
+  Animation<double>? _animation;
+  double _offset = 0;
+  bool _open = false;
+  bool _closingDragIntent = false;
+  int? _closedDragPointer;
+  Offset? _closedDragInitialPosition;
+  bool _trackingClosedLeftDrag = false;
+  bool _ignoringClosedDrag = false;
+
+  bool get _revealed => _offset < -_revealDistance / 2;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller =
+        AnimationController(
+          vsync: this,
+          duration: const Duration(milliseconds: 220),
+        )..addListener(() {
+          setState(() {
+            _offset = _animation!.value;
+          });
+          _reportReveal(claimActive: false);
+        });
+  }
+
+  @override
+  void didUpdateWidget(covariant _SwipeRevealDownloadedComicCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.selectionMode && !oldWidget.selectionMode) {
+      _scheduleClose();
+      return;
+    }
+    if (widget.activeSwipeStorageKey != widget.comic.storageKey &&
+        oldWidget.activeSwipeStorageKey == widget.comic.storageKey) {
+      _scheduleClose();
+    }
+  }
+
+  void _scheduleClose() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _animateTo(0);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _animateTo(double target) {
+    final open = target < 0;
+    if (_open != open) {
+      setState(() {
+        _open = open;
+      });
+    }
+    _animation = Tween<double>(
+      begin: _offset,
+      end: target,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic));
+    _controller.forward(from: 0);
+  }
+
+  void _handleClosedDragUpdate(DragUpdateDetails details) {
+    if (widget.selectionMode) {
+      return;
+    }
+    _controller.stop();
+    setState(() {
+      _offset = (_offset + details.delta.dx).clamp(-_revealDistance, 0);
+    });
+    _reportReveal(claimActive: true);
+  }
+
+  void _handleClosedDragEnd(DragEndDetails details) {
+    _animateTo(_revealed ? -_revealDistance : 0);
+  }
+
+  void _handleClosedPointerDown(PointerDownEvent event) {
+    if (widget.selectionMode || _closedDragPointer != null) {
+      return;
+    }
+    _closedDragPointer = event.pointer;
+    _closedDragInitialPosition = event.position;
+    _trackingClosedLeftDrag = false;
+    _ignoringClosedDrag = false;
+  }
+
+  void _handleClosedPointerMove(PointerMoveEvent event) {
+    if (widget.selectionMode ||
+        event.pointer != _closedDragPointer ||
+        _ignoringClosedDrag) {
+      return;
+    }
+    final initialPosition = _closedDragInitialPosition;
+    if (initialPosition == null) {
+      return;
+    }
+    if (!_trackingClosedLeftDrag) {
+      final delta = event.position - initialPosition;
+      if (delta.distance < kTouchSlop) {
+        return;
+      }
+      if (delta.dx >= 0 || delta.dx.abs() <= delta.dy.abs()) {
+        _ignoringClosedDrag = true;
+        return;
+      }
+      _trackingClosedLeftDrag = true;
+      _controller.stop();
+    }
+    _handleClosedDragUpdate(
+      DragUpdateDetails(
+        sourceTimeStamp: event.timeStamp,
+        delta: event.delta,
+        primaryDelta: event.delta.dx,
+        globalPosition: event.position,
+        localPosition: event.localPosition,
+      ),
+    );
+  }
+
+  void _handleClosedPointerEnd(PointerEvent event) {
+    if (event.pointer != _closedDragPointer) {
+      return;
+    }
+    final trackedLeftDrag = _trackingClosedLeftDrag;
+    _closedDragPointer = null;
+    _closedDragInitialPosition = null;
+    _trackingClosedLeftDrag = false;
+    _ignoringClosedDrag = false;
+    if (trackedLeftDrag) {
+      _handleClosedDragEnd(DragEndDetails());
+    }
+  }
+
+  void _handleRevealedDragUpdate(DragUpdateDetails details) {
+    if (widget.selectionMode) {
+      return;
+    }
+    _controller.stop();
+    if (details.delta.dx > 0) {
+      _closingDragIntent = true;
+    }
+    setState(() {
+      _offset = (_offset + details.delta.dx).clamp(-_revealDistance, 0);
+    });
+    _reportReveal(claimActive: true);
+  }
+
+  void _handleRevealedDragEnd(DragEndDetails details) {
+    if (widget.selectionMode) {
+      return;
+    }
+    final velocity = details.primaryVelocity ?? 0;
+    final close = _closingDragIntent || velocity > 250;
+    _closingDragIntent = false;
+    _animateTo(close ? 0 : -_revealDistance);
+  }
+
+  void _reportReveal({required bool claimActive}) {
+    final stackBox =
+        widget.swipeRevealStackKey.currentContext?.findRenderObject()
+            as RenderBox?;
+    final cardBox = context.findRenderObject() as RenderBox?;
+    if (stackBox == null || cardBox == null || !cardBox.hasSize) {
+      return;
+    }
+    final top = cardBox.localToGlobal(Offset.zero, ancestor: stackBox).dy;
+    widget.onSwipeRevealChanged(
+      _DownloadedComicSwipeReveal(
+        comic: widget.comic,
+        top: top,
+        height: cardBox.size.height - widget.bottomSpacing,
+        progress: (-_offset / _revealDistance).clamp(0.0, 1.0),
+        revealed: _open,
+        claimActive: claimActive,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: widget.bottomSpacing),
+      child: Transform.translate(
+        offset: Offset(_offset, 0),
+        child: _open
+            ? GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onTap: () => _animateTo(0),
+                onHorizontalDragStart: (_) {
+                  _closingDragIntent = false;
+                },
+                onHorizontalDragUpdate: _handleRevealedDragUpdate,
+                onHorizontalDragEnd: _handleRevealedDragEnd,
+                child: _DownloadedComicCard(
+                  bottomSpacing: 0,
+                  child: AbsorbPointer(child: widget.child),
+                ),
+              )
+            : Listener(
+                behavior: HitTestBehavior.translucent,
+                onPointerDown: _handleClosedPointerDown,
+                onPointerMove: _handleClosedPointerMove,
+                onPointerUp: _handleClosedPointerEnd,
+                onPointerCancel: _handleClosedPointerEnd,
+                child: _DownloadedComicCard(
+                  bottomSpacing: 0,
+                  child: widget.child,
+                ),
+              ),
+      ),
+    );
+  }
+}
+
+class _DownloadedComicEdgeDeleteButton extends StatelessWidget {
+  const _DownloadedComicEdgeDeleteButton({
+    required this.comic,
+    required this.enabled,
+    required this.onDeleteComic,
+  });
+
+  static const double width = 58;
+
+  final DownloadedMangaComic comic;
+  final bool enabled;
+  final ValueChanged<DownloadedMangaComic> onDeleteComic;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return ExcludeSemantics(
+      excluding: !enabled,
+      child: IgnorePointer(
+        ignoring: !enabled,
+        child: Tooltip(
+          message: l10n(context).comicDetailDelete,
+          child: Material(
+            key: ValueKey<String>('downloaded_edge_delete_${comic.storageKey}'),
+            color: colorScheme.error,
+            borderRadius: BorderRadius.circular(18),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: () => onDeleteComic(comic),
+              child: SizedBox(
+                width: width,
+                height: double.infinity,
+                child: Icon(
+                  Icons.delete_outline_rounded,
+                  color: colorScheme.onError,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DownloadedComicSwipeReveal {
+  const _DownloadedComicSwipeReveal({
+    required this.comic,
+    required this.top,
+    required this.height,
+    required this.progress,
+    required this.revealed,
+    required this.claimActive,
+  });
+
+  final DownloadedMangaComic comic;
+  final double top;
+  final double height;
+  final double progress;
+  final bool revealed;
+  final bool claimActive;
+}
+
 class _DownloadedComicCardContent extends StatelessWidget {
   const _DownloadedComicCardContent({
     required this.comic,
@@ -300,7 +674,6 @@ class _DownloadedComicCardContent extends StatelessWidget {
     required this.hasIntegrityIssue,
     required this.onToggleSelection,
     required this.onOpenComic,
-    required this.onDeleteComic,
   });
 
   final DownloadedMangaComic comic;
@@ -309,7 +682,6 @@ class _DownloadedComicCardContent extends StatelessWidget {
   final bool hasIntegrityIssue;
   final ValueChanged<String> onToggleSelection;
   final ValueChanged<DownloadedMangaComic> onOpenComic;
-  final ValueChanged<DownloadedMangaComic> onDeleteComic;
 
   @override
   Widget build(BuildContext context) {
@@ -393,12 +765,10 @@ class _DownloadedComicCardContent extends StatelessWidget {
                         ],
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    _DownloadedComicTrailingAction(
-                      selectionMode: selectionMode,
-                      selected: selected,
-                      onDelete: () => onDeleteComic(comic),
-                    ),
+                    if (selectionMode) ...[
+                      const SizedBox(width: 8),
+                      _DownloadedComicSelectionIndicator(selected: selected),
+                    ],
                   ],
                 ),
               ),
@@ -473,16 +843,10 @@ class _IntegrityWarningBanner extends StatelessWidget {
   }
 }
 
-class _DownloadedComicTrailingAction extends StatelessWidget {
-  const _DownloadedComicTrailingAction({
-    required this.selectionMode,
-    required this.selected,
-    required this.onDelete,
-  });
+class _DownloadedComicSelectionIndicator extends StatelessWidget {
+  const _DownloadedComicSelectionIndicator({required this.selected});
 
-  final bool selectionMode;
   final bool selected;
-  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -490,64 +854,33 @@ class _DownloadedComicTrailingAction extends StatelessWidget {
     return SizedBox(
       width: 48,
       height: 48,
-      child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 220),
-        switchInCurve: Curves.easeOutBack,
-        switchOutCurve: Curves.easeInCubic,
-        layoutBuilder: (currentChild, previousChildren) {
-          return Stack(
-            alignment: Alignment.center,
-            children: <Widget>[...previousChildren, ?currentChild],
-          );
-        },
-        transitionBuilder: (child, animation) {
-          return FadeTransition(
-            opacity: animation,
-            child: ScaleTransition(
-              scale: Tween<double>(begin: 0.82, end: 1).animate(animation),
-              child: SlideTransition(
-                position: Tween<Offset>(
-                  begin: const Offset(0.16, 0),
-                  end: Offset.zero,
-                ).animate(animation),
-                child: child,
-              ),
+      child: Center(
+        child: AnimatedContainer(
+          key: ValueKey<bool>(selected),
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOutCubic,
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: selected
+                ? colorScheme.primary.withValues(alpha: 0.16)
+                : colorScheme.surfaceContainerHighest,
+            border: Border.all(
+              color: selected
+                  ? colorScheme.primary
+                  : colorScheme.outlineVariant,
+              width: selected ? 2 : 1.4,
             ),
-          );
-        },
-        child: selectionMode
-            ? AnimatedContainer(
-                key: ValueKey<bool>(selected),
-                duration: const Duration(milliseconds: 200),
-                curve: Curves.easeOutCubic,
-                width: 34,
-                height: 34,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: selected
-                      ? colorScheme.primary.withValues(alpha: 0.16)
-                      : colorScheme.surfaceContainerHighest,
-                  border: Border.all(
-                    color: selected
-                        ? colorScheme.primary
-                        : colorScheme.outlineVariant,
-                    width: selected ? 2 : 1.4,
-                  ),
-                ),
-                child: Icon(
-                  selected ? Icons.check_rounded : Icons.circle_outlined,
-                  size: selected ? 18 : 20,
-                  color: selected
-                      ? colorScheme.primary
-                      : colorScheme.onSurfaceVariant,
-                ),
-              )
-            : IconButton(
-                key: const ValueKey<String>('delete_action'),
-                tooltip: l10n(context).comicDetailDelete,
-                onPressed: onDelete,
-                icon: const Icon(Icons.delete_outline_rounded),
-              ),
+          ),
+          child: Icon(
+            selected ? Icons.check_rounded : Icons.circle_outlined,
+            size: selected ? 18 : 20,
+            color: selected
+                ? colorScheme.primary
+                : colorScheme.onSurfaceVariant,
+          ),
+        ),
       ),
     );
   }

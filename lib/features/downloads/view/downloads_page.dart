@@ -102,66 +102,82 @@ class _DownloadsPageState extends State<DownloadsPage>
                   ),
                   body: !ready
                       ? const Center(child: CircularProgressIndicator())
-                      : TabBarView(
-                          controller: _tabController,
-                          children: [
-                            DownloadsOngoingTab(
-                              tasks: tasks,
-                              onPauseTask: (comicId) {
-                                unawaited(_controller.pauseTask(comicId));
-                              },
-                              onResumeTask: (comicId) {
-                                unawaited(_controller.resumeTask(comicId));
-                              },
-                              onDeleteTask: (comicId) {
-                                unawaited(
-                                  _controller.deleteTask(context, comicId),
-                                );
-                              },
-                            ),
-                            DownloadsCompletedTab(
-                              comics: comics,
-                              selectionMode: _selectionMode,
-                              scanning: _controller.scanningDownloaded,
-                              selectedCount: _controller.selectedCount,
-                              selectedComicIds: _controller.selectedComicIds,
-                              comicsWithIntegrityIssues:
-                                  _controller.comicsWithIntegrityIssues,
-                              onToggleSelection: _controller.toggleSelection,
-                              onDeleteSelected: () {
-                                unawaited(_controller.deleteSelected(context));
-                              },
-                              onScanDownloaded: () {
-                                unawaited(
-                                  _controller.scanDownloadedComics(context),
-                                );
-                              },
-                              onOpenComic: (comic) {
-                                unawaited(() async {
-                                  if (useWindowsComicDetailPanel) {
-                                    await _windowsController.closeAndWait();
-                                    if (!context.mounted) {
-                                      return;
+                      : ScrollConfiguration(
+                          key: const ValueKey<String>(
+                            'downloads_tab_scroll_configuration',
+                          ),
+                          behavior: ScrollConfiguration.of(
+                            context,
+                          ).copyWith(overscroll: false),
+                          child: TabBarView(
+                            controller: _tabController,
+                            physics: const ClampingScrollPhysics(),
+                            children: [
+                              DownloadsOngoingTab(
+                                tasks: tasks,
+                                onPauseTask: (comicId) {
+                                  unawaited(_controller.pauseTask(comicId));
+                                },
+                                onResumeTask: (comicId) {
+                                  unawaited(_controller.resumeTask(comicId));
+                                },
+                                onDeleteTask: (comicId) {
+                                  unawaited(
+                                    _controller.deleteTask(context, comicId),
+                                  );
+                                },
+                              ),
+                              DownloadsCompletedTab(
+                                comics: comics,
+                                active: _tabController.index == 1,
+                                selectionMode: _selectionMode,
+                                scanning: _controller.scanningDownloaded,
+                                selectedCount: _controller.selectedCount,
+                                selectedComicIds: _controller.selectedComicIds,
+                                comicsWithIntegrityIssues:
+                                    _controller.comicsWithIntegrityIssues,
+                                onToggleSelection: _controller.toggleSelection,
+                                onDeleteSelected: () {
+                                  unawaited(
+                                    _controller.deleteSelected(context),
+                                  );
+                                },
+                                onScanDownloaded: () {
+                                  unawaited(
+                                    _controller.scanDownloadedComics(context),
+                                  );
+                                },
+                                onOpenComic: (comic) {
+                                  unawaited(() async {
+                                    if (useWindowsComicDetailPanel) {
+                                      await _windowsController.closeAndWait();
+                                      if (!context.mounted) {
+                                        return;
+                                      }
                                     }
-                                  }
-                                  await Navigator.of(context).push(
-                                    MaterialPageRoute<void>(
-                                      builder: (_) => DownloadedComicDetailPage(
-                                        comic: comic,
-                                        readerPageBuilder:
-                                            widget.readerPageBuilder,
+                                    await Navigator.of(context).push(
+                                      MaterialPageRoute<void>(
+                                        builder: (_) =>
+                                            DownloadedComicDetailPage(
+                                              comic: comic,
+                                              readerPageBuilder:
+                                                  widget.readerPageBuilder,
+                                            ),
                                       ),
+                                    );
+                                  }());
+                                },
+                                onDeleteComic: (comic) {
+                                  unawaited(
+                                    _controller.deleteSingleComic(
+                                      context,
+                                      comic,
                                     ),
                                   );
-                                }());
-                              },
-                              onDeleteComic: (comic) {
-                                unawaited(
-                                  _controller.deleteSingleComic(context, comic),
-                                );
-                              },
-                            ),
-                          ],
+                                },
+                              ),
+                            ],
+                          ),
                         ),
                 ),
               ),

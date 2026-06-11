@@ -12,6 +12,44 @@ void main() {
     SharedPreferences.setMockInitialValues(const {});
   });
 
+  testWidgets('download tabs disable the edge overscroll indicator', (
+    tester,
+  ) async {
+    final downloadService = MangaDownloadService();
+    addTearDown(downloadService.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: DownloadsPage(
+          downloadService: downloadService,
+          readerPageBuilder: (_, _) => const SizedBox.shrink(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final configuration = find.byKey(
+      const ValueKey<String>('downloads_tab_scroll_configuration'),
+    );
+    expect(configuration, findsOneWidget);
+    expect(
+      find.descendant(
+        of: configuration,
+        matching: find.byType(StretchingOverscrollIndicator),
+      ),
+      findsNothing,
+    );
+    expect(
+      find.descendant(
+        of: configuration,
+        matching: find.byType(GlowingOverscrollIndicator),
+      ),
+      findsNothing,
+    );
+  });
+
   testWidgets('back exits multi-select before closing downloads page', (
     tester,
   ) async {
