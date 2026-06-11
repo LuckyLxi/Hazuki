@@ -71,3 +71,7 @@ coverage/
 # Local commit-message scratch files
 .commit-msg.tmp
 
+# Flutter ephemeral files
+**/ephemeral/
+**/Generated.xcconfig
+**/flutter_export_environment.sh
