@@ -305,6 +305,7 @@ class _AnimatedDownloadedComicCard extends StatelessWidget {
               scale: 0.98 + (0.02 * value),
               alignment: Alignment.topCenter,
               child: ClipRect(
+                clipper: const _DownloadedComicVerticalAnimationClipper(),
                 child: Align(
                   alignment: Alignment.topCenter,
                   heightFactor: value,
@@ -333,6 +334,26 @@ class _AnimatedDownloadedComicCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _DownloadedComicVerticalAnimationClipper extends CustomClipper<Rect> {
+  const _DownloadedComicVerticalAnimationClipper();
+
+  static const double _horizontalOverflow = 88;
+
+  @override
+  Rect getClip(Size size) {
+    return Rect.fromLTRB(
+      -_horizontalOverflow,
+      0,
+      size.width + _horizontalOverflow,
+      size.height,
+    );
+  }
+
+  @override
+  bool shouldReclip(_DownloadedComicVerticalAnimationClipper oldClipper) =>
+      false;
 }
 
 class _DownloadedComicCard extends StatelessWidget {
@@ -380,19 +401,18 @@ class _SwipeRevealDownloadedComicCard extends StatefulWidget {
 class _SwipeRevealDownloadedComicCardState
     extends State<_SwipeRevealDownloadedComicCard>
     with SingleTickerProviderStateMixin {
-  static const double _revealDistance = 42;
+  static const double _revealDistance = _DownloadedComicEdgeDeleteButton.width;
+  static const double _maxDragOvershoot = 18;
+  static const double _dragOvershootResistance = 0.2;
+  static const double _settleVelocity = 350;
 
   late final AnimationController _controller;
   Animation<double>? _animation;
   double _offset = 0;
+  double? _dragPosition;
   bool _open = false;
-  bool _closingDragIntent = false;
-  int? _closedDragPointer;
-  Offset? _closedDragInitialPosition;
-  bool _trackingClosedLeftDrag = false;
-  bool _ignoringClosedDrag = false;
 
-  bool get _revealed => _offset < -_revealDistance / 2;
+  bool get _revealed => _offset < -_revealDistance * 0.45;
 
   @override
   void initState() {
@@ -443,6 +463,11 @@ class _SwipeRevealDownloadedComicCardState
         _open = open;
       });
     }
+    final distance = (target - _offset).abs();
+    final durationMillis = (120 + (100 * distance / _revealDistance))
+        .round()
+        .clamp(120, 220);
+    _controller.duration = Duration(milliseconds: durationMillis);
     _animation = Tween<double>(
       begin: _offset,
       end: target,
@@ -450,100 +475,47 @@ class _SwipeRevealDownloadedComicCardState
     _controller.forward(from: 0);
   }
 
-  void _handleClosedDragUpdate(DragUpdateDetails details) {
+  void _handleDragStart(DragStartDetails details) {
     if (widget.selectionMode) {
       return;
     }
     _controller.stop();
-    setState(() {
-      _offset = (_offset + details.delta.dx).clamp(-_revealDistance, 0);
-    });
-    _reportReveal(claimActive: true);
+    _dragPosition = _offset;
   }
 
-  void _handleClosedDragEnd(DragEndDetails details) {
-    _animateTo(_revealed ? -_revealDistance : 0);
+  double _displayOffsetForDrag(double rawOffset) {
+    if (rawOffset >= 0) {
+      return 0;
+    }
+    if (rawOffset >= -_revealDistance) {
+      return rawOffset;
+    }
+    final overshoot = (-rawOffset - _revealDistance) * _dragOvershootResistance;
+    return -_revealDistance - overshoot.clamp(0, _maxDragOvershoot);
   }
 
-  void _handleClosedPointerDown(PointerDownEvent event) {
-    if (widget.selectionMode || _closedDragPointer != null) {
-      return;
-    }
-    _closedDragPointer = event.pointer;
-    _closedDragInitialPosition = event.position;
-    _trackingClosedLeftDrag = false;
-    _ignoringClosedDrag = false;
-  }
-
-  void _handleClosedPointerMove(PointerMoveEvent event) {
-    if (widget.selectionMode ||
-        event.pointer != _closedDragPointer ||
-        _ignoringClosedDrag) {
-      return;
-    }
-    final initialPosition = _closedDragInitialPosition;
-    if (initialPosition == null) {
-      return;
-    }
-    if (!_trackingClosedLeftDrag) {
-      final delta = event.position - initialPosition;
-      if (delta.distance < kTouchSlop) {
-        return;
-      }
-      if (delta.dx >= 0 || delta.dx.abs() <= delta.dy.abs()) {
-        _ignoringClosedDrag = true;
-        return;
-      }
-      _trackingClosedLeftDrag = true;
-      _controller.stop();
-    }
-    _handleClosedDragUpdate(
-      DragUpdateDetails(
-        sourceTimeStamp: event.timeStamp,
-        delta: event.delta,
-        primaryDelta: event.delta.dx,
-        globalPosition: event.position,
-        localPosition: event.localPosition,
-      ),
-    );
-  }
-
-  void _handleClosedPointerEnd(PointerEvent event) {
-    if (event.pointer != _closedDragPointer) {
-      return;
-    }
-    final trackedLeftDrag = _trackingClosedLeftDrag;
-    _closedDragPointer = null;
-    _closedDragInitialPosition = null;
-    _trackingClosedLeftDrag = false;
-    _ignoringClosedDrag = false;
-    if (trackedLeftDrag) {
-      _handleClosedDragEnd(DragEndDetails());
-    }
-  }
-
-  void _handleRevealedDragUpdate(DragUpdateDetails details) {
+  void _handleDragUpdate(DragUpdateDetails details) {
     if (widget.selectionMode) {
       return;
     }
-    _controller.stop();
-    if (details.delta.dx > 0) {
-      _closingDragIntent = true;
-    }
+    final dragPosition = (_dragPosition ?? _offset) + details.delta.dx;
+    _dragPosition = dragPosition;
     setState(() {
-      _offset = (_offset + details.delta.dx).clamp(-_revealDistance, 0);
+      _offset = _displayOffsetForDrag(dragPosition);
     });
     _reportReveal(claimActive: true);
   }
 
-  void _handleRevealedDragEnd(DragEndDetails details) {
+  void _handleDragEnd(DragEndDetails details) {
     if (widget.selectionMode) {
       return;
     }
     final velocity = details.primaryVelocity ?? 0;
-    final close = _closingDragIntent || velocity > 250;
-    _closingDragIntent = false;
-    _animateTo(close ? 0 : -_revealDistance);
+    _dragPosition = null;
+    final open =
+        velocity < -_settleVelocity ||
+        (velocity <= _settleVelocity && _revealed);
+    _animateTo(open ? -_revealDistance : 0);
   }
 
   void _reportReveal({required bool claimActive}) {
@@ -576,23 +548,34 @@ class _SwipeRevealDownloadedComicCardState
         child: _open
             ? GestureDetector(
                 behavior: HitTestBehavior.translucent,
+                dragStartBehavior: DragStartBehavior.down,
                 onTap: () => _animateTo(0),
-                onHorizontalDragStart: (_) {
-                  _closingDragIntent = false;
-                },
-                onHorizontalDragUpdate: _handleRevealedDragUpdate,
-                onHorizontalDragEnd: _handleRevealedDragEnd,
+                onHorizontalDragStart: _handleDragStart,
+                onHorizontalDragUpdate: _handleDragUpdate,
+                onHorizontalDragEnd: _handleDragEnd,
                 child: _DownloadedComicCard(
                   bottomSpacing: 0,
                   child: AbsorbPointer(child: widget.child),
                 ),
               )
-            : Listener(
+            : RawGestureDetector(
                 behavior: HitTestBehavior.translucent,
-                onPointerDown: _handleClosedPointerDown,
-                onPointerMove: _handleClosedPointerMove,
-                onPointerUp: _handleClosedPointerEnd,
-                onPointerCancel: _handleClosedPointerEnd,
+                gestures: widget.selectionMode
+                    ? const <Type, GestureRecognizerFactory>{}
+                    : <Type, GestureRecognizerFactory>{
+                        _LeftHorizontalDragGestureRecognizer:
+                            GestureRecognizerFactoryWithHandlers<
+                              _LeftHorizontalDragGestureRecognizer
+                            >(_LeftHorizontalDragGestureRecognizer.new, (
+                              recognizer,
+                            ) {
+                              recognizer
+                                ..dragStartBehavior = DragStartBehavior.down
+                                ..onStart = _handleDragStart
+                                ..onUpdate = _handleDragUpdate
+                                ..onEnd = _handleDragEnd;
+                            }),
+                      },
                 child: _DownloadedComicCard(
                   bottomSpacing: 0,
                   child: widget.child,
@@ -601,6 +584,23 @@ class _SwipeRevealDownloadedComicCardState
       ),
     );
   }
+}
+
+class _LeftHorizontalDragGestureRecognizer
+    extends HorizontalDragGestureRecognizer {
+  static const double _claimSlopFactor = 0.5;
+
+  @override
+  bool hasSufficientGlobalDistanceToAccept(
+    PointerDeviceKind pointerDeviceKind,
+    double? deviceTouchSlop,
+  ) {
+    return globalDistanceMoved <
+        -computeHitSlop(pointerDeviceKind, gestureSettings) * _claimSlopFactor;
+  }
+
+  @override
+  String get debugDescription => 'left horizontal drag';
 }
 
 class _DownloadedComicEdgeDeleteButton extends StatelessWidget {
