@@ -60,10 +60,33 @@ class _DownloadsCompletedTabState extends State<DownloadsCompletedTab> {
   void didUpdateWidget(covariant DownloadsCompletedTab oldWidget) {
     super.didUpdateWidget(oldWidget);
     if ((!widget.active && oldWidget.active) ||
-        (widget.selectionMode && !oldWidget.selectionMode)) {
+        (widget.selectionMode && !oldWidget.selectionMode) ||
+        (_swipeReveal != null &&
+            !widget.comics.any(
+              (comic) => comic.storageKey == _swipeReveal!.comic.storageKey,
+            ))) {
       _swipeReveal = null;
     }
     _syncVisibleComics();
+  }
+
+  void _closeSwipeReveal() {
+    if (_swipeReveal == null) {
+      return;
+    }
+    setState(() {
+      _swipeReveal = null;
+    });
+  }
+
+  void _handleOpenComic(DownloadedMangaComic comic) {
+    _closeSwipeReveal();
+    widget.onOpenComic(comic);
+  }
+
+  void _handleDeleteComic(DownloadedMangaComic comic) {
+    _closeSwipeReveal();
+    widget.onDeleteComic(comic);
   }
 
   void _handleSwipeReveal(_DownloadedComicSwipeReveal reveal) {
@@ -222,7 +245,7 @@ class _DownloadsCompletedTabState extends State<DownloadsCompletedTab> {
                   swipeRevealStackKey: _stackKey,
                   onSwipeRevealChanged: _handleSwipeReveal,
                   onToggleSelection: widget.onToggleSelection,
-                  onOpenComic: widget.onOpenComic,
+                  onOpenComic: _handleOpenComic,
                 );
               },
             ),
@@ -242,7 +265,7 @@ class _DownloadsCompletedTabState extends State<DownloadsCompletedTab> {
             child: _DownloadedComicEdgeDeleteButton(
               comic: reveal.comic,
               enabled: reveal.revealed,
-              onDeleteComic: widget.onDeleteComic,
+              onDeleteComic: _handleDeleteComic,
             ),
           ),
         Positioned(
@@ -297,10 +320,13 @@ class _AnimatedDownloadedComicCard extends StatelessWidget {
       duration: DownloadsCompletedTab.dismissDuration,
       curve: entry.exiting ? Curves.easeInCubic : Curves.easeOutCubic,
       builder: (context, value, child) {
+        final horizontalExitOffset = entry.exiting
+            ? -(MediaQuery.sizeOf(context).width + 32) * (1 - value)
+            : 0.0;
         return Opacity(
           opacity: value,
           child: Transform.translate(
-            offset: Offset(0, 8 * (1 - value)),
+            offset: Offset(horizontalExitOffset, 8 * (1 - value)),
             child: Transform.scale(
               scale: 0.98 + (0.02 * value),
               alignment: Alignment.topCenter,
@@ -339,14 +365,14 @@ class _AnimatedDownloadedComicCard extends StatelessWidget {
 class _DownloadedComicVerticalAnimationClipper extends CustomClipper<Rect> {
   const _DownloadedComicVerticalAnimationClipper();
 
-  static const double _horizontalOverflow = 88;
+  static const double _rightHorizontalOverflow = 88;
 
   @override
   Rect getClip(Size size) {
     return Rect.fromLTRB(
-      -_horizontalOverflow,
+      -size.width,
       0,
-      size.width + _horizontalOverflow,
+      size.width + _rightHorizontalOverflow,
       size.height,
     );
   }

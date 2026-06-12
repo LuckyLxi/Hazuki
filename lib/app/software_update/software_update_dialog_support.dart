@@ -8,6 +8,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -218,6 +219,10 @@ class _SoftwareUpdateDialogCardState extends State<_SoftwareUpdateDialogCard> {
     }
     setState(() => _downloadTriggerBusy = false);
     if (success && !_downloadService.isZipMode) {
+      if (Platform.isWindows) {
+        await SystemNavigator.pop();
+        return;
+      }
       Navigator.of(context).pop();
     }
   }

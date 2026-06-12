@@ -136,6 +136,102 @@ void main() {
     );
   });
 
+  testWidgets('returning from another comic leaves the revealed comic closed', (
+    tester,
+  ) async {
+    DownloadedMangaComic? openedComic;
+    final navigatorKey = GlobalKey<NavigatorState>();
+    await tester.pumpWidget(
+      _wrapTab(
+        navigatorKey: navigatorKey,
+        comics: const [_comic, _comic2],
+        onOpenComic: (comic) async {
+          openedComic = comic;
+          await navigatorKey.currentState!.push<void>(
+            MaterialPageRoute<void>(
+              builder: (_) => const Scaffold(body: Text('Comic details')),
+            ),
+          );
+        },
+      ),
+    );
+
+    final firstTitle = find.text('Test Comic');
+    final firstLeft = tester.getTopLeft(firstTitle).dx;
+
+    await tester.drag(firstTitle, const Offset(-120, 0));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Second Comic'));
+    await tester.pumpAndSettle();
+    expect(find.text('Comic details'), findsOneWidget);
+
+    navigatorKey.currentState!.pop();
+    await tester.pumpAndSettle();
+
+    expect(openedComic, _comic2);
+    expect(tester.getTopLeft(firstTitle).dx, closeTo(firstLeft, 0.1));
+    expect(
+      find.byKey(const ValueKey<String>('downloaded_edge_delete_comic-1')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('deleted comic flies left while following comic moves up', (
+    tester,
+  ) async {
+    var comics = const [_comic, _comic2];
+    late StateSetter updateComics;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: StatefulBuilder(
+            builder: (context, setState) {
+              updateComics = setState;
+              return _buildTab(
+                comics: comics,
+                onDeleteComic: (comic) {
+                  updateComics(() {
+                    comics = comics
+                        .where((item) => item.storageKey != comic.storageKey)
+                        .toList(growable: false);
+                  });
+                },
+              );
+            },
+          ),
+        ),
+      ),
+    );
+
+    final firstTitle = find.text('Test Comic');
+    final secondTitle = find.text('Second Comic');
+    final firstLeft = tester.getTopLeft(firstTitle).dx;
+    final secondTop = tester.getTopLeft(secondTitle).dy;
+
+    await tester.drag(firstTitle, const Offset(-120, 0));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.delete_outline_rounded));
+    await tester.pump();
+
+    expect(
+      find.byKey(const ValueKey<String>('downloaded_edge_delete_comic-1')),
+      findsNothing,
+    );
+
+    await tester.pump(DownloadsCompletedTab.dismissDuration ~/ 2);
+
+    expect(tester.getTopLeft(firstTitle).dx, lessThan(firstLeft - 58));
+    expect(tester.getTopLeft(secondTitle).dy, lessThan(secondTop));
+
+    await tester.pumpAndSettle();
+
+    expect(firstTitle, findsNothing);
+    expect(secondTitle, findsOneWidget);
+  });
+
   testWidgets('right swipe on a closed comic is passed to the tab view', (
     tester,
   ) async {
@@ -309,12 +405,15 @@ void main() {
 }
 
 Widget _wrapTab({
+  GlobalKey<NavigatorState>? navigatorKey,
   bool active = true,
   bool selectionMode = false,
   List<DownloadedMangaComic> comics = const [_comic],
+  ValueChanged<DownloadedMangaComic>? onOpenComic,
   ValueChanged<DownloadedMangaComic>? onDeleteComic,
 }) {
   return MaterialApp(
+    navigatorKey: navigatorKey,
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     home: Scaffold(
@@ -322,6 +421,7 @@ Widget _wrapTab({
         active: active,
         selectionMode: selectionMode,
         comics: comics,
+        onOpenComic: onOpenComic,
         onDeleteComic: onDeleteComic,
       ),
     ),
@@ -349,6 +449,7 @@ Widget _buildTab({
   bool active = true,
   bool selectionMode = false,
   List<DownloadedMangaComic> comics = const [_comic],
+  ValueChanged<DownloadedMangaComic>? onOpenComic,
   ValueChanged<DownloadedMangaComic>? onDeleteComic,
 }) {
   return DownloadsCompletedTab(
@@ -362,7 +463,7 @@ Widget _buildTab({
     onToggleSelection: (_) {},
     onDeleteSelected: () {},
     onScanDownloaded: () {},
-    onOpenComic: (_) {},
+    onOpenComic: onOpenComic ?? (_) {},
     onDeleteComic: onDeleteComic ?? (_) {},
   );
 }
