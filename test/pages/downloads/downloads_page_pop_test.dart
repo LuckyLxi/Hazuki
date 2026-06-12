@@ -4,12 +4,14 @@ import 'package:hazuki/features/downloads/downloads.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/manga_download/manga_download_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../support/test_service_locator.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  setUp(() {
+  setUp(() async {
     SharedPreferences.setMockInitialValues(const {});
+    await ensureTestServiceLocator();
   });
 
   testWidgets('download tabs disable the edge overscroll indicator', (

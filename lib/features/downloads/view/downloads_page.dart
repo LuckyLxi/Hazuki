@@ -2,10 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:hazuki/services/manga_download/manga_download_service.dart';
+import 'package:hazuki/services/download_groups_service.dart';
+import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/widgets/windows_comic_detail_host.dart';
 import '../downloads.dart';
 import 'package:hazuki/shared/windows/windows_comic_detail.dart';
+import '../support/downloads_group_actions.dart';
 
 class DownloadsPage extends StatefulWidget {
   const DownloadsPage({
@@ -43,8 +46,9 @@ class _DownloadsPageState extends State<DownloadsPage>
     super.initState();
     _controller = DownloadsPageController(
       downloadService: widget.downloadService ?? sl<MangaDownloadService>(),
+      downloadGroupsService: sl<DownloadGroupsService>(),
     );
-    _initFuture = _downloadService.ensureInitialized();
+    _initFuture = _controller.initialize();
     _initFuture.then((_) {
       if (mounted) unawaited(_controller.runIntegrityCheck());
     });
@@ -82,7 +86,7 @@ class _DownloadsPageState extends State<DownloadsPage>
           animation: _pageListenable,
           builder: (context, child) {
             final tasks = _downloadService.tasks;
-            final comics = _downloadService.downloadedComics;
+            final comics = _controller.filteredDownloadedComics;
             return PopScope(
               canPop: !_selectionMode,
               onPopInvokedWithResult: (didPop, result) {
@@ -175,6 +179,53 @@ class _DownloadsPageState extends State<DownloadsPage>
                                     ),
                                   );
                                 },
+                                groups: _controller.groups,
+                                selectedGroupId: _controller.selectedGroupId,
+                                selectedGroupName:
+                                    _controller.selectedGroup.isDefault
+                                    ? l10n(context).downloadsDefaultGroup
+                                    : _controller.selectedGroup.name,
+                                onSelectGroup: _controller.selectGroup,
+                                onCreateGroup: _controller.createGroup,
+                                onDeleteGroup: _controller.deleteGroup,
+                                onShowComicMenu:
+                                    (comic, globalPosition, itemContext) async {
+                                      final action =
+                                          await showDownloadsComicMenu(
+                                            context: context,
+                                            itemContext: itemContext,
+                                            globalPosition: globalPosition,
+                                          );
+                                      if (!context.mounted || action == null) {
+                                        return;
+                                      }
+                                      if (action ==
+                                          DownloadsComicMenuAction.delete) {
+                                        await _controller.deleteSingleComic(
+                                          context,
+                                          comic,
+                                        );
+                                        return;
+                                      }
+                                      final groupId =
+                                          await showDownloadGroupPicker(
+                                            context: context,
+                                            groups: _controller.groups,
+                                          );
+                                      if (groupId == null) return;
+                                      if (action ==
+                                          DownloadsComicMenuAction.add) {
+                                        await _controller.addComicToGroup(
+                                          comic,
+                                          groupId,
+                                        );
+                                      } else {
+                                        await _controller.moveComicToGroup(
+                                          comic,
+                                          groupId,
+                                        );
+                                      }
+                                    },
                               ),
                             ],
                           ),

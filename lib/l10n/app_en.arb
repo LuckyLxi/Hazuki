@@ -1177,6 +1177,21 @@
   },
   "downloadsScanTooltip": "Scan local comics",
   "downloadsIntegrityWarning": "Some files may have been moved or deleted",
+  "downloadsDefaultGroup": "Default group",
+  "downloadsGroupsTitle": "Download groups",
+  "downloadsNewGroup": "New group",
+  "downloadsGroupName": "Group name",
+  "downloadsCreateGroup": "Create",
+  "downloadsDeleteGroupTitle": "Delete group",
+  "downloadsDeleteGroupContent": "Delete \"{name}\"? Its comics will be moved to the default group.",
+  "@downloadsDeleteGroupContent": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "downloadsAddToGroup": "Add to group",
+  "downloadsMoveToGroup": "Move to group",
+  "downloadsChooseGroup": "Choose a group",
   "sourceUpdateRestartTitle": "Please restart the app",
   "sourceUpdateRestartMessage": "The source update has finished downloading. Please restart the app to apply the update.",
   "sourceUpdateLocalLabel": "Local",

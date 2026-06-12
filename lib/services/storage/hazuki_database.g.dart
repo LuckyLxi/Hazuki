@@ -2802,6 +2802,1065 @@ class LocalFavoriteEntryTombstonesCompanion
   }
 }
 
+class $DownloadGroupsTable extends DownloadGroups
+    with TableInfo<$DownloadGroupsTable, DownloadGroup> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $DownloadGroupsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _createdAtMsMeta = const VerificationMeta(
+    'createdAtMs',
+  );
+  @override
+  late final GeneratedColumn<int> createdAtMs = GeneratedColumn<int>(
+    'created_at_ms',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, name, createdAtMs];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'download_groups';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<DownloadGroup> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('created_at_ms')) {
+      context.handle(
+        _createdAtMsMeta,
+        createdAtMs.isAcceptableOrUnknown(
+          data['created_at_ms']!,
+          _createdAtMsMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_createdAtMsMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  DownloadGroup map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return DownloadGroup(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      createdAtMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}created_at_ms'],
+      )!,
+    );
+  }
+
+  @override
+  $DownloadGroupsTable createAlias(String alias) {
+    return $DownloadGroupsTable(attachedDatabase, alias);
+  }
+}
+
+class DownloadGroup extends DataClass implements Insertable<DownloadGroup> {
+  final String id;
+  final String name;
+  final int createdAtMs;
+  const DownloadGroup({
+    required this.id,
+    required this.name,
+    required this.createdAtMs,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    map['created_at_ms'] = Variable<int>(createdAtMs);
+    return map;
+  }
+
+  DownloadGroupsCompanion toCompanion(bool nullToAbsent) {
+    return DownloadGroupsCompanion(
+      id: Value(id),
+      name: Value(name),
+      createdAtMs: Value(createdAtMs),
+    );
+  }
+
+  factory DownloadGroup.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return DownloadGroup(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      createdAtMs: serializer.fromJson<int>(json['createdAtMs']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+      'createdAtMs': serializer.toJson<int>(createdAtMs),
+    };
+  }
+
+  DownloadGroup copyWith({String? id, String? name, int? createdAtMs}) =>
+      DownloadGroup(
+        id: id ?? this.id,
+        name: name ?? this.name,
+        createdAtMs: createdAtMs ?? this.createdAtMs,
+      );
+  DownloadGroup copyWithCompanion(DownloadGroupsCompanion data) {
+    return DownloadGroup(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      createdAtMs: data.createdAtMs.present
+          ? data.createdAtMs.value
+          : this.createdAtMs,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DownloadGroup(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('createdAtMs: $createdAtMs')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, name, createdAtMs);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is DownloadGroup &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.createdAtMs == this.createdAtMs);
+}
+
+class DownloadGroupsCompanion extends UpdateCompanion<DownloadGroup> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<int> createdAtMs;
+  final Value<int> rowid;
+  const DownloadGroupsCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.createdAtMs = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  DownloadGroupsCompanion.insert({
+    required String id,
+    required String name,
+    required int createdAtMs,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       name = Value(name),
+       createdAtMs = Value(createdAtMs);
+  static Insertable<DownloadGroup> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<int>? createdAtMs,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (createdAtMs != null) 'created_at_ms': createdAtMs,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  DownloadGroupsCompanion copyWith({
+    Value<String>? id,
+    Value<String>? name,
+    Value<int>? createdAtMs,
+    Value<int>? rowid,
+  }) {
+    return DownloadGroupsCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      createdAtMs: createdAtMs ?? this.createdAtMs,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (createdAtMs.present) {
+      map['created_at_ms'] = Variable<int>(createdAtMs.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DownloadGroupsCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('createdAtMs: $createdAtMs, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $DownloadGroupComicsTable extends DownloadGroupComics
+    with TableInfo<$DownloadGroupComicsTable, DownloadGroupComic> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $DownloadGroupComicsTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _groupIdMeta = const VerificationMeta(
+    'groupId',
+  );
+  @override
+  late final GeneratedColumn<String> groupId = GeneratedColumn<String>(
+    'group_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _comicStorageKeyMeta = const VerificationMeta(
+    'comicStorageKey',
+  );
+  @override
+  late final GeneratedColumn<String> comicStorageKey = GeneratedColumn<String>(
+    'comic_storage_key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _addedAtMsMeta = const VerificationMeta(
+    'addedAtMs',
+  );
+  @override
+  late final GeneratedColumn<int> addedAtMs = GeneratedColumn<int>(
+    'added_at_ms',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [groupId, comicStorageKey, addedAtMs];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'download_group_comics';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<DownloadGroupComic> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('group_id')) {
+      context.handle(
+        _groupIdMeta,
+        groupId.isAcceptableOrUnknown(data['group_id']!, _groupIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_groupIdMeta);
+    }
+    if (data.containsKey('comic_storage_key')) {
+      context.handle(
+        _comicStorageKeyMeta,
+        comicStorageKey.isAcceptableOrUnknown(
+          data['comic_storage_key']!,
+          _comicStorageKeyMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_comicStorageKeyMeta);
+    }
+    if (data.containsKey('added_at_ms')) {
+      context.handle(
+        _addedAtMsMeta,
+        addedAtMs.isAcceptableOrUnknown(data['added_at_ms']!, _addedAtMsMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_addedAtMsMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {groupId, comicStorageKey};
+  @override
+  DownloadGroupComic map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return DownloadGroupComic(
+      groupId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}group_id'],
+      )!,
+      comicStorageKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}comic_storage_key'],
+      )!,
+      addedAtMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}added_at_ms'],
+      )!,
+    );
+  }
+
+  @override
+  $DownloadGroupComicsTable createAlias(String alias) {
+    return $DownloadGroupComicsTable(attachedDatabase, alias);
+  }
+}
+
+class DownloadGroupComic extends DataClass
+    implements Insertable<DownloadGroupComic> {
+  final String groupId;
+  final String comicStorageKey;
+  final int addedAtMs;
+  const DownloadGroupComic({
+    required this.groupId,
+    required this.comicStorageKey,
+    required this.addedAtMs,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['group_id'] = Variable<String>(groupId);
+    map['comic_storage_key'] = Variable<String>(comicStorageKey);
+    map['added_at_ms'] = Variable<int>(addedAtMs);
+    return map;
+  }
+
+  DownloadGroupComicsCompanion toCompanion(bool nullToAbsent) {
+    return DownloadGroupComicsCompanion(
+      groupId: Value(groupId),
+      comicStorageKey: Value(comicStorageKey),
+      addedAtMs: Value(addedAtMs),
+    );
+  }
+
+  factory DownloadGroupComic.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return DownloadGroupComic(
+      groupId: serializer.fromJson<String>(json['groupId']),
+      comicStorageKey: serializer.fromJson<String>(json['comicStorageKey']),
+      addedAtMs: serializer.fromJson<int>(json['addedAtMs']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'groupId': serializer.toJson<String>(groupId),
+      'comicStorageKey': serializer.toJson<String>(comicStorageKey),
+      'addedAtMs': serializer.toJson<int>(addedAtMs),
+    };
+  }
+
+  DownloadGroupComic copyWith({
+    String? groupId,
+    String? comicStorageKey,
+    int? addedAtMs,
+  }) => DownloadGroupComic(
+    groupId: groupId ?? this.groupId,
+    comicStorageKey: comicStorageKey ?? this.comicStorageKey,
+    addedAtMs: addedAtMs ?? this.addedAtMs,
+  );
+  DownloadGroupComic copyWithCompanion(DownloadGroupComicsCompanion data) {
+    return DownloadGroupComic(
+      groupId: data.groupId.present ? data.groupId.value : this.groupId,
+      comicStorageKey: data.comicStorageKey.present
+          ? data.comicStorageKey.value
+          : this.comicStorageKey,
+      addedAtMs: data.addedAtMs.present ? data.addedAtMs.value : this.addedAtMs,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DownloadGroupComic(')
+          ..write('groupId: $groupId, ')
+          ..write('comicStorageKey: $comicStorageKey, ')
+          ..write('addedAtMs: $addedAtMs')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(groupId, comicStorageKey, addedAtMs);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is DownloadGroupComic &&
+          other.groupId == this.groupId &&
+          other.comicStorageKey == this.comicStorageKey &&
+          other.addedAtMs == this.addedAtMs);
+}
+
+class DownloadGroupComicsCompanion extends UpdateCompanion<DownloadGroupComic> {
+  final Value<String> groupId;
+  final Value<String> comicStorageKey;
+  final Value<int> addedAtMs;
+  final Value<int> rowid;
+  const DownloadGroupComicsCompanion({
+    this.groupId = const Value.absent(),
+    this.comicStorageKey = const Value.absent(),
+    this.addedAtMs = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  DownloadGroupComicsCompanion.insert({
+    required String groupId,
+    required String comicStorageKey,
+    required int addedAtMs,
+    this.rowid = const Value.absent(),
+  }) : groupId = Value(groupId),
+       comicStorageKey = Value(comicStorageKey),
+       addedAtMs = Value(addedAtMs);
+  static Insertable<DownloadGroupComic> custom({
+    Expression<String>? groupId,
+    Expression<String>? comicStorageKey,
+    Expression<int>? addedAtMs,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (groupId != null) 'group_id': groupId,
+      if (comicStorageKey != null) 'comic_storage_key': comicStorageKey,
+      if (addedAtMs != null) 'added_at_ms': addedAtMs,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  DownloadGroupComicsCompanion copyWith({
+    Value<String>? groupId,
+    Value<String>? comicStorageKey,
+    Value<int>? addedAtMs,
+    Value<int>? rowid,
+  }) {
+    return DownloadGroupComicsCompanion(
+      groupId: groupId ?? this.groupId,
+      comicStorageKey: comicStorageKey ?? this.comicStorageKey,
+      addedAtMs: addedAtMs ?? this.addedAtMs,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (groupId.present) {
+      map['group_id'] = Variable<String>(groupId.value);
+    }
+    if (comicStorageKey.present) {
+      map['comic_storage_key'] = Variable<String>(comicStorageKey.value);
+    }
+    if (addedAtMs.present) {
+      map['added_at_ms'] = Variable<int>(addedAtMs.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DownloadGroupComicsCompanion(')
+          ..write('groupId: $groupId, ')
+          ..write('comicStorageKey: $comicStorageKey, ')
+          ..write('addedAtMs: $addedAtMs, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $DownloadGroupTombstonesTable extends DownloadGroupTombstones
+    with TableInfo<$DownloadGroupTombstonesTable, DownloadGroupTombstone> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $DownloadGroupTombstonesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _groupIdMeta = const VerificationMeta(
+    'groupId',
+  );
+  @override
+  late final GeneratedColumn<String> groupId = GeneratedColumn<String>(
+    'group_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deletedAtMsMeta = const VerificationMeta(
+    'deletedAtMs',
+  );
+  @override
+  late final GeneratedColumn<int> deletedAtMs = GeneratedColumn<int>(
+    'deleted_at_ms',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [groupId, deletedAtMs];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'download_group_tombstones';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<DownloadGroupTombstone> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('group_id')) {
+      context.handle(
+        _groupIdMeta,
+        groupId.isAcceptableOrUnknown(data['group_id']!, _groupIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_groupIdMeta);
+    }
+    if (data.containsKey('deleted_at_ms')) {
+      context.handle(
+        _deletedAtMsMeta,
+        deletedAtMs.isAcceptableOrUnknown(
+          data['deleted_at_ms']!,
+          _deletedAtMsMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_deletedAtMsMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {groupId};
+  @override
+  DownloadGroupTombstone map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return DownloadGroupTombstone(
+      groupId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}group_id'],
+      )!,
+      deletedAtMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}deleted_at_ms'],
+      )!,
+    );
+  }
+
+  @override
+  $DownloadGroupTombstonesTable createAlias(String alias) {
+    return $DownloadGroupTombstonesTable(attachedDatabase, alias);
+  }
+}
+
+class DownloadGroupTombstone extends DataClass
+    implements Insertable<DownloadGroupTombstone> {
+  final String groupId;
+  final int deletedAtMs;
+  const DownloadGroupTombstone({
+    required this.groupId,
+    required this.deletedAtMs,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['group_id'] = Variable<String>(groupId);
+    map['deleted_at_ms'] = Variable<int>(deletedAtMs);
+    return map;
+  }
+
+  DownloadGroupTombstonesCompanion toCompanion(bool nullToAbsent) {
+    return DownloadGroupTombstonesCompanion(
+      groupId: Value(groupId),
+      deletedAtMs: Value(deletedAtMs),
+    );
+  }
+
+  factory DownloadGroupTombstone.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return DownloadGroupTombstone(
+      groupId: serializer.fromJson<String>(json['groupId']),
+      deletedAtMs: serializer.fromJson<int>(json['deletedAtMs']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'groupId': serializer.toJson<String>(groupId),
+      'deletedAtMs': serializer.toJson<int>(deletedAtMs),
+    };
+  }
+
+  DownloadGroupTombstone copyWith({String? groupId, int? deletedAtMs}) =>
+      DownloadGroupTombstone(
+        groupId: groupId ?? this.groupId,
+        deletedAtMs: deletedAtMs ?? this.deletedAtMs,
+      );
+  DownloadGroupTombstone copyWithCompanion(
+    DownloadGroupTombstonesCompanion data,
+  ) {
+    return DownloadGroupTombstone(
+      groupId: data.groupId.present ? data.groupId.value : this.groupId,
+      deletedAtMs: data.deletedAtMs.present
+          ? data.deletedAtMs.value
+          : this.deletedAtMs,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DownloadGroupTombstone(')
+          ..write('groupId: $groupId, ')
+          ..write('deletedAtMs: $deletedAtMs')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(groupId, deletedAtMs);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is DownloadGroupTombstone &&
+          other.groupId == this.groupId &&
+          other.deletedAtMs == this.deletedAtMs);
+}
+
+class DownloadGroupTombstonesCompanion
+    extends UpdateCompanion<DownloadGroupTombstone> {
+  final Value<String> groupId;
+  final Value<int> deletedAtMs;
+  final Value<int> rowid;
+  const DownloadGroupTombstonesCompanion({
+    this.groupId = const Value.absent(),
+    this.deletedAtMs = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  DownloadGroupTombstonesCompanion.insert({
+    required String groupId,
+    required int deletedAtMs,
+    this.rowid = const Value.absent(),
+  }) : groupId = Value(groupId),
+       deletedAtMs = Value(deletedAtMs);
+  static Insertable<DownloadGroupTombstone> custom({
+    Expression<String>? groupId,
+    Expression<int>? deletedAtMs,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (groupId != null) 'group_id': groupId,
+      if (deletedAtMs != null) 'deleted_at_ms': deletedAtMs,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  DownloadGroupTombstonesCompanion copyWith({
+    Value<String>? groupId,
+    Value<int>? deletedAtMs,
+    Value<int>? rowid,
+  }) {
+    return DownloadGroupTombstonesCompanion(
+      groupId: groupId ?? this.groupId,
+      deletedAtMs: deletedAtMs ?? this.deletedAtMs,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (groupId.present) {
+      map['group_id'] = Variable<String>(groupId.value);
+    }
+    if (deletedAtMs.present) {
+      map['deleted_at_ms'] = Variable<int>(deletedAtMs.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DownloadGroupTombstonesCompanion(')
+          ..write('groupId: $groupId, ')
+          ..write('deletedAtMs: $deletedAtMs, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $DownloadGroupComicTombstonesTable extends DownloadGroupComicTombstones
+    with
+        TableInfo<
+          $DownloadGroupComicTombstonesTable,
+          DownloadGroupComicTombstone
+        > {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $DownloadGroupComicTombstonesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _groupIdMeta = const VerificationMeta(
+    'groupId',
+  );
+  @override
+  late final GeneratedColumn<String> groupId = GeneratedColumn<String>(
+    'group_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _comicStorageKeyMeta = const VerificationMeta(
+    'comicStorageKey',
+  );
+  @override
+  late final GeneratedColumn<String> comicStorageKey = GeneratedColumn<String>(
+    'comic_storage_key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deletedAtMsMeta = const VerificationMeta(
+    'deletedAtMs',
+  );
+  @override
+  late final GeneratedColumn<int> deletedAtMs = GeneratedColumn<int>(
+    'deleted_at_ms',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [groupId, comicStorageKey, deletedAtMs];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'download_group_comic_tombstones';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<DownloadGroupComicTombstone> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('group_id')) {
+      context.handle(
+        _groupIdMeta,
+        groupId.isAcceptableOrUnknown(data['group_id']!, _groupIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_groupIdMeta);
+    }
+    if (data.containsKey('comic_storage_key')) {
+      context.handle(
+        _comicStorageKeyMeta,
+        comicStorageKey.isAcceptableOrUnknown(
+          data['comic_storage_key']!,
+          _comicStorageKeyMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_comicStorageKeyMeta);
+    }
+    if (data.containsKey('deleted_at_ms')) {
+      context.handle(
+        _deletedAtMsMeta,
+        deletedAtMs.isAcceptableOrUnknown(
+          data['deleted_at_ms']!,
+          _deletedAtMsMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_deletedAtMsMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {groupId, comicStorageKey};
+  @override
+  DownloadGroupComicTombstone map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return DownloadGroupComicTombstone(
+      groupId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}group_id'],
+      )!,
+      comicStorageKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}comic_storage_key'],
+      )!,
+      deletedAtMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}deleted_at_ms'],
+      )!,
+    );
+  }
+
+  @override
+  $DownloadGroupComicTombstonesTable createAlias(String alias) {
+    return $DownloadGroupComicTombstonesTable(attachedDatabase, alias);
+  }
+}
+
+class DownloadGroupComicTombstone extends DataClass
+    implements Insertable<DownloadGroupComicTombstone> {
+  final String groupId;
+  final String comicStorageKey;
+  final int deletedAtMs;
+  const DownloadGroupComicTombstone({
+    required this.groupId,
+    required this.comicStorageKey,
+    required this.deletedAtMs,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['group_id'] = Variable<String>(groupId);
+    map['comic_storage_key'] = Variable<String>(comicStorageKey);
+    map['deleted_at_ms'] = Variable<int>(deletedAtMs);
+    return map;
+  }
+
+  DownloadGroupComicTombstonesCompanion toCompanion(bool nullToAbsent) {
+    return DownloadGroupComicTombstonesCompanion(
+      groupId: Value(groupId),
+      comicStorageKey: Value(comicStorageKey),
+      deletedAtMs: Value(deletedAtMs),
+    );
+  }
+
+  factory DownloadGroupComicTombstone.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return DownloadGroupComicTombstone(
+      groupId: serializer.fromJson<String>(json['groupId']),
+      comicStorageKey: serializer.fromJson<String>(json['comicStorageKey']),
+      deletedAtMs: serializer.fromJson<int>(json['deletedAtMs']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'groupId': serializer.toJson<String>(groupId),
+      'comicStorageKey': serializer.toJson<String>(comicStorageKey),
+      'deletedAtMs': serializer.toJson<int>(deletedAtMs),
+    };
+  }
+
+  DownloadGroupComicTombstone copyWith({
+    String? groupId,
+    String? comicStorageKey,
+    int? deletedAtMs,
+  }) => DownloadGroupComicTombstone(
+    groupId: groupId ?? this.groupId,
+    comicStorageKey: comicStorageKey ?? this.comicStorageKey,
+    deletedAtMs: deletedAtMs ?? this.deletedAtMs,
+  );
+  DownloadGroupComicTombstone copyWithCompanion(
+    DownloadGroupComicTombstonesCompanion data,
+  ) {
+    return DownloadGroupComicTombstone(
+      groupId: data.groupId.present ? data.groupId.value : this.groupId,
+      comicStorageKey: data.comicStorageKey.present
+          ? data.comicStorageKey.value
+          : this.comicStorageKey,
+      deletedAtMs: data.deletedAtMs.present
+          ? data.deletedAtMs.value
+          : this.deletedAtMs,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DownloadGroupComicTombstone(')
+          ..write('groupId: $groupId, ')
+          ..write('comicStorageKey: $comicStorageKey, ')
+          ..write('deletedAtMs: $deletedAtMs')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(groupId, comicStorageKey, deletedAtMs);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is DownloadGroupComicTombstone &&
+          other.groupId == this.groupId &&
+          other.comicStorageKey == this.comicStorageKey &&
+          other.deletedAtMs == this.deletedAtMs);
+}
+
+class DownloadGroupComicTombstonesCompanion
+    extends UpdateCompanion<DownloadGroupComicTombstone> {
+  final Value<String> groupId;
+  final Value<String> comicStorageKey;
+  final Value<int> deletedAtMs;
+  final Value<int> rowid;
+  const DownloadGroupComicTombstonesCompanion({
+    this.groupId = const Value.absent(),
+    this.comicStorageKey = const Value.absent(),
+    this.deletedAtMs = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  DownloadGroupComicTombstonesCompanion.insert({
+    required String groupId,
+    required String comicStorageKey,
+    required int deletedAtMs,
+    this.rowid = const Value.absent(),
+  }) : groupId = Value(groupId),
+       comicStorageKey = Value(comicStorageKey),
+       deletedAtMs = Value(deletedAtMs);
+  static Insertable<DownloadGroupComicTombstone> custom({
+    Expression<String>? groupId,
+    Expression<String>? comicStorageKey,
+    Expression<int>? deletedAtMs,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (groupId != null) 'group_id': groupId,
+      if (comicStorageKey != null) 'comic_storage_key': comicStorageKey,
+      if (deletedAtMs != null) 'deleted_at_ms': deletedAtMs,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  DownloadGroupComicTombstonesCompanion copyWith({
+    Value<String>? groupId,
+    Value<String>? comicStorageKey,
+    Value<int>? deletedAtMs,
+    Value<int>? rowid,
+  }) {
+    return DownloadGroupComicTombstonesCompanion(
+      groupId: groupId ?? this.groupId,
+      comicStorageKey: comicStorageKey ?? this.comicStorageKey,
+      deletedAtMs: deletedAtMs ?? this.deletedAtMs,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (groupId.present) {
+      map['group_id'] = Variable<String>(groupId.value);
+    }
+    if (comicStorageKey.present) {
+      map['comic_storage_key'] = Variable<String>(comicStorageKey.value);
+    }
+    if (deletedAtMs.present) {
+      map['deleted_at_ms'] = Variable<int>(deletedAtMs.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('DownloadGroupComicTombstonesCompanion(')
+          ..write('groupId: $groupId, ')
+          ..write('comicStorageKey: $comicStorageKey, ')
+          ..write('deletedAtMs: $deletedAtMs, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 abstract class _$HazukiDatabase extends GeneratedDatabase {
   _$HazukiDatabase(QueryExecutor e) : super(e);
   $HazukiDatabaseManager get managers => $HazukiDatabaseManager(this);
@@ -2821,6 +3880,13 @@ abstract class _$HazukiDatabase extends GeneratedDatabase {
       $LocalFavoriteFolderTombstonesTable(this);
   late final $LocalFavoriteEntryTombstonesTable localFavoriteEntryTombstones =
       $LocalFavoriteEntryTombstonesTable(this);
+  late final $DownloadGroupsTable downloadGroups = $DownloadGroupsTable(this);
+  late final $DownloadGroupComicsTable downloadGroupComics =
+      $DownloadGroupComicsTable(this);
+  late final $DownloadGroupTombstonesTable downloadGroupTombstones =
+      $DownloadGroupTombstonesTable(this);
+  late final $DownloadGroupComicTombstonesTable downloadGroupComicTombstones =
+      $DownloadGroupComicTombstonesTable(this);
   @override
   Iterable<TableInfo<Table, Object?>> get allTables =>
       allSchemaEntities.whereType<TableInfo<Table, Object?>>();
@@ -2834,6 +3900,10 @@ abstract class _$HazukiDatabase extends GeneratedDatabase {
     localFavoriteComicFolders,
     localFavoriteFolderTombstones,
     localFavoriteEntryTombstones,
+    downloadGroups,
+    downloadGroupComics,
+    downloadGroupTombstones,
+    downloadGroupComicTombstones,
   ];
 }
 
@@ -4520,6 +5590,705 @@ typedef $$LocalFavoriteEntryTombstonesTableProcessedTableManager =
       LocalFavoriteEntryTombstone,
       PrefetchHooks Function()
     >;
+typedef $$DownloadGroupsTableCreateCompanionBuilder =
+    DownloadGroupsCompanion Function({
+      required String id,
+      required String name,
+      required int createdAtMs,
+      Value<int> rowid,
+    });
+typedef $$DownloadGroupsTableUpdateCompanionBuilder =
+    DownloadGroupsCompanion Function({
+      Value<String> id,
+      Value<String> name,
+      Value<int> createdAtMs,
+      Value<int> rowid,
+    });
+
+class $$DownloadGroupsTableFilterComposer
+    extends Composer<_$HazukiDatabase, $DownloadGroupsTable> {
+  $$DownloadGroupsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get createdAtMs => $composableBuilder(
+    column: $table.createdAtMs,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$DownloadGroupsTableOrderingComposer
+    extends Composer<_$HazukiDatabase, $DownloadGroupsTable> {
+  $$DownloadGroupsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get createdAtMs => $composableBuilder(
+    column: $table.createdAtMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$DownloadGroupsTableAnnotationComposer
+    extends Composer<_$HazukiDatabase, $DownloadGroupsTable> {
+  $$DownloadGroupsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<int> get createdAtMs => $composableBuilder(
+    column: $table.createdAtMs,
+    builder: (column) => column,
+  );
+}
+
+class $$DownloadGroupsTableTableManager
+    extends
+        RootTableManager<
+          _$HazukiDatabase,
+          $DownloadGroupsTable,
+          DownloadGroup,
+          $$DownloadGroupsTableFilterComposer,
+          $$DownloadGroupsTableOrderingComposer,
+          $$DownloadGroupsTableAnnotationComposer,
+          $$DownloadGroupsTableCreateCompanionBuilder,
+          $$DownloadGroupsTableUpdateCompanionBuilder,
+          (
+            DownloadGroup,
+            BaseReferences<
+              _$HazukiDatabase,
+              $DownloadGroupsTable,
+              DownloadGroup
+            >,
+          ),
+          DownloadGroup,
+          PrefetchHooks Function()
+        > {
+  $$DownloadGroupsTableTableManager(
+    _$HazukiDatabase db,
+    $DownloadGroupsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$DownloadGroupsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$DownloadGroupsTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$DownloadGroupsTableAnnotationComposer($db: db, $table: table),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<int> createdAtMs = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => DownloadGroupsCompanion(
+                id: id,
+                name: name,
+                createdAtMs: createdAtMs,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String name,
+                required int createdAtMs,
+                Value<int> rowid = const Value.absent(),
+              }) => DownloadGroupsCompanion.insert(
+                id: id,
+                name: name,
+                createdAtMs: createdAtMs,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$DownloadGroupsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$HazukiDatabase,
+      $DownloadGroupsTable,
+      DownloadGroup,
+      $$DownloadGroupsTableFilterComposer,
+      $$DownloadGroupsTableOrderingComposer,
+      $$DownloadGroupsTableAnnotationComposer,
+      $$DownloadGroupsTableCreateCompanionBuilder,
+      $$DownloadGroupsTableUpdateCompanionBuilder,
+      (
+        DownloadGroup,
+        BaseReferences<_$HazukiDatabase, $DownloadGroupsTable, DownloadGroup>,
+      ),
+      DownloadGroup,
+      PrefetchHooks Function()
+    >;
+typedef $$DownloadGroupComicsTableCreateCompanionBuilder =
+    DownloadGroupComicsCompanion Function({
+      required String groupId,
+      required String comicStorageKey,
+      required int addedAtMs,
+      Value<int> rowid,
+    });
+typedef $$DownloadGroupComicsTableUpdateCompanionBuilder =
+    DownloadGroupComicsCompanion Function({
+      Value<String> groupId,
+      Value<String> comicStorageKey,
+      Value<int> addedAtMs,
+      Value<int> rowid,
+    });
+
+class $$DownloadGroupComicsTableFilterComposer
+    extends Composer<_$HazukiDatabase, $DownloadGroupComicsTable> {
+  $$DownloadGroupComicsTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get groupId => $composableBuilder(
+    column: $table.groupId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get comicStorageKey => $composableBuilder(
+    column: $table.comicStorageKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get addedAtMs => $composableBuilder(
+    column: $table.addedAtMs,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$DownloadGroupComicsTableOrderingComposer
+    extends Composer<_$HazukiDatabase, $DownloadGroupComicsTable> {
+  $$DownloadGroupComicsTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get groupId => $composableBuilder(
+    column: $table.groupId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get comicStorageKey => $composableBuilder(
+    column: $table.comicStorageKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get addedAtMs => $composableBuilder(
+    column: $table.addedAtMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$DownloadGroupComicsTableAnnotationComposer
+    extends Composer<_$HazukiDatabase, $DownloadGroupComicsTable> {
+  $$DownloadGroupComicsTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get groupId =>
+      $composableBuilder(column: $table.groupId, builder: (column) => column);
+
+  GeneratedColumn<String> get comicStorageKey => $composableBuilder(
+    column: $table.comicStorageKey,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get addedAtMs =>
+      $composableBuilder(column: $table.addedAtMs, builder: (column) => column);
+}
+
+class $$DownloadGroupComicsTableTableManager
+    extends
+        RootTableManager<
+          _$HazukiDatabase,
+          $DownloadGroupComicsTable,
+          DownloadGroupComic,
+          $$DownloadGroupComicsTableFilterComposer,
+          $$DownloadGroupComicsTableOrderingComposer,
+          $$DownloadGroupComicsTableAnnotationComposer,
+          $$DownloadGroupComicsTableCreateCompanionBuilder,
+          $$DownloadGroupComicsTableUpdateCompanionBuilder,
+          (
+            DownloadGroupComic,
+            BaseReferences<
+              _$HazukiDatabase,
+              $DownloadGroupComicsTable,
+              DownloadGroupComic
+            >,
+          ),
+          DownloadGroupComic,
+          PrefetchHooks Function()
+        > {
+  $$DownloadGroupComicsTableTableManager(
+    _$HazukiDatabase db,
+    $DownloadGroupComicsTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$DownloadGroupComicsTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$DownloadGroupComicsTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$DownloadGroupComicsTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> groupId = const Value.absent(),
+                Value<String> comicStorageKey = const Value.absent(),
+                Value<int> addedAtMs = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => DownloadGroupComicsCompanion(
+                groupId: groupId,
+                comicStorageKey: comicStorageKey,
+                addedAtMs: addedAtMs,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String groupId,
+                required String comicStorageKey,
+                required int addedAtMs,
+                Value<int> rowid = const Value.absent(),
+              }) => DownloadGroupComicsCompanion.insert(
+                groupId: groupId,
+                comicStorageKey: comicStorageKey,
+                addedAtMs: addedAtMs,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$DownloadGroupComicsTableProcessedTableManager =
+    ProcessedTableManager<
+      _$HazukiDatabase,
+      $DownloadGroupComicsTable,
+      DownloadGroupComic,
+      $$DownloadGroupComicsTableFilterComposer,
+      $$DownloadGroupComicsTableOrderingComposer,
+      $$DownloadGroupComicsTableAnnotationComposer,
+      $$DownloadGroupComicsTableCreateCompanionBuilder,
+      $$DownloadGroupComicsTableUpdateCompanionBuilder,
+      (
+        DownloadGroupComic,
+        BaseReferences<
+          _$HazukiDatabase,
+          $DownloadGroupComicsTable,
+          DownloadGroupComic
+        >,
+      ),
+      DownloadGroupComic,
+      PrefetchHooks Function()
+    >;
+typedef $$DownloadGroupTombstonesTableCreateCompanionBuilder =
+    DownloadGroupTombstonesCompanion Function({
+      required String groupId,
+      required int deletedAtMs,
+      Value<int> rowid,
+    });
+typedef $$DownloadGroupTombstonesTableUpdateCompanionBuilder =
+    DownloadGroupTombstonesCompanion Function({
+      Value<String> groupId,
+      Value<int> deletedAtMs,
+      Value<int> rowid,
+    });
+
+class $$DownloadGroupTombstonesTableFilterComposer
+    extends Composer<_$HazukiDatabase, $DownloadGroupTombstonesTable> {
+  $$DownloadGroupTombstonesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get groupId => $composableBuilder(
+    column: $table.groupId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$DownloadGroupTombstonesTableOrderingComposer
+    extends Composer<_$HazukiDatabase, $DownloadGroupTombstonesTable> {
+  $$DownloadGroupTombstonesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get groupId => $composableBuilder(
+    column: $table.groupId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$DownloadGroupTombstonesTableAnnotationComposer
+    extends Composer<_$HazukiDatabase, $DownloadGroupTombstonesTable> {
+  $$DownloadGroupTombstonesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get groupId =>
+      $composableBuilder(column: $table.groupId, builder: (column) => column);
+
+  GeneratedColumn<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => column,
+  );
+}
+
+class $$DownloadGroupTombstonesTableTableManager
+    extends
+        RootTableManager<
+          _$HazukiDatabase,
+          $DownloadGroupTombstonesTable,
+          DownloadGroupTombstone,
+          $$DownloadGroupTombstonesTableFilterComposer,
+          $$DownloadGroupTombstonesTableOrderingComposer,
+          $$DownloadGroupTombstonesTableAnnotationComposer,
+          $$DownloadGroupTombstonesTableCreateCompanionBuilder,
+          $$DownloadGroupTombstonesTableUpdateCompanionBuilder,
+          (
+            DownloadGroupTombstone,
+            BaseReferences<
+              _$HazukiDatabase,
+              $DownloadGroupTombstonesTable,
+              DownloadGroupTombstone
+            >,
+          ),
+          DownloadGroupTombstone,
+          PrefetchHooks Function()
+        > {
+  $$DownloadGroupTombstonesTableTableManager(
+    _$HazukiDatabase db,
+    $DownloadGroupTombstonesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$DownloadGroupTombstonesTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$DownloadGroupTombstonesTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$DownloadGroupTombstonesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> groupId = const Value.absent(),
+                Value<int> deletedAtMs = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => DownloadGroupTombstonesCompanion(
+                groupId: groupId,
+                deletedAtMs: deletedAtMs,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String groupId,
+                required int deletedAtMs,
+                Value<int> rowid = const Value.absent(),
+              }) => DownloadGroupTombstonesCompanion.insert(
+                groupId: groupId,
+                deletedAtMs: deletedAtMs,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$DownloadGroupTombstonesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$HazukiDatabase,
+      $DownloadGroupTombstonesTable,
+      DownloadGroupTombstone,
+      $$DownloadGroupTombstonesTableFilterComposer,
+      $$DownloadGroupTombstonesTableOrderingComposer,
+      $$DownloadGroupTombstonesTableAnnotationComposer,
+      $$DownloadGroupTombstonesTableCreateCompanionBuilder,
+      $$DownloadGroupTombstonesTableUpdateCompanionBuilder,
+      (
+        DownloadGroupTombstone,
+        BaseReferences<
+          _$HazukiDatabase,
+          $DownloadGroupTombstonesTable,
+          DownloadGroupTombstone
+        >,
+      ),
+      DownloadGroupTombstone,
+      PrefetchHooks Function()
+    >;
+typedef $$DownloadGroupComicTombstonesTableCreateCompanionBuilder =
+    DownloadGroupComicTombstonesCompanion Function({
+      required String groupId,
+      required String comicStorageKey,
+      required int deletedAtMs,
+      Value<int> rowid,
+    });
+typedef $$DownloadGroupComicTombstonesTableUpdateCompanionBuilder =
+    DownloadGroupComicTombstonesCompanion Function({
+      Value<String> groupId,
+      Value<String> comicStorageKey,
+      Value<int> deletedAtMs,
+      Value<int> rowid,
+    });
+
+class $$DownloadGroupComicTombstonesTableFilterComposer
+    extends Composer<_$HazukiDatabase, $DownloadGroupComicTombstonesTable> {
+  $$DownloadGroupComicTombstonesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get groupId => $composableBuilder(
+    column: $table.groupId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get comicStorageKey => $composableBuilder(
+    column: $table.comicStorageKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$DownloadGroupComicTombstonesTableOrderingComposer
+    extends Composer<_$HazukiDatabase, $DownloadGroupComicTombstonesTable> {
+  $$DownloadGroupComicTombstonesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get groupId => $composableBuilder(
+    column: $table.groupId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get comicStorageKey => $composableBuilder(
+    column: $table.comicStorageKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$DownloadGroupComicTombstonesTableAnnotationComposer
+    extends Composer<_$HazukiDatabase, $DownloadGroupComicTombstonesTable> {
+  $$DownloadGroupComicTombstonesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get groupId =>
+      $composableBuilder(column: $table.groupId, builder: (column) => column);
+
+  GeneratedColumn<String> get comicStorageKey => $composableBuilder(
+    column: $table.comicStorageKey,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => column,
+  );
+}
+
+class $$DownloadGroupComicTombstonesTableTableManager
+    extends
+        RootTableManager<
+          _$HazukiDatabase,
+          $DownloadGroupComicTombstonesTable,
+          DownloadGroupComicTombstone,
+          $$DownloadGroupComicTombstonesTableFilterComposer,
+          $$DownloadGroupComicTombstonesTableOrderingComposer,
+          $$DownloadGroupComicTombstonesTableAnnotationComposer,
+          $$DownloadGroupComicTombstonesTableCreateCompanionBuilder,
+          $$DownloadGroupComicTombstonesTableUpdateCompanionBuilder,
+          (
+            DownloadGroupComicTombstone,
+            BaseReferences<
+              _$HazukiDatabase,
+              $DownloadGroupComicTombstonesTable,
+              DownloadGroupComicTombstone
+            >,
+          ),
+          DownloadGroupComicTombstone,
+          PrefetchHooks Function()
+        > {
+  $$DownloadGroupComicTombstonesTableTableManager(
+    _$HazukiDatabase db,
+    $DownloadGroupComicTombstonesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$DownloadGroupComicTombstonesTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$DownloadGroupComicTombstonesTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$DownloadGroupComicTombstonesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> groupId = const Value.absent(),
+                Value<String> comicStorageKey = const Value.absent(),
+                Value<int> deletedAtMs = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => DownloadGroupComicTombstonesCompanion(
+                groupId: groupId,
+                comicStorageKey: comicStorageKey,
+                deletedAtMs: deletedAtMs,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String groupId,
+                required String comicStorageKey,
+                required int deletedAtMs,
+                Value<int> rowid = const Value.absent(),
+              }) => DownloadGroupComicTombstonesCompanion.insert(
+                groupId: groupId,
+                comicStorageKey: comicStorageKey,
+                deletedAtMs: deletedAtMs,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$DownloadGroupComicTombstonesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$HazukiDatabase,
+      $DownloadGroupComicTombstonesTable,
+      DownloadGroupComicTombstone,
+      $$DownloadGroupComicTombstonesTableFilterComposer,
+      $$DownloadGroupComicTombstonesTableOrderingComposer,
+      $$DownloadGroupComicTombstonesTableAnnotationComposer,
+      $$DownloadGroupComicTombstonesTableCreateCompanionBuilder,
+      $$DownloadGroupComicTombstonesTableUpdateCompanionBuilder,
+      (
+        DownloadGroupComicTombstone,
+        BaseReferences<
+          _$HazukiDatabase,
+          $DownloadGroupComicTombstonesTable,
+          DownloadGroupComicTombstone
+        >,
+      ),
+      DownloadGroupComicTombstone,
+      PrefetchHooks Function()
+    >;
 
 class $HazukiDatabaseManager {
   final _$HazukiDatabase _db;
@@ -4553,5 +6322,20 @@ class $HazukiDatabaseManager {
       $$LocalFavoriteEntryTombstonesTableTableManager(
         _db,
         _db.localFavoriteEntryTombstones,
+      );
+  $$DownloadGroupsTableTableManager get downloadGroups =>
+      $$DownloadGroupsTableTableManager(_db, _db.downloadGroups);
+  $$DownloadGroupComicsTableTableManager get downloadGroupComics =>
+      $$DownloadGroupComicsTableTableManager(_db, _db.downloadGroupComics);
+  $$DownloadGroupTombstonesTableTableManager get downloadGroupTombstones =>
+      $$DownloadGroupTombstonesTableTableManager(
+        _db,
+        _db.downloadGroupTombstones,
+      );
+  $$DownloadGroupComicTombstonesTableTableManager
+  get downloadGroupComicTombstones =>
+      $$DownloadGroupComicTombstonesTableTableManager(
+        _db,
+        _db.downloadGroupComicTombstones,
       );
 }

@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/manga_download/manga_download_service.dart';
+import 'package:hazuki/services/download_groups_service.dart';
 import 'downloads_cover_widgets.dart';
 import 'downloads_shell_widgets.dart';
 
@@ -21,6 +24,13 @@ class DownloadsCompletedTab extends StatefulWidget {
     required this.onScanDownloaded,
     required this.onOpenComic,
     required this.onDeleteComic,
+    required this.groups,
+    required this.selectedGroupId,
+    required this.selectedGroupName,
+    required this.onSelectGroup,
+    required this.onCreateGroup,
+    required this.onDeleteGroup,
+    required this.onShowComicMenu,
   });
 
   final List<DownloadedMangaComic> comics;
@@ -35,6 +45,18 @@ class DownloadsCompletedTab extends StatefulWidget {
   final VoidCallback onScanDownloaded;
   final ValueChanged<DownloadedMangaComic> onOpenComic;
   final ValueChanged<DownloadedMangaComic> onDeleteComic;
+  final List<DownloadGroup> groups;
+  final String selectedGroupId;
+  final String selectedGroupName;
+  final ValueChanged<String> onSelectGroup;
+  final Future<DownloadGroup> Function(String name) onCreateGroup;
+  final Future<void> Function(String groupId) onDeleteGroup;
+  final Future<void> Function(
+    DownloadedMangaComic comic,
+    Offset globalPosition,
+    BuildContext itemContext,
+  )
+  onShowComicMenu;
 
   static const Duration dismissDuration = Duration(milliseconds: 320);
 
@@ -43,17 +65,31 @@ class DownloadsCompletedTab extends StatefulWidget {
 }
 
 class _DownloadsCompletedTabState extends State<DownloadsCompletedTab> {
+  static const double _backToTopThreshold = 280;
+
   final GlobalKey _stackKey = GlobalKey();
+  final ScrollController _scrollController = ScrollController();
   List<_AnimatedDownloadedComicEntry> _visibleComics =
       const <_AnimatedDownloadedComicEntry>[];
   _DownloadedComicSwipeReveal? _swipeReveal;
+  bool _showBackToTop = false;
+  bool _categoryShellOpen = false;
+  int _categoryLauncherLandingVersion = 0;
 
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_handleScrollChanged);
     _visibleComics = widget.comics
         .map((comic) => _AnimatedDownloadedComicEntry(comic: comic))
         .toList(growable: false);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_handleScrollChanged);
+    _scrollController.dispose();
+    super.dispose();
   }
 
   @override
@@ -67,7 +103,32 @@ class _DownloadsCompletedTabState extends State<DownloadsCompletedTab> {
             ))) {
       _swipeReveal = null;
     }
+    if ((!widget.active || widget.comics.isEmpty) && _showBackToTop) {
+      _showBackToTop = false;
+    }
     _syncVisibleComics();
+  }
+
+  void _handleScrollChanged() {
+    final showBackToTop =
+        widget.active && _scrollController.offset >= _backToTopThreshold;
+    if (_showBackToTop == showBackToTop) {
+      return;
+    }
+    setState(() {
+      _showBackToTop = showBackToTop;
+    });
+  }
+
+  Future<void> _scrollToTop() async {
+    if (!_scrollController.hasClients) {
+      return;
+    }
+    await _scrollController.animateTo(
+      0,
+      duration: const Duration(milliseconds: 360),
+      curve: Curves.easeOutCubic,
+    );
   }
 
   void _closeSwipeReveal() {
@@ -221,12 +282,14 @@ class _DownloadsCompletedTabState extends State<DownloadsCompletedTab> {
 
   @override
   Widget build(BuildContext context) {
-    final content = _visibleComics.isEmpty
+    final listContent = _visibleComics.isEmpty
         ? Center(child: Text(l10n(context).downloadsEmptyDownloaded))
         : NotificationListener<ScrollNotification>(
             onNotification: _handleScrollNotification,
             child: ListView.builder(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
+              key: const ValueKey<String>('downloaded_comics_list'),
+              controller: _scrollController,
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
               itemCount: _visibleComics.length,
               itemBuilder: (context, index) {
                 final entry = _visibleComics[index];
@@ -246,10 +309,22 @@ class _DownloadsCompletedTabState extends State<DownloadsCompletedTab> {
                   onSwipeRevealChanged: _handleSwipeReveal,
                   onToggleSelection: widget.onToggleSelection,
                   onOpenComic: _handleOpenComic,
+                  onShowComicMenu: widget.onShowComicMenu,
                 );
               },
             ),
           );
+    final content = Column(
+      children: [
+        DownloadsCategoryMorphLauncher(
+          visible: !_categoryShellOpen,
+          landingVersion: _categoryLauncherLandingVersion,
+          label: widget.selectedGroupName,
+          onPressed: _showCategoryShell,
+        ),
+        Expanded(child: listContent),
+      ],
+    );
     final bottomInset = MediaQuery.paddingOf(context).bottom;
     return Stack(
       key: _stackKey,
@@ -268,8 +343,10 @@ class _DownloadsCompletedTabState extends State<DownloadsCompletedTab> {
               onDeleteComic: _handleDeleteComic,
             ),
           ),
-        Positioned(
-          right: 16,
+        AnimatedPositioned(
+          duration: const Duration(milliseconds: 240),
+          curve: Curves.easeOutCubic,
+          right: _showBackToTop ? 84 : 16,
           bottom: 16 + bottomInset,
           child: DownloadsScanButton(
             selectionMode: widget.selectionMode,
@@ -279,7 +356,593 @@ class _DownloadsCompletedTabState extends State<DownloadsCompletedTab> {
             onScanDownloaded: widget.onScanDownloaded,
           ),
         ),
+        Positioned(
+          right: 16,
+          bottom: 16 + bottomInset,
+          child: DownloadsBackToTopButton(
+            visible: _showBackToTop,
+            onPressed: _scrollToTop,
+          ),
+        ),
       ],
+    );
+  }
+
+  Future<void> _showCategoryShell() async {
+    if (_categoryShellOpen) {
+      return;
+    }
+    _closeSwipeReveal();
+    setState(() {
+      _categoryShellOpen = true;
+    });
+    await showGeneralDialog<void>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+      barrierColor: Colors.black.withValues(alpha: 0.34),
+      transitionDuration: const Duration(milliseconds: 420),
+      pageBuilder: (dialogContext, animation, secondaryAnimation) {
+        return DownloadsCategoryShellDialog(
+          animation: animation,
+          onDisposed: _restoreCategoryLauncher,
+          groups: widget.groups,
+          selectedGroupId: widget.selectedGroupId,
+          onSelectGroup: widget.onSelectGroup,
+          onCreateGroup: widget.onCreateGroup,
+          onDeleteGroup: widget.onDeleteGroup,
+        );
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        return child;
+      },
+    );
+  }
+
+  void _restoreCategoryLauncher() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        setState(() {
+          _categoryShellOpen = false;
+          _categoryLauncherLandingVersion++;
+        });
+      }
+    });
+  }
+}
+
+class DownloadsCategoryMorphLauncher extends StatefulWidget {
+  const DownloadsCategoryMorphLauncher({
+    super.key,
+    required this.visible,
+    required this.landingVersion,
+    required this.onPressed,
+    required this.label,
+  });
+
+  static const double height = 36;
+  static const double cornerRadius = 12;
+
+  final bool visible;
+  final int landingVersion;
+  final VoidCallback onPressed;
+  final String label;
+
+  @override
+  State<DownloadsCategoryMorphLauncher> createState() =>
+      _DownloadsCategoryMorphLauncherState();
+}
+
+class _DownloadsCategoryMorphLauncherState
+    extends State<DownloadsCategoryMorphLauncher>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _landingController;
+  late final Animation<double> _landingOffset;
+  late final Animation<double> _landingScale;
+
+  @override
+  void initState() {
+    super.initState();
+    _landingController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 300),
+      value: 1,
+    );
+    final landingCurve = CurvedAnimation(
+      parent: _landingController,
+      curve: Curves.easeOutCubic,
+    );
+    _landingOffset = Tween<double>(begin: -3, end: 0).animate(landingCurve);
+    _landingScale = Tween<double>(begin: 0.995, end: 1).animate(landingCurve);
+  }
+
+  @override
+  void didUpdateWidget(covariant DownloadsCategoryMorphLauncher oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.visible && widget.landingVersion != oldWidget.landingVersion) {
+      _landingController.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _landingController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final radius = BorderRadius.circular(
+      DownloadsCategoryMorphLauncher.cornerRadius,
+    );
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: AnimatedBuilder(
+            animation: _landingController,
+            builder: (context, child) {
+              return Transform.translate(
+                key: const ValueKey<String>(
+                  'downloads_category_launcher_landing',
+                ),
+                offset: Offset(0, _landingOffset.value),
+                child: Transform.scale(
+                  scale: _landingScale.value,
+                  child: child,
+                ),
+              );
+            },
+            child: Opacity(
+              key: const ValueKey<String>(
+                'downloads_category_launcher_opacity',
+              ),
+              opacity: widget.visible ? 1 : 0,
+              child: IgnorePointer(
+                ignoring: !widget.visible,
+                child: DecoratedBox(
+                  key: const ValueKey<String>('downloads_category_launcher'),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primaryContainer,
+                    borderRadius: radius,
+                    border: Border.all(
+                      color: colorScheme.primary.withValues(alpha: 0.24),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: colorScheme.shadow.withValues(alpha: 0.12),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    borderRadius: radius,
+                    clipBehavior: Clip.antiAlias,
+                    child: InkWell(
+                      onTap: widget.onPressed,
+                      child: SizedBox(
+                        height: DownloadsCategoryMorphLauncher.height,
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.folder_copy_outlined,
+                              size: 16,
+                              color: colorScheme.onPrimaryContainer,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              widget.label,
+                              style: theme.textTheme.labelMedium?.copyWith(
+                                color: colorScheme.onPrimaryContainer,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(width: 2),
+                            Icon(
+                              Icons.keyboard_arrow_down_rounded,
+                              size: 17,
+                              color: colorScheme.onPrimaryContainer,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class DownloadsCategoryShellDialog extends StatefulWidget {
+  const DownloadsCategoryShellDialog({
+    super.key,
+    required this.animation,
+    required this.onDisposed,
+    required this.groups,
+    required this.selectedGroupId,
+    required this.onSelectGroup,
+    required this.onCreateGroup,
+    required this.onDeleteGroup,
+  });
+
+  static const double _dialogHeight = 270;
+
+  final Animation<double> animation;
+  final VoidCallback onDisposed;
+  final List<DownloadGroup> groups;
+  final String selectedGroupId;
+  final ValueChanged<String> onSelectGroup;
+  final Future<DownloadGroup> Function(String name) onCreateGroup;
+  final Future<void> Function(String groupId) onDeleteGroup;
+
+  @override
+  State<DownloadsCategoryShellDialog> createState() =>
+      _DownloadsCategoryShellDialogState();
+}
+
+class _DownloadsCategoryShellDialogState
+    extends State<DownloadsCategoryShellDialog> {
+  late List<DownloadGroup> _groups;
+  late String _selectedGroupId;
+
+  @override
+  void initState() {
+    super.initState();
+    _groups = List.of(widget.groups);
+    _selectedGroupId = widget.selectedGroupId;
+  }
+
+  @override
+  void dispose() {
+    widget.onDisposed();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final dialogWidth = (constraints.maxWidth - 32).clamp(0.0, 420.0);
+        final horizontalPosition = (constraints.maxWidth - dialogWidth) / 2;
+        final startTop = mediaQuery.padding.top + kToolbarHeight + 56;
+        final endCenterY = constraints.maxHeight / 2;
+        final startRect = Rect.fromLTWH(
+          horizontalPosition,
+          startTop,
+          dialogWidth,
+          DownloadsCategoryMorphLauncher.height,
+        );
+        final centeredBarRect = Rect.fromCenter(
+          center: Offset(constraints.maxWidth / 2, endCenterY),
+          width: dialogWidth,
+          height: DownloadsCategoryMorphLauncher.height,
+        );
+        return AnimatedBuilder(
+          animation: widget.animation,
+          builder: (context, child) {
+            final progress = widget.animation.value;
+            final moveProgress = const Interval(
+              0,
+              0.78,
+              curve: Curves.easeOutCubic,
+            ).transform(progress);
+            final expandProgress = const Interval(
+              0.08,
+              1,
+              curve: Curves.easeOutCubic,
+            ).transform(progress);
+            final movingRect = Rect.lerp(
+              startRect,
+              centeredBarRect,
+              moveProgress,
+            )!;
+            final rect = Rect.fromCenter(
+              center: movingRect.center,
+              width: dialogWidth,
+              height:
+                  DownloadsCategoryMorphLauncher.height +
+                  ((DownloadsCategoryShellDialog._dialogHeight -
+                          DownloadsCategoryMorphLauncher.height) *
+                      expandProgress),
+            );
+            final contentOpacity = const Interval(
+              0.42,
+              0.78,
+              curve: Curves.easeOutCubic,
+            ).transform(progress);
+            final launcherOpacity =
+                1 - const Interval(0.12, 0.42).transform(progress);
+            final shellColor = Color.lerp(
+              colorScheme.primaryContainer,
+              colorScheme.surfaceContainerHigh,
+              expandProgress,
+            )!;
+            final borderColor = Color.lerp(
+              colorScheme.primary.withValues(alpha: 0.24),
+              Colors.transparent,
+              expandProgress,
+            )!;
+            return Stack(
+              key: const ValueKey<String>('downloads_category_morph_animation'),
+              children: [
+                Positioned.fromRect(
+                  rect: rect,
+                  child: Material(
+                    key: const ValueKey<String>('downloads_category_dialog'),
+                    color: shellColor,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(
+                        DownloadsCategoryMorphLauncher.cornerRadius +
+                            (16 * expandProgress),
+                      ),
+                      side: BorderSide(color: borderColor),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    elevation: 4 + (4 * expandProgress),
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Opacity(
+                          opacity: launcherOpacity,
+                          child: _DownloadsCategoryLauncherContents(
+                            color: colorScheme.onPrimaryContainer,
+                          ),
+                        ),
+                        Positioned.fill(
+                          child: ClipRect(
+                            child: OverflowBox(
+                              alignment: Alignment.topCenter,
+                              minHeight:
+                                  DownloadsCategoryShellDialog._dialogHeight,
+                              maxHeight:
+                                  DownloadsCategoryShellDialog._dialogHeight,
+                              child: Opacity(
+                                opacity: contentOpacity,
+                                child: _DownloadsCategoryShellContents(
+                                  groups: _groups,
+                                  selectedGroupId: _selectedGroupId,
+                                  onSelectGroup: (groupId) {
+                                    widget.onSelectGroup(groupId);
+                                    Navigator.of(context).pop();
+                                  },
+                                  onCreateGroup: _createGroup,
+                                  onDeleteGroup: _deleteGroup,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _createGroup() async {
+    final name = await _showCreateGroupDialog(context);
+    if (name == null || !mounted) return;
+    final group = await widget.onCreateGroup(name);
+    if (!mounted) return;
+    setState(() => _groups = [..._groups, group]);
+  }
+
+  Future<void> _deleteGroup(DownloadGroup group) async {
+    final strings = l10n(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(strings.downloadsDeleteGroupTitle),
+        content: Text(strings.downloadsDeleteGroupContent(group.name)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(strings.commonCancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(strings.comicDetailDelete),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    await widget.onDeleteGroup(group.id);
+    if (!mounted) return;
+    setState(() {
+      _groups = _groups.where((item) => item.id != group.id).toList();
+      if (_selectedGroupId == group.id) {
+        _selectedGroupId = DownloadGroupsService.defaultGroupId;
+      }
+    });
+  }
+}
+
+class _DownloadsCategoryLauncherContents extends StatelessWidget {
+  const _DownloadsCategoryLauncherContents({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(Icons.folder_copy_outlined, size: 16, color: color),
+        const SizedBox(width: 6),
+        Text(
+          l10n(context).comicDetailCategories,
+          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+            color: color,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(width: 2),
+        Icon(Icons.keyboard_arrow_down_rounded, size: 17, color: color),
+      ],
+    );
+  }
+}
+
+class _DownloadsCategoryShellContents extends StatelessWidget {
+  const _DownloadsCategoryShellContents({
+    required this.groups,
+    required this.selectedGroupId,
+    required this.onSelectGroup,
+    required this.onCreateGroup,
+    required this.onDeleteGroup,
+  });
+
+  final List<DownloadGroup> groups;
+  final String selectedGroupId;
+  final ValueChanged<String> onSelectGroup;
+  final VoidCallback onCreateGroup;
+  final ValueChanged<DownloadGroup> onDeleteGroup;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = l10n(context);
+    final theme = Theme.of(context);
+    return SizedBox(
+      height: DownloadsCategoryShellDialog._dialogHeight,
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    strings.downloadsGroupsTitle,
+                    style: theme.textTheme.titleLarge,
+                  ),
+                ),
+                IconButton(
+                  tooltip: strings.downloadsNewGroup,
+                  onPressed: onCreateGroup,
+                  icon: const Icon(Icons.create_new_folder_outlined),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Expanded(
+              child: ListView.builder(
+                itemCount: groups.length,
+                itemBuilder: (context, index) {
+                  final group = groups[index];
+                  final selected = group.id == selectedGroupId;
+                  return TweenAnimationBuilder<double>(
+                    key: ValueKey<String>('download_group_${group.id}'),
+                    tween: Tween(begin: 0, end: 1),
+                    duration: const Duration(milliseconds: 280),
+                    curve: Curves.easeOutCubic,
+                    builder: (context, value, child) => Opacity(
+                      opacity: value,
+                      child: Transform.translate(
+                        offset: Offset(0, 10 * (1 - value)),
+                        child: child,
+                      ),
+                    ),
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.only(left: 8, right: 2),
+                      leading: Icon(
+                        selected
+                            ? Icons.folder_open_rounded
+                            : Icons.folder_outlined,
+                      ),
+                      title: Text(
+                        group.isDefault
+                            ? strings.downloadsDefaultGroup
+                            : group.name,
+                      ),
+                      trailing: group.isDefault
+                          ? (selected ? const Icon(Icons.check_rounded) : null)
+                          : Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (selected) const Icon(Icons.check_rounded),
+                                IconButton(
+                                  tooltip: strings.comicDetailDelete,
+                                  onPressed: () => onDeleteGroup(group),
+                                  icon: const Icon(Icons.delete_outline),
+                                ),
+                              ],
+                            ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      tileColor: selected
+                          ? theme.colorScheme.secondaryContainer
+                          : null,
+                      onTap: () => onSelectGroup(group.id),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class DownloadsBackToTopButton extends StatelessWidget {
+  const DownloadsBackToTopButton({
+    super.key,
+    required this.visible,
+    required this.onPressed,
+  });
+
+  final bool visible;
+  final Future<void> Function() onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSlide(
+      key: const ValueKey<String>('downloads_back_to_top_animation'),
+      offset: visible ? Offset.zero : const Offset(1.5, 0),
+      duration: const Duration(milliseconds: 240),
+      curve: Curves.easeOutCubic,
+      child: AnimatedScale(
+        scale: visible ? 1 : 0.82,
+        duration: const Duration(milliseconds: 240),
+        curve: Curves.easeOutCubic,
+        child: AnimatedOpacity(
+          opacity: visible ? 1 : 0,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOutCubic,
+          child: IgnorePointer(
+            ignoring: !visible,
+            child: FloatingActionButton(
+              key: const ValueKey<String>('downloads_back_to_top_button'),
+              heroTag: 'downloads_back_to_top',
+              onPressed: () => unawaited(onPressed()),
+              child: const Icon(Icons.vertical_align_top_rounded),
+            ),
+          ),
+        ),
+      ),
     );
   }
 }
@@ -297,6 +960,7 @@ class _AnimatedDownloadedComicCard extends StatelessWidget {
     required this.onSwipeRevealChanged,
     required this.onToggleSelection,
     required this.onOpenComic,
+    required this.onShowComicMenu,
   });
 
   final _AnimatedDownloadedComicEntry entry;
@@ -309,6 +973,12 @@ class _AnimatedDownloadedComicCard extends StatelessWidget {
   final ValueChanged<_DownloadedComicSwipeReveal> onSwipeRevealChanged;
   final ValueChanged<String> onToggleSelection;
   final ValueChanged<DownloadedMangaComic> onOpenComic;
+  final Future<void> Function(
+    DownloadedMangaComic comic,
+    Offset globalPosition,
+    BuildContext itemContext,
+  )
+  onShowComicMenu;
 
   @override
   Widget build(BuildContext context) {
@@ -356,6 +1026,7 @@ class _AnimatedDownloadedComicCard extends StatelessWidget {
           hasIntegrityIssue: hasIntegrityIssue,
           onToggleSelection: onToggleSelection,
           onOpenComic: onOpenComic,
+          onShowComicMenu: onShowComicMenu,
         ),
       ),
     );
@@ -700,6 +1371,7 @@ class _DownloadedComicCardContent extends StatelessWidget {
     required this.hasIntegrityIssue,
     required this.onToggleSelection,
     required this.onOpenComic,
+    required this.onShowComicMenu,
   });
 
   final DownloadedMangaComic comic;
@@ -708,6 +1380,12 @@ class _DownloadedComicCardContent extends StatelessWidget {
   final bool hasIntegrityIssue;
   final ValueChanged<String> onToggleSelection;
   final ValueChanged<DownloadedMangaComic> onOpenComic;
+  final Future<void> Function(
+    DownloadedMangaComic comic,
+    Offset globalPosition,
+    BuildContext itemContext,
+  )
+  onShowComicMenu;
 
   @override
   Widget build(BuildContext context) {
@@ -738,76 +1416,137 @@ class _DownloadedComicCardContent extends StatelessWidget {
       child: Material(
         color: Colors.transparent,
         borderRadius: BorderRadius.circular(18),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(18),
-          onTap: () {
-            if (selectionMode) {
-              onToggleSelection(comic.storageKey);
-            } else {
-              onOpenComic(comic);
-            }
-          },
-          onLongPress: () => onToggleSelection(comic.storageKey),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(12),
-                child: Row(
-                  children: [
-                    DownloadedComicCover(
-                      comic: comic,
-                      heroTag: 'downloaded_cover_${comic.storageKey}',
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            comic.title,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.titleMedium,
+        child: Builder(
+          builder: (itemContext) => GestureDetector(
+            onLongPressStart: selectionMode
+                ? null
+                : (details) => unawaited(
+                    onShowComicMenu(comic, details.globalPosition, itemContext),
+                  ),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(18),
+              onTap: () {
+                if (selectionMode) {
+                  onToggleSelection(comic.storageKey);
+                } else {
+                  onOpenComic(comic);
+                }
+              },
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      children: [
+                        DownloadedComicCover(
+                          comic: comic,
+                          heroTag: 'downloaded_cover_${comic.storageKey}',
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                comic.title,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.titleMedium,
+                              ),
+                              if (comic.subTitle.isNotEmpty) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  comic.subTitle,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.bodySmall,
+                                ),
+                              ],
+                              const SizedBox(height: 8),
+                              Text(
+                                l10n(context).downloadsChapterCount(
+                                  '${comic.chapters.length}',
+                                ),
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
                           ),
-                          if (comic.subTitle.isNotEmpty) ...[
-                            const SizedBox(height: 4),
-                            Text(
-                              comic.subTitle,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.bodySmall,
-                            ),
-                          ],
-                          const SizedBox(height: 8),
-                          Text(
-                            l10n(
-                              context,
-                            ).downloadsChapterCount('${comic.chapters.length}'),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
-                            ),
+                        ),
+                        if (selectionMode) ...[
+                          const SizedBox(width: 8),
+                          _DownloadedComicSelectionIndicator(
+                            selected: selected,
                           ),
                         ],
-                      ),
+                      ],
                     ),
-                    if (selectionMode) ...[
-                      const SizedBox(width: 8),
-                      _DownloadedComicSelectionIndicator(selected: selected),
-                    ],
-                  ],
-                ),
+                  ),
+                  if (hasIntegrityIssue)
+                    _IntegrityWarningBanner(
+                      message: l10n(context).downloadsIntegrityWarning,
+                    ),
+                ],
               ),
-              if (hasIntegrityIssue)
-                _IntegrityWarningBanner(
-                  message: l10n(context).downloadsIntegrityWarning,
-                ),
-            ],
+            ),
           ),
         ),
       ),
     );
   }
+}
+
+Future<String?> _showCreateGroupDialog(BuildContext context) async {
+  final controller = TextEditingController();
+  final strings = l10n(context);
+  final value = await showGeneralDialog<String>(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: strings.commonClose,
+    transitionDuration: const Duration(milliseconds: 240),
+    transitionBuilder: (context, animation, secondaryAnimation, child) {
+      final curved = CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutCubic,
+      );
+      return FadeTransition(
+        opacity: curved,
+        child: ScaleTransition(
+          scale: Tween<double>(begin: 0.9, end: 1).animate(curved),
+          child: child,
+        ),
+      );
+    },
+    pageBuilder: (dialogContext, animation, secondaryAnimation) => AlertDialog(
+      title: Text(strings.downloadsNewGroup),
+      content: TextField(
+        controller: controller,
+        autofocus: true,
+        decoration: InputDecoration(hintText: strings.downloadsGroupName),
+        onSubmitted: (name) {
+          if (name.trim().isNotEmpty) Navigator.pop(dialogContext, name.trim());
+        },
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(dialogContext),
+          child: Text(strings.commonCancel),
+        ),
+        FilledButton(
+          onPressed: () {
+            final name = controller.text.trim();
+            if (name.isNotEmpty) Navigator.pop(dialogContext, name);
+          },
+          child: Text(strings.downloadsCreateGroup),
+        ),
+      ],
+    ),
+  );
+  await Future<void>.delayed(const Duration(milliseconds: 260));
+  controller.dispose();
+  return value;
 }
 
 class _AnimatedDownloadedComicEntry {

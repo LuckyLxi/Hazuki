@@ -91,6 +91,41 @@ class LocalFavoriteEntryTombstones extends Table {
   Set<Column<Object>> get primaryKey => {storageKey};
 }
 
+class DownloadGroups extends Table {
+  TextColumn get id => text()();
+  TextColumn get name => text()();
+  IntColumn get createdAtMs => integer()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
+}
+
+class DownloadGroupComics extends Table {
+  TextColumn get groupId => text()();
+  TextColumn get comicStorageKey => text()();
+  IntColumn get addedAtMs => integer()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {groupId, comicStorageKey};
+}
+
+class DownloadGroupTombstones extends Table {
+  TextColumn get groupId => text()();
+  IntColumn get deletedAtMs => integer()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {groupId};
+}
+
+class DownloadGroupComicTombstones extends Table {
+  TextColumn get groupId => text()();
+  TextColumn get comicStorageKey => text()();
+  IntColumn get deletedAtMs => integer()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {groupId, comicStorageKey};
+}
+
 @DriftDatabase(
   tables: [
     ReadHistoryEntries,
@@ -101,6 +136,10 @@ class LocalFavoriteEntryTombstones extends Table {
     LocalFavoriteComicFolders,
     LocalFavoriteFolderTombstones,
     LocalFavoriteEntryTombstones,
+    DownloadGroups,
+    DownloadGroupComics,
+    DownloadGroupTombstones,
+    DownloadGroupComicTombstones,
   ],
 )
 class HazukiDatabase extends _$HazukiDatabase {
@@ -109,7 +148,7 @@ class HazukiDatabase extends _$HazukiDatabase {
   HazukiDatabase.memory() : super(NativeDatabase.memory());
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -120,6 +159,12 @@ class HazukiDatabase extends _$HazukiDatabase {
       }
       if (from < 3) {
         await m.createTable(readingProgressEntries);
+      }
+      if (from < 4) {
+        await m.createTable(downloadGroups);
+        await m.createTable(downloadGroupComics);
+        await m.createTable(downloadGroupTombstones);
+        await m.createTable(downloadGroupComicTombstones);
       }
     },
   );

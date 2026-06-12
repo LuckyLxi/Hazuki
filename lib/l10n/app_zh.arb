@@ -1177,6 +1177,21 @@
   },
   "downloadsScanTooltip": "扫描本地漫画",
   "downloadsIntegrityWarning": "检测到有文件可能被移动或删除",
+  "downloadsDefaultGroup": "默认组",
+  "downloadsGroupsTitle": "下载分组",
+  "downloadsNewGroup": "新建组",
+  "downloadsGroupName": "分组名称",
+  "downloadsCreateGroup": "新建",
+  "downloadsDeleteGroupTitle": "删除分组",
+  "downloadsDeleteGroupContent": "确定删除“{name}”吗？组内漫画会移动到默认组。",
+  "@downloadsDeleteGroupContent": {
+    "placeholders": {
+      "name": {}
+    }
+  },
+  "downloadsAddToGroup": "添加到分组",
+  "downloadsMoveToGroup": "移动到分组",
+  "downloadsChooseGroup": "选择分组",
   "sourceUpdateRestartTitle": "请重新启动软件",
   "sourceUpdateRestartMessage": "漫画源已下载完成，请重新启动软件以应用更新。",
   "sourceUpdateLocalLabel": "本地版本",

@@ -1,15 +1,42 @@
 import 'package:flutter/widgets.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/manga_download/manga_download_service.dart';
+import 'package:hazuki/services/download_groups_service.dart';
 import '../support/downloads_actions.dart';
 
 class DownloadsPageController extends ChangeNotifier {
-  DownloadsPageController({required MangaDownloadService downloadService})
-    : _downloadService = downloadService;
+  DownloadsPageController({
+    required MangaDownloadService downloadService,
+    required DownloadGroupsService downloadGroupsService,
+  }) : _downloadService = downloadService,
+       _downloadGroupsService = downloadGroupsService {
+    _downloadService.addListener(_handleDownloadsChanged);
+    _downloadGroupsService.addListener(_notify);
+  }
 
   final MangaDownloadService _downloadService;
+  final DownloadGroupsService _downloadGroupsService;
+  String _selectedGroupId = DownloadGroupsService.defaultGroupId;
+  bool _reconcilingGroups = false;
 
   MangaDownloadService get downloadService => _downloadService;
+  DownloadGroupsService get downloadGroupsService => _downloadGroupsService;
+  List<DownloadGroup> get groups => _downloadGroupsService.groups;
+  String get selectedGroupId => _selectedGroupId;
+  DownloadGroup get selectedGroup => groups.firstWhere(
+    (group) => group.id == _selectedGroupId,
+    orElse: () => const DownloadGroup(
+      id: DownloadGroupsService.defaultGroupId,
+      name: DownloadGroupsService.defaultGroupName,
+      createdAtMs: 0,
+    ),
+  );
+  List<DownloadedMangaComic> get filteredDownloadedComics {
+    final keys = _downloadGroupsService.comicKeysForGroup(_selectedGroupId);
+    return _downloadService.downloadedComics
+        .where((comic) => keys.contains(comic.storageKey))
+        .toList(growable: false);
+  }
 
   final Set<String> _selectedComicIds = <String>{};
   bool _selectionEnabled = false;
@@ -24,6 +51,37 @@ class DownloadsPageController extends ChangeNotifier {
   bool get scanningDownloaded => _scanningDownloaded;
   Set<String> get comicsWithIntegrityIssues =>
       Set<String>.unmodifiable(_comicsWithIntegrityIssues);
+
+  Future<void> initialize() async {
+    await _downloadService.ensureInitialized();
+    await _downloadGroupsService.initialize(
+      _downloadService.downloadedComics.map((comic) => comic.storageKey),
+    );
+  }
+
+  void selectGroup(String groupId) {
+    if (_selectedGroupId == groupId) return;
+    _selectedGroupId = groupId;
+    _clearSelection(notify: false);
+    _notify();
+  }
+
+  Future<DownloadGroup> createGroup(String name) =>
+      _downloadGroupsService.createGroup(name);
+
+  Future<void> deleteGroup(String groupId) async {
+    await _downloadGroupsService.deleteGroup(groupId);
+    if (_selectedGroupId == groupId) {
+      _selectedGroupId = DownloadGroupsService.defaultGroupId;
+    }
+    _notify();
+  }
+
+  Future<void> addComicToGroup(DownloadedMangaComic comic, String groupId) =>
+      _downloadGroupsService.addComicToGroup(comic.storageKey, groupId);
+
+  Future<void> moveComicToGroup(DownloadedMangaComic comic, String groupId) =>
+      _downloadGroupsService.moveComicToGroup(comic.storageKey, groupId);
 
   bool selectionModeForTab(int tabIndex) =>
       tabIndex == 1 && (_selectionEnabled || _selectedComicIds.isNotEmpty);
@@ -77,6 +135,9 @@ class DownloadsPageController extends ChangeNotifier {
     if (confirmed != true) {
       return;
     }
+    for (final key in _selectedComicIds) {
+      await _downloadGroupsService.removeComic(key);
+    }
     await _downloadService.deleteDownloadedComics(_selectedComicIds);
     _clearSelection(notify: true);
   }
@@ -94,6 +155,7 @@ class DownloadsPageController extends ChangeNotifier {
     if (confirmed != true) {
       return;
     }
+    await _downloadGroupsService.removeComic(comic.storageKey);
     await _downloadService.deleteDownloadedComics([comic.storageKey]);
   }
 
@@ -168,9 +230,23 @@ class DownloadsPageController extends ChangeNotifier {
     }
   }
 
+  void _handleDownloadsChanged() {
+    if (!_reconcilingGroups) {
+      _reconcilingGroups = true;
+      _downloadGroupsService
+          .reconcileDownloadedComics(
+            _downloadService.downloadedComics.map((comic) => comic.storageKey),
+          )
+          .whenComplete(() => _reconcilingGroups = false);
+    }
+    _notify();
+  }
+
   @override
   void dispose() {
     _disposed = true;
+    _downloadService.removeListener(_handleDownloadsChanged);
+    _downloadGroupsService.removeListener(_notify);
     super.dispose();
   }
 }
