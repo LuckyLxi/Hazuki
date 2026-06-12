@@ -156,6 +156,48 @@ class DownloadsScanButton extends StatelessWidget {
   }
 }
 
+class DownloadsBatchGroupButton extends StatelessWidget {
+  const DownloadsBatchGroupButton({
+    super.key,
+    required this.visible,
+    required this.enabled,
+    required this.onPressed,
+  });
+
+  final bool visible;
+  final bool enabled;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSlide(
+      key: const ValueKey<String>('downloads_batch_group_button_animation'),
+      offset: visible ? Offset.zero : const Offset(1.6, 0),
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOutCubic,
+      child: AnimatedScale(
+        scale: visible ? 1 : 0.82,
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutCubic,
+        child: AnimatedOpacity(
+          opacity: visible ? 1 : 0,
+          duration: const Duration(milliseconds: 220),
+          child: IgnorePointer(
+            ignoring: !visible,
+            child: FloatingActionButton(
+              key: const ValueKey<String>('downloads_batch_group_button'),
+              heroTag: 'downloads_batch_group_button',
+              tooltip: l10n(context).downloadsBatchGroupAction,
+              onPressed: enabled ? onPressed : null,
+              child: const Icon(Icons.folder_copy_outlined),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _DownloadsAnimatedAppBarTitle extends StatelessWidget {
   const _DownloadsAnimatedAppBarTitle({
     required this.selectionMode,

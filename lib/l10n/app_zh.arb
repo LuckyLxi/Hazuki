@@ -1179,6 +1179,7 @@
   "downloadsIntegrityWarning": "检测到有文件可能被移动或删除",
   "downloadsDefaultGroup": "默认组",
   "downloadsGroupsTitle": "下载分组",
+  "downloadsSwitchGroup": "切换组",
   "downloadsNewGroup": "新建组",
   "downloadsGroupName": "分组名称",
   "downloadsCreateGroup": "新建",
@@ -1192,6 +1193,101 @@
   "downloadsAddToGroup": "添加到分组",
   "downloadsMoveToGroup": "移动到分组",
   "downloadsChooseGroup": "选择分组",
+  "downloadsAddAction": "添加",
+  "downloadsMoveAction": "移动",
+  "downloadsAddedToGroup": "已添加到分组",
+  "downloadsMovedToGroup": "已移动到分组",
+  "downloadsAddedToGroups": "已添加到 {groups}",
+  "@downloadsAddedToGroups": {
+    "placeholders": {
+      "groups": {}
+    }
+  },
+  "downloadsMovedToGroups": "已移动到 {groups}",
+  "@downloadsMovedToGroups": {
+    "placeholders": {
+      "groups": {}
+    }
+  },
+  "downloadsComicRemovedFromGroup": "该漫画已从{group}移出",
+  "@downloadsComicRemovedFromGroup": {
+    "placeholders": {
+      "group": {}
+    }
+  },
+  "downloadsComicRemovedFromGroups": "已将该漫画从{groupCount}个组中移出",
+  "@downloadsComicRemovedFromGroups": {
+    "placeholders": {
+      "groupCount": {
+        "type": "int"
+      }
+    }
+  },
+  "downloadsGroupAlreadyContainsComic": "该组已经有这部漫画",
+  "downloadsSelectAtLeastOneGroup": "请至少勾选一个组",
+  "downloadsGroupNameRequired": "请输入分组名称",
+  "downloadsBatchGroupAction": "分组选中漫画",
+  "downloadsBack": "返回",
+  "downloadsBatchAddedToGroup": "已将{comicCount}部漫画添加到{group}",
+  "@downloadsBatchAddedToGroup": {
+    "placeholders": {
+      "comicCount": {
+        "type": "int"
+      },
+      "group": {}
+    }
+  },
+  "downloadsBatchAddedToGroups": "已将{comicCount}部漫画添加到{groupCount}个组中",
+  "@downloadsBatchAddedToGroups": {
+    "placeholders": {
+      "comicCount": {
+        "type": "int"
+      },
+      "groupCount": {
+        "type": "int"
+      }
+    }
+  },
+  "downloadsBatchMovedToGroup": "已将{comicCount}部漫画移动到{group}",
+  "@downloadsBatchMovedToGroup": {
+    "placeholders": {
+      "comicCount": {
+        "type": "int"
+      },
+      "group": {}
+    }
+  },
+  "downloadsBatchMovedToGroups": "已将{comicCount}部漫画移动到{groupCount}个组中",
+  "@downloadsBatchMovedToGroups": {
+    "placeholders": {
+      "comicCount": {
+        "type": "int"
+      },
+      "groupCount": {
+        "type": "int"
+      }
+    }
+  },
+  "downloadsBatchRemovedFromGroup": "已将{comicCount}部漫画从{group}移出",
+  "@downloadsBatchRemovedFromGroup": {
+    "placeholders": {
+      "comicCount": {
+        "type": "int"
+      },
+      "group": {}
+    }
+  },
+  "downloadsBatchRemovedFromGroups": "已将{comicCount}部漫画从{groupCount}个组中移出",
+  "@downloadsBatchRemovedFromGroups": {
+    "placeholders": {
+      "comicCount": {
+        "type": "int"
+      },
+      "groupCount": {
+        "type": "int"
+      }
+    }
+  },
   "sourceUpdateRestartTitle": "请重新启动软件",
   "sourceUpdateRestartMessage": "漫画源已下载完成，请重新启动软件以应用更新。",
   "sourceUpdateLocalLabel": "本地版本",

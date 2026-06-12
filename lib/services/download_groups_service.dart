@@ -36,6 +36,14 @@ class DownloadGroupsService extends ChangeNotifier {
   Set<String> comicKeysForGroup(String groupId) =>
       Set.unmodifiable(_comicKeysByGroup[groupId] ?? const <String>{});
 
+  bool groupContainsComic(String groupId, String comicStorageKey) =>
+      _comicKeysByGroup[groupId]?.contains(comicStorageKey) ?? false;
+
+  Set<String> groupIdsForComic(String comicStorageKey) => {
+    for (final entry in _comicKeysByGroup.entries)
+      if (entry.value.contains(comicStorageKey)) entry.key,
+  };
+
   Future<void> initialize(Iterable<String> downloadedComicKeys) async {
     await _ensureDefaultGroup();
     await reconcileDownloadedComics(downloadedComicKeys, notify: false);
@@ -136,14 +144,54 @@ class DownloadGroupsService extends ChangeNotifier {
     await reload();
   }
 
+  Future<void> addComicToGroups(
+    String comicStorageKey,
+    Iterable<String> groupIds,
+  ) async {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    await _database.transaction(() async {
+      for (final groupId in groupIds.toSet()) {
+        await _putMembership(groupId, comicStorageKey, now);
+      }
+    });
+    await reload();
+  }
+
+  Future<void> addComicsToGroups(
+    Iterable<String> comicStorageKeys,
+    Iterable<String> groupIds,
+  ) async {
+    final keys = comicStorageKeys.toSet();
+    final targets = groupIds.toSet();
+    if (keys.isEmpty || targets.isEmpty) return;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    await _database.transaction(() async {
+      for (final key in keys) {
+        for (final groupId in targets) {
+          await _putMembership(groupId, key, now);
+        }
+      }
+    });
+    await reload();
+  }
+
   Future<void> moveComicToGroup(String comicStorageKey, String groupId) async {
+    await moveComicToGroups(comicStorageKey, [groupId]);
+  }
+
+  Future<void> moveComicToGroups(
+    String comicStorageKey,
+    Iterable<String> groupIds,
+  ) async {
+    final targetGroupIds = groupIds.toSet();
+    if (targetGroupIds.isEmpty) return;
     final now = DateTime.now().millisecondsSinceEpoch;
     await _database.transaction(() async {
       final existing = await (_database.select(
         _database.downloadGroupComics,
       )..where((row) => row.comicStorageKey.equals(comicStorageKey))).get();
       for (final membership in existing) {
-        if (membership.groupId != groupId) {
+        if (!targetGroupIds.contains(membership.groupId)) {
           await _putMembershipTombstone(
             membership.groupId,
             comicStorageKey,
@@ -154,7 +202,42 @@ class DownloadGroupsService extends ChangeNotifier {
       await (_database.delete(
         _database.downloadGroupComics,
       )..where((row) => row.comicStorageKey.equals(comicStorageKey))).go();
-      await _putMembership(groupId, comicStorageKey, now);
+      for (final groupId in targetGroupIds) {
+        await _putMembership(groupId, comicStorageKey, now);
+      }
+    });
+    await reload();
+  }
+
+  Future<void> moveComicsToGroups(
+    Iterable<String> comicStorageKeys,
+    Iterable<String> groupIds,
+  ) async {
+    final keys = comicStorageKeys.toSet();
+    final targets = groupIds.toSet();
+    if (keys.isEmpty || targets.isEmpty) return;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    await _database.transaction(() async {
+      final existing = await (_database.select(
+        _database.downloadGroupComics,
+      )..where((row) => row.comicStorageKey.isIn(keys))).get();
+      for (final membership in existing) {
+        if (!targets.contains(membership.groupId)) {
+          await _putMembershipTombstone(
+            membership.groupId,
+            membership.comicStorageKey,
+            now,
+          );
+        }
+      }
+      await (_database.delete(
+        _database.downloadGroupComics,
+      )..where((row) => row.comicStorageKey.isIn(keys))).go();
+      for (final key in keys) {
+        for (final groupId in targets) {
+          await _putMembership(groupId, key, now);
+        }
+      }
     });
     await reload();
   }

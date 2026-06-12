@@ -4,6 +4,46 @@ import 'package:hazuki/features/downloads/downloads.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 
 void main() {
+  testWidgets('batch group button slides in and out with selection mode', (
+    tester,
+  ) async {
+    var visible = false;
+    late StateSetter update;
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: StatefulBuilder(
+            builder: (context, setState) {
+              update = setState;
+              return DownloadsBatchGroupButton(
+                visible: visible,
+                enabled: true,
+                onPressed: () {},
+              );
+            },
+          ),
+        ),
+      ),
+    );
+
+    final animation = find.byKey(
+      const ValueKey<String>('downloads_batch_group_button_animation'),
+    );
+    expect(tester.widget<AnimatedSlide>(animation).offset.dx, 1.6);
+
+    update(() => visible = true);
+    await tester.pump();
+    expect(tester.widget<AnimatedSlide>(animation).offset, Offset.zero);
+    await tester.pumpAndSettle();
+    expect(tester.widget<AnimatedSlide>(animation).offset, Offset.zero);
+
+    update(() => visible = false);
+    await tester.pumpAndSettle();
+    expect(tester.widget<AnimatedSlide>(animation).offset.dx, 1.6);
+  });
+
   testWidgets('multi-select action only appears on downloaded tab', (
     tester,
   ) async {

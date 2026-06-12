@@ -1179,6 +1179,7 @@
   "downloadsIntegrityWarning": "Some files may have been moved or deleted",
   "downloadsDefaultGroup": "Default group",
   "downloadsGroupsTitle": "Download groups",
+  "downloadsSwitchGroup": "Switch group",
   "downloadsNewGroup": "New group",
   "downloadsGroupName": "Group name",
   "downloadsCreateGroup": "Create",
@@ -1192,6 +1193,101 @@
   "downloadsAddToGroup": "Add to group",
   "downloadsMoveToGroup": "Move to group",
   "downloadsChooseGroup": "Choose a group",
+  "downloadsAddAction": "Add",
+  "downloadsMoveAction": "Move",
+  "downloadsAddedToGroup": "Added to group",
+  "downloadsMovedToGroup": "Moved to group",
+  "downloadsAddedToGroups": "Added to {groups}",
+  "@downloadsAddedToGroups": {
+    "placeholders": {
+      "groups": {}
+    }
+  },
+  "downloadsMovedToGroups": "Moved to {groups}",
+  "@downloadsMovedToGroups": {
+    "placeholders": {
+      "groups": {}
+    }
+  },
+  "downloadsComicRemovedFromGroup": "This comic was removed from {group}",
+  "@downloadsComicRemovedFromGroup": {
+    "placeholders": {
+      "group": {}
+    }
+  },
+  "downloadsComicRemovedFromGroups": "This comic was removed from {groupCount} groups",
+  "@downloadsComicRemovedFromGroups": {
+    "placeholders": {
+      "groupCount": {
+        "type": "int"
+      }
+    }
+  },
+  "downloadsGroupAlreadyContainsComic": "This comic is already in that group",
+  "downloadsSelectAtLeastOneGroup": "Select at least one group",
+  "downloadsGroupNameRequired": "Enter a group name",
+  "downloadsBatchGroupAction": "Group selected comics",
+  "downloadsBack": "Back",
+  "downloadsBatchAddedToGroup": "Added {comicCount} comics to {group}",
+  "@downloadsBatchAddedToGroup": {
+    "placeholders": {
+      "comicCount": {
+        "type": "int"
+      },
+      "group": {}
+    }
+  },
+  "downloadsBatchAddedToGroups": "Added {comicCount} comics to {groupCount} groups",
+  "@downloadsBatchAddedToGroups": {
+    "placeholders": {
+      "comicCount": {
+        "type": "int"
+      },
+      "groupCount": {
+        "type": "int"
+      }
+    }
+  },
+  "downloadsBatchMovedToGroup": "Moved {comicCount} comics to {group}",
+  "@downloadsBatchMovedToGroup": {
+    "placeholders": {
+      "comicCount": {
+        "type": "int"
+      },
+      "group": {}
+    }
+  },
+  "downloadsBatchMovedToGroups": "Moved {comicCount} comics to {groupCount} groups",
+  "@downloadsBatchMovedToGroups": {
+    "placeholders": {
+      "comicCount": {
+        "type": "int"
+      },
+      "groupCount": {
+        "type": "int"
+      }
+    }
+  },
+  "downloadsBatchRemovedFromGroup": "Removed {comicCount} comics from {group}",
+  "@downloadsBatchRemovedFromGroup": {
+    "placeholders": {
+      "comicCount": {
+        "type": "int"
+      },
+      "group": {}
+    }
+  },
+  "downloadsBatchRemovedFromGroups": "Removed {comicCount} comics from {groupCount} groups",
+  "@downloadsBatchRemovedFromGroups": {
+    "placeholders": {
+      "comicCount": {
+        "type": "int"
+      },
+      "groupCount": {
+        "type": "int"
+      }
+    }
+  },
   "sourceUpdateRestartTitle": "Please restart the app",
   "sourceUpdateRestartMessage": "The source update has finished downloading. Please restart the app to apply the update.",
   "sourceUpdateLocalLabel": "Local",

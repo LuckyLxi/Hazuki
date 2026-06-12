@@ -47,6 +47,38 @@ void main() {
     );
   });
 
+  test('move can save multiple selected groups at once', () async {
+    await service.initialize(const ['comic-a']);
+    final first = await service.createGroup('First');
+    final second = await service.createGroup('Second');
+
+    await service.moveComicToGroups('comic-a', {first.id, second.id});
+
+    expect(service.comicKeysForGroup(first.id), contains('comic-a'));
+    expect(service.comicKeysForGroup(second.id), contains('comic-a'));
+    expect(
+      service.comicKeysForGroup(DownloadGroupsService.defaultGroupId),
+      isNot(contains('comic-a')),
+    );
+  });
+
+  test('batch add and move update all selected comics together', () async {
+    await service.initialize(const ['comic-a', 'comic-b']);
+    final first = await service.createGroup('First');
+    final second = await service.createGroup('Second');
+
+    await service.addComicsToGroups(
+      const ['comic-a', 'comic-b'],
+      {first.id, second.id},
+    );
+    expect(service.comicKeysForGroup(first.id), {'comic-a', 'comic-b'});
+    expect(service.comicKeysForGroup(second.id), {'comic-a', 'comic-b'});
+
+    await service.moveComicsToGroups(const ['comic-a', 'comic-b'], {second.id});
+    expect(service.comicKeysForGroup(first.id), isEmpty);
+    expect(service.comicKeysForGroup(second.id), {'comic-a', 'comic-b'});
+  });
+
   test('deleting a group moves its comics to default', () async {
     await service.initialize(const ['comic-a']);
     final group = await service.createGroup('Temporary');

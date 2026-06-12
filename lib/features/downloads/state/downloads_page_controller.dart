@@ -4,6 +4,30 @@ import 'package:hazuki/services/manga_download/manga_download_service.dart';
 import 'package:hazuki/services/download_groups_service.dart';
 import '../support/downloads_actions.dart';
 
+class UpdateComicGroupsResult {
+  const UpdateComicGroupsResult({
+    required this.changed,
+    this.addedGroupIds = const {},
+    this.removedGroupIds = const {},
+  });
+
+  final bool changed;
+  final Set<String> addedGroupIds;
+  final Set<String> removedGroupIds;
+}
+
+class UpdateSelectedComicGroupsResult {
+  const UpdateSelectedComicGroupsResult({
+    required this.comicCount,
+    required this.removedComicCount,
+    required this.removedGroupIds,
+  });
+
+  final int comicCount;
+  final int removedComicCount;
+  final Set<String> removedGroupIds;
+}
+
 class DownloadsPageController extends ChangeNotifier {
   DownloadsPageController({
     required MangaDownloadService downloadService,
@@ -31,6 +55,19 @@ class DownloadsPageController extends ChangeNotifier {
       createdAtMs: 0,
     ),
   );
+  int comicCountForGroup(String groupId) =>
+      _downloadGroupsService.comicKeysForGroup(groupId).length;
+  Set<String> groupIdsForComic(DownloadedMangaComic comic) =>
+      _downloadGroupsService.groupIdsForComic(comic.storageKey);
+  Set<String> get commonGroupIdsForSelectedComics {
+    Set<String>? common;
+    for (final key in _selectedComicIds) {
+      final groups = _downloadGroupsService.groupIdsForComic(key);
+      common = common == null ? groups : common.intersection(groups);
+    }
+    return common ?? const {};
+  }
+
   List<DownloadedMangaComic> get filteredDownloadedComics {
     final keys = _downloadGroupsService.comicKeysForGroup(_selectedGroupId);
     return _downloadService.downloadedComics
@@ -77,11 +114,47 @@ class DownloadsPageController extends ChangeNotifier {
     _notify();
   }
 
-  Future<void> addComicToGroup(DownloadedMangaComic comic, String groupId) =>
-      _downloadGroupsService.addComicToGroup(comic.storageKey, groupId);
+  Future<UpdateComicGroupsResult> updateComicGroups(
+    DownloadedMangaComic comic,
+    Set<String> groupIds,
+  ) async {
+    final current = _downloadGroupsService.groupIdsForComic(comic.storageKey);
+    final added = groupIds.difference(current);
+    final removed = current.difference(groupIds);
+    if (added.isEmpty && removed.isEmpty) {
+      return const UpdateComicGroupsResult(changed: false);
+    }
+    await _downloadGroupsService.moveComicToGroups(comic.storageKey, groupIds);
+    return UpdateComicGroupsResult(
+      changed: true,
+      addedGroupIds: added,
+      removedGroupIds: removed,
+    );
+  }
 
-  Future<void> moveComicToGroup(DownloadedMangaComic comic, String groupId) =>
-      _downloadGroupsService.moveComicToGroup(comic.storageKey, groupId);
+  Future<UpdateSelectedComicGroupsResult> updateSelectedComicsGroups(
+    Set<String> groupIds,
+  ) async {
+    final keys = Set<String>.of(_selectedComicIds);
+    final removedGroupIds = <String>{};
+    var removedComicCount = 0;
+    for (final key in keys) {
+      final removed = _downloadGroupsService
+          .groupIdsForComic(key)
+          .difference(groupIds);
+      if (removed.isNotEmpty) {
+        removedComicCount++;
+        removedGroupIds.addAll(removed);
+      }
+    }
+    await _downloadGroupsService.moveComicsToGroups(keys, groupIds);
+    _clearSelection(notify: true);
+    return UpdateSelectedComicGroupsResult(
+      comicCount: keys.length,
+      removedComicCount: removedComicCount,
+      removedGroupIds: removedGroupIds,
+    );
+  }
 
   bool selectionModeForTab(int tabIndex) =>
       tabIndex == 1 && (_selectionEnabled || _selectedComicIds.isNotEmpty);

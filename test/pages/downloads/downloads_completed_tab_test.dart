@@ -447,16 +447,18 @@ void main() {
 
     final movingDialogRect = tester.getRect(dialog);
     expect(movingDialogRect.height, greaterThan(initialDialogRect.height));
-    expect(movingDialogRect.height, lessThan(270));
+    expect(movingDialogRect.height, lessThan(420));
     expect(movingDialogRect.top, greaterThan(initialDialogRect.top));
     expect(movingDialogRect.width, closeTo(initialDialogRect.width, 0.1));
 
     await tester.pumpAndSettle();
 
-    expect(tester.getSize(dialog).height, closeTo(270, 0.1));
-    expect(find.text('Download groups'), findsOneWidget);
-    expect(find.text('Default group'), findsWidgets);
+    expect(tester.getSize(dialog).height, closeTo(420, 0.1));
+    expect(find.text('Switch group'), findsOneWidget);
+    expect(find.text('Default group (1)'), findsWidgets);
     expect(find.byIcon(Icons.create_new_folder_outlined), findsOneWidget);
+    expect(find.byIcon(Icons.check_rounded), findsNothing);
+    expect(find.byIcon(Icons.keyboard_arrow_down_rounded), findsNothing);
 
     await tester.tapAt(const Offset(4, 4));
     await tester.pump();
@@ -532,6 +534,7 @@ void main() {
                 visible: visible,
                 landingVersion: landingVersion,
                 label: 'Default group',
+                comicCount: 1,
                 onPressed: () {},
               );
             },
@@ -587,19 +590,56 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byIcon(Icons.create_new_folder_outlined));
     await tester.pumpAndSettle();
+    expect(find.text('Enter a group name'), findsOneWidget);
+    final createButton = tester.widget<FilledButton>(
+      find.widgetWithText(FilledButton, 'Create'),
+    );
+    expect(createButton.onPressed, isNull);
     await tester.enterText(find.byType(TextField), 'Favorites');
+    await tester.pump();
     await tester.tap(find.text('Create'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Favorites'), findsOneWidget);
+    expect(find.text('Favorites (0)'), findsOneWidget);
     await tester.tap(find.byIcon(Icons.delete_outline));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Delete'));
     await tester.pumpAndSettle();
 
     expect(deleted, ['new-group']);
-    expect(find.text('Favorites'), findsNothing);
+    expect(find.text('Favorites (0)'), findsNothing);
   });
+
+  testWidgets(
+    'category launcher stays above comics while they scroll underneath',
+    (tester) async {
+      final comics = List<DownloadedMangaComic>.generate(
+        8,
+        (index) => _comicAt(index),
+      );
+      await tester.pumpWidget(_wrapTab(comics: comics));
+
+      final launcher = find.byKey(
+        const ValueKey<String>('downloads_category_launcher'),
+      );
+      final firstComic = find.text('Comic 0');
+      final launcherRect = tester.getRect(launcher);
+
+      await tester.drag(firstComic, const Offset(0, -100));
+      await tester.pumpAndSettle();
+
+      final comicRect = tester.getRect(firstComic);
+      expect(comicRect.top, lessThan(launcherRect.bottom));
+      expect(comicRect.bottom, greaterThan(launcherRect.top));
+
+      await tester.tap(launcher);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey<String>('downloads_category_dialog')),
+        findsOneWidget,
+      );
+    },
+  );
 
   testWidgets(
     'back to top button slides in beside scan button after scrolling',
@@ -613,6 +653,10 @@ void main() {
       final backAnimation = find.byKey(
         const ValueKey<String>('downloads_back_to_top_animation'),
       );
+      final comicsList = tester.widget<ListView>(
+        find.byKey(const ValueKey<String>('downloaded_comics_list')),
+      );
+      expect(comicsList.clipBehavior, Clip.hardEdge);
       expect(tester.widget<AnimatedSlide>(backAnimation).offset.dx, 1.5);
 
       await tester.drag(
@@ -701,12 +745,15 @@ Widget _buildTab({
     comicsWithIntegrityIssues: const {},
     onToggleSelection: (_) {},
     onDeleteSelected: () {},
+    onBatchGroup: () {},
     onScanDownloaded: () {},
     onOpenComic: onOpenComic ?? (_) {},
     onDeleteComic: onDeleteComic ?? (_) {},
     groups: const [_defaultGroup],
     selectedGroupId: DownloadGroupsService.defaultGroupId,
     selectedGroupName: 'Default group',
+    selectedGroupComicCount: comics.length,
+    groupComicCounts: {DownloadGroupsService.defaultGroupId: comics.length},
     onSelectGroup: (_) {},
     onCreateGroup: (name) async =>
         DownloadGroup(id: 'new-group', name: name, createdAtMs: 1),
