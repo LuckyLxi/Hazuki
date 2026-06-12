@@ -121,6 +121,65 @@ void main() {
     expect(deleteCount, 1);
   });
 
+  testWidgets('downloaded action button animates from scan to delete', (
+    tester,
+  ) async {
+    var selectionMode = false;
+    late StateSetter updateButton;
+
+    await tester.pumpWidget(
+      _wrapWithMaterial(
+        StatefulBuilder(
+          builder: (context, setState) {
+            updateButton = setState;
+            return DownloadsScanButton(
+              selectionMode: selectionMode,
+              scanning: false,
+              selectedCount: selectionMode ? 1 : 0,
+              onDeleteSelected: () {},
+              onScanDownloaded: () {},
+            );
+          },
+        ),
+      ),
+    );
+
+    final colorScheme = Theme.of(
+      tester.element(find.byType(DownloadsScanButton)),
+    ).colorScheme;
+    expect(
+      tester
+          .widget<FloatingActionButton>(find.byType(FloatingActionButton))
+          .backgroundColor,
+      colorScheme.primaryContainer,
+    );
+
+    updateButton(() {
+      selectionMode = true;
+    });
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 120));
+
+    expect(find.byIcon(Icons.manage_search_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.delete_outline_rounded), findsOneWidget);
+    final animatedColor = tester
+        .widget<FloatingActionButton>(find.byType(FloatingActionButton))
+        .backgroundColor;
+    expect(animatedColor, isNot(colorScheme.primaryContainer));
+    expect(animatedColor, isNot(colorScheme.errorContainer));
+
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.manage_search_rounded), findsNothing);
+    expect(find.byIcon(Icons.delete_outline_rounded), findsOneWidget);
+    expect(
+      tester
+          .widget<FloatingActionButton>(find.byType(FloatingActionButton))
+          .backgroundColor,
+      colorScheme.errorContainer,
+    );
+  });
+
   testWidgets('delete action is disabled without a selection', (tester) async {
     var deleteCount = 0;
 

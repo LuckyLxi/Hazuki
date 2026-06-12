@@ -84,42 +84,74 @@ class DownloadsScanButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return FloatingActionButton(
-      heroTag: 'downloads_scan_button',
-      tooltip: selectionMode
-          ? l10n(context).comicDetailDelete
-          : l10n(context).downloadsScanTooltip,
-      backgroundColor: selectionMode ? colorScheme.errorContainer : null,
-      foregroundColor: selectionMode ? colorScheme.onErrorContainer : null,
-      onPressed: selectionMode
-          ? (selectedCount > 0 ? onDeleteSelected : null)
-          : (scanning ? null : onScanDownloaded),
-      child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 180),
-        switchInCurve: Curves.easeOutCubic,
-        switchOutCurve: Curves.easeInCubic,
-        child: selectionMode
-            ? const Icon(
-                Icons.delete_outline_rounded,
-                key: ValueKey<String>('delete_icon'),
-              )
-            : scanning
-            ? SizedBox(
-                key: const ValueKey<String>('scan_loading'),
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.4,
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    Theme.of(context).colorScheme.onPrimaryContainer,
+    return TweenAnimationBuilder<double>(
+      key: const ValueKey<String>('downloads_action_button_animation'),
+      tween: Tween<double>(end: selectionMode ? 1 : 0),
+      duration: const Duration(milliseconds: 240),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) {
+        return FloatingActionButton(
+          heroTag: 'downloads_scan_button',
+          tooltip: selectionMode
+              ? l10n(context).comicDetailDelete
+              : l10n(context).downloadsScanTooltip,
+          backgroundColor: Color.lerp(
+            colorScheme.primaryContainer,
+            colorScheme.errorContainer,
+            value,
+          ),
+          foregroundColor: Color.lerp(
+            colorScheme.onPrimaryContainer,
+            colorScheme.onErrorContainer,
+            value,
+          ),
+          onPressed: selectionMode
+              ? (selectedCount > 0 ? onDeleteSelected : null)
+              : (scanning ? null : onScanDownloaded),
+          child: AnimatedSwitcher(
+            key: const ValueKey<String>('downloads_action_icon_switcher'),
+            duration: const Duration(milliseconds: 240),
+            switchInCurve: Curves.easeOutBack,
+            switchOutCurve: Curves.easeInCubic,
+            transitionBuilder: (child, animation) {
+              return FadeTransition(
+                opacity: animation,
+                child: RotationTransition(
+                  turns: Tween<double>(begin: 0.75, end: 1).animate(animation),
+                  child: ScaleTransition(
+                    scale: Tween<double>(
+                      begin: 0.65,
+                      end: 1,
+                    ).animate(animation),
+                    child: child,
                   ),
                 ),
-              )
-            : const Icon(
-                Icons.manage_search_rounded,
-                key: ValueKey<String>('scan_icon'),
-              ),
-      ),
+              );
+            },
+            child: selectionMode
+                ? const Icon(
+                    Icons.delete_outline_rounded,
+                    key: ValueKey<String>('delete_icon'),
+                  )
+                : scanning
+                ? SizedBox(
+                    key: const ValueKey<String>('scan_loading'),
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.4,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        colorScheme.onPrimaryContainer,
+                      ),
+                    ),
+                  )
+                : const Icon(
+                    Icons.manage_search_rounded,
+                    key: ValueKey<String>('scan_icon'),
+                  ),
+          ),
+        );
+      },
     );
   }
 }

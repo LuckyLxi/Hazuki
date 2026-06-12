@@ -13,7 +13,8 @@ class DownloadedComicExpandableDescription extends StatefulWidget {
 
 class _DownloadedComicExpandableDescriptionState
     extends State<DownloadedComicExpandableDescription> {
-  static const int _collapsedMaxLines = 5;
+  static const int _collapsedMaxLines = 4;
+  static const Duration _animationDuration = Duration(milliseconds: 280);
 
   bool _expanded = false;
 
@@ -41,16 +42,17 @@ class _DownloadedComicExpandableDescriptionState
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             AnimatedSize(
-              duration: const Duration(milliseconds: 280),
+              key: const ValueKey<String>('downloaded_description_size'),
+              duration: _animationDuration,
+              reverseDuration: _animationDuration,
               curve: Curves.easeOutCubic,
               alignment: Alignment.topCenter,
               clipBehavior: Clip.hardEdge,
               child: Text(
+                key: const ValueKey<String>('downloaded_description_text'),
                 widget.text,
                 style: textStyle,
-                maxLines: _expanded
-                    ? null
-                    : (isOverflowing ? _collapsedMaxLines : null),
+                maxLines: _expanded ? null : _collapsedMaxLines,
                 overflow: _expanded
                     ? TextOverflow.visible
                     : TextOverflow.ellipsis,
@@ -62,6 +64,9 @@ class _DownloadedComicExpandableDescriptionState
                 child: Align(
                   alignment: Alignment.centerRight,
                   child: InkWell(
+                    key: const ValueKey<String>(
+                      'downloaded_description_toggle',
+                    ),
                     borderRadius: BorderRadius.circular(999),
                     onTap: () {
                       setState(() {

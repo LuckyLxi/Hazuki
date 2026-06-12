@@ -83,6 +83,51 @@ void main() {
       expect(find.byIcon(Icons.broken_image_outlined), findsOneWidget);
     });
 
+    testWidgets('uses the full preview area as the zoom canvas', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: DownloadedComicCoverPreviewPage(
+            comic: _comic(localCoverPath: null, coverUrl: '   '),
+            heroTag: 'preview-hero',
+          ),
+        ),
+      );
+
+      final viewerFinder = find.byKey(
+        const ValueKey<String>('downloaded_cover_viewer'),
+      );
+      final viewer = tester.widget<InteractiveViewer>(viewerFinder);
+      final viewerSize = tester.getSize(viewerFinder);
+
+      expect(viewer.clipBehavior, Clip.none);
+      expect(viewer.boundaryMargin, EdgeInsets.zero);
+      expect(viewerSize.width, greaterThan(700));
+      expect(viewerSize.height, greaterThan(500));
+    });
+
+    testWidgets('keeps the cover fixed while it is not zoomed', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: DownloadedComicCoverPreviewPage(
+            comic: _comic(localCoverPath: null, coverUrl: '   '),
+            heroTag: 'preview-hero',
+          ),
+        ),
+      );
+
+      final coverFinder = find.byIcon(Icons.broken_image_outlined);
+      final originalCenter = tester.getCenter(coverFinder);
+
+      await tester.drag(coverFinder, const Offset(140, 100));
+      await tester.pumpAndSettle();
+
+      final draggedCenter = tester.getCenter(coverFinder);
+      expect(draggedCenter.dx, closeTo(originalCenter.dx, 0.01));
+      expect(draggedCenter.dy, closeTo(originalCenter.dy, 0.01));
+    });
+
     testWidgets('tapping preview pops the route', (tester) async {
       await tester.pumpWidget(
         MaterialApp(

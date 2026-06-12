@@ -133,24 +133,37 @@ class DownloadedComicCoverPreviewPage extends StatelessWidget {
       child: SafeArea(
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 32),
-              child: Hero(
-                tag: heroTag,
-                child: Material(
-                  color: Colors.transparent,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(14),
-                    child: InteractiveViewer(
-                      minScale: 1,
-                      maxScale: 4,
-                      child: imageChild,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return InteractiveViewer(
+                key: const ValueKey<String>('downloaded_cover_viewer'),
+                minScale: 1,
+                maxScale: 4,
+                clipBehavior: Clip.none,
+                child: SizedBox(
+                  width: constraints.maxWidth,
+                  height: constraints.maxHeight,
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 32,
+                      ),
+                      child: Hero(
+                        tag: heroTag,
+                        child: Material(
+                          color: Colors.transparent,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(14),
+                            child: imageChild,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
         ),
       ),
