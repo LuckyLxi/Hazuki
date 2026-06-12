@@ -10,13 +10,29 @@ class DownloadsPageAppBar extends StatelessWidget
     required this.tabController,
     required this.selectionMode,
     required this.selectedCount,
+    required this.allSelected,
     required this.onToggleSelectionMode,
+    required this.onSelectAll,
+    required this.onPauseAll,
+    required this.onResumeAll,
   });
 
   final TabController tabController;
   final bool selectionMode;
   final int selectedCount;
+
+  /// 当前筛选组内所有漫画是否已全选
+  final bool allSelected;
   final VoidCallback onToggleSelectionMode;
+
+  /// 全选回调
+  final VoidCallback onSelectAll;
+
+  /// 全部暂停回调
+  final VoidCallback onPauseAll;
+
+  /// 全部开始回调
+  final VoidCallback onResumeAll;
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight + 46);
@@ -32,6 +48,79 @@ class DownloadsPageAppBar extends StatelessWidget
         tabIndex: tabController.index,
       ),
       actions: [
+        // 正在下载 tab 下显示的全部开始按钒
+        AnimatedBuilder(
+          animation: tabController.animation!,
+          builder: (context, child) {
+            final animationValue = tabController.animation!.value;
+            // 当动画属于「正在下载」 tab（index == 0）一侧时才显示
+            final ongoingTabIsActive = tabController.indexIsChanging
+                ? tabController.index == 0
+                : tabController.index == 0
+                ? animationValue <= precisionErrorTolerance
+                : animationValue < 1 - precisionErrorTolerance;
+            return ongoingTabIsActive ? child! : const SizedBox.shrink();
+          },
+          child: IconButton(
+            tooltip: l10n(context).downloadsActionResumeAll,
+            icon: const Icon(Icons.play_arrow_rounded),
+            onPressed: onResumeAll,
+          ),
+        ),
+        // 正在下载 tab 下显示的全部暂停按钒
+        AnimatedBuilder(
+          animation: tabController.animation!,
+          builder: (context, child) {
+            final animationValue = tabController.animation!.value;
+            final ongoingTabIsActive = tabController.indexIsChanging
+                ? tabController.index == 0
+                : tabController.index == 0
+                ? animationValue <= precisionErrorTolerance
+                : animationValue < 1 - precisionErrorTolerance;
+            return ongoingTabIsActive ? child! : const SizedBox.shrink();
+          },
+          child: IconButton(
+            tooltip: l10n(context).downloadsActionPauseAll,
+            icon: const Icon(Icons.pause_rounded),
+            onPressed: onPauseAll,
+          ),
+        ),
+        // 已下载 tab + 多选模式下显示的全选按钒，带出现/消失动画
+        AnimatedBuilder(
+          animation: tabController.animation!,
+          builder: (context, child) {
+            final animationValue = tabController.animation!.value;
+            // 已下载 tab 激活判断
+            final downloadedTabIsActive = tabController.indexIsChanging
+                ? tabController.index == 1
+                : tabController.index == 1
+                ? animationValue >= 1 - precisionErrorTolerance
+                : animationValue > precisionErrorTolerance;
+            // 只有在已下载 tab 且处于多选模式时才展示全选按钒
+            final visible = downloadedTabIsActive && selectionMode;
+            return AnimatedScale(
+              scale: visible ? 1.0 : 0.7,
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOutCubic,
+              child: AnimatedOpacity(
+                opacity: visible ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 180),
+                curve: Curves.easeOutCubic,
+                child: IgnorePointer(ignoring: !visible, child: child!),
+              ),
+            );
+          },
+          child: IconButton(
+            key: const ValueKey<String>('downloads_select_all_button'),
+            tooltip: l10n(context).commonSelectAll,
+            icon: Icon(
+              // 已全选时换成 done_all 图标提供视觉反馈，未全选时显示 select_all
+              allSelected ? Icons.done_all : Icons.select_all,
+            ),
+            onPressed: onSelectAll,
+          ),
+        ),
+        // 已下载 tab 下显示的选择按钒
         AnimatedBuilder(
           animation: tabController.animation!,
           builder: (context, child) {

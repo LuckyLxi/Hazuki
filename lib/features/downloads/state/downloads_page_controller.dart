@@ -178,6 +178,22 @@ class DownloadsPageController extends ChangeNotifier {
     _notify();
   }
 
+  /// 切换全选状态：当前已全选则取消全选，否则全选指定范围内的漫画
+  void toggleSelectAll(Iterable<String> comicKeys) {
+    final keys = comicKeys.toList();
+    // 判断是否已全选：所有 key 都在已选集合里
+    final isAllSelected =
+        keys.isNotEmpty && keys.every(_selectedComicIds.contains);
+    if (isAllSelected) {
+      // 已全选 → 取消全选
+      _selectedComicIds.removeAll(keys);
+    } else {
+      // 未全选 → 全选
+      _selectedComicIds.addAll(keys);
+    }
+    _notify();
+  }
+
   void toggleSelectionMode(int tabIndex) {
     if (selectionModeForTab(tabIndex)) {
       exitSelectionMode(tabIndex);
@@ -238,6 +254,16 @@ class DownloadsPageController extends ChangeNotifier {
 
   Future<void> resumeTask(String comicId) async {
     await _downloadService.resumeTask(comicId);
+  }
+
+  /// 暂停所有下载任务
+  Future<void> pauseAllTasks() async {
+    await _downloadService.pauseAllTasks();
+  }
+
+  /// 恢复所有暂停或失败的下载任务
+  Future<void> resumeAllTasks() async {
+    await _downloadService.resumeAllTasks();
   }
 
   Future<void> deleteTask(BuildContext context, String comicId) async {

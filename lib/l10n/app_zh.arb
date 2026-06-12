@@ -552,6 +552,8 @@
   "downloadsActionSelect": "选择",
   "downloadsActionPause": "暂停",
   "downloadsActionResume": "继续",
+  "downloadsActionPauseAll": "全部暂停",
+  "downloadsActionResumeAll": "全部开始",
   "downloadsQueued": "已加入 {count} 话到下载队列",
   "@downloadsQueued": {
     "placeholders": {

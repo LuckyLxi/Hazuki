@@ -238,11 +238,66 @@ void main() {
 
     expect(deleteCount, 0);
   });
+
+  testWidgets(
+    'select-all button is hidden when not in selection mode on downloaded tab',
+    (tester) async {
+      // 非多选模式下全选按钒不可见
+      await tester.pumpWidget(
+        _wrapWithAppBar(
+          initialIndex: 1,
+          onToggleSelectionMode: () {},
+          selectionMode: false,
+        ),
+      );
+      await tester.pumpAndSettle();
+      // 全选按钒应被隐藏（opacity=0 + ignorePointer）
+      final button = find.byKey(
+        const ValueKey<String>('downloads_select_all_button'),
+      );
+      expect(button, findsOneWidget);
+      final opacity = tester.widget<AnimatedOpacity>(
+        find.ancestor(of: button, matching: find.byType(AnimatedOpacity)),
+      );
+      expect(opacity.opacity, 0.0);
+    },
+  );
+
+  testWidgets(
+    'select-all button is visible and tappable in selection mode on downloaded tab',
+    (tester) async {
+      var selectAllCount = 0;
+      // 多选模式下全选按钒可见且可点击
+      await tester.pumpWidget(
+        _wrapWithAppBar(
+          initialIndex: 1,
+          onToggleSelectionMode: () {},
+          selectionMode: true,
+          onSelectAll: () => selectAllCount++,
+        ),
+      );
+      await tester.pumpAndSettle();
+      final button = find.byKey(
+        const ValueKey<String>('downloads_select_all_button'),
+      );
+      final opacity = tester.widget<AnimatedOpacity>(
+        find.ancestor(of: button, matching: find.byType(AnimatedOpacity)),
+      );
+      expect(opacity.opacity, 1.0);
+      await tester.tap(button);
+      expect(selectAllCount, 1);
+    },
+  );
 }
 
 Widget _wrapWithAppBar({
   required int initialIndex,
   required VoidCallback onToggleSelectionMode,
+  VoidCallback? onPauseAll,
+  VoidCallback? onResumeAll,
+  bool selectionMode = false,
+  bool allSelected = false,
+  VoidCallback? onSelectAll,
 }) {
   return _wrapWithMaterial(
     DefaultTabController(
@@ -253,9 +308,13 @@ Widget _wrapWithAppBar({
         builder: (context) => Scaffold(
           appBar: DownloadsPageAppBar(
             tabController: DefaultTabController.of(context),
-            selectionMode: false,
+            selectionMode: selectionMode,
             selectedCount: 0,
+            allSelected: allSelected,
             onToggleSelectionMode: onToggleSelectionMode,
+            onSelectAll: onSelectAll ?? () {},
+            onPauseAll: onPauseAll ?? () {},
+            onResumeAll: onResumeAll ?? () {},
           ),
           body: TabBarView(
             controller: DefaultTabController.of(context),

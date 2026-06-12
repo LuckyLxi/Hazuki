@@ -345,6 +345,46 @@ class MangaDownloadService extends ChangeNotifier {
     unawaited(_queueExecutor.processQueue());
   }
 
+  /// 暂停所有未完成的下载任务
+  Future<void> pauseAllTasks() async {
+    await ensureInitialized();
+    // 找出所有非暂停状态的任务并将其设为暂停
+    bool changed = false;
+    for (int i = 0; i < _tasks.length; i++) {
+      final task = _tasks[i];
+      if (task.status != MangaDownloadTaskStatus.paused) {
+        _tasks[i] = task.copyWith(status: MangaDownloadTaskStatus.paused);
+        changed = true;
+      }
+    }
+    if (!changed) return;
+    await _persistState();
+    notifyListeners();
+  }
+
+  /// 恢复所有已暂停或失败的下载任务
+  Future<void> resumeAllTasks() async {
+    await ensureInitialized();
+    // 找出所有暂停或失败状态的任务并将其设为排队等待
+    bool changed = false;
+    for (int i = 0; i < _tasks.length; i++) {
+      final task = _tasks[i];
+      if (task.status == MangaDownloadTaskStatus.paused ||
+          task.status == MangaDownloadTaskStatus.failed) {
+        _tasks[i] = task.copyWith(
+          status: MangaDownloadTaskStatus.queued,
+          clearErrorMessage: true,
+          retryCount: 0,
+        );
+        changed = true;
+      }
+    }
+    if (!changed) return;
+    await _persistState();
+    notifyListeners();
+    unawaited(_queueExecutor.processQueue());
+  }
+
   Future<void> deleteTask(String storageKey) async {
     await ensureInitialized();
     final index = _tasks.indexWhere((item) => item.storageKey == storageKey);

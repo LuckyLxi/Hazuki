@@ -119,8 +119,26 @@ class _DownloadsPageState extends State<DownloadsPage>
                     tabController: _tabController,
                     selectionMode: _selectionMode,
                     selectedCount: _controller.selectedCount,
+                    // 当前组有漫画且均被选中则认为已全选
+                    allSelected:
+                        comics.isNotEmpty &&
+                        _controller.selectedCount == comics.length,
                     onToggleSelectionMode: () {
                       _controller.toggleSelectionMode(_tabController.index);
+                    },
+                    onSelectAll: () {
+                      // 切换全选：已全选则取消全选，否则全选当前组内所有漫画
+                      _controller.toggleSelectAll(
+                        comics.map((c) => c.storageKey),
+                      );
+                    },
+                    onPauseAll: () {
+                      // 一键暂停所有下载任务
+                      unawaited(_controller.pauseAllTasks());
+                    },
+                    onResumeAll: () {
+                      // 一键开始所有暂停或失败的下载任务
+                      unawaited(_controller.resumeAllTasks());
                     },
                   ),
                   body: !ready
