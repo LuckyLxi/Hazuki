@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/downloads/support/downloads_group_actions.dart';
+import 'package:hazuki/features/downloads/view/downloads_cover_widgets.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/download_groups_service.dart';
+import 'package:hazuki/services/manga_download/manga_download_service.dart';
 
 void main() {
   testWidgets('upward long press menu anchors to the comic top edge', (
@@ -49,6 +51,9 @@ void main() {
       find.byKey(const ValueKey<String>('downloads_comic_long_press_menu')),
     );
     expect(menuRect.bottom, closeTo(cardRect.top - 8, 0.1));
+    expect(find.text('Move / Add'), findsOneWidget);
+    expect(find.text('Add to group'), findsNothing);
+    expect(find.text('Move to group'), findsNothing);
   });
 
   testWidgets('group picker saves multiple selections with one action', (
@@ -77,7 +82,6 @@ void main() {
                   initiallySelectedGroupIds: const {
                     DownloadGroupsService.defaultGroupId,
                   },
-                  action: DownloadsComicMenuAction.move,
                 );
               },
               child: const Text('Open'),
@@ -98,13 +102,24 @@ void main() {
       const EdgeInsets.symmetric(horizontal: 40, vertical: 48),
     );
     expect(find.byType(CheckboxListTile), findsNWidgets(3));
+    expect(
+      tester
+          .widget<CheckboxListTile>(
+            find.widgetWithText(CheckboxListTile, 'Default group'),
+          )
+          .onChanged,
+      isNotNull,
+    );
 
+    await tester.tap(find.text('Default group'));
     await tester.tap(find.text('A'));
     await tester.tap(find.text('B'));
-    await tester.tap(find.text('Move'));
+    await tester.tap(find.text('A'));
+    await tester.tap(find.text('A'));
+    await tester.tap(find.text('Move / Add'));
     await tester.pumpAndSettle();
 
-    expect(result, {DownloadGroupsService.defaultGroupId, 'a', 'b'});
+    expect(result, {'a', 'b'});
   });
 
   testWidgets('group picker only warns after saving without a group', (
@@ -124,7 +139,6 @@ void main() {
                     DownloadGroup(id: 'a', name: 'A', createdAtMs: 1),
                   ],
                   initiallySelectedGroupIds: const {},
-                  action: DownloadsComicMenuAction.add,
                 );
               },
               child: const Text('Open'),
@@ -140,11 +154,11 @@ void main() {
     expect(find.text('Select at least one group'), findsNothing);
     expect(
       tester
-          .widget<FilledButton>(find.widgetWithText(FilledButton, 'Add'))
+          .widget<FilledButton>(find.widgetWithText(FilledButton, 'Move / Add'))
           .onPressed,
       isNotNull,
     );
-    await tester.tap(find.widgetWithText(FilledButton, 'Add'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Move / Add'));
     await tester.pumpAndSettle();
 
     expect(find.text('Select at least one group'), findsOneWidget);
@@ -152,12 +166,12 @@ void main() {
       find.widgetWithText(TextButton, 'Cancel'),
     );
     final addCenter = tester.getCenter(
-      find.widgetWithText(FilledButton, 'Add'),
+      find.widgetWithText(FilledButton, 'Move / Add'),
     );
     expect(cancelCenter.dy, closeTo(addCenter.dy, 0.1));
   });
 
-  testWidgets('bulk group dialog stretches into group selection', (
+  testWidgets('bulk group dialog morphs into remove confirmation', (
     tester,
   ) async {
     DownloadsBulkGroupSelection? result;
@@ -174,7 +188,9 @@ void main() {
                   groups: const [
                     DownloadGroup(id: 'a', name: 'A', createdAtMs: 1),
                   ],
-                  initiallySelectedGroupIds: const {},
+                  selectedComics: _comics,
+                  initialComicKeysByGroup: const {'a': {}},
+                  currentGroupName: 'A',
                 );
               },
               child: const Text('Open'),
@@ -190,48 +206,32 @@ void main() {
     final dialog = find.byKey(
       const ValueKey<String>('downloads_bulk_group_dialog'),
     );
-    expect(tester.getSize(dialog), const Size(260, 250));
+    expect(tester.getSize(dialog), const Size(280, 250));
     expect(
       find.byKey(const ValueKey<String>('downloads_bulk_action_stage')),
       findsOneWidget,
     );
 
-    await tester.tap(find.widgetWithText(FilledButton, 'Move'));
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 160));
-    final movingSize = tester.getSize(dialog);
-    expect(movingSize.width, greaterThan(260));
-    expect(movingSize.width, lessThan(380));
+    await tester.tap(
+      find.widgetWithText(FilledButton, 'Remove from this group'),
+    );
     await tester.pumpAndSettle();
 
-    expect(tester.getSize(dialog), const Size(380, 430));
+    expect(tester.getSize(dialog), const Size(340, 220));
     expect(
-      find.byKey(const ValueKey<String>('downloads_bulk_group_stage')),
+      find.byKey(
+        const ValueKey<String>('downloads_bulk_remove_confirmation_stage'),
+      ),
       findsOneWidget,
     );
-    expect(find.text('Select at least one group'), findsNothing);
-
-    await tester.tap(find.widgetWithText(FilledButton, 'Move'));
-    await tester.pumpAndSettle();
-    expect(find.text('Select at least one group'), findsOneWidget);
-    final backCenter = tester.getCenter(
-      find.widgetWithText(TextButton, 'Back'),
-    );
-    final moveCenter = tester.getCenter(
-      find.widgetWithText(FilledButton, 'Move'),
-    );
-    expect(backCenter.dy, closeTo(moveCenter.dy, 0.1));
-
-    await tester.tap(find.text('A'));
-    await tester.pump();
-    await tester.tap(find.widgetWithText(FilledButton, 'Move'));
+    expect(find.text('Remove the selected comics from A?'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, 'OK'));
     await tester.pumpAndSettle();
 
-    expect(result?.action, DownloadsComicMenuAction.move);
-    expect(result?.groupIds, {'a'});
+    expect(result?.action, DownloadsBulkGroupAction.removeFromCurrentGroup);
   });
 
-  testWidgets('bulk group dialog starts with common groups selected', (
+  testWidgets('partial group can fill, restore, and edit individual comics', (
     tester,
   ) async {
     DownloadsBulkGroupSelection? result;
@@ -249,7 +249,12 @@ void main() {
                     DownloadGroup(id: 'a', name: 'A', createdAtMs: 1),
                     DownloadGroup(id: 'b', name: 'B', createdAtMs: 2),
                   ],
-                  initiallySelectedGroupIds: const {'a'},
+                  selectedComics: _comics,
+                  initialComicKeysByGroup: const {
+                    'a': {'comic-a'},
+                    'b': {},
+                  },
+                  currentGroupName: 'A',
                 );
               },
               child: const Text('Open'),
@@ -261,19 +266,89 @@ void main() {
 
     await tester.tap(find.text('Open'));
     await tester.pumpAndSettle();
-    expect(find.widgetWithText(FilledButton, 'Remove'), findsNothing);
-    await tester.tap(find.widgetWithText(FilledButton, 'Add'));
-    await tester.pumpAndSettle();
-    expect(
-      tester
-          .widget<CheckboxListTile>(find.widgetWithText(CheckboxListTile, 'A'))
-          .value,
-      isTrue,
-    );
-    await tester.tap(find.widgetWithText(FilledButton, 'Add'));
+    await tester.tap(find.widgetWithText(FilledButton, 'Move / Add'));
     await tester.pumpAndSettle();
 
-    expect(result?.action, DownloadsComicMenuAction.add);
-    expect(result?.groupIds, {'a'});
+    final partialTile = find.widgetWithText(CheckboxListTile, 'A');
+    expect(tester.widget<CheckboxListTile>(partialTile).value, isNull);
+    expect(find.widgetWithText(TextButton, 'View'), findsOneWidget);
+
+    await tester.tap(partialTile);
+    await tester.pump();
+    expect(tester.widget<CheckboxListTile>(partialTile).value, isTrue);
+    await tester.tap(partialTile);
+    await tester.pump();
+    expect(tester.widget<CheckboxListTile>(partialTile).value, isNull);
+
+    await tester.tap(find.widgetWithText(TextButton, 'View'));
+    await tester.pump(const Duration(milliseconds: 120));
+    expect(
+      find.byKey(
+        const ValueKey<String>('downloads_group_membership_details_transition'),
+      ),
+      findsOneWidget,
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(
+        const ValueKey<String>('downloads_group_membership_details_dialog'),
+      ),
+      findsOneWidget,
+    );
+    expect(find.byType(DownloadedComicCover), findsOneWidget);
+
+    await tester.tap(find.byType(DownloadedComicCover));
+    await tester.pump();
+    await tester.tap(find.text('Joined'));
+    await tester.pump();
+    expect(find.byType(DownloadedComicCover), findsNWidgets(2));
+    await tester.tap(find.byType(DownloadedComicCover).first);
+    await tester.pump();
+    final detailsDialog = find.byKey(
+      const ValueKey<String>('downloads_group_membership_details_dialog'),
+    );
+    await tester.tap(
+      find.descendant(
+        of: detailsDialog,
+        matching: find.widgetWithText(FilledButton, 'Save'),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(
+      find.byKey(
+        const ValueKey<String>('downloads_group_membership_details_transition'),
+      ),
+      findsOneWidget,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+    await tester.pumpAndSettle();
+
+    expect(result?.action, DownloadsBulkGroupAction.updateMemberships);
+    expect(result?.comicKeysByGroup['a'], {'comic-b'});
+    expect(result?.comicKeysByGroup['b'], isEmpty);
   });
 }
+
+const _comics = [
+  DownloadedMangaComic(
+    comicId: 'comic-a',
+    title: 'Comic A',
+    subTitle: '',
+    description: '',
+    coverUrl: '',
+    localCoverPath: null,
+    chapters: [],
+    updatedAtMillis: 0,
+  ),
+  DownloadedMangaComic(
+    comicId: 'comic-b',
+    title: 'Comic B',
+    subTitle: '',
+    description: '',
+    coverUrl: '',
+    localCoverPath: null,
+    chapters: [],
+    updatedAtMillis: 0,
+  ),
+];

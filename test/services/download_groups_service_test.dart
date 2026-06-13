@@ -79,6 +79,33 @@ void main() {
     expect(service.comicKeysForGroup(second.id), {'comic-a', 'comic-b'});
   });
 
+  test('removing comics from a group preserves other memberships', () async {
+    await service.initialize(const ['comic-a', 'comic-b']);
+    final first = await service.createGroup('First');
+    final second = await service.createGroup('Second');
+    await service.addComicsToGroups(
+      const ['comic-a', 'comic-b'],
+      {first.id, second.id},
+    );
+
+    await service.removeComicsFromGroup(const ['comic-a'], first.id);
+
+    expect(service.comicKeysForGroup(first.id), {'comic-b'});
+    expect(service.comicKeysForGroup(second.id), {'comic-a', 'comic-b'});
+  });
+
+  test('the last default membership cannot be removed', () async {
+    await service.initialize(const ['comic-a']);
+
+    await service.removeComicsFromGroup(const [
+      'comic-a',
+    ], DownloadGroupsService.defaultGroupId);
+
+    expect(service.comicKeysForGroup(DownloadGroupsService.defaultGroupId), {
+      'comic-a',
+    });
+  });
+
   test('deleting a group moves its comics to default', () async {
     await service.initialize(const ['comic-a']);
     final group = await service.createGroup('Temporary');
@@ -91,6 +118,28 @@ void main() {
       service.comicKeysForGroup(DownloadGroupsService.defaultGroupId),
       contains('comic-a'),
     );
+  });
+
+  test('groups can be renamed and reordered persistently', () async {
+    await service.initialize(const []);
+    final first = await service.createGroup('First');
+    final second = await service.createGroup('Second');
+
+    await service.renameGroup(first.id, 'Renamed');
+    await service.reorderGroups([second.id, first.id]);
+
+    expect(service.groups.map((group) => group.name), [
+      DownloadGroupsService.defaultGroupName,
+      'Second',
+      'Renamed',
+    ]);
+
+    await service.reload();
+    expect(service.groups.map((group) => group.id), [
+      DownloadGroupsService.defaultGroupId,
+      second.id,
+      first.id,
+    ]);
   });
 
   test('webdav snapshot syncs groups and respects deletions', () async {

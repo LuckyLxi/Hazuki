@@ -2837,8 +2837,20 @@ class $DownloadGroupsTable extends DownloadGroups
     type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _sortOrderMeta = const VerificationMeta(
+    'sortOrder',
+  );
   @override
-  List<GeneratedColumn> get $columns => [id, name, createdAtMs];
+  late final GeneratedColumn<int> sortOrder = GeneratedColumn<int>(
+    'sort_order',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, name, createdAtMs, sortOrder];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -2875,6 +2887,12 @@ class $DownloadGroupsTable extends DownloadGroups
     } else if (isInserting) {
       context.missing(_createdAtMsMeta);
     }
+    if (data.containsKey('sort_order')) {
+      context.handle(
+        _sortOrderMeta,
+        sortOrder.isAcceptableOrUnknown(data['sort_order']!, _sortOrderMeta),
+      );
+    }
     return context;
   }
 
@@ -2896,6 +2914,10 @@ class $DownloadGroupsTable extends DownloadGroups
         DriftSqlType.int,
         data['${effectivePrefix}created_at_ms'],
       )!,
+      sortOrder: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}sort_order'],
+      )!,
     );
   }
 
@@ -2909,10 +2931,12 @@ class DownloadGroup extends DataClass implements Insertable<DownloadGroup> {
   final String id;
   final String name;
   final int createdAtMs;
+  final int sortOrder;
   const DownloadGroup({
     required this.id,
     required this.name,
     required this.createdAtMs,
+    required this.sortOrder,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2920,6 +2944,7 @@ class DownloadGroup extends DataClass implements Insertable<DownloadGroup> {
     map['id'] = Variable<String>(id);
     map['name'] = Variable<String>(name);
     map['created_at_ms'] = Variable<int>(createdAtMs);
+    map['sort_order'] = Variable<int>(sortOrder);
     return map;
   }
 
@@ -2928,6 +2953,7 @@ class DownloadGroup extends DataClass implements Insertable<DownloadGroup> {
       id: Value(id),
       name: Value(name),
       createdAtMs: Value(createdAtMs),
+      sortOrder: Value(sortOrder),
     );
   }
 
@@ -2940,6 +2966,7 @@ class DownloadGroup extends DataClass implements Insertable<DownloadGroup> {
       id: serializer.fromJson<String>(json['id']),
       name: serializer.fromJson<String>(json['name']),
       createdAtMs: serializer.fromJson<int>(json['createdAtMs']),
+      sortOrder: serializer.fromJson<int>(json['sortOrder']),
     );
   }
   @override
@@ -2949,15 +2976,21 @@ class DownloadGroup extends DataClass implements Insertable<DownloadGroup> {
       'id': serializer.toJson<String>(id),
       'name': serializer.toJson<String>(name),
       'createdAtMs': serializer.toJson<int>(createdAtMs),
+      'sortOrder': serializer.toJson<int>(sortOrder),
     };
   }
 
-  DownloadGroup copyWith({String? id, String? name, int? createdAtMs}) =>
-      DownloadGroup(
-        id: id ?? this.id,
-        name: name ?? this.name,
-        createdAtMs: createdAtMs ?? this.createdAtMs,
-      );
+  DownloadGroup copyWith({
+    String? id,
+    String? name,
+    int? createdAtMs,
+    int? sortOrder,
+  }) => DownloadGroup(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    createdAtMs: createdAtMs ?? this.createdAtMs,
+    sortOrder: sortOrder ?? this.sortOrder,
+  );
   DownloadGroup copyWithCompanion(DownloadGroupsCompanion data) {
     return DownloadGroup(
       id: data.id.present ? data.id.value : this.id,
@@ -2965,6 +2998,7 @@ class DownloadGroup extends DataClass implements Insertable<DownloadGroup> {
       createdAtMs: data.createdAtMs.present
           ? data.createdAtMs.value
           : this.createdAtMs,
+      sortOrder: data.sortOrder.present ? data.sortOrder.value : this.sortOrder,
     );
   }
 
@@ -2973,37 +3007,42 @@ class DownloadGroup extends DataClass implements Insertable<DownloadGroup> {
     return (StringBuffer('DownloadGroup(')
           ..write('id: $id, ')
           ..write('name: $name, ')
-          ..write('createdAtMs: $createdAtMs')
+          ..write('createdAtMs: $createdAtMs, ')
+          ..write('sortOrder: $sortOrder')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, name, createdAtMs);
+  int get hashCode => Object.hash(id, name, createdAtMs, sortOrder);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is DownloadGroup &&
           other.id == this.id &&
           other.name == this.name &&
-          other.createdAtMs == this.createdAtMs);
+          other.createdAtMs == this.createdAtMs &&
+          other.sortOrder == this.sortOrder);
 }
 
 class DownloadGroupsCompanion extends UpdateCompanion<DownloadGroup> {
   final Value<String> id;
   final Value<String> name;
   final Value<int> createdAtMs;
+  final Value<int> sortOrder;
   final Value<int> rowid;
   const DownloadGroupsCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
     this.createdAtMs = const Value.absent(),
+    this.sortOrder = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   DownloadGroupsCompanion.insert({
     required String id,
     required String name,
     required int createdAtMs,
+    this.sortOrder = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name),
@@ -3012,12 +3051,14 @@ class DownloadGroupsCompanion extends UpdateCompanion<DownloadGroup> {
     Expression<String>? id,
     Expression<String>? name,
     Expression<int>? createdAtMs,
+    Expression<int>? sortOrder,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (name != null) 'name': name,
       if (createdAtMs != null) 'created_at_ms': createdAtMs,
+      if (sortOrder != null) 'sort_order': sortOrder,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -3026,12 +3067,14 @@ class DownloadGroupsCompanion extends UpdateCompanion<DownloadGroup> {
     Value<String>? id,
     Value<String>? name,
     Value<int>? createdAtMs,
+    Value<int>? sortOrder,
     Value<int>? rowid,
   }) {
     return DownloadGroupsCompanion(
       id: id ?? this.id,
       name: name ?? this.name,
       createdAtMs: createdAtMs ?? this.createdAtMs,
+      sortOrder: sortOrder ?? this.sortOrder,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -3048,6 +3091,9 @@ class DownloadGroupsCompanion extends UpdateCompanion<DownloadGroup> {
     if (createdAtMs.present) {
       map['created_at_ms'] = Variable<int>(createdAtMs.value);
     }
+    if (sortOrder.present) {
+      map['sort_order'] = Variable<int>(sortOrder.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -3060,6 +3106,7 @@ class DownloadGroupsCompanion extends UpdateCompanion<DownloadGroup> {
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('createdAtMs: $createdAtMs, ')
+          ..write('sortOrder: $sortOrder, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -5595,6 +5642,7 @@ typedef $$DownloadGroupsTableCreateCompanionBuilder =
       required String id,
       required String name,
       required int createdAtMs,
+      Value<int> sortOrder,
       Value<int> rowid,
     });
 typedef $$DownloadGroupsTableUpdateCompanionBuilder =
@@ -5602,6 +5650,7 @@ typedef $$DownloadGroupsTableUpdateCompanionBuilder =
       Value<String> id,
       Value<String> name,
       Value<int> createdAtMs,
+      Value<int> sortOrder,
       Value<int> rowid,
     });
 
@@ -5626,6 +5675,11 @@ class $$DownloadGroupsTableFilterComposer
 
   ColumnFilters<int> get createdAtMs => $composableBuilder(
     column: $table.createdAtMs,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -5653,6 +5707,11 @@ class $$DownloadGroupsTableOrderingComposer
     column: $table.createdAtMs,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get sortOrder => $composableBuilder(
+    column: $table.sortOrder,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$DownloadGroupsTableAnnotationComposer
@@ -5674,6 +5733,9 @@ class $$DownloadGroupsTableAnnotationComposer
     column: $table.createdAtMs,
     builder: (column) => column,
   );
+
+  GeneratedColumn<int> get sortOrder =>
+      $composableBuilder(column: $table.sortOrder, builder: (column) => column);
 }
 
 class $$DownloadGroupsTableTableManager
@@ -5716,11 +5778,13 @@ class $$DownloadGroupsTableTableManager
                 Value<String> id = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<int> createdAtMs = const Value.absent(),
+                Value<int> sortOrder = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => DownloadGroupsCompanion(
                 id: id,
                 name: name,
                 createdAtMs: createdAtMs,
+                sortOrder: sortOrder,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -5728,11 +5792,13 @@ class $$DownloadGroupsTableTableManager
                 required String id,
                 required String name,
                 required int createdAtMs,
+                Value<int> sortOrder = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => DownloadGroupsCompanion.insert(
                 id: id,
                 name: name,
                 createdAtMs: createdAtMs,
+                sortOrder: sortOrder,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

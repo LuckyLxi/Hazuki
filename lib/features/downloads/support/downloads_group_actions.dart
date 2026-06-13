@@ -3,17 +3,21 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/download_groups_service.dart';
+import 'package:hazuki/services/manga_download/manga_download_service.dart';
+import '../view/downloads_cover_widgets.dart';
 
-enum DownloadsComicMenuAction { add, move, delete }
+enum DownloadsComicMenuAction { updateGroups, delete }
+
+enum DownloadsBulkGroupAction { updateMemberships, removeFromCurrentGroup }
 
 class DownloadsBulkGroupSelection {
   const DownloadsBulkGroupSelection({
     required this.action,
-    required this.groupIds,
+    this.comicKeysByGroup = const {},
   });
 
-  final DownloadsComicMenuAction action;
-  final Set<String> groupIds;
+  final DownloadsBulkGroupAction action;
+  final Map<String, Set<String>> comicKeysByGroup;
 }
 
 Future<DownloadsComicMenuAction?> showDownloadsComicMenu({
@@ -27,7 +31,7 @@ Future<DownloadsComicMenuAction?> showDownloadsComicMenu({
   if (overlay == null || cardBox == null) return null;
 
   const width = 212.0;
-  const height = 174.0;
+  const height = 126.0;
   const gap = 8.0;
   final padding = MediaQuery.paddingOf(context);
   final finger = overlay.globalToLocal(globalPosition);
@@ -94,19 +98,11 @@ Future<DownloadsComicMenuAction?> showDownloadsComicMenu({
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       _MenuItem(
-                        icon: Icons.playlist_add_rounded,
-                        label: strings.downloadsAddToGroup,
-                        onTap: () => Navigator.pop(
-                          dialogContext,
-                          DownloadsComicMenuAction.add,
-                        ),
-                      ),
-                      _MenuItem(
                         icon: Icons.drive_file_move_outline,
-                        label: strings.downloadsMoveToGroup,
+                        label: strings.downloadsMoveOrAddAction,
                         onTap: () => Navigator.pop(
                           dialogContext,
-                          DownloadsComicMenuAction.move,
+                          DownloadsComicMenuAction.updateGroups,
                         ),
                       ),
                       Divider(height: 1, color: scheme.outlineVariant),
@@ -135,7 +131,6 @@ Future<Set<String>?> showDownloadGroupPicker({
   required BuildContext context,
   required List<DownloadGroup> groups,
   required Set<String> initiallySelectedGroupIds,
-  required DownloadsComicMenuAction action,
 }) {
   return showGeneralDialog<Set<String>>(
     context: context,
@@ -160,7 +155,6 @@ Future<Set<String>?> showDownloadGroupPicker({
       return _DownloadGroupPickerDialog(
         groups: groups,
         initiallySelectedGroupIds: initiallySelectedGroupIds,
-        action: action,
       );
     },
   );
@@ -169,7 +163,9 @@ Future<Set<String>?> showDownloadGroupPicker({
 Future<DownloadsBulkGroupSelection?> showDownloadsBulkGroupDialog({
   required BuildContext context,
   required List<DownloadGroup> groups,
-  required Set<String> initiallySelectedGroupIds,
+  required List<DownloadedMangaComic> selectedComics,
+  required Map<String, Set<String>> initialComicKeysByGroup,
+  required String currentGroupName,
 }) {
   return showGeneralDialog<DownloadsBulkGroupSelection>(
     context: context,
@@ -194,7 +190,9 @@ Future<DownloadsBulkGroupSelection?> showDownloadsBulkGroupDialog({
     pageBuilder: (dialogContext, animation, secondaryAnimation) =>
         _DownloadsBulkGroupDialog(
           groups: groups,
-          initiallySelectedGroupIds: initiallySelectedGroupIds,
+          selectedComics: selectedComics,
+          initialComicKeysByGroup: initialComicKeysByGroup,
+          currentGroupName: currentGroupName,
         ),
   );
 }
@@ -202,36 +200,64 @@ Future<DownloadsBulkGroupSelection?> showDownloadsBulkGroupDialog({
 class _DownloadsBulkGroupDialog extends StatefulWidget {
   const _DownloadsBulkGroupDialog({
     required this.groups,
-    required this.initiallySelectedGroupIds,
+    required this.selectedComics,
+    required this.initialComicKeysByGroup,
+    required this.currentGroupName,
   });
 
   final List<DownloadGroup> groups;
-  final Set<String> initiallySelectedGroupIds;
+  final List<DownloadedMangaComic> selectedComics;
+  final Map<String, Set<String>> initialComicKeysByGroup;
+  final String currentGroupName;
 
   @override
   State<_DownloadsBulkGroupDialog> createState() =>
       _DownloadsBulkGroupDialogState();
 }
 
+enum _DownloadsBulkDialogStage { actions, groups, removeConfirmation }
+
 class _DownloadsBulkGroupDialogState extends State<_DownloadsBulkGroupDialog> {
-  DownloadsComicMenuAction? _action;
-  late final Set<String> _selected = {...widget.initiallySelectedGroupIds};
-  bool _showSelectionRequired = false;
+  _DownloadsBulkDialogStage _stage = _DownloadsBulkDialogStage.actions;
+  late final Set<String> _selectedComicKeys = {
+    for (final comic in widget.selectedComics) comic.storageKey,
+  };
+  late final Map<String, Set<String>> _initialComicKeysByGroup = {
+    for (final group in widget.groups)
+      group.id: Set<String>.of(
+        widget.initialComicKeysByGroup[group.id] ?? const {},
+      ),
+  };
+  late final Map<String, Set<String>> _draftComicKeysByGroup = {
+    for (final entry in _initialComicKeysByGroup.entries)
+      entry.key: Set<String>.of(entry.value),
+  };
 
   @override
   Widget build(BuildContext context) {
-    final choosingGroups = _action != null;
+    final choosingGroups = _stage == _DownloadsBulkDialogStage.groups;
+    final confirmingRemoval =
+        _stage == _DownloadsBulkDialogStage.removeConfirmation;
     return Center(
       child: AnimatedContainer(
         key: const ValueKey<String>('downloads_bulk_group_dialog'),
         duration: const Duration(milliseconds: 320),
         curve: Curves.easeOutCubic,
-        width: choosingGroups ? 380 : 260,
-        height: choosingGroups ? 430 : 250,
+        width: choosingGroups ? 420 : (confirmingRemoval ? 340 : 280),
+        height: choosingGroups ? 500 : (confirmingRemoval ? 220 : 250),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(confirmingRemoval ? 48 : 28),
+          border: Border.all(
+            color: confirmingRemoval
+                ? Theme.of(context).colorScheme.error
+                : Colors.transparent,
+            width: confirmingRemoval ? 2 : 0,
+          ),
+        ),
         child: Material(
           color: Theme.of(context).colorScheme.surfaceContainerHigh,
-          elevation: 8,
-          borderRadius: BorderRadius.circular(28),
+          elevation: confirmingRemoval ? 12 : 8,
+          borderRadius: BorderRadius.circular(confirmingRemoval ? 48 : 28),
           clipBehavior: Clip.antiAlias,
           child: AnimatedSwitcher(
             duration: const Duration(milliseconds: 260),
@@ -246,9 +272,14 @@ class _DownloadsBulkGroupDialogState extends State<_DownloadsBulkGroupDialog> {
                 child: child,
               ),
             ),
-            child: choosingGroups
-                ? _buildGroupSelection(context)
-                : _buildActionSelection(context),
+            child: switch (_stage) {
+              _DownloadsBulkDialogStage.actions => _buildActionSelection(
+                context,
+              ),
+              _DownloadsBulkDialogStage.groups => _buildGroupSelection(context),
+              _DownloadsBulkDialogStage.removeConfirmation =>
+                _buildRemoveConfirmation(context),
+            },
           ),
         ),
       ),
@@ -270,16 +301,17 @@ class _DownloadsBulkGroupDialogState extends State<_DownloadsBulkGroupDialog> {
           const SizedBox(height: 20),
           FilledButton.tonalIcon(
             onPressed: () =>
-                setState(() => _action = DownloadsComicMenuAction.add),
+                setState(() => _stage = _DownloadsBulkDialogStage.groups),
             icon: const Icon(Icons.playlist_add_rounded),
-            label: Text(strings.downloadsAddAction),
+            label: Text(strings.downloadsMoveOrAddAction),
           ),
           const SizedBox(height: 8),
           FilledButton.tonalIcon(
-            onPressed: () =>
-                setState(() => _action = DownloadsComicMenuAction.move),
-            icon: const Icon(Icons.drive_file_move_outline),
-            label: Text(strings.downloadsMoveAction),
+            onPressed: () => setState(
+              () => _stage = _DownloadsBulkDialogStage.removeConfirmation,
+            ),
+            icon: const Icon(Icons.remove_circle_outline),
+            label: Text(strings.downloadsRemoveFromCurrentGroup),
           ),
           const Spacer(),
         ],
@@ -306,73 +338,321 @@ class _DownloadsBulkGroupDialogState extends State<_DownloadsBulkGroupDialog> {
               itemCount: widget.groups.length,
               itemBuilder: (context, index) {
                 final group = widget.groups[index];
-                return CheckboxListTile(
-                  contentPadding: EdgeInsets.zero,
-                  value: _selected.contains(group.id),
-                  title: Text(
-                    group.isDefault
-                        ? strings.downloadsDefaultGroup
-                        : group.name,
-                  ),
-                  onChanged: (selected) {
-                    setState(() {
-                      if (selected == true) {
-                        _selected.add(group.id);
-                      } else {
-                        _selected.remove(group.id);
-                      }
-                      if (_selected.isNotEmpty) {
-                        _showSelectionRequired = false;
-                      }
-                    });
-                  },
+                final initial =
+                    _initialComicKeysByGroup[group.id] ?? const <String>{};
+                final draft =
+                    _draftComicKeysByGroup[group.id] ?? const <String>{};
+                final initialAll =
+                    initial.length == _selectedComicKeys.length &&
+                    _selectedComicKeys.isNotEmpty;
+                final value = draft.isEmpty
+                    ? false
+                    : draft.length == _selectedComicKeys.length
+                    ? true
+                    : null;
+                return Row(
+                  children: [
+                    Expanded(
+                      child: CheckboxListTile(
+                        tristate: true,
+                        contentPadding: EdgeInsets.zero,
+                        value: value,
+                        title: Text(
+                          group.isDefault
+                              ? strings.downloadsDefaultGroup
+                              : group.name,
+                        ),
+                        onChanged: initialAll
+                            ? null
+                            : (_) => _toggleGroup(group.id),
+                      ),
+                    ),
+                    if (value == null)
+                      TextButton(
+                        onPressed: () => _showGroupMembershipDetails(group),
+                        child: Text(strings.downloadsViewGroupMembership),
+                      ),
+                  ],
                 );
               },
             ),
-          ),
-          AnimatedSize(
-            duration: const Duration(milliseconds: 180),
-            child: _showSelectionRequired && _selected.isEmpty
-                ? Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: Text(
-                      strings.downloadsSelectAtLeastOneGroup,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
-                      ),
-                    ),
-                  )
-                : const SizedBox.shrink(),
           ),
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               TextButton(
-                onPressed: () => setState(() => _action = null),
+                onPressed: () =>
+                    setState(() => _stage = _DownloadsBulkDialogStage.actions),
                 child: Text(strings.downloadsBack),
               ),
               const SizedBox(width: 8),
               FilledButton(
                 onPressed: () {
-                  if (_selected.isEmpty) {
-                    setState(() => _showSelectionRequired = true);
-                    return;
-                  }
                   Navigator.pop(
                     context,
                     DownloadsBulkGroupSelection(
-                      action: _action!,
-                      groupIds: Set.of(_selected),
+                      action: DownloadsBulkGroupAction.updateMemberships,
+                      comicKeysByGroup: {
+                        for (final entry in _draftComicKeysByGroup.entries)
+                          entry.key: Set<String>.of(entry.value),
+                      },
                     ),
                   );
                 },
-                child: Text(
-                  _action == DownloadsComicMenuAction.add
-                      ? strings.downloadsAddAction
-                      : strings.downloadsMoveAction,
-                ),
+                child: Text(strings.commonSave),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRemoveConfirmation(BuildContext context) {
+    final strings = l10n(context);
+    return Padding(
+      key: const ValueKey<String>('downloads_bulk_remove_confirmation_stage'),
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            strings.downloadsConfirmRemoveFromGroup(widget.currentGroupName),
+            style: Theme.of(context).textTheme.titleMedium,
+            textAlign: TextAlign.center,
+          ),
+          const Spacer(),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton(
+                onPressed: () =>
+                    setState(() => _stage = _DownloadsBulkDialogStage.actions),
+                child: Text(strings.commonCancel),
+              ),
+              const SizedBox(width: 8),
+              FilledButton(
+                onPressed: () => Navigator.pop(
+                  context,
+                  const DownloadsBulkGroupSelection(
+                    action: DownloadsBulkGroupAction.removeFromCurrentGroup,
+                  ),
+                ),
+                style: FilledButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.error,
+                  foregroundColor: Theme.of(context).colorScheme.onError,
+                ),
+                child: Text(strings.commonConfirm),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _toggleGroup(String groupId) {
+    final initial = _initialComicKeysByGroup[groupId] ?? const <String>{};
+    final draft = _draftComicKeysByGroup[groupId] ?? const <String>{};
+    setState(() {
+      _draftComicKeysByGroup[groupId] =
+          draft.length == _selectedComicKeys.length
+          ? Set<String>.of(initial)
+          : Set<String>.of(_selectedComicKeys);
+    });
+  }
+
+  Future<void> _showGroupMembershipDetails(DownloadGroup group) async {
+    final updated = await showGeneralDialog<Set<String>>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: l10n(context).commonClose,
+      barrierColor: Colors.black38,
+      transitionDuration: const Duration(milliseconds: 300),
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        final curved = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutBack,
+          reverseCurve: Curves.easeInCubic,
+        );
+        return FadeTransition(
+          opacity: CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
+            reverseCurve: Curves.easeInCubic,
+          ),
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0, 0.06),
+              end: Offset.zero,
+            ).animate(curved),
+            child: ScaleTransition(
+              key: const ValueKey<String>(
+                'downloads_group_membership_details_transition',
+              ),
+              scale: Tween<double>(begin: 0.9, end: 1).animate(curved),
+              child: child,
+            ),
+          ),
+        );
+      },
+      pageBuilder: (context, animation, secondaryAnimation) => Center(
+        child: _DownloadsGroupMembershipDetailsDialog(
+          group: group,
+          comics: widget.selectedComics,
+          joinedComicKeys: Set<String>.of(
+            _draftComicKeysByGroup[group.id] ?? const {},
+          ),
+        ),
+      ),
+    );
+    if (updated == null || !mounted) return;
+    setState(() => _draftComicKeysByGroup[group.id] = updated);
+  }
+}
+
+class _DownloadsGroupMembershipDetailsDialog extends StatefulWidget {
+  const _DownloadsGroupMembershipDetailsDialog({
+    required this.group,
+    required this.comics,
+    required this.joinedComicKeys,
+  });
+
+  final DownloadGroup group;
+  final List<DownloadedMangaComic> comics;
+  final Set<String> joinedComicKeys;
+
+  @override
+  State<_DownloadsGroupMembershipDetailsDialog> createState() =>
+      _DownloadsGroupMembershipDetailsDialogState();
+}
+
+class _DownloadsGroupMembershipDetailsDialogState
+    extends State<_DownloadsGroupMembershipDetailsDialog> {
+  late final Set<String> _joinedComicKeys = Set.of(widget.joinedComicKeys);
+  bool _showJoined = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = l10n(context);
+    final visibleComics = widget.comics
+        .where(
+          (comic) => _joinedComicKeys.contains(comic.storageKey) == _showJoined,
+        )
+        .toList(growable: false);
+    return AlertDialog(
+      key: const ValueKey<String>('downloads_group_membership_details_dialog'),
+      title: Text(
+        widget.group.isDefault
+            ? strings.downloadsDefaultGroup
+            : widget.group.name,
+      ),
+      content: SizedBox(
+        width: 420,
+        height: 420,
+        child: Column(
+          children: [
+            SegmentedButton<bool>(
+              segments: [
+                ButtonSegment(
+                  value: false,
+                  label: Text(strings.downloadsNotJoined),
+                ),
+                ButtonSegment(
+                  value: true,
+                  label: Text(strings.downloadsJoined),
+                ),
+              ],
+              selected: {_showJoined},
+              onSelectionChanged: (value) {
+                setState(() => _showJoined = value.single);
+              },
+            ),
+            const SizedBox(height: 16),
+            Expanded(
+              child: visibleComics.isEmpty
+                  ? Center(child: Text(strings.downloadsNoMatchingComics))
+                  : GridView.builder(
+                      gridDelegate:
+                          const SliverGridDelegateWithMaxCrossAxisExtent(
+                            maxCrossAxisExtent: 96,
+                            childAspectRatio: 0.7,
+                            crossAxisSpacing: 12,
+                            mainAxisSpacing: 12,
+                          ),
+                      itemCount: visibleComics.length,
+                      itemBuilder: (context, index) {
+                        final comic = visibleComics[index];
+                        return _DownloadsMembershipComicCover(
+                          comic: comic,
+                          joined: _joinedComicKeys.contains(comic.storageKey),
+                          onTap: () {
+                            setState(() {
+                              if (_joinedComicKeys.contains(comic.storageKey)) {
+                                _joinedComicKeys.remove(comic.storageKey);
+                              } else {
+                                _joinedComicKeys.add(comic.storageKey);
+                              }
+                            });
+                          },
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(strings.commonCancel),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, Set.of(_joinedComicKeys)),
+          child: Text(strings.commonSave),
+        ),
+      ],
+    );
+  }
+}
+
+class _DownloadsMembershipComicCover extends StatelessWidget {
+  const _DownloadsMembershipComicCover({
+    required this.comic,
+    required this.joined,
+    required this.onTap,
+  });
+
+  final DownloadedMangaComic comic;
+  final bool joined;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          DownloadedComicCover(comic: comic, borderRadius: 10),
+          Positioned(
+            top: 4,
+            right: 4,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: Theme.of(
+                  context,
+                ).colorScheme.surface.withValues(alpha: 0.88),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                joined ? Icons.remove_circle_rounded : Icons.add_circle_rounded,
+                color: joined
+                    ? Theme.of(context).colorScheme.error
+                    : Theme.of(context).colorScheme.primary,
+              ),
+            ),
           ),
         ],
       ),
@@ -384,12 +664,10 @@ class _DownloadGroupPickerDialog extends StatefulWidget {
   const _DownloadGroupPickerDialog({
     required this.groups,
     required this.initiallySelectedGroupIds,
-    required this.action,
   });
 
   final List<DownloadGroup> groups;
   final Set<String> initiallySelectedGroupIds;
-  final DownloadsComicMenuAction action;
 
   @override
   State<_DownloadGroupPickerDialog> createState() =>
@@ -478,11 +756,7 @@ class _DownloadGroupPickerDialogState
             }
             Navigator.pop(context, Set<String>.of(_selected));
           },
-          child: Text(
-            widget.action == DownloadsComicMenuAction.add
-                ? strings.downloadsAddAction
-                : strings.downloadsMoveAction,
-          ),
+          child: Text(strings.downloadsMoveOrAddAction),
         ),
       ],
     );

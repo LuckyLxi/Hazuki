@@ -554,6 +554,9 @@
   "downloadsActionResume": "Resume",
   "downloadsActionPauseAll": "Pause all",
   "downloadsActionResumeAll": "Resume all",
+  "downloadsAllTasksPaused": "All download tasks paused",
+  "downloadsAllTasksResumed": "All download tasks started",
+  "downloadsNoTasks": "No download tasks",
   "downloadsQueued": "{count} chapters added to downloads",
   "@downloadsQueued": {
     "placeholders": {
@@ -1185,6 +1188,9 @@
   "downloadsNewGroup": "New group",
   "downloadsGroupName": "Group name",
   "downloadsCreateGroup": "Create",
+  "downloadsRenameGroup": "Rename group",
+  "downloadsSortGroups": "Sort groups",
+  "downloadsReorderGroup": "Hold and drag to reorder",
   "downloadsDeleteGroupTitle": "Delete group",
   "downloadsDeleteGroupContent": "Delete \"{name}\"? Its comics will be moved to the default group.",
   "@downloadsDeleteGroupContent": {
@@ -1230,6 +1236,26 @@
   "downloadsGroupNameRequired": "Enter a group name",
   "downloadsBatchGroupAction": "Group selected comics",
   "downloadsBack": "Back",
+  "downloadsMoveOrAddAction": "Move / Add",
+  "downloadsRemoveFromCurrentGroup": "Remove from this group",
+  "downloadsConfirmRemoveFromGroup": "Remove the selected comics from {group}?",
+  "@downloadsConfirmRemoveFromGroup": {
+    "placeholders": {
+      "group": {}
+    }
+  },
+  "downloadsViewGroupMembership": "View",
+  "downloadsNotJoined": "Not joined",
+  "downloadsJoined": "Joined",
+  "downloadsNoMatchingComics": "No comics in this list",
+  "downloadsBatchGroupsUpdated": "Updated groups for {comicCount} comics",
+  "@downloadsBatchGroupsUpdated": {
+    "placeholders": {
+      "comicCount": {
+        "type": "int"
+      }
+    }
+  },
   "downloadsBatchAddedToGroup": "Added {comicCount} comics to {group}",
   "@downloadsBatchAddedToGroup": {
     "placeholders": {

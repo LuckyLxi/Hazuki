@@ -610,6 +610,133 @@ void main() {
     expect(find.text('Favorites (0)'), findsNothing);
   });
 
+  testWidgets('category dialog renames custom groups with validation', (
+    tester,
+  ) async {
+    final renamed = <String>[];
+    await tester.pumpWidget(
+      _wrapTab(
+        groups: const [_defaultGroup, _firstGroup],
+        onRenameGroup: (groupId, name) async {
+          renamed.add('$groupId:$name');
+          return DownloadGroup(id: groupId, name: name, createdAtMs: 1);
+        },
+      ),
+    );
+
+    await tester.tap(
+      find.byKey(const ValueKey<String>('downloads_category_launcher')),
+    );
+    await tester.pumpAndSettle();
+    final defaultGroupBackground = find.byKey(
+      const ValueKey<String>(
+        'download_group_background_${DownloadGroupsService.defaultGroupId}',
+      ),
+    );
+    expect(
+      tester
+          .widget<InkWell>(
+            find.descendant(
+              of: defaultGroupBackground,
+              matching: find.byType(InkWell),
+            ),
+          )
+          .onLongPress,
+      isNull,
+    );
+
+    await tester.longPress(
+      find.byKey(const ValueKey<String>('download_group_background_first')),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey<String>('downloads_rename_group_transition')),
+      findsOneWidget,
+    );
+    await tester.enterText(find.byType(TextField), '');
+    await tester.pump();
+    expect(find.text('Enter a group name'), findsOneWidget);
+    expect(
+      tester
+          .widget<FilledButton>(find.widgetWithText(FilledButton, 'Save'))
+          .onPressed,
+      isNull,
+    );
+    await tester.enterText(find.byType(TextField), 'Renamed');
+    await tester.pump();
+    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+    await tester.pumpAndSettle();
+
+    expect(renamed, ['first:Renamed']);
+    expect(find.text('Renamed (0)'), findsOneWidget);
+  });
+
+  testWidgets('category dialog reorders custom groups and saves', (
+    tester,
+  ) async {
+    final savedOrders = <List<String>>[];
+    await tester.pumpWidget(
+      _wrapTab(
+        groups: const [_defaultGroup, _firstGroup, _secondGroup],
+        onReorderGroups: (groupIds) async => savedOrders.add(groupIds),
+      ),
+    );
+
+    await tester.tap(
+      find.byKey(const ValueKey<String>('downloads_category_launcher')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey<String>('downloads_group_sort_start')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.delete_outline), findsNothing);
+    expect(find.byIcon(Icons.drag_handle_rounded), findsNWidgets(2));
+    expect(
+      tester
+          .widget<IconButton>(
+            find
+                .ancestor(
+                  of: find.byIcon(Icons.create_new_folder_outlined),
+                  matching: find.byType(IconButton),
+                )
+                .first,
+          )
+          .onPressed,
+      isNull,
+    );
+
+    await tester.drag(
+      find.byType(ReorderableDragStartListener).last,
+      const Offset(0, -120),
+    );
+    await tester.pumpAndSettle();
+    final saveButton = find.byKey(
+      const ValueKey<String>('downloads_group_sort_save'),
+    );
+    final saveButtonRight = tester.getRect(saveButton).right;
+    await tester.tap(saveButton);
+    await tester.pump();
+    expect(
+      tester
+          .getRect(
+            find.byKey(const ValueKey<String>('downloads_group_sort_start')),
+          )
+          .right,
+      closeTo(saveButtonRight, 0.1),
+    );
+    await tester.pumpAndSettle();
+
+    expect(savedOrders, [
+      ['second', 'first'],
+    ]);
+    expect(
+      find.byKey(const ValueKey<String>('downloads_group_sort_start')),
+      findsOneWidget,
+    );
+  });
+
   testWidgets(
     'category launcher stays above comics while they scroll underneath',
     (tester) async {
@@ -692,6 +819,9 @@ Widget _wrapTab({
   ValueChanged<DownloadedMangaComic>? onOpenComic,
   ValueChanged<DownloadedMangaComic>? onDeleteComic,
   Future<void> Function(String groupId)? onDeleteGroup,
+  Future<DownloadGroup> Function(String groupId, String name)? onRenameGroup,
+  Future<void> Function(List<String> orderedGroupIds)? onReorderGroups,
+  List<DownloadGroup> groups = const [_defaultGroup],
 }) {
   return MaterialApp(
     navigatorKey: navigatorKey,
@@ -705,6 +835,9 @@ Widget _wrapTab({
         onOpenComic: onOpenComic,
         onDeleteComic: onDeleteComic,
         onDeleteGroup: onDeleteGroup,
+        onRenameGroup: onRenameGroup,
+        onReorderGroups: onReorderGroups,
+        groups: groups,
       ),
     ),
   );
@@ -734,6 +867,9 @@ Widget _buildTab({
   ValueChanged<DownloadedMangaComic>? onOpenComic,
   ValueChanged<DownloadedMangaComic>? onDeleteComic,
   Future<void> Function(String groupId)? onDeleteGroup,
+  Future<DownloadGroup> Function(String groupId, String name)? onRenameGroup,
+  Future<void> Function(List<String> orderedGroupIds)? onReorderGroups,
+  List<DownloadGroup> groups = const [_defaultGroup],
 }) {
   return DownloadsCompletedTab(
     comics: comics,
@@ -749,7 +885,7 @@ Widget _buildTab({
     onScanDownloaded: () {},
     onOpenComic: onOpenComic ?? (_) {},
     onDeleteComic: onDeleteComic ?? (_) {},
-    groups: const [_defaultGroup],
+    groups: groups,
     selectedGroupId: DownloadGroupsService.defaultGroupId,
     selectedGroupName: 'Default group',
     selectedGroupComicCount: comics.length,
@@ -757,6 +893,11 @@ Widget _buildTab({
     onSelectGroup: (_) {},
     onCreateGroup: (name) async =>
         DownloadGroup(id: 'new-group', name: name, createdAtMs: 1),
+    onRenameGroup:
+        onRenameGroup ??
+        (groupId, name) async =>
+            DownloadGroup(id: groupId, name: name, createdAtMs: 1),
+    onReorderGroups: onReorderGroups ?? (_) async {},
     onDeleteGroup: onDeleteGroup ?? (_) async {},
     onShowComicMenu: (_, _, _) async {},
   );
@@ -766,6 +907,20 @@ const _defaultGroup = DownloadGroup(
   id: DownloadGroupsService.defaultGroupId,
   name: DownloadGroupsService.defaultGroupName,
   createdAtMs: 0,
+);
+
+const _firstGroup = DownloadGroup(
+  id: 'first',
+  name: 'First',
+  createdAtMs: 1,
+  sortOrder: 1,
+);
+
+const _secondGroup = DownloadGroup(
+  id: 'second',
+  name: 'Second',
+  createdAtMs: 2,
+  sortOrder: 2,
 );
 
 const _comic = DownloadedMangaComic(

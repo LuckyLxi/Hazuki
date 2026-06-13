@@ -97,7 +97,10 @@ class DownloadsPageAppBar extends StatelessWidget
                 ? animationValue >= 1 - precisionErrorTolerance
                 : animationValue > precisionErrorTolerance;
             // 只有在已下载 tab 且处于多选模式时才展示全选按钒
-            final visible = downloadedTabIsActive && selectionMode;
+            if (!downloadedTabIsActive) {
+              return const SizedBox.shrink();
+            }
+            final visible = selectionMode;
             return AnimatedScale(
               scale: visible ? 1.0 : 0.7,
               duration: const Duration(milliseconds: 200),

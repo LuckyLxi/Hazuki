@@ -134,11 +134,11 @@ class _DownloadsPageState extends State<DownloadsPage>
                     },
                     onPauseAll: () {
                       // 一键暂停所有下载任务
-                      unawaited(_controller.pauseAllTasks());
+                      unawaited(_pauseAllTasks(tasks));
                     },
                     onResumeAll: () {
                       // 一键开始所有暂停或失败的下载任务
-                      unawaited(_controller.resumeAllTasks());
+                      unawaited(_resumeAllTasks(tasks));
                     },
                   ),
                   body: !ready
@@ -189,69 +189,58 @@ class _DownloadsPageState extends State<DownloadsPage>
                                         await showDownloadsBulkGroupDialog(
                                           context: context,
                                           groups: _controller.groups,
-                                          initiallySelectedGroupIds: _controller
-                                              .commonGroupIdsForSelectedComics,
+                                          selectedComics: _controller
+                                              .selectedDownloadedComics,
+                                          initialComicKeysByGroup: _controller
+                                              .selectedComicKeysByGroup,
+                                          currentGroupName:
+                                              _controller
+                                                  .selectedGroup
+                                                  .isDefault
+                                              ? l10n(
+                                                  context,
+                                                ).downloadsDefaultGroup
+                                              : _controller.selectedGroup.name,
                                         );
                                     if (selection == null || !context.mounted) {
                                       return;
                                     }
-                                    final updated = await _controller
-                                        .updateSelectedComicsGroups(
-                                          selection.groupIds,
-                                        );
+                                    final comicCount =
+                                        selection.action ==
+                                            DownloadsBulkGroupAction
+                                                .removeFromCurrentGroup
+                                        ? await _controller
+                                              .removeSelectedComicsFromCurrentGroup()
+                                        : (await _controller
+                                                  .updateSelectedComicsGroups(
+                                                    selection.comicKeysByGroup,
+                                                  ))
+                                              .comicCount;
                                     if (!context.mounted) return;
-                                    final selectedGroupNames = _groupNames(
-                                      context,
-                                      selection.groupIds,
-                                    );
-                                    final removedGroupNames = _groupNames(
-                                      context,
-                                      updated.removedGroupIds,
-                                    );
                                     unawaited(
                                       showHazukiPrompt(
                                         context,
-                                        updated.removedGroupIds.length == 1
+                                        selection.action ==
+                                                DownloadsBulkGroupAction
+                                                    .removeFromCurrentGroup
                                             ? l10n(
                                                 context,
                                               ).downloadsBatchRemovedFromGroup(
-                                                updated.removedComicCount,
-                                                removedGroupNames,
-                                              )
-                                            : updated.removedGroupIds.isNotEmpty
-                                            ? l10n(
-                                                context,
-                                              ).downloadsBatchRemovedFromGroups(
-                                                updated.removedComicCount,
-                                                updated.removedGroupIds.length,
-                                              )
-                                            : selection.action ==
-                                                  DownloadsComicMenuAction.add
-                                            ? selection.groupIds.length == 1
-                                                  ? l10n(
-                                                      context,
-                                                    ).downloadsBatchAddedToGroup(
-                                                      updated.comicCount,
-                                                      selectedGroupNames,
-                                                    )
-                                                  : l10n(
-                                                      context,
-                                                    ).downloadsBatchAddedToGroups(
-                                                      updated.comicCount,
-                                                      selection.groupIds.length,
-                                                    )
-                                            : selection.groupIds.length == 1
-                                            ? l10n(
-                                                context,
-                                              ).downloadsBatchMovedToGroup(
-                                                updated.comicCount,
-                                                selectedGroupNames,
+                                                comicCount,
+                                                _controller
+                                                        .selectedGroup
+                                                        .isDefault
+                                                    ? l10n(
+                                                        context,
+                                                      ).downloadsDefaultGroup
+                                                    : _controller
+                                                          .selectedGroup
+                                                          .name,
                                               )
                                             : l10n(
                                                 context,
-                                              ).downloadsBatchMovedToGroups(
-                                                updated.comicCount,
-                                                selection.groupIds.length,
+                                              ).downloadsBatchGroupsUpdated(
+                                                comicCount,
                                               ),
                                       ),
                                     );
@@ -308,6 +297,8 @@ class _DownloadsPageState extends State<DownloadsPage>
                                 },
                                 onSelectGroup: _controller.selectGroup,
                                 onCreateGroup: _controller.createGroup,
+                                onRenameGroup: _controller.renameGroup,
+                                onReorderGroups: _controller.reorderGroups,
                                 onDeleteGroup: _controller.deleteGroup,
                                 onShowComicMenu:
                                     (comic, globalPosition, itemContext) async {
@@ -336,7 +327,6 @@ class _DownloadsPageState extends State<DownloadsPage>
                                                 _controller.groupIdsForComic(
                                                   comic,
                                                 ),
-                                            action: action,
                                           );
                                       if (selectedGroupIds == null) return;
                                       final updated = await _controller
@@ -364,22 +354,12 @@ class _DownloadsPageState extends State<DownloadsPage>
                                             ).downloadsComicRemovedFromGroups(
                                               updated.removedGroupIds.length,
                                             )
-                                          : action ==
-                                                DownloadsComicMenuAction.add
-                                          ? l10n(
+                                          : l10n(
                                               context,
                                             ).downloadsAddedToGroups(
                                               _groupNames(
                                                 context,
                                                 updated.addedGroupIds,
-                                              ),
-                                            )
-                                          : l10n(
-                                              context,
-                                            ).downloadsMovedToGroups(
-                                              _groupNames(
-                                                context,
-                                                selectedGroupIds,
                                               ),
                                             );
                                       unawaited(
@@ -397,5 +377,27 @@ class _DownloadsPageState extends State<DownloadsPage>
         );
       },
     );
+  }
+
+  Future<void> _pauseAllTasks(List<MangaDownloadTask> tasks) async {
+    final strings = l10n(context);
+    if (tasks.isEmpty) {
+      await showHazukiPrompt(context, strings.downloadsNoTasks);
+      return;
+    }
+    await _controller.pauseAllTasks();
+    if (!mounted) return;
+    await showHazukiPrompt(context, strings.downloadsAllTasksPaused);
+  }
+
+  Future<void> _resumeAllTasks(List<MangaDownloadTask> tasks) async {
+    final strings = l10n(context);
+    if (tasks.isEmpty) {
+      await showHazukiPrompt(context, strings.downloadsNoTasks);
+      return;
+    }
+    await _controller.resumeAllTasks();
+    if (!mounted) return;
+    await showHazukiPrompt(context, strings.downloadsAllTasksResumed);
   }
 }

@@ -69,6 +69,27 @@ void main() {
     expect(toggleCount, 1);
   });
 
+  testWidgets('ongoing actions do not reserve space for select-all', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _wrapWithAppBar(initialIndex: 0, onToggleSelectionMode: () {}),
+    );
+
+    expect(
+      find.byKey(const ValueKey<String>('downloads_select_all_button')),
+      findsNothing,
+    );
+    final pauseButton = find.ancestor(
+      of: find.byIcon(Icons.pause_rounded),
+      matching: find.byType(IconButton),
+    );
+    expect(
+      tester.getRect(pauseButton).right,
+      greaterThan(tester.getSize(find.byType(Scaffold)).width - 16),
+    );
+  });
+
   testWidgets('multi-select action hides as soon as downloaded tab is left', (
     tester,
   ) async {

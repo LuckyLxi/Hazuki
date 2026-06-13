@@ -32,6 +32,8 @@ class DownloadsCompletedTab extends StatefulWidget {
     required this.groupComicCounts,
     required this.onSelectGroup,
     required this.onCreateGroup,
+    required this.onRenameGroup,
+    required this.onReorderGroups,
     required this.onDeleteGroup,
     required this.onShowComicMenu,
     required this.onBatchGroup,
@@ -56,6 +58,9 @@ class DownloadsCompletedTab extends StatefulWidget {
   final Map<String, int> groupComicCounts;
   final ValueChanged<String> onSelectGroup;
   final Future<DownloadGroup> Function(String name) onCreateGroup;
+  final Future<DownloadGroup> Function(String groupId, String name)
+  onRenameGroup;
+  final Future<void> Function(List<String> orderedGroupIds) onReorderGroups;
   final Future<void> Function(String groupId) onDeleteGroup;
   final Future<void> Function(
     DownloadedMangaComic comic,
@@ -415,6 +420,8 @@ class _DownloadsCompletedTabState extends State<DownloadsCompletedTab> {
           groupComicCounts: widget.groupComicCounts,
           onSelectGroup: widget.onSelectGroup,
           onCreateGroup: widget.onCreateGroup,
+          onRenameGroup: widget.onRenameGroup,
+          onReorderGroups: widget.onReorderGroups,
           onDeleteGroup: widget.onDeleteGroup,
         );
       },
@@ -595,6 +602,8 @@ class DownloadsCategoryShellDialog extends StatefulWidget {
     required this.groupComicCounts,
     required this.onSelectGroup,
     required this.onCreateGroup,
+    required this.onRenameGroup,
+    required this.onReorderGroups,
     required this.onDeleteGroup,
   });
 
@@ -607,6 +616,9 @@ class DownloadsCategoryShellDialog extends StatefulWidget {
   final Map<String, int> groupComicCounts;
   final ValueChanged<String> onSelectGroup;
   final Future<DownloadGroup> Function(String name) onCreateGroup;
+  final Future<DownloadGroup> Function(String groupId, String name)
+  onRenameGroup;
+  final Future<void> Function(List<String> orderedGroupIds) onReorderGroups;
   final Future<void> Function(String groupId) onDeleteGroup;
 
   @override
@@ -618,6 +630,7 @@ class _DownloadsCategoryShellDialogState
     extends State<DownloadsCategoryShellDialog> {
   late List<DownloadGroup> _groups;
   late String _selectedGroupId;
+  bool _sorting = false;
 
   @override
   void initState() {
@@ -744,6 +757,10 @@ class _DownloadsCategoryShellDialogState
                                     Navigator.of(context).pop();
                                   },
                                   onCreateGroup: _createGroup,
+                                  onRenameGroup: _renameGroup,
+                                  sorting: _sorting,
+                                  onToggleSorting: _toggleSorting,
+                                  onReorder: _reorder,
                                   onDeleteGroup: _deleteGroup,
                                 ),
                               ),
@@ -768,6 +785,42 @@ class _DownloadsCategoryShellDialogState
     final group = await widget.onCreateGroup(name);
     if (!mounted) return;
     setState(() => _groups = [..._groups, group]);
+  }
+
+  Future<void> _renameGroup(DownloadGroup group) async {
+    unawaited(HapticFeedback.lightImpact());
+    final name = await _showRenameGroupDialog(context, group.name);
+    if (name == null || !mounted) return;
+    final renamed = await widget.onRenameGroup(group.id, name);
+    if (!mounted) return;
+    setState(() {
+      _groups = [
+        for (final item in _groups)
+          if (item.id == renamed.id) renamed else item,
+      ];
+    });
+  }
+
+  Future<void> _toggleSorting() async {
+    if (!_sorting) {
+      setState(() => _sorting = true);
+      return;
+    }
+    await widget.onReorderGroups([
+      for (final group in _groups)
+        if (!group.isDefault) group.id,
+    ]);
+    if (!mounted) return;
+    setState(() => _sorting = false);
+  }
+
+  void _reorder(int oldIndex, int newIndex) {
+    if (oldIndex == 0) return;
+    newIndex = newIndex.clamp(1, _groups.length - 1);
+    setState(() {
+      final group = _groups.removeAt(oldIndex);
+      _groups.insert(newIndex, group);
+    });
   }
 
   Future<void> _deleteGroup(DownloadGroup group) async {
@@ -851,6 +904,10 @@ class _DownloadsCategoryShellContents extends StatelessWidget {
     required this.groupComicCounts,
     required this.onSelectGroup,
     required this.onCreateGroup,
+    required this.onRenameGroup,
+    required this.sorting,
+    required this.onToggleSorting,
+    required this.onReorder,
     required this.onDeleteGroup,
   });
 
@@ -859,6 +916,10 @@ class _DownloadsCategoryShellContents extends StatelessWidget {
   final Map<String, int> groupComicCounts;
   final ValueChanged<String> onSelectGroup;
   final VoidCallback onCreateGroup;
+  final ValueChanged<DownloadGroup> onRenameGroup;
+  final bool sorting;
+  final VoidCallback onToggleSorting;
+  final ReorderCallback onReorder;
   final ValueChanged<DownloadGroup> onDeleteGroup;
 
   @override
@@ -880,18 +941,44 @@ class _DownloadsCategoryShellContents extends StatelessWidget {
                     style: theme.textTheme.titleLarge,
                   ),
                 ),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 180),
+                  layoutBuilder: (currentChild, previousChildren) => Stack(
+                    alignment: Alignment.centerRight,
+                    children: [...previousChildren, ?currentChild],
+                  ),
+                  child: sorting
+                      ? FilledButton.tonalIcon(
+                          key: const ValueKey<String>(
+                            'downloads_group_sort_save',
+                          ),
+                          onPressed: onToggleSorting,
+                          icon: const Icon(Icons.save_outlined),
+                          label: Text(strings.commonSave),
+                        )
+                      : IconButton(
+                          key: const ValueKey<String>(
+                            'downloads_group_sort_start',
+                          ),
+                          tooltip: strings.downloadsSortGroups,
+                          onPressed: onToggleSorting,
+                          icon: const Icon(Icons.sort_rounded),
+                        ),
+                ),
                 IconButton(
                   tooltip: strings.downloadsNewGroup,
-                  onPressed: onCreateGroup,
+                  onPressed: sorting ? null : onCreateGroup,
                   icon: const Icon(Icons.create_new_folder_outlined),
                 ),
               ],
             ),
             const SizedBox(height: 8),
             Expanded(
-              child: ListView.builder(
+              child: ReorderableListView.builder(
                 padding: EdgeInsets.zero,
                 itemCount: groups.length,
+                onReorderItem: onReorder,
+                buildDefaultDragHandles: false,
                 itemBuilder: (context, index) {
                   final group = groups[index];
                   final selected = group.id == selectedGroupId;
@@ -926,7 +1013,12 @@ class _DownloadsCategoryShellContents extends StatelessWidget {
                           borderRadius: BorderRadius.circular(16),
                           clipBehavior: Clip.antiAlias,
                           child: InkWell(
-                            onTap: () => onSelectGroup(group.id),
+                            onTap: sorting
+                                ? null
+                                : () => onSelectGroup(group.id),
+                            onLongPress: sorting || group.isDefault
+                                ? null
+                                : () => onRenameGroup(group),
                             child: SizedBox(
                               height: 52,
                               child: Row(
@@ -952,13 +1044,27 @@ class _DownloadsCategoryShellContents extends StatelessWidget {
                                     child: Row(
                                       mainAxisAlignment: MainAxisAlignment.end,
                                       children: [
-                                        if (!group.isDefault)
+                                        if (!group.isDefault && !sorting)
                                           IconButton(
                                             tooltip: strings.comicDetailDelete,
                                             onPressed: () =>
                                                 onDeleteGroup(group),
                                             icon: const Icon(
                                               Icons.delete_outline,
+                                            ),
+                                          ),
+                                        if (!group.isDefault && sorting)
+                                          ReorderableDragStartListener(
+                                            index: index,
+                                            child: Tooltip(
+                                              message:
+                                                  strings.downloadsReorderGroup,
+                                              child: const Padding(
+                                                padding: EdgeInsets.all(12),
+                                                child: Icon(
+                                                  Icons.drag_handle_rounded,
+                                                ),
+                                              ),
                                             ),
                                           ),
                                       ],
@@ -1638,6 +1744,83 @@ Future<String?> _showCreateGroupDialog(BuildContext context) async {
         ),
   );
   await Future<void>.delayed(const Duration(milliseconds: 260));
+  controller.dispose();
+  return value;
+}
+
+Future<String?> _showRenameGroupDialog(
+  BuildContext context,
+  String currentName,
+) async {
+  final controller = TextEditingController(text: currentName);
+  controller.selection = TextSelection(
+    baseOffset: 0,
+    extentOffset: controller.text.length,
+  );
+  final strings = l10n(context);
+  final value = await showGeneralDialog<String>(
+    context: context,
+    barrierDismissible: true,
+    barrierLabel: strings.commonClose,
+    barrierColor: Colors.black26,
+    transitionDuration: const Duration(milliseconds: 260),
+    transitionBuilder: (context, animation, secondaryAnimation, child) {
+      final curved = CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutBack,
+        reverseCurve: Curves.easeInCubic,
+      );
+      return FadeTransition(
+        opacity: CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        ),
+        child: ScaleTransition(
+          key: const ValueKey<String>('downloads_rename_group_transition'),
+          scale: Tween<double>(begin: 0.9, end: 1).animate(curved),
+          child: child,
+        ),
+      );
+    },
+    pageBuilder: (dialogContext, animation, secondaryAnimation) =>
+        ValueListenableBuilder<TextEditingValue>(
+          valueListenable: controller,
+          builder: (context, value, child) {
+            final name = value.text.trim();
+            return AlertDialog(
+              key: const ValueKey<String>('downloads_rename_group_dialog'),
+              title: Text(strings.downloadsRenameGroup),
+              content: TextField(
+                controller: controller,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: strings.downloadsGroupName,
+                  errorText: name.isEmpty
+                      ? strings.downloadsGroupNameRequired
+                      : null,
+                ),
+                onSubmitted: (_) {
+                  if (name.isNotEmpty) Navigator.pop(dialogContext, name);
+                },
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext),
+                  child: Text(strings.commonCancel),
+                ),
+                FilledButton(
+                  onPressed: name.isEmpty
+                      ? null
+                      : () => Navigator.pop(dialogContext, name),
+                  child: Text(strings.commonSave),
+                ),
+              ],
+            );
+          },
+        ),
+  );
+  await Future<void>.delayed(const Duration(milliseconds: 280));
   controller.dispose();
   return value;
 }

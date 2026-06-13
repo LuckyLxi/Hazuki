@@ -95,6 +95,7 @@ class DownloadGroups extends Table {
   TextColumn get id => text()();
   TextColumn get name => text()();
   IntColumn get createdAtMs => integer()();
+  IntColumn get sortOrder => integer().withDefault(const Constant(0))();
 
   @override
   Set<Column<Object>> get primaryKey => {id};
@@ -148,7 +149,7 @@ class HazukiDatabase extends _$HazukiDatabase {
   HazukiDatabase.memory() : super(NativeDatabase.memory());
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -165,6 +166,9 @@ class HazukiDatabase extends _$HazukiDatabase {
         await m.createTable(downloadGroupComics);
         await m.createTable(downloadGroupTombstones);
         await m.createTable(downloadGroupComicTombstones);
+      }
+      if (from < 5) {
+        await m.addColumn(downloadGroups, downloadGroups.sortOrder);
       }
     },
   );

@@ -40,11 +40,14 @@ void main() {
 
     await groups.addComicToGroup(comic.storageKey, first.id);
     controller.toggleSelection(comic.storageKey);
-    final bulkResult = await controller.updateSelectedComicsGroups({first.id});
+    final bulkResult = await controller.updateSelectedComicsGroups({
+      DownloadGroupsService.defaultGroupId: const {},
+      first.id: {comic.storageKey},
+      second.id: const {},
+    });
 
     expect(bulkResult.comicCount, 1);
-    expect(bulkResult.removedComicCount, 1);
-    expect(bulkResult.removedGroupIds, {second.id});
+    expect(bulkResult.changedGroupCount, 1);
     expect(groups.groupIdsForComic(comic.storageKey), {first.id});
 
     controller.dispose();
@@ -65,4 +68,38 @@ void main() {
     expect(strings.downloadsBatchRemovedFromGroup(3, '收藏组'), '已将3部漫画从收藏组移出');
     expect(strings.downloadsBatchRemovedFromGroups(3, 2), '已将3部漫画从2个组中移出');
   });
+
+  test(
+    'batch group update preserves untouched per-comic memberships',
+    () async {
+      final database = HazukiDatabase.memory();
+      final groups = DownloadGroupsService(database: database);
+      final downloads = MangaDownloadService();
+      final controller = DownloadsPageController(
+        downloadService: downloads,
+        downloadGroupsService: groups,
+      );
+      await groups.initialize(const ['comic-a', 'comic-b']);
+      final first = await groups.createGroup('First');
+      final second = await groups.createGroup('Second');
+      await groups.moveComicToGroup('comic-a', first.id);
+      await groups.moveComicToGroup('comic-b', second.id);
+      controller.toggleSelection('comic-a');
+      controller.toggleSelection('comic-b');
+
+      await controller.updateSelectedComicsGroups({
+        DownloadGroupsService.defaultGroupId: const {},
+        first.id: const {'comic-a', 'comic-b'},
+        second.id: const {'comic-b'},
+      });
+
+      expect(groups.groupIdsForComic('comic-a'), {first.id});
+      expect(groups.groupIdsForComic('comic-b'), {first.id, second.id});
+
+      controller.dispose();
+      downloads.dispose();
+      groups.dispose();
+      await database.close();
+    },
+  );
 }

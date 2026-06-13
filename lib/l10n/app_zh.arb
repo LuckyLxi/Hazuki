@@ -554,6 +554,9 @@
   "downloadsActionResume": "继续",
   "downloadsActionPauseAll": "全部暂停",
   "downloadsActionResumeAll": "全部开始",
+  "downloadsAllTasksPaused": "已暂停所有下载任务",
+  "downloadsAllTasksResumed": "已开始所有下载任务",
+  "downloadsNoTasks": "暂无下载任务",
   "downloadsQueued": "已加入 {count} 话到下载队列",
   "@downloadsQueued": {
     "placeholders": {
@@ -1185,6 +1188,9 @@
   "downloadsNewGroup": "新建组",
   "downloadsGroupName": "分组名称",
   "downloadsCreateGroup": "新建",
+  "downloadsRenameGroup": "重命名分组",
+  "downloadsSortGroups": "排序分组",
+  "downloadsReorderGroup": "按住拖动排序",
   "downloadsDeleteGroupTitle": "删除分组",
   "downloadsDeleteGroupContent": "确定删除“{name}”吗？组内漫画会移动到默认组。",
   "@downloadsDeleteGroupContent": {
@@ -1230,6 +1236,26 @@
   "downloadsGroupNameRequired": "请输入分组名称",
   "downloadsBatchGroupAction": "分组选中漫画",
   "downloadsBack": "返回",
+  "downloadsMoveOrAddAction": "移动/添加",
+  "downloadsRemoveFromCurrentGroup": "移出该组",
+  "downloadsConfirmRemoveFromGroup": "确认将所选漫画移出{group}？",
+  "@downloadsConfirmRemoveFromGroup": {
+    "placeholders": {
+      "group": {}
+    }
+  },
+  "downloadsViewGroupMembership": "查看",
+  "downloadsNotJoined": "未加入",
+  "downloadsJoined": "已加入",
+  "downloadsNoMatchingComics": "暂无漫画",
+  "downloadsBatchGroupsUpdated": "已更新{comicCount}部漫画的分组",
+  "@downloadsBatchGroupsUpdated": {
+    "placeholders": {
+      "comicCount": {
+        "type": "int"
+      }
+    }
+  },
   "downloadsBatchAddedToGroup": "已将{comicCount}部漫画添加到{group}",
   "@downloadsBatchAddedToGroup": {
     "placeholders": {

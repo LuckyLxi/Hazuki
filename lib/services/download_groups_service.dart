@@ -10,11 +10,13 @@ class DownloadGroup {
     required this.id,
     required this.name,
     required this.createdAtMs,
+    this.sortOrder = 0,
   });
 
   final String id;
   final String name;
   final int createdAtMs;
+  final int sortOrder;
 
   bool get isDefault => id == DownloadGroupsService.defaultGroupId;
 }
@@ -95,15 +97,63 @@ class DownloadGroupsService extends ChangeNotifier {
       throw ArgumentError.value(rawName, 'name');
     }
     final now = DateTime.now().millisecondsSinceEpoch;
+    final nextSortOrder =
+        _groups
+            .where((group) => !group.isDefault)
+            .fold<int>(
+              0,
+              (value, group) =>
+                  value > group.sortOrder ? value : group.sortOrder,
+            ) +
+        1;
     final id =
         'group_${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}_${_nextGroupId++}';
     await _database
         .into(_database.downloadGroups)
         .insert(
-          DownloadGroupsCompanion.insert(id: id, name: name, createdAtMs: now),
+          DownloadGroupsCompanion.insert(
+            id: id,
+            name: name,
+            createdAtMs: now,
+            sortOrder: Value(nextSortOrder),
+          ),
         );
     await reload();
-    return DownloadGroup(id: id, name: name, createdAtMs: now);
+    return DownloadGroup(
+      id: id,
+      name: name,
+      createdAtMs: now,
+      sortOrder: nextSortOrder,
+    );
+  }
+
+  Future<DownloadGroup> renameGroup(String groupId, String rawName) async {
+    if (groupId == defaultGroupId) {
+      throw ArgumentError.value(groupId, 'groupId');
+    }
+    final name = rawName.trim();
+    if (name.isEmpty) {
+      throw ArgumentError.value(rawName, 'name');
+    }
+    await (_database.update(_database.downloadGroups)
+          ..where((row) => row.id.equals(groupId)))
+        .write(DownloadGroupsCompanion(name: Value(name)));
+    await reload();
+    return _groups.firstWhere((group) => group.id == groupId);
+  }
+
+  Future<void> reorderGroups(Iterable<String> orderedGroupIds) async {
+    final ids = orderedGroupIds
+        .where((id) => id != defaultGroupId)
+        .toList(growable: false);
+    await _database.transaction(() async {
+      for (var index = 0; index < ids.length; index++) {
+        await (_database.update(_database.downloadGroups)
+              ..where((row) => row.id.equals(ids[index])))
+            .write(DownloadGroupsCompanion(sortOrder: Value(index + 1)));
+      }
+    });
+    await reload();
   }
 
   Future<void> deleteGroup(String groupId) async {
@@ -169,6 +219,46 @@ class DownloadGroupsService extends ChangeNotifier {
       for (final key in keys) {
         for (final groupId in targets) {
           await _putMembership(groupId, key, now);
+        }
+      }
+    });
+    await reload();
+  }
+
+  Future<void> removeComicsFromGroup(
+    Iterable<String> comicStorageKeys,
+    String groupId,
+  ) async {
+    final keys = comicStorageKeys.toSet();
+    if (keys.isEmpty) return;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    await _database.transaction(() async {
+      final memberships = await (_database.select(
+        _database.downloadGroupComics,
+      )..where((row) => row.comicStorageKey.isIn(keys))).get();
+      final groupIdsByComic = <String, Set<String>>{};
+      for (final membership in memberships) {
+        groupIdsByComic
+            .putIfAbsent(membership.comicStorageKey, () => <String>{})
+            .add(membership.groupId);
+      }
+      for (final key in keys) {
+        final existingGroupIds = groupIdsByComic[key];
+        if (!(existingGroupIds?.contains(groupId) ?? false)) {
+          continue;
+        }
+        if (groupId == defaultGroupId && existingGroupIds!.length == 1) {
+          continue;
+        }
+        await _putMembershipTombstone(groupId, key, now);
+        await (_database.delete(_database.downloadGroupComics)..where(
+              (row) =>
+                  row.groupId.equals(groupId) & row.comicStorageKey.equals(key),
+            ))
+            .go();
+        final remaining = existingGroupIds!..remove(groupId);
+        if (remaining.isEmpty) {
+          await _putMembership(defaultGroupId, key, now);
         }
       }
     });
@@ -273,7 +363,12 @@ class DownloadGroupsService extends ChangeNotifier {
       'version': 1,
       'groups': [
         for (final row in groups)
-          {'id': row.id, 'name': row.name, 'createdAtMs': row.createdAtMs},
+          {
+            'id': row.id,
+            'name': row.name,
+            'createdAtMs': row.createdAtMs,
+            'sortOrder': row.sortOrder,
+          },
       ],
       'memberships': [
         for (final row in memberships)
@@ -341,6 +436,7 @@ class DownloadGroupsService extends ChangeNotifier {
         final id = (item['id'] ?? '').toString();
         final name = (item['name'] ?? '').toString().trim();
         final createdAt = (item['createdAtMs'] as num?)?.toInt() ?? 0;
+        final sortOrder = (item['sortOrder'] as num?)?.toInt() ?? 0;
         if (id.isEmpty || name.isEmpty) continue;
         final deletedAt = await _groupDeletedAt(id);
         if (id != defaultGroupId && deletedAt >= createdAt) continue;
@@ -355,6 +451,7 @@ class DownloadGroupsService extends ChangeNotifier {
                 id: id,
                 name: name,
                 createdAtMs: createdAt,
+                sortOrder: Value(sortOrder),
               ),
             );
       }
@@ -420,6 +517,7 @@ class DownloadGroupsService extends ChangeNotifier {
   Future<void> reload() async {
     final groupRows =
         await (_database.select(_database.downloadGroups)..orderBy([
+              (row) => OrderingTerm.asc(row.sortOrder),
               (row) => OrderingTerm.asc(row.createdAtMs),
               (row) => OrderingTerm.asc(row.name),
             ]))
@@ -429,7 +527,12 @@ class DownloadGroupsService extends ChangeNotifier {
         .get();
     _groups = [
       for (final row in groupRows)
-        DownloadGroup(id: row.id, name: row.name, createdAtMs: row.createdAtMs),
+        DownloadGroup(
+          id: row.id,
+          name: row.name,
+          createdAtMs: row.createdAtMs,
+          sortOrder: row.sortOrder,
+        ),
     ];
     final nextMemberships = <String, Set<String>>{};
     for (final row in membershipRows) {
@@ -449,6 +552,7 @@ class DownloadGroupsService extends ChangeNotifier {
             id: defaultGroupId,
             name: defaultGroupName,
             createdAtMs: 0,
+            sortOrder: const Value(0),
           ),
         );
   }
