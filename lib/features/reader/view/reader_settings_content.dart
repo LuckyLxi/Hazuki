@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:hazuki/features/reader/state/reader_filter_color.dart';
 import 'package:hazuki/features/reader/state/reader_mode.dart';
 import 'package:hazuki/features/reader/support/reader_source_image_quality_settings.dart';
 import 'package:hazuki/l10n/l10n.dart';
@@ -21,6 +22,9 @@ class ReaderSettingsContent extends StatelessWidget {
     required this.pageIndicator,
     required this.customBrightness,
     required this.brightnessValue,
+    required this.filterEnabled,
+    required this.filterColor,
+    required this.filterStrength,
     required this.sourceImageQuality,
     required this.onReaderModeChanged,
     required this.onDoublePageModeChanged,
@@ -33,9 +37,13 @@ class ReaderSettingsContent extends StatelessWidget {
     required this.onPageIndicatorChanged,
     required this.onCustomBrightnessChanged,
     required this.onBrightnessChanged,
+    required this.onFilterEnabledChanged,
+    required this.onFilterColorChanged,
+    required this.onFilterStrengthChanged,
     required this.onCopyMangaImageQualityChanged,
     required this.onPicacgImageQualityChanged,
     this.onBrightnessChangeEnd,
+    this.onFilterStrengthChangeEnd,
     this.onClose,
   });
 
@@ -51,6 +59,9 @@ class ReaderSettingsContent extends StatelessWidget {
   final bool pageIndicator;
   final bool customBrightness;
   final double brightnessValue;
+  final bool filterEnabled;
+  final ReaderFilterColor filterColor;
+  final double filterStrength;
   final ReaderSourceImageQualitySnapshot sourceImageQuality;
   final ValueChanged<ReaderMode?> onReaderModeChanged;
   final ValueChanged<bool> onDoublePageModeChanged;
@@ -64,6 +75,10 @@ class ReaderSettingsContent extends StatelessWidget {
   final ValueChanged<bool> onCustomBrightnessChanged;
   final ValueChanged<double>? onBrightnessChanged;
   final ValueChanged<double>? onBrightnessChangeEnd;
+  final ValueChanged<bool> onFilterEnabledChanged;
+  final ValueChanged<ReaderFilterColor> onFilterColorChanged;
+  final ValueChanged<double>? onFilterStrengthChanged;
+  final ValueChanged<double>? onFilterStrengthChangeEnd;
   final ValueChanged<String?> onCopyMangaImageQualityChanged;
   final ValueChanged<String?> onPicacgImageQualityChanged;
   final VoidCallback? onClose;
@@ -155,6 +170,15 @@ class ReaderSettingsContent extends StatelessWidget {
               onChanged: onCustomBrightnessChanged,
             ),
             _buildPageBrightnessTile(context),
+            const Divider(height: 1, indent: 16, endIndent: 16),
+            SwitchListTile(
+              secondary: const Icon(Icons.filter_vintage_outlined),
+              title: Text(l10n(context).readingFilterTitle),
+              subtitle: Text(l10n(context).readingFilterSubtitle),
+              value: filterEnabled,
+              onChanged: onFilterEnabledChanged,
+            ),
+            _buildFilterOptions(context, drawer: false),
           ],
         ),
         if (sourceImageQuality.isCopyMangaSource)
@@ -287,6 +311,15 @@ class ReaderSettingsContent extends StatelessWidget {
                 onChanged: onCustomBrightnessChanged,
               ),
               _buildDrawerBrightnessTile(context),
+              const Divider(height: 1),
+              SwitchListTile(
+                secondary: const Icon(Icons.filter_vintage_outlined),
+                title: Text(l10n(context).readingFilterTitle),
+                subtitle: Text(l10n(context).readingFilterSubtitle),
+                value: filterEnabled,
+                onChanged: onFilterEnabledChanged,
+              ),
+              _buildFilterOptions(context, drawer: true),
             ],
           ),
           if (sourceImageQuality.isCopyMangaSource ||
@@ -308,26 +341,18 @@ class ReaderSettingsContent extends StatelessWidget {
   }
 
   Widget _buildPageReaderModeTile(BuildContext context) {
-    return ListTile(
-      leading: const Icon(Icons.chrome_reader_mode_outlined),
-      title: Text(l10n(context).readingModeTitle),
-      subtitle: Text(l10n(context).readingModeSubtitle),
-      trailing: DropdownButtonHideUnderline(
-        child: DropdownButton<ReaderMode>(
-          value: readerMode,
-          borderRadius: BorderRadius.circular(18),
-          onChanged: onReaderModeChanged,
-          items: _buildReaderModeDropdownItems(context),
-        ),
-      ),
-    );
+    return _buildReaderModeSection(context, drawer: false);
   }
 
   Widget _buildDrawerReaderModeSection(BuildContext context) {
+    return _buildReaderModeSection(context, drawer: true);
+  }
+
+  Widget _buildReaderModeSection(BuildContext context, {required bool drawer}) {
     final theme = Theme.of(context);
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
+      padding: EdgeInsets.fromLTRB(16, drawer ? 20 : 16, 16, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -358,26 +383,11 @@ class ReaderSettingsContent extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: SegmentedButton<ReaderMode>(
-              segments: [
-                ButtonSegment(
-                  value: ReaderMode.topToBottom,
-                  label: Text(l10n(context).readingModeTopToBottom),
-                  icon: const Icon(Icons.swap_vert_rounded),
-                ),
-                ButtonSegment(
-                  value: ReaderMode.rightToLeft,
-                  label: Text(l10n(context).readingModeRightToLeft),
-                  icon: const Icon(Icons.swap_horiz_rounded),
-                ),
-              ],
-              selected: {readerMode},
-              onSelectionChanged: (set) {
-                onReaderModeChanged(set.first);
-              },
-            ),
+          _ReaderModeSlider(
+            value: readerMode,
+            topToBottomLabel: l10n(context).readingModeTopToBottom,
+            rightToLeftLabel: l10n(context).readingModeRightToLeft,
+            onChanged: onReaderModeChanged,
           ),
         ],
       ),
@@ -465,6 +475,79 @@ class ReaderSettingsContent extends StatelessWidget {
     );
   }
 
+  Widget _buildFilterOptions(BuildContext context, {required bool drawer}) {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 240),
+      reverseDuration: const Duration(milliseconds: 180),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      transitionBuilder: (child, animation) {
+        return FadeTransition(
+          opacity: animation,
+          child: SizeTransition(
+            sizeFactor: animation,
+            alignment: Alignment.topCenter,
+            child: child,
+          ),
+        );
+      },
+      child: filterEnabled
+          ? Padding(
+              key: const ValueKey<String>('reader-filter-options'),
+              padding: EdgeInsets.fromLTRB(16, 0, drawer ? 8 : 16, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _ReaderFilterColorSlider(
+                    value: filterColor,
+                    yellowLabel: l10n(context).readingFilterColorYellow,
+                    blackLabel: l10n(context).readingFilterColorBlack,
+                    onChanged: onFilterColorChanged,
+                  ),
+                  const SizedBox(height: 8),
+                  _buildFilterStrengthSlider(context),
+                ],
+              ),
+            )
+          : const SizedBox.shrink(
+              key: ValueKey<String>('reader-filter-options-hidden'),
+            ),
+    );
+  }
+
+  Widget _buildFilterStrengthSlider(BuildContext context) {
+    final theme = Theme.of(context);
+    final strengthText = (filterStrength * 100).round().toString();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Text(
+            l10n(context).readingFilterStrengthLabel(strengthText),
+            style: theme.textTheme.bodyLarge,
+          ),
+        ),
+        SliderTheme(
+          data: SliderTheme.of(context).copyWith(
+            overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
+          ),
+          child: Slider(
+            value: filterStrength,
+            min: 0,
+            max: 1,
+            divisions: 100,
+            onChanged: onFilterStrengthChanged,
+            onChangeEnd: onFilterStrengthChangeEnd,
+            activeColor: theme.colorScheme.primary,
+            inactiveColor: theme.colorScheme.onSurface.withValues(alpha: 0.24),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildCopyMangaImageQualityField() {
     return Builder(
       builder: (context) {
@@ -543,21 +626,6 @@ class ReaderSettingsContent extends StatelessWidget {
       },
     );
   }
-
-  List<DropdownMenuItem<ReaderMode>> _buildReaderModeDropdownItems(
-    BuildContext context,
-  ) {
-    return [
-      DropdownMenuItem(
-        value: ReaderMode.topToBottom,
-        child: Text(l10n(context).readingModeTopToBottom),
-      ),
-      DropdownMenuItem(
-        value: ReaderMode.rightToLeft,
-        child: Text(l10n(context).readingModeRightToLeft),
-      ),
-    ];
-  }
 }
 
 class _PageSettingsGroup extends StatelessWidget {
@@ -616,6 +684,251 @@ class _DrawerSettingsGroup extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: children,
         ),
+      ),
+    );
+  }
+}
+
+class _ReaderFilterColorSlider extends StatelessWidget {
+  const _ReaderFilterColorSlider({
+    required this.value,
+    required this.yellowLabel,
+    required this.blackLabel,
+    required this.onChanged,
+  });
+
+  final ReaderFilterColor value;
+  final String yellowLabel;
+  final String blackLabel;
+  final ValueChanged<ReaderFilterColor> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final blackSelected = value == ReaderFilterColor.black;
+
+    return SizedBox(
+      key: const ValueKey<String>('reader-filter-color-slider'),
+      height: 48,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final itemWidth = constraints.maxWidth / 2;
+          return Material(
+            color: colorScheme.surfaceContainer,
+            borderRadius: BorderRadius.circular(14),
+            clipBehavior: Clip.antiAlias,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                AnimatedPositioned(
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.easeOutCubic,
+                  left: blackSelected ? itemWidth : 2,
+                  top: 2,
+                  bottom: 2,
+                  width: itemWidth - 2,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: blackSelected
+                          ? colorScheme.inverseSurface
+                          : const Color(0xFFFFE082),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: _ReaderFilterColorOption(
+                        label: yellowLabel,
+                        icon: Icons.light_mode_outlined,
+                        selected: !blackSelected,
+                        selectedColor: const Color(0xFF4E3B00),
+                        onTap: () => onChanged(ReaderFilterColor.yellow),
+                      ),
+                    ),
+                    Expanded(
+                      child: _ReaderFilterColorOption(
+                        label: blackLabel,
+                        icon: Icons.dark_mode_outlined,
+                        selected: blackSelected,
+                        selectedColor: colorScheme.onInverseSurface,
+                        onTap: () => onChanged(ReaderFilterColor.black),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _ReaderModeSlider extends StatelessWidget {
+  const _ReaderModeSlider({
+    required this.value,
+    required this.topToBottomLabel,
+    required this.rightToLeftLabel,
+    required this.onChanged,
+  });
+
+  final ReaderMode value;
+  final String topToBottomLabel;
+  final String rightToLeftLabel;
+  final ValueChanged<ReaderMode?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final rightToLeftSelected = value == ReaderMode.rightToLeft;
+
+    return SizedBox(
+      key: const ValueKey<String>('reader-mode-slider'),
+      height: 48,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final itemWidth = constraints.maxWidth / 2;
+          return Material(
+            color: colorScheme.surfaceContainer,
+            borderRadius: BorderRadius.circular(14),
+            clipBehavior: Clip.antiAlias,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                AnimatedPositioned(
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.easeOutCubic,
+                  left: rightToLeftSelected ? itemWidth : 2,
+                  top: 2,
+                  bottom: 2,
+                  width: itemWidth - 2,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: colorScheme.shadow.withValues(alpha: 0.08),
+                          blurRadius: 10,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: _ReaderModeOption(
+                        label: topToBottomLabel,
+                        icon: Icons.swap_vert_rounded,
+                        selected: !rightToLeftSelected,
+                        onTap: () => onChanged(ReaderMode.topToBottom),
+                      ),
+                    ),
+                    Expanded(
+                      child: _ReaderModeOption(
+                        label: rightToLeftLabel,
+                        icon: Icons.swap_horiz_rounded,
+                        selected: rightToLeftSelected,
+                        onTap: () => onChanged(ReaderMode.rightToLeft),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _ReaderModeOption extends StatelessWidget {
+  const _ReaderModeOption({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = selected
+        ? theme.colorScheme.onPrimaryContainer
+        : theme.colorScheme.onSurfaceVariant;
+    return InkWell(
+      onTap: onTap,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 18, color: color),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: color,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReaderFilterColorOption extends StatelessWidget {
+  const _ReaderFilterColorOption({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.selectedColor,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final Color selectedColor;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = selected ? selectedColor : theme.colorScheme.onSurfaceVariant;
+    return InkWell(
+      onTap: onTap,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 18, color: color),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: color,
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -15,6 +15,9 @@ class ReaderSettingsSnapshot {
     required this.keepScreenOn,
     required this.customBrightness,
     required this.brightnessValue,
+    required this.filterEnabled,
+    required this.filterColor,
+    required this.filterStrength,
     required this.pageIndicator,
     required this.pinchToZoom,
     required this.longPressToSave,
@@ -28,6 +31,9 @@ class ReaderSettingsSnapshot {
   final bool keepScreenOn;
   final bool customBrightness;
   final double brightnessValue;
+  final bool filterEnabled;
+  final ReaderFilterColor filterColor;
+  final double filterStrength;
   final bool pageIndicator;
   final bool pinchToZoom;
   final bool longPressToSave;
@@ -45,6 +51,9 @@ class ReaderSettingsStore {
   static const String keepScreenOnKey = 'reader_keep_screen_on';
   static const String customBrightnessKey = 'reader_custom_brightness';
   static const String brightnessValueKey = 'reader_brightness_value';
+  static const String filterEnabledKey = 'reader_filter_enabled';
+  static const String filterColorKey = 'reader_filter_color';
+  static const String filterStrengthKey = 'reader_filter_strength';
   static const String pageIndicatorKey = 'reader_page_indicator';
   static const String pinchToZoomKey = 'reader_pinch_to_zoom';
   static const String longPressToSaveKey = 'reader_long_press_save';
@@ -57,6 +66,9 @@ class ReaderSettingsStore {
   static const bool defaultKeepScreenOn = true;
   static const bool defaultCustomBrightness = false;
   static const double defaultBrightnessValue = 0.5;
+  static const bool defaultFilterEnabled = false;
+  static const ReaderFilterColor defaultFilterColor = ReaderFilterColor.yellow;
+  static const double defaultFilterStrength = 0.3;
   static const bool defaultPageIndicator = false;
   static const bool defaultPinchToZoom = false;
   static const bool defaultLongPressToSave = false;
@@ -75,6 +87,11 @@ class ReaderSettingsStore {
           prefs.getBool(customBrightnessKey) ?? defaultCustomBrightness,
       brightnessValue: normalizeBrightnessValue(
         prefs.getDouble(brightnessValueKey) ?? defaultBrightnessValue,
+      ),
+      filterEnabled: prefs.getBool(filterEnabledKey) ?? defaultFilterEnabled,
+      filterColor: readerFilterColorFromRaw(prefs.getString(filterColorKey)),
+      filterStrength: normalizeFilterStrength(
+        prefs.getDouble(filterStrengthKey) ?? defaultFilterStrength,
       ),
       pageIndicator: prefs.getBool(pageIndicatorKey) ?? defaultPageIndicator,
       pinchToZoom: prefs.getBool(pinchToZoomKey) ?? defaultPinchToZoom,
@@ -115,6 +132,18 @@ class ReaderSettingsStore {
     return _saveDouble(brightnessValueKey, normalizeBrightnessValue(value));
   }
 
+  Future<void> saveFilterEnabled(bool value) {
+    return _saveBool(filterEnabledKey, value);
+  }
+
+  Future<void> saveFilterColor(ReaderFilterColor value) {
+    return _saveString(filterColorKey, value.prefsValue);
+  }
+
+  Future<void> saveFilterStrength(double value) {
+    return _saveDouble(filterStrengthKey, normalizeFilterStrength(value));
+  }
+
   Future<void> savePageIndicator(bool value) {
     return _saveBool(pageIndicatorKey, value);
   }
@@ -128,6 +157,10 @@ class ReaderSettingsStore {
   }
 
   static double normalizeBrightnessValue(double value) {
+    return value.clamp(0.0, 1.0).toDouble();
+  }
+
+  static double normalizeFilterStrength(double value) {
     return value.clamp(0.0, 1.0).toDouble();
   }
 

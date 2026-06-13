@@ -376,6 +376,27 @@ class _ReaderPageState extends State<ReaderPage>
 
   Widget _wrapImageWidget(Widget imageWidget, String url) {
     Widget result = imageWidget;
+    if (_runtimeState.filterEnabled) {
+      final filterColor = switch (_runtimeState.filterColor) {
+        ReaderFilterColor.yellow => const Color(0xFFFFD54F),
+        ReaderFilterColor.black => Colors.black,
+      };
+      result = Stack(
+        fit: StackFit.passthrough,
+        children: [
+          result,
+          Positioned.fill(
+            child: IgnorePointer(
+              child: ColoredBox(
+                color: filterColor.withValues(
+                  alpha: _runtimeState.filterStrength,
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
     if (_runtimeState.longPressToSave) {
       result = GestureDetector(
         onLongPress: () => _showSaveImageDialog(url),
@@ -423,6 +444,14 @@ class _ReaderPageState extends State<ReaderPage>
           : null,
       onBrightnessChangeEnd: _runtimeState.customBrightness
           ? _settingsController.handleBrightnessChangeEnd
+          : null,
+      onFilterEnabledChanged: _settingsController.toggleFilter,
+      onFilterColorChanged: _settingsController.updateFilterColor,
+      onFilterStrengthChanged: _runtimeState.filterEnabled
+          ? _settingsController.updateFilterStrength
+          : null,
+      onFilterStrengthChangeEnd: _runtimeState.filterEnabled
+          ? _settingsController.handleFilterStrengthChangeEnd
           : null,
       sourceImageQuality: _sourceImageQuality,
       onCopyMangaImageQualityChanged: (value) async {

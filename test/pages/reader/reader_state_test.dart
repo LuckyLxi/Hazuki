@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:hazuki/features/reader/support/reader_diagnostics_support.dart';
 import 'package:hazuki/features/reader/state/reader_image_pipeline_state.dart';
+import 'package:hazuki/features/reader/state/reader_filter_color.dart';
 import 'package:hazuki/features/reader/state/reader_mode.dart';
 import 'package:hazuki/features/reader/support/reader_display_bridge.dart';
 import 'package:hazuki/features/reader/support/reader_image_pipeline_controller.dart';
@@ -20,6 +21,8 @@ import 'package:hazuki/features/reader/support/reader_source_image_quality_setti
 import 'package:hazuki/features/reader/support/reader_zoom_controller.dart';
 import 'package:hazuki/features/settings/state/reading_settings_controller.dart';
 import 'package:hazuki/features/reader/view/reader_overlay_layout.dart';
+import 'package:hazuki/features/reader/view/reader_settings_content.dart';
+import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
 import 'package:hazuki/features/reader/state/reader_settings_store.dart';
@@ -116,6 +119,9 @@ void main() {
           keepScreenOn: false,
           customBrightness: true,
           brightnessValue: 0.8,
+          filterEnabled: true,
+          filterColor: ReaderFilterColor.black,
+          filterStrength: 0.6,
           pageIndicator: true,
           pinchToZoom: true,
           longPressToSave: true,
@@ -130,6 +136,9 @@ void main() {
       expect(state.keepScreenOn, isFalse);
       expect(state.customBrightness, isTrue);
       expect(state.brightnessValue, 0.8);
+      expect(state.filterEnabled, isTrue);
+      expect(state.filterColor, ReaderFilterColor.black);
+      expect(state.filterStrength, 0.6);
       expect(state.pageIndicator, isTrue);
       expect(state.pinchToZoom, isTrue);
       expect(state.longPressToSave, isTrue);
@@ -315,6 +324,22 @@ void main() {
         expect(runtimeState.currentPageIndex, 0);
         expect(runtimeState.readerSpreadSize, 2);
         expect(logEvents, contains('Reader double page mode toggled'));
+
+        await controller.toggleFilter(true);
+        await controller.updateFilterColor(ReaderFilterColor.black);
+        await controller.updateFilterStrength(0.7);
+
+        expect(runtimeState.filterEnabled, isTrue);
+        expect(runtimeState.filterColor, ReaderFilterColor.black);
+        expect(runtimeState.filterStrength, 0.7);
+        expect(prefs.getBool(ReaderSettingsStore.filterEnabledKey), isTrue);
+        expect(
+          prefs.getString(ReaderSettingsStore.filterColorKey),
+          ReaderFilterColor.black.prefsValue,
+        );
+        expect(prefs.getDouble(ReaderSettingsStore.filterStrengthKey), 0.7);
+        expect(logEvents, contains('Reader filter toggled'));
+        expect(logEvents, contains('Reader filter color changed'));
       },
     );
   });
@@ -462,6 +487,9 @@ void main() {
       addTearDown(controller.dispose);
 
       await controller.loadSettings();
+      expect(controller.filterEnabled, isFalse);
+      expect(controller.filterColor, ReaderFilterColor.yellow);
+      expect(controller.filterStrength, 0.3);
       await controller.updateReaderMode(ReaderMode.rightToLeft);
       await controller.toggleDoublePageMode(true);
       await controller.toggleTapToTurnPage(true);
@@ -470,6 +498,9 @@ void main() {
       await controller.toggleKeepScreenOn(false);
       await controller.toggleCustomBrightness(true);
       await controller.updateBrightness(1.4);
+      await controller.toggleFilter(true);
+      await controller.updateFilterColor(ReaderFilterColor.black);
+      await controller.updateFilterStrength(1.4);
       await controller.togglePageIndicator(true);
       await controller.togglePinchToZoom(true);
       await controller.toggleLongPressToSave(true);
@@ -489,9 +520,104 @@ void main() {
       expect(prefs.getBool(ReaderSettingsStore.keepScreenOnKey), isFalse);
       expect(prefs.getBool(ReaderSettingsStore.customBrightnessKey), isTrue);
       expect(prefs.getDouble(ReaderSettingsStore.brightnessValueKey), 1.0);
+      expect(prefs.getBool(ReaderSettingsStore.filterEnabledKey), isTrue);
+      expect(
+        prefs.getString(ReaderSettingsStore.filterColorKey),
+        ReaderFilterColor.black.prefsValue,
+      );
+      expect(prefs.getDouble(ReaderSettingsStore.filterStrengthKey), 1.0);
       expect(prefs.getBool(ReaderSettingsStore.pageIndicatorKey), isTrue);
       expect(prefs.getBool(ReaderSettingsStore.pinchToZoomKey), isTrue);
       expect(prefs.getBool(ReaderSettingsStore.longPressToSaveKey), isTrue);
+    });
+  });
+
+  group('ReaderSettingsContent', () {
+    testWidgets('settings sliders fill their height and center their labels', (
+      tester,
+    ) async {
+      ReaderFilterColor? selectedColor;
+      ReaderMode? selectedMode;
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: ReaderSettingsContent(
+              surface: ReaderSettingsSurface.page,
+              readerMode: ReaderMode.topToBottom,
+              doublePageMode: false,
+              tapToTurnPage: false,
+              volumeButtonTurnPage: false,
+              pinchToZoom: false,
+              longPressToSave: false,
+              immersiveMode: true,
+              keepScreenOn: true,
+              pageIndicator: false,
+              customBrightness: false,
+              brightnessValue: 0.5,
+              filterEnabled: true,
+              filterColor: ReaderFilterColor.yellow,
+              filterStrength: 0.3,
+              sourceImageQuality: ReaderSourceImageQualitySnapshot.defaults,
+              onReaderModeChanged: (value) => selectedMode = value,
+              onDoublePageModeChanged: (_) {},
+              onTapToTurnPageChanged: (_) {},
+              onVolumeButtonTurnPageChanged: (_) {},
+              onPinchToZoomChanged: (_) {},
+              onLongPressToSaveChanged: (_) {},
+              onImmersiveModeChanged: (_) {},
+              onKeepScreenOnChanged: (_) {},
+              onPageIndicatorChanged: (_) {},
+              onCustomBrightnessChanged: (_) {},
+              onBrightnessChanged: (_) {},
+              onFilterEnabledChanged: (_) {},
+              onFilterColorChanged: (value) => selectedColor = value,
+              onFilterStrengthChanged: (_) {},
+              onCopyMangaImageQualityChanged: (_) {},
+              onPicacgImageQualityChanged: (_) {},
+            ),
+          ),
+        ),
+      );
+
+      final modeSlider = find.byKey(
+        const ValueKey<String>('reader-mode-slider'),
+      );
+      final modeSliderRect = tester.getRect(modeSlider);
+      final horizontalLabelRect = tester.getRect(
+        find.text('Horizontal paging'),
+      );
+      expect(
+        horizontalLabelRect.center.dy,
+        closeTo(modeSliderRect.center.dy, 1),
+      );
+
+      await tester.tapAt(
+        Offset(
+          modeSliderRect.center.dx + modeSliderRect.width / 4,
+          modeSliderRect.bottom - 2,
+        ),
+      );
+      expect(selectedMode, ReaderMode.rightToLeft);
+
+      final slider = find.byKey(
+        const ValueKey<String>('reader-filter-color-slider'),
+      );
+      await tester.scrollUntilVisible(slider, 200);
+      await tester.pumpAndSettle();
+
+      final sliderRect = tester.getRect(slider);
+      final blackLabelRect = tester.getRect(find.text('Black'));
+      expect(blackLabelRect.center.dy, closeTo(sliderRect.center.dy, 1));
+
+      await tester.tapAt(
+        Offset(
+          sliderRect.center.dx + sliderRect.width / 4,
+          sliderRect.bottom - 2,
+        ),
+      );
+      expect(selectedColor, ReaderFilterColor.black);
     });
   });
 

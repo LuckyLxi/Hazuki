@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:hazuki/features/reader/state/reader_filter_color.dart';
 import 'package:hazuki/features/reader/state/reader_mode.dart';
 import 'package:hazuki/features/reader/support/reader_source_image_quality_settings.dart';
 import 'package:hazuki/features/reader/view/reader_settings_content.dart';
@@ -18,6 +19,9 @@ class ReaderSettingsDrawerContent extends StatelessWidget {
     required this.pageIndicator,
     required this.customBrightness,
     required this.brightnessValue,
+    required this.filterEnabled,
+    required this.filterColor,
+    required this.filterStrength,
     required this.sourceImageQuality,
     required this.onReaderModeChanged,
     required this.onDoublePageModeChanged,
@@ -31,6 +35,10 @@ class ReaderSettingsDrawerContent extends StatelessWidget {
     required this.onCustomBrightnessChanged,
     required this.onBrightnessChanged,
     required this.onBrightnessChangeEnd,
+    required this.onFilterEnabledChanged,
+    required this.onFilterColorChanged,
+    required this.onFilterStrengthChanged,
+    required this.onFilterStrengthChangeEnd,
     required this.onCopyMangaImageQualityChanged,
     required this.onPicacgImageQualityChanged,
     required this.onClose,
@@ -47,6 +55,9 @@ class ReaderSettingsDrawerContent extends StatelessWidget {
   final bool pageIndicator;
   final bool customBrightness;
   final double brightnessValue;
+  final bool filterEnabled;
+  final ReaderFilterColor filterColor;
+  final double filterStrength;
   final ReaderSourceImageQualitySnapshot sourceImageQuality;
   final ValueChanged<ReaderMode?> onReaderModeChanged;
   final ValueChanged<bool> onDoublePageModeChanged;
@@ -60,6 +71,10 @@ class ReaderSettingsDrawerContent extends StatelessWidget {
   final ValueChanged<bool> onCustomBrightnessChanged;
   final ValueChanged<double>? onBrightnessChanged;
   final ValueChanged<double>? onBrightnessChangeEnd;
+  final ValueChanged<bool> onFilterEnabledChanged;
+  final ValueChanged<ReaderFilterColor> onFilterColorChanged;
+  final ValueChanged<double>? onFilterStrengthChanged;
+  final ValueChanged<double>? onFilterStrengthChangeEnd;
   final ValueChanged<String?> onCopyMangaImageQualityChanged;
   final ValueChanged<String?> onPicacgImageQualityChanged;
   final VoidCallback onClose;
@@ -79,6 +94,9 @@ class ReaderSettingsDrawerContent extends StatelessWidget {
       pageIndicator: pageIndicator,
       customBrightness: customBrightness,
       brightnessValue: brightnessValue,
+      filterEnabled: filterEnabled,
+      filterColor: filterColor,
+      filterStrength: filterStrength,
       sourceImageQuality: sourceImageQuality,
       onReaderModeChanged: onReaderModeChanged,
       onDoublePageModeChanged: onDoublePageModeChanged,
@@ -92,6 +110,10 @@ class ReaderSettingsDrawerContent extends StatelessWidget {
       onCustomBrightnessChanged: onCustomBrightnessChanged,
       onBrightnessChanged: onBrightnessChanged,
       onBrightnessChangeEnd: onBrightnessChangeEnd,
+      onFilterEnabledChanged: onFilterEnabledChanged,
+      onFilterColorChanged: onFilterColorChanged,
+      onFilterStrengthChanged: onFilterStrengthChanged,
+      onFilterStrengthChangeEnd: onFilterStrengthChangeEnd,
       onCopyMangaImageQualityChanged: onCopyMangaImageQualityChanged,
       onPicacgImageQualityChanged: onPicacgImageQualityChanged,
       onClose: onClose,

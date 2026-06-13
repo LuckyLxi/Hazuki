@@ -503,6 +503,16 @@
       "value": {}
     }
   },
+  "readingFilterTitle": "阅读滤镜",
+  "readingFilterSubtitle": "在漫画图片上覆盖黄色或黑色滤镜",
+  "readingFilterColorYellow": "黄色",
+  "readingFilterColorBlack": "黑色",
+  "readingFilterStrengthLabel": "滤镜强度 {value}%",
+  "@readingFilterStrengthLabel": {
+    "placeholders": {
+      "value": {}
+    }
+  },
   "readingPageIndicatorTitle": "页数指示器",
   "readingPageIndicatorSubtitle": "在阅读器左下角显示第几话与当前页数/总页数",
   "readingPinchToZoomTitle": "双指缩放",

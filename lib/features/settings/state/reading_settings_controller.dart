@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import 'package:hazuki/features/reader/state/reader_mode.dart';
 import 'package:hazuki/features/reader/state/reader_settings_store.dart';
+import 'package:hazuki/features/reader/state/reader_filter_color.dart';
 import 'package:hazuki/features/reader/support/reader_source_image_quality_settings.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
 
@@ -27,6 +28,9 @@ class ReadingSettingsController extends ChangeNotifier {
   bool keepScreenOn = ReaderSettingsStore.defaultKeepScreenOn;
   bool customBrightness = ReaderSettingsStore.defaultCustomBrightness;
   double brightnessValue = ReaderSettingsStore.defaultBrightnessValue;
+  bool filterEnabled = ReaderSettingsStore.defaultFilterEnabled;
+  ReaderFilterColor filterColor = ReaderSettingsStore.defaultFilterColor;
+  double filterStrength = ReaderSettingsStore.defaultFilterStrength;
   bool pageIndicator = ReaderSettingsStore.defaultPageIndicator;
   bool pinchToZoom = ReaderSettingsStore.defaultPinchToZoom;
   bool longPressToSave = ReaderSettingsStore.defaultLongPressToSave;
@@ -54,6 +58,9 @@ class ReadingSettingsController extends ChangeNotifier {
     keepScreenOn = settings.keepScreenOn;
     customBrightness = settings.customBrightness;
     brightnessValue = settings.brightnessValue;
+    filterEnabled = settings.filterEnabled;
+    filterColor = settings.filterColor;
+    filterStrength = settings.filterStrength;
     pageIndicator = settings.pageIndicator;
     pinchToZoom = settings.pinchToZoom;
     longPressToSave = settings.longPressToSave;
@@ -111,6 +118,25 @@ class ReadingSettingsController extends ChangeNotifier {
     brightnessValue = normalized;
     _notify();
     await _settingsStore.saveBrightnessValue(normalized);
+  }
+
+  Future<void> toggleFilter(bool value) async {
+    filterEnabled = value;
+    _notify();
+    await _settingsStore.saveFilterEnabled(value);
+  }
+
+  Future<void> updateFilterColor(ReaderFilterColor value) async {
+    filterColor = value;
+    _notify();
+    await _settingsStore.saveFilterColor(value);
+  }
+
+  Future<void> updateFilterStrength(double value) async {
+    final normalized = ReaderSettingsStore.normalizeFilterStrength(value);
+    filterStrength = normalized;
+    _notify();
+    await _settingsStore.saveFilterStrength(normalized);
   }
 
   Future<void> togglePageIndicator(bool value) async {

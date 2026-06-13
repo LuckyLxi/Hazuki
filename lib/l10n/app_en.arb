@@ -503,6 +503,16 @@
       "value": {}
     }
   },
+  "readingFilterTitle": "Reading filter",
+  "readingFilterSubtitle": "Add a yellow or black overlay to comic images",
+  "readingFilterColorYellow": "Yellow",
+  "readingFilterColorBlack": "Black",
+  "readingFilterStrengthLabel": "Filter strength {value}%",
+  "@readingFilterStrengthLabel": {
+    "placeholders": {
+      "value": {}
+    }
+  },
   "readingPageIndicatorTitle": "Page indicator",
   "readingPageIndicatorSubtitle": "Show the chapter number and current page/total pages in the lower-left corner of the reader",
   "readingPinchToZoomTitle": "Pinch to zoom",
