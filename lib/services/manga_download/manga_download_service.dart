@@ -156,7 +156,7 @@ class MangaDownloadService extends ChangeNotifier {
     final result = await _recoveryScanner.scanDownloadedFromDisk(rootDir);
     _downloaded
       ..clear()
-      ..addAll(result.comics)
+      ..addAll(_mergeLegacyJmAliases(result.comics))
       ..sort((a, b) => b.updatedAtMillis.compareTo(a.updatedAtMillis));
     await _persistState();
     notifyListeners();
@@ -200,6 +200,14 @@ class MangaDownloadService extends ChangeNotifier {
       if (item.storageKey == storageKey ||
           (item.sourceKey.isEmpty && item.comicId == storageKey)) {
         return item;
+      }
+    }
+    final scopedId = SourceScopedComicId.fromStorageKey(storageKey);
+    if (isHazukiJmSourceKey(scopedId.sourceKey)) {
+      for (final item in _downloaded) {
+        if (item.sourceKey.isEmpty && item.comicId == scopedId.comicId) {
+          return item;
+        }
       }
     }
     return null;
@@ -573,7 +581,7 @@ class MangaDownloadService extends ChangeNotifier {
       if (hasAccess) {
         final rootDir = await _ensureRootDir();
         final result = await _recoveryScanner.scanDownloadedFromDisk(rootDir);
-        _downloaded.addAll(result.comics);
+        _downloaded.addAll(_mergeLegacyJmAliases(result.comics));
         _downloaded.sort(
           (a, b) => b.updatedAtMillis.compareTo(a.updatedAtMillis),
         );
@@ -658,8 +666,62 @@ class MangaDownloadService extends ChangeNotifier {
     }
     _downloaded
       ..clear()
-      ..addAll(sanitized)
+      ..addAll(_mergeLegacyJmAliases(sanitized))
       ..sort((a, b) => b.updatedAtMillis.compareTo(a.updatedAtMillis));
+  }
+
+  List<DownloadedMangaComic> _mergeLegacyJmAliases(
+    Iterable<DownloadedMangaComic> comics,
+  ) {
+    final merged = <DownloadedMangaComic>[];
+    for (final comic in comics) {
+      final aliasIndex = merged.indexWhere(
+        (item) =>
+            item.comicId == comic.comicId &&
+            ((item.sourceKey.isEmpty && isHazukiJmSourceKey(comic.sourceKey)) ||
+                (comic.sourceKey.isEmpty &&
+                    isHazukiJmSourceKey(item.sourceKey))),
+      );
+      if (aliasIndex < 0) {
+        merged.add(comic);
+        continue;
+      }
+      merged[aliasIndex] = _mergeDownloadedComicAliases(
+        merged[aliasIndex],
+        comic,
+      );
+    }
+    return merged;
+  }
+
+  DownloadedMangaComic _mergeDownloadedComicAliases(
+    DownloadedMangaComic first,
+    DownloadedMangaComic second,
+  ) {
+    final scoped = first.sourceKey.isNotEmpty ? first : second;
+    final legacy = identical(scoped, first) ? second : first;
+    final chaptersByIndex = <int, DownloadedMangaChapter>{
+      for (final chapter in legacy.chapters) chapter.index: chapter,
+      for (final chapter in scoped.chapters) chapter.index: chapter,
+    };
+    final chapters = chaptersByIndex.values.toList()
+      ..sort((a, b) => a.index.compareTo(b.index));
+    String preferScoped(String scopedValue, String legacyValue) =>
+        scopedValue.trim().isNotEmpty ? scopedValue : legacyValue;
+
+    return DownloadedMangaComic(
+      comicId: scoped.comicId,
+      sourceKey: scoped.sourceKey,
+      title: preferScoped(scoped.title, legacy.title),
+      subTitle: preferScoped(scoped.subTitle, legacy.subTitle),
+      description: preferScoped(scoped.description, legacy.description),
+      coverUrl: preferScoped(scoped.coverUrl, legacy.coverUrl),
+      localCoverPath: scoped.localCoverPath ?? legacy.localCoverPath,
+      chapters: chapters,
+      updatedAtMillis: scoped.updatedAtMillis > legacy.updatedAtMillis
+          ? scoped.updatedAtMillis
+          : legacy.updatedAtMillis,
+    );
   }
 
   bool _replaceTask(String storageKey, MangaDownloadTask next) {
@@ -758,9 +820,14 @@ class MangaDownloadService extends ChangeNotifier {
   }
 
   void _upsertDownloadedComic(DownloadedMangaComic comic) {
-    final index = _downloaded.indexWhere(
+    var index = _downloaded.indexWhere(
       (item) => item.storageKey == comic.storageKey,
     );
+    if (index < 0 && isHazukiJmSourceKey(comic.sourceKey)) {
+      index = _downloaded.indexWhere(
+        (item) => item.sourceKey.isEmpty && item.comicId == comic.comicId,
+      );
+    }
     if (index >= 0) {
       _downloaded[index] = comic;
     } else {

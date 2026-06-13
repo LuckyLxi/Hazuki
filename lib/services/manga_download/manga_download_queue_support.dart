@@ -166,6 +166,9 @@ class MangaDownloadQueueExecutor {
             chapters: const <DownloadedMangaChapter>[],
             updatedAtMillis: DateTime.now().millisecondsSinceEpoch,
           );
+      if (downloadedComic.sourceKey.isEmpty && task.sourceKey.isNotEmpty) {
+        downloadedComic = downloadedComic.copyWith(sourceKey: task.sourceKey);
+      }
 
       final localCoverPath = await _downloadCoverIfNeeded(
         task: task,

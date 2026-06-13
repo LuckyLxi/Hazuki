@@ -120,6 +120,66 @@ void main() {
   });
 
   test(
+    'restoring merges legacy and scoped JM chapters into one comic',
+    () async {
+      const legacy = DownloadedMangaComic(
+        comicId: 'comic-id',
+        title: 'Hazuki',
+        subTitle: '',
+        description: '',
+        coverUrl: '',
+        localCoverPath: null,
+        chapters: [
+          DownloadedMangaChapter(
+            epId: 'local_1',
+            title: 'Chapter 1',
+            index: 0,
+            imagePaths: ['C:/downloads/Hazuki/MangaChapter001/0001.jpg'],
+          ),
+        ],
+        updatedAtMillis: 1,
+      );
+      const scoped = DownloadedMangaComic(
+        comicId: 'comic-id',
+        sourceKey: 'jm',
+        title: 'Hazuki',
+        subTitle: '',
+        description: '',
+        coverUrl: '',
+        localCoverPath: null,
+        chapters: [
+          DownloadedMangaChapter(
+            epId: 'ep-2',
+            title: 'Chapter 2',
+            index: 1,
+            imagePaths: ['C:/downloads/Hazuki/MangaChapter002/0001.jpg'],
+          ),
+        ],
+        updatedAtMillis: 2,
+      );
+      SharedPreferences.setMockInitialValues({
+        'manga_download_service_state_v2': jsonEncode({
+          'tasks': const [],
+          'downloaded': [legacy.toJson(), scoped.toJson()],
+        }),
+      });
+      final service = MangaDownloadService();
+      addTearDown(service.dispose);
+
+      await service.ensureInitialized();
+
+      expect(service.downloadedComics, hasLength(1));
+      expect(service.downloadedComics.single.storageKey, 'jm::comic-id');
+      expect(
+        service.downloadedComics.single.chapters.map(
+          (chapter) => chapter.index,
+        ),
+        [0, 1],
+      );
+    },
+  );
+
+  test(
     'legacy redownload removes the old chapter and queues it again',
     () async {
       final root = await Directory.systemTemp.createTemp(

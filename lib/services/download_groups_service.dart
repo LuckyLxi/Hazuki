@@ -46,14 +46,22 @@ class DownloadGroupsService extends ChangeNotifier {
       if (entry.value.contains(comicStorageKey)) entry.key,
   };
 
-  Future<void> initialize(Iterable<String> downloadedComicKeys) async {
+  Future<void> initialize(
+    Iterable<String> downloadedComicKeys, {
+    Map<String, String> migratedComicKeys = const {},
+  }) async {
     await _ensureDefaultGroup();
-    await reconcileDownloadedComics(downloadedComicKeys, notify: false);
+    await reconcileDownloadedComics(
+      downloadedComicKeys,
+      migratedComicKeys: migratedComicKeys,
+      notify: false,
+    );
     await reload();
   }
 
   Future<void> reconcileDownloadedComics(
     Iterable<String> downloadedComicKeys, {
+    Map<String, String> migratedComicKeys = const {},
     bool notify = true,
   }) async {
     final keys = downloadedComicKeys
@@ -61,6 +69,7 @@ class DownloadGroupsService extends ChangeNotifier {
         .where((key) => key.isNotEmpty)
         .toSet();
     await _database.transaction(() async {
+      await _migrateComicMemberships(migratedComicKeys);
       final memberships = await _database
           .select(_database.downloadGroupComics)
           .get();
@@ -88,6 +97,33 @@ class DownloadGroupsService extends ChangeNotifier {
     });
     if (notify) {
       await reload();
+    }
+  }
+
+  Future<void> _migrateComicMemberships(
+    Map<String, String> migratedComicKeys,
+  ) async {
+    for (final entry in migratedComicKeys.entries) {
+      final oldKey = entry.key.trim();
+      final newKey = entry.value.trim();
+      if (oldKey.isEmpty || newKey.isEmpty || oldKey == newKey) {
+        continue;
+      }
+      final oldMemberships = await (_database.select(
+        _database.downloadGroupComics,
+      )..where((row) => row.comicStorageKey.equals(oldKey))).get();
+      if (oldMemberships.isEmpty) {
+        continue;
+      }
+      await (_database.delete(
+        _database.downloadGroupComics,
+      )..where((row) => row.comicStorageKey.equals(newKey))).go();
+      for (final membership in oldMemberships) {
+        await _putMembership(membership.groupId, newKey, membership.addedAtMs);
+      }
+      await (_database.delete(
+        _database.downloadGroupComics,
+      )..where((row) => row.comicStorageKey.equals(oldKey))).go();
     }
   }
 

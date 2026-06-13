@@ -292,13 +292,14 @@ class DownloadedMangaComic {
   ).downloadDirName;
 
   DownloadedMangaComic copyWith({
+    String? sourceKey,
     String? localCoverPath,
     List<DownloadedMangaChapter>? chapters,
     int? updatedAtMillis,
   }) {
     return DownloadedMangaComic(
       comicId: comicId,
-      sourceKey: sourceKey,
+      sourceKey: sourceKey ?? this.sourceKey,
       title: title,
       subTitle: subTitle,
       description: description,

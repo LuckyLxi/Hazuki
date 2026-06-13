@@ -47,6 +47,23 @@ void main() {
     );
   });
 
+  test('migrating a legacy comic key preserves its original groups', () async {
+    await service.initialize(const ['comic-a']);
+    final group = await service.createGroup('First');
+    await service.moveComicToGroup('comic-a', group.id);
+
+    await service.reconcileDownloadedComics(
+      const ['jm::comic-a'],
+      migratedComicKeys: const {'comic-a': 'jm::comic-a'},
+    );
+
+    expect(service.comicKeysForGroup(group.id), {'jm::comic-a'});
+    expect(
+      service.comicKeysForGroup(DownloadGroupsService.defaultGroupId),
+      isEmpty,
+    );
+  });
+
   test('move can save multiple selected groups at once', () async {
     await service.initialize(const ['comic-a']);
     final first = await service.createGroup('First');

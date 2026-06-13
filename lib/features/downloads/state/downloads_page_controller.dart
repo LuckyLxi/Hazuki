@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:hazuki/l10n/l10n.dart';
+import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/services/manga_download/manga_download_service.dart';
 import 'package:hazuki/services/download_groups_service.dart';
 import '../support/downloads_actions.dart';
@@ -98,8 +99,14 @@ class DownloadsPageController extends ChangeNotifier {
     await _downloadService.ensureInitialized();
     await _downloadGroupsService.initialize(
       _downloadService.downloadedComics.map((comic) => comic.storageKey),
+      migratedComicKeys: _legacyComicKeyMigrations,
     );
   }
+
+  Map<String, String> get _legacyComicKeyMigrations => {
+    for (final comic in _downloadService.downloadedComics)
+      if (isHazukiJmSourceKey(comic.sourceKey)) comic.comicId: comic.storageKey,
+  };
 
   void selectGroup(String groupId) {
     if (_selectedGroupId == groupId) return;
@@ -368,6 +375,7 @@ class DownloadsPageController extends ChangeNotifier {
       _downloadGroupsService
           .reconcileDownloadedComics(
             _downloadService.downloadedComics.map((comic) => comic.storageKey),
+            migratedComicKeys: _legacyComicKeyMigrations,
           )
           .whenComplete(() => _reconcilingGroups = false);
     }
