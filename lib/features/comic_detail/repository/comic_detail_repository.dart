@@ -159,12 +159,19 @@ class ComicDetailRepository implements FavoriteFoldersRepository {
     required String coverUrl,
     required String description,
     required List<MangaChapterDownloadTarget> chapters,
+    bool redownloadExisting = false,
   }) => _downloader.enqueueDownload(
     details: details,
     coverUrl: coverUrl,
     description: description,
     chapters: chapters,
+    redownloadExisting: redownloadExisting,
   );
+
+  Future<MangaDownloadConflict> checkDownloadConflict({
+    required ComicDetailsData details,
+    required List<MangaChapterDownloadTarget> chapters,
+  }) => _downloader.checkDownloadConflict(details: details, chapters: chapters);
 
   // ── Persistence ──────────────────────────────────────────────────────────
 

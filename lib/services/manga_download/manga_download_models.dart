@@ -37,6 +37,18 @@ class MangaChapterDownloadTarget {
   }
 }
 
+class MangaDownloadConflict {
+  const MangaDownloadConflict({
+    required this.comicTitle,
+    required this.existingChapters,
+  });
+
+  final String comicTitle;
+  final List<MangaChapterDownloadTarget> existingChapters;
+
+  bool get hasConflict => existingChapters.isNotEmpty;
+}
+
 class MangaDownloadTask {
   const MangaDownloadTask({
     required this.comicId,

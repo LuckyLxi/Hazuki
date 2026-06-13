@@ -566,6 +566,35 @@
   "downloadsDownloadChaptersTitle": "Download chapters",
   "downloadsDownloadChaptersSubtitle": "Select the chapters you want to download",
   "downloadsDownloadAction": "Download",
+  "downloadsDuplicateDialogTitle": "Already downloaded",
+  "downloadsDuplicateDialogContent": "\"{comicTitle}\" already has {count} selected chapter(s) downloaded locally:\n\n{chapters}\n\nDownload them again?",
+  "@downloadsDuplicateDialogContent": {
+    "placeholders": {
+      "comicTitle": {},
+      "count": {
+        "type": "int"
+      },
+      "chapters": {}
+    }
+  },
+  "downloadsDuplicateDownloadAction": "Download again",
+  "downloadsSkipDownloadedDialogTitle": "Skip downloaded chapters?",
+  "downloadsSkipDownloadedDialogContent": "{count} selected chapter(s) are already downloaded. Skip them and download only the remaining chapters?",
+  "@downloadsSkipDownloadedDialogContent": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "downloadsDoNotSkipAction": "No",
+  "downloadsSkipDownloadedAction": "Skip",
+  "downloadsQueueFailed": "Could not add chapters to downloads: {error}",
+  "@downloadsQueueFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
   "privacySettingsTitle": "Privacy settings",
   "privacyBlurTaskTitle": "Blur app in recent tasks",
   "privacyBlurTaskSubtitle": "Show a pure black task card when switching to recent apps",

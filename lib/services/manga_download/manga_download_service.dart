@@ -185,6 +185,13 @@ class MangaDownloadService extends ChangeNotifier {
         return item;
       }
     }
+    if (isHazukiJmSourceKey(sourceKey)) {
+      for (final item in _downloaded) {
+        if (item.sourceKey.isEmpty && item.comicId == comicId) {
+          return item;
+        }
+      }
+    }
     return null;
   }
 
@@ -207,11 +214,36 @@ class MangaDownloadService extends ChangeNotifier {
     return null;
   }
 
+  Future<MangaDownloadConflict> checkDownloadConflict({
+    required ComicDetailsData details,
+    required List<MangaChapterDownloadTarget> chapters,
+  }) async {
+    await ensureInitialized();
+    final downloaded = downloadedComicByIdForSource(
+      details.id,
+      sourceKey: details.sourceKey.trim(),
+    );
+    return MangaDownloadConflict(
+      comicTitle: details.title,
+      existingChapters: downloaded == null
+          ? const <MangaChapterDownloadTarget>[]
+          : chapters
+                .where(
+                  (target) => downloaded.chapters.any(
+                    (chapter) =>
+                        _downloadedChapterMatchesTarget(chapter, target),
+                  ),
+                )
+                .toList(growable: false),
+    );
+  }
+
   Future<void> enqueueDownload({
     required ComicDetailsData details,
     required String coverUrl,
     required String description,
     required List<MangaChapterDownloadTarget> chapters,
+    bool redownloadExisting = false,
   }) async {
     if (chapters.isEmpty) {
       return;
@@ -219,19 +251,24 @@ class MangaDownloadService extends ChangeNotifier {
 
     await ensureInitialized();
     final sourceKey = details.sourceKey.trim();
+    if (redownloadExisting) {
+      await _removeDownloadedChaptersForRedownload(
+        details: details,
+        chapters: chapters,
+      );
+    }
     final existingDownloaded = downloadedComicByIdForSource(
       details.id,
       sourceKey: sourceKey,
     );
-    final downloadedEpIds = existingDownloaded == null
-        ? <String>{}
-        : existingDownloaded.chapters.map((e) => e.epId).toSet();
-
     final normalizedTargets = <MangaChapterDownloadTarget>[];
     final seen = <String>{};
     for (final target in chapters) {
       if (target.epId.isEmpty ||
-          downloadedEpIds.contains(target.epId) ||
+          (existingDownloaded?.chapters.any(
+                (chapter) => _downloadedChapterMatchesTarget(chapter, target),
+              ) ??
+              false) ||
           !seen.add(target.epId)) {
         continue;
       }
@@ -281,6 +318,108 @@ class MangaDownloadService extends ChangeNotifier {
     await _persistState();
     notifyListeners();
     unawaited(_queueExecutor.processQueue());
+  }
+
+  Future<void> _removeDownloadedChaptersForRedownload({
+    required ComicDetailsData details,
+    required List<MangaChapterDownloadTarget> chapters,
+  }) async {
+    final downloaded = downloadedComicByIdForSource(
+      details.id,
+      sourceKey: details.sourceKey.trim(),
+    );
+    if (downloaded == null) {
+      return;
+    }
+
+    final chaptersToRemove = downloaded.chapters
+        .where(
+          (chapter) => chapters.any(
+            (target) => _downloadedChapterMatchesTarget(chapter, target),
+          ),
+        )
+        .toList(growable: false);
+    if (chaptersToRemove.isEmpty) {
+      return;
+    }
+
+    if (!await _ensureAndroidDownloadsAccess()) {
+      throw FileSystemException('Android downloads access not granted');
+    }
+    final rootDir = await _ensureRootDir();
+    final comicDir = Directory('${rootDir.path}/${downloaded.downloadDirName}');
+    final chapterDirectories = <String>{};
+    for (final chapter in chaptersToRemove) {
+      final directory = await _recoveryScanner.resolveChapterDirForEpId(
+        comicDir: comicDir,
+        epId: chapter.epId,
+        targets: chapters,
+        downloadedComic: downloaded,
+      );
+      if (directory != null && _isPathWithin(directory, comicDir)) {
+        chapterDirectories.add(directory.path);
+      }
+    }
+    for (final path in chapterDirectories) {
+      final directory = Directory(path);
+      if (await directory.exists()) {
+        await directory.delete(recursive: true);
+      }
+    }
+
+    final remainingChapters = downloaded.chapters
+        .where(
+          (chapter) => !chapters.any(
+            (target) => _downloadedChapterMatchesTarget(chapter, target),
+          ),
+        )
+        .toList(growable: false);
+    if (remainingChapters.isEmpty) {
+      _downloaded.removeWhere(
+        (comic) => comic.storageKey == downloaded.storageKey,
+      );
+      await _deleteMetadataFiles(comicDir);
+    } else {
+      final updated = downloaded.copyWith(chapters: remainingChapters);
+      _upsertDownloadedComic(updated);
+      await _writeMetadataFile(comicDir, updated);
+    }
+    await _persistState();
+    notifyListeners();
+  }
+
+  bool _downloadedChapterMatchesTarget(
+    DownloadedMangaChapter downloaded,
+    MangaChapterDownloadTarget target,
+  ) {
+    if (downloaded.epId == target.epId) {
+      return true;
+    }
+    return RegExp(r'^local_\d+$').hasMatch(downloaded.epId.trim()) &&
+        downloaded.index == target.index;
+  }
+
+  bool _isPathWithin(Directory child, Directory parent) {
+    String normalize(String path) {
+      final absolute = Directory(path).absolute.path.replaceAll('\\', '/');
+      final trimmed = absolute.endsWith('/')
+          ? absolute.substring(0, absolute.length - 1)
+          : absolute;
+      return Platform.isWindows ? trimmed.toLowerCase() : trimmed;
+    }
+
+    final childPath = normalize(child.path);
+    final parentPath = normalize(parent.path);
+    return childPath.startsWith('$parentPath/');
+  }
+
+  Future<void> _deleteMetadataFiles(Directory comicDir) async {
+    for (final name in const [_metadataFileName, _legacyMetadataFileName]) {
+      final file = File('${comicDir.path}/$name');
+      if (await file.exists()) {
+        await file.delete();
+      }
+    }
   }
 
   Future<void> deleteDownloadedComics(Iterable<String> comicIds) async {

@@ -566,6 +566,35 @@
   "downloadsDownloadChaptersTitle": "下载章节",
   "downloadsDownloadChaptersSubtitle": "选择要下载的章节",
   "downloadsDownloadAction": "下载",
+  "downloadsDuplicateDialogTitle": "本地已有下载",
+  "downloadsDuplicateDialogContent": "《{comicTitle}》已有 {count} 个所选章节/话存在于本地：\n\n{chapters}\n\n是否重复下载？",
+  "@downloadsDuplicateDialogContent": {
+    "placeholders": {
+      "comicTitle": {},
+      "count": {
+        "type": "int"
+      },
+      "chapters": {}
+    }
+  },
+  "downloadsDuplicateDownloadAction": "重复下载",
+  "downloadsSkipDownloadedDialogTitle": "跳过已下载章节/话？",
+  "downloadsSkipDownloadedDialogContent": "所选内容中有 {count} 个章节/话已下载，是否跳过它们，仅下载未下载的章节/话？",
+  "@downloadsSkipDownloadedDialogContent": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "downloadsDoNotSkipAction": "否",
+  "downloadsSkipDownloadedAction": "跳过",
+  "downloadsQueueFailed": "无法加入下载队列：{error}",
+  "@downloadsQueueFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
   "privacySettingsTitle": "隐私设置",
   "privacyBlurTaskTitle": "模糊任务栏应用页面",
   "privacyBlurTaskSubtitle": "切到近期任务时任务卡片显示为纯黑",

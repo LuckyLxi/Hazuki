@@ -91,6 +91,7 @@ class MangaDownloadRecoveryRules {
         : comicId;
     return DownloadedMangaComic(
       comicId: normalizedComicId,
+      sourceKey: comic.sourceKey.trim(),
       title: _normalizeRecoveredComicTitle(comic.title, normalizedComicId),
       subTitle: comic.subTitle.trim(),
       description: comic.description.trim(),
