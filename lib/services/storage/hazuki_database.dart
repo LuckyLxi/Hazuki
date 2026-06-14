@@ -148,6 +148,8 @@ class HazukiDatabase extends _$HazukiDatabase {
 
   HazukiDatabase.memory() : super(NativeDatabase.memory());
 
+  HazukiDatabase.forTesting(super.executor);
+
   @override
   int get schemaVersion => 5;
 
@@ -166,8 +168,7 @@ class HazukiDatabase extends _$HazukiDatabase {
         await m.createTable(downloadGroupComics);
         await m.createTable(downloadGroupTombstones);
         await m.createTable(downloadGroupComicTombstones);
-      }
-      if (from < 5) {
+      } else if (from < 5) {
         await m.addColumn(downloadGroups, downloadGroups.sortOrder);
       }
     },
