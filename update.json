@@ -1,12 +1,12 @@
 {
-  "version": "1.1.2",
-  "releaseUrl": "https://github.com/LuckyLxi/Hazuki/releases/tag/v1.1.2",
+  "version": "1.1.3",
+  "releaseUrl": "https://github.com/LuckyLxi/Hazuki/releases/tag/v1.1.3",
   "apkUrls": {
-    "arm64-v8a": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.1.2/app-arm64-v8a-release.apk"
+    "arm64-v8a": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.1.3/app-arm64-v8a-release.apk"
   },
   "windowsUrls": {
-    "x64_zip": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.1.2/hazuki-windows-x64-v1.1.2.zip",
-    "x64_exe": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.1.2/hazuki-windows-x64-v1.1.2-setup.exe"
+    "x64_zip": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.1.3/hazuki-windows-x64-v1.1.3.zip",
+    "x64_exe": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.1.3/hazuki-windows-x64-v1.1.3-setup.exe"
   },
-  "changelog": "Hazuki v1.1.2\n\n- 优化下载页面已完成任务的滑动操作、选择模式与操作栏\n- 优化历史记录页面删除动画与返回交互\n- 将历史记录、阅读进度、收藏夹及搜索历史迁移至 Drift 数据库\n- 优化漫画封面 Hero 动画与图片预加载\n- 修复收藏夹弹窗溢出、发现页加载时序等问题"
+  "changelog": "Hazuki v1.1.3\n\n- 新增下载分组功能，支持分组拖拽排序与批量管理\n- 新增下载任务冲突检测与解决机制\n- 下载页面新增全部暂停、全部继续与全选操作\n- 阅读器新增图片滤镜与叠加效果设置\n- 已下载漫画在离线状态下支持展示详情信息\n- 优化下载页面交互、封面预览与描述布局"
 }
