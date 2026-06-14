@@ -24,6 +24,7 @@ class CloudSyncConfigStore {
 
   static const folderTombstonesKey = 'local_favorite_folder_tombstones_v1';
   static const entryTombstonesKey = 'local_favorite_entry_tombstones_v1';
+  static const downloadGroupsKey = 'download_groups_v1';
 
   static const Set<String> alwaysSkippedSettings = {
     'cookie_store_v1',
@@ -41,6 +42,7 @@ class CloudSyncConfigStore {
   static const Set<String> restoreSkippedSettings = {
     folderTombstonesKey,
     entryTombstonesKey,
+    downloadGroupsKey,
   };
   static const Set<String> windowsOnlySettings = {
     hazukiUseSystemTitleBarPreferenceKey,

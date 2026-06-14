@@ -43,6 +43,10 @@ class MangaDownloadRecoveryRules {
     );
   }
 
+  bool hasActiveTaskForComicDirectory(Directory comicDir) {
+    return _taskByComicId(_baseNameFromPath(comicDir.path)) != null;
+  }
+
   List<DownloadedMangaChapter> mergeRecoveredChapters({
     required List<DownloadedMangaChapter> normalizedChapters,
     required List<DownloadedMangaChapter> scannedChapters,
@@ -91,10 +95,15 @@ class MangaDownloadRecoveryRules {
         : comicId;
     return DownloadedMangaComic(
       comicId: normalizedComicId,
+      sourceKey: comic.sourceKey.trim(),
       title: _normalizeRecoveredComicTitle(comic.title, normalizedComicId),
       subTitle: comic.subTitle.trim(),
       description: comic.description.trim(),
       coverUrl: comic.coverUrl.trim(),
+      tags: comic.tags,
+      uploader: comic.uploader.trim(),
+      updateTime: comic.updateTime.trim(),
+      pageCount: comic.pageCount.trim(),
       localCoverPath: localCoverPath,
       chapters: chapters,
       updatedAtMillis: updatedAtMillis,

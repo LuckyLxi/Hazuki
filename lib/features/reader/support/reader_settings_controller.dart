@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:hazuki/features/reader/state/reader_mode.dart';
+import 'package:hazuki/features/reader/state/reader_filter_color.dart';
 import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
 import 'package:hazuki/features/reader/state/reader_settings_store.dart';
 import 'package:hazuki/features/reader/support/reader_controller_support.dart';
@@ -171,6 +172,54 @@ class ReaderSettingsController {
     });
     await _settingsStore.saveBrightnessValue(normalized);
     await _sessionController.applyReaderDisplaySettings();
+  }
+
+  Future<void> toggleFilter(bool value) async {
+    _updateState(() {
+      _runtimeState.filterEnabled = value;
+    });
+    await _settingsStore.saveFilterEnabled(value);
+    _logEvent(
+      'Reader filter toggled',
+      source: 'reader_settings',
+      content: _logPayload({'setting': 'filter', 'value': value}),
+    );
+  }
+
+  Future<void> updateFilterColor(ReaderFilterColor value) async {
+    _updateState(() {
+      _runtimeState.filterColor = value;
+    });
+    await _settingsStore.saveFilterColor(value);
+    _logEvent(
+      'Reader filter color changed',
+      source: 'reader_settings',
+      content: _logPayload({
+        'setting': 'filter_color',
+        'value': value.prefsValue,
+      }),
+    );
+  }
+
+  Future<void> updateFilterStrength(double value) async {
+    final normalized = ReaderSettingsStore.normalizeFilterStrength(value);
+    _updateState(() {
+      _runtimeState.filterStrength = normalized;
+    });
+    await _settingsStore.saveFilterStrength(normalized);
+  }
+
+  void handleFilterStrengthChangeEnd(double value) {
+    final normalized = ReaderSettingsStore.normalizeFilterStrength(value);
+    _logEvent(
+      'Reader filter strength adjusted',
+      source: 'reader_settings',
+      content: _logPayload({
+        'setting': 'filter_strength',
+        'value': normalized,
+        'strengthPercent': (normalized * 100).round(),
+      }),
+    );
   }
 
   Future<void> togglePageIndicator(bool value) async {

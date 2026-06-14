@@ -181,7 +181,19 @@ class SoftwareUpdateDownloadService extends ChangeNotifier {
           return false;
         }
       } else if (Platform.isWindows && !_isZipMode) {
-        Process.run('explorer.exe', [file.path]);
+        try {
+          await Process.start(
+            file.path,
+            const [],
+            mode: ProcessStartMode.detached,
+          );
+        } catch (error) {
+          _setFailure(
+            SoftwareUpdateDownloadFailureKind.installerLaunchFailed,
+            error.toString(),
+          );
+          return false;
+        }
       }
 
       _stage = _isZipMode

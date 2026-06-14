@@ -4,12 +4,14 @@ import 'package:hazuki/features/downloads/downloads.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/manga_download/manga_download_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../support/test_service_locator.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  setUp(() {
+  setUp(() async {
     SharedPreferences.setMockInitialValues(const {});
+    await ensureTestServiceLocator();
   });
 
   testWidgets('download tabs disable the edge overscroll indicator', (
@@ -48,6 +50,48 @@ void main() {
       ),
       findsNothing,
     );
+  });
+
+  testWidgets('bulk download actions prompt when there are no tasks', (
+    tester,
+  ) async {
+    final downloadService = _FakeDownloadService();
+    addTearDown(downloadService.dispose);
+
+    await tester.pumpWidget(_downloadsPage(downloadService));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.play_arrow_rounded));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('No download tasks'), findsOneWidget);
+    expect(downloadService.resumeAllCount, 0);
+
+    await tester.tap(find.byIcon(Icons.pause_rounded));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('No download tasks'), findsOneWidget);
+    expect(downloadService.pauseAllCount, 0);
+    await tester.pump(const Duration(seconds: 3));
+  });
+
+  testWidgets('bulk download actions prompt after handling tasks', (
+    tester,
+  ) async {
+    final downloadService = _FakeDownloadService(fakeTasks: const [_task]);
+    addTearDown(downloadService.dispose);
+
+    await tester.pumpWidget(_downloadsPage(downloadService));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byIcon(Icons.play_arrow_rounded));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('All download tasks started'), findsOneWidget);
+    expect(downloadService.resumeAllCount, 1);
+
+    await tester.tap(find.byIcon(Icons.pause_rounded));
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('All download tasks paused'), findsOneWidget);
+    expect(downloadService.pauseAllCount, 1);
+    await tester.pump(const Duration(seconds: 3));
   });
 
   testWidgets('back exits multi-select before closing downloads page', (
@@ -103,3 +147,51 @@ void main() {
     expect(find.byType(DownloadsPage), findsNothing);
   });
 }
+
+Widget _downloadsPage(MangaDownloadService downloadService) {
+  return MaterialApp(
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    supportedLocales: AppLocalizations.supportedLocales,
+    home: DownloadsPage(
+      downloadService: downloadService,
+      readerPageBuilder: (_, _) => const SizedBox.shrink(),
+    ),
+  );
+}
+
+class _FakeDownloadService extends MangaDownloadService {
+  _FakeDownloadService({this.fakeTasks = const []});
+
+  final List<MangaDownloadTask> fakeTasks;
+  int pauseAllCount = 0;
+  int resumeAllCount = 0;
+
+  @override
+  List<MangaDownloadTask> get tasks => fakeTasks;
+
+  @override
+  Future<void> ensureInitialized() async {}
+
+  @override
+  Future<void> pauseAllTasks() async {
+    pauseAllCount++;
+  }
+
+  @override
+  Future<void> resumeAllTasks() async {
+    resumeAllCount++;
+  }
+}
+
+const _task = MangaDownloadTask(
+  comicId: 'comic',
+  title: 'Comic',
+  subTitle: '',
+  description: '',
+  coverUrl: '',
+  targets: [],
+  completedEpIds: {},
+  status: MangaDownloadTaskStatus.paused,
+  createdAtMillis: 0,
+  updatedAtMillis: 0,
+);

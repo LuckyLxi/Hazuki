@@ -10,6 +10,7 @@ import 'cloud_sync/cloud_sync_restore_applier.dart';
 import 'cloud_sync/cloud_sync_snapshot_codec.dart';
 import 'comment_filter_service.dart';
 import 'local_favorites_service.dart';
+import 'download_groups_service.dart';
 
 export 'cloud_sync/cloud_sync_models.dart';
 
@@ -17,14 +18,18 @@ class CloudSyncService {
   CloudSyncService({
     required LocalFavoritesService localFavorites,
     required CommentFilterService commentFilter,
+    required DownloadGroupsService downloadGroups,
   }) : _localFavorites = localFavorites,
-       _commentFilter = commentFilter;
+       _commentFilter = commentFilter,
+       _downloadGroups = downloadGroups;
 
   final LocalFavoritesService _localFavorites;
   final CommentFilterService _commentFilter;
+  final DownloadGroupsService _downloadGroups;
   final CloudSyncConfigStore _configStore = CloudSyncConfigStore();
   late final CloudSyncSnapshotCodec _snapshotCodec = CloudSyncSnapshotCodec(
     configStore: _configStore,
+    downloadGroupsService: _downloadGroups,
   );
   late final CloudSyncRestoreApplier _restoreApplier =
       CloudSyncRestoreApplier();
@@ -73,6 +78,7 @@ class CloudSyncService {
           await _snapshotCodec.mergeRemoteIntoLocal(client);
           _localFavorites.onExternalDataChanged();
           await _commentFilter.load(notify: true);
+          await _downloadGroups.reload();
         }
       }
 
@@ -175,6 +181,15 @@ class CloudSyncService {
     final settingsResult = await _restoreApplier.applySettingsJson(
       settingsText,
     );
+    final settingsDecoded = jsonDecode(settingsText);
+    if (settingsDecoded is Map && settingsDecoded['data'] is Map) {
+      final data = settingsDecoded['data'] as Map;
+      final downloadGroupsRaw = data[CloudSyncConfigStore.downloadGroupsKey];
+      await _downloadGroups.importJsonString(
+        downloadGroupsRaw is String ? downloadGroupsRaw : null,
+        replace: true,
+      );
+    }
     await _commentFilter.load(notify: true);
     await _restoreApplier.applyReadingSnapshot(readingText);
     await _restoreApplier.applySearchHistoryJsonl(searchHistoryText);

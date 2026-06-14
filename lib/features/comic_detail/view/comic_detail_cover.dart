@@ -260,46 +260,59 @@ class ComicCoverPreviewPage extends StatelessWidget {
       child: SafeArea(
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-          child: Center(
-            child: GestureDetector(
-              onTap: () => Navigator.of(context).pop(),
-              onLongPress: onLongPress,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 32,
-                ),
-                child: Hero(
-                  tag: heroTag,
-                  flightShuttleBuilder: buildComicCoverHeroFlightShuttle,
-                  placeholderBuilder: buildComicCoverHeroPlaceholder,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(coverBorderRadius),
-                    child: InteractiveViewer(
-                      minScale: 1,
-                      maxScale: 4,
-                      child: HazukiCachedImage(
-                        url: imageUrl,
-                        sourceKey: sourceKey,
-                        fit: BoxFit.contain,
-                        loading: Container(
-                          width: 220,
-                          height: 300,
-                          color: placeholderColor,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return InteractiveViewer(
+                key: const ValueKey<String>('comic_cover_viewer'),
+                minScale: 1,
+                maxScale: 4,
+                clipBehavior: Clip.none,
+                child: SizedBox(
+                  width: constraints.maxWidth,
+                  height: constraints.maxHeight,
+                  child: Center(
+                    child: GestureDetector(
+                      onTap: () => Navigator.of(context).pop(),
+                      onLongPress: onLongPress,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 32,
                         ),
-                        error: Container(
-                          width: 220,
-                          height: 300,
-                          color: placeholderColor,
-                          alignment: Alignment.center,
-                          child: const Icon(Icons.broken_image_outlined),
+                        child: Hero(
+                          tag: heroTag,
+                          flightShuttleBuilder:
+                              buildComicCoverHeroFlightShuttle,
+                          placeholderBuilder: buildComicCoverHeroPlaceholder,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(
+                              coverBorderRadius,
+                            ),
+                            child: HazukiCachedImage(
+                              url: imageUrl,
+                              sourceKey: sourceKey,
+                              fit: BoxFit.contain,
+                              loading: Container(
+                                width: 220,
+                                height: 300,
+                                color: placeholderColor,
+                              ),
+                              error: Container(
+                                width: 220,
+                                height: 300,
+                                color: placeholderColor,
+                                alignment: Alignment.center,
+                                child: const Icon(Icons.broken_image_outlined),
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
         ),
       ),

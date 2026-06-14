@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../app/app_preferences.dart';
 import '../hazuki_source_service.dart';
 import '../local_favorites_service.dart';
+import '../download_groups_service.dart';
 import '../reading_progress_service.dart';
 import '../read_history_service.dart';
 import '../../features/search/support/search_history_service.dart';
@@ -21,6 +22,7 @@ class CloudSyncSnapshotCodec {
     ReadHistoryService? readHistoryService,
     ReadingProgressService? readingProgressService,
     LocalFavoritesService? localFavoritesService,
+    DownloadGroupsService? downloadGroupsService,
     SearchHistoryService? searchHistoryService,
   }) : _sourceService = sourceService ?? sl<HazukiSourceService>(),
        _readHistoryService = readHistoryService ?? sl<ReadHistoryService>(),
@@ -28,6 +30,8 @@ class CloudSyncSnapshotCodec {
            readingProgressService ?? sl<ReadingProgressService>(),
        _localFavoritesService =
            localFavoritesService ?? sl<LocalFavoritesService>(),
+       _downloadGroupsService =
+           downloadGroupsService ?? sl<DownloadGroupsService>(),
        _searchHistoryService =
            searchHistoryService ?? sl<SearchHistoryService>();
 
@@ -35,6 +39,7 @@ class CloudSyncSnapshotCodec {
   final ReadHistoryService _readHistoryService;
   final ReadingProgressService _readingProgressService;
   final LocalFavoritesService _localFavoritesService;
+  final DownloadGroupsService _downloadGroupsService;
   final SearchHistoryService _searchHistoryService;
 
   Future<void> mergeRemoteIntoLocal(CloudSyncRemoteClient client) async {
@@ -65,6 +70,8 @@ class CloudSyncSnapshotCodec {
         .exportFoldersJsonString();
     final localEntriesSnapshot = await _localFavoritesService
         .exportEntriesJsonString();
+    final localDownloadGroupsSnapshot = await _downloadGroupsService
+        .exportJsonString();
 
     if (readingText != null) {
       Map<String, dynamic>? readingMap;
@@ -250,6 +257,15 @@ class CloudSyncSnapshotCodec {
               data,
               localKeywordsSnapshot: localCommentFilterKeywordsSnapshot,
             );
+            final remoteGroupsRaw =
+                data[CloudSyncConfigStore.downloadGroupsKey];
+            final remoteGroups = remoteGroupsRaw is String
+                ? remoteGroupsRaw
+                : null;
+            await _downloadGroupsService.importJsonString(
+              localDownloadGroupsSnapshot,
+            );
+            await _downloadGroupsService.importJsonString(remoteGroups);
           }
         }
       } catch (_) {}
@@ -270,6 +286,8 @@ class CloudSyncSnapshotCodec {
         settingsMap[key] = value;
       }
     }
+    settingsMap[CloudSyncConfigStore.downloadGroupsKey] =
+        await _downloadGroupsService.exportJsonString();
     final settingsJson = jsonEncode({
       'version': 2,
       'updatedAtMs': DateTime.now().millisecondsSinceEpoch,

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/downloads/view/downloads_completed_tab.dart';
+import 'package:hazuki/features/downloads/view/downloads_shell_widgets.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/manga_download/manga_download_service.dart';
+import 'package:hazuki/services/download_groups_service.dart';
 
 void main() {
   testWidgets('swiping a downloaded comic left reveals its delete action', (
@@ -110,7 +112,56 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(tester.getTopLeft(title).dx, originalLeft);
-    expect(find.byIcon(Icons.circle_outlined), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey<String>('downloaded_selection_indicator')),
+      findsOneWidget,
+    );
+    expect(find.byIcon(Icons.circle_outlined), findsNothing);
+  });
+
+  testWidgets('selection indicator animates in and out with selection mode', (
+    tester,
+  ) async {
+    late StateSetter rebuild;
+    var selectionMode = false;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: StatefulBuilder(
+            builder: (context, setState) {
+              rebuild = setState;
+              return _buildTab(selectionMode: selectionMode);
+            },
+          ),
+        ),
+      ),
+    );
+
+    final visibleIndicator = find.byKey(
+      const ValueKey<String>('downloaded_selection_indicator_visible'),
+    );
+    expect(visibleIndicator, findsNothing);
+
+    rebuild(() => selectionMode = true);
+    await tester.pump();
+    expect(visibleIndicator, findsOneWidget);
+    expect(
+      find.ancestor(
+        of: visibleIndicator,
+        matching: find.byType(SlideTransition),
+      ),
+      findsWidgets,
+    );
+    await tester.pumpAndSettle();
+
+    rebuild(() => selectionMode = false);
+    await tester.pump();
+    expect(visibleIndicator, findsOneWidget);
+    await tester.pumpAndSettle();
+    expect(visibleIndicator, findsNothing);
   });
 
   testWidgets('swiping another comic closes the previously revealed comic', (
@@ -134,6 +185,102 @@ void main() {
       find.byKey(const ValueKey<String>('downloaded_edge_delete_comic-2')),
       findsOneWidget,
     );
+  });
+
+  testWidgets('returning from another comic leaves the revealed comic closed', (
+    tester,
+  ) async {
+    DownloadedMangaComic? openedComic;
+    final navigatorKey = GlobalKey<NavigatorState>();
+    await tester.pumpWidget(
+      _wrapTab(
+        navigatorKey: navigatorKey,
+        comics: const [_comic, _comic2],
+        onOpenComic: (comic) async {
+          openedComic = comic;
+          await navigatorKey.currentState!.push<void>(
+            MaterialPageRoute<void>(
+              builder: (_) => const Scaffold(body: Text('Comic details')),
+            ),
+          );
+        },
+      ),
+    );
+
+    final firstTitle = find.text('Test Comic');
+    final firstLeft = tester.getTopLeft(firstTitle).dx;
+
+    await tester.drag(firstTitle, const Offset(-120, 0));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Second Comic'));
+    await tester.pumpAndSettle();
+    expect(find.text('Comic details'), findsOneWidget);
+
+    navigatorKey.currentState!.pop();
+    await tester.pumpAndSettle();
+
+    expect(openedComic, _comic2);
+    expect(tester.getTopLeft(firstTitle).dx, closeTo(firstLeft, 0.1));
+    expect(
+      find.byKey(const ValueKey<String>('downloaded_edge_delete_comic-1')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('deleted comic flies left while following comic moves up', (
+    tester,
+  ) async {
+    var comics = const [_comic, _comic2];
+    late StateSetter updateComics;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: StatefulBuilder(
+            builder: (context, setState) {
+              updateComics = setState;
+              return _buildTab(
+                comics: comics,
+                onDeleteComic: (comic) {
+                  updateComics(() {
+                    comics = comics
+                        .where((item) => item.storageKey != comic.storageKey)
+                        .toList(growable: false);
+                  });
+                },
+              );
+            },
+          ),
+        ),
+      ),
+    );
+
+    final firstTitle = find.text('Test Comic');
+    final secondTitle = find.text('Second Comic');
+    final firstLeft = tester.getTopLeft(firstTitle).dx;
+    final secondTop = tester.getTopLeft(secondTitle).dy;
+
+    await tester.drag(firstTitle, const Offset(-120, 0));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.delete_outline_rounded));
+    await tester.pump();
+
+    expect(
+      find.byKey(const ValueKey<String>('downloaded_edge_delete_comic-1')),
+      findsNothing,
+    );
+
+    await tester.pump(DownloadsCompletedTab.dismissDuration ~/ 2);
+
+    expect(tester.getTopLeft(firstTitle).dx, lessThan(firstLeft - 58));
+    expect(tester.getTopLeft(secondTitle).dy, lessThan(secondTop));
+
+    await tester.pumpAndSettle();
+
+    expect(firstTitle, findsNothing);
+    expect(secondTitle, findsOneWidget);
   });
 
   testWidgets('right swipe on a closed comic is passed to the tab view', (
@@ -306,15 +453,427 @@ void main() {
       findsNothing,
     );
   });
+
+  testWidgets('category launcher morphs into a category shell dialog', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_wrapTab());
+
+    final launcher = find.byKey(
+      const ValueKey<String>('downloads_category_launcher'),
+    );
+    expect(tester.getSize(launcher).height, 36);
+    final launcherDecoration =
+        tester.widget<DecoratedBox>(launcher).decoration as BoxDecoration;
+    expect(launcherDecoration.gradient, isNull);
+    expect(launcherDecoration.color, isNotNull);
+    expect(launcherDecoration.borderRadius, BorderRadius.circular(12));
+    expect(launcherDecoration.boxShadow, isNotEmpty);
+
+    await tester.tap(launcher);
+    await tester.pump();
+
+    final dialog = find.byKey(
+      const ValueKey<String>('downloads_category_dialog'),
+    );
+    expect(dialog, findsOneWidget);
+    final initialDialogRect = tester.getRect(dialog);
+    expect(initialDialogRect.height, closeTo(36, 0.1));
+    expect(
+      tester
+          .widget<Opacity>(
+            find.byKey(
+              const ValueKey<String>('downloads_category_launcher_opacity'),
+            ),
+          )
+          .opacity,
+      0,
+    );
+    final initialDialogMaterial = tester.widget<Material>(dialog);
+    expect(initialDialogMaterial.color, launcherDecoration.color);
+
+    await tester.pump(const Duration(milliseconds: 100));
+
+    final movingDialogRect = tester.getRect(dialog);
+    expect(movingDialogRect.height, greaterThan(initialDialogRect.height));
+    expect(movingDialogRect.height, lessThan(420));
+    expect(movingDialogRect.top, greaterThan(initialDialogRect.top));
+    expect(movingDialogRect.width, closeTo(initialDialogRect.width, 0.1));
+
+    await tester.pumpAndSettle();
+
+    expect(tester.getSize(dialog).height, closeTo(420, 0.1));
+    expect(find.text('Switch group'), findsOneWidget);
+    expect(find.text('Default group (1)'), findsWidgets);
+    expect(find.byIcon(Icons.create_new_folder_outlined), findsOneWidget);
+    expect(find.byIcon(Icons.check_rounded), findsNothing);
+    expect(find.byIcon(Icons.keyboard_arrow_down_rounded), findsNothing);
+
+    await tester.tapAt(const Offset(4, 4));
+    await tester.pump();
+    expect(
+      tester
+          .widget<Opacity>(
+            find.byKey(
+              const ValueKey<String>('downloads_category_launcher_opacity'),
+            ),
+          )
+          .opacity,
+      0,
+    );
+
+    await tester.pump(const Duration(milliseconds: 420));
+
+    expect(
+      tester
+          .widget<Opacity>(
+            find.byKey(
+              const ValueKey<String>('downloads_category_launcher_opacity'),
+            ),
+          )
+          .opacity,
+      0,
+    );
+
+    await tester.pump();
+
+    expect(dialog, findsOneWidget);
+    expect(
+      tester
+          .widget<Opacity>(
+            find.byKey(
+              const ValueKey<String>('downloads_category_launcher_opacity'),
+            ),
+          )
+          .opacity,
+      0,
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(dialog, findsNothing);
+    expect(
+      tester
+          .widget<Opacity>(
+            find.byKey(
+              const ValueKey<String>('downloads_category_launcher_opacity'),
+            ),
+          )
+          .opacity,
+      1,
+    );
+  });
+
+  testWidgets('category launcher visibly bounces after returning', (
+    tester,
+  ) async {
+    var visible = true;
+    var landingVersion = 0;
+    late StateSetter updateLauncher;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: StatefulBuilder(
+            builder: (context, setState) {
+              updateLauncher = setState;
+              return DownloadsCategoryMorphLauncher(
+                visible: visible,
+                landingVersion: landingVersion,
+                label: 'Default group',
+                comicCount: 1,
+                onPressed: () {},
+              );
+            },
+          ),
+        ),
+      ),
+    );
+
+    updateLauncher(() {
+      visible = false;
+    });
+    await tester.pump();
+    updateLauncher(() {
+      visible = true;
+      landingVersion++;
+    });
+    await tester.pump();
+
+    final landing = find.byKey(
+      const ValueKey<String>('downloads_category_launcher_landing'),
+    );
+    expect(
+      tester.widget<Transform>(landing).transform.getTranslation().y,
+      closeTo(-3, 0.1),
+    );
+
+    await tester.pump(const Duration(milliseconds: 150));
+
+    expect(
+      tester.widget<Transform>(landing).transform.getTranslation().y,
+      isNot(closeTo(0, 0.1)),
+    );
+
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.widget<Transform>(landing).transform.getTranslation().y,
+      closeTo(0, 0.1),
+    );
+  });
+
+  testWidgets('category dialog creates and deletes non-default groups', (
+    tester,
+  ) async {
+    final deleted = <String>[];
+    await tester.pumpWidget(
+      _wrapTab(onDeleteGroup: (groupId) async => deleted.add(groupId)),
+    );
+
+    await tester.tap(
+      find.byKey(const ValueKey<String>('downloads_category_launcher')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byIcon(Icons.create_new_folder_outlined));
+    await tester.pumpAndSettle();
+    expect(find.text('Enter a group name'), findsOneWidget);
+    final createButton = tester.widget<FilledButton>(
+      find.widgetWithText(FilledButton, 'Create'),
+    );
+    expect(createButton.onPressed, isNull);
+    await tester.enterText(find.byType(TextField), 'Favorites');
+    await tester.pump();
+    await tester.tap(find.text('Create'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Favorites (0)'), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.delete_outline));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete'));
+    await tester.pumpAndSettle();
+
+    expect(deleted, ['new-group']);
+    expect(find.text('Favorites (0)'), findsNothing);
+  });
+
+  testWidgets('category dialog renames custom groups with validation', (
+    tester,
+  ) async {
+    final renamed = <String>[];
+    await tester.pumpWidget(
+      _wrapTab(
+        groups: const [_defaultGroup, _firstGroup],
+        onRenameGroup: (groupId, name) async {
+          renamed.add('$groupId:$name');
+          return DownloadGroup(id: groupId, name: name, createdAtMs: 1);
+        },
+      ),
+    );
+
+    await tester.tap(
+      find.byKey(const ValueKey<String>('downloads_category_launcher')),
+    );
+    await tester.pumpAndSettle();
+    final defaultGroupBackground = find.byKey(
+      const ValueKey<String>(
+        'download_group_background_${DownloadGroupsService.defaultGroupId}',
+      ),
+    );
+    expect(
+      tester
+          .widget<InkWell>(
+            find.descendant(
+              of: defaultGroupBackground,
+              matching: find.byType(InkWell),
+            ),
+          )
+          .onLongPress,
+      isNull,
+    );
+
+    await tester.longPress(
+      find.byKey(const ValueKey<String>('download_group_background_first')),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey<String>('downloads_rename_group_transition')),
+      findsOneWidget,
+    );
+    await tester.enterText(find.byType(TextField), '');
+    await tester.pump();
+    expect(find.text('Enter a group name'), findsOneWidget);
+    expect(
+      tester
+          .widget<FilledButton>(find.widgetWithText(FilledButton, 'Save'))
+          .onPressed,
+      isNull,
+    );
+    await tester.enterText(find.byType(TextField), 'Renamed');
+    await tester.pump();
+    await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+    await tester.pumpAndSettle();
+
+    expect(renamed, ['first:Renamed']);
+    expect(find.text('Renamed (0)'), findsOneWidget);
+  });
+
+  testWidgets('category dialog reorders custom groups and saves', (
+    tester,
+  ) async {
+    final savedOrders = <List<String>>[];
+    await tester.pumpWidget(
+      _wrapTab(
+        groups: const [_defaultGroup, _firstGroup, _secondGroup],
+        onReorderGroups: (groupIds) async => savedOrders.add(groupIds),
+      ),
+    );
+
+    await tester.tap(
+      find.byKey(const ValueKey<String>('downloads_category_launcher')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey<String>('downloads_group_sort_start')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.byIcon(Icons.delete_outline), findsNothing);
+    expect(find.byIcon(Icons.drag_handle_rounded), findsNWidgets(2));
+    expect(
+      tester
+          .widget<IconButton>(
+            find
+                .ancestor(
+                  of: find.byIcon(Icons.create_new_folder_outlined),
+                  matching: find.byType(IconButton),
+                )
+                .first,
+          )
+          .onPressed,
+      isNull,
+    );
+
+    await tester.drag(
+      find.byType(ReorderableDragStartListener).last,
+      const Offset(0, -120),
+    );
+    await tester.pumpAndSettle();
+    final saveButton = find.byKey(
+      const ValueKey<String>('downloads_group_sort_save'),
+    );
+    final saveButtonRight = tester.getRect(saveButton).right;
+    await tester.tap(saveButton);
+    await tester.pump();
+    expect(
+      tester
+          .getRect(
+            find.byKey(const ValueKey<String>('downloads_group_sort_start')),
+          )
+          .right,
+      closeTo(saveButtonRight, 0.1),
+    );
+    await tester.pumpAndSettle();
+
+    expect(savedOrders, [
+      ['second', 'first'],
+    ]);
+    expect(
+      find.byKey(const ValueKey<String>('downloads_group_sort_start')),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets(
+    'category launcher stays above comics while they scroll underneath',
+    (tester) async {
+      final comics = List<DownloadedMangaComic>.generate(
+        8,
+        (index) => _comicAt(index),
+      );
+      await tester.pumpWidget(_wrapTab(comics: comics));
+
+      final launcher = find.byKey(
+        const ValueKey<String>('downloads_category_launcher'),
+      );
+      final firstComic = find.text('Comic 0');
+      final launcherRect = tester.getRect(launcher);
+
+      await tester.drag(firstComic, const Offset(0, -100));
+      await tester.pumpAndSettle();
+
+      final comicRect = tester.getRect(firstComic);
+      expect(comicRect.top, lessThan(launcherRect.bottom));
+      expect(comicRect.bottom, greaterThan(launcherRect.top));
+
+      await tester.tap(launcher);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey<String>('downloads_category_dialog')),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'back to top button slides in beside scan button after scrolling',
+    (tester) async {
+      final comics = List<DownloadedMangaComic>.generate(
+        18,
+        (index) => _comicAt(index),
+      );
+      await tester.pumpWidget(_wrapTab(comics: comics));
+
+      final backAnimation = find.byKey(
+        const ValueKey<String>('downloads_back_to_top_animation'),
+      );
+      final comicsList = tester.widget<ListView>(
+        find.byKey(const ValueKey<String>('downloaded_comics_list')),
+      );
+      expect(comicsList.clipBehavior, Clip.hardEdge);
+      expect(tester.widget<AnimatedSlide>(backAnimation).offset.dx, 1.5);
+
+      await tester.drag(
+        find.byKey(const ValueKey<String>('downloaded_comics_list')),
+        const Offset(0, -700),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 120));
+
+      expect(tester.widget<AnimatedSlide>(backAnimation).offset, Offset.zero);
+      final scanCenter = tester.getCenter(find.byType(DownloadsScanButton));
+      final backCenter = tester.getCenter(
+        find.byKey(const ValueKey<String>('downloads_back_to_top_button')),
+      );
+      expect(backCenter.dx, greaterThan(scanCenter.dx));
+
+      await tester.tap(
+        find.byKey(const ValueKey<String>('downloads_back_to_top_button')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.widget<AnimatedSlide>(backAnimation).offset.dx, 1.5);
+      expect(find.text('Comic 0'), findsOneWidget);
+    },
+  );
 }
 
 Widget _wrapTab({
+  GlobalKey<NavigatorState>? navigatorKey,
   bool active = true,
   bool selectionMode = false,
   List<DownloadedMangaComic> comics = const [_comic],
+  ValueChanged<DownloadedMangaComic>? onOpenComic,
   ValueChanged<DownloadedMangaComic>? onDeleteComic,
+  Future<void> Function(String groupId)? onDeleteGroup,
+  Future<DownloadGroup> Function(String groupId, String name)? onRenameGroup,
+  Future<void> Function(List<String> orderedGroupIds)? onReorderGroups,
+  List<DownloadGroup> groups = const [_defaultGroup],
 }) {
   return MaterialApp(
+    navigatorKey: navigatorKey,
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     home: Scaffold(
@@ -322,7 +881,12 @@ Widget _wrapTab({
         active: active,
         selectionMode: selectionMode,
         comics: comics,
+        onOpenComic: onOpenComic,
         onDeleteComic: onDeleteComic,
+        onDeleteGroup: onDeleteGroup,
+        onRenameGroup: onRenameGroup,
+        onReorderGroups: onReorderGroups,
+        groups: groups,
       ),
     ),
   );
@@ -349,7 +913,12 @@ Widget _buildTab({
   bool active = true,
   bool selectionMode = false,
   List<DownloadedMangaComic> comics = const [_comic],
+  ValueChanged<DownloadedMangaComic>? onOpenComic,
   ValueChanged<DownloadedMangaComic>? onDeleteComic,
+  Future<void> Function(String groupId)? onDeleteGroup,
+  Future<DownloadGroup> Function(String groupId, String name)? onRenameGroup,
+  Future<void> Function(List<String> orderedGroupIds)? onReorderGroups,
+  List<DownloadGroup> groups = const [_defaultGroup],
 }) {
   return DownloadsCompletedTab(
     comics: comics,
@@ -361,11 +930,47 @@ Widget _buildTab({
     comicsWithIntegrityIssues: const {},
     onToggleSelection: (_) {},
     onDeleteSelected: () {},
+    onBatchGroup: () {},
     onScanDownloaded: () {},
-    onOpenComic: (_) {},
+    onOpenComic: onOpenComic ?? (_) {},
     onDeleteComic: onDeleteComic ?? (_) {},
+    groups: groups,
+    selectedGroupId: DownloadGroupsService.defaultGroupId,
+    selectedGroupName: 'Default group',
+    selectedGroupComicCount: comics.length,
+    groupComicCounts: {DownloadGroupsService.defaultGroupId: comics.length},
+    onSelectGroup: (_) {},
+    onCreateGroup: (name) async =>
+        DownloadGroup(id: 'new-group', name: name, createdAtMs: 1),
+    onRenameGroup:
+        onRenameGroup ??
+        (groupId, name) async =>
+            DownloadGroup(id: groupId, name: name, createdAtMs: 1),
+    onReorderGroups: onReorderGroups ?? (_) async {},
+    onDeleteGroup: onDeleteGroup ?? (_) async {},
+    onShowComicMenu: (_, _, _) async {},
   );
 }
+
+const _defaultGroup = DownloadGroup(
+  id: DownloadGroupsService.defaultGroupId,
+  name: DownloadGroupsService.defaultGroupName,
+  createdAtMs: 0,
+);
+
+const _firstGroup = DownloadGroup(
+  id: 'first',
+  name: 'First',
+  createdAtMs: 1,
+  sortOrder: 1,
+);
+
+const _secondGroup = DownloadGroup(
+  id: 'second',
+  name: 'Second',
+  createdAtMs: 2,
+  sortOrder: 2,
+);
 
 const _comic = DownloadedMangaComic(
   comicId: 'comic-1',
@@ -388,3 +993,16 @@ const _comic2 = DownloadedMangaComic(
   chapters: [],
   updatedAtMillis: 0,
 );
+
+DownloadedMangaComic _comicAt(int index) {
+  return DownloadedMangaComic(
+    comicId: 'comic-$index',
+    title: 'Comic $index',
+    subTitle: 'Subtitle',
+    description: 'Description',
+    coverUrl: '',
+    localCoverPath: null,
+    chapters: const [],
+    updatedAtMillis: index,
+  );
+}

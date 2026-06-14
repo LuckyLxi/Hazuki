@@ -3,7 +3,9 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:hazuki/services/manga_download/manga_download_service.dart';
-import 'package:hazuki/widgets/widgets.dart';
+
+const downloadedCoverPlaceholderAsset =
+    'assets/images/downloaded_cover_placeholder.png';
 
 class DownloadedComicCover extends StatelessWidget {
   const DownloadedComicCover({
@@ -41,21 +43,10 @@ class DownloadedComicCover extends StatelessWidget {
           ),
         );
       } else {
-        child = _buildFallback(context, radius);
+        child = _buildFallback(radius);
       }
-    } else if (comic.coverUrl.trim().isNotEmpty) {
-      child = ClipRRect(
-        borderRadius: radius,
-        child: HazukiCachedImage(
-          url: comic.coverUrl,
-          sourceKey: comic.sourceKey,
-          width: width,
-          height: height,
-          fit: BoxFit.cover,
-        ),
-      );
     } else {
-      child = _buildFallback(context, radius);
+      child = _buildFallback(radius);
     }
     if (heroTag != null) {
       child = Hero(tag: heroTag!, child: child);
@@ -66,16 +57,16 @@ class DownloadedComicCover extends StatelessWidget {
     return child;
   }
 
-  Widget _buildFallback(BuildContext context, BorderRadius radius) {
-    return Container(
-      width: width,
-      height: height,
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: radius,
+  Widget _buildFallback(BorderRadius radius) {
+    return ClipRRect(
+      borderRadius: radius,
+      child: Image.asset(
+        downloadedCoverPlaceholderAsset,
+        key: const ValueKey<String>('downloaded_cover_placeholder'),
+        width: width,
+        height: height,
+        fit: BoxFit.cover,
       ),
-      alignment: Alignment.center,
-      child: const Icon(Icons.image_not_supported_outlined),
     );
   }
 }
@@ -93,7 +84,6 @@ class DownloadedComicCoverPreviewPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final localPath = comic.localCoverPath?.trim();
-    final networkUrl = comic.coverUrl.trim();
     final placeholderColor = Theme.of(context).brightness == Brightness.dark
         ? Colors.white.withValues(alpha: 0.1)
         : Colors.black.withValues(alpha: 0.06);
@@ -103,27 +93,18 @@ class DownloadedComicCoverPreviewPage extends StatelessWidget {
         localPath.isNotEmpty &&
         File(localPath).existsSync()) {
       imageChild = Image.file(File(localPath), fit: BoxFit.contain);
-    } else if (networkUrl.isNotEmpty) {
-      imageChild = HazukiCachedImage(
-        url: networkUrl,
-        sourceKey: comic.sourceKey,
+    } else {
+      imageChild = Image.asset(
+        downloadedCoverPlaceholderAsset,
+        key: const ValueKey<String>('downloaded_cover_preview_placeholder'),
         fit: BoxFit.contain,
-        loading: Container(width: 220, height: 300, color: placeholderColor),
-        error: Container(
+        errorBuilder: (context, error, stackTrace) => Container(
           width: 220,
           height: 300,
           color: placeholderColor,
           alignment: Alignment.center,
           child: const Icon(Icons.broken_image_outlined),
         ),
-      );
-    } else {
-      imageChild = Container(
-        width: 220,
-        height: 300,
-        color: placeholderColor,
-        alignment: Alignment.center,
-        child: const Icon(Icons.broken_image_outlined),
       );
     }
 
@@ -133,24 +114,37 @@ class DownloadedComicCoverPreviewPage extends StatelessWidget {
       child: SafeArea(
         child: BackdropFilter(
           filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 32),
-              child: Hero(
-                tag: heroTag,
-                child: Material(
-                  color: Colors.transparent,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(14),
-                    child: InteractiveViewer(
-                      minScale: 1,
-                      maxScale: 4,
-                      child: imageChild,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return InteractiveViewer(
+                key: const ValueKey<String>('downloaded_cover_viewer'),
+                minScale: 1,
+                maxScale: 4,
+                clipBehavior: Clip.none,
+                child: SizedBox(
+                  width: constraints.maxWidth,
+                  height: constraints.maxHeight,
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 32,
+                      ),
+                      child: Hero(
+                        tag: heroTag,
+                        child: Material(
+                          color: Colors.transparent,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(14),
+                            child: imageChild,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
         ),
       ),

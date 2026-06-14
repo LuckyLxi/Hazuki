@@ -156,7 +156,7 @@ class MangaDownloadService extends ChangeNotifier {
     final result = await _recoveryScanner.scanDownloadedFromDisk(rootDir);
     _downloaded
       ..clear()
-      ..addAll(result.comics)
+      ..addAll(_mergeLegacyJmAliases(result.comics))
       ..sort((a, b) => b.updatedAtMillis.compareTo(a.updatedAtMillis));
     await _persistState();
     notifyListeners();
@@ -185,6 +185,13 @@ class MangaDownloadService extends ChangeNotifier {
         return item;
       }
     }
+    if (isHazukiJmSourceKey(sourceKey)) {
+      for (final item in _downloaded) {
+        if (item.sourceKey.isEmpty && item.comicId == comicId) {
+          return item;
+        }
+      }
+    }
     return null;
   }
 
@@ -195,16 +202,50 @@ class MangaDownloadService extends ChangeNotifier {
         return item;
       }
     }
+    final scopedId = SourceScopedComicId.fromStorageKey(storageKey);
+    if (isHazukiJmSourceKey(scopedId.sourceKey)) {
+      for (final item in _downloaded) {
+        if (item.sourceKey.isEmpty && item.comicId == scopedId.comicId) {
+          return item;
+        }
+      }
+    }
     return null;
   }
 
   MangaDownloadTask? taskByComicId(String comicId) {
     for (final item in _tasks) {
-      if (item.comicId == comicId) {
+      if (item.comicId == comicId ||
+          item.storageKey == comicId ||
+          item.downloadDirName == comicId) {
         return item;
       }
     }
     return null;
+  }
+
+  Future<MangaDownloadConflict> checkDownloadConflict({
+    required ComicDetailsData details,
+    required List<MangaChapterDownloadTarget> chapters,
+  }) async {
+    await ensureInitialized();
+    final downloaded = downloadedComicByIdForSource(
+      details.id,
+      sourceKey: details.sourceKey.trim(),
+    );
+    return MangaDownloadConflict(
+      comicTitle: details.title,
+      existingChapters: downloaded == null
+          ? const <MangaChapterDownloadTarget>[]
+          : chapters
+                .where(
+                  (target) => downloaded.chapters.any(
+                    (chapter) =>
+                        _downloadedChapterMatchesTarget(chapter, target),
+                  ),
+                )
+                .toList(growable: false),
+    );
   }
 
   Future<void> enqueueDownload({
@@ -212,6 +253,7 @@ class MangaDownloadService extends ChangeNotifier {
     required String coverUrl,
     required String description,
     required List<MangaChapterDownloadTarget> chapters,
+    bool redownloadExisting = false,
   }) async {
     if (chapters.isEmpty) {
       return;
@@ -219,19 +261,24 @@ class MangaDownloadService extends ChangeNotifier {
 
     await ensureInitialized();
     final sourceKey = details.sourceKey.trim();
+    if (redownloadExisting) {
+      await _removeDownloadedChaptersForRedownload(
+        details: details,
+        chapters: chapters,
+      );
+    }
     final existingDownloaded = downloadedComicByIdForSource(
       details.id,
       sourceKey: sourceKey,
     );
-    final downloadedEpIds = existingDownloaded == null
-        ? <String>{}
-        : existingDownloaded.chapters.map((e) => e.epId).toSet();
-
     final normalizedTargets = <MangaChapterDownloadTarget>[];
     final seen = <String>{};
     for (final target in chapters) {
       if (target.epId.isEmpty ||
-          downloadedEpIds.contains(target.epId) ||
+          (existingDownloaded?.chapters.any(
+                (chapter) => _downloadedChapterMatchesTarget(chapter, target),
+              ) ??
+              false) ||
           !seen.add(target.epId)) {
         continue;
       }
@@ -253,6 +300,14 @@ class MangaDownloadService extends ChangeNotifier {
         ),
       ]..sort((a, b) => a.index.compareTo(b.index));
       _tasks[existingTaskIndex] = task.copyWith(
+        title: details.title,
+        subTitle: details.subTitle,
+        description: description,
+        coverUrl: coverUrl,
+        tags: details.tags,
+        uploader: details.uploader,
+        updateTime: details.updateTime,
+        pageCount: details.pageCount,
         targets: merged,
         status: MangaDownloadTaskStatus.queued,
         clearErrorMessage: true,
@@ -268,6 +323,10 @@ class MangaDownloadService extends ChangeNotifier {
           subTitle: details.subTitle,
           description: description,
           coverUrl: coverUrl,
+          tags: details.tags,
+          uploader: details.uploader,
+          updateTime: details.updateTime,
+          pageCount: details.pageCount,
           targets: normalizedTargets
             ..sort((a, b) => a.index.compareTo(b.index)),
           completedEpIds: <String>{},
@@ -281,6 +340,108 @@ class MangaDownloadService extends ChangeNotifier {
     await _persistState();
     notifyListeners();
     unawaited(_queueExecutor.processQueue());
+  }
+
+  Future<void> _removeDownloadedChaptersForRedownload({
+    required ComicDetailsData details,
+    required List<MangaChapterDownloadTarget> chapters,
+  }) async {
+    final downloaded = downloadedComicByIdForSource(
+      details.id,
+      sourceKey: details.sourceKey.trim(),
+    );
+    if (downloaded == null) {
+      return;
+    }
+
+    final chaptersToRemove = downloaded.chapters
+        .where(
+          (chapter) => chapters.any(
+            (target) => _downloadedChapterMatchesTarget(chapter, target),
+          ),
+        )
+        .toList(growable: false);
+    if (chaptersToRemove.isEmpty) {
+      return;
+    }
+
+    if (!await _ensureAndroidDownloadsAccess()) {
+      throw FileSystemException('Android downloads access not granted');
+    }
+    final rootDir = await _ensureRootDir();
+    final comicDir = Directory('${rootDir.path}/${downloaded.downloadDirName}');
+    final chapterDirectories = <String>{};
+    for (final chapter in chaptersToRemove) {
+      final directory = await _recoveryScanner.resolveChapterDirForEpId(
+        comicDir: comicDir,
+        epId: chapter.epId,
+        targets: chapters,
+        downloadedComic: downloaded,
+      );
+      if (directory != null && _isPathWithin(directory, comicDir)) {
+        chapterDirectories.add(directory.path);
+      }
+    }
+    for (final path in chapterDirectories) {
+      final directory = Directory(path);
+      if (await directory.exists()) {
+        await directory.delete(recursive: true);
+      }
+    }
+
+    final remainingChapters = downloaded.chapters
+        .where(
+          (chapter) => !chapters.any(
+            (target) => _downloadedChapterMatchesTarget(chapter, target),
+          ),
+        )
+        .toList(growable: false);
+    if (remainingChapters.isEmpty) {
+      _downloaded.removeWhere(
+        (comic) => comic.storageKey == downloaded.storageKey,
+      );
+      await _deleteMetadataFiles(comicDir);
+    } else {
+      final updated = downloaded.copyWith(chapters: remainingChapters);
+      _upsertDownloadedComic(updated);
+      await _writeMetadataFile(comicDir, updated);
+    }
+    await _persistState();
+    notifyListeners();
+  }
+
+  bool _downloadedChapterMatchesTarget(
+    DownloadedMangaChapter downloaded,
+    MangaChapterDownloadTarget target,
+  ) {
+    if (downloaded.epId == target.epId) {
+      return true;
+    }
+    return RegExp(r'^local_\d+$').hasMatch(downloaded.epId.trim()) &&
+        downloaded.index == target.index;
+  }
+
+  bool _isPathWithin(Directory child, Directory parent) {
+    String normalize(String path) {
+      final absolute = Directory(path).absolute.path.replaceAll('\\', '/');
+      final trimmed = absolute.endsWith('/')
+          ? absolute.substring(0, absolute.length - 1)
+          : absolute;
+      return Platform.isWindows ? trimmed.toLowerCase() : trimmed;
+    }
+
+    final childPath = normalize(child.path);
+    final parentPath = normalize(parent.path);
+    return childPath.startsWith('$parentPath/');
+  }
+
+  Future<void> _deleteMetadataFiles(Directory comicDir) async {
+    for (final name in const [_metadataFileName, _legacyMetadataFileName]) {
+      final file = File('${comicDir.path}/$name');
+      if (await file.exists()) {
+        await file.delete();
+      }
+    }
   }
 
   Future<void> deleteDownloadedComics(Iterable<String> comicIds) async {
@@ -345,6 +506,46 @@ class MangaDownloadService extends ChangeNotifier {
     unawaited(_queueExecutor.processQueue());
   }
 
+  /// 暂停所有未完成的下载任务
+  Future<void> pauseAllTasks() async {
+    await ensureInitialized();
+    // 找出所有非暂停状态的任务并将其设为暂停
+    bool changed = false;
+    for (int i = 0; i < _tasks.length; i++) {
+      final task = _tasks[i];
+      if (task.status != MangaDownloadTaskStatus.paused) {
+        _tasks[i] = task.copyWith(status: MangaDownloadTaskStatus.paused);
+        changed = true;
+      }
+    }
+    if (!changed) return;
+    await _persistState();
+    notifyListeners();
+  }
+
+  /// 恢复所有已暂停或失败的下载任务
+  Future<void> resumeAllTasks() async {
+    await ensureInitialized();
+    // 找出所有暂停或失败状态的任务并将其设为排队等待
+    bool changed = false;
+    for (int i = 0; i < _tasks.length; i++) {
+      final task = _tasks[i];
+      if (task.status == MangaDownloadTaskStatus.paused ||
+          task.status == MangaDownloadTaskStatus.failed) {
+        _tasks[i] = task.copyWith(
+          status: MangaDownloadTaskStatus.queued,
+          clearErrorMessage: true,
+          retryCount: 0,
+        );
+        changed = true;
+      }
+    }
+    if (!changed) return;
+    await _persistState();
+    notifyListeners();
+    unawaited(_queueExecutor.processQueue());
+  }
+
   Future<void> deleteTask(String storageKey) async {
     await ensureInitialized();
     final index = _tasks.indexWhere((item) => item.storageKey == storageKey);
@@ -394,7 +595,7 @@ class MangaDownloadService extends ChangeNotifier {
       if (hasAccess) {
         final rootDir = await _ensureRootDir();
         final result = await _recoveryScanner.scanDownloadedFromDisk(rootDir);
-        _downloaded.addAll(result.comics);
+        _downloaded.addAll(_mergeLegacyJmAliases(result.comics));
         _downloaded.sort(
           (a, b) => b.updatedAtMillis.compareTo(a.updatedAtMillis),
         );
@@ -479,8 +680,66 @@ class MangaDownloadService extends ChangeNotifier {
     }
     _downloaded
       ..clear()
-      ..addAll(sanitized)
+      ..addAll(_mergeLegacyJmAliases(sanitized))
       ..sort((a, b) => b.updatedAtMillis.compareTo(a.updatedAtMillis));
+  }
+
+  List<DownloadedMangaComic> _mergeLegacyJmAliases(
+    Iterable<DownloadedMangaComic> comics,
+  ) {
+    final merged = <DownloadedMangaComic>[];
+    for (final comic in comics) {
+      final aliasIndex = merged.indexWhere(
+        (item) =>
+            item.comicId == comic.comicId &&
+            ((item.sourceKey.isEmpty && isHazukiJmSourceKey(comic.sourceKey)) ||
+                (comic.sourceKey.isEmpty &&
+                    isHazukiJmSourceKey(item.sourceKey))),
+      );
+      if (aliasIndex < 0) {
+        merged.add(comic);
+        continue;
+      }
+      merged[aliasIndex] = _mergeDownloadedComicAliases(
+        merged[aliasIndex],
+        comic,
+      );
+    }
+    return merged;
+  }
+
+  DownloadedMangaComic _mergeDownloadedComicAliases(
+    DownloadedMangaComic first,
+    DownloadedMangaComic second,
+  ) {
+    final scoped = first.sourceKey.isNotEmpty ? first : second;
+    final legacy = identical(scoped, first) ? second : first;
+    final chaptersByIndex = <int, DownloadedMangaChapter>{
+      for (final chapter in legacy.chapters) chapter.index: chapter,
+      for (final chapter in scoped.chapters) chapter.index: chapter,
+    };
+    final chapters = chaptersByIndex.values.toList()
+      ..sort((a, b) => a.index.compareTo(b.index));
+    String preferScoped(String scopedValue, String legacyValue) =>
+        scopedValue.trim().isNotEmpty ? scopedValue : legacyValue;
+
+    return DownloadedMangaComic(
+      comicId: scoped.comicId,
+      sourceKey: scoped.sourceKey,
+      title: preferScoped(scoped.title, legacy.title),
+      subTitle: preferScoped(scoped.subTitle, legacy.subTitle),
+      description: preferScoped(scoped.description, legacy.description),
+      coverUrl: preferScoped(scoped.coverUrl, legacy.coverUrl),
+      tags: scoped.tags.isNotEmpty ? scoped.tags : legacy.tags,
+      uploader: preferScoped(scoped.uploader, legacy.uploader),
+      updateTime: preferScoped(scoped.updateTime, legacy.updateTime),
+      pageCount: preferScoped(scoped.pageCount, legacy.pageCount),
+      localCoverPath: scoped.localCoverPath ?? legacy.localCoverPath,
+      chapters: chapters,
+      updatedAtMillis: scoped.updatedAtMillis > legacy.updatedAtMillis
+          ? scoped.updatedAtMillis
+          : legacy.updatedAtMillis,
+    );
   }
 
   bool _replaceTask(String storageKey, MangaDownloadTask next) {
@@ -579,9 +838,14 @@ class MangaDownloadService extends ChangeNotifier {
   }
 
   void _upsertDownloadedComic(DownloadedMangaComic comic) {
-    final index = _downloaded.indexWhere(
+    var index = _downloaded.indexWhere(
       (item) => item.storageKey == comic.storageKey,
     );
+    if (index < 0 && isHazukiJmSourceKey(comic.sourceKey)) {
+      index = _downloaded.indexWhere(
+        (item) => item.sourceKey.isEmpty && item.comicId == comic.comicId,
+      );
+    }
     if (index >= 0) {
       _downloaded[index] = comic;
     } else {

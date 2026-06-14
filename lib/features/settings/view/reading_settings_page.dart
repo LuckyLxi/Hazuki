@@ -62,6 +62,9 @@ class _ReadingSettingsPageState extends State<ReadingSettingsPage> {
               pageIndicator: _controller.pageIndicator,
               customBrightness: _controller.customBrightness,
               brightnessValue: _controller.brightnessValue,
+              filterEnabled: _controller.filterEnabled,
+              filterColor: _controller.filterColor,
+              filterStrength: _controller.filterStrength,
               sourceImageQuality: _controller.sourceImageQuality,
               onReaderModeChanged: _controller.updateReaderMode,
               onDoublePageModeChanged: _controller.toggleDoublePageMode,
@@ -79,6 +82,11 @@ class _ReadingSettingsPageState extends State<ReadingSettingsPage> {
               onCustomBrightnessChanged: _controller.toggleCustomBrightness,
               onBrightnessChanged: _controller.customBrightness
                   ? _controller.updateBrightness
+                  : null,
+              onFilterEnabledChanged: _controller.toggleFilter,
+              onFilterColorChanged: _controller.updateFilterColor,
+              onFilterStrengthChanged: _controller.filterEnabled
+                  ? _controller.updateFilterStrength
                   : null,
               onCopyMangaImageQualityChanged:
                   _controller.updateCopyMangaImageQuality,

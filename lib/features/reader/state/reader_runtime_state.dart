@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'package:hazuki/features/reader/state/reader_filter_color.dart';
 import 'package:hazuki/features/reader/state/reader_mode.dart';
 import 'package:hazuki/features/reader/state/reader_settings_store.dart';
 
@@ -18,6 +19,9 @@ class ReaderRuntimeState {
   bool keepScreenOn = ReaderSettingsStore.defaultKeepScreenOn;
   bool customBrightness = ReaderSettingsStore.defaultCustomBrightness;
   double brightnessValue = ReaderSettingsStore.defaultBrightnessValue;
+  bool filterEnabled = ReaderSettingsStore.defaultFilterEnabled;
+  ReaderFilterColor filterColor = ReaderSettingsStore.defaultFilterColor;
+  double filterStrength = ReaderSettingsStore.defaultFilterStrength;
   ReaderMode readerMode = ReaderSettingsStore.defaultReaderMode;
   bool doublePageMode = ReaderSettingsStore.defaultDoublePageMode;
   bool tapToTurnPage = ReaderSettingsStore.defaultTapToTurnPage;
@@ -38,6 +42,9 @@ class ReaderRuntimeState {
     customBrightness = settings.customBrightness;
     pageIndicator = settings.pageIndicator;
     brightnessValue = settings.brightnessValue;
+    filterEnabled = settings.filterEnabled;
+    filterColor = settings.filterColor;
+    filterStrength = settings.filterStrength;
     readerMode = settings.readerMode;
     doublePageMode = settings.doublePageMode;
     tapToTurnPage = settings.tapToTurnPage;

@@ -45,6 +45,8 @@ class ReaderPage extends StatefulWidget {
     this.comicTheme,
     this.onFavoriteRequested,
     this.commentsWidgetBuilder,
+    this.offlineMode = false,
+    this.offlineChapters = const <ReaderOfflineChapterData>[],
   });
 
   final String title;
@@ -57,6 +59,8 @@ class ReaderPage extends StatefulWidget {
   final ThemeData? comicTheme;
   final Future<void> Function(BuildContext)? onFavoriteRequested;
   final CommentsWidgetBuilder? commentsWidgetBuilder;
+  final bool offlineMode;
+  final List<ReaderOfflineChapterData> offlineChapters;
 
   @override
   State<ReaderPage> createState() => _ReaderPageState();
@@ -90,6 +94,8 @@ class _ReaderPageState extends State<ReaderPage>
     comicTheme: widget.comicTheme,
     onFavoriteRequested: widget.onFavoriteRequested,
     commentsWidgetBuilder: widget.commentsWidgetBuilder,
+    offlineMode: widget.offlineMode,
+    offlineChapters: widget.offlineChapters,
   );
 
   late final AnimationController _resetAnimController = AnimationController(
@@ -171,6 +177,7 @@ class _ReaderPageState extends State<ReaderPage>
         chapterIndex: widget.chapterIndex,
         widgetImages: widget.images,
         sourceService: sl<HazukiSourceService>(),
+        offlineMode: widget.offlineMode,
       );
   late final ReaderSettingsController _settingsController =
       ReaderSettingsController(
@@ -330,14 +337,17 @@ class _ReaderPageState extends State<ReaderPage>
               onPreviousChapter: () {
                 unawaited(_actionsController.jumpToAdjacentChapter(-1));
               },
-              onFavorite: widget.onFavoriteRequested != null
+              onFavorite:
+                  !widget.offlineMode && widget.onFavoriteRequested != null
                   ? () {
                       unawaited(_actionsController.openFavoriteDialog());
                     }
                   : null,
-              onComments: () {
-                unawaited(_actionsController.openCommentsSheet());
-              },
+              onComments: widget.offlineMode
+                  ? null
+                  : () {
+                      unawaited(_actionsController.openCommentsSheet());
+                    },
               onNextChapter: () {
                 unawaited(_actionsController.jumpToAdjacentChapter(1));
               },
@@ -376,6 +386,27 @@ class _ReaderPageState extends State<ReaderPage>
 
   Widget _wrapImageWidget(Widget imageWidget, String url) {
     Widget result = imageWidget;
+    if (_runtimeState.filterEnabled) {
+      final filterColor = switch (_runtimeState.filterColor) {
+        ReaderFilterColor.yellow => const Color(0xFFFFD54F),
+        ReaderFilterColor.black => Colors.black,
+      };
+      result = Stack(
+        fit: StackFit.passthrough,
+        children: [
+          result,
+          Positioned.fill(
+            child: IgnorePointer(
+              child: ColoredBox(
+                color: filterColor.withValues(
+                  alpha: _runtimeState.filterStrength,
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
     if (_runtimeState.longPressToSave) {
       result = GestureDetector(
         onLongPress: () => _showSaveImageDialog(url),
@@ -397,6 +428,8 @@ class _ReaderPageState extends State<ReaderPage>
       comicTheme: pageContext.comicTheme,
       onFavoriteRequested: pageContext.onFavoriteRequested,
       commentsWidgetBuilder: pageContext.commentsWidgetBuilder,
+      offlineMode: pageContext.offlineMode,
+      offlineChapters: pageContext.offlineChapters,
     );
   }
 
@@ -423,6 +456,14 @@ class _ReaderPageState extends State<ReaderPage>
           : null,
       onBrightnessChangeEnd: _runtimeState.customBrightness
           ? _settingsController.handleBrightnessChangeEnd
+          : null,
+      onFilterEnabledChanged: _settingsController.toggleFilter,
+      onFilterColorChanged: _settingsController.updateFilterColor,
+      onFilterStrengthChanged: _runtimeState.filterEnabled
+          ? _settingsController.updateFilterStrength
+          : null,
+      onFilterStrengthChangeEnd: _runtimeState.filterEnabled
+          ? _settingsController.handleFilterStrengthChangeEnd
           : null,
       sourceImageQuality: _sourceImageQuality,
       onCopyMangaImageQualityChanged: (value) async {

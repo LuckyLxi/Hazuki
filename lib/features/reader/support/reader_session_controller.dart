@@ -38,6 +38,7 @@ class ReaderSessionController {
     required int chapterIndex,
     required List<String> widgetImages,
     required HazukiSourceService sourceService,
+    bool offlineMode = false,
   }) : _runtimeState = runtimeState,
        _displayBridge = displayBridge,
        _settingsStore = settingsStore,
@@ -60,7 +61,8 @@ class ReaderSessionController {
        _chapterTitle = chapterTitle,
        _chapterIndex = chapterIndex,
        _widgetImages = widgetImages,
-       _sourceService = sourceService;
+       _sourceService = sourceService,
+       _offlineMode = offlineMode;
 
   final ReaderRuntimeState _runtimeState;
   final ReaderDisplayBridge _displayBridge;
@@ -86,6 +88,7 @@ class ReaderSessionController {
   final int _chapterIndex;
   final List<String> _widgetImages;
   final HazukiSourceService _sourceService;
+  final bool _offlineMode;
   Future<void> _displayOperation = Future<void>.value();
   bool _closed = false;
 
@@ -151,6 +154,13 @@ class ReaderSessionController {
     );
     if (initialImages.isNotEmpty) {
       _applyInitialImages(initialImages, trigger: 'constructor_images');
+      return;
+    }
+    if (_offlineMode) {
+      _applyInitialImages(
+        const <String>[],
+        trigger: 'offline_constructor_images',
+      );
       return;
     }
     unawaited(_loadChapterImages(trigger: 'initial_load'));
