@@ -1277,6 +1277,7 @@
   "downloadsBack": "Back",
   "downloadsMoveOrAddAction": "Move / Add",
   "downloadsRemoveFromCurrentGroup": "Remove from this group",
+  "downloadsCannotRemoveOnlyDefaultGroup": "This comic only belongs to the default group and cannot be removed",
   "downloadsConfirmRemoveFromGroup": "Remove the selected comics from {group}?",
   "@downloadsConfirmRemoveFromGroup": {
     "placeholders": {

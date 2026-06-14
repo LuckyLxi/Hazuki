@@ -18,11 +18,11 @@ class ReaderOverlayHost extends StatelessWidget {
     required this.goToPage,
     required this.onBackPressed,
     required this.onOpenSettingsDrawer,
-    required this.onOpenChaptersPanel,
-    required this.onPreviousChapter,
-    required this.onFavorite,
-    required this.onComments,
-    required this.onNextChapter,
+    this.onOpenChaptersPanel,
+    this.onPreviousChapter,
+    this.onFavorite,
+    this.onComments,
+    this.onNextChapter,
     required this.onResetZoom,
   });
 
@@ -36,11 +36,11 @@ class ReaderOverlayHost extends StatelessWidget {
   final Future<void> Function(int target) goToPage;
   final VoidCallback onBackPressed;
   final VoidCallback onOpenSettingsDrawer;
-  final Future<void> Function() onOpenChaptersPanel;
-  final VoidCallback onPreviousChapter;
+  final Future<void> Function()? onOpenChaptersPanel;
+  final VoidCallback? onPreviousChapter;
   final VoidCallback? onFavorite;
-  final VoidCallback onComments;
-  final VoidCallback onNextChapter;
+  final VoidCallback? onComments;
+  final VoidCallback? onNextChapter;
   final VoidCallback onResetZoom;
 
   @override

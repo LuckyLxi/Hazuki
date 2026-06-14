@@ -196,6 +196,18 @@ class DownloadsPageController extends ChangeNotifier {
     return removableKeys.length;
   }
 
+  Future<bool> removeComicFromCurrentGroup(DownloadedMangaComic comic) async {
+    final groupId = _selectedGroupId;
+    if (groupId == DownloadGroupsService.defaultGroupId &&
+        _downloadGroupsService.groupIdsForComic(comic.storageKey).length <= 1) {
+      return false;
+    }
+    await _downloadGroupsService.removeComicsFromGroup([
+      comic.storageKey,
+    ], groupId);
+    return true;
+  }
+
   bool selectionModeForTab(int tabIndex) =>
       tabIndex == 1 && (_selectionEnabled || _selectedComicIds.isNotEmpty);
 

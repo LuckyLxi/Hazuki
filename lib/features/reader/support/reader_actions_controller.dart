@@ -53,12 +53,34 @@ class ReaderActionsController {
   Future<ComicDetailsData> loadReaderComicDetails() async {
     final details =
         _chapterDetailsCache ??
-        await _sessionController.loadComicDetails(
-          _pageContext.comicId,
-          sourceKey: _pageContext.sourceKey,
-        );
+        (_pageContext.offlineMode
+            ? _buildOfflineComicDetails()
+            : await _sessionController.loadComicDetails(
+                _pageContext.comicId,
+                sourceKey: _pageContext.sourceKey,
+              ));
     _chapterDetailsCache ??= details;
     return details;
+  }
+
+  ComicDetailsData _buildOfflineComicDetails() {
+    final chapters = [..._pageContext.offlineChapters]
+      ..sort((a, b) => a.index.compareTo(b.index));
+    return ComicDetailsData(
+      id: _pageContext.comicId,
+      sourceKey: _pageContext.sourceKey,
+      title: _pageContext.title,
+      subTitle: '',
+      cover: '',
+      description: '',
+      updateTime: '',
+      likesCount: '',
+      chapters: {for (final chapter in chapters) chapter.epId: chapter.title},
+      tags: const {},
+      recommend: const [],
+      isFavorite: false,
+      subId: '',
+    );
   }
 
   Future<void> openFavoriteDialog() async {
@@ -86,6 +108,9 @@ class ReaderActionsController {
 
   Future<void> openCommentsSheet() async {
     _logEvent('Reader comments sheet requested', source: 'reader_ui');
+    if (_pageContext.offlineMode) {
+      return;
+    }
     try {
       final details = await loadReaderComicDetails();
       if (!_isMounted()) {

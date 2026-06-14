@@ -112,7 +112,56 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(tester.getTopLeft(title).dx, originalLeft);
-    expect(find.byIcon(Icons.circle_outlined), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey<String>('downloaded_selection_indicator')),
+      findsOneWidget,
+    );
+    expect(find.byIcon(Icons.circle_outlined), findsNothing);
+  });
+
+  testWidgets('selection indicator animates in and out with selection mode', (
+    tester,
+  ) async {
+    late StateSetter rebuild;
+    var selectionMode = false;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: StatefulBuilder(
+            builder: (context, setState) {
+              rebuild = setState;
+              return _buildTab(selectionMode: selectionMode);
+            },
+          ),
+        ),
+      ),
+    );
+
+    final visibleIndicator = find.byKey(
+      const ValueKey<String>('downloaded_selection_indicator_visible'),
+    );
+    expect(visibleIndicator, findsNothing);
+
+    rebuild(() => selectionMode = true);
+    await tester.pump();
+    expect(visibleIndicator, findsOneWidget);
+    expect(
+      find.ancestor(
+        of: visibleIndicator,
+        matching: find.byType(SlideTransition),
+      ),
+      findsWidgets,
+    );
+    await tester.pumpAndSettle();
+
+    rebuild(() => selectionMode = false);
+    await tester.pump();
+    expect(visibleIndicator, findsOneWidget);
+    await tester.pumpAndSettle();
+    expect(visibleIndicator, findsNothing);
   });
 
   testWidgets('swiping another comic closes the previously revealed comic', (

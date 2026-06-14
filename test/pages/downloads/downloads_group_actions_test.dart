@@ -52,6 +52,7 @@ void main() {
     );
     expect(menuRect.bottom, closeTo(cardRect.top - 8, 0.1));
     expect(find.text('Move / Add'), findsOneWidget);
+    expect(find.text('Remove from this group'), findsOneWidget);
     expect(find.text('Add to group'), findsNothing);
     expect(find.text('Move to group'), findsNothing);
   });
@@ -120,6 +121,43 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(result, {'a', 'b'});
+  });
+
+  testWidgets('long press menu can remove a comic from the current group', (
+    tester,
+  ) async {
+    DownloadsComicMenuAction? result;
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: Builder(
+              builder: (itemContext) => FilledButton(
+                onPressed: () async {
+                  result = await showDownloadsComicMenu(
+                    context: context,
+                    itemContext: itemContext,
+                    globalPosition: const Offset(200, 200),
+                  );
+                },
+                child: const Text('Open menu'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open menu'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Remove from this group'), findsOneWidget);
+    await tester.tap(find.text('Remove from this group'));
+    await tester.pumpAndSettle();
+
+    expect(result, DownloadsComicMenuAction.removeFromCurrentGroup);
   });
 
   testWidgets('group picker only warns after saving without a group', (

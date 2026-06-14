@@ -319,6 +319,43 @@ class _DownloadsPageState extends State<DownloadsPage>
                                         );
                                         return;
                                       }
+                                      if (action ==
+                                          DownloadsComicMenuAction
+                                              .removeFromCurrentGroup) {
+                                        final selectedGroup =
+                                            _controller.selectedGroup;
+                                        final removed = await _controller
+                                            .removeComicFromCurrentGroup(comic);
+                                        if (!context.mounted) {
+                                          return;
+                                        }
+                                        if (!removed) {
+                                          unawaited(
+                                            showHazukiPrompt(
+                                              context,
+                                              l10n(
+                                                context,
+                                              ).downloadsCannotRemoveOnlyDefaultGroup,
+                                            ),
+                                          );
+                                          return;
+                                        }
+                                        unawaited(
+                                          showHazukiPrompt(
+                                            context,
+                                            l10n(
+                                              context,
+                                            ).downloadsComicRemovedFromGroup(
+                                              selectedGroup.isDefault
+                                                  ? l10n(
+                                                      context,
+                                                    ).downloadsDefaultGroup
+                                                  : selectedGroup.name,
+                                            ),
+                                          ),
+                                        );
+                                        return;
+                                      }
                                       final selectedGroupIds =
                                           await showDownloadGroupPicker(
                                             context: context,

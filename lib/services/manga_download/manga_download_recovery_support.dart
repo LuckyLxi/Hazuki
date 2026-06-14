@@ -155,6 +155,14 @@ class MangaDownloadRecoveryScanner {
   Future<DownloadedMangaComic?> _readComicFromDirectory(
     Directory comicDir,
   ) async {
+    if (_rules.hasActiveTaskForComicDirectory(comicDir)) {
+      _logScan(
+        'Comic directory scan skipped because download is still active',
+        level: 'warning',
+        content: {'comicDir': comicDir.path},
+      );
+      return null;
+    }
     final metadataFile = await _diskSupport.findMetadataFile(comicDir);
     if (metadataFile == null) {
       _logScan(

@@ -345,6 +345,58 @@ void main() {
   });
 
   group('ReaderSessionController', () {
+    testWidgets('offline session never loads an empty chapter from source', (
+      tester,
+    ) async {
+      SharedPreferences.setMockInitialValues({});
+      await tester.pumpWidget(const SizedBox.shrink());
+      final runtimeState = ReaderRuntimeState();
+      final scrollController = ScrollController();
+      final pageController = PageController();
+      final focusNode = FocusNode();
+      final transformationController = TransformationController();
+      var appliedInitialImages = false;
+      var loadChapterImagesCount = 0;
+      final sessionController = ReaderSessionController(
+        runtimeState: runtimeState,
+        displayBridge: ReaderDisplayBridge(onVolumeButtonPressed: (_) async {}),
+        settingsStore: const ReaderSettingsStore(),
+        scrollController: scrollController,
+        pageController: pageController,
+        readerKeyFocusNode: focusNode,
+        zoomController: transformationController,
+        applyInitialImages: (images, {required trigger}) {
+          appliedInitialImages = true;
+          expect(images, isEmpty);
+          expect(trigger, 'offline_constructor_images');
+        },
+        loadChapterImages: ({trigger = 'manual'}) async {
+          loadChapterImagesCount++;
+        },
+        onNoImageModeChanged: () {},
+        isMounted: () => false,
+        updateState: (update) => update(),
+        logEvent: (_, {level = 'info', source = 'reader_ui', content}) {},
+        logPayload: ([extra]) => extra ?? <String, dynamic>{},
+        onScrollPositionChanged: () {},
+        onZoomChanged: () {},
+        comicId: 'comic',
+        epId: 'ep',
+        chapterTitle: 'Chapter 1',
+        chapterIndex: 0,
+        widgetImages: const [],
+        sourceService: sl<HazukiSourceService>(),
+        offlineMode: true,
+      );
+
+      sessionController.initialize();
+
+      expect(appliedInitialImages, isTrue);
+      expect(loadChapterImagesCount, 0);
+
+      sessionController.dispose();
+    });
+
     testWidgets('turning off immersive mode shows system overlays', (
       tester,
     ) async {
@@ -622,7 +674,7 @@ void main() {
   });
 
   group('ReaderPageContext', () {
-    test('copyForChapter preserves callbacks, source, theme, and title', () {
+    test('copyForChapter preserves callbacks and offline chapter data', () {
       Future<void> onFavorite(BuildContext context) async {}
       Widget commentsBuilder({
         required String comicId,
@@ -643,6 +695,15 @@ void main() {
         chapterIndex: 0,
         images: const ['a'],
         sourceKey: 'source',
+        offlineMode: true,
+        offlineChapters: const [
+          ReaderOfflineChapterData(
+            epId: 'ep-2',
+            title: 'Chapter 2',
+            index: 1,
+            images: ['local-image-2'],
+          ),
+        ],
         comicTheme: theme,
         onFavoriteRequested: onFavorite,
         commentsWidgetBuilder: commentsBuilder,
@@ -657,13 +718,15 @@ void main() {
       expect(next.title, 'Hazuki');
       expect(next.comicId, 'comic');
       expect(next.sourceKey, 'source');
+      expect(next.offlineMode, isTrue);
+      expect(next.offlineChapters, hasLength(1));
       expect(next.comicTheme, same(theme));
       expect(next.onFavoriteRequested, same(onFavorite));
       expect(next.commentsWidgetBuilder, same(commentsBuilder));
       expect(next.epId, 'ep-2');
       expect(next.chapterTitle, 'Chapter 2');
       expect(next.chapterIndex, 1);
-      expect(next.images, isEmpty);
+      expect(next.images, ['local-image-2']);
     });
   });
 

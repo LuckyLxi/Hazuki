@@ -18,11 +18,11 @@ class ReaderBottomControls extends StatelessWidget {
     required this.onSliderChangeStart,
     required this.onSliderChanged,
     required this.onSliderChangeEnd,
-    required this.onOpenChaptersPanel,
-    required this.onPreviousChapter,
+    this.onOpenChaptersPanel,
+    this.onPreviousChapter,
     this.onFavorite,
-    required this.onComments,
-    required this.onNextChapter,
+    this.onComments,
+    this.onNextChapter,
     required this.onResetZoom,
     required this.isZoomed,
     required this.previousTooltip,
@@ -43,11 +43,11 @@ class ReaderBottomControls extends StatelessWidget {
   final ValueChanged<double>? onSliderChangeStart;
   final ValueChanged<double>? onSliderChanged;
   final ValueChanged<double>? onSliderChangeEnd;
-  final VoidCallback onOpenChaptersPanel;
-  final VoidCallback onPreviousChapter;
+  final VoidCallback? onOpenChaptersPanel;
+  final VoidCallback? onPreviousChapter;
   final VoidCallback? onFavorite;
-  final VoidCallback onComments;
-  final VoidCallback onNextChapter;
+  final VoidCallback? onComments;
+  final VoidCallback? onNextChapter;
   final VoidCallback onResetZoom;
   final bool isZoomed;
   final String previousTooltip;
@@ -222,17 +222,21 @@ class _ReaderUnifiedControlBar extends StatelessWidget {
   final ValueChanged<double>? onSliderChangeStart;
   final ValueChanged<double>? onSliderChanged;
   final ValueChanged<double>? onSliderChangeEnd;
-  final VoidCallback onPreviousChapter;
-  final VoidCallback onOpenChaptersPanel;
+  final VoidCallback? onPreviousChapter;
+  final VoidCallback? onOpenChaptersPanel;
   final VoidCallback? onFavorite;
-  final VoidCallback onComments;
-  final VoidCallback onNextChapter;
+  final VoidCallback? onComments;
+  final VoidCallback? onNextChapter;
   final VoidCallback onResetZoom;
 
   @override
   Widget build(BuildContext context) {
+    final hasTopActions =
+        onOpenChaptersPanel != null || onFavorite != null || onComments != null;
     return Container(
-      height: ReaderOverlayLayout.bottomControlsHeight,
+      height: hasTopActions
+          ? ReaderOverlayLayout.bottomControlsHeight
+          : ReaderOverlayLayout.bottomControlsButtonSize + 24,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.68),
@@ -242,53 +246,69 @@ class _ReaderUnifiedControlBar extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (hasTopActions)
+            Row(
+              children: [
+                AnimatedSize(
+                  duration: const Duration(milliseconds: 260),
+                  curve: Curves.easeOutCubic,
+                  alignment: Alignment.centerLeft,
+                  child: isZoomed
+                      ? Padding(
+                          padding: const EdgeInsets.only(right: 4),
+                          child: _ReaderResetZoomButton(
+                            label: resetZoomLabel,
+                            onPressed: onResetZoom,
+                            embedded: true,
+                          ),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+                const Spacer(),
+                if (onOpenChaptersPanel != null)
+                  _ReaderBarIconButton(
+                    tooltip: chaptersTooltip,
+                    onPressed: chapterPanelLoading ? null : onOpenChaptersPanel,
+                    loading: chapterPanelLoading,
+                    icon: Icons.menu_book_rounded,
+                  ),
+                if (onOpenChaptersPanel != null && onFavorite != null)
+                  const SizedBox(
+                    width: ReaderOverlayLayout.bottomControlsIconGap,
+                  ),
+                if (onFavorite != null)
+                  _ReaderBarIconButton(
+                    tooltip: favoriteTooltip,
+                    onPressed: onFavorite,
+                    icon: Icons.favorite_border_rounded,
+                  ),
+                if ((onOpenChaptersPanel != null || onFavorite != null) &&
+                    onComments != null)
+                  const SizedBox(
+                    width: ReaderOverlayLayout.bottomControlsIconGap,
+                  ),
+                if (onComments != null)
+                  _ReaderBarIconButton(
+                    tooltip: commentsTooltip,
+                    onPressed: onComments,
+                    icon: Icons.mode_comment_outlined,
+                  ),
+              ],
+            ),
+          if (hasTopActions)
+            const SizedBox(height: ReaderOverlayLayout.bottomControlsRowGap),
           Row(
             children: [
-              AnimatedSize(
-                duration: const Duration(milliseconds: 260),
-                curve: Curves.easeOutCubic,
-                alignment: Alignment.centerLeft,
-                child: isZoomed
-                    ? Padding(
-                        padding: const EdgeInsets.only(right: 4),
-                        child: _ReaderResetZoomButton(
-                          label: resetZoomLabel,
-                          onPressed: onResetZoom,
-                          embedded: true,
-                        ),
-                      )
-                    : const SizedBox.shrink(),
-              ),
-              const Spacer(),
-              _ReaderBarIconButton(
-                tooltip: chaptersTooltip,
-                onPressed: chapterPanelLoading ? null : onOpenChaptersPanel,
-                loading: chapterPanelLoading,
-                icon: Icons.menu_book_rounded,
-              ),
-              const SizedBox(width: ReaderOverlayLayout.bottomControlsIconGap),
-              _ReaderBarIconButton(
-                tooltip: favoriteTooltip,
-                onPressed: onFavorite,
-                icon: Icons.favorite_border_rounded,
-              ),
-              const SizedBox(width: ReaderOverlayLayout.bottomControlsIconGap),
-              _ReaderBarIconButton(
-                tooltip: commentsTooltip,
-                onPressed: onComments,
-                icon: Icons.mode_comment_outlined,
-              ),
-            ],
-          ),
-          const SizedBox(height: ReaderOverlayLayout.bottomControlsRowGap),
-          Row(
-            children: [
-              _ReaderBarIconButton(
-                tooltip: previousTooltip,
-                onPressed: onPreviousChapter,
-                icon: Icons.skip_previous_rounded,
-              ),
-              const SizedBox(width: ReaderOverlayLayout.bottomControlsIconGap),
+              if (onPreviousChapter != null) ...[
+                _ReaderBarIconButton(
+                  tooltip: previousTooltip,
+                  onPressed: onPreviousChapter,
+                  icon: Icons.skip_previous_rounded,
+                ),
+                const SizedBox(
+                  width: ReaderOverlayLayout.bottomControlsIconGap,
+                ),
+              ],
               Expanded(
                 child: _ReaderProgressSlider(
                   readerTheme: readerTheme,
@@ -302,12 +322,16 @@ class _ReaderUnifiedControlBar extends StatelessWidget {
                   onSliderChangeEnd: onSliderChangeEnd,
                 ),
               ),
-              const SizedBox(width: ReaderOverlayLayout.bottomControlsIconGap),
-              _ReaderBarIconButton(
-                tooltip: nextTooltip,
-                onPressed: onNextChapter,
-                icon: Icons.skip_next_rounded,
-              ),
+              if (onNextChapter != null) ...[
+                const SizedBox(
+                  width: ReaderOverlayLayout.bottomControlsIconGap,
+                ),
+                _ReaderBarIconButton(
+                  tooltip: nextTooltip,
+                  onPressed: onNextChapter,
+                  icon: Icons.skip_next_rounded,
+                ),
+              ],
             ],
           ),
         ],

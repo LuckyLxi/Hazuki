@@ -11,6 +11,7 @@ import 'package:hazuki/features/comments/comments.dart';
 import 'package:hazuki/features/home/home.dart';
 import 'package:hazuki/features/home/support/home_profile_actions.dart';
 import 'package:hazuki/features/reader/view/reader_page.dart';
+import 'package:hazuki/features/reader/support/reader_page_context.dart';
 import 'package:hazuki/features/search/search.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
@@ -207,7 +208,19 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
             chapterIndex: chapter.index,
             images: chapter.imagePaths,
             sourceKey: comic.sourceKey,
-            commentsWidgetBuilder: _buildReaderComments,
+            offlineMode: true,
+            offlineChapters: [
+              for (final downloadedChapter in comic.chapters)
+                ReaderOfflineChapterData(
+                  epId: downloadedChapter.epId,
+                  title: resolveHazukiChapterTitle(
+                    context,
+                    downloadedChapter.title,
+                  ),
+                  index: downloadedChapter.index,
+                  images: downloadedChapter.imagePaths,
+                ),
+            ],
           ),
         );
 

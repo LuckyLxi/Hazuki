@@ -274,6 +274,129 @@ void main() {
 
     expect(recovered.sourceKey, 'copy_manga');
   });
+
+  test(
+    'scan skips a source-scoped comic directory while downloading',
+    () async {
+      final root = await Directory.systemTemp.createTemp('hazuki-active-scan-');
+      addTearDown(() async {
+        if (await root.exists()) {
+          await root.delete(recursive: true);
+        }
+      });
+      const task = MangaDownloadTask(
+        comicId: 'comic-id',
+        sourceKey: 'jm',
+        title: 'Hazuki',
+        subTitle: '',
+        description: '',
+        coverUrl: '',
+        targets: [
+          MangaChapterDownloadTarget(
+            epId: 'ep-1',
+            title: 'Chapter 1',
+            index: 0,
+          ),
+          MangaChapterDownloadTarget(
+            epId: 'ep-2',
+            title: 'Chapter 2',
+            index: 1,
+          ),
+        ],
+        completedEpIds: {'ep-1'},
+        status: MangaDownloadTaskStatus.paused,
+        createdAtMillis: 1,
+        updatedAtMillis: 1,
+      );
+      final comicDir = Directory('${root.path}/${task.downloadDirName}');
+      final chapterDir = Directory('${comicDir.path}/MangaChapter001');
+      await chapterDir.create(recursive: true);
+      final image = File('${chapterDir.path}/0001.jpg');
+      await image.writeAsString('image');
+      final partialComic = DownloadedMangaComic(
+        comicId: task.comicId,
+        sourceKey: task.sourceKey,
+        title: task.title,
+        subTitle: '',
+        description: '',
+        coverUrl: '',
+        localCoverPath: null,
+        chapters: [
+          DownloadedMangaChapter(
+            epId: 'ep-1',
+            title: 'Chapter 1',
+            index: 0,
+            imagePaths: [image.path],
+          ),
+        ],
+        updatedAtMillis: 1,
+      );
+      await File(
+        '${comicDir.path}/comic.json',
+      ).writeAsString(jsonEncode(partialComic.toJson()));
+      SharedPreferences.setMockInitialValues({
+        'manga_download_root_path_v1': root.path,
+        'manga_download_service_state_v2': jsonEncode({
+          'tasks': [task.toJson()],
+          'downloaded': const [],
+        }),
+      });
+      final service = MangaDownloadService();
+      addTearDown(service.dispose);
+
+      final result = await service.scanDownloadedComics();
+
+      expect(result.scannedDirectories, 1);
+      expect(result.recoveredComics, 0);
+      expect(service.downloadedComics, isEmpty);
+    },
+  );
+
+  test('integrity check only reports missing chapter images', () async {
+    final root = await Directory.systemTemp.createTemp('hazuki-integrity-');
+    addTearDown(() async {
+      if (await root.exists()) {
+        await root.delete(recursive: true);
+      }
+    });
+    final chapterDir = Directory('${root.path}/jm__comic-id/MangaChapter001');
+    await chapterDir.create(recursive: true);
+    final image = File('${chapterDir.path}/0001.jpg');
+    await image.writeAsString('image');
+    final downloaded = DownloadedMangaComic(
+      comicId: 'comic-id',
+      sourceKey: 'jm',
+      title: 'Hazuki',
+      subTitle: '',
+      description: '',
+      coverUrl: 'https://example.com/cover.jpg',
+      localCoverPath: '${root.path}/jm__comic-id/cover.jpg',
+      chapters: [
+        DownloadedMangaChapter(
+          epId: 'ep-1',
+          title: 'Chapter 1',
+          index: 0,
+          imagePaths: [image.path],
+        ),
+      ],
+      updatedAtMillis: 1,
+    );
+    SharedPreferences.setMockInitialValues({
+      'manga_download_root_path_v1': root.path,
+      'manga_download_service_state_v2': jsonEncode({
+        'tasks': const [],
+        'downloaded': [downloaded.toJson()],
+      }),
+    });
+    final service = MangaDownloadService();
+    addTearDown(service.dispose);
+    await service.ensureInitialized();
+
+    expect(await service.checkDownloadedIntegrity(), isEmpty);
+
+    await image.delete();
+    expect(await service.checkDownloadedIntegrity(), {'jm::comic-id'});
+  });
 }
 
 ComicDetailsData _details({required String sourceKey}) {

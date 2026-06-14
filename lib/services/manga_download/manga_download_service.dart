@@ -215,7 +215,9 @@ class MangaDownloadService extends ChangeNotifier {
 
   MangaDownloadTask? taskByComicId(String comicId) {
     for (final item in _tasks) {
-      if (item.comicId == comicId) {
+      if (item.comicId == comicId ||
+          item.storageKey == comicId ||
+          item.downloadDirName == comicId) {
         return item;
       }
     }

@@ -1277,6 +1277,7 @@
   "downloadsBack": "返回",
   "downloadsMoveOrAddAction": "移动/添加",
   "downloadsRemoveFromCurrentGroup": "移出该组",
+  "downloadsCannotRemoveOnlyDefaultGroup": "该漫画只存在于默认组，无法移出",
   "downloadsConfirmRemoveFromGroup": "确认将所选漫画移出{group}？",
   "@downloadsConfirmRemoveFromGroup": {
     "placeholders": {

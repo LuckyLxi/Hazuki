@@ -6,7 +6,7 @@ import 'package:hazuki/services/download_groups_service.dart';
 import 'package:hazuki/services/manga_download/manga_download_service.dart';
 import '../view/downloads_cover_widgets.dart';
 
-enum DownloadsComicMenuAction { updateGroups, delete }
+enum DownloadsComicMenuAction { updateGroups, removeFromCurrentGroup, delete }
 
 enum DownloadsBulkGroupAction { updateMemberships, removeFromCurrentGroup }
 
@@ -31,7 +31,7 @@ Future<DownloadsComicMenuAction?> showDownloadsComicMenu({
   if (overlay == null || cardBox == null) return null;
 
   const width = 212.0;
-  const height = 126.0;
+  const height = 169.0;
   const gap = 8.0;
   final padding = MediaQuery.paddingOf(context);
   final finger = overlay.globalToLocal(globalPosition);
@@ -103,6 +103,15 @@ Future<DownloadsComicMenuAction?> showDownloadsComicMenu({
                         onTap: () => Navigator.pop(
                           dialogContext,
                           DownloadsComicMenuAction.updateGroups,
+                        ),
+                      ),
+                      Divider(height: 1, color: scheme.outlineVariant),
+                      _MenuItem(
+                        icon: Icons.remove_circle_outline_rounded,
+                        label: strings.downloadsRemoveFromCurrentGroup,
+                        onTap: () => Navigator.pop(
+                          dialogContext,
+                          DownloadsComicMenuAction.removeFromCurrentGroup,
                         ),
                       ),
                       Divider(height: 1, color: scheme.outlineVariant),

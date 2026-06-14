@@ -1663,12 +1663,10 @@ class _DownloadedComicCardContent extends StatelessWidget {
                             ],
                           ),
                         ),
-                        if (selectionMode) ...[
-                          const SizedBox(width: 8),
-                          _DownloadedComicSelectionIndicator(
-                            selected: selected,
-                          ),
-                        ],
+                        _DownloadedComicSelectionSlot(
+                          visible: selectionMode,
+                          selected: selected,
+                        ),
                       ],
                     ),
                   ),
@@ -1884,6 +1882,56 @@ class _IntegrityWarningBanner extends StatelessWidget {
   }
 }
 
+class _DownloadedComicSelectionSlot extends StatelessWidget {
+  const _DownloadedComicSelectionSlot({
+    required this.visible,
+    required this.selected,
+  });
+
+  final bool visible;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSize(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+      alignment: Alignment.centerRight,
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 220),
+        switchInCurve: Curves.easeOutBack,
+        switchOutCurve: Curves.easeInCubic,
+        transitionBuilder: (child, animation) {
+          return FadeTransition(
+            opacity: animation,
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0.45, 0),
+                end: Offset.zero,
+              ).animate(animation),
+              child: ScaleTransition(
+                scale: Tween<double>(begin: 0.78, end: 1).animate(animation),
+                child: child,
+              ),
+            ),
+          );
+        },
+        child: visible
+            ? Padding(
+                key: const ValueKey<String>(
+                  'downloaded_selection_indicator_visible',
+                ),
+                padding: const EdgeInsets.only(left: 8),
+                child: _DownloadedComicSelectionIndicator(selected: selected),
+              )
+            : const SizedBox.shrink(
+                key: ValueKey<String>('downloaded_selection_indicator_hidden'),
+              ),
+      ),
+    );
+  }
+}
+
 class _DownloadedComicSelectionIndicator extends StatelessWidget {
   const _DownloadedComicSelectionIndicator({required this.selected});
 
@@ -1893,33 +1941,37 @@ class _DownloadedComicSelectionIndicator extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     return SizedBox(
-      width: 48,
-      height: 48,
+      width: 42,
+      height: 42,
       child: Center(
         child: AnimatedContainer(
-          key: ValueKey<bool>(selected),
+          key: const ValueKey<String>('downloaded_selection_indicator'),
           duration: const Duration(milliseconds: 200),
           curve: Curves.easeOutCubic,
-          width: 34,
-          height: 34,
+          width: 30,
+          height: 30,
           decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: selected
-                ? colorScheme.primary.withValues(alpha: 0.16)
-                : colorScheme.surfaceContainerHighest,
+            color: selected ? colorScheme.primary : Colors.transparent,
+            borderRadius: BorderRadius.circular(9),
             border: Border.all(
-              color: selected
-                  ? colorScheme.primary
-                  : colorScheme.outlineVariant,
-              width: selected ? 2 : 1.4,
+              color: selected ? colorScheme.primary : colorScheme.outline,
+              width: selected ? 1 : 1.6,
             ),
           ),
-          child: Icon(
-            selected ? Icons.check_rounded : Icons.circle_outlined,
-            size: selected ? 18 : 20,
-            color: selected
-                ? colorScheme.primary
-                : colorScheme.onSurfaceVariant,
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 160),
+            switchInCurve: Curves.easeOutBack,
+            switchOutCurve: Curves.easeInCubic,
+            child: selected
+                ? Icon(
+                    Icons.check_rounded,
+                    key: const ValueKey<String>('downloaded_selection_check'),
+                    size: 19,
+                    color: colorScheme.onPrimary,
+                  )
+                : const SizedBox.shrink(
+                    key: ValueKey<String>('downloaded_selection_empty'),
+                  ),
           ),
         ),
       ),

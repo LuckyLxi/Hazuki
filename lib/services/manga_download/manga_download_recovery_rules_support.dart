@@ -43,6 +43,10 @@ class MangaDownloadRecoveryRules {
     );
   }
 
+  bool hasActiveTaskForComicDirectory(Directory comicDir) {
+    return _taskByComicId(_baseNameFromPath(comicDir.path)) != null;
+  }
+
   List<DownloadedMangaChapter> mergeRecoveredChapters({
     required List<DownloadedMangaChapter> normalizedChapters,
     required List<DownloadedMangaChapter> scannedChapters,

@@ -140,11 +140,11 @@ Widget buildReaderBottomControls({
   required void Function(double value) maybeTriggerSliderHaptic,
   required void Function(VoidCallback update) updateState,
   required Future<void> Function(int target) goToPage,
-  required Future<void> Function() onOpenChaptersPanel,
-  required VoidCallback onPreviousChapter,
+  Future<void> Function()? onOpenChaptersPanel,
+  VoidCallback? onPreviousChapter,
   VoidCallback? onFavorite,
-  required VoidCallback onComments,
-  required VoidCallback onNextChapter,
+  VoidCallback? onComments,
+  VoidCallback? onNextChapter,
   required VoidCallback onResetZoom,
 }) {
   final maxIndex = math.max(runtimeState.readerSpreadCount - 1, 0);

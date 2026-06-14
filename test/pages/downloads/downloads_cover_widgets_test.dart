@@ -12,7 +12,7 @@ void main() {
   });
 
   group('DownloadedComicCover', () {
-    testWidgets('renders network cover when no local path is provided', (
+    testWidgets('does not load network cover when no local path is provided', (
       tester,
     ) async {
       await tester.pumpWidget(
@@ -26,7 +26,11 @@ void main() {
         ),
       );
 
-      expect(find.byType(HazukiCachedImage), findsOneWidget);
+      expect(find.byType(HazukiCachedImage), findsNothing);
+      expect(
+        find.byKey(const ValueKey<String>('downloaded_cover_placeholder')),
+        findsOneWidget,
+      );
     });
 
     testWidgets(
@@ -41,7 +45,10 @@ void main() {
         );
 
         expect(find.byType(HazukiCachedImage), findsNothing);
-        expect(find.byIcon(Icons.image_not_supported_outlined), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey<String>('downloaded_cover_placeholder')),
+          findsOneWidget,
+        );
       },
     );
 
@@ -67,7 +74,7 @@ void main() {
   });
 
   group('DownloadedComicCoverPreviewPage', () {
-    testWidgets('shows broken image placeholder when cover is unavailable', (
+    testWidgets('shows bundled placeholder when cover is unavailable', (
       tester,
     ) async {
       await tester.pumpWidget(
@@ -80,7 +87,12 @@ void main() {
       );
 
       expect(find.byType(InteractiveViewer), findsOneWidget);
-      expect(find.byIcon(Icons.broken_image_outlined), findsOneWidget);
+      expect(
+        find.byKey(
+          const ValueKey<String>('downloaded_cover_preview_placeholder'),
+        ),
+        findsOneWidget,
+      );
     });
 
     testWidgets('uses the full preview area as the zoom canvas', (
@@ -117,7 +129,9 @@ void main() {
         ),
       );
 
-      final coverFinder = find.byIcon(Icons.broken_image_outlined);
+      final coverFinder = find.byKey(
+        const ValueKey<String>('downloaded_cover_preview_placeholder'),
+      );
       final originalCenter = tester.getCenter(coverFinder);
 
       await tester.drag(coverFinder, const Offset(140, 100));

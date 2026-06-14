@@ -69,6 +69,73 @@ void main() {
     expect(strings.downloadsBatchRemovedFromGroups(3, 2), '已将3部漫画从2个组中移出');
   });
 
+  test('single comic can be removed from the selected custom group', () async {
+    final database = HazukiDatabase.memory();
+    final groups = DownloadGroupsService(database: database);
+    final downloads = MangaDownloadService();
+    final controller = DownloadsPageController(
+      downloadService: downloads,
+      downloadGroupsService: groups,
+    );
+    const comic = DownloadedMangaComic(
+      comicId: 'comic-a',
+      title: 'Comic A',
+      subTitle: '',
+      description: '',
+      coverUrl: '',
+      localCoverPath: null,
+      chapters: [],
+      updatedAtMillis: 0,
+    );
+
+    await groups.initialize([comic.storageKey]);
+    final customGroup = await groups.createGroup('Custom');
+    await groups.moveComicToGroup(comic.storageKey, customGroup.id);
+    controller.selectGroup(customGroup.id);
+
+    expect(await controller.removeComicFromCurrentGroup(comic), isTrue);
+    expect(groups.groupIdsForComic(comic.storageKey), {
+      DownloadGroupsService.defaultGroupId,
+    });
+
+    controller.dispose();
+    downloads.dispose();
+    groups.dispose();
+    await database.close();
+  });
+
+  test('comic only in default group cannot be removed from it', () async {
+    final database = HazukiDatabase.memory();
+    final groups = DownloadGroupsService(database: database);
+    final downloads = MangaDownloadService();
+    final controller = DownloadsPageController(
+      downloadService: downloads,
+      downloadGroupsService: groups,
+    );
+    const comic = DownloadedMangaComic(
+      comicId: 'comic-a',
+      title: 'Comic A',
+      subTitle: '',
+      description: '',
+      coverUrl: '',
+      localCoverPath: null,
+      chapters: [],
+      updatedAtMillis: 0,
+    );
+
+    await groups.initialize([comic.storageKey]);
+
+    expect(await controller.removeComicFromCurrentGroup(comic), isFalse);
+    expect(groups.groupIdsForComic(comic.storageKey), {
+      DownloadGroupsService.defaultGroupId,
+    });
+
+    controller.dispose();
+    downloads.dispose();
+    groups.dispose();
+    await database.close();
+  });
+
   test(
     'batch group update preserves untouched per-comic memberships',
     () async {
