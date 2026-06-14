@@ -300,6 +300,14 @@ class MangaDownloadService extends ChangeNotifier {
         ),
       ]..sort((a, b) => a.index.compareTo(b.index));
       _tasks[existingTaskIndex] = task.copyWith(
+        title: details.title,
+        subTitle: details.subTitle,
+        description: description,
+        coverUrl: coverUrl,
+        tags: details.tags,
+        uploader: details.uploader,
+        updateTime: details.updateTime,
+        pageCount: details.pageCount,
         targets: merged,
         status: MangaDownloadTaskStatus.queued,
         clearErrorMessage: true,
@@ -315,6 +323,10 @@ class MangaDownloadService extends ChangeNotifier {
           subTitle: details.subTitle,
           description: description,
           coverUrl: coverUrl,
+          tags: details.tags,
+          uploader: details.uploader,
+          updateTime: details.updateTime,
+          pageCount: details.pageCount,
           targets: normalizedTargets
             ..sort((a, b) => a.index.compareTo(b.index)),
           completedEpIds: <String>{},
@@ -718,6 +730,10 @@ class MangaDownloadService extends ChangeNotifier {
       subTitle: preferScoped(scoped.subTitle, legacy.subTitle),
       description: preferScoped(scoped.description, legacy.description),
       coverUrl: preferScoped(scoped.coverUrl, legacy.coverUrl),
+      tags: scoped.tags.isNotEmpty ? scoped.tags : legacy.tags,
+      uploader: preferScoped(scoped.uploader, legacy.uploader),
+      updateTime: preferScoped(scoped.updateTime, legacy.updateTime),
+      pageCount: preferScoped(scoped.pageCount, legacy.pageCount),
       localCoverPath: scoped.localCoverPath ?? legacy.localCoverPath,
       chapters: chapters,
       updatedAtMillis: scoped.updatedAtMillis > legacy.updatedAtMillis

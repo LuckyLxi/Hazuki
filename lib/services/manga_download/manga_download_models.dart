@@ -57,6 +57,10 @@ class MangaDownloadTask {
     required this.subTitle,
     required this.description,
     required this.coverUrl,
+    this.tags = const <String, List<String>>{},
+    this.uploader = '',
+    this.updateTime = '',
+    this.pageCount = '',
     required this.targets,
     required this.completedEpIds,
     required this.status,
@@ -76,6 +80,10 @@ class MangaDownloadTask {
   final String subTitle;
   final String description;
   final String coverUrl;
+  final Map<String, List<String>> tags;
+  final String uploader;
+  final String updateTime;
+  final String pageCount;
   final List<MangaChapterDownloadTarget> targets;
   final Set<String> completedEpIds;
   final MangaDownloadTaskStatus status;
@@ -109,6 +117,14 @@ class MangaDownloadTask {
   }
 
   MangaDownloadTask copyWith({
+    String? title,
+    String? subTitle,
+    String? description,
+    String? coverUrl,
+    Map<String, List<String>>? tags,
+    String? uploader,
+    String? updateTime,
+    String? pageCount,
     List<MangaChapterDownloadTarget>? targets,
     Set<String>? completedEpIds,
     MangaDownloadTaskStatus? status,
@@ -126,10 +142,14 @@ class MangaDownloadTask {
     return MangaDownloadTask(
       comicId: comicId,
       sourceKey: sourceKey,
-      title: title,
-      subTitle: subTitle,
-      description: description,
-      coverUrl: coverUrl,
+      title: title ?? this.title,
+      subTitle: subTitle ?? this.subTitle,
+      description: description ?? this.description,
+      coverUrl: coverUrl ?? this.coverUrl,
+      tags: sanitizeMangaDownloadTags(tags ?? this.tags),
+      uploader: uploader ?? this.uploader,
+      updateTime: updateTime ?? this.updateTime,
+      pageCount: pageCount ?? this.pageCount,
       targets: targets ?? this.targets,
       completedEpIds: completedEpIds ?? this.completedEpIds,
       status: status ?? this.status,
@@ -157,6 +177,10 @@ class MangaDownloadTask {
     'subTitle': subTitle,
     'description': description,
     'coverUrl': coverUrl,
+    'tags': sanitizeMangaDownloadTags(tags),
+    'uploader': uploader,
+    'updateTime': updateTime,
+    'pageCount': pageCount,
     'targets': targets.map((e) => e.toJson()).toList(),
     'completedEpIds': completedEpIds.toList(),
     'status': status.name,
@@ -201,6 +225,10 @@ class MangaDownloadTask {
       subTitle: (map['subTitle'] ?? '').toString(),
       description: (map['description'] ?? '').toString(),
       coverUrl: (map['coverUrl'] ?? '').toString(),
+      tags: sanitizeMangaDownloadTags(_stringListMapFromJson(map['tags'])),
+      uploader: (map['uploader'] ?? '').toString(),
+      updateTime: (map['updateTime'] ?? '').toString(),
+      pageCount: (map['pageCount'] ?? '').toString(),
       targets: targets,
       completedEpIds: completedEpIds,
       status: _mangaDownloadTaskStatusFromRaw(map['status']?.toString()),
@@ -268,6 +296,10 @@ class DownloadedMangaComic {
     required this.subTitle,
     required this.description,
     required this.coverUrl,
+    this.tags = const <String, List<String>>{},
+    this.uploader = '',
+    this.updateTime = '',
+    this.pageCount = '',
     required this.localCoverPath,
     required this.chapters,
     required this.updatedAtMillis,
@@ -279,6 +311,10 @@ class DownloadedMangaComic {
   final String subTitle;
   final String description;
   final String coverUrl;
+  final Map<String, List<String>> tags;
+  final String uploader;
+  final String updateTime;
+  final String pageCount;
   final String? localCoverPath;
   final List<DownloadedMangaChapter> chapters;
   final int updatedAtMillis;
@@ -293,6 +329,14 @@ class DownloadedMangaComic {
 
   DownloadedMangaComic copyWith({
     String? sourceKey,
+    String? title,
+    String? subTitle,
+    String? description,
+    String? coverUrl,
+    Map<String, List<String>>? tags,
+    String? uploader,
+    String? updateTime,
+    String? pageCount,
     String? localCoverPath,
     List<DownloadedMangaChapter>? chapters,
     int? updatedAtMillis,
@@ -300,13 +344,34 @@ class DownloadedMangaComic {
     return DownloadedMangaComic(
       comicId: comicId,
       sourceKey: sourceKey ?? this.sourceKey,
-      title: title,
-      subTitle: subTitle,
-      description: description,
-      coverUrl: coverUrl,
+      title: title ?? this.title,
+      subTitle: subTitle ?? this.subTitle,
+      description: description ?? this.description,
+      coverUrl: coverUrl ?? this.coverUrl,
+      tags: sanitizeMangaDownloadTags(tags ?? this.tags),
+      uploader: uploader ?? this.uploader,
+      updateTime: updateTime ?? this.updateTime,
+      pageCount: pageCount ?? this.pageCount,
       localCoverPath: localCoverPath ?? this.localCoverPath,
       chapters: chapters ?? this.chapters,
       updatedAtMillis: updatedAtMillis ?? DateTime.now().millisecondsSinceEpoch,
+    );
+  }
+
+  DownloadedMangaComic mergeTaskMetadata(MangaDownloadTask task) {
+    String preferTaskValue(String taskValue, String existingValue) =>
+        taskValue.trim().isNotEmpty ? taskValue : existingValue;
+    final sanitizedTaskTags = sanitizeMangaDownloadTags(task.tags);
+
+    return copyWith(
+      title: preferTaskValue(task.title, title),
+      subTitle: preferTaskValue(task.subTitle, subTitle),
+      description: preferTaskValue(task.description, description),
+      coverUrl: preferTaskValue(task.coverUrl, coverUrl),
+      tags: sanitizedTaskTags.isNotEmpty ? sanitizedTaskTags : tags,
+      uploader: preferTaskValue(task.uploader, uploader),
+      updateTime: preferTaskValue(task.updateTime, updateTime),
+      pageCount: preferTaskValue(task.pageCount, pageCount),
     );
   }
 
@@ -317,6 +382,10 @@ class DownloadedMangaComic {
     'subTitle': subTitle,
     'description': description,
     'coverUrl': coverUrl,
+    'tags': sanitizeMangaDownloadTags(tags),
+    'uploader': uploader,
+    'updateTime': updateTime,
+    'pageCount': pageCount,
     'localCoverPath': localCoverPath,
     'chapters': chapters.map((e) => e.toJson()).toList(),
     'updatedAtMillis': updatedAtMillis,
@@ -342,6 +411,10 @@ class DownloadedMangaComic {
       subTitle: (map['subTitle'] ?? '').toString(),
       description: (map['description'] ?? '').toString(),
       coverUrl: (map['coverUrl'] ?? '').toString(),
+      tags: sanitizeMangaDownloadTags(_stringListMapFromJson(map['tags'])),
+      uploader: (map['uploader'] ?? '').toString(),
+      updateTime: (map['updateTime'] ?? '').toString(),
+      pageCount: (map['pageCount'] ?? '').toString(),
       localCoverPath: map['localCoverPath']?.toString(),
       chapters: chapters,
       updatedAtMillis:
@@ -350,6 +423,64 @@ class DownloadedMangaComic {
     );
   }
 }
+
+Map<String, List<String>> _stringListMapFromJson(Object? raw) {
+  if (raw is! Map) {
+    return const <String, List<String>>{};
+  }
+  final result = <String, List<String>>{};
+  for (final entry in raw.entries) {
+    final key = entry.key.toString().trim();
+    final value = entry.value;
+    if (key.isEmpty || value is! List) {
+      continue;
+    }
+    final values = value
+        .map((item) => item.toString().trim())
+        .where((item) => item.isNotEmpty)
+        .toList(growable: false);
+    if (values.isNotEmpty) {
+      result[key] = values;
+    }
+  }
+  return result;
+}
+
+Map<String, List<String>> sanitizeMangaDownloadTags(
+  Map<String, List<String>> tags,
+) {
+  final result = <String, List<String>>{};
+  for (final entry in tags.entries) {
+    final normalizedKey = entry.key.trim().toLowerCase().replaceAll(
+      RegExp(r'[\s_-]+'),
+      '',
+    );
+    if (_mangaDownloadStatisticTagKeys.contains(normalizedKey)) {
+      continue;
+    }
+    result[entry.key] = entry.value;
+  }
+  return result;
+}
+
+const _mangaDownloadStatisticTagKeys = <String>{
+  'view',
+  'views',
+  'viewcount',
+  '浏览',
+  '浏览量',
+  '觀看',
+  '觀看量',
+  '观看',
+  '观看量',
+  'like',
+  'likes',
+  'likecount',
+  '点赞',
+  '点赞量',
+  '點讚',
+  '點讚量',
+};
 
 class MangaDownloadedScanResult {
   const MangaDownloadedScanResult({

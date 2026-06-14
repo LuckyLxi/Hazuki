@@ -162,6 +162,10 @@ class MangaDownloadQueueExecutor {
             subTitle: task.subTitle,
             description: task.description,
             coverUrl: task.coverUrl,
+            tags: task.tags,
+            uploader: task.uploader,
+            updateTime: task.updateTime,
+            pageCount: task.pageCount,
             localCoverPath: null,
             chapters: const <DownloadedMangaChapter>[],
             updatedAtMillis: DateTime.now().millisecondsSinceEpoch,
@@ -169,6 +173,7 @@ class MangaDownloadQueueExecutor {
       if (downloadedComic.sourceKey.isEmpty && task.sourceKey.isNotEmpty) {
         downloadedComic = downloadedComic.copyWith(sourceKey: task.sourceKey);
       }
+      downloadedComic = downloadedComic.mergeTaskMetadata(task);
 
       final localCoverPath = await _downloadCoverIfNeeded(
         task: task,

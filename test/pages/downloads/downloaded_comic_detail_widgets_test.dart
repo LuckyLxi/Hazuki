@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/downloads/view/downloaded_comic_detail_widgets.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/services/manga_download/manga_download_models.dart';
 
 void main() {
   testWidgets('description over four lines expands fully and collapses', (
@@ -65,6 +66,60 @@ void main() {
       find.byKey(const ValueKey<String>('downloaded_description_toggle')),
       findsNothing,
     );
+  });
+
+  testWidgets('overview and metadata show offline comic details', (
+    tester,
+  ) async {
+    const comic = DownloadedMangaComic(
+      comicId: 'comic-123',
+      sourceKey: 'jm',
+      title: 'Hazuki',
+      subTitle: 'Subtitle',
+      description: '',
+      coverUrl: '',
+      tags: {
+        '作者': ['Author A'],
+        '标签': ['Tag A', 'Tag B'],
+      },
+      uploader: 'Uploader A',
+      updateTime: '2026-06-14',
+      pageCount: '128',
+      localCoverPath: null,
+      chapters: [],
+      updatedAtMillis: 1,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: ListView(
+            children: [
+              DownloadedComicOverviewCard(
+                comic: comic,
+                imageCount: 20,
+                coverHeroTag: 'cover',
+                onCoverTap: () {},
+                onCopyId: () {},
+              ),
+              DownloadedComicMetadata(
+                tags: comic.tags,
+                uploader: comic.uploader,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    expect(find.text('ID: comic-123'), findsOneWidget);
+    expect(find.text('Author A'), findsOneWidget);
+    expect(find.text('Tag A'), findsOneWidget);
+    expect(find.text('Tag B'), findsOneWidget);
+    expect(find.text('Uploader A'), findsOneWidget);
+    expect(find.textContaining('2026-06-14'), findsOneWidget);
   });
 }
 
