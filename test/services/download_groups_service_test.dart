@@ -64,6 +64,21 @@ void main() {
     );
   });
 
+  test('reconcile preserves groups when local downloads are missing', () async {
+    await service.initialize(const ['comic-a']);
+    final group = await service.createGroup('First');
+    await service.moveComicToGroup('comic-a', group.id);
+
+    await service.reconcileDownloadedComics(const []);
+    await service.reconcileDownloadedComics(const ['comic-a']);
+
+    expect(service.comicKeysForGroup(group.id), {'comic-a'});
+    expect(
+      service.comicKeysForGroup(DownloadGroupsService.defaultGroupId),
+      isEmpty,
+    );
+  });
+
   test('move can save multiple selected groups at once', () async {
     await service.initialize(const ['comic-a']);
     final first = await service.createGroup('First');
@@ -182,4 +197,32 @@ void main() {
     remote.dispose();
     await remoteDatabase.close();
   });
+
+  test(
+    'device without local downloads does not sync membership deletion',
+    () async {
+      await service.initialize(const ['comic-a']);
+      final group = await service.createGroup('Synced');
+      await service.moveComicToGroup('comic-a', group.id);
+
+      final remoteDatabase = HazukiDatabase.memory();
+      final remote = DownloadGroupsService(database: remoteDatabase);
+      await remote.importJsonString(
+        await service.exportJsonString(),
+        replace: true,
+      );
+
+      await remote.reconcileDownloadedComics(const []);
+      await service.importJsonString(await remote.exportJsonString());
+
+      expect(service.comicKeysForGroup(group.id), contains('comic-a'));
+      expect(
+        service.comicKeysForGroup(DownloadGroupsService.defaultGroupId),
+        isNot(contains('comic-a')),
+      );
+
+      remote.dispose();
+      await remoteDatabase.close();
+    },
+  );
 }

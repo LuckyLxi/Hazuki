@@ -78,22 +78,8 @@ class DownloadGroupsService extends ChangeNotifier {
       for (final key in keys.difference(knownKeys)) {
         await _putMembership(defaultGroupId, key, now);
       }
-      for (final membership in memberships.where(
-        (item) => !keys.contains(item.comicStorageKey),
-      )) {
-        await _putMembershipTombstone(
-          membership.groupId,
-          membership.comicStorageKey,
-          now,
-        );
-      }
-      if (keys.isEmpty) {
-        await _database.delete(_database.downloadGroupComics).go();
-      } else {
-        await (_database.delete(
-          _database.downloadGroupComics,
-        )..where((row) => row.comicStorageKey.isNotIn(keys))).go();
-      }
+      // Missing local downloads may be remote-only or temporarily unavailable.
+      // Only explicit deletion should remove memberships and create tombstones.
     });
     if (notify) {
       await reload();

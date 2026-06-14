@@ -54,8 +54,16 @@ class DownloadsPageController extends ChangeNotifier {
       createdAtMs: 0,
     ),
   );
-  int comicCountForGroup(String groupId) =>
-      _downloadGroupsService.comicKeysForGroup(groupId).length;
+  int comicCountForGroup(String groupId) {
+    final downloadedKeys = _downloadService.downloadedComics
+        .map((comic) => comic.storageKey)
+        .toSet();
+    return _downloadGroupsService
+        .comicKeysForGroup(groupId)
+        .where(downloadedKeys.contains)
+        .length;
+  }
+
   Set<String> groupIdsForComic(DownloadedMangaComic comic) =>
       _downloadGroupsService.groupIdsForComic(comic.storageKey);
   Map<String, Set<String>> get selectedComicKeysByGroup {

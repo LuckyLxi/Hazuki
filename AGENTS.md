@@ -1,66 +1,36 @@
-# AGENTS.md
+# Repository Guidelines
 
-Compact guidance for future OpenCode sessions in this repository.
+## Project Structure & Module Organization
 
-## Commands
+Hazuki is a Flutter comics application. Application code lives in `lib/`: startup and dependency registration are under `lib/app/`, feature modules under `lib/features/<feature>/`, reusable UI under `lib/widgets/`, services under `lib/services/`, and shared models/helpers under `lib/models/` and `lib/shared/`. Tests mirror this layout in `test/`. Static resources and the JavaScript source bridge live in `assets/`. Platform projects are in `android/`, `windows/`, and the other Flutter platform directories.
 
-```bash
-# First setup / after dependency changes
-flutter pub get
-flutter gen-l10n
+`third_party/flutter_qjs` is a separate Flutter package. Run its dependency, format, analysis, and test commands from that directory when modifying it.
 
-# CI app quality path
-dart format --output=none --set-exit-if-changed lib test
-flutter analyze
-flutter test --coverage --reporter expanded
+## Build, Test, and Development Commands
 
-# Focused test
-flutter test test/path/to/test_file.dart
+- `flutter pub get`: install dependencies.
+- `flutter gen-l10n`: regenerate localization code after editing `lib/l10n/*.arb`.
+- `dart format --output=none --set-exit-if-changed lib test`: verify formatting.
+- `flutter analyze`: run Flutter lints and static analysis.
+- `flutter test --coverage --reporter expanded`: run the full test suite with coverage.
+- `flutter test test/features/search/search_results_controller_test.dart`: run one focused test.
+- `flutter build apk --debug` / `flutter build windows --debug`: perform CI smoke builds.
+- `dart run build_runner build --delete-conflicting-outputs`: regenerate Drift code after database schema changes.
 
-# App smoke builds used by CI
-flutter build apk --debug
-flutter build windows --debug
+## Coding Style & Naming Conventions
 
-# Android release shape used by release CI
-flutter build apk --release --split-per-abi --target-platform android-arm64
+Use Dart's standard two-space formatting and run `dart format` before submitting. Follow `flutter_lints` from `analysis_options.yaml`. Name files in `snake_case.dart`, classes in `UpperCamelCase`, and variables/methods in `lowerCamelCase`. Keep feature-specific view, state, and support code inside its feature directory; place genuinely shared code in `lib/widgets/` or `lib/shared/`.
 
-# Drift codegen when lib/services/storage/hazuki_database.dart changes
-dart run build_runner build --delete-conflicting-outputs
-```
+Do not hand-edit generated localization files or `lib/services/storage/hazuki_database.g.dart`. Preserve local dependency overrides in `third_party/pub_overrides/`.
 
-`third_party/flutter_qjs` is a separate Flutter package with its own `pubspec.yaml`; run its quality checks from that directory: `flutter pub get`, `dart format --output=none --set-exit-if-changed lib test`, `flutter analyze`, `flutter test --reporter expanded`.
+## Testing Guidelines
 
-## Build And Tooling Notes
+Use `flutter_test`; `mocktail` and `HazukiDatabase.memory()` are available for isolated service tests. Name tests `*_test.dart` and mirror the corresponding source path where practical. Add focused controller/service tests for behavior changes and widget smoke tests for new feature entry points. Run format, analysis, and the full test suite before opening a PR.
 
-- CI uses Flutter stable. Android jobs use Java 17 for app quality/CI and Java 21 for debug smoke/release builds.
-- Localization is generated from `lib/l10n/app_en.arb` and `lib/l10n/app_zh.arb`; run `flutter gen-l10n` after ARB changes. Generated `lib/l10n/app_localizations*.dart` files are present in the tree.
-- Drift generates `lib/services/storage/hazuki_database.g.dart` from `lib/services/storage/hazuki_database.dart`; bump migrations/schema deliberately when changing tables.
-- `analysis_options.yaml` excludes `third_party/flutter_qjs/**` and `third_party/pub_overrides/**` from the app analyzer; check `flutter_qjs` separately when touching it.
-- `pubspec.yaml` uses local dependency overrides under `third_party/pub_overrides/`; do not replace them with hosted packages unless the override is intentionally removed.
+## Commit & Pull Request Guidelines
 
-## Architecture
+Recent history follows Conventional Commits, for example `feat(settings): allow selecting update source` and `fix(storage): fix database migration crash`. Keep commits scoped and imperative. PRs should explain the behavior change, list verification commands, link relevant issues, and include screenshots for approved visual changes. Call out migrations, generated files, dependency changes, and platform-specific effects.
 
-- Entry point: `lib/main.dart` calls `bootstrapApp()` in `lib/app/startup/app_bootstrap.dart`, which registers `get_it` services, loads source/runtime preferences, initializes downloads/password-lock/comment filters, then builds `HazukiApp`.
-- App-level services are registered in `lib/app/service_locator.dart` through `sl`; many services still expose or rely on singleton-style access, so keep service registration order in mind during tests/startup changes.
-- Manga content comes from JavaScript source scripts from `venera-configs` (`jm`, `copy_manga`, `picacg`) executed through QuickJS via `flutter_qjs`.
-- `HazukiSourceService` (`lib/services/hazuki_source_service.dart`) owns the source runtime. Closely coupled source capabilities are `part` files under `lib/services/source/`; newer decoupled capabilities live as normal classes under the same tree.
-- `SourceRuntimeCoordinator` (`lib/app/source_runtime/source_runtime_coordinator.dart`) handles first-run source download/load, network recovery, and source update prompts.
-- `assets/init.js` is the JS bridge injected before source scripts; source-runtime changes often need Dart and JS bridge changes together.
-- Persistent app data uses Drift in `HazukiDatabase`; runtime/source preferences and settings use `SharedPreferences`, with keys centralized in `lib/app/app_preferences.dart` and `lib/services/source/common/source_prefs_keys.dart`.
+## Agent-Specific Instructions
 
-## Feature Structure
-
-- Features live under `lib/features/<feature>/` with `view/`, `state/`, and/or `support/` code plus a public barrel such as `features/search/search.dart`.
-- State is plain Flutter: controllers extend `ChangeNotifier`, expose immutable-ish state snapshots, and are consumed with `ListenableBuilder`/`AnimatedBuilder`; no Provider/Riverpod/GetX is used.
-- Main shell is `HazukiHomePage`/`HomeCoordinator`; platform navigation differs: Android uses bottom/drawer-style UI, Windows has sidebar/title-bar adaptations.
-- Shared non-feature UI/helpers belong in `lib/widgets/` or `lib/shared/`; shared models belong in `lib/models/`.
-
-## Testing Conventions
-
-- Tests under `test/` mirror `lib/` where practical. Common patterns are smoke construction tests for feature entry widgets and controller/service unit tests with mocked preferences or in-memory database state.
-- For service tests that touch Drift, prefer `HazukiDatabase.memory()` rather than the real app database.
-
-## Release Notes
-
-- Release workflow requires annotated `v*` tags; tag annotation text becomes GitHub release notes and `update.json` changelog.
-- `update.json` is generated and committed by release CI after tagged releases; avoid hand-editing it unless intentionally overriding release metadata.
+Obtain user approval before modifying UI appearance or animation behavior. Avoid unrelated refactors, and never overwrite existing user changes.
