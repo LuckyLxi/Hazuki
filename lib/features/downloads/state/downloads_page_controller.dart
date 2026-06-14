@@ -284,9 +284,6 @@ class DownloadsPageController extends ChangeNotifier {
     if (confirmed != true) {
       return;
     }
-    for (final key in _selectedComicIds) {
-      await _downloadGroupsService.removeComic(key);
-    }
     await _downloadService.deleteDownloadedComics(_selectedComicIds);
     _clearSelection(notify: true);
   }
@@ -304,7 +301,6 @@ class DownloadsPageController extends ChangeNotifier {
     if (confirmed != true) {
       return;
     }
-    await _downloadGroupsService.removeComic(comic.storageKey);
     await _downloadService.deleteDownloadedComics([comic.storageKey]);
   }
 

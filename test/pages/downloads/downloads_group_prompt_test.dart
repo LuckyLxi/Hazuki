@@ -1,5 +1,7 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/downloads/state/downloads_page_controller.dart';
+import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/l10n/app_localizations_zh.dart';
 import 'package:hazuki/services/download_groups_service.dart';
 import 'package:hazuki/services/manga_download/manga_download_service.dart';
@@ -169,4 +171,67 @@ void main() {
       await database.close();
     },
   );
+
+  testWidgets('deleting a local download preserves synced group memberships', (
+    tester,
+  ) async {
+    final database = HazukiDatabase.memory();
+    final groups = DownloadGroupsService(database: database);
+    final downloads = _DeleteTrackingDownloadService();
+    final controller = DownloadsPageController(
+      downloadService: downloads,
+      downloadGroupsService: groups,
+    );
+    const comic = DownloadedMangaComic(
+      comicId: 'comic-a',
+      title: 'Comic A',
+      subTitle: '',
+      description: '',
+      coverUrl: '',
+      localCoverPath: null,
+      chapters: [],
+      updatedAtMillis: 0,
+    );
+    await groups.initialize([comic.storageKey]);
+    final customGroup = await groups.createGroup('Custom');
+    await groups.moveComicToGroup(comic.storageKey, customGroup.id);
+
+    late BuildContext context;
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Builder(
+          builder: (builderContext) {
+            context = builderContext;
+            return const SizedBox.shrink();
+          },
+        ),
+      ),
+    );
+
+    final deletion = controller.deleteSingleComic(context, comic);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete').last);
+    await tester.pumpAndSettle();
+    await deletion;
+
+    expect(downloads.deletedKeys, {comic.storageKey});
+    expect(groups.groupIdsForComic(comic.storageKey), {customGroup.id});
+
+    controller.dispose();
+    downloads.dispose();
+    groups.dispose();
+    await database.close();
+  });
+}
+
+class _DeleteTrackingDownloadService extends MangaDownloadService {
+  final Set<String> deletedKeys = {};
+
+  @override
+  Future<void> deleteDownloadedComics(Iterable<String> comicIds) async {
+    deletedKeys.addAll(comicIds);
+    notifyListeners();
+  }
 }

@@ -64,6 +64,46 @@ void main() {
     );
   });
 
+  test(
+    'legacy migration merges memberships already on the scoped key',
+    () async {
+      await service.initialize(const ['comic-a', 'jm::comic-a']);
+      final legacyGroup = await service.createGroup('Legacy');
+      final scopedGroup = await service.createGroup('Scoped');
+      await service.moveComicToGroup('comic-a', legacyGroup.id);
+      await service.moveComicToGroup('jm::comic-a', scopedGroup.id);
+
+      await service.reconcileDownloadedComics(
+        const ['jm::comic-a'],
+        migratedComicKeys: const {'comic-a': 'jm::comic-a'},
+      );
+
+      expect(service.groupIdsForComic('jm::comic-a'), {
+        legacyGroup.id,
+        scopedGroup.id,
+      });
+      expect(service.groupIdsForComic('comic-a'), isEmpty);
+    },
+  );
+
+  test('legacy migration respects removals made on the scoped key', () async {
+    await service.initialize(const ['comic-a', 'jm::comic-a']);
+    final group = await service.createGroup('Shared');
+    await service.addComicToGroup('comic-a', group.id);
+    await service.addComicToGroup('jm::comic-a', group.id);
+    await service.removeComicsFromGroup(const ['jm::comic-a'], group.id);
+
+    await service.reconcileDownloadedComics(
+      const ['jm::comic-a'],
+      migratedComicKeys: const {'comic-a': 'jm::comic-a'},
+    );
+
+    expect(service.groupIdsForComic('jm::comic-a'), {
+      DownloadGroupsService.defaultGroupId,
+    });
+    expect(service.groupIdsForComic('comic-a'), isEmpty);
+  });
+
   test('reconcile preserves groups when local downloads are missing', () async {
     await service.initialize(const ['comic-a']);
     final group = await service.createGroup('First');

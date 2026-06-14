@@ -101,11 +101,25 @@ class DownloadGroupsService extends ChangeNotifier {
       if (oldMemberships.isEmpty) {
         continue;
       }
-      await (_database.delete(
-        _database.downloadGroupComics,
-      )..where((row) => row.comicStorageKey.equals(newKey))).go();
       for (final membership in oldMemberships) {
-        await _putMembership(membership.groupId, newKey, membership.addedAtMs);
+        if (await _membershipDeletedAt(membership.groupId, newKey) >=
+            membership.addedAtMs) {
+          continue;
+        }
+        final existing =
+            await (_database.select(_database.downloadGroupComics)..where(
+                  (row) =>
+                      row.groupId.equals(membership.groupId) &
+                      row.comicStorageKey.equals(newKey),
+                ))
+                .getSingleOrNull();
+        if (existing == null || existing.addedAtMs < membership.addedAtMs) {
+          await _putMembership(
+            membership.groupId,
+            newKey,
+            membership.addedAtMs,
+          );
+        }
       }
       await (_database.delete(
         _database.downloadGroupComics,
