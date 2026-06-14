@@ -276,9 +276,14 @@ void main() {
     await tester.tap(partialTile);
     await tester.pump();
     expect(tester.widget<CheckboxListTile>(partialTile).value, isTrue);
+    expect(find.widgetWithText(TextButton, 'View'), findsOneWidget);
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(TextButton, 'View'), findsNothing);
     await tester.tap(partialTile);
     await tester.pump();
     expect(tester.widget<CheckboxListTile>(partialTile).value, isNull);
+    expect(find.widgetWithText(TextButton, 'View'), findsOneWidget);
+    await tester.pumpAndSettle();
 
     await tester.tap(find.widgetWithText(TextButton, 'View'));
     await tester.pump(const Duration(milliseconds: 120));
@@ -295,12 +300,40 @@ void main() {
       ),
       findsOneWidget,
     );
+    expect(find.byType(SegmentedButton<bool>), findsNothing);
+    expect(
+      find.byKey(const ValueKey<String>('downloads_membership_slider')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(
+        const ValueKey<String>('downloads_membership_content_switcher'),
+      ),
+      findsOneWidget,
+    );
     expect(find.byType(DownloadedComicCover), findsOneWidget);
 
     await tester.tap(find.byType(DownloadedComicCover));
     await tester.pump();
+    final dismissingCover = tester.widget<AnimatedOpacity>(
+      find.byKey(const ValueKey<String>('downloads_membership_cover_comic-b')),
+    );
+    expect(dismissingCover.opacity, 0);
+    expect(find.byType(DownloadedComicCover), findsOneWidget);
     await tester.tap(find.text('Joined'));
-    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(
+      tester
+          .widget<AnimatedAlign>(
+            find.byKey(
+              const ValueKey<String>('downloads_membership_slider_thumb'),
+            ),
+          )
+          .alignment,
+      Alignment.centerRight,
+    );
+    expect(find.byType(DownloadedComicCover), findsNWidgets(3));
+    await tester.pumpAndSettle();
     expect(find.byType(DownloadedComicCover), findsNWidgets(2));
     await tester.tap(find.byType(DownloadedComicCover).first);
     await tester.pump();
