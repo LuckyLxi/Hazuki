@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/services/software_update/software_update_service.dart';
 import '../settings_group.dart';
 
 class AdvancedSettingsContent extends StatelessWidget {
@@ -8,11 +9,13 @@ class AdvancedSettingsContent extends StatelessWidget {
     required this.loading,
     required this.noImageMode,
     required this.softwareLogCaptureEnabled,
+    required this.softwareUpdateSource,
     required this.hasCustomEditedSource,
     required this.showCopyMangaSettings,
     required this.logsPageBuilder,
     required this.onToggleNoImageMode,
     required this.onToggleSoftwareLogCaptureEnabled,
+    required this.onSoftwareUpdateSourceChanged,
     required this.onOpenComicSourceEditor,
     required this.onRestoreComicSource,
     required this.onClearCopyMangaDeviceInfo,
@@ -21,11 +24,13 @@ class AdvancedSettingsContent extends StatelessWidget {
   final bool loading;
   final bool noImageMode;
   final bool softwareLogCaptureEnabled;
+  final SoftwareUpdateSource softwareUpdateSource;
   final bool hasCustomEditedSource;
   final bool showCopyMangaSettings;
   final WidgetBuilder logsPageBuilder;
   final ValueChanged<bool> onToggleNoImageMode;
   final ValueChanged<bool> onToggleSoftwareLogCaptureEnabled;
+  final ValueChanged<SoftwareUpdateSource> onSoftwareUpdateSourceChanged;
   final Future<void> Function() onOpenComicSourceEditor;
   final Future<void> Function() onRestoreComicSource;
   final Future<void> Function() onClearCopyMangaDeviceInfo;
@@ -69,6 +74,29 @@ class AdvancedSettingsContent extends StatelessWidget {
               subtitle: Text(strings.advancedSoftwareLogCaptureSubtitle),
               value: softwareLogCaptureEnabled,
               onChanged: onToggleSoftwareLogCaptureEnabled,
+            ),
+            ListTile(
+              leading: const Icon(Icons.system_update_alt_outlined),
+              title: Text(strings.advancedSoftwareUpdateSourceTitle),
+              subtitle: Text(strings.advancedSoftwareUpdateSourceSubtitle),
+              trailing: DropdownButton<SoftwareUpdateSource>(
+                value: softwareUpdateSource,
+                onChanged: (value) {
+                  if (value != null) {
+                    onSoftwareUpdateSourceChanged(value);
+                  }
+                },
+                items: const [
+                  DropdownMenuItem(
+                    value: SoftwareUpdateSource.jsDelivr,
+                    child: Text('jsdelivr'),
+                  ),
+                  DropdownMenuItem(
+                    value: SoftwareUpdateSource.github,
+                    child: Text('GitHub'),
+                  ),
+                ],
+              ),
             ),
             if (showCopyMangaSettings)
               ListTile(

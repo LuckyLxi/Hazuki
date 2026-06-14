@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/software_update/software_update_service.dart';
 import 'package:hazuki/shared/ui_flags.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -26,9 +27,12 @@ class AdvancedSettingsPage extends StatefulWidget {
 
 class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
   final HazukiSourceService _sourceService = sl<HazukiSourceService>();
+  final SoftwareUpdateService _softwareUpdateService =
+      sl<SoftwareUpdateService>();
   bool _noImageMode = false;
   bool _softwareLogCaptureEnabled = false;
   bool _hasCustomEditedSource = false;
+  SoftwareUpdateSource _softwareUpdateSource = SoftwareUpdateSource.jsDelivr;
   bool _loading = true;
 
   @override
@@ -56,6 +60,8 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
         .hasCustomEditedActiveSource();
     final softwareLogCaptureEnabled = await _sourceService
         .loadSoftwareLogCaptureEnabled();
+    final softwareUpdateSource = await _softwareUpdateService
+        .loadUpdateSource();
     if (!mounted) {
       return;
     }
@@ -63,6 +69,7 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
       _noImageMode = prefs.getBool(hazukiNoImageModePreferenceKey) ?? false;
       _softwareLogCaptureEnabled = softwareLogCaptureEnabled;
       _hasCustomEditedSource = hasCustomEditedSource;
+      _softwareUpdateSource = softwareUpdateSource;
       _loading = false;
     });
   }
@@ -75,6 +82,11 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
   Future<void> _toggleSoftwareLogCaptureEnabled(bool value) async {
     setState(() => _softwareLogCaptureEnabled = value);
     await _sourceService.setSoftwareLogCaptureEnabled(value);
+  }
+
+  Future<void> _setSoftwareUpdateSource(SoftwareUpdateSource value) async {
+    setState(() => _softwareUpdateSource = value);
+    await _softwareUpdateService.setUpdateSource(value);
   }
 
   Future<void> _refreshCustomEditedSourceState() async {
@@ -144,11 +156,13 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
           loading: _loading,
           noImageMode: _noImageMode,
           softwareLogCaptureEnabled: _softwareLogCaptureEnabled,
+          softwareUpdateSource: _softwareUpdateSource,
           hasCustomEditedSource: _hasCustomEditedSource,
           showCopyMangaSettings: _sourceService.isActiveCopyMangaSource,
           logsPageBuilder: widget.logsPageBuilder,
           onToggleNoImageMode: _toggleNoImageMode,
           onToggleSoftwareLogCaptureEnabled: _toggleSoftwareLogCaptureEnabled,
+          onSoftwareUpdateSourceChanged: _setSoftwareUpdateSource,
           onOpenComicSourceEditor: _openComicSourceEditor,
           onRestoreComicSource: _restoreComicSource,
           onClearCopyMangaDeviceInfo: _clearCopyMangaDeviceInfo,

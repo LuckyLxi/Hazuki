@@ -1104,6 +1104,8 @@
   "advancedDebugSubtitle": "Error, action, system, and performance logs",
   "advancedSoftwareLogCaptureTitle": "Record software logs",
   "advancedSoftwareLogCaptureSubtitle": "When turned off, error, action, system, and performance logs will no longer be captured",
+  "advancedSoftwareUpdateSourceTitle": "Software update source",
+  "advancedSoftwareUpdateSourceSubtitle": "Select the link used to check for software updates",
   "advancedComicIdSearchTitle": "Comic ID detection",
   "advancedComicIdSearchSubtitle": "Show a tappable hint above the keyboard when a comic ID can be extracted from the search text",
   "labSourceAccountTitle": "Switch Source",

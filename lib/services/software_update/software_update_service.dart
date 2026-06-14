@@ -5,16 +5,35 @@ import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:dio/dio.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../app/app_preferences.dart';
 import '../network/hazuki_network.dart';
 import 'software_update_version_utils.dart';
+
+enum SoftwareUpdateSource {
+  jsDelivr('jsdelivr'),
+  github('github');
+
+  const SoftwareUpdateSource(this.preferenceValue);
+
+  final String preferenceValue;
+
+  static SoftwareUpdateSource fromPreference(String? value) {
+    return SoftwareUpdateSource.values.firstWhere(
+      (source) => source.preferenceValue == value,
+      orElse: () => SoftwareUpdateSource.jsDelivr,
+    );
+  }
+}
 
 class SoftwareUpdateService {
   SoftwareUpdateService();
 
-  static const _updateManifestUrls = [
-    'https://cdn.jsdelivr.net/gh/LuckyLxi/Hazuki@main/update.json',
-  ];
+  static const _jsDelivrUpdateManifestUrl =
+      'https://cdn.jsdelivr.net/gh/LuckyLxi/Hazuki@main/update.json';
+  static const _githubUpdateManifestUrl =
+      'https://raw.githubusercontent.com/LuckyLxi/Hazuki/main/update.json';
 
   static const _latestReleaseUrl =
       'https://api.github.com/repos/LuckyLxi/Hazuki/releases/latest';
@@ -82,14 +101,28 @@ class SoftwareUpdateService {
     );
   }
 
+  Future<SoftwareUpdateSource> loadUpdateSource() async {
+    final prefs = await SharedPreferences.getInstance();
+    return SoftwareUpdateSource.fromPreference(
+      prefs.getString(hazukiSoftwareUpdateSourcePreferenceKey),
+    );
+  }
+
+  Future<void> setUpdateSource(SoftwareUpdateSource source) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      hazukiSoftwareUpdateSourcePreferenceKey,
+      source.preferenceValue,
+    );
+  }
+
   Future<Map<String, dynamic>?> _loadUpdateManifest() async {
-    for (final url in _updateManifestUrls) {
-      final jsonMap = await _getJsonMap(url);
-      if (jsonMap != null) {
-        return jsonMap;
-      }
-    }
-    return null;
+    final source = await loadUpdateSource();
+    final url = switch (source) {
+      SoftwareUpdateSource.jsDelivr => _jsDelivrUpdateManifestUrl,
+      SoftwareUpdateSource.github => _githubUpdateManifestUrl,
+    };
+    return _getJsonMap(url);
   }
 
   Future<Map<String, dynamic>?> _loadLatestReleaseFromGitHubApi() async {
