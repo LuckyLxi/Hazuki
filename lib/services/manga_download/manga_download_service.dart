@@ -224,6 +224,26 @@ class MangaDownloadService extends ChangeNotifier {
     return null;
   }
 
+  Future<MangaDownloadConflict> checkDownloadTaskConflict({
+    required ComicDetailsData details,
+    required List<MangaChapterDownloadTarget> chapters,
+  }) async {
+    await ensureInitialized();
+    final taskIndex = _taskIndexForStorageKey(details.scopedId.storageKey);
+    final task = taskIndex < 0 ? null : _tasks[taskIndex];
+    return MangaDownloadConflict(
+      comicTitle: details.title,
+      existingChapters: task == null
+          ? const <MangaChapterDownloadTarget>[]
+          : chapters
+                .where(
+                  (target) =>
+                      task.targets.any((item) => item.epId == target.epId),
+                )
+                .toList(growable: false),
+    );
+  }
+
   Future<MangaDownloadConflict> checkDownloadConflict({
     required ComicDetailsData details,
     required List<MangaChapterDownloadTarget> chapters,
@@ -248,7 +268,7 @@ class MangaDownloadService extends ChangeNotifier {
     );
   }
 
-  Future<void> enqueueDownload({
+  Future<MangaDownloadEnqueueResult> enqueueDownload({
     required ComicDetailsData details,
     required String coverUrl,
     required String description,
@@ -256,7 +276,7 @@ class MangaDownloadService extends ChangeNotifier {
     bool redownloadExisting = false,
   }) async {
     if (chapters.isEmpty) {
-      return;
+      return MangaDownloadEnqueueResult.nothingToQueue;
     }
 
     await ensureInitialized();
@@ -267,13 +287,25 @@ class MangaDownloadService extends ChangeNotifier {
         chapters: chapters,
       );
     }
+    final existingTaskIndex = _taskIndexForStorageKey(
+      details.scopedId.storageKey,
+    );
+    final existingTask = existingTaskIndex < 0
+        ? null
+        : _tasks[existingTaskIndex];
     final existingDownloaded = downloadedComicByIdForSource(
       details.id,
       sourceKey: sourceKey,
     );
     final normalizedTargets = <MangaChapterDownloadTarget>[];
     final seen = <String>{};
+    var hasQueuedTarget = false;
     for (final target in chapters) {
+      if (existingTask?.targets.any((item) => item.epId == target.epId) ??
+          false) {
+        hasQueuedTarget = true;
+        continue;
+      }
       if (target.epId.isEmpty ||
           (existingDownloaded?.chapters.any(
                 (chapter) => _downloadedChapterMatchesTarget(chapter, target),
@@ -285,21 +317,15 @@ class MangaDownloadService extends ChangeNotifier {
       normalizedTargets.add(target);
     }
     if (normalizedTargets.isEmpty) {
-      return;
+      return hasQueuedTarget
+          ? MangaDownloadEnqueueResult.alreadyQueued
+          : MangaDownloadEnqueueResult.nothingToQueue;
     }
 
-    final existingTaskIndex = _tasks.indexWhere(
-      (task) => task.storageKey == details.scopedId.storageKey,
-    );
-    if (existingTaskIndex >= 0) {
-      final task = _tasks[existingTaskIndex];
-      final merged = <MangaChapterDownloadTarget>[
-        ...task.targets,
-        ...normalizedTargets.where(
-          (target) => !task.targets.any((item) => item.epId == target.epId),
-        ),
-      ]..sort((a, b) => a.index.compareTo(b.index));
-      _tasks[existingTaskIndex] = task.copyWith(
+    if (existingTask != null) {
+      final mergedTargets = [...existingTask.targets, ...normalizedTargets]
+        ..sort((a, b) => a.index.compareTo(b.index));
+      _tasks[existingTaskIndex] = existingTask.copyWith(
         title: details.title,
         subTitle: details.subTitle,
         description: description,
@@ -308,10 +334,15 @@ class MangaDownloadService extends ChangeNotifier {
         uploader: details.uploader,
         updateTime: details.updateTime,
         pageCount: details.pageCount,
-        targets: merged,
-        status: MangaDownloadTaskStatus.queued,
-        clearErrorMessage: true,
-        retryCount: 0,
+        targets: mergedTargets,
+        status: existingTask.status == MangaDownloadTaskStatus.failed
+            ? MangaDownloadTaskStatus.queued
+            : existingTask.status,
+        clearErrorMessage:
+            existingTask.status == MangaDownloadTaskStatus.failed,
+        retryCount: existingTask.status == MangaDownloadTaskStatus.failed
+            ? 0
+            : existingTask.retryCount,
       );
     } else {
       final now = DateTime.now().millisecondsSinceEpoch;
@@ -340,6 +371,7 @@ class MangaDownloadService extends ChangeNotifier {
     await _persistState();
     notifyListeners();
     unawaited(_queueExecutor.processQueue());
+    return MangaDownloadEnqueueResult.queued;
   }
 
   Future<void> _removeDownloadedChaptersForRedownload({
@@ -612,6 +644,7 @@ class MangaDownloadService extends ChangeNotifier {
     _tasks
       ..clear()
       ..addAll(restored.tasks);
+    _sanitizeRestoredTasks();
     _downloaded
       ..clear()
       ..addAll(restored.downloaded);
@@ -684,6 +717,35 @@ class MangaDownloadService extends ChangeNotifier {
       ..sort((a, b) => b.updatedAtMillis.compareTo(a.updatedAtMillis));
   }
 
+  void _sanitizeRestoredTasks() {
+    final tasksByStorageKey = <String, MangaDownloadTask>{};
+    for (final task in _tasks) {
+      final existing = tasksByStorageKey[task.storageKey];
+      if (existing == null) {
+        tasksByStorageKey[task.storageKey] = task;
+        continue;
+      }
+
+      final targetsByEpId = <String, MangaChapterDownloadTarget>{
+        for (final target in existing.targets) target.epId: target,
+        for (final target in task.targets) target.epId: target,
+      };
+      final targets = targetsByEpId.values.toList()
+        ..sort((a, b) => a.index.compareTo(b.index));
+      final latest = task.updatedAtMillis > existing.updatedAtMillis
+          ? task
+          : existing;
+      tasksByStorageKey[task.storageKey] = latest.copyWith(
+        targets: targets,
+        completedEpIds: {...existing.completedEpIds, ...task.completedEpIds},
+      );
+    }
+    _tasks
+      ..clear()
+      ..addAll(tasksByStorageKey.values)
+      ..sort((a, b) => a.createdAtMillis.compareTo(b.createdAtMillis));
+  }
+
   List<DownloadedMangaComic> _mergeLegacyJmAliases(
     Iterable<DownloadedMangaComic> comics,
   ) {
@@ -750,8 +812,22 @@ class MangaDownloadService extends ChangeNotifier {
     if (index < 0) {
       return false;
     }
-    _tasks[index] = next;
+    final current = _tasks[index];
+    final targetsByEpId = <String, MangaChapterDownloadTarget>{
+      for (final target in next.targets) target.epId: target,
+      for (final target in current.targets) target.epId: target,
+    };
+    final targets = targetsByEpId.values.toList()
+      ..sort((a, b) => a.index.compareTo(b.index));
+    _tasks[index] = next.copyWith(
+      targets: targets,
+      completedEpIds: {...current.completedEpIds, ...next.completedEpIds},
+    );
     return true;
+  }
+
+  int _taskIndexForStorageKey(String storageKey) {
+    return _tasks.indexWhere((task) => task.storageKey == storageKey);
   }
 
   bool _removeTaskByComicId(String storageKey) {

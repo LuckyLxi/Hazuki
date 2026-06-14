@@ -154,7 +154,7 @@ class ComicDetailRepository implements FavoriteFoldersRepository {
 
   // ── Downloads ────────────────────────────────────────────────────────────
 
-  Future<void> enqueueDownload({
+  Future<MangaDownloadEnqueueResult> enqueueDownload({
     required ComicDetailsData details,
     required String coverUrl,
     required String description,
@@ -172,6 +172,14 @@ class ComicDetailRepository implements FavoriteFoldersRepository {
     required ComicDetailsData details,
     required List<MangaChapterDownloadTarget> chapters,
   }) => _downloader.checkDownloadConflict(details: details, chapters: chapters);
+
+  Future<MangaDownloadConflict> checkDownloadTaskConflict({
+    required ComicDetailsData details,
+    required List<MangaChapterDownloadTarget> chapters,
+  }) => _downloader.checkDownloadTaskConflict(
+    details: details,
+    chapters: chapters,
+  );
 
   // ── Persistence ──────────────────────────────────────────────────────────
 

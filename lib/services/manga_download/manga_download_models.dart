@@ -2,6 +2,8 @@ import '../../models/hazuki_models.dart';
 
 enum MangaDownloadTaskStatus { queued, downloading, paused, failed }
 
+enum MangaDownloadEnqueueResult { queued, alreadyQueued, nothingToQueue }
+
 MangaDownloadTaskStatus _mangaDownloadTaskStatusFromRaw(String? raw) {
   return switch (raw) {
     'downloading' => MangaDownloadTaskStatus.downloading,

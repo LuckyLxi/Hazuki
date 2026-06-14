@@ -573,6 +573,7 @@
       "count": {}
     }
   },
+  "downloadsAlreadyInQueue": "This comic is already in the download queue",
   "downloadsDownloadChaptersTitle": "Download chapters",
   "downloadsDownloadChaptersSubtitle": "Select the chapters you want to download",
   "downloadsDownloadAction": "Download",

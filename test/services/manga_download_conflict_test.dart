@@ -248,6 +248,285 @@ void main() {
     },
   );
 
+  test('redownload tolerates the existing task being removed', () async {
+    final root = await Directory.systemTemp.createTemp(
+      'hazuki-redownload-task-race-',
+    );
+    addTearDown(() async {
+      if (await root.exists()) {
+        await root.delete(recursive: true);
+      }
+    });
+    const task = MangaDownloadTask(
+      comicId: 'comic-id',
+      sourceKey: 'jm',
+      title: 'Hazuki',
+      subTitle: '',
+      description: '',
+      coverUrl: '',
+      targets: [
+        MangaChapterDownloadTarget(epId: 'ep-0', title: 'Chapter 0', index: 0),
+      ],
+      completedEpIds: {},
+      status: MangaDownloadTaskStatus.paused,
+      createdAtMillis: 1,
+      updatedAtMillis: 1,
+    );
+    final comicDir = Directory('${root.path}/${task.downloadDirName}');
+    final chapterDir = Directory('${comicDir.path}/MangaChapter002');
+    await chapterDir.create(recursive: true);
+    final imagePaths = <String>[];
+    for (var index = 0; index < 100; index++) {
+      final image = File('${chapterDir.path}/$index.jpg');
+      await image.writeAsString('old image');
+      imagePaths.add(image.path);
+    }
+    final downloaded = DownloadedMangaComic(
+      comicId: 'comic-id',
+      sourceKey: 'jm',
+      title: 'Hazuki',
+      subTitle: '',
+      description: '',
+      coverUrl: '',
+      localCoverPath: null,
+      chapters: [
+        DownloadedMangaChapter(
+          epId: 'ep-1',
+          title: 'Chapter 1',
+          index: 1,
+          imagePaths: imagePaths,
+        ),
+      ],
+      updatedAtMillis: 1,
+    );
+    SharedPreferences.setMockInitialValues({
+      'manga_download_root_path_v1': root.path,
+      'manga_download_service_state_v2': jsonEncode({
+        'tasks': [task.toJson()],
+        'downloaded': [downloaded.toJson()],
+      }),
+    });
+    final service = MangaDownloadService();
+    addTearDown(service.dispose);
+    await service.ensureInitialized();
+    service.handleAppLifecycleState(AppLifecycleState.detached);
+
+    final enqueueFuture = service.enqueueDownload(
+      details: _details(sourceKey: 'jm'),
+      coverUrl: '',
+      description: '',
+      chapters: const [
+        MangaChapterDownloadTarget(epId: 'ep-1', title: 'Chapter 1', index: 1),
+      ],
+      redownloadExisting: true,
+    );
+    await Future<void>.delayed(Duration.zero);
+    await service.deleteTask(task.storageKey);
+    final result = await enqueueFuture;
+
+    expect(result, MangaDownloadEnqueueResult.queued);
+    expect(service.tasks, hasLength(1));
+    expect(service.tasks.single.targets.map((target) => target.epId), ['ep-1']);
+  });
+
+  test('enqueue rejects a chapter that is already in download tasks', () async {
+    const existingTask = MangaDownloadTask(
+      comicId: 'comic-id',
+      sourceKey: 'jm',
+      title: 'Hazuki',
+      subTitle: '',
+      description: '',
+      coverUrl: '',
+      targets: [
+        MangaChapterDownloadTarget(epId: 'ep-1', title: 'Chapter 1', index: 0),
+      ],
+      completedEpIds: {},
+      status: MangaDownloadTaskStatus.paused,
+      createdAtMillis: 1,
+      updatedAtMillis: 1,
+    );
+    SharedPreferences.setMockInitialValues({
+      'manga_download_service_state_v2': jsonEncode({
+        'tasks': [existingTask.toJson()],
+        'downloaded': const [],
+      }),
+    });
+    final service = MangaDownloadService();
+    addTearDown(service.dispose);
+
+    final conflict = await service.checkDownloadTaskConflict(
+      details: _details(sourceKey: 'jm'),
+      chapters: const [
+        MangaChapterDownloadTarget(epId: 'ep-1', title: 'Chapter 1', index: 0),
+        MangaChapterDownloadTarget(epId: 'ep-2', title: 'Chapter 2', index: 1),
+      ],
+    );
+    final result = await service.enqueueDownload(
+      details: _details(sourceKey: 'jm'),
+      coverUrl: 'new-cover',
+      description: 'new-description',
+      chapters: const [
+        MangaChapterDownloadTarget(epId: 'ep-1', title: 'Chapter 1', index: 0),
+      ],
+    );
+
+    expect(conflict.existingChapters.map((target) => target.epId), ['ep-1']);
+    expect(result, MangaDownloadEnqueueResult.alreadyQueued);
+    expect(service.tasks, hasLength(1));
+    expect(service.tasks.single.status, MangaDownloadTaskStatus.paused);
+    expect(service.tasks.single.targets.map((target) => target.epId), ['ep-1']);
+    expect(service.tasks.single.coverUrl, isEmpty);
+  });
+
+  test(
+    'enqueue appends a different chapter to the existing comic task',
+    () async {
+      const existingTask = MangaDownloadTask(
+        comicId: 'comic-id',
+        sourceKey: 'jm',
+        title: 'Hazuki',
+        subTitle: '',
+        description: '',
+        coverUrl: '',
+        targets: [
+          MangaChapterDownloadTarget(
+            epId: 'ep-1',
+            title: 'Chapter 1',
+            index: 0,
+          ),
+        ],
+        completedEpIds: {},
+        status: MangaDownloadTaskStatus.paused,
+        createdAtMillis: 1,
+        updatedAtMillis: 1,
+      );
+      SharedPreferences.setMockInitialValues({
+        'manga_download_service_state_v2': jsonEncode({
+          'tasks': [existingTask.toJson()],
+          'downloaded': const [],
+        }),
+      });
+      final service = MangaDownloadService();
+      addTearDown(service.dispose);
+
+      final result = await service.enqueueDownload(
+        details: _details(sourceKey: 'jm'),
+        coverUrl: '',
+        description: '',
+        chapters: const [
+          MangaChapterDownloadTarget(
+            epId: 'ep-2',
+            title: 'Chapter 2',
+            index: 1,
+          ),
+        ],
+      );
+
+      expect(result, MangaDownloadEnqueueResult.queued);
+      expect(service.tasks, hasLength(1));
+      expect(service.tasks.single.status, MangaDownloadTaskStatus.paused);
+      expect(service.tasks.single.targets.map((target) => target.epId), [
+        'ep-1',
+        'ep-2',
+      ]);
+    },
+  );
+
+  test('concurrent enqueue calls create only one task per comic', () async {
+    SharedPreferences.setMockInitialValues({
+      'manga_download_service_state_v2': jsonEncode({
+        'tasks': const [],
+        'downloaded': const [],
+      }),
+    });
+    final service = MangaDownloadService();
+    addTearDown(service.dispose);
+    await service.ensureInitialized();
+    service.handleAppLifecycleState(AppLifecycleState.detached);
+
+    final results = await Future.wait([
+      service.enqueueDownload(
+        details: _details(sourceKey: 'jm'),
+        coverUrl: '',
+        description: '',
+        chapters: const [
+          MangaChapterDownloadTarget(
+            epId: 'ep-1',
+            title: 'Chapter 1',
+            index: 0,
+          ),
+        ],
+      ),
+      service.enqueueDownload(
+        details: _details(sourceKey: 'jm'),
+        coverUrl: '',
+        description: '',
+        chapters: const [
+          MangaChapterDownloadTarget(
+            epId: 'ep-1',
+            title: 'Chapter 1',
+            index: 0,
+          ),
+        ],
+      ),
+    ]);
+
+    expect(results, contains(MangaDownloadEnqueueResult.queued));
+    expect(results, contains(MangaDownloadEnqueueResult.alreadyQueued));
+    expect(service.tasks, hasLength(1));
+    expect(service.tasks.single.targets, hasLength(1));
+  });
+
+  test('restore merges duplicate tasks for the same comic', () async {
+    const firstTask = MangaDownloadTask(
+      comicId: 'comic-id',
+      sourceKey: 'jm',
+      title: 'Hazuki',
+      subTitle: '',
+      description: '',
+      coverUrl: '',
+      targets: [
+        MangaChapterDownloadTarget(epId: 'ep-1', title: 'Chapter 1', index: 0),
+      ],
+      completedEpIds: {'ep-1'},
+      status: MangaDownloadTaskStatus.paused,
+      createdAtMillis: 1,
+      updatedAtMillis: 1,
+    );
+    const secondTask = MangaDownloadTask(
+      comicId: 'comic-id',
+      sourceKey: 'jm',
+      title: 'Hazuki',
+      subTitle: '',
+      description: '',
+      coverUrl: '',
+      targets: [
+        MangaChapterDownloadTarget(epId: 'ep-2', title: 'Chapter 2', index: 1),
+      ],
+      completedEpIds: {},
+      status: MangaDownloadTaskStatus.paused,
+      createdAtMillis: 2,
+      updatedAtMillis: 2,
+    );
+    SharedPreferences.setMockInitialValues({
+      'manga_download_service_state_v2': jsonEncode({
+        'tasks': [firstTask.toJson(), secondTask.toJson()],
+        'downloaded': const [],
+      }),
+    });
+    final service = MangaDownloadService();
+    addTearDown(service.dispose);
+
+    await service.ensureInitialized();
+
+    expect(service.tasks, hasLength(1));
+    expect(service.tasks.single.targets.map((target) => target.epId), [
+      'ep-1',
+      'ep-2',
+    ]);
+    expect(service.tasks.single.completedEpIds, {'ep-1'});
+  });
+
   test('metadata recovery preserves source key', () {
     final rules = MangaDownloadRecoveryRules(
       taskByComicId: (_) => null,

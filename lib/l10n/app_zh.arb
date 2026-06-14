@@ -573,6 +573,7 @@
       "count": {}
     }
   },
+  "downloadsAlreadyInQueue": "该漫画已经在下载任务中",
   "downloadsDownloadChaptersTitle": "下载章节",
   "downloadsDownloadChaptersSubtitle": "选择要下载的章节",
   "downloadsDownloadAction": "下载",

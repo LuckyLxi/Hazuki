@@ -309,6 +309,27 @@ class MangaDownloadQueueExecutor {
         await _flushState();
       }
 
+      final latest = _latestTask(task.storageKey);
+      final hasPendingTargets =
+          latest?.targets.any(
+            (target) => !latest.completedEpIds.contains(target.epId),
+          ) ??
+          false;
+      if (latest != null && hasPendingTargets) {
+        _replaceTask(
+          task.storageKey,
+          latest.copyWith(
+            status: MangaDownloadTaskStatus.queued,
+            clearCurrentChapterEpId: true,
+            clearCurrentChapterTitle: true,
+            currentImageIndex: 0,
+            currentImageTotal: 0,
+          ),
+        );
+        await _flushState();
+        return;
+      }
+
       _removeTaskByComicId(task.storageKey);
       _upsertDownloadedComic(downloadedComic);
       await _writeMetadataFile(comicDir, downloadedComic);

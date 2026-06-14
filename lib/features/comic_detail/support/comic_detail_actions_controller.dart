@@ -434,15 +434,36 @@ class ComicDetailActionsController extends ChangeNotifier {
     if (targets.isEmpty) return;
     var queuedTargets = targets;
     try {
-      final conflict = await _repository.checkDownloadConflict(
+      final taskConflict = await _repository.checkDownloadTaskConflict(
         details: details,
         chapters: targets,
+      );
+      if (_disposed || !context.mounted) return;
+      if (taskConflict.hasConflict) {
+        final queuedEpIds = taskConflict.existingChapters
+            .map((chapter) => chapter.epId)
+            .toSet();
+        queuedTargets = targets
+            .where((chapter) => !queuedEpIds.contains(chapter.epId))
+            .toList(growable: false);
+      }
+      if (queuedTargets.isEmpty) {
+        if (_disposed || !context.mounted) return;
+        unawaited(
+          showHazukiPrompt(context, l10n(context).downloadsAlreadyInQueue),
+        );
+        return;
+      }
+      final downloadConflictTargets = queuedTargets;
+      final conflict = await _repository.checkDownloadConflict(
+        details: details,
+        chapters: downloadConflictTargets,
       );
       if (_disposed || !context.mounted) return;
       var redownloadExisting = false;
       if (conflict.hasConflict) {
         final hasUndownloadedChapters =
-            conflict.existingChapters.length < targets.length;
+            conflict.existingChapters.length < queuedTargets.length;
         if (hasUndownloadedChapters) {
           final action = await showComicDetailSkipDownloadedChaptersDialog(
             context,
@@ -456,7 +477,7 @@ class ComicDetailActionsController extends ChangeNotifier {
             final existingEpIds = conflict.existingChapters
                 .map((chapter) => chapter.epId)
                 .toSet();
-            queuedTargets = targets
+            queuedTargets = queuedTargets
                 .where((chapter) => !existingEpIds.contains(chapter.epId))
                 .toList(growable: false);
           } else {
@@ -465,7 +486,7 @@ class ComicDetailActionsController extends ChangeNotifier {
           }
         }
         if (!hasUndownloadedChapters ||
-            queuedTargets.length == targets.length) {
+            queuedTargets.length == downloadConflictTargets.length) {
           redownloadExisting = await showComicDetailDownloadConflictDialog(
             context,
             conflict: conflict,
@@ -476,7 +497,7 @@ class ComicDetailActionsController extends ChangeNotifier {
           }
         }
       }
-      await _repository.enqueueDownload(
+      final result = await _repository.enqueueDownload(
         details: details,
         coverUrl: details.cover.trim().isNotEmpty
             ? details.cover
@@ -485,6 +506,16 @@ class ComicDetailActionsController extends ChangeNotifier {
         chapters: queuedTargets,
         redownloadExisting: redownloadExisting,
       );
+      if (_disposed || !context.mounted) return;
+      if (result == MangaDownloadEnqueueResult.alreadyQueued) {
+        unawaited(
+          showHazukiPrompt(context, l10n(context).downloadsAlreadyInQueue),
+        );
+        return;
+      }
+      if (result == MangaDownloadEnqueueResult.nothingToQueue) {
+        return;
+      }
     } catch (error) {
       if (_disposed || !context.mounted) return;
       unawaited(
@@ -496,7 +527,7 @@ class ComicDetailActionsController extends ChangeNotifier {
       );
       return;
     }
-    if (_disposed) return;
+    if (_disposed || !context.mounted) return;
     unawaited(
       showHazukiPrompt(
         context,
