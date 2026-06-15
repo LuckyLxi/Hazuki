@@ -54,6 +54,29 @@ void main() {
     expect(tester.testTextInput.isVisible, isFalse);
   });
 
+  testWidgets('search entry page refreshes after external history changes', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues(const {});
+
+    await tester.pumpWidget(
+      _buildTestApp(
+        SearchEntryPage(
+          comicDetailPageBuilder: _comicDetailPageBuilder,
+          comicCoverHeroTagBuilder: _testComicCoverHeroTag,
+          searchPageLoader: _fakeSearchPageLoader,
+        ),
+      ),
+    );
+    await _pumpSearchSettled(tester);
+    expect(find.text('synced-keyword'), findsNothing);
+
+    await sl<SearchHistoryService>().replace(['synced-keyword']);
+    await _pumpSearchSettled(tester);
+
+    expect(find.text('synced-keyword'), findsOneWidget);
+  });
+
   testWidgets('search entry page single tap restores caret focus', (
     tester,
   ) async {

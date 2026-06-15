@@ -34,6 +34,8 @@ class LocalFavoritesService extends ChangeNotifier {
       'local_favorite_folder_tombstones_v1';
   static const String _entryTombstonesKey =
       'local_favorite_entry_tombstones_v1';
+  static const String _comicFolderTombstonesKey =
+      'local_favorite_comic_folder_tombstones_v1';
   static const String _migrationDoneKey = 'local_favorite_drift_migrated_v1';
   static const String _sortOrderKey = 'local_favorite_sort_order_v1';
   static const String _pageModeKey = 'favorite_page_mode_v1';
@@ -78,6 +80,9 @@ class LocalFavoritesService extends ChangeNotifier {
         prefs.getString(_folderTombstonesKey),
       );
       await _importEntryTombstonesString(prefs.getString(_entryTombstonesKey));
+      await _importComicFolderTombstonesString(
+        prefs.getString(_comicFolderTombstonesKey),
+      );
       await prefs.setBool(_migrationDoneKey, true);
     });
     return _migration;
@@ -291,14 +296,24 @@ class LocalFavoritesService extends ChangeNotifier {
       final store = await _loadStore();
       store.folders.add(
         _LocalFavoriteFolderRecord(
-          id: DateTime.now().microsecondsSinceEpoch.toString(),
+          id: _nextFavoriteFolderId(store),
           name: normalizedName,
           sourceKey: sourceKey.trim(),
+          updatedAtMs: DateTime.now().millisecondsSinceEpoch,
         ),
       );
       await _saveStore(store);
       notifyListeners();
     });
+  }
+
+  String _nextFavoriteFolderId(_LocalFavoritesStore store) {
+    var candidate = DateTime.now().microsecondsSinceEpoch;
+    final existingIds = store.folders.map((folder) => folder.id).toSet();
+    while (existingIds.contains(candidate.toString())) {
+      candidate++;
+    }
+    return candidate.toString();
   }
 
   Future<void> renameFavoriteFolder({
@@ -330,6 +345,7 @@ class LocalFavoritesService extends ChangeNotifier {
         id: current.id,
         name: normalizedName,
         sourceKey: current.sourceKey,
+        updatedAtMs: _timestampAfter(current.updatedAtMs),
       );
       await _saveStore(store);
       notifyListeners();
@@ -389,6 +405,14 @@ class LocalFavoritesService extends ChangeNotifier {
       );
 
       if (isAdding) {
+        final storageKey = SourceScopedComicId(
+          sourceKey: normalizedSourceKey,
+          comicId: normalizedComicId,
+        ).storageKey;
+        final savedAtMs = await _nextComicFolderSavedAtMs(
+          storageKey,
+          normalizedFolderId,
+        );
         final record = existingIndex >= 0
             ? store.entries[existingIndex]
             : _LocalFavoriteComicRecord(
@@ -406,17 +430,22 @@ class LocalFavoritesService extends ChangeNotifier {
           ..subTitle = details.subTitle.trim()
           ..cover = details.cover.trim()
           ..updateTime = details.updateTime.trim()
-          ..folderSavedAtMs.putIfAbsent(
-            normalizedFolderId,
-            () => DateTime.now().millisecondsSinceEpoch,
-          );
+          ..folderSavedAtMs.putIfAbsent(normalizedFolderId, () => savedAtMs);
 
         if (existingIndex < 0) {
           store.entries.add(record);
         }
       } else if (existingIndex >= 0) {
         final record = store.entries[existingIndex];
+        final removedSavedAtMs =
+            record.folderSavedAtMs[normalizedFolderId] ?? 0;
         record.folderSavedAtMs.remove(normalizedFolderId);
+        await _appendComicFolderTombstone(
+          normalizedComicId,
+          normalizedFolderId,
+          sourceKey: normalizedSourceKey,
+          afterMs: removedSavedAtMs,
+        );
         if (record.folderSavedAtMs.isEmpty) {
           store.entries.removeAt(existingIndex);
           await _saveStore(store);
@@ -497,6 +526,56 @@ class LocalFavoritesService extends ChangeNotifier {
     await _pruneTombstones();
   }
 
+  Future<void> _appendComicFolderTombstone(
+    String comicId,
+    String folderId, {
+    String sourceKey = '',
+    int afterMs = 0,
+  }) async {
+    final storageKey = SourceScopedComicId(
+      sourceKey: sourceKey.trim(),
+      comicId: comicId,
+    ).storageKey;
+    await _database
+        .into(_database.localFavoriteComicFolderTombstones)
+        .insertOnConflictUpdate(
+          LocalFavoriteComicFolderTombstonesCompanion.insert(
+            comicStorageKey: storageKey,
+            folderId: folderId,
+            deletedAtMs: _timestampAfter(afterMs),
+          ),
+        );
+    await _pruneTombstones();
+  }
+
+  Future<int> _nextComicFolderSavedAtMs(
+    String storageKey,
+    String folderId,
+  ) async {
+    final comicFolderTombstone =
+        await (_database.select(_database.localFavoriteComicFolderTombstones)
+              ..where(
+                (row) =>
+                    row.comicStorageKey.equals(storageKey) &
+                    row.folderId.equals(folderId),
+              ))
+            .getSingleOrNull();
+    final entryTombstone = await (_database.select(
+      _database.localFavoriteEntryTombstones,
+    )..where((row) => row.storageKey.equals(storageKey))).getSingleOrNull();
+    return _timestampAfter(
+      [
+        comicFolderTombstone?.deletedAtMs ?? 0,
+        entryTombstone?.deletedAtMs ?? 0,
+      ].reduce((a, b) => a > b ? a : b),
+    );
+  }
+
+  int _timestampAfter(int value) {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    return now > value ? now : value + 1;
+  }
+
   List<Map<String, dynamic>> _decodeTombstones(String? raw) {
     if (raw == null || raw.trim().isEmpty) return [];
     try {
@@ -534,6 +613,7 @@ class LocalFavoritesService extends ChangeNotifier {
               id: folder.id,
               name: folder.name,
               sourceKey: folder.sourceKey,
+              updatedAtMs: folder.updatedAtMs,
             ),
           )
           .toList(growable: true),
@@ -574,6 +654,7 @@ class LocalFavoritesService extends ChangeNotifier {
                 id: folder.id,
                 name: folder.name,
                 sourceKey: Value(folder.sourceKey),
+                updatedAtMs: Value(folder.updatedAtMs),
               ),
             );
       }
@@ -657,11 +738,31 @@ class LocalFavoritesService extends ChangeNotifier {
     );
   }
 
+  Future<String> exportComicFolderTombstonesJsonString() async {
+    await _ensureMigrated();
+    await _pruneTombstones();
+    final rows = await (_database.select(
+      _database.localFavoriteComicFolderTombstones,
+    )).get();
+    return jsonEncode(
+      rows.map((row) {
+        final scoped = SourceScopedComicId.fromStorageKey(row.comicStorageKey);
+        return {
+          'comicId': scoped.comicId,
+          if (scoped.sourceKey.isNotEmpty) 'sourceKey': scoped.sourceKey,
+          'folderId': row.folderId,
+          'deletedAtMs': row.deletedAtMs,
+        };
+      }).toList(),
+    );
+  }
+
   Future<void> importJsonStrings({
     String? foldersRaw,
     String? entriesRaw,
     String? folderTombstonesRaw,
     String? entryTombstonesRaw,
+    String? comicFolderTombstonesRaw,
     required bool replace,
   }) async {
     await _ensureMigrated();
@@ -705,6 +806,7 @@ class LocalFavoritesService extends ChangeNotifier {
     }
     await _importFolderTombstonesString(folderTombstonesRaw);
     await _importEntryTombstonesString(entryTombstonesRaw);
+    await _importComicFolderTombstonesString(comicFolderTombstonesRaw);
     notifyListeners();
   }
 
@@ -753,6 +855,32 @@ class LocalFavoritesService extends ChangeNotifier {
     await _pruneTombstones();
   }
 
+  Future<void> _importComicFolderTombstonesString(String? raw) async {
+    for (final item in _decodeTombstones(raw)) {
+      final comicId = (item['comicId'] ?? '').toString().trim();
+      final sourceKey = (item['sourceKey'] ?? '').toString().trim();
+      final folderId = (item['folderId'] ?? '').toString().trim();
+      final deletedAtMs = (item['deletedAtMs'] as num?)?.toInt() ?? 0;
+      if (comicId.isEmpty || folderId.isEmpty || deletedAtMs <= 0) {
+        continue;
+      }
+      final storageKey = SourceScopedComicId(
+        sourceKey: sourceKey,
+        comicId: comicId,
+      ).storageKey;
+      await _database
+          .into(_database.localFavoriteComicFolderTombstones)
+          .insertOnConflictUpdate(
+            LocalFavoriteComicFolderTombstonesCompanion.insert(
+              comicStorageKey: storageKey,
+              folderId: folderId,
+              deletedAtMs: deletedAtMs,
+            ),
+          );
+    }
+    await _pruneTombstones();
+  }
+
   Future<void> _pruneTombstones() async {
     final cutoff = DateTime.now().millisecondsSinceEpoch - _tombstoneTtlMs;
     await (_database.delete(
@@ -760,6 +888,9 @@ class LocalFavoritesService extends ChangeNotifier {
     )..where((row) => row.deletedAtMs.isSmallerThanValue(cutoff))).go();
     await (_database.delete(
       _database.localFavoriteEntryTombstones,
+    )..where((row) => row.deletedAtMs.isSmallerThanValue(cutoff))).go();
+    await (_database.delete(
+      _database.localFavoriteComicFolderTombstones,
     )..where((row) => row.deletedAtMs.isSmallerThanValue(cutoff))).go();
   }
 
@@ -841,6 +972,7 @@ class _LocalFavoriteFolderRecord {
     required this.id,
     required this.name,
     required this.sourceKey,
+    required this.updatedAtMs,
   });
 
   factory _LocalFavoriteFolderRecord.fromJson(Map<String, dynamic> json) {
@@ -848,17 +980,20 @@ class _LocalFavoriteFolderRecord {
       id: (json['id'] ?? '').toString().trim(),
       name: (json['name'] ?? '').toString().trim(),
       sourceKey: (json['sourceKey'] ?? '').toString().trim(),
+      updatedAtMs: (json['updatedAtMs'] as num?)?.toInt() ?? 0,
     );
   }
 
   final String id;
   final String name;
   final String sourceKey;
+  final int updatedAtMs;
 
   Map<String, dynamic> toJson() => <String, dynamic>{
     'id': id,
     'name': name,
     if (sourceKey.isNotEmpty) 'sourceKey': sourceKey,
+    'updatedAtMs': updatedAtMs,
   };
 }
 

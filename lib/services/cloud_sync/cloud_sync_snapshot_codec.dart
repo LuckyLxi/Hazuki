@@ -63,7 +63,6 @@ class CloudSyncSnapshotCodec {
     );
     final localProgressSnapshot = await _readingProgressService
         .exportJsonList();
-    final localSearchSnapshot = await _searchHistoryService.load();
     final localCommentFilterKeywordsSnapshot =
         prefs.getStringList(hazukiCommentFilterKeywordsKey) ?? const <String>[];
     final localFoldersSnapshot = await _localFavoritesService
@@ -202,19 +201,8 @@ class CloudSyncSnapshotCodec {
       }
     }
 
-    final remoteKeywords = <String>[];
     if (searchText != null) {
-      for (final raw in searchText.split('\n')) {
-        final line = raw.trim();
-        if (line.isEmpty) continue;
-        try {
-          final decoded = jsonDecode(line);
-          if (decoded is Map) {
-            final keyword = (decoded['keyword'] ?? '').toString().trim();
-            if (keyword.isNotEmpty) remoteKeywords.add(keyword);
-          }
-        } catch (_) {}
-      }
+      await _searchHistoryService.mergeSyncJsonl(searchText);
     } else if (settingsText != null) {
       try {
         final decoded = jsonDecode(settingsText);
@@ -223,22 +211,16 @@ class CloudSyncSnapshotCodec {
           if (data is Map) {
             final raw = data['search_history'];
             if (raw is List) {
-              remoteKeywords.addAll(raw.map((e) => e.toString()));
+              await _searchHistoryService.mergeSyncJsonl(
+                raw
+                    .map((keyword) => jsonEncode({'keyword': keyword}))
+                    .join('\n'),
+              );
             }
           }
         }
       } catch (_) {}
     }
-    final localKeywords = localSearchSnapshot;
-    final merged = <String>[];
-    final seen = <String>{};
-    for (final keyword in [...localKeywords, ...remoteKeywords]) {
-      if (seen.add(keyword)) merged.add(keyword);
-    }
-    if (merged.length > hazukiSearchHistoryMaxCount) {
-      merged.removeRange(hazukiSearchHistoryMaxCount, merged.length);
-    }
-    await _searchHistoryService.replace(merged);
 
     if (settingsText != null) {
       try {
@@ -296,6 +278,8 @@ class CloudSyncSnapshotCodec {
         await _localFavoritesService.exportFolderTombstonesJsonString();
     settingsMap[CloudSyncConfigStore.entryTombstonesKey] =
         await _localFavoritesService.exportEntryTombstonesJsonString();
+    settingsMap[CloudSyncConfigStore.comicFolderTombstonesKey] =
+        await _localFavoritesService.exportComicFolderTombstonesJsonString();
     final settingsJson = jsonEncode({
       'version': 2,
       'updatedAtMs': DateTime.now().millisecondsSinceEpoch,
@@ -320,9 +304,7 @@ class CloudSyncSnapshotCodec {
     final search = (await _searchHistoryService.load()).take(
       hazukiSearchHistoryMaxCount,
     );
-    final lines = search
-        .map((keyword) => jsonEncode({'keyword': keyword}))
-        .join('\n');
+    final lines = await _searchHistoryService.exportSyncJsonl();
 
     // 仅当用户手动编辑过源文件时才将其上传到云端，
     // 避免把自动下载的官方源错误地同步到其他设备。
@@ -402,6 +384,17 @@ class CloudSyncSnapshotCodec {
             : null,
       ),
     );
+    final comicFolderTombstones = _mergeTombstoneMaps(
+      _decodeComicFolderTombstoneMap(
+        await _localFavoritesService.exportComicFolderTombstonesJsonString(),
+      ),
+      _decodeComicFolderTombstoneMap(
+        remoteData[CloudSyncConfigStore.comicFolderTombstonesKey] is String
+            ? remoteData[CloudSyncConfigStore.comicFolderTombstonesKey]
+                  as String
+            : null,
+      ),
+    );
 
     List<Map<String, dynamic>> localFolders = const [];
     final localFoldersRaw = localFoldersSnapshot;
@@ -443,20 +436,26 @@ class CloudSyncSnapshotCodec {
     }
 
     final mergedFolders = <Map<String, dynamic>>[];
-    final mergedFolderIds = <String>{};
+    final mergedFoldersById = <String, Map<String, dynamic>>{};
     for (final folder in localFolders) {
       final id = folder['id']?.toString() ?? '';
       if (id.isEmpty || isFolderTombstoned(id)) continue;
-      mergedFolders.add(folder);
-      mergedFolderIds.add(id);
+      mergedFoldersById[id] = folder;
     }
     for (final folder in remoteFolders) {
       final id = folder['id']?.toString() ?? '';
-      if (id.isEmpty || mergedFolderIds.contains(id)) continue;
+      if (id.isEmpty) continue;
       if (isFolderTombstoned(id)) continue;
-      mergedFolders.add(folder);
-      mergedFolderIds.add(id);
+      final existing = mergedFoldersById[id];
+      final existingUpdatedAtMs =
+          (existing?['updatedAtMs'] as num?)?.toInt() ?? 0;
+      final remoteUpdatedAtMs = (folder['updatedAtMs'] as num?)?.toInt() ?? 0;
+      if (existing == null || remoteUpdatedAtMs > existingUpdatedAtMs) {
+        mergedFoldersById[id] = folder;
+      }
     }
+    mergedFolders.addAll(mergedFoldersById.values);
+    final mergedFolderIds = mergedFoldersById.keys.toSet();
 
     List<Map<String, dynamic>> localEntries = const [];
     final localEntriesRaw = localEntriesSnapshot;
@@ -490,12 +489,12 @@ class CloudSyncSnapshotCodec {
     bool isEntryTombstoned(String storageKey, int savedAtMs) {
       final deletedAtMs = entryTombstones[storageKey];
       if (deletedAtMs == null) return false;
-      return deletedAtMs > savedAtMs;
+      return deletedAtMs >= savedAtMs;
     }
 
     final mergedEntries = <String, Map<String, dynamic>>{};
     for (final entry in localEntries) {
-      final normalizedEntry = _normalizeLocalFavoriteEntry(entry);
+      var normalizedEntry = _normalizeLocalFavoriteEntry(entry);
       if (normalizedEntry == null) continue;
       final comicId = normalizedEntry['comicId'] as String;
       final sourceKey = (normalizedEntry['sourceKey'] ?? '').toString();
@@ -503,12 +502,18 @@ class CloudSyncSnapshotCodec {
         sourceKey: sourceKey,
         comicId: comicId,
       ).storageKey;
+      normalizedEntry = _withoutTombstonedComicFolders(
+        normalizedEntry,
+        storageKey,
+        comicFolderTombstones,
+      );
       final savedAtMs = _localFavoriteEntrySavedAtMs(normalizedEntry);
+      if (savedAtMs <= 0) continue;
       if (isEntryTombstoned(storageKey, savedAtMs)) continue;
       mergedEntries[storageKey] = normalizedEntry;
     }
     for (final entry in remoteEntries) {
-      final normalizedEntry = _normalizeLocalFavoriteEntry(entry);
+      var normalizedEntry = _normalizeLocalFavoriteEntry(entry);
       if (normalizedEntry == null) continue;
       final comicId = normalizedEntry['comicId'] as String;
       final sourceKey = (normalizedEntry['sourceKey'] ?? '').toString();
@@ -516,7 +521,13 @@ class CloudSyncSnapshotCodec {
         sourceKey: sourceKey,
         comicId: comicId,
       ).storageKey;
+      normalizedEntry = _withoutTombstonedComicFolders(
+        normalizedEntry,
+        storageKey,
+        comicFolderTombstones,
+      );
       final savedAtMs = _localFavoriteEntrySavedAtMs(normalizedEntry);
+      if (savedAtMs <= 0) continue;
       if (isEntryTombstoned(storageKey, savedAtMs)) continue;
       final existing = mergedEntries[storageKey];
       if (existing == null) {
@@ -562,6 +573,10 @@ class CloudSyncSnapshotCodec {
       ),
       entryTombstonesRaw: _encodeEntryTombstoneMap(
         entryTombstones,
+        tombstoneCutoff,
+      ),
+      comicFolderTombstonesRaw: _encodeComicFolderTombstoneMap(
+        comicFolderTombstones,
         tombstoneCutoff,
       ),
       replace: true,
@@ -620,6 +635,33 @@ class CloudSyncSnapshotCodec {
     }
   }
 
+  Map<String, int> _decodeComicFolderTombstoneMap(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return {};
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return {};
+      final result = <String, int>{};
+      for (final item in decoded.whereType<Map>()) {
+        final comicId = (item['comicId'] ?? '').toString().trim();
+        final folderId = (item['folderId'] ?? '').toString().trim();
+        final deletedAtMs = (item['deletedAtMs'] as num?)?.toInt() ?? 0;
+        if (comicId.isEmpty || folderId.isEmpty || deletedAtMs <= 0) continue;
+        final storageKey = SourceScopedComicId(
+          sourceKey: (item['sourceKey'] ?? '').toString().trim(),
+          comicId: comicId,
+        ).storageKey;
+        final key = _comicFolderTombstoneKey(storageKey, folderId);
+        final existing = result[key];
+        if (existing == null || deletedAtMs > existing) {
+          result[key] = deletedAtMs;
+        }
+      }
+      return result;
+    } catch (_) {
+      return {};
+    }
+  }
+
   /// Merges two tombstone maps, keeping the latest deletedAtMs per id.
   Map<String, int> _mergeTombstoneMaps(Map<String, int> a, Map<String, int> b) {
     final merged = Map<String, int>.from(a);
@@ -649,6 +691,40 @@ class CloudSyncSnapshotCodec {
       };
     }).toList();
     return jsonEncode(pruned);
+  }
+
+  String _encodeComicFolderTombstoneMap(Map<String, int> map, int cutoff) {
+    final pruned = map.entries.where((e) => e.value >= cutoff).map((e) {
+      final parts = jsonDecode(e.key) as List<dynamic>;
+      final scoped = SourceScopedComicId.fromStorageKey(parts[0] as String);
+      return {
+        'comicId': scoped.comicId,
+        if (scoped.sourceKey.isNotEmpty) 'sourceKey': scoped.sourceKey,
+        'folderId': parts[1] as String,
+        'deletedAtMs': e.value,
+      };
+    }).toList();
+    return jsonEncode(pruned);
+  }
+
+  String _comicFolderTombstoneKey(String storageKey, String folderId) =>
+      jsonEncode([storageKey, folderId]);
+
+  Map<String, dynamic> _withoutTombstonedComicFolders(
+    Map<String, dynamic> entry,
+    String storageKey,
+    Map<String, int> tombstones,
+  ) {
+    final folderSavedAtMs = _decodeFolderSavedAtMs(entry)
+      ..removeWhere((folderId, savedAtMs) {
+        final deletedAtMs =
+            tombstones[_comicFolderTombstoneKey(storageKey, folderId)];
+        return deletedAtMs != null && deletedAtMs >= savedAtMs;
+      });
+    return _withNormalizedLocalFavoriteEntry(
+      entry,
+      folderSavedAtMs: folderSavedAtMs,
+    );
   }
 
   Map<String, int> _decodeFolderSavedAtMs(Map<String, dynamic> entry) {

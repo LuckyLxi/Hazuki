@@ -19,6 +19,7 @@ class CloudSyncConfigStore {
   static const legacyReadingFileName = 'reading.sqlite';
   static const searchHistoryFileName = 'search_history.jsonl';
   static const manifestFileName = 'manifest.json';
+  static const syncLockFileName = '.sync_lock';
   static const sourceDirName = 'source';
   static const sourceFileName = 'jm.js';
 
@@ -26,6 +27,8 @@ class CloudSyncConfigStore {
   static const localFavoriteEntriesKey = 'local_favorite_entries_v1';
   static const folderTombstonesKey = 'local_favorite_folder_tombstones_v1';
   static const entryTombstonesKey = 'local_favorite_entry_tombstones_v1';
+  static const comicFolderTombstonesKey =
+      'local_favorite_comic_folder_tombstones_v1';
   static const downloadGroupsKey = 'download_groups_v1';
 
   static const Set<String> alwaysSkippedSettings = {
@@ -46,6 +49,7 @@ class CloudSyncConfigStore {
     localFavoriteEntriesKey,
     folderTombstonesKey,
     entryTombstonesKey,
+    comicFolderTombstonesKey,
     downloadGroupsKey,
   };
   static const Set<String> windowsOnlySettings = {

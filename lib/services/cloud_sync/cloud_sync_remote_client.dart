@@ -71,6 +71,142 @@ class CloudSyncRemoteClient {
     return _putString('$sourceDirUrl/$fileName', content);
   }
 
+  Future<bool> tryAcquireSyncLock(String token) async {
+    final response = await _client.request<dynamic>(
+      '$backupDirUrl/${CloudSyncConfigStore.syncLockFileName}',
+      method: 'PUT',
+      data: utf8.encode(token),
+      options: Options(
+        headers: {
+          'content-type': 'application/octet-stream',
+          'if-none-match': '*',
+        },
+      ),
+      retryPolicy: HazukiNetworkRetryPolicy.none,
+    );
+    final code = response.statusCode ?? 0;
+    if (code == 412 || code == 423) {
+      return false;
+    }
+    if (code >= 200 && code < 300) {
+      return true;
+    }
+    throw Exception('cloud_sync_lock_failed:$code');
+  }
+
+  Future<String?> readSyncLock() {
+    return _readSyncLockSnapshot().then((snapshot) => snapshot?.content);
+  }
+
+  Future<bool> renewSyncLock(String token) async {
+    final snapshot = await _readSyncLockSnapshot();
+    if (snapshot == null ||
+        snapshot.etag == null ||
+        !_sameSyncLockOwner(snapshot.content, token)) {
+      return false;
+    }
+    final ownerId = _syncLockOwnerId(token);
+    if (ownerId == null) {
+      return false;
+    }
+    final renewedToken = jsonEncode({
+      'id': ownerId,
+      'createdAtMs': DateTime.now().millisecondsSinceEpoch,
+    });
+    final response = await _client.request<dynamic>(
+      '$backupDirUrl/${CloudSyncConfigStore.syncLockFileName}',
+      method: 'PUT',
+      data: utf8.encode(renewedToken),
+      options: Options(
+        headers: {
+          'content-type': 'application/octet-stream',
+          'if-match': snapshot.etag,
+        },
+      ),
+      retryPolicy: HazukiNetworkRetryPolicy.none,
+    );
+    final code = response.statusCode ?? 0;
+    if (code == 404 || code == 412 || code == 423) {
+      return false;
+    }
+    if (code >= 200 && code < 300) {
+      return true;
+    }
+    throw Exception('cloud_sync_lock_renew_failed:$code');
+  }
+
+  Future<void> releaseSyncLock(String token) async {
+    final snapshot = await _readSyncLockSnapshot();
+    if (snapshot == null ||
+        snapshot.etag == null ||
+        !_sameSyncLockOwner(snapshot.content, token)) {
+      return;
+    }
+    await _deleteSyncLockIfMatch(snapshot.etag!);
+  }
+
+  Future<void> deleteStaleSyncLock(String observedToken) async {
+    final snapshot = await _readSyncLockSnapshot();
+    if (snapshot == null ||
+        snapshot.etag == null ||
+        snapshot.content != observedToken) {
+      return;
+    }
+    await _deleteSyncLockIfMatch(snapshot.etag!);
+  }
+
+  Future<_SyncLockSnapshot?> _readSyncLockSnapshot() async {
+    final response = await _client.get<List<int>>(
+      '$backupDirUrl/${CloudSyncConfigStore.syncLockFileName}',
+      options: Options(responseType: ResponseType.bytes),
+      retryPolicy: HazukiNetworkRetryPolicy.none,
+    );
+    final code = response.statusCode ?? 0;
+    if (code == 404) {
+      return null;
+    }
+    if (code < 200 || code >= 300) {
+      throw Exception('cloud_sync_download_failed:$code');
+    }
+    return _SyncLockSnapshot(
+      content: utf8.decode(response.data ?? const <int>[]),
+      etag: response.headers.value('etag'),
+    );
+  }
+
+  Future<bool> _deleteSyncLockIfMatch(String etag) async {
+    final response = await _client.request<dynamic>(
+      '$backupDirUrl/${CloudSyncConfigStore.syncLockFileName}',
+      method: 'DELETE',
+      options: Options(headers: {'if-match': etag}),
+      retryPolicy: HazukiNetworkRetryPolicy.none,
+    );
+    final code = response.statusCode ?? 0;
+    if (code == 404 || code == 412 || code == 423) {
+      return false;
+    }
+    if (code >= 200 && code < 300) {
+      return true;
+    }
+    throw Exception('cloud_sync_delete_failed:$code');
+  }
+
+  bool _sameSyncLockOwner(String first, String second) {
+    final firstId = _syncLockOwnerId(first);
+    return firstId != null && firstId == _syncLockOwnerId(second);
+  }
+
+  String? _syncLockOwnerId(String content) {
+    try {
+      final decoded = jsonDecode(content);
+      if (decoded is Map) {
+        final id = (decoded['id'] ?? '').toString().trim();
+        return id.isEmpty ? null : id;
+      }
+    } catch (_) {}
+    return null;
+  }
+
   Future<String> getBackupFile(String fileName) {
     return _getString('$backupDirUrl/$fileName');
   }
@@ -189,4 +325,11 @@ class CloudSyncRemoteClient {
     final bytes = response.data ?? const <int>[];
     return utf8.decode(bytes);
   }
+}
+
+class _SyncLockSnapshot {
+  const _SyncLockSnapshot({required this.content, required this.etag});
+
+  final String content;
+  final String? etag;
 }

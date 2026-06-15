@@ -37,15 +37,33 @@ class ReadingProgressEntries extends Table {
 class SearchHistoryEntries extends Table {
   TextColumn get keyword => text()();
   IntColumn get position => integer()();
+  IntColumn get updatedAtMs => integer().withDefault(const Constant(0))();
 
   @override
   Set<Column<Object>> get primaryKey => {keyword};
+}
+
+class SearchHistoryTombstones extends Table {
+  TextColumn get keyword => text()();
+  IntColumn get deletedAtMs => integer()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {keyword};
+}
+
+class SearchHistoryClearStates extends Table {
+  TextColumn get id => text()();
+  IntColumn get clearedAtMs => integer()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {id};
 }
 
 class LocalFavoriteFolders extends Table {
   TextColumn get id => text()();
   TextColumn get name => text()();
   TextColumn get sourceKey => text().withDefault(const Constant(''))();
+  IntColumn get updatedAtMs => integer().withDefault(const Constant(0))();
 
   @override
   Set<Column<Object>> get primaryKey => {id};
@@ -91,6 +109,15 @@ class LocalFavoriteEntryTombstones extends Table {
   Set<Column<Object>> get primaryKey => {storageKey};
 }
 
+class LocalFavoriteComicFolderTombstones extends Table {
+  TextColumn get comicStorageKey => text()();
+  TextColumn get folderId => text()();
+  IntColumn get deletedAtMs => integer()();
+
+  @override
+  Set<Column<Object>> get primaryKey => {comicStorageKey, folderId};
+}
+
 class DownloadGroups extends Table {
   TextColumn get id => text()();
   TextColumn get name => text()();
@@ -132,11 +159,14 @@ class DownloadGroupComicTombstones extends Table {
     ReadHistoryEntries,
     ReadingProgressEntries,
     SearchHistoryEntries,
+    SearchHistoryTombstones,
+    SearchHistoryClearStates,
     LocalFavoriteFolders,
     LocalFavoriteComics,
     LocalFavoriteComicFolders,
     LocalFavoriteFolderTombstones,
     LocalFavoriteEntryTombstones,
+    LocalFavoriteComicFolderTombstones,
     DownloadGroups,
     DownloadGroupComics,
     DownloadGroupTombstones,
@@ -151,7 +181,7 @@ class HazukiDatabase extends _$HazukiDatabase {
   HazukiDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -170,6 +200,23 @@ class HazukiDatabase extends _$HazukiDatabase {
         await m.createTable(downloadGroupComicTombstones);
       } else if (from < 5) {
         await m.addColumn(downloadGroups, downloadGroups.sortOrder);
+      }
+      if (from < 6) {
+        await m.createTable(localFavoriteComicFolderTombstones);
+        await m.addColumn(
+          localFavoriteFolders,
+          localFavoriteFolders.updatedAtMs,
+        );
+      }
+      if (from < 7) {
+        if (from >= 2) {
+          await m.addColumn(
+            searchHistoryEntries,
+            searchHistoryEntries.updatedAtMs,
+          );
+        }
+        await m.createTable(searchHistoryTombstones);
+        await m.createTable(searchHistoryClearStates);
       }
     },
   );

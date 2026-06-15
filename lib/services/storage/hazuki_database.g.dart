@@ -1029,8 +1029,20 @@ class $SearchHistoryEntriesTable extends SearchHistoryEntries
     type: DriftSqlType.int,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _updatedAtMsMeta = const VerificationMeta(
+    'updatedAtMs',
+  );
   @override
-  List<GeneratedColumn> get $columns => [keyword, position];
+  late final GeneratedColumn<int> updatedAtMs = GeneratedColumn<int>(
+    'updated_at_ms',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [keyword, position, updatedAtMs];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -1059,6 +1071,15 @@ class $SearchHistoryEntriesTable extends SearchHistoryEntries
     } else if (isInserting) {
       context.missing(_positionMeta);
     }
+    if (data.containsKey('updated_at_ms')) {
+      context.handle(
+        _updatedAtMsMeta,
+        updatedAtMs.isAcceptableOrUnknown(
+          data['updated_at_ms']!,
+          _updatedAtMsMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -1076,6 +1097,10 @@ class $SearchHistoryEntriesTable extends SearchHistoryEntries
         DriftSqlType.int,
         data['${effectivePrefix}position'],
       )!,
+      updatedAtMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}updated_at_ms'],
+      )!,
     );
   }
 
@@ -1089,12 +1114,18 @@ class SearchHistoryEntry extends DataClass
     implements Insertable<SearchHistoryEntry> {
   final String keyword;
   final int position;
-  const SearchHistoryEntry({required this.keyword, required this.position});
+  final int updatedAtMs;
+  const SearchHistoryEntry({
+    required this.keyword,
+    required this.position,
+    required this.updatedAtMs,
+  });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['keyword'] = Variable<String>(keyword);
     map['position'] = Variable<int>(position);
+    map['updated_at_ms'] = Variable<int>(updatedAtMs);
     return map;
   }
 
@@ -1102,6 +1133,7 @@ class SearchHistoryEntry extends DataClass
     return SearchHistoryEntriesCompanion(
       keyword: Value(keyword),
       position: Value(position),
+      updatedAtMs: Value(updatedAtMs),
     );
   }
 
@@ -1113,6 +1145,7 @@ class SearchHistoryEntry extends DataClass
     return SearchHistoryEntry(
       keyword: serializer.fromJson<String>(json['keyword']),
       position: serializer.fromJson<int>(json['position']),
+      updatedAtMs: serializer.fromJson<int>(json['updatedAtMs']),
     );
   }
   @override
@@ -1121,18 +1154,26 @@ class SearchHistoryEntry extends DataClass
     return <String, dynamic>{
       'keyword': serializer.toJson<String>(keyword),
       'position': serializer.toJson<int>(position),
+      'updatedAtMs': serializer.toJson<int>(updatedAtMs),
     };
   }
 
-  SearchHistoryEntry copyWith({String? keyword, int? position}) =>
-      SearchHistoryEntry(
-        keyword: keyword ?? this.keyword,
-        position: position ?? this.position,
-      );
+  SearchHistoryEntry copyWith({
+    String? keyword,
+    int? position,
+    int? updatedAtMs,
+  }) => SearchHistoryEntry(
+    keyword: keyword ?? this.keyword,
+    position: position ?? this.position,
+    updatedAtMs: updatedAtMs ?? this.updatedAtMs,
+  );
   SearchHistoryEntry copyWithCompanion(SearchHistoryEntriesCompanion data) {
     return SearchHistoryEntry(
       keyword: data.keyword.present ? data.keyword.value : this.keyword,
       position: data.position.present ? data.position.value : this.position,
+      updatedAtMs: data.updatedAtMs.present
+          ? data.updatedAtMs.value
+          : this.updatedAtMs,
     );
   }
 
@@ -1140,45 +1181,52 @@ class SearchHistoryEntry extends DataClass
   String toString() {
     return (StringBuffer('SearchHistoryEntry(')
           ..write('keyword: $keyword, ')
-          ..write('position: $position')
+          ..write('position: $position, ')
+          ..write('updatedAtMs: $updatedAtMs')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(keyword, position);
+  int get hashCode => Object.hash(keyword, position, updatedAtMs);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is SearchHistoryEntry &&
           other.keyword == this.keyword &&
-          other.position == this.position);
+          other.position == this.position &&
+          other.updatedAtMs == this.updatedAtMs);
 }
 
 class SearchHistoryEntriesCompanion
     extends UpdateCompanion<SearchHistoryEntry> {
   final Value<String> keyword;
   final Value<int> position;
+  final Value<int> updatedAtMs;
   final Value<int> rowid;
   const SearchHistoryEntriesCompanion({
     this.keyword = const Value.absent(),
     this.position = const Value.absent(),
+    this.updatedAtMs = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   SearchHistoryEntriesCompanion.insert({
     required String keyword,
     required int position,
+    this.updatedAtMs = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : keyword = Value(keyword),
        position = Value(position);
   static Insertable<SearchHistoryEntry> custom({
     Expression<String>? keyword,
     Expression<int>? position,
+    Expression<int>? updatedAtMs,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (keyword != null) 'keyword': keyword,
       if (position != null) 'position': position,
+      if (updatedAtMs != null) 'updated_at_ms': updatedAtMs,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1186,11 +1234,13 @@ class SearchHistoryEntriesCompanion
   SearchHistoryEntriesCompanion copyWith({
     Value<String>? keyword,
     Value<int>? position,
+    Value<int>? updatedAtMs,
     Value<int>? rowid,
   }) {
     return SearchHistoryEntriesCompanion(
       keyword: keyword ?? this.keyword,
       position: position ?? this.position,
+      updatedAtMs: updatedAtMs ?? this.updatedAtMs,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1204,6 +1254,9 @@ class SearchHistoryEntriesCompanion
     if (position.present) {
       map['position'] = Variable<int>(position.value);
     }
+    if (updatedAtMs.present) {
+      map['updated_at_ms'] = Variable<int>(updatedAtMs.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1215,6 +1268,462 @@ class SearchHistoryEntriesCompanion
     return (StringBuffer('SearchHistoryEntriesCompanion(')
           ..write('keyword: $keyword, ')
           ..write('position: $position, ')
+          ..write('updatedAtMs: $updatedAtMs, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $SearchHistoryTombstonesTable extends SearchHistoryTombstones
+    with TableInfo<$SearchHistoryTombstonesTable, SearchHistoryTombstone> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SearchHistoryTombstonesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _keywordMeta = const VerificationMeta(
+    'keyword',
+  );
+  @override
+  late final GeneratedColumn<String> keyword = GeneratedColumn<String>(
+    'keyword',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deletedAtMsMeta = const VerificationMeta(
+    'deletedAtMs',
+  );
+  @override
+  late final GeneratedColumn<int> deletedAtMs = GeneratedColumn<int>(
+    'deleted_at_ms',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [keyword, deletedAtMs];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'search_history_tombstones';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<SearchHistoryTombstone> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('keyword')) {
+      context.handle(
+        _keywordMeta,
+        keyword.isAcceptableOrUnknown(data['keyword']!, _keywordMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_keywordMeta);
+    }
+    if (data.containsKey('deleted_at_ms')) {
+      context.handle(
+        _deletedAtMsMeta,
+        deletedAtMs.isAcceptableOrUnknown(
+          data['deleted_at_ms']!,
+          _deletedAtMsMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_deletedAtMsMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {keyword};
+  @override
+  SearchHistoryTombstone map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SearchHistoryTombstone(
+      keyword: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}keyword'],
+      )!,
+      deletedAtMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}deleted_at_ms'],
+      )!,
+    );
+  }
+
+  @override
+  $SearchHistoryTombstonesTable createAlias(String alias) {
+    return $SearchHistoryTombstonesTable(attachedDatabase, alias);
+  }
+}
+
+class SearchHistoryTombstone extends DataClass
+    implements Insertable<SearchHistoryTombstone> {
+  final String keyword;
+  final int deletedAtMs;
+  const SearchHistoryTombstone({
+    required this.keyword,
+    required this.deletedAtMs,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['keyword'] = Variable<String>(keyword);
+    map['deleted_at_ms'] = Variable<int>(deletedAtMs);
+    return map;
+  }
+
+  SearchHistoryTombstonesCompanion toCompanion(bool nullToAbsent) {
+    return SearchHistoryTombstonesCompanion(
+      keyword: Value(keyword),
+      deletedAtMs: Value(deletedAtMs),
+    );
+  }
+
+  factory SearchHistoryTombstone.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SearchHistoryTombstone(
+      keyword: serializer.fromJson<String>(json['keyword']),
+      deletedAtMs: serializer.fromJson<int>(json['deletedAtMs']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'keyword': serializer.toJson<String>(keyword),
+      'deletedAtMs': serializer.toJson<int>(deletedAtMs),
+    };
+  }
+
+  SearchHistoryTombstone copyWith({String? keyword, int? deletedAtMs}) =>
+      SearchHistoryTombstone(
+        keyword: keyword ?? this.keyword,
+        deletedAtMs: deletedAtMs ?? this.deletedAtMs,
+      );
+  SearchHistoryTombstone copyWithCompanion(
+    SearchHistoryTombstonesCompanion data,
+  ) {
+    return SearchHistoryTombstone(
+      keyword: data.keyword.present ? data.keyword.value : this.keyword,
+      deletedAtMs: data.deletedAtMs.present
+          ? data.deletedAtMs.value
+          : this.deletedAtMs,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SearchHistoryTombstone(')
+          ..write('keyword: $keyword, ')
+          ..write('deletedAtMs: $deletedAtMs')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(keyword, deletedAtMs);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SearchHistoryTombstone &&
+          other.keyword == this.keyword &&
+          other.deletedAtMs == this.deletedAtMs);
+}
+
+class SearchHistoryTombstonesCompanion
+    extends UpdateCompanion<SearchHistoryTombstone> {
+  final Value<String> keyword;
+  final Value<int> deletedAtMs;
+  final Value<int> rowid;
+  const SearchHistoryTombstonesCompanion({
+    this.keyword = const Value.absent(),
+    this.deletedAtMs = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  SearchHistoryTombstonesCompanion.insert({
+    required String keyword,
+    required int deletedAtMs,
+    this.rowid = const Value.absent(),
+  }) : keyword = Value(keyword),
+       deletedAtMs = Value(deletedAtMs);
+  static Insertable<SearchHistoryTombstone> custom({
+    Expression<String>? keyword,
+    Expression<int>? deletedAtMs,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (keyword != null) 'keyword': keyword,
+      if (deletedAtMs != null) 'deleted_at_ms': deletedAtMs,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  SearchHistoryTombstonesCompanion copyWith({
+    Value<String>? keyword,
+    Value<int>? deletedAtMs,
+    Value<int>? rowid,
+  }) {
+    return SearchHistoryTombstonesCompanion(
+      keyword: keyword ?? this.keyword,
+      deletedAtMs: deletedAtMs ?? this.deletedAtMs,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (keyword.present) {
+      map['keyword'] = Variable<String>(keyword.value);
+    }
+    if (deletedAtMs.present) {
+      map['deleted_at_ms'] = Variable<int>(deletedAtMs.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SearchHistoryTombstonesCompanion(')
+          ..write('keyword: $keyword, ')
+          ..write('deletedAtMs: $deletedAtMs, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
+class $SearchHistoryClearStatesTable extends SearchHistoryClearStates
+    with TableInfo<$SearchHistoryClearStatesTable, SearchHistoryClearState> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $SearchHistoryClearStatesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _clearedAtMsMeta = const VerificationMeta(
+    'clearedAtMs',
+  );
+  @override
+  late final GeneratedColumn<int> clearedAtMs = GeneratedColumn<int>(
+    'cleared_at_ms',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, clearedAtMs];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'search_history_clear_states';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<SearchHistoryClearState> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('cleared_at_ms')) {
+      context.handle(
+        _clearedAtMsMeta,
+        clearedAtMs.isAcceptableOrUnknown(
+          data['cleared_at_ms']!,
+          _clearedAtMsMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_clearedAtMsMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  SearchHistoryClearState map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return SearchHistoryClearState(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      clearedAtMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}cleared_at_ms'],
+      )!,
+    );
+  }
+
+  @override
+  $SearchHistoryClearStatesTable createAlias(String alias) {
+    return $SearchHistoryClearStatesTable(attachedDatabase, alias);
+  }
+}
+
+class SearchHistoryClearState extends DataClass
+    implements Insertable<SearchHistoryClearState> {
+  final String id;
+  final int clearedAtMs;
+  const SearchHistoryClearState({required this.id, required this.clearedAtMs});
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['cleared_at_ms'] = Variable<int>(clearedAtMs);
+    return map;
+  }
+
+  SearchHistoryClearStatesCompanion toCompanion(bool nullToAbsent) {
+    return SearchHistoryClearStatesCompanion(
+      id: Value(id),
+      clearedAtMs: Value(clearedAtMs),
+    );
+  }
+
+  factory SearchHistoryClearState.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return SearchHistoryClearState(
+      id: serializer.fromJson<String>(json['id']),
+      clearedAtMs: serializer.fromJson<int>(json['clearedAtMs']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'clearedAtMs': serializer.toJson<int>(clearedAtMs),
+    };
+  }
+
+  SearchHistoryClearState copyWith({String? id, int? clearedAtMs}) =>
+      SearchHistoryClearState(
+        id: id ?? this.id,
+        clearedAtMs: clearedAtMs ?? this.clearedAtMs,
+      );
+  SearchHistoryClearState copyWithCompanion(
+    SearchHistoryClearStatesCompanion data,
+  ) {
+    return SearchHistoryClearState(
+      id: data.id.present ? data.id.value : this.id,
+      clearedAtMs: data.clearedAtMs.present
+          ? data.clearedAtMs.value
+          : this.clearedAtMs,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SearchHistoryClearState(')
+          ..write('id: $id, ')
+          ..write('clearedAtMs: $clearedAtMs')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, clearedAtMs);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is SearchHistoryClearState &&
+          other.id == this.id &&
+          other.clearedAtMs == this.clearedAtMs);
+}
+
+class SearchHistoryClearStatesCompanion
+    extends UpdateCompanion<SearchHistoryClearState> {
+  final Value<String> id;
+  final Value<int> clearedAtMs;
+  final Value<int> rowid;
+  const SearchHistoryClearStatesCompanion({
+    this.id = const Value.absent(),
+    this.clearedAtMs = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  SearchHistoryClearStatesCompanion.insert({
+    required String id,
+    required int clearedAtMs,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       clearedAtMs = Value(clearedAtMs);
+  static Insertable<SearchHistoryClearState> custom({
+    Expression<String>? id,
+    Expression<int>? clearedAtMs,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (clearedAtMs != null) 'cleared_at_ms': clearedAtMs,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  SearchHistoryClearStatesCompanion copyWith({
+    Value<String>? id,
+    Value<int>? clearedAtMs,
+    Value<int>? rowid,
+  }) {
+    return SearchHistoryClearStatesCompanion(
+      id: id ?? this.id,
+      clearedAtMs: clearedAtMs ?? this.clearedAtMs,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (clearedAtMs.present) {
+      map['cleared_at_ms'] = Variable<int>(clearedAtMs.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('SearchHistoryClearStatesCompanion(')
+          ..write('id: $id, ')
+          ..write('clearedAtMs: $clearedAtMs, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -1257,8 +1766,20 @@ class $LocalFavoriteFoldersTable extends LocalFavoriteFolders
     requiredDuringInsert: false,
     defaultValue: const Constant(''),
   );
+  static const VerificationMeta _updatedAtMsMeta = const VerificationMeta(
+    'updatedAtMs',
+  );
   @override
-  List<GeneratedColumn> get $columns => [id, name, sourceKey];
+  late final GeneratedColumn<int> updatedAtMs = GeneratedColumn<int>(
+    'updated_at_ms',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, name, sourceKey, updatedAtMs];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -1290,6 +1811,15 @@ class $LocalFavoriteFoldersTable extends LocalFavoriteFolders
         sourceKey.isAcceptableOrUnknown(data['source_key']!, _sourceKeyMeta),
       );
     }
+    if (data.containsKey('updated_at_ms')) {
+      context.handle(
+        _updatedAtMsMeta,
+        updatedAtMs.isAcceptableOrUnknown(
+          data['updated_at_ms']!,
+          _updatedAtMsMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -1311,6 +1841,10 @@ class $LocalFavoriteFoldersTable extends LocalFavoriteFolders
         DriftSqlType.string,
         data['${effectivePrefix}source_key'],
       )!,
+      updatedAtMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}updated_at_ms'],
+      )!,
     );
   }
 
@@ -1325,10 +1859,12 @@ class LocalFavoriteFolder extends DataClass
   final String id;
   final String name;
   final String sourceKey;
+  final int updatedAtMs;
   const LocalFavoriteFolder({
     required this.id,
     required this.name,
     required this.sourceKey,
+    required this.updatedAtMs,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1336,6 +1872,7 @@ class LocalFavoriteFolder extends DataClass
     map['id'] = Variable<String>(id);
     map['name'] = Variable<String>(name);
     map['source_key'] = Variable<String>(sourceKey);
+    map['updated_at_ms'] = Variable<int>(updatedAtMs);
     return map;
   }
 
@@ -1344,6 +1881,7 @@ class LocalFavoriteFolder extends DataClass
       id: Value(id),
       name: Value(name),
       sourceKey: Value(sourceKey),
+      updatedAtMs: Value(updatedAtMs),
     );
   }
 
@@ -1356,6 +1894,7 @@ class LocalFavoriteFolder extends DataClass
       id: serializer.fromJson<String>(json['id']),
       name: serializer.fromJson<String>(json['name']),
       sourceKey: serializer.fromJson<String>(json['sourceKey']),
+      updatedAtMs: serializer.fromJson<int>(json['updatedAtMs']),
     );
   }
   @override
@@ -1365,20 +1904,29 @@ class LocalFavoriteFolder extends DataClass
       'id': serializer.toJson<String>(id),
       'name': serializer.toJson<String>(name),
       'sourceKey': serializer.toJson<String>(sourceKey),
+      'updatedAtMs': serializer.toJson<int>(updatedAtMs),
     };
   }
 
-  LocalFavoriteFolder copyWith({String? id, String? name, String? sourceKey}) =>
-      LocalFavoriteFolder(
-        id: id ?? this.id,
-        name: name ?? this.name,
-        sourceKey: sourceKey ?? this.sourceKey,
-      );
+  LocalFavoriteFolder copyWith({
+    String? id,
+    String? name,
+    String? sourceKey,
+    int? updatedAtMs,
+  }) => LocalFavoriteFolder(
+    id: id ?? this.id,
+    name: name ?? this.name,
+    sourceKey: sourceKey ?? this.sourceKey,
+    updatedAtMs: updatedAtMs ?? this.updatedAtMs,
+  );
   LocalFavoriteFolder copyWithCompanion(LocalFavoriteFoldersCompanion data) {
     return LocalFavoriteFolder(
       id: data.id.present ? data.id.value : this.id,
       name: data.name.present ? data.name.value : this.name,
       sourceKey: data.sourceKey.present ? data.sourceKey.value : this.sourceKey,
+      updatedAtMs: data.updatedAtMs.present
+          ? data.updatedAtMs.value
+          : this.updatedAtMs,
     );
   }
 
@@ -1387,20 +1935,22 @@ class LocalFavoriteFolder extends DataClass
     return (StringBuffer('LocalFavoriteFolder(')
           ..write('id: $id, ')
           ..write('name: $name, ')
-          ..write('sourceKey: $sourceKey')
+          ..write('sourceKey: $sourceKey, ')
+          ..write('updatedAtMs: $updatedAtMs')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, name, sourceKey);
+  int get hashCode => Object.hash(id, name, sourceKey, updatedAtMs);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is LocalFavoriteFolder &&
           other.id == this.id &&
           other.name == this.name &&
-          other.sourceKey == this.sourceKey);
+          other.sourceKey == this.sourceKey &&
+          other.updatedAtMs == this.updatedAtMs);
 }
 
 class LocalFavoriteFoldersCompanion
@@ -1408,17 +1958,20 @@ class LocalFavoriteFoldersCompanion
   final Value<String> id;
   final Value<String> name;
   final Value<String> sourceKey;
+  final Value<int> updatedAtMs;
   final Value<int> rowid;
   const LocalFavoriteFoldersCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
     this.sourceKey = const Value.absent(),
+    this.updatedAtMs = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   LocalFavoriteFoldersCompanion.insert({
     required String id,
     required String name,
     this.sourceKey = const Value.absent(),
+    this.updatedAtMs = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name);
@@ -1426,12 +1979,14 @@ class LocalFavoriteFoldersCompanion
     Expression<String>? id,
     Expression<String>? name,
     Expression<String>? sourceKey,
+    Expression<int>? updatedAtMs,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (name != null) 'name': name,
       if (sourceKey != null) 'source_key': sourceKey,
+      if (updatedAtMs != null) 'updated_at_ms': updatedAtMs,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1440,12 +1995,14 @@ class LocalFavoriteFoldersCompanion
     Value<String>? id,
     Value<String>? name,
     Value<String>? sourceKey,
+    Value<int>? updatedAtMs,
     Value<int>? rowid,
   }) {
     return LocalFavoriteFoldersCompanion(
       id: id ?? this.id,
       name: name ?? this.name,
       sourceKey: sourceKey ?? this.sourceKey,
+      updatedAtMs: updatedAtMs ?? this.updatedAtMs,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1462,6 +2019,9 @@ class LocalFavoriteFoldersCompanion
     if (sourceKey.present) {
       map['source_key'] = Variable<String>(sourceKey.value);
     }
+    if (updatedAtMs.present) {
+      map['updated_at_ms'] = Variable<int>(updatedAtMs.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1474,6 +2034,7 @@ class LocalFavoriteFoldersCompanion
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('sourceKey: $sourceKey, ')
+          ..write('updatedAtMs: $updatedAtMs, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -2802,6 +3363,304 @@ class LocalFavoriteEntryTombstonesCompanion
   }
 }
 
+class $LocalFavoriteComicFolderTombstonesTable
+    extends LocalFavoriteComicFolderTombstones
+    with
+        TableInfo<
+          $LocalFavoriteComicFolderTombstonesTable,
+          LocalFavoriteComicFolderTombstone
+        > {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $LocalFavoriteComicFolderTombstonesTable(
+    this.attachedDatabase, [
+    this._alias,
+  ]);
+  static const VerificationMeta _comicStorageKeyMeta = const VerificationMeta(
+    'comicStorageKey',
+  );
+  @override
+  late final GeneratedColumn<String> comicStorageKey = GeneratedColumn<String>(
+    'comic_storage_key',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _folderIdMeta = const VerificationMeta(
+    'folderId',
+  );
+  @override
+  late final GeneratedColumn<String> folderId = GeneratedColumn<String>(
+    'folder_id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _deletedAtMsMeta = const VerificationMeta(
+    'deletedAtMs',
+  );
+  @override
+  late final GeneratedColumn<int> deletedAtMs = GeneratedColumn<int>(
+    'deleted_at_ms',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    comicStorageKey,
+    folderId,
+    deletedAtMs,
+  ];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'local_favorite_comic_folder_tombstones';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<LocalFavoriteComicFolderTombstone> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('comic_storage_key')) {
+      context.handle(
+        _comicStorageKeyMeta,
+        comicStorageKey.isAcceptableOrUnknown(
+          data['comic_storage_key']!,
+          _comicStorageKeyMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_comicStorageKeyMeta);
+    }
+    if (data.containsKey('folder_id')) {
+      context.handle(
+        _folderIdMeta,
+        folderId.isAcceptableOrUnknown(data['folder_id']!, _folderIdMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_folderIdMeta);
+    }
+    if (data.containsKey('deleted_at_ms')) {
+      context.handle(
+        _deletedAtMsMeta,
+        deletedAtMs.isAcceptableOrUnknown(
+          data['deleted_at_ms']!,
+          _deletedAtMsMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_deletedAtMsMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {comicStorageKey, folderId};
+  @override
+  LocalFavoriteComicFolderTombstone map(
+    Map<String, dynamic> data, {
+    String? tablePrefix,
+  }) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return LocalFavoriteComicFolderTombstone(
+      comicStorageKey: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}comic_storage_key'],
+      )!,
+      folderId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}folder_id'],
+      )!,
+      deletedAtMs: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}deleted_at_ms'],
+      )!,
+    );
+  }
+
+  @override
+  $LocalFavoriteComicFolderTombstonesTable createAlias(String alias) {
+    return $LocalFavoriteComicFolderTombstonesTable(attachedDatabase, alias);
+  }
+}
+
+class LocalFavoriteComicFolderTombstone extends DataClass
+    implements Insertable<LocalFavoriteComicFolderTombstone> {
+  final String comicStorageKey;
+  final String folderId;
+  final int deletedAtMs;
+  const LocalFavoriteComicFolderTombstone({
+    required this.comicStorageKey,
+    required this.folderId,
+    required this.deletedAtMs,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['comic_storage_key'] = Variable<String>(comicStorageKey);
+    map['folder_id'] = Variable<String>(folderId);
+    map['deleted_at_ms'] = Variable<int>(deletedAtMs);
+    return map;
+  }
+
+  LocalFavoriteComicFolderTombstonesCompanion toCompanion(bool nullToAbsent) {
+    return LocalFavoriteComicFolderTombstonesCompanion(
+      comicStorageKey: Value(comicStorageKey),
+      folderId: Value(folderId),
+      deletedAtMs: Value(deletedAtMs),
+    );
+  }
+
+  factory LocalFavoriteComicFolderTombstone.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return LocalFavoriteComicFolderTombstone(
+      comicStorageKey: serializer.fromJson<String>(json['comicStorageKey']),
+      folderId: serializer.fromJson<String>(json['folderId']),
+      deletedAtMs: serializer.fromJson<int>(json['deletedAtMs']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'comicStorageKey': serializer.toJson<String>(comicStorageKey),
+      'folderId': serializer.toJson<String>(folderId),
+      'deletedAtMs': serializer.toJson<int>(deletedAtMs),
+    };
+  }
+
+  LocalFavoriteComicFolderTombstone copyWith({
+    String? comicStorageKey,
+    String? folderId,
+    int? deletedAtMs,
+  }) => LocalFavoriteComicFolderTombstone(
+    comicStorageKey: comicStorageKey ?? this.comicStorageKey,
+    folderId: folderId ?? this.folderId,
+    deletedAtMs: deletedAtMs ?? this.deletedAtMs,
+  );
+  LocalFavoriteComicFolderTombstone copyWithCompanion(
+    LocalFavoriteComicFolderTombstonesCompanion data,
+  ) {
+    return LocalFavoriteComicFolderTombstone(
+      comicStorageKey: data.comicStorageKey.present
+          ? data.comicStorageKey.value
+          : this.comicStorageKey,
+      folderId: data.folderId.present ? data.folderId.value : this.folderId,
+      deletedAtMs: data.deletedAtMs.present
+          ? data.deletedAtMs.value
+          : this.deletedAtMs,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalFavoriteComicFolderTombstone(')
+          ..write('comicStorageKey: $comicStorageKey, ')
+          ..write('folderId: $folderId, ')
+          ..write('deletedAtMs: $deletedAtMs')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(comicStorageKey, folderId, deletedAtMs);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is LocalFavoriteComicFolderTombstone &&
+          other.comicStorageKey == this.comicStorageKey &&
+          other.folderId == this.folderId &&
+          other.deletedAtMs == this.deletedAtMs);
+}
+
+class LocalFavoriteComicFolderTombstonesCompanion
+    extends UpdateCompanion<LocalFavoriteComicFolderTombstone> {
+  final Value<String> comicStorageKey;
+  final Value<String> folderId;
+  final Value<int> deletedAtMs;
+  final Value<int> rowid;
+  const LocalFavoriteComicFolderTombstonesCompanion({
+    this.comicStorageKey = const Value.absent(),
+    this.folderId = const Value.absent(),
+    this.deletedAtMs = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  LocalFavoriteComicFolderTombstonesCompanion.insert({
+    required String comicStorageKey,
+    required String folderId,
+    required int deletedAtMs,
+    this.rowid = const Value.absent(),
+  }) : comicStorageKey = Value(comicStorageKey),
+       folderId = Value(folderId),
+       deletedAtMs = Value(deletedAtMs);
+  static Insertable<LocalFavoriteComicFolderTombstone> custom({
+    Expression<String>? comicStorageKey,
+    Expression<String>? folderId,
+    Expression<int>? deletedAtMs,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (comicStorageKey != null) 'comic_storage_key': comicStorageKey,
+      if (folderId != null) 'folder_id': folderId,
+      if (deletedAtMs != null) 'deleted_at_ms': deletedAtMs,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  LocalFavoriteComicFolderTombstonesCompanion copyWith({
+    Value<String>? comicStorageKey,
+    Value<String>? folderId,
+    Value<int>? deletedAtMs,
+    Value<int>? rowid,
+  }) {
+    return LocalFavoriteComicFolderTombstonesCompanion(
+      comicStorageKey: comicStorageKey ?? this.comicStorageKey,
+      folderId: folderId ?? this.folderId,
+      deletedAtMs: deletedAtMs ?? this.deletedAtMs,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (comicStorageKey.present) {
+      map['comic_storage_key'] = Variable<String>(comicStorageKey.value);
+    }
+    if (folderId.present) {
+      map['folder_id'] = Variable<String>(folderId.value);
+    }
+    if (deletedAtMs.present) {
+      map['deleted_at_ms'] = Variable<int>(deletedAtMs.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('LocalFavoriteComicFolderTombstonesCompanion(')
+          ..write('comicStorageKey: $comicStorageKey, ')
+          ..write('folderId: $folderId, ')
+          ..write('deletedAtMs: $deletedAtMs, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $DownloadGroupsTable extends DownloadGroups
     with TableInfo<$DownloadGroupsTable, DownloadGroup> {
   @override
@@ -3917,6 +4776,10 @@ abstract class _$HazukiDatabase extends GeneratedDatabase {
       $ReadingProgressEntriesTable(this);
   late final $SearchHistoryEntriesTable searchHistoryEntries =
       $SearchHistoryEntriesTable(this);
+  late final $SearchHistoryTombstonesTable searchHistoryTombstones =
+      $SearchHistoryTombstonesTable(this);
+  late final $SearchHistoryClearStatesTable searchHistoryClearStates =
+      $SearchHistoryClearStatesTable(this);
   late final $LocalFavoriteFoldersTable localFavoriteFolders =
       $LocalFavoriteFoldersTable(this);
   late final $LocalFavoriteComicsTable localFavoriteComics =
@@ -3927,6 +4790,10 @@ abstract class _$HazukiDatabase extends GeneratedDatabase {
       $LocalFavoriteFolderTombstonesTable(this);
   late final $LocalFavoriteEntryTombstonesTable localFavoriteEntryTombstones =
       $LocalFavoriteEntryTombstonesTable(this);
+  late final $LocalFavoriteComicFolderTombstonesTable
+  localFavoriteComicFolderTombstones = $LocalFavoriteComicFolderTombstonesTable(
+    this,
+  );
   late final $DownloadGroupsTable downloadGroups = $DownloadGroupsTable(this);
   late final $DownloadGroupComicsTable downloadGroupComics =
       $DownloadGroupComicsTable(this);
@@ -3942,11 +4809,14 @@ abstract class _$HazukiDatabase extends GeneratedDatabase {
     readHistoryEntries,
     readingProgressEntries,
     searchHistoryEntries,
+    searchHistoryTombstones,
+    searchHistoryClearStates,
     localFavoriteFolders,
     localFavoriteComics,
     localFavoriteComicFolders,
     localFavoriteFolderTombstones,
     localFavoriteEntryTombstones,
+    localFavoriteComicFolderTombstones,
     downloadGroups,
     downloadGroupComics,
     downloadGroupTombstones,
@@ -4495,12 +5365,14 @@ typedef $$SearchHistoryEntriesTableCreateCompanionBuilder =
     SearchHistoryEntriesCompanion Function({
       required String keyword,
       required int position,
+      Value<int> updatedAtMs,
       Value<int> rowid,
     });
 typedef $$SearchHistoryEntriesTableUpdateCompanionBuilder =
     SearchHistoryEntriesCompanion Function({
       Value<String> keyword,
       Value<int> position,
+      Value<int> updatedAtMs,
       Value<int> rowid,
     });
 
@@ -4520,6 +5392,11 @@ class $$SearchHistoryEntriesTableFilterComposer
 
   ColumnFilters<int> get position => $composableBuilder(
     column: $table.position,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get updatedAtMs => $composableBuilder(
+    column: $table.updatedAtMs,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -4542,6 +5419,11 @@ class $$SearchHistoryEntriesTableOrderingComposer
     column: $table.position,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get updatedAtMs => $composableBuilder(
+    column: $table.updatedAtMs,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$SearchHistoryEntriesTableAnnotationComposer
@@ -4558,6 +5440,11 @@ class $$SearchHistoryEntriesTableAnnotationComposer
 
   GeneratedColumn<int> get position =>
       $composableBuilder(column: $table.position, builder: (column) => column);
+
+  GeneratedColumn<int> get updatedAtMs => $composableBuilder(
+    column: $table.updatedAtMs,
+    builder: (column) => column,
+  );
 }
 
 class $$SearchHistoryEntriesTableTableManager
@@ -4605,20 +5492,24 @@ class $$SearchHistoryEntriesTableTableManager
               ({
                 Value<String> keyword = const Value.absent(),
                 Value<int> position = const Value.absent(),
+                Value<int> updatedAtMs = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SearchHistoryEntriesCompanion(
                 keyword: keyword,
                 position: position,
+                updatedAtMs: updatedAtMs,
                 rowid: rowid,
               ),
           createCompanionCallback:
               ({
                 required String keyword,
                 required int position,
+                Value<int> updatedAtMs = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => SearchHistoryEntriesCompanion.insert(
                 keyword: keyword,
                 position: position,
+                updatedAtMs: updatedAtMs,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -4650,11 +5541,340 @@ typedef $$SearchHistoryEntriesTableProcessedTableManager =
       SearchHistoryEntry,
       PrefetchHooks Function()
     >;
+typedef $$SearchHistoryTombstonesTableCreateCompanionBuilder =
+    SearchHistoryTombstonesCompanion Function({
+      required String keyword,
+      required int deletedAtMs,
+      Value<int> rowid,
+    });
+typedef $$SearchHistoryTombstonesTableUpdateCompanionBuilder =
+    SearchHistoryTombstonesCompanion Function({
+      Value<String> keyword,
+      Value<int> deletedAtMs,
+      Value<int> rowid,
+    });
+
+class $$SearchHistoryTombstonesTableFilterComposer
+    extends Composer<_$HazukiDatabase, $SearchHistoryTombstonesTable> {
+  $$SearchHistoryTombstonesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get keyword => $composableBuilder(
+    column: $table.keyword,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$SearchHistoryTombstonesTableOrderingComposer
+    extends Composer<_$HazukiDatabase, $SearchHistoryTombstonesTable> {
+  $$SearchHistoryTombstonesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get keyword => $composableBuilder(
+    column: $table.keyword,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$SearchHistoryTombstonesTableAnnotationComposer
+    extends Composer<_$HazukiDatabase, $SearchHistoryTombstonesTable> {
+  $$SearchHistoryTombstonesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get keyword =>
+      $composableBuilder(column: $table.keyword, builder: (column) => column);
+
+  GeneratedColumn<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => column,
+  );
+}
+
+class $$SearchHistoryTombstonesTableTableManager
+    extends
+        RootTableManager<
+          _$HazukiDatabase,
+          $SearchHistoryTombstonesTable,
+          SearchHistoryTombstone,
+          $$SearchHistoryTombstonesTableFilterComposer,
+          $$SearchHistoryTombstonesTableOrderingComposer,
+          $$SearchHistoryTombstonesTableAnnotationComposer,
+          $$SearchHistoryTombstonesTableCreateCompanionBuilder,
+          $$SearchHistoryTombstonesTableUpdateCompanionBuilder,
+          (
+            SearchHistoryTombstone,
+            BaseReferences<
+              _$HazukiDatabase,
+              $SearchHistoryTombstonesTable,
+              SearchHistoryTombstone
+            >,
+          ),
+          SearchHistoryTombstone,
+          PrefetchHooks Function()
+        > {
+  $$SearchHistoryTombstonesTableTableManager(
+    _$HazukiDatabase db,
+    $SearchHistoryTombstonesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SearchHistoryTombstonesTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$SearchHistoryTombstonesTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$SearchHistoryTombstonesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> keyword = const Value.absent(),
+                Value<int> deletedAtMs = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => SearchHistoryTombstonesCompanion(
+                keyword: keyword,
+                deletedAtMs: deletedAtMs,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String keyword,
+                required int deletedAtMs,
+                Value<int> rowid = const Value.absent(),
+              }) => SearchHistoryTombstonesCompanion.insert(
+                keyword: keyword,
+                deletedAtMs: deletedAtMs,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$SearchHistoryTombstonesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$HazukiDatabase,
+      $SearchHistoryTombstonesTable,
+      SearchHistoryTombstone,
+      $$SearchHistoryTombstonesTableFilterComposer,
+      $$SearchHistoryTombstonesTableOrderingComposer,
+      $$SearchHistoryTombstonesTableAnnotationComposer,
+      $$SearchHistoryTombstonesTableCreateCompanionBuilder,
+      $$SearchHistoryTombstonesTableUpdateCompanionBuilder,
+      (
+        SearchHistoryTombstone,
+        BaseReferences<
+          _$HazukiDatabase,
+          $SearchHistoryTombstonesTable,
+          SearchHistoryTombstone
+        >,
+      ),
+      SearchHistoryTombstone,
+      PrefetchHooks Function()
+    >;
+typedef $$SearchHistoryClearStatesTableCreateCompanionBuilder =
+    SearchHistoryClearStatesCompanion Function({
+      required String id,
+      required int clearedAtMs,
+      Value<int> rowid,
+    });
+typedef $$SearchHistoryClearStatesTableUpdateCompanionBuilder =
+    SearchHistoryClearStatesCompanion Function({
+      Value<String> id,
+      Value<int> clearedAtMs,
+      Value<int> rowid,
+    });
+
+class $$SearchHistoryClearStatesTableFilterComposer
+    extends Composer<_$HazukiDatabase, $SearchHistoryClearStatesTable> {
+  $$SearchHistoryClearStatesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get clearedAtMs => $composableBuilder(
+    column: $table.clearedAtMs,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$SearchHistoryClearStatesTableOrderingComposer
+    extends Composer<_$HazukiDatabase, $SearchHistoryClearStatesTable> {
+  $$SearchHistoryClearStatesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get clearedAtMs => $composableBuilder(
+    column: $table.clearedAtMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$SearchHistoryClearStatesTableAnnotationComposer
+    extends Composer<_$HazukiDatabase, $SearchHistoryClearStatesTable> {
+  $$SearchHistoryClearStatesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<int> get clearedAtMs => $composableBuilder(
+    column: $table.clearedAtMs,
+    builder: (column) => column,
+  );
+}
+
+class $$SearchHistoryClearStatesTableTableManager
+    extends
+        RootTableManager<
+          _$HazukiDatabase,
+          $SearchHistoryClearStatesTable,
+          SearchHistoryClearState,
+          $$SearchHistoryClearStatesTableFilterComposer,
+          $$SearchHistoryClearStatesTableOrderingComposer,
+          $$SearchHistoryClearStatesTableAnnotationComposer,
+          $$SearchHistoryClearStatesTableCreateCompanionBuilder,
+          $$SearchHistoryClearStatesTableUpdateCompanionBuilder,
+          (
+            SearchHistoryClearState,
+            BaseReferences<
+              _$HazukiDatabase,
+              $SearchHistoryClearStatesTable,
+              SearchHistoryClearState
+            >,
+          ),
+          SearchHistoryClearState,
+          PrefetchHooks Function()
+        > {
+  $$SearchHistoryClearStatesTableTableManager(
+    _$HazukiDatabase db,
+    $SearchHistoryClearStatesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$SearchHistoryClearStatesTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$SearchHistoryClearStatesTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$SearchHistoryClearStatesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<int> clearedAtMs = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => SearchHistoryClearStatesCompanion(
+                id: id,
+                clearedAtMs: clearedAtMs,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required int clearedAtMs,
+                Value<int> rowid = const Value.absent(),
+              }) => SearchHistoryClearStatesCompanion.insert(
+                id: id,
+                clearedAtMs: clearedAtMs,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$SearchHistoryClearStatesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$HazukiDatabase,
+      $SearchHistoryClearStatesTable,
+      SearchHistoryClearState,
+      $$SearchHistoryClearStatesTableFilterComposer,
+      $$SearchHistoryClearStatesTableOrderingComposer,
+      $$SearchHistoryClearStatesTableAnnotationComposer,
+      $$SearchHistoryClearStatesTableCreateCompanionBuilder,
+      $$SearchHistoryClearStatesTableUpdateCompanionBuilder,
+      (
+        SearchHistoryClearState,
+        BaseReferences<
+          _$HazukiDatabase,
+          $SearchHistoryClearStatesTable,
+          SearchHistoryClearState
+        >,
+      ),
+      SearchHistoryClearState,
+      PrefetchHooks Function()
+    >;
 typedef $$LocalFavoriteFoldersTableCreateCompanionBuilder =
     LocalFavoriteFoldersCompanion Function({
       required String id,
       required String name,
       Value<String> sourceKey,
+      Value<int> updatedAtMs,
       Value<int> rowid,
     });
 typedef $$LocalFavoriteFoldersTableUpdateCompanionBuilder =
@@ -4662,6 +5882,7 @@ typedef $$LocalFavoriteFoldersTableUpdateCompanionBuilder =
       Value<String> id,
       Value<String> name,
       Value<String> sourceKey,
+      Value<int> updatedAtMs,
       Value<int> rowid,
     });
 
@@ -4686,6 +5907,11 @@ class $$LocalFavoriteFoldersTableFilterComposer
 
   ColumnFilters<String> get sourceKey => $composableBuilder(
     column: $table.sourceKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get updatedAtMs => $composableBuilder(
+    column: $table.updatedAtMs,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -4713,6 +5939,11 @@ class $$LocalFavoriteFoldersTableOrderingComposer
     column: $table.sourceKey,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get updatedAtMs => $composableBuilder(
+    column: $table.updatedAtMs,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$LocalFavoriteFoldersTableAnnotationComposer
@@ -4732,6 +5963,11 @@ class $$LocalFavoriteFoldersTableAnnotationComposer
 
   GeneratedColumn<String> get sourceKey =>
       $composableBuilder(column: $table.sourceKey, builder: (column) => column);
+
+  GeneratedColumn<int> get updatedAtMs => $composableBuilder(
+    column: $table.updatedAtMs,
+    builder: (column) => column,
+  );
 }
 
 class $$LocalFavoriteFoldersTableTableManager
@@ -4780,11 +6016,13 @@ class $$LocalFavoriteFoldersTableTableManager
                 Value<String> id = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<String> sourceKey = const Value.absent(),
+                Value<int> updatedAtMs = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LocalFavoriteFoldersCompanion(
                 id: id,
                 name: name,
                 sourceKey: sourceKey,
+                updatedAtMs: updatedAtMs,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -4792,11 +6030,13 @@ class $$LocalFavoriteFoldersTableTableManager
                 required String id,
                 required String name,
                 Value<String> sourceKey = const Value.absent(),
+                Value<int> updatedAtMs = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LocalFavoriteFoldersCompanion.insert(
                 id: id,
                 name: name,
                 sourceKey: sourceKey,
+                updatedAtMs: updatedAtMs,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -5637,6 +6877,194 @@ typedef $$LocalFavoriteEntryTombstonesTableProcessedTableManager =
       LocalFavoriteEntryTombstone,
       PrefetchHooks Function()
     >;
+typedef $$LocalFavoriteComicFolderTombstonesTableCreateCompanionBuilder =
+    LocalFavoriteComicFolderTombstonesCompanion Function({
+      required String comicStorageKey,
+      required String folderId,
+      required int deletedAtMs,
+      Value<int> rowid,
+    });
+typedef $$LocalFavoriteComicFolderTombstonesTableUpdateCompanionBuilder =
+    LocalFavoriteComicFolderTombstonesCompanion Function({
+      Value<String> comicStorageKey,
+      Value<String> folderId,
+      Value<int> deletedAtMs,
+      Value<int> rowid,
+    });
+
+class $$LocalFavoriteComicFolderTombstonesTableFilterComposer
+    extends
+        Composer<_$HazukiDatabase, $LocalFavoriteComicFolderTombstonesTable> {
+  $$LocalFavoriteComicFolderTombstonesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get comicStorageKey => $composableBuilder(
+    column: $table.comicStorageKey,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get folderId => $composableBuilder(
+    column: $table.folderId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => ColumnFilters(column),
+  );
+}
+
+class $$LocalFavoriteComicFolderTombstonesTableOrderingComposer
+    extends
+        Composer<_$HazukiDatabase, $LocalFavoriteComicFolderTombstonesTable> {
+  $$LocalFavoriteComicFolderTombstonesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get comicStorageKey => $composableBuilder(
+    column: $table.comicStorageKey,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get folderId => $composableBuilder(
+    column: $table.folderId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$LocalFavoriteComicFolderTombstonesTableAnnotationComposer
+    extends
+        Composer<_$HazukiDatabase, $LocalFavoriteComicFolderTombstonesTable> {
+  $$LocalFavoriteComicFolderTombstonesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get comicStorageKey => $composableBuilder(
+    column: $table.comicStorageKey,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get folderId =>
+      $composableBuilder(column: $table.folderId, builder: (column) => column);
+
+  GeneratedColumn<int> get deletedAtMs => $composableBuilder(
+    column: $table.deletedAtMs,
+    builder: (column) => column,
+  );
+}
+
+class $$LocalFavoriteComicFolderTombstonesTableTableManager
+    extends
+        RootTableManager<
+          _$HazukiDatabase,
+          $LocalFavoriteComicFolderTombstonesTable,
+          LocalFavoriteComicFolderTombstone,
+          $$LocalFavoriteComicFolderTombstonesTableFilterComposer,
+          $$LocalFavoriteComicFolderTombstonesTableOrderingComposer,
+          $$LocalFavoriteComicFolderTombstonesTableAnnotationComposer,
+          $$LocalFavoriteComicFolderTombstonesTableCreateCompanionBuilder,
+          $$LocalFavoriteComicFolderTombstonesTableUpdateCompanionBuilder,
+          (
+            LocalFavoriteComicFolderTombstone,
+            BaseReferences<
+              _$HazukiDatabase,
+              $LocalFavoriteComicFolderTombstonesTable,
+              LocalFavoriteComicFolderTombstone
+            >,
+          ),
+          LocalFavoriteComicFolderTombstone,
+          PrefetchHooks Function()
+        > {
+  $$LocalFavoriteComicFolderTombstonesTableTableManager(
+    _$HazukiDatabase db,
+    $LocalFavoriteComicFolderTombstonesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$LocalFavoriteComicFolderTombstonesTableFilterComposer(
+                $db: db,
+                $table: table,
+              ),
+          createOrderingComposer: () =>
+              $$LocalFavoriteComicFolderTombstonesTableOrderingComposer(
+                $db: db,
+                $table: table,
+              ),
+          createComputedFieldComposer: () =>
+              $$LocalFavoriteComicFolderTombstonesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> comicStorageKey = const Value.absent(),
+                Value<String> folderId = const Value.absent(),
+                Value<int> deletedAtMs = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => LocalFavoriteComicFolderTombstonesCompanion(
+                comicStorageKey: comicStorageKey,
+                folderId: folderId,
+                deletedAtMs: deletedAtMs,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String comicStorageKey,
+                required String folderId,
+                required int deletedAtMs,
+                Value<int> rowid = const Value.absent(),
+              }) => LocalFavoriteComicFolderTombstonesCompanion.insert(
+                comicStorageKey: comicStorageKey,
+                folderId: folderId,
+                deletedAtMs: deletedAtMs,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .toList(),
+          prefetchHooksCallback: null,
+        ),
+      );
+}
+
+typedef $$LocalFavoriteComicFolderTombstonesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$HazukiDatabase,
+      $LocalFavoriteComicFolderTombstonesTable,
+      LocalFavoriteComicFolderTombstone,
+      $$LocalFavoriteComicFolderTombstonesTableFilterComposer,
+      $$LocalFavoriteComicFolderTombstonesTableOrderingComposer,
+      $$LocalFavoriteComicFolderTombstonesTableAnnotationComposer,
+      $$LocalFavoriteComicFolderTombstonesTableCreateCompanionBuilder,
+      $$LocalFavoriteComicFolderTombstonesTableUpdateCompanionBuilder,
+      (
+        LocalFavoriteComicFolderTombstone,
+        BaseReferences<
+          _$HazukiDatabase,
+          $LocalFavoriteComicFolderTombstonesTable,
+          LocalFavoriteComicFolderTombstone
+        >,
+      ),
+      LocalFavoriteComicFolderTombstone,
+      PrefetchHooks Function()
+    >;
 typedef $$DownloadGroupsTableCreateCompanionBuilder =
     DownloadGroupsCompanion Function({
       required String id,
@@ -6368,6 +7796,16 @@ class $HazukiDatabaseManager {
       );
   $$SearchHistoryEntriesTableTableManager get searchHistoryEntries =>
       $$SearchHistoryEntriesTableTableManager(_db, _db.searchHistoryEntries);
+  $$SearchHistoryTombstonesTableTableManager get searchHistoryTombstones =>
+      $$SearchHistoryTombstonesTableTableManager(
+        _db,
+        _db.searchHistoryTombstones,
+      );
+  $$SearchHistoryClearStatesTableTableManager get searchHistoryClearStates =>
+      $$SearchHistoryClearStatesTableTableManager(
+        _db,
+        _db.searchHistoryClearStates,
+      );
   $$LocalFavoriteFoldersTableTableManager get localFavoriteFolders =>
       $$LocalFavoriteFoldersTableTableManager(_db, _db.localFavoriteFolders);
   $$LocalFavoriteComicsTableTableManager get localFavoriteComics =>
@@ -6388,6 +7826,12 @@ class $HazukiDatabaseManager {
       $$LocalFavoriteEntryTombstonesTableTableManager(
         _db,
         _db.localFavoriteEntryTombstones,
+      );
+  $$LocalFavoriteComicFolderTombstonesTableTableManager
+  get localFavoriteComicFolderTombstones =>
+      $$LocalFavoriteComicFolderTombstonesTableTableManager(
+        _db,
+        _db.localFavoriteComicFolderTombstones,
       );
   $$DownloadGroupsTableTableManager get downloadGroups =>
       $$DownloadGroupsTableTableManager(_db, _db.downloadGroups);

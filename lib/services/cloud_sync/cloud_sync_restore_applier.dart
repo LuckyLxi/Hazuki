@@ -75,6 +75,9 @@ class CloudSyncRestoreApplier {
       entryTombstonesRaw: _stringValue(
         data[CloudSyncConfigStore.entryTombstonesKey],
       ),
+      comicFolderTombstonesRaw: _stringValue(
+        data[CloudSyncConfigStore.comicFolderTombstonesKey],
+      ),
       replace: true,
     );
     return CloudSyncApplySettingsResult(
@@ -152,34 +155,7 @@ class CloudSyncRestoreApplier {
   }
 
   Future<void> applySearchHistoryJsonl(String content) async {
-    final lines = content.split('\n');
-    final list = <String>[];
-    for (final raw in lines) {
-      final line = raw.trim();
-      if (line.isEmpty) {
-        continue;
-      }
-      try {
-        final decoded = jsonDecode(line);
-        if (decoded is Map) {
-          final keyword = (decoded['keyword'] ?? '').toString().trim();
-          if (keyword.isNotEmpty) {
-            list.add(keyword);
-          }
-        }
-      } catch (_) {}
-    }
-    final deduped = <String>[];
-    final seen = <String>{};
-    for (final keyword in list) {
-      if (seen.add(keyword)) {
-        deduped.add(keyword);
-        if (deduped.length >= hazukiSearchHistoryMaxCount) {
-          break;
-        }
-      }
-    }
-    await _searchHistoryService.replace(deduped);
+    await _searchHistoryService.restoreSyncJsonl(content);
   }
 
   Future<bool> applySourceFile({

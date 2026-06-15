@@ -62,6 +62,7 @@ class _SearchEntryPageState extends State<SearchEntryPage>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _focusCoordinator.primaryFocusNode.addListener(_handleSearchFocusChanged);
+    _historyService.addListener(_handleHistoryChanged);
   }
 
   @override
@@ -85,6 +86,7 @@ class _SearchEntryPageState extends State<SearchEntryPage>
     _focusCoordinator.primaryFocusNode.removeListener(
       _handleSearchFocusChanged,
     );
+    _historyService.removeListener(_handleHistoryChanged);
     WidgetsBinding.instance.removeObserver(this);
     _idExtractController.dispose();
     _focusCoordinator.dispose();
@@ -145,6 +147,10 @@ class _SearchEntryPageState extends State<SearchEntryPage>
     } else {
       _idExtractController.scheduleHideIfUnfocused();
     }
+  }
+
+  void _handleHistoryChanged() {
+    unawaited(_loadHistory());
   }
 
   Future<void> _loadHistory() async {
