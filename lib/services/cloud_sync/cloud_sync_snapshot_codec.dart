@@ -288,6 +288,14 @@ class CloudSyncSnapshotCodec {
     }
     settingsMap[CloudSyncConfigStore.downloadGroupsKey] =
         await _downloadGroupsService.exportJsonString();
+    settingsMap[CloudSyncConfigStore.localFavoriteFoldersKey] =
+        await _localFavoritesService.exportFoldersJsonString();
+    settingsMap[CloudSyncConfigStore.localFavoriteEntriesKey] =
+        await _localFavoritesService.exportEntriesJsonString();
+    settingsMap[CloudSyncConfigStore.folderTombstonesKey] =
+        await _localFavoritesService.exportFolderTombstonesJsonString();
+    settingsMap[CloudSyncConfigStore.entryTombstonesKey] =
+        await _localFavoritesService.exportEntryTombstonesJsonString();
     final settingsJson = jsonEncode({
       'version': 2,
       'updatedAtMs': DateTime.now().millisecondsSinceEpoch,
@@ -410,7 +418,8 @@ class CloudSyncSnapshotCodec {
     }
 
     List<Map<String, dynamic>> remoteFolders = const [];
-    final remoteFoldersRaw = remoteData['local_favorite_folders_v1'];
+    final remoteFoldersRaw =
+        remoteData[CloudSyncConfigStore.localFavoriteFoldersKey];
     if (remoteFoldersRaw is String && remoteFoldersRaw.isNotEmpty) {
       try {
         final decoded = jsonDecode(remoteFoldersRaw);
@@ -464,7 +473,8 @@ class CloudSyncSnapshotCodec {
     }
 
     List<Map<String, dynamic>> remoteEntries = const [];
-    final remoteEntriesRaw = remoteData['local_favorite_entries_v1'];
+    final remoteEntriesRaw =
+        remoteData[CloudSyncConfigStore.localFavoriteEntriesKey];
     if (remoteEntriesRaw is String && remoteEntriesRaw.isNotEmpty) {
       try {
         final decoded = jsonDecode(remoteEntriesRaw);

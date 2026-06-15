@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../app/app_preferences.dart';
 import '../hazuki_source_service.dart';
+import '../local_favorites_service.dart';
 import '../reading_progress_service.dart';
 import '../read_history_service.dart';
 import '../../features/search/support/search_history_service.dart';
@@ -13,13 +14,18 @@ import 'cloud_sync_config_store.dart';
 import 'cloud_sync_models.dart';
 
 class CloudSyncRestoreApplier {
-  CloudSyncRestoreApplier({HazukiSourceService? sourceService})
-    : _sourceService = sourceService ?? sl<HazukiSourceService>(),
-      _readHistoryService = sl<ReadHistoryService>(),
-      _readingProgressService = sl<ReadingProgressService>(),
-      _searchHistoryService = sl<SearchHistoryService>();
+  CloudSyncRestoreApplier({
+    HazukiSourceService? sourceService,
+    LocalFavoritesService? localFavoritesService,
+  }) : _sourceService = sourceService ?? sl<HazukiSourceService>(),
+       _localFavoritesService =
+           localFavoritesService ?? sl<LocalFavoritesService>(),
+       _readHistoryService = sl<ReadHistoryService>(),
+       _readingProgressService = sl<ReadingProgressService>(),
+       _searchHistoryService = sl<SearchHistoryService>();
 
   final HazukiSourceService _sourceService;
+  final LocalFavoritesService _localFavoritesService;
   final ReadHistoryService _readHistoryService;
   final ReadingProgressService _readingProgressService;
   final SearchHistoryService _searchHistoryService;
@@ -56,11 +62,28 @@ class CloudSyncRestoreApplier {
       }
       await _setPrefValue(prefs, entry.key, sanitized);
     }
+    await _localFavoritesService.importJsonStrings(
+      foldersRaw: _stringValue(
+        data[CloudSyncConfigStore.localFavoriteFoldersKey],
+      ),
+      entriesRaw: _stringValue(
+        data[CloudSyncConfigStore.localFavoriteEntriesKey],
+      ),
+      folderTombstonesRaw: _stringValue(
+        data[CloudSyncConfigStore.folderTombstonesKey],
+      ),
+      entryTombstonesRaw: _stringValue(
+        data[CloudSyncConfigStore.entryTombstonesKey],
+      ),
+      replace: true,
+    );
     return CloudSyncApplySettingsResult(
       appliedPlatformFilteredKeys: appliedPlatformFilteredKeys,
       skippedKeys: skippedKeys,
     );
   }
+
+  String? _stringValue(dynamic value) => value is String ? value : null;
 
   Future<void> _restoreManualRestoreSpecialSettings(
     SharedPreferences prefs,

@@ -29,10 +29,12 @@ class CloudSyncService {
   final CloudSyncConfigStore _configStore = CloudSyncConfigStore();
   late final CloudSyncSnapshotCodec _snapshotCodec = CloudSyncSnapshotCodec(
     configStore: _configStore,
+    localFavoritesService: _localFavorites,
     downloadGroupsService: _downloadGroups,
   );
-  late final CloudSyncRestoreApplier _restoreApplier =
-      CloudSyncRestoreApplier();
+  late final CloudSyncRestoreApplier _restoreApplier = CloudSyncRestoreApplier(
+    localFavoritesService: _localFavorites,
+  );
   late final CloudSyncFacade facade = CloudSyncFacade._(
     configStore: _configStore,
     snapshotCodec: _snapshotCodec,

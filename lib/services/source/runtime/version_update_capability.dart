@@ -6,11 +6,21 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
   }
 
   Future<SourceVersionCheckResult?> checkJmSourceVersionFromCloud() async {
-    final facade = this.facade;
-    final sourceKey = activeSourceKey;
+    final handle = _activeHandle;
+    return handle.runOperation(() => _checkSourceVersionFromCloud(handle));
+  }
+
+  Future<SourceVersionCheckResult?> _checkSourceVersionFromCloud(
+    SourceRuntimeHandle handle,
+  ) async {
+    final facade = handle.facade;
+    final sourceKey = handle.sourceKey;
     final sourceDefinition = _definitionForSourceKey(sourceKey);
-    final sourceName = _sourceUpdateDisplayName(sourceDefinition);
-    final sourceDir = await _getSourceStorageDirectory();
+    final sourceName = _sourceUpdateDisplayName(
+      sourceDefinition,
+      targetFacade: facade,
+    );
+    final sourceDir = await _getSourceStorageDirectory(sourceKey: sourceKey);
     final jmFile = File('${sourceDir.path}/source.js');
     if (!await jmFile.exists()) {
       facade.lastSourceVersionDebugInfo = {
@@ -29,6 +39,7 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
       sourceKey: sourceKey,
       sourceName: sourceName,
       sourceDefinition: sourceDefinition,
+      targetFacade: facade,
     );
     if (remoteVersionDirect != null && remoteVersionDirect.isNotEmpty) {
       final hasUpdate = _isVersionGreater(remoteVersionDirect, localVersion);
@@ -54,7 +65,10 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
       );
     }
 
-    final indexRaw = await _downloadFromUrls(_sourceIndexUrls);
+    final indexRaw = await _downloadFromUrls(
+      _sourceIndexUrls,
+      targetFacade: facade,
+    );
     if (indexRaw == null || indexRaw.trim().isEmpty) {
       facade.lastSourceVersionDebugInfo = {
         'checkedAt': DateTime.now().toIso8601String(),
@@ -148,16 +162,29 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
   Future<bool> downloadActiveSourceAndReload({
     void Function(int received, int total)? onProgress,
   }) async {
-    final facade = this.facade;
-    final sourceDir = await _getSourceStorageDirectory();
+    final handle = _activeHandle;
+    return handle.runOperation(
+      () => _downloadSourceAndMarkForRestart(handle, onProgress: onProgress),
+    );
+  }
+
+  Future<bool> _downloadSourceAndMarkForRestart(
+    SourceRuntimeHandle handle, {
+    void Function(int received, int total)? onProgress,
+  }) async {
+    final facade = handle.facade;
+    final sourceDir = await _getSourceStorageDirectory(
+      sourceKey: handle.sourceKey,
+    );
     if (!await sourceDir.exists()) {
       await sourceDir.create(recursive: true);
     }
     final jmFile = File('${sourceDir.path}/source.js');
 
     final jmScript = await _downloadFromUrlsWithProgress(
-      await _resolveActiveSourceDownloadUrls(),
+      await _resolveActiveSourceDownloadUrls(handle: handle),
       onProgress: onProgress,
+      targetFacade: facade,
     );
     if (jmScript == null || jmScript.trim().isEmpty) {
       return false;
@@ -165,7 +192,11 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
 
     final downloadedVersion = _extractSourceVersion(jmScript);
     await jmFile.writeAsString(jmScript);
-    await _setCustomEditedSourceFlag(activeSourceKey, false);
+    await _setCustomEditedSourceFlag(
+      handle.sourceKey,
+      false,
+      targetFacade: facade,
+    );
 
     facade.lastSourceVersionDebugInfo = {
       'checkedAt': DateTime.now().toIso8601String(),
@@ -176,6 +207,7 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
     _setRuntimeWaitingForRestartState(
       statusText: 'source_downloaded_waiting_for_restart|$downloadedVersion',
       debugDetail: 'downloaded_jm_script',
+      targetFacade: facade,
     );
     return true;
   }
@@ -187,7 +219,14 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
   }
 
   Future<bool> refreshSourceOnNetworkRecovery() async {
-    final facade = this.facade;
+    final handle = _activeHandle;
+    return handle.runOperation(() => _refreshSourceOnNetworkRecovery(handle));
+  }
+
+  Future<bool> _refreshSourceOnNetworkRecovery(
+    SourceRuntimeHandle handle,
+  ) async {
+    final facade = handle.facade;
     if (facade.isRefreshingSource) {
       return false;
     }
@@ -200,22 +239,23 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
         SourceRuntimeStep.downloadingSource,
         statusText: 'source_refreshing_after_network_recovery',
         debugDetail: 'network_recovery',
+        targetFacade: facade,
       );
       facade.lastReloginAt = null;
       facade.favoritesDebugCache = null;
-      exploreCache.clearMemory();
+      handle.exploreCache.clearMemory();
       facade.cache.clearCategoryTagGroupsMemoryCache();
       facade.runtime.sourceMeta = null;
-      final result = await _downloadOrLoadSourceFiles();
-      final meta = await _loadSourceMetadata(result.jmFile);
+      final result = await _downloadOrLoadSourceFiles(handle: handle);
+      final meta = await _loadSourceMetadata(result.jmFile, handle: handle);
       facade.runtime.sourceMeta = meta;
-      _setRuntimeReadyState(result: result, meta: meta);
-      if (isLogged) {
+      _setRuntimeReadyState(result: result, meta: meta, targetFacade: facade);
+      if (activeSourceKey == handle.sourceKey && facade.isLogged) {
         await _tryReloginFromStoredAccount(force: true);
       }
       return true;
     } catch (e) {
-      _setRuntimeFailedState(e);
+      _setRuntimeFailedState(e, targetFacade: facade);
       return false;
     } finally {
       facade.isRefreshingSource = false;
@@ -231,10 +271,12 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
     required String sourceKey,
     required String sourceName,
     required SourceCatalogEntry sourceDefinition,
+    required HazukiSourceFacade targetFacade,
   }) async {
     final indexRaw = await _downloadFromUrls(
       _sourceIndexUrls,
       source: 'source_version_index',
+      targetFacade: targetFacade,
     );
     if (indexRaw != null && indexRaw.trim().isNotEmpty) {
       try {
@@ -257,7 +299,7 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
             }
             final version = map['version']?.toString().trim();
             if (version != null && version.isNotEmpty) {
-              facade.lastSourceVersionDebugInfo = {
+              targetFacade.lastSourceVersionDebugInfo = {
                 'checkedAt': DateTime.now().toIso8601String(),
                 'resolvedFrom': 'index_json',
                 'sourceKey': sourceKey,
@@ -274,11 +316,15 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
     }
 
     final remoteScript = await _downloadFromUrls(
-      await _resolveSourceVersionDownloadUrls(sourceDefinition),
+      await _resolveSourceVersionDownloadUrls(
+        sourceDefinition,
+        targetFacade: targetFacade,
+      ),
       source: 'source_version_script',
+      targetFacade: targetFacade,
     );
     if (remoteScript == null || remoteScript.trim().isEmpty) {
-      facade.lastSourceVersionDebugInfo = {
+      targetFacade.lastSourceVersionDebugInfo = {
         'checkedAt': DateTime.now().toIso8601String(),
         'resolvedFrom': 'failed',
         'sourceKey': sourceKey,
@@ -288,7 +334,7 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
       return null;
     }
     final version = _extractSourceVersion(remoteScript);
-    facade.lastSourceVersionDebugInfo = {
+    targetFacade.lastSourceVersionDebugInfo = {
       'checkedAt': DateTime.now().toIso8601String(),
       'resolvedFrom': 'source_script',
       'sourceKey': sourceKey,
@@ -299,8 +345,9 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
   }
 
   Future<List<String>> _resolveSourceVersionDownloadUrls(
-    SourceCatalogEntry definition,
-  ) async {
+    SourceCatalogEntry definition, {
+    HazukiSourceFacade? targetFacade,
+  }) async {
     final directUrls = definition.directUrls
         .map((url) => url.trim())
         .where((url) => url.isNotEmpty)
@@ -312,6 +359,7 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
     final indexRaw = await _downloadFromUrls(
       _sourceIndexUrls,
       source: 'source_version_download_index',
+      targetFacade: targetFacade,
     );
     if (indexRaw == null || indexRaw.trim().isEmpty) {
       return definition.fallbackUrls();
@@ -346,8 +394,12 @@ extension HazukiSourceServiceVersionUpdateCapability on HazukiSourceService {
     return definition.fallbackUrls();
   }
 
-  String _sourceUpdateDisplayName(SourceCatalogEntry definition) {
-    final metaName = sourceMeta?.name.trim() ?? '';
+  String _sourceUpdateDisplayName(
+    SourceCatalogEntry definition, {
+    HazukiSourceFacade? targetFacade,
+  }) {
+    final metaName =
+        (targetFacade?.sourceMeta ?? sourceMeta)?.name.trim() ?? '';
     if (metaName.isNotEmpty) {
       return metaName;
     }

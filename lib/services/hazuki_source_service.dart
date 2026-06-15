@@ -320,6 +320,8 @@ class SourceRuntimeHandle {
   final Dio dio = _createSourceDio();
   final SourceRuntimeKernel runtime = SourceRuntimeKernel();
   bool _disposed = false;
+  bool _disposeRequested = false;
+  int _activeOperationCount = 0;
   late final SourceSessionStore session = SourceSessionStore(
     sourceKey: sourceKey,
     secureStorage: service._secureSessionStorage,
@@ -349,14 +351,37 @@ class SourceRuntimeHandle {
     facade,
   );
   late final ImageCacheCapability imageCache = ImageCacheCapability(this);
-  late final ExploreCacheCapability exploreCache = ExploreCacheCapability(
-    service,
-  );
+  late final ExploreCacheCapability exploreCache = ExploreCacheCapability(this);
   late final DebugLogCapability debugLog = DebugLogCapability(facade);
 
   bool get isDisposed => _disposed;
 
-  void dispose() {
+  Future<T> runOperation<T>(Future<T> Function() operation) async {
+    if (_disposed || _disposeRequested) {
+      throw StateError('source_runtime_disposed:$sourceKey');
+    }
+    _activeOperationCount += 1;
+    try {
+      return await operation();
+    } finally {
+      _activeOperationCount -= 1;
+      if (_disposeRequested && _activeOperationCount == 0) {
+        _disposeNow();
+      }
+    }
+  }
+
+  void requestDispose() {
+    if (_disposed || _disposeRequested) {
+      return;
+    }
+    _disposeRequested = true;
+    if (_activeOperationCount == 0) {
+      _disposeNow();
+    }
+  }
+
+  void _disposeNow() {
     if (_disposed) {
       return;
     }
@@ -393,6 +418,7 @@ class HazukiSourceService extends ChangeNotifier {
   final Map<String, SourceRuntimeHandle> _runtimeHandles =
       <String, SourceRuntimeHandle>{};
   String _activeSourceKey = hazukiDefaultSourceKey;
+  Future<void> _activationTail = Future<void>.value();
 
   final StreamController<void> _cloudFavoritesChangedController =
       StreamController<void>.broadcast();
@@ -416,6 +442,14 @@ class HazukiSourceService extends ChangeNotifier {
   Dio get dio => _activeHandle.dio;
   HazukiSourceFacade get facade => _activeHandle.facade;
   LineSettingsCapability get lineSettings => _activeHandle.lineSettings;
+
+  @visibleForTesting
+  dynamic handleJsMessageForTesting(
+    SourceRuntimeHandle handle,
+    dynamic message,
+  ) {
+    return _handleJsMessageForHandle(handle, message);
+  }
 
   Future<Map<String, dynamic>> getLineSettingsSnapshot() =>
       lineSettings.getSnapshot();
@@ -678,6 +712,15 @@ class HazukiSourceService extends ChangeNotifier {
   }
 
   Future<void> loadActiveSourcePreference() async {
+    final load = _activationTail.then<void>(
+      (_) => _loadActiveSourcePreferenceSerially(),
+      onError: (_, _) => _loadActiveSourcePreferenceSerially(),
+    );
+    _activationTail = load;
+    await load;
+  }
+
+  Future<void> _loadActiveSourcePreferenceSerially() async {
     final prefs = await _activeHandle.session.ensurePrefs();
     for (final source in hazukiAllowedSourceCatalog) {
       final session = _handleFor(source.key).session;
@@ -692,17 +735,27 @@ class HazukiSourceService extends ChangeNotifier {
 
   Future<void> activateSource(String sourceKey) async {
     final normalized = _normalizeAllowedSourceKey(sourceKey);
+    final activation = _activationTail.then<void>(
+      (_) => _activateSourceSerially(normalized),
+      onError: (_, _) => _activateSourceSerially(normalized),
+    );
+    _activationTail = activation;
+    await activation;
+  }
+
+  Future<void> _activateSourceSerially(String normalized) async {
     if (normalized == _activeSourceKey) {
       return;
     }
     final previousSourceKey = _activeSourceKey;
     final previousHandle = _runtimeHandles[previousSourceKey];
-    _activeSourceKey = normalized;
-    final prefs = await _activeHandle.session.ensurePrefs();
+    final nextHandle = _handleFor(normalized);
+    final prefs = await nextHandle.session.ensurePrefs();
     await prefs.setString(SourcePrefsKeys.activeSourceKey, normalized);
+    _activeSourceKey = normalized;
     if (identical(_runtimeHandles[previousSourceKey], previousHandle)) {
       _runtimeHandles.remove(previousSourceKey);
-      previousHandle?.dispose();
+      previousHandle?.requestDispose();
     }
     notifyListeners();
     runtimeRegistry._notify();

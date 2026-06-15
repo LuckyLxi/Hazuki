@@ -52,16 +52,11 @@ extension HazukiSourceServiceSourceFileManagementCapability
   }
 
   Future<String> loadEditableSource(String sourceKey) async {
-    final previous = activeSourceKey;
-    await activateSource(sourceKey);
-    try {
-      final result = await _downloadOrLoadSourceFiles();
+    final handle = _handleFor(sourceKey);
+    return handle.runOperation(() async {
+      final result = await _downloadOrLoadSourceFiles(handle: handle);
       return result.jmFile.readAsString();
-    } finally {
-      if (previous != activeSourceKey) {
-        await activateSource(previous);
-      }
-    }
+    });
   }
 
   Future<void> writeLocalSource(String sourceKey, String content) async {
@@ -78,28 +73,28 @@ extension HazukiSourceServiceSourceFileManagementCapability
   }
 
   Future<void> saveEditedSource(String sourceKey, String content) async {
-    final previous = activeSourceKey;
-    await activateSource(sourceKey);
-    try {
-      final facade = this.facade;
-      final result = await _downloadOrLoadSourceFiles();
+    final handle = _handleFor(sourceKey);
+    await handle.runOperation(() async {
+      final facade = handle.facade;
+      final result = await _downloadOrLoadSourceFiles(handle: handle);
       await result.jmFile.writeAsString(content, flush: true);
-      await _setCustomEditedSourceFlag(activeSourceKey, true);
+      await _setCustomEditedSourceFlag(
+        handle.sourceKey,
+        true,
+        targetFacade: facade,
+      );
       facade.lastSourceVersionDebugInfo = {
         'checkedAt': DateTime.now().toIso8601String(),
         'resolvedFrom': 'local_source_editor',
-        'sourceKey': activeSourceKey,
+        'sourceKey': handle.sourceKey,
         'outcome': 'edited_waiting_for_restart',
       };
       _setRuntimeWaitingForRestartState(
         statusText: 'source_edited_waiting_for_restart',
         debugDetail: 'local_source_editor',
+        targetFacade: facade,
       );
-    } finally {
-      if (previous != activeSourceKey) {
-        await activateSource(previous);
-      }
-    }
+    });
   }
 
   Future<bool> hasLocalJmSourceFile() async {
@@ -125,30 +120,29 @@ extension HazukiSourceServiceSourceFileManagementCapability
     void Function(int received, int total)? onProgress,
   }) async {
     final normalizedSourceKey = _normalizeAllowedSourceKey(sourceKey);
-    final previous = activeSourceKey;
-    await activateSource(normalizedSourceKey);
-    try {
-      final facade = this.facade;
+    final handle = _handleFor(normalizedSourceKey);
+    await handle.runOperation(() async {
+      final facade = handle.facade;
       facade.lastReloginAt = null;
-      exploreCache.clearMemory();
+      handle.exploreCache.clearMemory();
       facade.cache.clearCategoryTagGroupsMemoryCache();
-      final result = await _downloadSourceFiles(onProgress: onProgress);
-      await _setCustomEditedSourceFlag(activeSourceKey, false);
+      final result = await _downloadSourceFiles(
+        handle: handle,
+        onProgress: onProgress,
+      );
+      await _setCustomEditedSourceFlag(
+        handle.sourceKey,
+        false,
+        targetFacade: facade,
+      );
       facade.lastSourceVersionDebugInfo = {
         'checkedAt': DateTime.now().toIso8601String(),
         'resolvedFrom': 'manual_source_download',
-        'sourceKey': activeSourceKey,
+        'sourceKey': handle.sourceKey,
         'outcome': result.message,
       };
-    } catch (_) {
-      if (previous != activeSourceKey) {
-        try {
-          await activateSource(previous);
-          await ensureInitialized();
-        } catch (_) {}
-      }
-      rethrow;
-    }
+    });
+    await activateSource(normalizedSourceKey);
   }
 
   Future<bool> hasCustomEditedActiveSource() async {
@@ -157,7 +151,7 @@ extension HazukiSourceServiceSourceFileManagementCapability
 
   Future<bool> hasCustomEditedSource(String sourceKey) async {
     final normalizedSourceKey = _normalizeAllowedSourceKey(sourceKey);
-    final prefs = await facade.ensurePrefs();
+    final prefs = await _handleFor(normalizedSourceKey).facade.ensurePrefs();
     final scopedKey = SourcePrefsKeys.customEditedSource(normalizedSourceKey);
     if (prefs.containsKey(scopedKey)) {
       return prefs.getBool(scopedKey) ?? false;
@@ -172,9 +166,14 @@ extension HazukiSourceServiceSourceFileManagementCapability
     return hasCustomEditedActiveSource();
   }
 
-  Future<void> _setCustomEditedSourceFlag(String sourceKey, bool value) async {
+  Future<void> _setCustomEditedSourceFlag(
+    String sourceKey,
+    bool value, {
+    HazukiSourceFacade? targetFacade,
+  }) async {
     final normalizedSourceKey = _normalizeAllowedSourceKey(sourceKey);
-    final prefs = await facade.ensurePrefs();
+    final prefs = await (targetFacade ?? _handleFor(normalizedSourceKey).facade)
+        .ensurePrefs();
     await prefs.setBool(
       SourcePrefsKeys.customEditedSource(normalizedSourceKey),
       value,
@@ -185,37 +184,42 @@ extension HazukiSourceServiceSourceFileManagementCapability
   }
 
   Future<void> reloadFromLocalSourceFiles() async {
-    final facade = this.facade;
-    if (facade.isRefreshingSource) {
-      throw Exception('source_reload_in_progress');
-    }
-    facade.isRefreshingSource = true;
-    try {
-      _setRuntimeBusyState(
-        SourceRuntimePhase.loading,
-        SourceRuntimeStep.loadingCache,
-        statusText: 'source_reloading_from_local_restore',
-        debugDetail: 'cloud_sync_restore',
-      );
-      facade.lastReloginAt = null;
-      facade.favoritesDebugCache = null;
-      exploreCache.clearMemory();
-      facade.cache.clearCategoryTagGroupsMemoryCache();
-      final result = await _ensureLocalSourceFiles();
-      _setRuntimeBusyState(
-        SourceRuntimePhase.loading,
-        SourceRuntimeStep.creatingEngine,
-        debugDetail: 'creating_engine',
-      );
-      final meta = await _loadSourceMetadata(result.jmFile);
-      facade.runtime.sourceMeta = meta;
-      _setRuntimeReadyState(result: result, meta: meta);
-      if (isLogged) {
-        await _tryReloginFromStoredAccount(force: true);
+    final handle = _activeHandle;
+    await handle.runOperation(() async {
+      final facade = handle.facade;
+      if (facade.isRefreshingSource) {
+        throw Exception('source_reload_in_progress');
       }
-    } finally {
-      facade.isRefreshingSource = false;
-    }
+      facade.isRefreshingSource = true;
+      try {
+        _setRuntimeBusyState(
+          SourceRuntimePhase.loading,
+          SourceRuntimeStep.loadingCache,
+          statusText: 'source_reloading_from_local_restore',
+          debugDetail: 'cloud_sync_restore',
+          targetFacade: facade,
+        );
+        facade.lastReloginAt = null;
+        facade.favoritesDebugCache = null;
+        handle.exploreCache.clearMemory();
+        facade.cache.clearCategoryTagGroupsMemoryCache();
+        final result = await _ensureLocalSourceFiles(handle: handle);
+        _setRuntimeBusyState(
+          SourceRuntimePhase.loading,
+          SourceRuntimeStep.creatingEngine,
+          debugDetail: 'creating_engine',
+          targetFacade: facade,
+        );
+        final meta = await _loadSourceMetadata(result.jmFile, handle: handle);
+        facade.runtime.sourceMeta = meta;
+        _setRuntimeReadyState(result: result, meta: meta, targetFacade: facade);
+        if (activeSourceKey == handle.sourceKey && facade.isLogged) {
+          await _tryReloginFromStoredAccount(force: true);
+        }
+      } finally {
+        facade.isRefreshingSource = false;
+      }
+    });
   }
 
   Future<Directory> _getSourceStorageDirectory({String? sourceKey}) async {

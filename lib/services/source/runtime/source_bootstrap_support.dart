@@ -33,16 +33,32 @@ extension SourceBootstrapSupport on HazukiSourceService {
     void Function(int received, int total)? onSourceDownloadProgress,
     bool prewarm = false,
   }) async {
-    final facade = this.facade;
+    final handle = _activeHandle;
+    await _initHandle(
+      handle,
+      onSourceDownloadProgress: onSourceDownloadProgress,
+      prewarm: prewarm,
+    );
+  }
+
+  Future<void> _initHandle(
+    SourceRuntimeHandle handle, {
+    void Function(int received, int total)? onSourceDownloadProgress,
+    required bool prewarm,
+  }) async {
+    final facade = handle.facade;
     final inFlight = facade.initFuture;
     if (inFlight != null) {
       await inFlight;
       return;
     }
 
-    final future = _initInternal(
-      onSourceDownloadProgress: onSourceDownloadProgress,
-      prewarm: prewarm,
+    final future = handle.runOperation(
+      () => _initInternal(
+        handle,
+        onSourceDownloadProgress: onSourceDownloadProgress,
+        prewarm: prewarm,
+      ),
     );
     facade.initFuture = future;
     try {
@@ -58,36 +74,41 @@ extension SourceBootstrapSupport on HazukiSourceService {
     if (sourceKey != null && sourceKey.trim().isNotEmpty) {
       await activateSource(sourceKey);
     }
-    final facade = this.facade;
-    if (isInitialized) {
+    final handle = _activeHandle;
+    final facade = handle.facade;
+    if (_isHandleInitialized(handle)) {
       return;
     }
 
     final inFlight = facade.initFuture;
     if (inFlight == null) {
-      await init();
+      await _initHandle(handle, prewarm: false);
     } else {
       await inFlight;
     }
 
-    if (isInitialized) {
+    if (_isHandleInitialized(handle)) {
       return;
     }
 
     facade.initFuture = null;
-    await init();
+    await _initHandle(handle, prewarm: false);
 
-    if (!isInitialized) {
+    if (!_isHandleInitialized(handle)) {
       throw Exception('source_not_initialized:${facade.statusText}');
     }
   }
 
-  Future<void> _initInternal({
+  bool _isHandleInitialized(SourceRuntimeHandle handle) {
+    return handle.runtime.engine != null && handle.runtime.sourceMeta != null;
+  }
+
+  Future<void> _initInternal(
+    SourceRuntimeHandle handle, {
     void Function(int received, int total)? onSourceDownloadProgress,
     required bool prewarm,
   }) async {
-    await loadActiveSourcePreference();
-    final facade = this.facade;
+    final facade = handle.facade;
     final busyPhase = switch (facade.runtimeState.phase) {
       SourceRuntimePhase.failed => SourceRuntimePhase.retrying,
       _ when prewarm => SourceRuntimePhase.prewarming,
@@ -100,41 +121,48 @@ extension SourceBootstrapSupport on HazukiSourceService {
         SourceRuntimeStep.loadingCache,
         statusText: prewarm ? 'source_prewarming' : 'source_initializing',
         debugDetail: 'loading_cache',
+        targetFacade: facade,
       );
       final prefs = await facade.ensurePrefs();
       facade.debug.softwareLogCaptureEnabled =
           prefs.getBool(SourcePrefsKeys.softwareLogCaptureEnabled) ?? false;
-      _configureDioCookieBridge();
-      await imageCache.init();
-      await exploreCache.init();
+      _configureDioCookieBridge(handle);
+      await handle.imageCache.init();
+      await handle.exploreCache.init();
       _setRuntimeBusyState(
         busyPhase,
         SourceRuntimeStep.downloadingSource,
         debugDetail: 'downloading_source',
+        targetFacade: facade,
       );
       final result = await _downloadOrLoadSourceFiles(
+        handle: handle,
         onProgress: onSourceDownloadProgress,
       );
       _setRuntimeBusyState(
         busyPhase,
         SourceRuntimeStep.creatingEngine,
         debugDetail: 'creating_engine',
+        targetFacade: facade,
       );
-      final meta = await _loadSourceMetadata(result.jmFile);
+      final meta = await _loadSourceMetadata(result.jmFile, handle: handle);
       facade.runtime.sourceMeta = meta;
-      _setRuntimeReadyState(result: result, meta: meta);
+      _setRuntimeReadyState(result: result, meta: meta, targetFacade: facade);
     } catch (e) {
-      _setRuntimeFailedState(e);
+      _setRuntimeFailedState(e, targetFacade: facade);
     }
   }
 
   Future<String?> _downloadFromUrls(
     List<String> urls, {
     String source = 'source_fetch',
+    HazukiSourceFacade? targetFacade,
   }) async {
     if (urls.isEmpty) {
       return null;
     }
+
+    final facade = targetFacade ?? this.facade;
 
     Future<String?> requestOnce(String url) async {
       final startedAt = DateTime.now();
@@ -209,7 +237,9 @@ extension SourceBootstrapSupport on HazukiSourceService {
     List<String> urls, {
     void Function(int received, int total)? onProgress,
     String source = 'source_download',
+    HazukiSourceFacade? targetFacade,
   }) async {
+    final facade = targetFacade ?? this.facade;
     for (final url in urls) {
       final startedAt = DateTime.now();
       final requestUrl = facade.httpGateway.normalizeUrl(url);

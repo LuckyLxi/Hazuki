@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 import 'dart:convert';
 import 'package:hazuki/app/service_locator.dart';
@@ -7,6 +8,7 @@ import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/cloud_sync_service.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/services/source/debug/debug_log_internals.dart';
+import 'package:hazuki/services/source/common/source_prefs_keys.dart';
 import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../support/test_service_locator.dart';
@@ -96,6 +98,38 @@ void main() {
       expect(service.activeSourceKey, hazukiDefaultSourceKey);
     },
   );
+
+  test('concurrent source switches commit in request order', () async {
+    final service = sl<HazukiSourceService>();
+
+    final first = service.activateSource('copy_manga');
+    final second = service.activateSource('picacg');
+    await Future.wait([first, second]);
+
+    final prefs = await SharedPreferences.getInstance();
+    expect(service.activeSourceKey, 'picacg');
+    expect(prefs.getString(SourcePrefsKeys.activeSourceKey), 'picacg');
+  });
+
+  test('switching source defers disposal of a running runtime', () async {
+    final service = sl<HazukiSourceService>();
+    final originalHandle = service.facade.handle;
+    final operationStarted = Completer<void>();
+    final releaseOperation = Completer<void>();
+
+    final operation = originalHandle.runOperation(() async {
+      operationStarted.complete();
+      await releaseOperation.future;
+    });
+    await operationStarted.future;
+
+    await service.activateSource('copy_manga');
+    expect(originalHandle.isDisposed, isFalse);
+
+    releaseOperation.complete();
+    await operation;
+    expect(originalHandle.isDisposed, isTrue);
+  });
 
   test(
     'CloudSyncFacade keeps config and remote client access reachable',
@@ -327,6 +361,92 @@ void main() {
       expect(service.isLoggedForSource('copy_manga'), isTrue);
     },
   );
+
+  test('JS bridge rejects cross-source session access', () async {
+    SharedPreferences.setMockInitialValues({
+      'source_data_jm': jsonEncode({
+        'settings': {'favoriteOrder': 'mr'},
+      }),
+      'source_data_copy_manga': jsonEncode({
+        'settings': {'favoriteOrder': 'time'},
+      }),
+    });
+    final secureStorage = MemorySourceSecureSessionStorage();
+    final service = HazukiSourceService(secureSessionStorage: secureStorage);
+    final handle = SourceRuntimeHandle(
+      service: service,
+      sourceKey: hazukiDefaultSourceKey,
+    );
+    await handle.facade.ensurePrefs();
+    await handle.facade.saveSourceData('copy_manga', 'token', 'copy-token');
+
+    dynamic invoke(Map<String, dynamic> message) {
+      return service.handleJsMessageForTesting(handle, message);
+    }
+
+    expect(
+      invoke({
+        'method': 'load_setting',
+        'key': hazukiDefaultSourceKey,
+        'setting_key': 'favoriteOrder',
+      }),
+      'mr',
+    );
+    await invoke({
+      'method': 'save_data',
+      'key': hazukiDefaultSourceKey,
+      'data_key': 'token',
+      'data': 'jm-token',
+    });
+    expect(
+      invoke({
+        'method': 'load_data',
+        'key': hazukiDefaultSourceKey,
+        'data_key': 'token',
+      }),
+      'jm-token',
+    );
+
+    for (final message in <Map<String, dynamic>>[
+      {'method': 'load_data', 'key': 'copy_manga', 'data_key': 'token'},
+      {
+        'method': 'save_data',
+        'key': 'copy_manga',
+        'data_key': 'token',
+        'data': 'overwritten',
+      },
+      {'method': 'delete_data', 'key': 'copy_manga', 'data_key': 'token'},
+      {
+        'method': 'load_setting',
+        'key': 'copy_manga',
+        'setting_key': 'favoriteOrder',
+      },
+      {'method': 'isLogged', 'key': 'copy_manga'},
+    ]) {
+      expect(
+        () => invoke(message),
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message,
+            'message',
+            contains('source_bridge_scope_violation:jm:copy_manga'),
+          ),
+        ),
+      );
+    }
+    expect(
+      () => invoke({'method': 'load_data', 'data_key': 'token'}),
+      throwsA(
+        isA<StateError>().having(
+          (error) => error.message,
+          'message',
+          contains('source_bridge_scope_violation:jm:'),
+        ),
+      ),
+    );
+
+    expect(handle.facade.loadSourceData('copy_manga', 'token'), 'copy-token');
+  });
 
   test(
     'logout deletes secure source secrets without clearing settings',

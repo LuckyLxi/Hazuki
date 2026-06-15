@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/app/app_preferences.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/features/search/support/search_history_service.dart';
+import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_config_store.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_models.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_remote_client.dart';
@@ -238,6 +239,88 @@ void main() {
         jsonDecode(lines.last)['keyword'],
         'keyword-${hazukiSearchHistoryMaxCount - 1}',
       );
+    });
+
+    test('backs up local favorites stored in Drift', () async {
+      final favorites = sl<LocalFavoritesService>();
+      await favorites.addFavoriteFolder('Synced folder', sourceKey: 'jm');
+      final folder = (await favorites.loadFavoriteFolders(
+        sourceKey: 'jm',
+      )).folders.single;
+      await favorites.toggleFavorite(
+        details: const ComicDetailsData(
+          id: 'comic-123',
+          sourceKey: 'jm',
+          title: 'Synced comic',
+          subTitle: '',
+          cover: '',
+          description: '',
+          updateTime: '',
+          likesCount: '',
+          chapters: {},
+          tags: {},
+          recommend: [],
+          isFavorite: false,
+          subId: '',
+        ),
+        isAdding: true,
+        folderId: folder.id,
+      );
+
+      final snapshot = await CloudSyncSnapshotCodec(
+        configStore: CloudSyncConfigStore(),
+      ).buildLocalSnapshotFiles();
+      final settings = jsonDecode(snapshot.settings) as Map<String, dynamic>;
+      final data = settings['data'] as Map<String, dynamic>;
+      final folders =
+          jsonDecode(
+                data[CloudSyncConfigStore.localFavoriteFoldersKey] as String,
+              )
+              as List<dynamic>;
+      final entries =
+          jsonDecode(
+                data[CloudSyncConfigStore.localFavoriteEntriesKey] as String,
+              )
+              as List<dynamic>;
+
+      expect((folders.single as Map<String, dynamic>)['name'], 'Synced folder');
+      expect((folders.single as Map<String, dynamic>)['sourceKey'], 'jm');
+      expect((entries.single as Map<String, dynamic>)['comicId'], 'comic-123');
+      expect((entries.single as Map<String, dynamic>)['sourceKey'], 'jm');
+    });
+
+    test('restores local favorites into Drift', () async {
+      await CloudSyncRestoreApplier().applySettingsJson(
+        jsonEncode({
+          'version': 2,
+          'data': {
+            CloudSyncConfigStore.localFavoriteFoldersKey: jsonEncode([
+              {'id': 'folder-1', 'name': 'Restored folder', 'sourceKey': 'jm'},
+            ]),
+            CloudSyncConfigStore.localFavoriteEntriesKey: jsonEncode([
+              {
+                'comicId': 'comic-123',
+                'sourceKey': 'jm',
+                'title': 'Restored comic',
+                'folderIds': ['folder-1'],
+                'folderSavedAtMs': {'folder-1': 123},
+              },
+            ]),
+          },
+        }),
+      );
+
+      final favorites = sl<LocalFavoritesService>();
+      final folders = await favorites.loadFavoriteFolders(sourceKey: 'jm');
+      final comics = await favorites.loadFavoriteComics(
+        page: 1,
+        folderId: 'folder-1',
+        sourceKey: 'jm',
+      );
+
+      expect(folders.folders.single.name, 'Restored folder');
+      expect(comics.comics.single.id, 'comic-123');
+      expect(comics.comics.single.title, 'Restored comic');
     });
   });
 }

@@ -21,31 +21,36 @@ extension _JsBridgeSupport on HazukiSourceService {
         result = _handleCookieOperationForHandle(handle, map);
         break;
       case 'load_data':
+        final sourceKey = _requireScopedJsSourceKey(handle, map);
         result = handle.facade.loadSourceData(
-          map['key']?.toString() ?? '',
+          sourceKey,
           map['data_key']?.toString() ?? '',
         );
         break;
       case 'save_data':
+        final sourceKey = _requireScopedJsSourceKey(handle, map);
         result = handle.facade.saveSourceData(
-          map['key']?.toString() ?? '',
+          sourceKey,
           map['data_key']?.toString() ?? '',
           map['data'],
         );
         break;
       case 'delete_data':
+        final sourceKey = _requireScopedJsSourceKey(handle, map);
         result = handle.facade.deleteSourceData(
-          map['key']?.toString() ?? '',
+          sourceKey,
           map['data_key']?.toString() ?? '',
         );
         break;
       case 'load_setting':
+        final sourceKey = _requireScopedJsSourceKey(handle, map);
         result = handle.facade.loadSourceSetting(
-          map['key']?.toString() ?? '',
+          sourceKey,
           map['setting_key']?.toString() ?? '',
         );
         break;
       case 'isLogged':
+        _requireScopedJsSourceKey(handle, map);
         result = handle.facade.loadAccountDataSync() != null;
         break;
       case 'delay':
@@ -89,13 +94,27 @@ extension _JsBridgeSupport on HazukiSourceService {
     return result;
   }
 
+  String _requireScopedJsSourceKey(
+    SourceRuntimeHandle handle,
+    Map<String, dynamic> request,
+  ) {
+    final requestedSourceKey = request['key']?.toString().trim() ?? '';
+    if (requestedSourceKey != handle.sourceKey) {
+      throw StateError(
+        'source_bridge_scope_violation:${handle.sourceKey}:'
+        '$requestedSourceKey',
+      );
+    }
+    return handle.sourceKey;
+  }
+
   Future<Map<String, dynamic>> _handleHttpRequestForHandle(
     SourceRuntimeHandle handle,
     Map<String, dynamic> request,
   ) => handle.facade.httpGateway.sendJsHttpRequest(request);
 
-  void _configureDioCookieBridge() {
-    facade.httpGateway.configureCookieBridge();
+  void _configureDioCookieBridge([SourceRuntimeHandle? targetHandle]) {
+    (targetHandle ?? _activeHandle).facade.httpGateway.configureCookieBridge();
   }
 
   dynamic _handleRandom(Map<String, dynamic> request) {

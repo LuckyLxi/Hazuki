@@ -3,14 +3,19 @@ part of '../../hazuki_source_service.dart';
 extension HazukiSourceServiceSourceLoaderCapability on HazukiSourceService {
   Future<_SourceLoadResult> _ensureLocalSourceFiles({
     bool requireJmFile = true,
+    SourceRuntimeHandle? handle,
   }) async {
-    final sourceDir = await _getSourceStorageDirectory();
+    final targetHandle = handle ?? _activeHandle;
+    final sourceDir = await _getSourceStorageDirectory(
+      sourceKey: targetHandle.sourceKey,
+    );
     if (!await sourceDir.exists()) {
       await sourceDir.create(recursive: true);
     }
 
     final jmFile = File('${sourceDir.path}/source.js');
-    if (activeSourceKey == hazukiDefaultSourceKey && !await jmFile.exists()) {
+    if (targetHandle.sourceKey == hazukiDefaultSourceKey &&
+        !await jmFile.exists()) {
       final legacy = File('${sourceDir.parent.path}/jm.js');
       if (await legacy.exists()) {
         await legacy.copy(jmFile.path);
@@ -29,8 +34,13 @@ extension HazukiSourceServiceSourceLoaderCapability on HazukiSourceService {
 
   Future<_SourceLoadResult> _downloadOrLoadSourceFiles({
     void Function(int received, int total)? onProgress,
+    SourceRuntimeHandle? handle,
   }) async {
-    final localFiles = await _ensureLocalSourceFiles(requireJmFile: false);
+    final targetHandle = handle ?? _activeHandle;
+    final localFiles = await _ensureLocalSourceFiles(
+      requireJmFile: false,
+      handle: targetHandle,
+    );
     final jmFile = localFiles.jmFile;
 
     if (await jmFile.exists()) {
@@ -41,8 +51,9 @@ extension HazukiSourceServiceSourceLoaderCapability on HazukiSourceService {
     }
 
     final jmScript = await _downloadFromUrlsWithProgress(
-      await _resolveActiveSourceDownloadUrls(),
+      await _resolveActiveSourceDownloadUrls(handle: targetHandle),
       onProgress: onProgress,
+      targetFacade: targetHandle.facade,
     );
     if (jmScript != null && jmScript.trim().isNotEmpty) {
       await jmFile.writeAsString(jmScript);
@@ -57,13 +68,19 @@ extension HazukiSourceServiceSourceLoaderCapability on HazukiSourceService {
 
   Future<_SourceLoadResult> _downloadSourceFiles({
     void Function(int received, int total)? onProgress,
+    SourceRuntimeHandle? handle,
   }) async {
-    final localFiles = await _ensureLocalSourceFiles(requireJmFile: false);
+    final targetHandle = handle ?? _activeHandle;
+    final localFiles = await _ensureLocalSourceFiles(
+      requireJmFile: false,
+      handle: targetHandle,
+    );
     final jmFile = localFiles.jmFile;
 
     final jmScript = await _downloadFromUrlsWithProgress(
-      await _resolveActiveSourceDownloadUrls(),
+      await _resolveActiveSourceDownloadUrls(handle: targetHandle),
       onProgress: onProgress,
+      targetFacade: targetHandle.facade,
     );
     if (jmScript != null && jmScript.trim().isNotEmpty) {
       await jmFile.writeAsString(jmScript, flush: true);
@@ -76,8 +93,12 @@ extension HazukiSourceServiceSourceLoaderCapability on HazukiSourceService {
     throw Exception('source_download_failed_without_cache');
   }
 
-  Future<SourceMeta> _loadSourceMetadata(File jmFile) async {
-    final facade = this.facade;
+  Future<SourceMeta> _loadSourceMetadata(
+    File jmFile, {
+    SourceRuntimeHandle? handle,
+  }) async {
+    final targetHandle = handle ?? _activeHandle;
+    final facade = targetHandle.facade;
     if (facade.handle.isDisposed) {
       throw Exception('source_runtime_disposed');
     }
@@ -91,10 +112,9 @@ extension HazukiSourceServiceSourceLoaderCapability on HazukiSourceService {
 
       final setGlobal =
           engine.evaluate('(k, v) => { this[k] = v; }') as JSInvokable;
-      final handle = _activeHandle;
       setGlobal.invoke([
         'sendMessage',
-        (dynamic message) => _handleJsMessageForHandle(handle, message),
+        (dynamic message) => _handleJsMessageForHandle(targetHandle, message),
       ]);
       setGlobal.invoke(['appVersion', '1.0.0']);
       setGlobal.free();
@@ -119,7 +139,6 @@ extension HazukiSourceServiceSourceLoaderCapability on HazukiSourceService {
       if (name.isEmpty || key.isEmpty || version.isEmpty) {
         throw Exception('source_metadata_incomplete');
       }
-
       final settingsDefaults = _parseSettingsDefaultMap(
         engine.evaluate('this.__hazuki_source.settings ?? {}'),
       );
@@ -136,6 +155,7 @@ extension HazukiSourceServiceSourceLoaderCapability on HazukiSourceService {
         facade.runtimeState.phase,
         SourceRuntimeStep.runningSourceInit,
         debugDetail: 'running_source_init',
+        targetFacade: facade,
       );
       final oldMeta = facade.sourceMeta;
       facade.runtime.sourceMeta = meta;
@@ -164,8 +184,11 @@ extension HazukiSourceServiceSourceLoaderCapability on HazukiSourceService {
     }
   }
 
-  Future<List<String>> _resolveActiveSourceDownloadUrls() async {
-    final definition = _definitionForSourceKey(activeSourceKey);
+  Future<List<String>> _resolveActiveSourceDownloadUrls({
+    SourceRuntimeHandle? handle,
+  }) async {
+    final targetHandle = handle ?? _activeHandle;
+    final definition = _definitionForSourceKey(targetHandle.sourceKey);
     final directUrls = definition.directUrls
         .map((url) => url.trim())
         .where((url) => url.isNotEmpty)
@@ -177,6 +200,7 @@ extension HazukiSourceServiceSourceLoaderCapability on HazukiSourceService {
     final indexRaw = await _downloadFromUrls(
       _sourceIndexUrls,
       source: 'source_catalog_index',
+      targetFacade: targetHandle.facade,
     );
     if (indexRaw == null || indexRaw.trim().isEmpty) {
       return definition.fallbackUrls();

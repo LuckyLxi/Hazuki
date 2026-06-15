@@ -22,6 +22,8 @@ class CloudSyncConfigStore {
   static const sourceDirName = 'source';
   static const sourceFileName = 'jm.js';
 
+  static const localFavoriteFoldersKey = 'local_favorite_folders_v1';
+  static const localFavoriteEntriesKey = 'local_favorite_entries_v1';
   static const folderTombstonesKey = 'local_favorite_folder_tombstones_v1';
   static const entryTombstonesKey = 'local_favorite_entry_tombstones_v1';
   static const downloadGroupsKey = 'download_groups_v1';
@@ -40,6 +42,8 @@ class CloudSyncConfigStore {
   /// Keys that bypass the generic settings-restore loop and are restored
   /// specially during manual full restore so missing keys clear local state.
   static const Set<String> restoreSkippedSettings = {
+    localFavoriteFoldersKey,
+    localFavoriteEntriesKey,
     folderTombstonesKey,
     entryTombstonesKey,
     downloadGroupsKey,
