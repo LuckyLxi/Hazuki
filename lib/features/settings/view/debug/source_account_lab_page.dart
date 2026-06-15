@@ -72,6 +72,7 @@ class _SourceAccountLabPageState extends State<SourceAccountLabPage> {
         source.normalizedKey == _registry.activeSourceKey) {
       return;
     }
+    final previousSourceKey = _registry.activeSourceKey;
     setState(() => _busySourceKey = source.normalizedKey);
     try {
       await _registry.activateSource(source.normalizedKey);
@@ -81,6 +82,9 @@ class _SourceAccountLabPageState extends State<SourceAccountLabPage> {
       }
       await showHazukiPrompt(context, _strings.labSourceAccountSwitchSuccess);
     } catch (error) {
+      try {
+        await _sourceService.ensureInitialized(sourceKey: previousSourceKey);
+      } catch (_) {}
       if (!mounted) {
         return;
       }

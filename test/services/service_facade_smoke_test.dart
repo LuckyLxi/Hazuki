@@ -52,12 +52,13 @@ void main() {
   );
 
   test(
-    'image memory cache can read a non-active source by sourceKey',
+    'switching source releases the previous source runtime and memory cache',
     () async {
       final service = sl<HazukiSourceService>();
       const url = 'https://example.com/shared-cover.jpg';
       final jmBytes = Uint8List.fromList([1, 2, 3]);
       final copyBytes = Uint8List.fromList([4, 5, 6]);
+      final originalJmFacade = service.facade;
 
       service.facade.cache.putImageBytes(
         SourceScopedComicId(
@@ -68,6 +69,13 @@ void main() {
       );
 
       await service.runtimeRegistry.activateSource('copy_manga');
+      expect(
+        service.peekImageBytesFromMemory(
+          url,
+          sourceKey: hazukiDefaultSourceKey,
+        ),
+        isNull,
+      );
       service.facade.cache.putImageBytes(
         SourceScopedComicId(
           sourceKey: 'copy_manga',
@@ -79,10 +87,11 @@ void main() {
       await service.runtimeRegistry.activateSource(hazukiDefaultSourceKey);
 
       expect(service.activeSourceKey, hazukiDefaultSourceKey);
-      expect(service.peekImageBytesFromMemory(url), jmBytes);
+      expect(service.facade, isNot(same(originalJmFacade)));
+      expect(service.peekImageBytesFromMemory(url), isNull);
       expect(
         service.peekImageBytesFromMemory(url, sourceKey: 'copy_manga'),
-        copyBytes,
+        isNull,
       );
       expect(service.activeSourceKey, hazukiDefaultSourceKey);
     },

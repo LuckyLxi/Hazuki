@@ -78,6 +78,9 @@ extension HazukiSourceServiceSourceLoaderCapability on HazukiSourceService {
 
   Future<SourceMeta> _loadSourceMetadata(File jmFile) async {
     final facade = this.facade;
+    if (facade.handle.isDisposed) {
+      throw Exception('source_runtime_disposed');
+    }
     final initScript = await rootBundle.loadString(_bundledInitAssetPath);
     final jmScript = await jmFile.readAsString();
     final className = _extractSourceClassName(jmScript);
@@ -143,6 +146,9 @@ extension HazukiSourceServiceSourceLoaderCapability on HazukiSourceService {
         );
         if (initResult is Future) {
           await initResult;
+        }
+        if (facade.handle.isDisposed) {
+          throw Exception('source_runtime_disposed');
         }
       } catch (_) {
         facade.runtime.sourceMeta = oldMeta;

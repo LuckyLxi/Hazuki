@@ -319,6 +319,7 @@ class SourceRuntimeHandle {
   final String sourceKey;
   final Dio dio = _createSourceDio();
   final SourceRuntimeKernel runtime = SourceRuntimeKernel();
+  bool _disposed = false;
   late final SourceSessionStore session = SourceSessionStore(
     sourceKey: sourceKey,
     secureStorage: service._secureSessionStorage,
@@ -352,6 +353,32 @@ class SourceRuntimeHandle {
     service,
   );
   late final DebugLogCapability debugLog = DebugLogCapability(facade);
+
+  bool get isDisposed => _disposed;
+
+  void dispose() {
+    if (_disposed) {
+      return;
+    }
+    _disposed = true;
+
+    final engine = runtime.engine;
+    runtime
+      ..engine = null
+      ..initFuture = null
+      ..sourceMeta = null
+      ..lastReloginAt = null
+      ..transientAvatarUrl = null;
+    try {
+      dio.close(force: true);
+    } catch (_) {}
+    try {
+      engine?.close();
+    } catch (_) {}
+    session.clearMemory();
+    cache.clearMemory();
+    debug.clearCapturedLogs();
+  }
 }
 
 class HazukiSourceService extends ChangeNotifier {
@@ -668,9 +695,15 @@ class HazukiSourceService extends ChangeNotifier {
     if (normalized == _activeSourceKey) {
       return;
     }
+    final previousSourceKey = _activeSourceKey;
+    final previousHandle = _runtimeHandles[previousSourceKey];
     _activeSourceKey = normalized;
     final prefs = await _activeHandle.session.ensurePrefs();
     await prefs.setString(SourcePrefsKeys.activeSourceKey, normalized);
+    if (identical(_runtimeHandles[previousSourceKey], previousHandle)) {
+      _runtimeHandles.remove(previousSourceKey);
+      previousHandle?.dispose();
+    }
     notifyListeners();
     runtimeRegistry._notify();
   }
@@ -869,6 +902,11 @@ class SourceSessionStore {
   final Map<String, _SecureSourceSessionData> _secureCache =
       <String, _SecureSourceSessionData>{};
   SharedPreferences? prefs;
+
+  void clearMemory() {
+    _secureCache.clear();
+    prefs = null;
+  }
 
   Future<SharedPreferences> ensurePrefs() async {
     final current = prefs ??= await SharedPreferences.getInstance();
@@ -1278,6 +1316,20 @@ class SourceCacheStore {
   Directory? imageCacheDir;
   Directory? comicDetailsCacheDir;
   Directory? discoverCacheDir;
+
+  void clearMemory() {
+    imageBytesCache.clear();
+    imageDownloadInFlight.clear();
+    comicDetailsMemoryCache.clear();
+    comicDetailsInFlight.clear();
+    exploreSectionsMemoryCache = null;
+    exploreSectionsMemoryCachedAt = null;
+    categoryTagGroupsMemoryCache = null;
+    categoryTagGroupsMemoryCachedAt = null;
+    imageCacheDir = null;
+    comicDetailsCacheDir = null;
+    discoverCacheDir = null;
+  }
 
   Uint8List? touchImageBytes(String rawUrl) {
     final normalizedUrl = rawUrl.trim();

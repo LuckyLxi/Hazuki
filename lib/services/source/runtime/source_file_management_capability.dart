@@ -142,7 +142,10 @@ extension HazukiSourceServiceSourceFileManagementCapability
       };
     } catch (_) {
       if (previous != activeSourceKey) {
-        await activateSource(previous);
+        try {
+          await activateSource(previous);
+          await ensureInitialized();
+        } catch (_) {}
       }
       rethrow;
     }

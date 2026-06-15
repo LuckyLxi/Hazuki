@@ -87,7 +87,9 @@ Future<void> showHomeSourceSwitchDialog(
             );
           } catch (error) {
             try {
-              await registry.activateSource(previousSourceKey);
+              await sourceService.ensureInitialized(
+                sourceKey: previousSourceKey,
+              );
             } catch (_) {}
             if (!dialogContext.mounted) {
               return;
