@@ -13,6 +13,7 @@ const hazukiWindowsAdaptationNoticeAcceptedPreferenceKey =
     'windows_adaptation_notice_accepted';
 const hazukiComicIdSearchEnhancePreferenceKey =
     'advanced_comic_id_search_enhance';
+const hazukiAggregateSearchEnabledPreferenceKey = 'search_aggregate_enabled';
 const hazukiCommentFilterKeywordsKey = 'comment_filter_keywords';
 const hazukiCommentFilterModeKey = 'comment_filter_mode';
 const hazukiReadHistoryMaxCount = 300;

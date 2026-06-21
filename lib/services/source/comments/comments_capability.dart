@@ -114,11 +114,7 @@ extension HazukiSourceServiceCommentsCapability on HazukiSourceService {
       await facade.js.resolve(result);
     }
 
-    if (resolvedSourceKey == activeSourceKey) {
-      await _runWithReloginRetry(runSend);
-    } else {
-      await runSend();
-    }
+    await _runWithReloginRetry(runSend, targetFacade: facade);
   }
 
   Future<void> likeComment({
@@ -147,11 +143,7 @@ extension HazukiSourceServiceCommentsCapability on HazukiSourceService {
       await facade.js.resolve(result);
     }
 
-    if (resolvedSourceKey == activeSourceKey) {
-      await _runWithReloginRetry(runLike);
-    } else {
-      await runLike();
-    }
+    await _runWithReloginRetry(runLike, targetFacade: facade);
   }
 
   bool supportCommentSendForSource(String sourceKey) {

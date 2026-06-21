@@ -12,42 +12,54 @@ import 'package:hazuki/services/reading_progress_service.dart';
 import 'package:hazuki/services/read_history_service.dart';
 
 class ComicDetailRepository implements FavoriteFoldersRepository {
-  const ComicDetailRepository({
+  ComicDetailRepository({
     required HazukiSourceService source,
     required LocalFavoritesService local,
     required MangaDownloadService downloader,
+    String sourceKey = '',
   }) : _source = source,
        _local = local,
-       _downloader = downloader;
+       _downloader = downloader,
+       _sourceKey = sourceKey.trim().isEmpty
+           ? source.activeSourceKey
+           : sourceKey.trim();
 
   final HazukiSourceService _source;
   final LocalFavoritesService _local;
   final MangaDownloadService _downloader;
+  final String _sourceKey;
 
   // ── Source capabilities ──────────────────────────────────────────────────
 
   @override
-  bool get isLogged => _source.isLogged;
+  bool get isLogged => _source.isLoggedForSource(_sourceKey);
   @override
-  bool get supportFavoriteFolderLoad => _source.supportFavoriteFolderLoad;
+  bool get supportFavoriteFolderLoad =>
+      _source.supportFavoriteFolderLoadForSource(_sourceKey);
   @override
-  bool get supportFavoriteFolderAdd => _source.supportFavoriteFolderAdd;
+  bool get supportFavoriteFolderAdd =>
+      _source.supportFavoriteFolderAddForSource(_sourceKey);
   @override
-  bool get supportFavoriteFolderDelete => _source.supportFavoriteFolderDelete;
+  bool get supportFavoriteFolderDelete =>
+      _source.supportFavoriteFolderDeleteForSource(_sourceKey);
   @override
-  bool get supportFavoriteToggle => _source.supportFavoriteToggle;
-  bool get supportComicLike => _source.supportComicLike;
+  bool get supportFavoriteToggle =>
+      _source.supportFavoriteToggleForSource(_sourceKey);
+  bool get supportComicLike => _source.supportComicLikeForSource(_sourceKey);
   @override
   bool get favoriteSingleFolderForSingleComic =>
-      _source.favoriteSingleFolderForSingleComic;
+      _source.favoriteSingleFolderForSingleComicForSource(_sourceKey);
 
   Future<ComicDetailsData> loadComicDetails(
     String id, {
     String sourceKey = '',
-  }) => _source.loadComicDetails(id, sourceKey: sourceKey);
+  }) => _source.loadComicDetails(
+    id,
+    sourceKey: sourceKey.trim().isEmpty ? _sourceKey : sourceKey,
+  );
 
   Future<List<CategoryTagGroup>> loadCategoryTagGroups() {
-    return _source.loadCategoryTagGroups();
+    return _source.loadCategoryTagGroups(sourceKey: _sourceKey);
   }
 
   Future<Uint8List> downloadImageBytes(
@@ -57,7 +69,7 @@ class ComicDetailRepository implements FavoriteFoldersRepository {
   }) => _source.downloadImageBytes(
     url,
     keepInMemory: keepInMemory,
-    sourceKey: sourceKey,
+    sourceKey: sourceKey.trim().isEmpty ? _sourceKey : sourceKey,
   );
 
   Future<List<String>> loadChapterImages({
@@ -67,7 +79,7 @@ class ComicDetailRepository implements FavoriteFoldersRepository {
   }) => _source.loadChapterImages(
     comicId: comicId,
     epId: epId,
-    sourceKey: sourceKey,
+    sourceKey: sourceKey.trim().isEmpty ? _sourceKey : sourceKey,
   );
 
   Future<void> prefetchComicImages({
@@ -83,21 +95,21 @@ class ComicDetailRepository implements FavoriteFoldersRepository {
     imageUrls: imageUrls,
     count: count,
     memoryCount: memoryCount,
-    sourceKey: sourceKey,
+    sourceKey: sourceKey.trim().isEmpty ? _sourceKey : sourceKey,
   );
 
   @override
   Future<FavoriteFoldersResult> loadCloudFavoriteFolders({
     required String comicId,
-  }) => _source.loadFavoriteFolders(comicId: comicId);
+  }) => _source.loadFavoriteFolders(comicId: comicId, sourceKey: _sourceKey);
 
   @override
   Future<void> addCloudFavoriteFolder(String name) =>
-      _source.addFavoriteFolder(name);
+      _source.addFavoriteFolder(name, sourceKey: _sourceKey);
 
   @override
   Future<void> deleteCloudFavoriteFolder(String id) =>
-      _source.deleteFavoriteFolder(id);
+      _source.deleteFavoriteFolder(id, sourceKey: _sourceKey);
 
   @override
   Future<void> toggleCloudFavorite({
@@ -108,6 +120,7 @@ class ComicDetailRepository implements FavoriteFoldersRepository {
     comicId: comicId,
     isAdding: isAdding,
     folderId: folderId,
+    sourceKey: _sourceKey,
   );
 
   // ── Local favorites ──────────────────────────────────────────────────────
@@ -119,7 +132,7 @@ class ComicDetailRepository implements FavoriteFoldersRepository {
   }) => _source.toggleComicLike(
     comicId: comicId,
     isLike: isLike,
-    sourceKey: sourceKey,
+    sourceKey: sourceKey.trim().isEmpty ? _sourceKey : sourceKey,
   );
 
   Future<bool> isComicLocallyFavorited(
@@ -186,7 +199,7 @@ class ComicDetailRepository implements FavoriteFoldersRepository {
   Future<Map<String, dynamic>?> loadReadingProgress(String comicId) async {
     return sl<ReadingProgressService>().load(
       comicId: comicId,
-      sourceKey: _source.activeSourceKey,
+      sourceKey: _sourceKey,
     );
   }
 

@@ -6,8 +6,9 @@ extension HazukiSourceServiceCategoryCapability on HazukiSourceService {
     required DateTime startedAt,
     Map<String, Object?>? content,
     String level = 'info',
+    HazukiSourceFacade? targetFacade,
   }) {
-    facade.addApplicationLog(
+    (targetFacade ?? facade).addApplicationLog(
       level: level,
       title: title,
       source: 'source_category_tags',
@@ -20,8 +21,10 @@ extension HazukiSourceServiceCategoryCapability on HazukiSourceService {
 
   Future<List<CategoryTagGroup>> loadCategoryTagGroups({
     bool forceRefresh = false,
+    String sourceKey = '',
   }) async {
-    final facade = this.facade;
+    final resolvedSourceKey = _resolveActiveSourceKey(sourceKey);
+    final facade = _handleFor(resolvedSourceKey).facade;
     await facade.ensureInitialized();
 
     final startedAt = DateTime.now();
@@ -41,6 +44,7 @@ extension HazukiSourceServiceCategoryCapability on HazukiSourceService {
               (sum, group) => sum + group.tags.length,
             ),
           },
+          targetFacade: facade,
         );
         return memoryCached;
       }
@@ -55,6 +59,7 @@ extension HazukiSourceServiceCategoryCapability on HazukiSourceService {
         startedAt: startedAt,
         level: 'error',
         content: {'error': 'source_not_initialized'},
+        targetFacade: facade,
       );
       throw Exception('source_not_initialized');
     }
@@ -67,12 +72,14 @@ extension HazukiSourceServiceCategoryCapability on HazukiSourceService {
       'Source category tags availability evaluate finished',
       startedAt: hasCategoryEvaluateStartedAt,
       content: {'hasCategory': hasCategory},
+      targetFacade: facade,
     );
     if (!hasCategory) {
       _logCategoryTagTiming(
         'Source category tags loaded',
         startedAt: startedAt,
         content: {'groupCount': 0, 'tagCount': 0, 'hasCategory': false},
+        targetFacade: facade,
       );
       return const [];
     }
@@ -105,6 +112,7 @@ extension HazukiSourceServiceCategoryCapability on HazukiSourceService {
     _logCategoryTagTiming(
       'Source category tags evaluate finished',
       startedAt: evaluateStartedAt,
+      targetFacade: facade,
     );
 
     final dynamic resolved = await facade.js.resolve(result);
@@ -117,6 +125,7 @@ extension HazukiSourceServiceCategoryCapability on HazukiSourceService {
           'tagCount': 0,
           'resultType': resolved.runtimeType.toString(),
         },
+        targetFacade: facade,
       );
       return const [];
     }
@@ -153,7 +162,7 @@ extension HazukiSourceServiceCategoryCapability on HazukiSourceService {
 
       groups.add(
         CategoryTagGroup(
-          name: _translateSourceText(name),
+          name: _translateSourceText(name, sourceKey: resolvedSourceKey),
           tags: tags,
           params: params,
           itemType: itemType,
@@ -182,6 +191,7 @@ extension HazukiSourceServiceCategoryCapability on HazukiSourceService {
           (sum, group) => sum + group.tags.length,
         ),
       },
+      targetFacade: facade,
     );
     return cached;
   }

@@ -2,9 +2,11 @@ part of '../../hazuki_source_service.dart';
 
 extension HazukiSourceServiceFavoritesManagementCapability
     on HazukiSourceService {
-  Future<void> addFavoriteFolder(String name) async {
-    final facade = this.facade;
-    await _runWithReloginRetry(() async {
+  Future<void> addFavoriteFolder(String name, {String sourceKey = ''}) async {
+    final resolvedSourceKey = _resolveActiveSourceKey(sourceKey);
+    final facade = _handleFor(resolvedSourceKey).facade;
+    await facade.ensureInitialized();
+    Future<void> runAdd() async {
       final engine = facade.js.engine;
       if (engine == null) {
         throw Exception('source_not_initialized');
@@ -20,12 +22,19 @@ extension HazukiSourceServiceFavoritesManagementCapability
         name: 'source_favorite_add_folder.js',
       );
       await facade.js.resolve(result);
-    });
+    }
+
+    await _runWithReloginRetry(runAdd, targetFacade: facade);
   }
 
-  Future<void> deleteFavoriteFolder(String folderId) async {
-    final facade = this.facade;
-    await _runWithReloginRetry(() async {
+  Future<void> deleteFavoriteFolder(
+    String folderId, {
+    String sourceKey = '',
+  }) async {
+    final resolvedSourceKey = _resolveActiveSourceKey(sourceKey);
+    final facade = _handleFor(resolvedSourceKey).facade;
+    await facade.ensureInitialized();
+    Future<void> runDelete() async {
       final engine = facade.js.engine;
       if (engine == null) {
         throw Exception('source_not_initialized');
@@ -41,7 +50,9 @@ extension HazukiSourceServiceFavoritesManagementCapability
         name: 'source_favorite_delete_folder.js',
       );
       await facade.js.resolve(result);
-    });
+    }
+
+    await _runWithReloginRetry(runDelete, targetFacade: facade);
   }
 
   Future<void> toggleFavorite({
@@ -49,11 +60,13 @@ extension HazukiSourceServiceFavoritesManagementCapability
     required bool isAdding,
     String folderId = '0',
     String? favoriteId,
+    String sourceKey = '',
   }) async {
     final normalizedComicId = comicId.trim();
-    final resolvedSourceKey = _resolveActiveSourceKey();
-    final facade = this.facade;
-    await _runWithReloginRetry(() async {
+    final resolvedSourceKey = _resolveActiveSourceKey(sourceKey);
+    final facade = _handleFor(resolvedSourceKey).facade;
+    await facade.ensureInitialized();
+    Future<void> runToggle() async {
       final engine = facade.js.engine;
       if (engine == null) {
         throw Exception('source_not_initialized');
@@ -82,14 +95,19 @@ extension HazukiSourceServiceFavoritesManagementCapability
       );
 
       await facade.js.resolve(result);
-    });
+    }
+
+    await _runWithReloginRetry(runToggle, targetFacade: facade);
 
     if (normalizedComicId.isNotEmpty) {
       final scopedKey = SourceScopedComicId(
         sourceKey: resolvedSourceKey,
         comicId: normalizedComicId,
       ).storageKey;
-      final cached = _getComicDetailsFromMemoryCache(scopedKey);
+      final cached = _getComicDetailsFromMemoryCache(
+        scopedKey,
+        sourceKey: resolvedSourceKey,
+      );
       if (cached != null) {
         _updateComicDetailsFavoriteStateInMemoryCache(
           cached.scopedId,

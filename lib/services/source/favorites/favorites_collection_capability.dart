@@ -195,14 +195,21 @@ extension HazukiSourceServiceFavoritesCollectionCapability
     }
   }
 
-  Future<FavoriteFoldersResult> loadFavoriteFolders({String? comicId}) async {
+  Future<FavoriteFoldersResult> loadFavoriteFolders({
+    String? comicId,
+    String sourceKey = '',
+  }) async {
     try {
-      final facade = this.facade;
-      final sessionReady = await _ensureFavoriteSessionReady();
+      final resolvedSourceKey = _resolveActiveSourceKey(sourceKey);
+      final facade = _handleFor(resolvedSourceKey).facade;
+      await facade.ensureInitialized();
+      final sessionReady = await _ensureFavoriteSessionReady(
+        targetFacade: facade,
+      );
       if (!sessionReady) {
         throw Exception('login_expired');
       }
-      final result = await _runWithReloginRetry(() async {
+      Future<(List<FavoriteFolder>, Set<String>)> runLoad() async {
         final engine = facade.js.engine;
         if (engine == null) {
           throw Exception('source_not_initialized');
@@ -288,12 +295,16 @@ extension HazukiSourceServiceFavoritesCollectionCapability
               engine: engine,
               comicId: normalizedComicId,
               folders: folders,
+              facade: facade,
+              sourceKey: resolvedSourceKey,
             ),
           );
         }
 
         return (folders, favorited);
-      });
+      }
+
+      final result = await _runWithReloginRetry(runLoad, targetFacade: facade);
 
       return FavoriteFoldersResult.success(
         folders: result.$1,
@@ -308,8 +319,9 @@ extension HazukiSourceServiceFavoritesCollectionCapability
     required dynamic engine,
     required String comicId,
     required List<FavoriteFolder> folders,
+    required HazukiSourceFacade facade,
+    required String sourceKey,
   }) async {
-    final facade = this.facade;
     final normalizedComicId = comicId.trim();
     if (normalizedComicId.isEmpty) {
       return const <String>{};
@@ -322,7 +334,9 @@ extension HazukiSourceServiceFavoritesCollectionCapability
     }
 
     final inferred = <String>{};
-    final singleFolderOnly = favoriteSingleFolderForSingleComic;
+    final singleFolderOnly = favoriteSingleFolderForSingleComicForSource(
+      sourceKey,
+    );
     for (final folder in folders) {
       final folderId = folder.id.trim();
       if (folderId.isEmpty || folderId == '0') {
@@ -332,6 +346,8 @@ extension HazukiSourceServiceFavoritesCollectionCapability
         engine: engine,
         comicId: normalizedComicId,
         folderId: folderId,
+        facade: facade,
+        sourceKey: sourceKey,
       );
       if (!containsComic) {
         continue;
@@ -348,8 +364,9 @@ extension HazukiSourceServiceFavoritesCollectionCapability
     required dynamic engine,
     required String comicId,
     required String folderId,
+    required HazukiSourceFacade facade,
+    required String sourceKey,
   }) async {
-    final facade = this.facade;
     final normalizedComicId = comicId.trim();
     final normalizedFolderId = folderId.trim();
     if (normalizedComicId.isEmpty ||
@@ -381,7 +398,7 @@ extension HazukiSourceServiceFavoritesCollectionCapability
         return false;
       }
 
-      final comics = _parseExploreComics(comicsRaw);
+      final comics = _parseExploreComics(comicsRaw, sourceKey: sourceKey);
       if (comics.any((comic) => comic.id == normalizedComicId)) {
         return true;
       }

@@ -1,6 +1,56 @@
 part of '../../hazuki_source_service.dart';
 
 extension HazukiSourceServiceFavoritesCapability on HazukiSourceService {
+  HazukiSourceFacade _favoritesFacadeForSource(String sourceKey) =>
+      _handleFor(_resolveActiveSourceKey(sourceKey)).facade;
+
+  bool favoriteSingleFolderForSingleComicForSource(String sourceKey) {
+    final targetFacade = _favoritesFacadeForSource(sourceKey);
+    final engine = targetFacade.js.engine;
+    if (engine == null) return false;
+    return targetFacade.js.asBool(
+      engine.evaluate(
+        'this.__hazuki_source.favorites?.singleFolderForSingleComic == true',
+      ),
+    );
+  }
+
+  bool supportFavoriteFolderAddForSource(String sourceKey) {
+    final targetFacade = _favoritesFacadeForSource(sourceKey);
+    final engine = targetFacade.js.engine;
+    return engine != null &&
+        targetFacade.js.asBool(
+          engine.evaluate('!!this.__hazuki_source.favorites?.addFolder'),
+        );
+  }
+
+  bool supportFavoriteFolderDeleteForSource(String sourceKey) {
+    final targetFacade = _favoritesFacadeForSource(sourceKey);
+    final engine = targetFacade.js.engine;
+    return engine != null &&
+        targetFacade.js.asBool(
+          engine.evaluate('!!this.__hazuki_source.favorites?.deleteFolder'),
+        );
+  }
+
+  bool supportFavoriteFolderLoadForSource(String sourceKey) {
+    final targetFacade = _favoritesFacadeForSource(sourceKey);
+    final engine = targetFacade.js.engine;
+    return engine != null &&
+        targetFacade.js.asBool(
+          engine.evaluate('!!this.__hazuki_source.favorites?.loadFolders'),
+        );
+  }
+
+  bool supportFavoriteToggleForSource(String sourceKey) {
+    final targetFacade = _favoritesFacadeForSource(sourceKey);
+    final engine = targetFacade.js.engine;
+    return engine != null &&
+        targetFacade.js.asBool(
+          engine.evaluate('!!this.__hazuki_source.favorites?.addOrDelFavorite'),
+        );
+  }
+
   bool get favoriteSingleFolderForSingleComic {
     final engine = facade.js.engine;
     if (engine == null) {

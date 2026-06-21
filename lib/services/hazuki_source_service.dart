@@ -463,6 +463,25 @@ class HazukiSourceService extends ChangeNotifier {
   Future<void> updateActiveSourceSetting(String key, dynamic value) =>
       facade.saveSourceSetting(activeSourceKey, key, value);
 
+  Object? loadSourceSetting(String sourceKey, String key) {
+    final resolvedSourceKey = _resolveActiveSourceKey(sourceKey);
+    return _handleFor(
+      resolvedSourceKey,
+    ).facade.loadSourceSetting(resolvedSourceKey, key);
+  }
+
+  Future<void> updateSourceSetting(
+    String sourceKey,
+    String key,
+    dynamic value,
+  ) {
+    final resolvedSourceKey = _resolveActiveSourceKey(sourceKey);
+    final targetFacade = _handleFor(resolvedSourceKey).facade;
+    return targetFacade.ensurePrefs().then(
+      (_) => targetFacade.saveSourceSetting(resolvedSourceKey, key, value),
+    );
+  }
+
   Future<void> clearCopyMangaDeviceInfo() async {
     const sourceKey = 'copy_manga';
     final handle = _handleFor(sourceKey);
@@ -665,9 +684,6 @@ class HazukiSourceService extends ChangeNotifier {
   bool get _softwareLogCaptureEnabled =>
       _activeHandle.debug.softwareLogCaptureEnabled;
 
-  LinkedHashMap<String, ComicDetailsData> get _comicDetailsMemoryCache =>
-      _activeHandle.cache.comicDetailsMemoryCache;
-
   Directory? get _comicDetailsCacheDir =>
       _activeHandle.cache.comicDetailsCacheDir;
   set _comicDetailsCacheDir(Directory? value) =>
@@ -840,21 +856,24 @@ class HazukiSourceService extends ChangeNotifier {
 
   String resolveActiveSourceKey([String? requestedSourceKey]) {
     final requested = requestedSourceKey?.trim() ?? '';
-    final active = activeSourceKey;
-    if (requested.isNotEmpty && active.isNotEmpty && requested != active) {
-      throw Exception('source_mismatch:$requested:$active');
-    }
-    return requested.isNotEmpty ? requested : active;
+    return requested.isNotEmpty
+        ? _normalizeAllowedSourceKey(requested)
+        : activeSourceKey;
   }
 
   Future<SearchComicsResult> searchComics({
     required String keyword,
     required int page,
     String order = 'mr',
+    String sourceKey = '',
   }) async {
-    await ensureInitialized();
+    final resolvedSourceKey = sourceKey.trim().isEmpty
+        ? activeSourceKey
+        : _normalizeAllowedSourceKey(sourceKey);
+    await ensureSourceInitialized(resolvedSourceKey);
 
-    final engine = _engine;
+    final facade = _handleFor(resolvedSourceKey).facade;
+    final engine = facade.js.engine;
     if (engine == null) {
       throw Exception('source_not_initialized');
     }
@@ -865,10 +884,9 @@ class HazukiSourceService extends ChangeNotifier {
     }
 
     final normalizedPage = page < 1 ? 1 : page;
-    final activeSearchSourceKey = activeSourceKey;
     final normalizedOrder = _normalizeSearchOptionForSource(
       order,
-      sourceKey: activeSearchSourceKey,
+      sourceKey: resolvedSourceKey,
     );
 
     final hasSearch = jsAsBool(
@@ -886,7 +904,7 @@ class HazukiSourceService extends ChangeNotifier {
       'this.__hazuki_source.search.load(${jsonEncode(normalizedKeyword)}, $optionsArg, $normalizedPage)',
       name: 'source_search.js',
     );
-    final dynamic resolved = await awaitJsResult(result);
+    final dynamic resolved = await facade.js.resolve(result);
 
     if (resolved is! Map) {
       return const SearchComicsResult(comics: [], maxPage: null);
@@ -895,7 +913,7 @@ class HazukiSourceService extends ChangeNotifier {
     final map = Map<String, dynamic>.from(resolved);
     final comicsRaw = map['comics'];
     final List<ExploreComic> comics = comicsRaw is List
-        ? _parseExploreComics(comicsRaw)
+        ? _parseExploreComics(comicsRaw, sourceKey: resolvedSourceKey)
         : const <ExploreComic>[];
 
     final maxPageRaw = map['maxPage'];
@@ -1536,7 +1554,7 @@ class HazukiSourceFacade {
   String get sourceKey => handle.sourceKey;
 
   Future<void> ensureInitialized() =>
-      _service.ensureInitialized(sourceKey: sourceKey);
+      _service.ensureSourceInitialized(sourceKey);
 
   Future<SharedPreferences> ensurePrefs() => session.ensurePrefs();
 

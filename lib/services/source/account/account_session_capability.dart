@@ -19,11 +19,14 @@ extension HazukiSourceServiceAccountSessionCapability on HazukiSourceService {
 
   bool get isLogged => facade.loadAccountDataSync() != null;
 
-  Future<void> login({
+  Future<void> login({required String account, required String password}) =>
+      _loginWithFacade(facade, account: account, password: password);
+
+  Future<void> _loginWithFacade(
+    HazukiSourceFacade facade, {
     required String account,
     required String password,
   }) async {
-    final facade = this.facade;
     await facade.ensureInitialized();
 
     final engine = facade.js.engine;

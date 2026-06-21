@@ -183,30 +183,33 @@ class _FavoriteFoldersMorphDialogState
     return SizedBox(
       key: const ValueKey('favorite_dialog_loading'),
       width: double.infinity,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const SizedBox(height: 8),
-          const ShapeMorphingLoader(size: 90),
-          const SizedBox(height: 18),
-          Text(
-            AppLocalizations.of(context)!.commonLoading,
-            textAlign: TextAlign.center,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.2,
+      child: SingleChildScrollView(
+        physics: const ClampingScrollPhysics(),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            const ShapeMorphingLoader(size: 90),
+            const SizedBox(height: 18),
+            Text(
+              AppLocalizations.of(context)!.commonLoading,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.2,
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            AppLocalizations.of(context)!.comicDetailManageFavorites,
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: cs.onSurfaceVariant,
+            const SizedBox(height: 8),
+            Text(
+              AppLocalizations.of(context)!.comicDetailManageFavorites,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: cs.onSurfaceVariant,
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-        ],
+            const SizedBox(height: 8),
+          ],
+        ),
       ),
     );
   }
@@ -466,7 +469,7 @@ class _FavoriteFoldersMorphDialogState
             ),
           ),
           const SizedBox(height: 16),
-          _buildDialogBody(context),
+          Flexible(child: _buildDialogBody(context)),
           const SizedBox(height: 18),
           Row(
             children: [

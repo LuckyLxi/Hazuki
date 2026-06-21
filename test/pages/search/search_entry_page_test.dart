@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/app/service_locator.dart';
@@ -52,6 +54,39 @@ void main() {
     expect(find.byType(FloatingActionButton), findsOneWidget);
     expect(editableText.focusNode.hasFocus, isFalse);
     expect(tester.testTextInput.isVisible, isFalse);
+  });
+
+  testWidgets('search settings toggles and persists aggregate search', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      hazukiAggregateSearchEnabledPreferenceKey: false,
+    });
+
+    await tester.pumpWidget(
+      _buildTestApp(
+        SearchEntryPage(
+          comicDetailPageBuilder: _comicDetailPageBuilder,
+          comicCoverHeroTagBuilder: _testComicCoverHeroTag,
+          searchPageLoader: _fakeSearchPageLoader,
+        ),
+      ),
+    );
+    await _pumpSearchSettled(tester);
+
+    await tester.tap(find.byKey(const ValueKey('search-settings-button')));
+    await tester.pumpAndSettle();
+
+    final switchFinder = find.byKey(const ValueKey('aggregate-search-switch'));
+    expect(switchFinder, findsOneWidget);
+    expect(tester.widget<SwitchListTile>(switchFinder).value, isFalse);
+
+    await tester.tap(switchFinder);
+    await tester.pumpAndSettle();
+
+    expect(tester.widget<SwitchListTile>(switchFinder).value, isTrue);
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getBool(hazukiAggregateSearchEnabledPreferenceKey), isTrue);
   });
 
   testWidgets('search entry page refreshes after external history changes', (
@@ -320,6 +355,93 @@ void main() {
 
     expect(find.text('Comic external-tag 0'), findsOneWidget);
     expect(tester.testTextInput.isVisible, isFalse);
+  });
+
+  testWidgets('results clear button only clears the search field', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues(const {});
+
+    await tester.pumpWidget(
+      _buildTestApp(
+        SearchPage(
+          initialKeyword: 'keep-results',
+          comicDetailPageBuilder: _comicDetailPageBuilder,
+          comicCoverHeroTagBuilder: _testComicCoverHeroTag,
+          searchPageLoader: _fakeSearchPageLoader,
+        ),
+      ),
+    );
+    await _pumpSearchSettled(tester);
+
+    expect(find.text('Comic keep-results 0'), findsOneWidget);
+    final resultsSearch = find.byKey(
+      const ValueKey('search-results-app-bar-search-bar'),
+    );
+    await tester.tap(
+      find.descendant(of: resultsSearch, matching: find.byIcon(Icons.close)),
+    );
+    await _pumpSearchSettled(tester);
+
+    final editableText = tester.widget<EditableText>(
+      find.descendant(of: resultsSearch, matching: find.byType(EditableText)),
+    );
+    expect(editableText.controller.text, isEmpty);
+    expect(find.text('Comic keep-results 0'), findsOneWidget);
+  });
+
+  testWidgets('aggregate JM id lookup shows loading before opening detail', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues(const {});
+    final detailsCompleter = Completer<ComicDetailsData>();
+    String? requestedSourceKey;
+
+    await tester.pumpWidget(
+      _buildTestApp(
+        SearchResultsPage(
+          initialKeyword: '12345',
+          aggregateSearchEnabled: true,
+          comicDetailPageBuilder: _comicDetailPageBuilder,
+          comicCoverHeroTagBuilder: _testComicCoverHeroTag,
+          comicDetailsLoader: (comicId, {required sourceKey}) {
+            requestedSourceKey = sourceKey;
+            return detailsCompleter.future;
+          },
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(requestedSourceKey, jmSearchSourceKey);
+    expect(find.byKey(const ValueKey('search-loading')), findsOneWidget);
+    expect(find.byKey(const ValueKey('empty')), findsNothing);
+
+    detailsCompleter.complete(
+      const ComicDetailsData(
+        id: '12345',
+        title: 'JM 12345',
+        subTitle: '',
+        cover: '',
+        description: '',
+        updateTime: '',
+        likesCount: '',
+        chapters: {},
+        tags: {},
+        recommend: [],
+        isFavorite: false,
+        subId: '',
+        sourceKey: jmSearchSourceKey,
+      ),
+    );
+    await _pumpSearchSettled(tester);
+
+    if (useWindowsComicDetailPanel) {
+      expect(WindowsComicDetailController.instance.entry?.comic.id, '12345');
+    } else {
+      expect(find.textContaining('detail:12345-'), findsOneWidget);
+    }
   });
 
   testWidgets('results search loses focus on outside interactions', (

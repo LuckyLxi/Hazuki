@@ -34,16 +34,8 @@ extension CookieStoreSupport on HazukiSourceService {
     }
   }
 
-  List<_Cookie> _loadCookieStore() {
-    return facade._loadCookieStore();
-  }
-
   List<_Cookie> _loadCookieStoreForHandle(SourceRuntimeHandle handle) {
     return handle.facade._loadCookieStore();
-  }
-
-  Future<void> _saveCookieStore(List<_Cookie> cookies) async {
-    await facade._saveCookieStore(cookies);
   }
 
   Future<void> _saveCookieStoreForHandle(

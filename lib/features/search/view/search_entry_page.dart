@@ -15,6 +15,7 @@ import '../support/search_shared.dart';
 import 'search_bar_shell.dart';
 import 'search_entry_widgets.dart';
 import 'search_results_page.dart';
+import 'search_settings_dialog.dart';
 
 class SearchEntryPage extends StatefulWidget {
   const SearchEntryPage({
@@ -56,6 +57,7 @@ class _SearchEntryPageState extends State<SearchEntryPage>
   bool _historyEditMode = false;
   bool _historyExpanded = false;
   bool _initialDataLoadScheduled = false;
+  bool _aggregateSearchEnabled = false;
 
   @override
   void initState() {
@@ -138,7 +140,13 @@ class _SearchEntryPageState extends State<SearchEntryPage>
   }
 
   Future<void> _loadInitialData() async {
+    final aggregateSearchFuture = isAggregateSearchEnabled();
     await Future.wait([_loadHistory(), _idExtractController.load()]);
+    final aggregateSearchEnabled = await aggregateSearchFuture;
+    if (!mounted) return;
+    setState(() {
+      _aggregateSearchEnabled = aggregateSearchEnabled;
+    });
   }
 
   void _handleSearchFocusChanged() {
@@ -219,6 +227,7 @@ class _SearchEntryPageState extends State<SearchEntryPage>
           comicDetailPageBuilder: widget.comicDetailPageBuilder,
           comicCoverHeroTagBuilder: widget.comicCoverHeroTagBuilder,
           searchPageLoader: widget.searchPageLoader,
+          aggregateSearchEnabled: _aggregateSearchEnabled,
         ),
       ),
     );
@@ -331,6 +340,23 @@ class _SearchEntryPageState extends State<SearchEntryPage>
     _idExtractController.syncWithFocus(_focusCoordinator.text);
   }
 
+  Future<void> _openSearchSettings() async {
+    await _focusCoordinator.dismissKeyboard(context, parkOnPage: true);
+    if (!mounted) return;
+    await showSearchSettingsDialog(
+      context,
+      aggregateSearchEnabled: _aggregateSearchEnabled,
+      onAggregateSearchChanged: (enabled) {
+        if (mounted) {
+          setState(() {
+            _aggregateSearchEnabled = enabled;
+          });
+        }
+        unawaited(setAggregateSearchEnabled(enabled));
+      },
+    );
+  }
+
   void _toggleHistoryEditMode() {
     unawaited(_focusCoordinator.dismissKeyboard(context, parkOnPage: true));
     setState(() {
@@ -386,6 +412,14 @@ class _SearchEntryPageState extends State<SearchEntryPage>
                   ),
                 ),
                 enableBlur: false,
+                actions: [
+                  IconButton(
+                    key: const ValueKey('search-settings-button'),
+                    tooltip: AppLocalizations.of(context)!.searchSettingsTitle,
+                    onPressed: () => unawaited(_openSearchSettings()),
+                    icon: const Icon(Icons.tune_rounded),
+                  ),
+                ],
               ),
               body: SearchEntryBody(
                 scrollController: _scrollController,

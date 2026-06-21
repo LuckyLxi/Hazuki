@@ -111,6 +111,20 @@ void main() {
     expect(prefs.getString(SourcePrefsKeys.activeSourceKey), 'picacg');
   });
 
+  test(
+    'resolving and updating another source does not switch active source',
+    () async {
+      final service = sl<HazukiSourceService>();
+      await service.activateSource(hazukiDefaultSourceKey);
+
+      expect(service.resolveActiveSourceKey('copy_manga'), 'copy_manga');
+      await service.updateSourceSetting('copy_manga', 'image_quality', '1200');
+
+      expect(service.activeSourceKey, hazukiDefaultSourceKey);
+      expect(service.loadSourceSetting('copy_manga', 'image_quality'), '1200');
+    },
+  );
+
   test('switching source defers disposal of a running runtime', () async {
     final service = sl<HazukiSourceService>();
     final originalHandle = service.facade.handle;

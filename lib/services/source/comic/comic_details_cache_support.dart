@@ -32,20 +32,33 @@ extension HazukiSourceServiceComicDetailsCacheSupport on HazukiSourceService {
     return File('${dir.path}/${_comicDetailsCacheFileName(scopedKey)}');
   }
 
-  ComicDetailsData? _getComicDetailsFromMemoryCache(String comicId) {
-    final value = _comicDetailsMemoryCache.remove(comicId);
+  ComicDetailsData? _getComicDetailsFromMemoryCache(
+    String comicId, {
+    String sourceKey = '',
+  }) {
+    final cache = _handleFor(
+      _resolveActiveSourceKey(sourceKey),
+    ).cache.comicDetailsMemoryCache;
+    final value = cache.remove(comicId);
     if (value == null) {
       return null;
     }
-    _comicDetailsMemoryCache[comicId] = value;
+    cache[comicId] = value;
     return value;
   }
 
-  void _putComicDetailsInMemoryCache(String comicId, ComicDetailsData details) {
-    _comicDetailsMemoryCache.remove(comicId);
-    _comicDetailsMemoryCache[comicId] = details;
-    while (_comicDetailsMemoryCache.length > 120) {
-      _comicDetailsMemoryCache.remove(_comicDetailsMemoryCache.keys.first);
+  void _putComicDetailsInMemoryCache(
+    String comicId,
+    ComicDetailsData details, {
+    String sourceKey = '',
+  }) {
+    final cache = _handleFor(
+      _resolveActiveSourceKey(sourceKey),
+    ).cache.comicDetailsMemoryCache;
+    cache.remove(comicId);
+    cache[comicId] = details;
+    while (cache.length > 120) {
+      cache.remove(cache.keys.first);
     }
   }
 

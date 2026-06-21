@@ -70,14 +70,15 @@ class _ComicDetailPageState extends State<ComicDetailPage>
   @override
   void initState() {
     super.initState();
+    final comicSourceKey = widget.comic.sourceKey.trim().isNotEmpty
+        ? widget.comic.sourceKey
+        : sl<HazukiSourceService>().activeSourceKey;
     _repository = ComicDetailRepository(
       source: sl<HazukiSourceService>(),
       local: sl<LocalFavoritesService>(),
       downloader: sl<MangaDownloadService>(),
+      sourceKey: comicSourceKey,
     );
-    final comicSourceKey = widget.comic.sourceKey.trim().isNotEmpty
-        ? widget.comic.sourceKey
-        : sl<HazukiSourceService>().activeSourceKey;
     _supportsJmExclusiveActions = isHazukiJmSourceKey(comicSourceKey);
     _supportsComicLikeAction =
         isHazukiJmSourceKey(comicSourceKey) ||

@@ -1,7 +1,11 @@
 part of '../../hazuki_source_service.dart';
 
 extension HazukiSourceServiceAccountSessionRetrySupport on HazukiSourceService {
-  Future<T> _runWithReloginRetry<T>(Future<T> Function() action) async {
+  Future<T> _runWithReloginRetry<T>(
+    Future<T> Function() action, {
+    HazukiSourceFacade? targetFacade,
+  }) async {
+    final facade = targetFacade ?? this.facade;
     try {
       return await action();
     } catch (e) {
@@ -9,8 +13,11 @@ extension HazukiSourceServiceAccountSessionRetrySupport on HazukiSourceService {
         rethrow;
       }
 
-      await _clearCookiesForFavoriteDomains();
-      final reloginOk = await _tryReloginFromStoredAccount(force: true);
+      await _clearCookiesForFavoriteDomains(targetFacade: facade);
+      final reloginOk = await _tryReloginFromStoredAccount(
+        force: true,
+        targetFacade: facade,
+      );
       if (!reloginOk) {
         rethrow;
       }
@@ -19,8 +26,10 @@ extension HazukiSourceServiceAccountSessionRetrySupport on HazukiSourceService {
     }
   }
 
-  Future<bool> _ensureFavoriteSessionReady() async {
-    final facade = this.facade;
+  Future<bool> _ensureFavoriteSessionReady({
+    HazukiSourceFacade? targetFacade,
+  }) async {
+    final facade = targetFacade ?? this.facade;
     await facade.ensureInitialized();
 
     if (!facade.isLogged) {
@@ -31,7 +40,7 @@ extension HazukiSourceServiceAccountSessionRetrySupport on HazukiSourceService {
       return true;
     }
 
-    return _tryReloginFromStoredAccount();
+    return _tryReloginFromStoredAccount(targetFacade: facade);
   }
 
   bool _isLoginExpiredError(Object error) {
@@ -43,8 +52,11 @@ extension HazukiSourceServiceAccountSessionRetrySupport on HazukiSourceService {
         msg.contains('401');
   }
 
-  Future<bool> _tryReloginFromStoredAccount({bool force = false}) async {
-    final facade = this.facade;
+  Future<bool> _tryReloginFromStoredAccount({
+    bool force = false,
+    HazukiSourceFacade? targetFacade,
+  }) async {
+    final facade = targetFacade ?? this.facade;
     final accountData = facade.loadAccountDataSync();
     if (accountData == null || accountData.length < 2) {
       return false;
@@ -57,7 +69,11 @@ extension HazukiSourceServiceAccountSessionRetrySupport on HazukiSourceService {
     }
 
     try {
-      await login(account: accountData[0], password: accountData[1]);
+      await _loginWithFacade(
+        facade,
+        account: accountData[0],
+        password: accountData[1],
+      );
       facade.lastReloginAt = DateTime.now();
       return true;
     } catch (_) {
@@ -65,8 +81,11 @@ extension HazukiSourceServiceAccountSessionRetrySupport on HazukiSourceService {
     }
   }
 
-  Future<void> _clearCookiesForFavoriteDomains() async {
-    final all = _loadCookieStore();
+  Future<void> _clearCookiesForFavoriteDomains({
+    HazukiSourceFacade? targetFacade,
+  }) async {
+    final facade = targetFacade ?? this.facade;
+    final all = facade._loadCookieStore();
     all.removeWhere((cookie) {
       final domain = cookie.domain.toLowerCase();
       return domain.contains('jmcomic') ||
@@ -79,6 +98,6 @@ extension HazukiSourceServiceAccountSessionRetrySupport on HazukiSourceService {
           domain.contains('cdnaspa') ||
           domain.contains('cdnntr');
     });
-    await _saveCookieStore(all);
+    await facade._saveCookieStore(all);
   }
 }

@@ -74,7 +74,15 @@ extension SourceBootstrapSupport on HazukiSourceService {
     if (sourceKey != null && sourceKey.trim().isNotEmpty) {
       await activateSource(sourceKey);
     }
-    final handle = _activeHandle;
+    await _ensureHandleInitialized(_activeHandle);
+  }
+
+  Future<void> ensureSourceInitialized(String sourceKey) async {
+    final handle = _handleFor(sourceKey);
+    await _ensureHandleInitialized(handle);
+  }
+
+  Future<void> _ensureHandleInitialized(SourceRuntimeHandle handle) async {
     final facade = handle.facade;
     if (_isHandleInitialized(handle)) {
       return;

@@ -17,6 +17,7 @@ class SearchResultsAppBar extends StatelessWidget
     required this.searchOrder,
     required this.onOrderMenuOpened,
     required this.onOrderSelected,
+    this.showOrderControl = true,
   });
 
   final Widget title;
@@ -25,6 +26,7 @@ class SearchResultsAppBar extends StatelessWidget
   final String searchOrder;
   final VoidCallback onOrderMenuOpened;
   final ValueChanged<String> onOrderSelected;
+  final bool showOrderControl;
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
@@ -36,42 +38,43 @@ class SearchResultsAppBar extends StatelessWidget
       enableBlur: false,
       title: title,
       actions: [
-        PopupMenuButton<String>(
-          tooltip: currentOrderLabel,
-          onOpened: onOrderMenuOpened,
-          onSelected: onOrderSelected,
-          itemBuilder: (context) => [
-            for (final entry in orderLabels.entries)
-              PopupMenuItem<String>(
-                value: entry.key,
-                child: Row(
-                  children: [
-                    Expanded(child: Text(entry.value)),
-                    if (entry.key == searchOrder)
-                      Icon(
-                        Icons.check,
-                        size: 18,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                  ],
+        if (showOrderControl)
+          PopupMenuButton<String>(
+            tooltip: currentOrderLabel,
+            onOpened: onOrderMenuOpened,
+            onSelected: onOrderSelected,
+            itemBuilder: (context) => [
+              for (final entry in orderLabels.entries)
+                PopupMenuItem<String>(
+                  value: entry.key,
+                  child: Row(
+                    children: [
+                      Expanded(child: Text(entry.value)),
+                      if (entry.key == searchOrder)
+                        Icon(
+                          Icons.check,
+                          size: 18,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                    ],
+                  ),
                 ),
+            ],
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    currentOrderLabel,
+                    style: Theme.of(context).textTheme.labelLarge,
+                  ),
+                  const SizedBox(width: 4),
+                  const Icon(Icons.swap_vert, size: 18),
+                ],
               ),
-          ],
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  currentOrderLabel,
-                  style: Theme.of(context).textTheme.labelLarge,
-                ),
-                const SizedBox(width: 4),
-                const Icon(Icons.swap_vert, size: 18),
-              ],
             ),
           ),
-        ),
       ],
     );
   }

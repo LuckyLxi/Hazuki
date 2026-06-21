@@ -8,13 +8,16 @@ import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
 import 'package:hazuki/shared/windows/windows_comic_detail.dart';
+import 'package:hazuki/widgets/widgets.dart';
 import 'package:hazuki/widgets/windows_comic_detail_host.dart';
 
+import '../state/aggregate_search_results_controller.dart';
 import '../state/search_focus_coordinator.dart';
 import '../state/search_id_extract_controller.dart';
 import '../state/search_results_controller.dart';
 import '../support/search_shared.dart';
 import 'search_bar_shell.dart';
+import 'search_aggregate_results.dart';
 import 'search_results_page_widgets.dart';
 import 'search_results_widgets.dart';
 
@@ -27,6 +30,8 @@ class SearchResultsPage extends StatefulWidget {
     required this.comicDetailPageBuilder,
     this.comicCoverHeroTagBuilder = comicCoverHeroTag,
     this.searchPageLoader,
+    this.aggregateSearchEnabled,
+    this.comicDetailsLoader,
   });
 
   final String initialKeyword;
@@ -35,6 +40,8 @@ class SearchResultsPage extends StatefulWidget {
   final ComicDetailPageBuilder comicDetailPageBuilder;
   final ComicHeroTagBuilder comicCoverHeroTagBuilder;
   final SearchPageLoader? searchPageLoader;
+  final bool? aggregateSearchEnabled;
+  final SearchComicDetailsLoader? comicDetailsLoader;
 
   @override
   State<SearchResultsPage> createState() => _SearchResultsPageState();
@@ -43,6 +50,7 @@ class SearchResultsPage extends StatefulWidget {
 class _SearchResultsPageState extends State<SearchResultsPage>
     with WidgetsBindingObserver {
   late final SearchResultsController _resultsController;
+  late final AggregateSearchResultsController _aggregateResultsController;
   late final SearchFocusCoordinator _focusCoordinator = SearchFocusCoordinator(
     isMounted: () => mounted,
     initialText: widget.initialKeyword,
@@ -59,8 +67,11 @@ class _SearchResultsPageState extends State<SearchResultsPage>
   final ScrollController _scrollController = ScrollController();
 
   bool _showBackToTop = false;
+  late bool _aggregateSearchEnabled;
 
-  String get _searchKeyword => _resultsController.searchKeyword;
+  String get _searchKeyword => _aggregateSearchEnabled
+      ? _aggregateResultsController.keyword
+      : _resultsController.searchKeyword;
   String? get _searchErrorMessage => _resultsController.searchErrorMessage;
   List<ExploreComic> get _searchComics => _resultsController.searchComics;
   bool get _searchLoading => _resultsController.searchLoading;
@@ -99,6 +110,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
       child: ListenableBuilder(
         listenable: Listenable.merge([
           _resultsController,
+          _aggregateResultsController,
           _focusCoordinator,
           _idExtractController,
         ]),
@@ -128,10 +140,15 @@ class _SearchResultsPageState extends State<SearchResultsPage>
   }
 
   void _initializeSearchResultsPage() {
+    _aggregateSearchEnabled = widget.aggregateSearchEnabled ?? false;
     _resultsController = SearchResultsController(
       initialOrder: widget.initialOrder,
       sourceService: sl<HazukiSourceService>(),
       searchPageLoader: widget.searchPageLoader,
+      comicDetailsLoader: widget.comicDetailsLoader,
+    );
+    _aggregateResultsController = AggregateSearchResultsController(
+      sourceService: _sourceService,
     );
     _scrollController.addListener(_onScroll);
     WidgetsBinding.instance.addObserver(this);
@@ -141,19 +158,23 @@ class _SearchResultsPageState extends State<SearchResultsPage>
       if (!mounted) {
         return;
       }
-      _focusCoordinator.syncKeyboardVisibility();
-      _focusCoordinator.attachRouteAutoFocus(
-        context,
-        showKeyboard: _showKeyboardOnEnter,
-        forceShowKeyboard: true,
-      );
-      unawaited(
-        _idExtractController.load().whenComplete(() {
-          if (mounted) {
-            unawaited(_submitSearch());
-          }
-        }),
-      );
+      unawaited(() async {
+        if (widget.aggregateSearchEnabled == null) {
+          final enabled = await isAggregateSearchEnabled();
+          if (!mounted) return;
+          setState(() {
+            _aggregateSearchEnabled = enabled;
+          });
+        }
+        _focusCoordinator.syncKeyboardVisibility();
+        _focusCoordinator.attachRouteAutoFocus(
+          context,
+          showKeyboard: _showKeyboardOnEnter,
+          forceShowKeyboard: true,
+        );
+        await _idExtractController.load();
+        if (mounted) await _submitSearch();
+      }());
     });
   }
 
@@ -166,6 +187,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
     _idExtractController.dispose();
     _scrollController.dispose();
     _resultsController.dispose();
+    _aggregateResultsController.dispose();
     _focusCoordinator.dispose();
   }
 
@@ -237,7 +259,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
       });
     }
 
-    if (shouldLoadMore) {
+    if (shouldLoadMore && !_aggregateSearchEnabled) {
       unawaited(_resultsController.loadMoreSearch(context));
     }
   }
@@ -258,7 +280,6 @@ class _SearchResultsPageState extends State<SearchResultsPage>
   void _clearSearch() {
     _focusCoordinator.clearText();
     _idExtractController.hide();
-    _resultsController.clearSearchData();
     unawaited(_requestSearchFocus());
   }
 
@@ -309,8 +330,11 @@ class _SearchResultsPageState extends State<SearchResultsPage>
     return normalizeDirectComicIdKeyword(keyword);
   }
 
-  Future<bool> _tryOpenComicDetailByKeywordId(String keyword) async {
-    if (!_sourceService.isActiveJmSource) {
+  Future<bool> _tryOpenComicDetailByKeywordId(
+    String keyword, {
+    required String sourceKey,
+  }) async {
+    if (!isHazukiJmSourceKey(sourceKey)) {
       return false;
     }
     final comicId = _normalizeComicIdKeyword(keyword);
@@ -319,7 +343,10 @@ class _SearchResultsPageState extends State<SearchResultsPage>
     }
 
     try {
-      final details = await _resultsController.loadComicById(comicId);
+      final details = await _resultsController.loadComicById(
+        comicId,
+        sourceKey: sourceKey,
+      );
       if (!mounted) {
         return true;
       }
@@ -376,14 +403,23 @@ class _SearchResultsPageState extends State<SearchResultsPage>
       return;
     }
 
-    final idKeyword = _sourceService.isActiveJmSource
-        ? _normalizeComicIdKeyword(keyword)
-        : null;
+    final directIdSourceKey = directComicIdSourceKey(
+      aggregateSearchEnabled: _aggregateSearchEnabled,
+      activeSourceKey: _sourceService.activeSourceKey,
+    );
+    final idKeyword = directIdSourceKey == null
+        ? null
+        : _normalizeComicIdKeyword(keyword);
     final requestToken = idKeyword != null
         ? _resultsController.prepareDirectIdLookup(keyword)
         : -1;
 
-    final openedById = await _tryOpenComicDetailByKeywordId(keyword);
+    final openedById = directIdSourceKey != null
+        ? await _tryOpenComicDetailByKeywordId(
+            keyword,
+            sourceKey: directIdSourceKey,
+          )
+        : false;
     if (!openedById) {
       await addSearchHistory(keyword);
     }
@@ -401,7 +437,15 @@ class _SearchResultsPageState extends State<SearchResultsPage>
       return;
     }
 
-    await _resultsController.search(context, keyword: keyword, page: 1);
+    if (requestToken != -1) {
+      _resultsController.finishDirectIdLookup(requestToken);
+    }
+
+    if (_aggregateSearchEnabled) {
+      await _aggregateResultsController.search(context, keyword);
+    } else {
+      await _resultsController.search(context, keyword: keyword, page: 1);
+    }
   }
 
   Widget _buildSearchBar({
@@ -514,10 +558,47 @@ class _SearchResultsPageState extends State<SearchResultsPage>
         unawaited(_dismissSearchInputIfFocused());
         unawaited(_onSearchOrderSelected(order));
       },
+      showOrderControl: !_aggregateSearchEnabled,
     );
   }
 
   Widget _buildSearchResultsBody() {
+    if (_aggregateSearchEnabled) {
+      if (_resultsController.searchLoading) {
+        return ListView(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: ClampingScrollPhysics(),
+          ),
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+          children: [
+            SearchResultsStateView(
+              searchKeyword: _resultsController.searchKeyword,
+              searchLoading: true,
+              searchComics: const [],
+              searchErrorMessage: null,
+              sourceRuntimeState: const SourceRuntimeState.idle(),
+              onRetry: () async {},
+            ),
+          ],
+        );
+      }
+      return SearchAggregateResultsBody(
+        scrollController: _scrollController,
+        sections: _aggregateResultsController.sections,
+        onRefresh: _refreshSearchResults,
+        onScrollNotification: _handleSearchResultsScrollNotification,
+        onRetry: (section) {
+          unawaited(_aggregateResultsController.retry(context, section));
+        },
+        onLoadMore: (section) {
+          unawaited(_aggregateResultsController.loadMore(context, section));
+        },
+        onComicTap: _openAggregateComic,
+        onViewMore: _openAggregateSection,
+        heroTagBuilder: (comic, salt) =>
+            widget.comicCoverHeroTagBuilder(comic, salt: salt),
+      );
+    }
     return SearchResultsBody(
       scrollController: _scrollController,
       searchKeyword: _searchKeyword,
@@ -542,11 +623,50 @@ class _SearchResultsPageState extends State<SearchResultsPage>
       await _submitSearch();
       return;
     }
-    await _resultsController.search(
-      context,
-      keyword: _searchKeyword,
-      page: 1,
-      silentRefresh: _searchComics.isNotEmpty,
+    if (_aggregateSearchEnabled) {
+      await _aggregateResultsController.search(context, _searchKeyword);
+    } else {
+      await _resultsController.search(
+        context,
+        keyword: _searchKeyword,
+        page: 1,
+        silentRefresh: _searchComics.isNotEmpty,
+      );
+    }
+  }
+
+  Future<void> _openAggregateComic(ExploreComic comic, String heroTag) async {
+    await _dismissSearchInputIfFocused();
+    if (!mounted) return;
+    try {
+      await openComicDetail(
+        context,
+        comic: comic,
+        heroTag: heroTag,
+        pageBuilder: widget.comicDetailPageBuilder,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      await showHazukiPrompt(
+        context,
+        AppLocalizations.of(context)!.searchFailed('$error'),
+        isError: true,
+      );
+    }
+  }
+
+  void _openAggregateSection(AggregateSearchSectionState section) {
+    unawaited(_dismissSearchInputIfFocused());
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => SearchAggregateSectionPage(
+          controller: _aggregateResultsController,
+          section: section,
+          onComicTap: _openAggregateComic,
+          heroTagBuilder: (comic, salt) =>
+              widget.comicCoverHeroTagBuilder(comic, salt: salt),
+        ),
+      ),
     );
   }
 

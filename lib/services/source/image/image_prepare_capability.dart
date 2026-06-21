@@ -56,9 +56,14 @@ extension HazukiSourceServiceImagePrepareCapability on HazukiSourceService {
       imageUrl,
       comicId: comicId,
       epId: epId,
+      sourceKey: sourceKey,
     );
     final sourceExtension = _imageExtensionFromUrl(imageUrl);
-    final fallbackSegments = calculateJmImageSegments(epId, imageUrl);
+    final fallbackSegments = calculateJmImageSegments(
+      epId,
+      imageUrl,
+      sourceKey: sourceKey,
+    );
     final segments = declaredSegments != null && declaredSegments > 1
         ? declaredSegments
         : fallbackSegments;

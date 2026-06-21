@@ -245,7 +245,10 @@ class _ReaderPageState extends State<ReaderPage>
   void initState() {
     super.initState();
     _sessionController.initialize();
-    _sourceImageQuality = ReaderSourceImageQualitySettings.load(_sourceService);
+    _sourceImageQuality = ReaderSourceImageQualitySettings.load(
+      _sourceService,
+      widget.sourceKey,
+    );
   }
 
   @override
@@ -480,6 +483,7 @@ class _ReaderPageState extends State<ReaderPage>
         });
         await ReaderSourceImageQualitySettings.updateCopyMangaImageQuality(
           _sourceService,
+          widget.sourceKey,
           normalized,
         );
       },
@@ -495,6 +499,7 @@ class _ReaderPageState extends State<ReaderPage>
         });
         await ReaderSourceImageQualitySettings.updatePicacgImageQuality(
           _sourceService,
+          widget.sourceKey,
           normalized,
         );
       },

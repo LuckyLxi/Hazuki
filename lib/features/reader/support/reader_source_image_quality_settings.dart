@@ -52,17 +52,18 @@ class ReaderSourceImageQualitySettings {
 
   static ReaderSourceImageQualitySnapshot load(
     HazukiSourceService sourceService,
+    String sourceKey,
   ) {
     final copyMangaImageQuality = normalizeCopyMangaImageQuality(
-      sourceService.loadActiveSourceSetting(copyMangaSettingKey),
+      sourceService.loadSourceSetting(sourceKey, copyMangaSettingKey),
     );
     final picacgImageQuality = normalizePicacgImageQuality(
-      sourceService.loadActiveSourceSetting(picacgSettingKey),
+      sourceService.loadSourceSetting(sourceKey, picacgSettingKey),
     );
 
     return ReaderSourceImageQualitySnapshot(
-      isCopyMangaSource: sourceService.isActiveCopyMangaSource,
-      isPicacgSource: isHazukiPicacgSourceKey(sourceService.activeSourceKey),
+      isCopyMangaSource: isHazukiCopyMangaSourceKey(sourceKey),
+      isPicacgSource: isHazukiPicacgSourceKey(sourceKey),
       copyMangaImageQuality: copyMangaImageQuality,
       picacgImageQuality: picacgImageQuality,
     );
@@ -84,9 +85,11 @@ class ReaderSourceImageQualitySettings {
 
   static Future<void> updateCopyMangaImageQuality(
     HazukiSourceService sourceService,
+    String sourceKey,
     String value,
   ) {
-    return sourceService.updateActiveSourceSetting(
+    return sourceService.updateSourceSetting(
+      sourceKey,
       copyMangaSettingKey,
       normalizeCopyMangaImageQuality(value),
     );
@@ -94,9 +97,11 @@ class ReaderSourceImageQualitySettings {
 
   static Future<void> updatePicacgImageQuality(
     HazukiSourceService sourceService,
+    String sourceKey,
     String value,
   ) {
-    return sourceService.updateActiveSourceSetting(
+    return sourceService.updateSourceSetting(
+      sourceKey,
       picacgSettingKey,
       normalizePicacgImageQuality(value),
     );

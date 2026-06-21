@@ -12,7 +12,9 @@ class SearchResultsController extends ChangeNotifier {
     required String initialOrder,
     required HazukiSourceService sourceService,
     SearchPageLoader? searchPageLoader,
+    SearchComicDetailsLoader? comicDetailsLoader,
   }) : _searchPageLoader = searchPageLoader,
+       _comicDetailsLoader = comicDetailsLoader,
        _sourceService = sourceService,
        _searchOrder = _normalizeSearchOrder(
          initialOrder,
@@ -22,6 +24,7 @@ class SearchResultsController extends ChangeNotifier {
   }
 
   final SearchPageLoader? _searchPageLoader;
+  final SearchComicDetailsLoader? _comicDetailsLoader;
   final HazukiSourceService _sourceService;
 
   String _searchKeyword = '';
@@ -116,8 +119,20 @@ class SearchResultsController extends ChangeNotifier {
 
   bool isCurrentRequest(int token) => token == _searchRequestToken;
 
-  Future<ComicDetailsData> loadComicById(String comicId) {
-    return _sourceService.loadComicDetails(comicId).timeout(searchLoadTimeout);
+  Future<ComicDetailsData> loadComicById(
+    String comicId, {
+    String sourceKey = '',
+  }) {
+    final overrideLoader = _comicDetailsLoader;
+    if (overrideLoader != null) {
+      return overrideLoader(
+        comicId,
+        sourceKey: sourceKey,
+      ).timeout(searchLoadTimeout);
+    }
+    return _sourceService
+        .loadComicDetails(comicId, sourceKey: sourceKey)
+        .timeout(searchLoadTimeout);
   }
 
   void finishDirectIdLookup(int token) {

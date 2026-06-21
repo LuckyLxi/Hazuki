@@ -174,8 +174,10 @@ Promise.all(
     };
   }
 
-  List<ExploreComic> _parseExploreComics(List list) {
-    final sourceKey = activeSourceKey;
+  List<ExploreComic> _parseExploreComics(List list, {String sourceKey = ''}) {
+    final resolvedSourceKey = sourceKey.trim().isEmpty
+        ? activeSourceKey
+        : sourceKey.trim();
     final comics = <ExploreComic>[];
     for (final comic in list) {
       if (comic is! Map) {
@@ -189,7 +191,7 @@ Promise.all(
           subTitle: (comicMap['subTitle'] ?? comicMap['subtitle'] ?? '')
               .toString(),
           cover: comicMap['cover']?.toString() ?? '',
-          sourceKey: sourceKey,
+          sourceKey: resolvedSourceKey,
         ),
       );
     }

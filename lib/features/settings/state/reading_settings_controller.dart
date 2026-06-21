@@ -12,7 +12,10 @@ class ReadingSettingsController extends ChangeNotifier {
     ReaderSettingsStore settingsStore = const ReaderSettingsStore(),
   }) : _sourceService = sourceService,
        _settingsStore = settingsStore {
-    sourceImageQuality = ReaderSourceImageQualitySettings.load(_sourceService);
+    sourceImageQuality = ReaderSourceImageQualitySettings.load(
+      _sourceService,
+      _sourceService.activeSourceKey,
+    );
   }
 
   final HazukiSourceService _sourceService;
@@ -46,6 +49,7 @@ class ReadingSettingsController extends ChangeNotifier {
     final settings = await _settingsStore.load();
     final sourceSettings = ReaderSourceImageQualitySettings.load(
       _sourceService,
+      _sourceService.activeSourceKey,
     );
     if (_disposed) {
       return;
@@ -172,6 +176,7 @@ class ReadingSettingsController extends ChangeNotifier {
     _notify();
     await ReaderSourceImageQualitySettings.updateCopyMangaImageQuality(
       _sourceService,
+      _sourceService.activeSourceKey,
       normalized,
     );
   }
@@ -191,6 +196,7 @@ class ReadingSettingsController extends ChangeNotifier {
     _notify();
     await ReaderSourceImageQualitySettings.updatePicacgImageQuality(
       _sourceService,
+      _sourceService.activeSourceKey,
       normalized,
     );
   }

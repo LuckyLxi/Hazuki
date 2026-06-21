@@ -10,6 +10,7 @@ import 'search_history_service.dart';
 const searchLoadTimeout = Duration(seconds: 25);
 const searchHistoryCollapsedMaxRows = 4;
 const searchHistoryChipSpacing = 8.0;
+const jmSearchSourceKey = 'jm';
 const searchOrderKeys = <String>{
   'mr',
   'mv',
@@ -41,6 +42,12 @@ typedef SearchPageLoader =
       required String keyword,
       required int page,
       required String order,
+    });
+
+typedef SearchComicDetailsLoader =
+    Future<ComicDetailsData> Function(
+      String comicId, {
+      required String sourceKey,
     });
 
 Map<String, String> searchOrderLabels(
@@ -93,9 +100,27 @@ String? normalizeDirectComicIdKeyword(String keyword) {
   return null;
 }
 
+String? directComicIdSourceKey({
+  required bool aggregateSearchEnabled,
+  required String activeSourceKey,
+}) {
+  if (aggregateSearchEnabled) return jmSearchSourceKey;
+  return activeSourceKey.trim() == jmSearchSourceKey ? jmSearchSourceKey : null;
+}
+
 Future<bool> isComicIdSearchEnhanceEnabled() async {
   final prefs = await SharedPreferences.getInstance();
   return prefs.getBool(hazukiComicIdSearchEnhancePreferenceKey) == true;
+}
+
+Future<bool> isAggregateSearchEnabled() async {
+  final prefs = await SharedPreferences.getInstance();
+  return prefs.getBool(hazukiAggregateSearchEnabledPreferenceKey) == true;
+}
+
+Future<void> setAggregateSearchEnabled(bool enabled) async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setBool(hazukiAggregateSearchEnabledPreferenceKey, enabled);
 }
 
 Future<String> normalizeSubmittedKeyword(

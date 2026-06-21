@@ -15,12 +15,15 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
       comicId: normalizedComicId,
     ).storageKey;
 
-    final memoryCached = _getComicDetailsFromMemoryCache(scopedComicKey);
+    final memoryCached = _getComicDetailsFromMemoryCache(
+      scopedComicKey,
+      sourceKey: resolvedSourceKey,
+    );
     if (memoryCached != null) {
       return memoryCached;
     }
 
-    final facade = this.facade;
+    final facade = _handleFor(resolvedSourceKey).facade;
 
     final inFlight = facade.cache.comicDetailsInFlight[scopedComicKey];
     if (inFlight != null) {
@@ -100,9 +103,14 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
         comicId: normalizedComicId,
       ).storageKey,
       details,
+      sourceKey: sourceKey,
     );
     if (details.id != normalizedComicId) {
-      _putComicDetailsInMemoryCache(details.scopedId.storageKey, details);
+      _putComicDetailsInMemoryCache(
+        details.scopedId.storageKey,
+        details,
+        sourceKey: sourceKey,
+      );
     }
     return details;
   }
@@ -112,8 +120,9 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
     required String epId,
     String sourceKey = '',
   }) async {
-    _resolveActiveSourceKey(sourceKey);
-    final facade = this.facade;
+    final resolvedSourceKey = _resolveActiveSourceKey(sourceKey);
+    final facade = _handleFor(resolvedSourceKey).facade;
+    await facade.ensureInitialized();
     final engine = facade.js.engine;
     if (engine == null) {
       throw Exception('source_not_initialized');
@@ -148,7 +157,10 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
       map,
       fallbackComicId: normalizedComicId,
     );
-    final recommend = _extractComicDetailsRecommendations(map);
+    final recommend = _extractComicDetailsRecommendations(
+      map,
+      sourceKey: sourceKey,
+    );
     final tags = _extractComicDetailsTags(map, sourceKey: sourceKey);
 
     final detailsComicId = map['id']?.toString().trim() ?? '';
@@ -192,6 +204,20 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
     }
   }
 
+  bool supportComicLikeForSource(String sourceKey) {
+    final resolvedSourceKey = _resolveActiveSourceKey(sourceKey);
+    final targetFacade = _handleFor(resolvedSourceKey).facade;
+    final engine = targetFacade.js.engine;
+    if (engine == null) return false;
+    try {
+      return targetFacade.js.asBool(
+        engine.evaluate('!!this.__hazuki_source.comic?.likeComic'),
+      );
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<void> toggleComicLike({
     required String comicId,
     required bool isLike,
@@ -202,10 +228,10 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
       throw Exception('comic_id_empty');
     }
     final resolvedSourceKey = _resolveActiveSourceKey(sourceKey);
-    final facade = this.facade;
+    final facade = _handleFor(resolvedSourceKey).facade;
     await facade.ensureInitialized();
 
-    await _runWithReloginRetry(() async {
+    Future<void> runToggle() async {
       final engine = facade.js.engine;
       if (engine == null) {
         throw Exception('source_not_initialized');
@@ -221,13 +247,18 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
         name: 'source_comic_like.js',
       );
       await facade.js.resolve(result);
-    });
+    }
+
+    await _runWithReloginRetry(runToggle, targetFacade: facade);
 
     final scopedKey = SourceScopedComicId(
       sourceKey: resolvedSourceKey,
       comicId: normalizedComicId,
     ).storageKey;
-    final cached = _getComicDetailsFromMemoryCache(scopedKey);
+    final cached = _getComicDetailsFromMemoryCache(
+      scopedKey,
+      sourceKey: resolvedSourceKey,
+    );
     if (cached != null) {
       _updateComicDetailsLikeStateInMemoryCache(
         cached.scopedId,
@@ -261,13 +292,20 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
     required ComicDetailsData Function(ComicDetailsData details) update,
   }) {
     final canonicalKey = scopedId.storageKey;
-    final entries = _comicDetailsMemoryCache.entries.toList();
+    final cache = _handleFor(
+      _resolveActiveSourceKey(scopedId.sourceKey),
+    ).cache.comicDetailsMemoryCache;
+    final entries = cache.entries.toList();
     for (final entry in entries) {
       if (entry.key != canonicalKey &&
           entry.value.scopedId.storageKey != canonicalKey) {
         continue;
       }
-      _putComicDetailsInMemoryCache(entry.key, update(entry.value));
+      _putComicDetailsInMemoryCache(
+        entry.key,
+        update(entry.value),
+        sourceKey: scopedId.sourceKey,
+      );
     }
   }
 
@@ -331,9 +369,9 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
   }
 
   List<ExploreComic> _extractComicDetailsRecommendations(
-    Map<String, dynamic> map,
-  ) {
-    final sourceKey = activeSourceKey;
+    Map<String, dynamic> map, {
+    required String sourceKey,
+  }) {
     final recommend = <ExploreComic>[];
     final recommendRaw = map['recommend'];
     if (recommendRaw is List) {
