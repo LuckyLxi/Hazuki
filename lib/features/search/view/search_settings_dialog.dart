@@ -72,7 +72,6 @@ class _SearchSettingsDialogState extends State<_SearchSettingsDialog> {
         value: _aggregateSearchEnabled,
         secondary: const Icon(Icons.hub_outlined),
         title: Text(strings.searchAggregateSearch),
-        subtitle: Text(strings.searchAggregateSearchDescription),
         onChanged: (enabled) {
           setState(() {
             _aggregateSearchEnabled = enabled;
