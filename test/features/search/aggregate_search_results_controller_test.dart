@@ -68,23 +68,16 @@ void main() {
     final picacg = controller.sections.firstWhere(
       (section) => section.source.normalizedKey == 'picacg',
     );
-    final relaManhua = controller.sections.firstWhere(
-      (section) => section.source.normalizedKey == 'relamanhua',
-    );
-
     expect(jm.comics.single.title, 'Hazuki');
     expect(jm.errorMessage, isNull);
     expect(copy.comics, isEmpty);
     expect(copy.errorMessage, contains('copy unavailable'));
     expect(picacg.comics, isEmpty);
     expect(picacg.errorMessage, isNull);
-    expect(relaManhua.comics, isEmpty);
-    expect(relaManhua.errorMessage, isNull);
     expect(requestedOrders, {
       hazukiDefaultSourceKey: 'mr',
       'copy_manga': '-',
       'picacg': 'dd',
-      'relamanhua': 'mr',
     });
   });
 
