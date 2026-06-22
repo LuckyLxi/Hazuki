@@ -67,6 +67,21 @@ void main() {
       },
     );
 
+    test('matches when a pasted line break is removed by the input', () async {
+      const storedKeyword =
+          '給大家發個蘿莉視頻破.解版，幼和禁區.視頻豐富，都不收費已經去廣告！拿走不用謝！！'
+          '下栽鏈.接在我頭.像，輸入到瀏覽器就可以打開了';
+      const comment =
+          '給大家發個蘿莉視頻破.解版，幼和禁區.視頻豐富，都不收費已經去廣告！拿走不用謝！！\n'
+          '下栽鏈.接在我頭.像，輸入到瀏覽器就可以打開了';
+      await service.save(
+        userKeywords: [storedKeyword],
+        mode: CommentFilterMode.hide,
+      );
+
+      expect(service.isFiltered(commentFilterText(comment)), isTrue);
+    });
+
     test('empty / whitespace-only user keyword does not match', () async {
       await service.save(
         userKeywords: ['', '   ', '\n\n'],

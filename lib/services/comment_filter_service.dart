@@ -57,6 +57,7 @@ class CommentFilterService with ChangeNotifier {
     r'\u{FEFF}\u{180E}]',
     unicode: true,
   );
+  static final _whitespacePattern = RegExp(r'\s+', unicode: true);
 
   static String _clean(String text) => text
       .replaceAll(_invisibleCharsPattern, '')
@@ -72,6 +73,11 @@ class CommentFilterService with ChangeNotifier {
     final cleanKeyword = _clean(rawKeyword);
     if (cleanKeyword.isEmpty) return false;
     if (cleanedContent.contains(cleanKeyword)) return true;
+    final compactKeyword = cleanKeyword.replaceAll(_whitespacePattern, '');
+    final compactContent = cleanedContent.replaceAll(_whitespacePattern, '');
+    if (compactKeyword.isNotEmpty && compactContent.contains(compactKeyword)) {
+      return true;
+    }
     final lines = cleanKeyword
         .split('\n')
         .map((l) => l.trim())

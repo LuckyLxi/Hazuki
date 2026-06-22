@@ -77,7 +77,14 @@ class _CommentFilterSheetState extends State<_CommentFilterSheet>
     super.dispose();
   }
 
-  Future<void> _save() async {
+  Future<void> _save({bool includePendingKeyword = false}) async {
+    if (includePendingKeyword) {
+      final pendingKeyword = _addController.text.trim();
+      if (pendingKeyword.isNotEmpty &&
+          !_userKeywords.contains(pendingKeyword)) {
+        _userKeywords.add(pendingKeyword);
+      }
+    }
     await sl<CommentFilterService>().save(
       userKeywords: _userKeywords,
       mode: _mode,
@@ -400,7 +407,7 @@ class _CommentFilterSheetState extends State<_CommentFilterSheet>
                           // 保存按钮
                           FilledButton(
                             onPressed: () async {
-                              await _save();
+                              await _save(includePendingKeyword: true);
                               if (context.mounted) Navigator.of(context).pop();
                             },
                             style: FilledButton.styleFrom(
