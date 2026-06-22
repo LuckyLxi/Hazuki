@@ -1159,6 +1159,22 @@
     }
   },
   "homeSourceSwitchLoadingMessage": "Please wait until the source is ready",
+  "labSourceDeleteTooltip": "Delete source",
+  "labSourceDeleteTitle": "Delete source",
+  "labSourceDeleteMessage": "Delete the downloaded files for {sourceName}? Account, favorites, and history data will be kept.",
+  "@labSourceDeleteMessage": {
+    "placeholders": {
+      "sourceName": {}
+    }
+  },
+  "labSourceDeleteAction": "Delete",
+  "labSourceDeleteSuccess": "Comic source deleted",
+  "labSourceDeleteFailed": "Could not delete source: {error}",
+  "@labSourceDeleteFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
   "labSourceAccountNotDownloaded": "Not downloaded",
   "labSourceAccountDownloadSuccess": "Comic source downloaded",
   "labSourceAccountDownloadFailed": "Could not download comic source: {error}",

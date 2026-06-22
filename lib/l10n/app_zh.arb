@@ -1159,6 +1159,22 @@
     }
   },
   "homeSourceSwitchLoadingMessage": "请等待漫画源准备完成",
+  "labSourceDeleteTooltip": "删除漫画源",
+  "labSourceDeleteTitle": "删除漫画源",
+  "labSourceDeleteMessage": "确定删除已下载的“{sourceName}”漫画源文件吗？账号、收藏和历史数据会保留。",
+  "@labSourceDeleteMessage": {
+    "placeholders": {
+      "sourceName": {}
+    }
+  },
+  "labSourceDeleteAction": "删除",
+  "labSourceDeleteSuccess": "漫画源已删除",
+  "labSourceDeleteFailed": "删除漫画源失败：{error}",
+  "@labSourceDeleteFailed": {
+    "placeholders": {
+      "error": {}
+    }
+  },
   "labSourceAccountNotDownloaded": "未下载",
   "labSourceAccountDownloadSuccess": "漫画源已下载",
   "labSourceAccountDownloadFailed": "漫画源下载失败：{error}",

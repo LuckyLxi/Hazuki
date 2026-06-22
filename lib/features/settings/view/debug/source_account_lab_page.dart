@@ -159,6 +159,57 @@ class _SourceAccountLabPageState extends State<SourceAccountLabPage> {
     }
   }
 
+  Future<void> _deleteSource(SourceCatalogEntry source) async {
+    final sourceKey = source.normalizedKey;
+    if (_busySourceKey != null || sourceKey == _registry.activeSourceKey) {
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(_strings.labSourceDeleteTitle),
+        content: Text(_strings.labSourceDeleteMessage(source.name)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(_strings.commonCancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(_strings.labSourceDeleteAction),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) {
+      return;
+    }
+
+    setState(() => _busySourceKey = sourceKey);
+    try {
+      await _sourceService.deleteLocalSourceFile(sourceKey);
+      if (!mounted) {
+        return;
+      }
+      setState(() => _sourceInstalled[sourceKey] = false);
+      await showHazukiPrompt(context, _strings.labSourceDeleteSuccess);
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      await showHazukiPrompt(
+        context,
+        _strings.labSourceDeleteFailed('$error'),
+        isError: true,
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _busySourceKey = null);
+      }
+    }
+  }
+
   Future<HomeLoginDialogProfile> _login(String account, String password) async {
     return loginSourceAccountForDialog(
       sourceService: _sourceService,
@@ -257,19 +308,36 @@ class _SourceAccountLabPageState extends State<SourceAccountLabPage> {
               ),
             )
           // 非活跃源：显示按钮，但点击时提示先切换，不自动切换
-          : TextButton(
-              onPressed: _busySourceKey == null
-                  ? () => showHazukiPrompt(
-                      context,
-                      _strings.labSourceAccountSwitchFirst(source.name),
-                      isError: false,
-                    )
-                  : null,
-              child: Text(
-                isSourceLogged
-                    ? _strings.labSourceAccountLogout
-                    : _strings.labSourceAccountLogin,
-              ),
+          : Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                IconButton(
+                  tooltip: _strings.labSourceDeleteTooltip,
+                  onPressed: _busySourceKey == null
+                      ? () => _deleteSource(source)
+                      : null,
+                  icon: busy
+                      ? const SizedBox.square(
+                          dimension: 20,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.delete_outline),
+                ),
+                TextButton(
+                  onPressed: _busySourceKey == null
+                      ? () => showHazukiPrompt(
+                          context,
+                          _strings.labSourceAccountSwitchFirst(source.name),
+                          isError: false,
+                        )
+                      : null,
+                  child: Text(
+                    isSourceLogged
+                        ? _strings.labSourceAccountLogout
+                        : _strings.labSourceAccountLogin,
+                  ),
+                ),
+              ],
             ),
     );
   }

@@ -115,6 +115,23 @@ extension HazukiSourceServiceSourceFileManagementCapability
     return jmFile.exists();
   }
 
+  Future<void> deleteLocalSourceFile(String sourceKey) async {
+    final normalizedSourceKey = _normalizeAllowedSourceKey(sourceKey);
+    if (normalizedSourceKey == activeSourceKey) {
+      throw StateError('source_delete_active_not_allowed');
+    }
+
+    final sourceDir = await _getSourceStorageDirectory(
+      sourceKey: normalizedSourceKey,
+    );
+    final sourceFile = File('${sourceDir.path}/source.js');
+    if (await sourceFile.exists()) {
+      await sourceFile.delete();
+    }
+    await _setCustomEditedSourceFlag(normalizedSourceKey, false);
+    _runtimeHandles.remove(normalizedSourceKey)?.requestDispose();
+  }
+
   Future<void> downloadSourceFile(
     String sourceKey, {
     void Function(int received, int total)? onProgress,
