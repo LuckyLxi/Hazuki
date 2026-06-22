@@ -41,10 +41,22 @@ class CommentFilterService with ChangeNotifier {
     required List<String> userKeywords,
     required CommentFilterMode mode,
   }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final storedKeywords =
+        prefs.getStringList(hazukiCommentFilterKeywordsKey) ?? const <String>[];
+    final keywordsChanged = !listEquals(storedKeywords, userKeywords);
     _userKeywords = List.of(userKeywords);
     _mode = mode;
-    final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList(hazukiCommentFilterKeywordsKey, _userKeywords);
+    if (keywordsChanged) {
+      final previousUpdatedAt =
+          prefs.getInt(hazukiCommentFilterKeywordsUpdatedAtKey) ?? 0;
+      final now = DateTime.now().millisecondsSinceEpoch;
+      await prefs.setInt(
+        hazukiCommentFilterKeywordsUpdatedAtKey,
+        now > previousUpdatedAt ? now : previousUpdatedAt + 1,
+      );
+    }
     await prefs.setString(hazukiCommentFilterModeKey, mode.name);
     notifyListeners();
   }

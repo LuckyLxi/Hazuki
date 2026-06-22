@@ -69,6 +69,8 @@ class CloudSyncSnapshotCodec {
         .exportJsonList();
     final localCommentFilterKeywordsSnapshot =
         prefs.getStringList(hazukiCommentFilterKeywordsKey) ?? const <String>[];
+    final localCommentFilterKeywordsUpdatedAtSnapshot =
+        prefs.getInt(hazukiCommentFilterKeywordsUpdatedAtKey) ?? 0;
     final localFoldersSnapshot = await _localFavoritesService
         .exportFoldersJsonString();
     final localEntriesSnapshot = await _localFavoritesService
@@ -245,6 +247,9 @@ class CloudSyncSnapshotCodec {
               prefs,
               data,
               localKeywordsSnapshot: localCommentFilterKeywordsSnapshot,
+              localUpdatedAtMsSnapshot:
+                  localCommentFilterKeywordsUpdatedAtSnapshot,
+              remoteSettingsAreNewer: applyRemoteSettings,
             );
             final remoteGroupsRaw =
                 data[CloudSyncConfigStore.downloadGroupsKey];
@@ -273,6 +278,7 @@ class CloudSyncSnapshotCodec {
       if (remoteKeys.contains(key) ||
           key == hazukiFirstUseDatePreferenceKey ||
           key == hazukiCommentFilterKeywordsKey ||
+          key == hazukiCommentFilterKeywordsUpdatedAtKey ||
           CloudSyncConfigStore.shouldAlwaysSkipSetting(key) ||
           CloudSyncConfigStore.restoreSkippedSettings.contains(key) ||
           CloudSyncConfigStore.windowsOnlySettings.contains(key) ||
@@ -285,6 +291,8 @@ class CloudSyncSnapshotCodec {
     for (final entry in remoteData.entries) {
       final key = entry.key.toString().trim();
       if (key.isEmpty ||
+          key == hazukiCommentFilterKeywordsKey ||
+          key == hazukiCommentFilterKeywordsUpdatedAtKey ||
           CloudSyncConfigStore.shouldAlwaysSkipSetting(key) ||
           CloudSyncConfigStore.restoreSkippedSettings.contains(key) ||
           (CloudSyncConfigStore.windowsOnlySettings.contains(key) &&
@@ -411,26 +419,64 @@ class CloudSyncSnapshotCodec {
     SharedPreferences prefs,
     Map<dynamic, dynamic> remoteData, {
     required List<String> localKeywordsSnapshot,
+    required int localUpdatedAtMsSnapshot,
+    required bool remoteSettingsAreNewer,
   }) async {
     final remoteRaw = remoteData[hazukiCommentFilterKeywordsKey];
     if (remoteRaw is! List) {
       return;
     }
 
-    final merged = <String>[];
+    final remoteKeywords = remoteRaw.map((e) => e.toString()).toList();
+    final remoteUpdatedAtMs =
+        (remoteData[hazukiCommentFilterKeywordsUpdatedAtKey] as num?)
+            ?.toInt() ??
+        0;
+
+    late final List<String> resolved;
+    late final int resolvedUpdatedAtMs;
+    if (localUpdatedAtMsSnapshot > remoteUpdatedAtMs) {
+      resolved = localKeywordsSnapshot;
+      resolvedUpdatedAtMs = localUpdatedAtMsSnapshot;
+    } else if (remoteUpdatedAtMs > localUpdatedAtMsSnapshot) {
+      resolved = remoteKeywords;
+      resolvedUpdatedAtMs = remoteUpdatedAtMs;
+    } else if (localUpdatedAtMsSnapshot > 0) {
+      resolved = remoteSettingsAreNewer
+          ? remoteKeywords
+          : localKeywordsSnapshot;
+      resolvedUpdatedAtMs = localUpdatedAtMsSnapshot;
+    } else if (!remoteSettingsAreNewer) {
+      // The remote snapshot has not changed since this device last synced.
+      // Keep the local list authoritative so a local deletion is not revived.
+      resolved = localKeywordsSnapshot;
+      resolvedUpdatedAtMs = 0;
+    } else {
+      // Legacy snapshots have no revision. Preserve the old union behavior for
+      // a genuinely newer remote snapshot so existing users do not lose terms.
+      resolved = [...remoteKeywords, ...localKeywordsSnapshot];
+      resolvedUpdatedAtMs = 0;
+    }
+
+    final normalized = <String>[];
     final seen = <String>{};
-    for (final keyword in [
-      ...remoteRaw.map((e) => e.toString()),
-      ...localKeywordsSnapshot,
-    ]) {
+    for (final keyword in resolved) {
       if (keyword.trim().isEmpty) {
         continue;
       }
       if (seen.add(keyword)) {
-        merged.add(keyword);
+        normalized.add(keyword);
       }
     }
-    await prefs.setStringList(hazukiCommentFilterKeywordsKey, merged);
+    await prefs.setStringList(hazukiCommentFilterKeywordsKey, normalized);
+    if (resolvedUpdatedAtMs > 0) {
+      await prefs.setInt(
+        hazukiCommentFilterKeywordsUpdatedAtKey,
+        resolvedUpdatedAtMs,
+      );
+    } else {
+      await prefs.remove(hazukiCommentFilterKeywordsUpdatedAtKey);
+    }
   }
 
   Future<void> _mergeLocalFavorites(

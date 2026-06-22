@@ -167,6 +167,7 @@ void main() {
         _FakeCloudSyncRemoteClient({
           CloudSyncConfigStore.settingsFileName: remoteSettings,
         }),
+        applyRemoteSettings: true,
       );
 
       final prefs = await SharedPreferences.getInstance();
@@ -174,6 +175,58 @@ void main() {
         'remote',
         'local',
       ]);
+    });
+
+    test('does not revive a locally deleted comment filter keyword', () async {
+      SharedPreferences.setMockInitialValues({
+        hazukiCommentFilterKeywordsKey: ['kept'],
+      });
+
+      final remoteSettings = jsonEncode({
+        'version': 2,
+        'data': {
+          hazukiCommentFilterKeywordsKey: ['deleted', 'kept'],
+        },
+      });
+
+      await CloudSyncSnapshotCodec(
+        configStore: CloudSyncConfigStore(),
+      ).mergeRemoteIntoLocal(
+        _FakeCloudSyncRemoteClient({
+          CloudSyncConfigStore.settingsFileName: remoteSettings,
+        }),
+      );
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getStringList(hazukiCommentFilterKeywordsKey), ['kept']);
+    });
+
+    test('applies a newer remote comment filter deletion', () async {
+      SharedPreferences.setMockInitialValues({
+        hazukiCommentFilterKeywordsKey: ['deleted', 'kept'],
+        hazukiCommentFilterKeywordsUpdatedAtKey: 100,
+      });
+
+      final remoteSettings = jsonEncode({
+        'version': 2,
+        'data': {
+          hazukiCommentFilterKeywordsKey: ['kept'],
+          hazukiCommentFilterKeywordsUpdatedAtKey: 200,
+        },
+      });
+
+      await CloudSyncSnapshotCodec(
+        configStore: CloudSyncConfigStore(),
+      ).mergeRemoteIntoLocal(
+        _FakeCloudSyncRemoteClient({
+          CloudSyncConfigStore.settingsFileName: remoteSettings,
+        }),
+        applyRemoteSettings: true,
+      );
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getStringList(hazukiCommentFilterKeywordsKey), ['kept']);
+      expect(prefs.getInt(hazukiCommentFilterKeywordsUpdatedAtKey), 200);
     });
 
     test('trims merged search history to the shared local limit', () async {

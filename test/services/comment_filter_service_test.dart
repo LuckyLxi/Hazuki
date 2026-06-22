@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hazuki/app/app_preferences.dart';
 import 'package:hazuki/features/comments/state/comments_page_controller.dart';
 import 'package:hazuki/features/comments/support/comments_content_support.dart';
 import 'package:hazuki/models/hazuki_models.dart';
@@ -111,6 +112,12 @@ void main() {
       final a = CommentFilterService();
       await a.load();
       await a.save(userKeywords: ['kw1', 'kw2'], mode: CommentFilterMode.hide);
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(
+        prefs.getInt(hazukiCommentFilterKeywordsUpdatedAtKey),
+        greaterThan(0),
+      );
 
       final b = CommentFilterService();
       await b.load();
