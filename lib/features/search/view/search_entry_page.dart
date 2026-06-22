@@ -391,8 +391,9 @@ class _SearchEntryPageState extends State<SearchEntryPage>
             child: Scaffold(
               backgroundColor: Theme.of(context).colorScheme.surface,
               resizeToAvoidBottomInset: true,
-              floatingActionButtonAnimator:
-                  FloatingActionButtonAnimator.noAnimation,
+              floatingActionButtonLocation: _KeyboardSafeEndFloatFabLocation(
+                MediaQuery.viewPaddingOf(context).bottom,
+              ),
               floatingActionButton: _historyList.isNotEmpty
                   ? SearchEntryHistoryEditFab(
                       editMode: _historyEditMode,
@@ -450,4 +451,33 @@ class _SearchEntryPageState extends State<SearchEntryPage>
       ),
     );
   }
+}
+
+class _KeyboardSafeEndFloatFabLocation extends FloatingActionButtonLocation {
+  const _KeyboardSafeEndFloatFabLocation(this.bottomViewPadding);
+
+  final double bottomViewPadding;
+
+  @override
+  Offset getOffset(ScaffoldPrelayoutGeometry scaffoldGeometry) {
+    final offset = FloatingActionButtonLocation.endFloat.getOffset(
+      scaffoldGeometry,
+    );
+    final lowestSafeY =
+        scaffoldGeometry.scaffoldSize.height -
+        scaffoldGeometry.floatingActionButtonSize.height -
+        kFloatingActionButtonMargin -
+        bottomViewPadding;
+    final safeY = lowestSafeY < 0 ? 0.0 : lowestSafeY;
+    return Offset(offset.dx, offset.dy > safeY ? safeY : offset.dy);
+  }
+
+  @override
+  bool operator ==(Object other) {
+    return other is _KeyboardSafeEndFloatFabLocation &&
+        other.bottomViewPadding == bottomViewPadding;
+  }
+
+  @override
+  int get hashCode => bottomViewPadding.hashCode;
 }

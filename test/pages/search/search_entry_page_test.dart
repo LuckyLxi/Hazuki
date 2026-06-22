@@ -56,6 +56,46 @@ void main() {
     expect(tester.testTextInput.isVisible, isFalse);
   });
 
+  testWidgets('history FAB keeps its safe-area margin as keyboard closes', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      'search_history': <String>['hazuki'],
+    });
+    await sl<SearchHistoryService>().load();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        builder: (context, child) {
+          final mediaQuery = MediaQuery.of(context);
+          return MediaQuery(
+            data: mediaQuery.copyWith(
+              viewInsets: const EdgeInsets.only(bottom: 1),
+              viewPadding: const EdgeInsets.only(bottom: 24),
+            ),
+            child: child!,
+          );
+        },
+        home: SearchEntryPage(
+          comicDetailPageBuilder: _comicDetailPageBuilder,
+          comicCoverHeroTagBuilder: _testComicCoverHeroTag,
+          searchPageLoader: _fakeSearchPageLoader,
+        ),
+      ),
+    );
+    await _pumpSearchSettled(tester);
+
+    final scaffoldRect = tester.getRect(find.byType(Scaffold).first);
+    final fabRect = tester.getRect(find.byType(FloatingActionButton));
+
+    expect(
+      fabRect.bottom,
+      lessThanOrEqualTo(scaffoldRect.bottom - 24 - kFloatingActionButtonMargin),
+    );
+  });
+
   testWidgets('search settings toggles and persists aggregate search', (
     tester,
   ) async {
