@@ -265,6 +265,7 @@
   "historySelectionCancelTooltip": "取消多选",
   "historySelectionEnterTooltip": "多选",
   "historyDeleteSelectedTooltip": "删除选中的历史",
+  "historyDeleteSelectionRequired": "请先选择要删除的漫画",
   "historyClearAllTooltip": "清空所有历史",
   "historyDeleteSelectedTitle": "删除历史记录",
   "historyDeleteSelectedContent": "你确定要删除选中的{count}部漫画历史记录吗？",
@@ -1027,6 +1028,9 @@
     }
   },
   "discoverSectionEmpty": "暂无漫画",
+  "discoverSectionChooseDate": "选择日期",
+  "discoverSectionPreviousIssue": "上一期",
+  "discoverSectionNextIssue": "下一期",
   "commentsTitle": "评论",
   "commentsLoadFailed": "加载评论失败：{error}",
   "@commentsLoadFailed": {

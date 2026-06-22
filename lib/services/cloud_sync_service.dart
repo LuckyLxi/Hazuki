@@ -122,7 +122,13 @@ class CloudSyncService {
       );
       final remoteUpdatedAtMs = _manifestUpdatedAtMs(remoteManifestText);
       if (remoteManifestText != null) {
-        await _snapshotCodec.mergeRemoteIntoLocal(client);
+        final lastSyncedRemoteTs = await _configStore.loadLastSyncedRemoteTs(
+          config,
+        );
+        await _snapshotCodec.mergeRemoteIntoLocal(
+          client,
+          applyRemoteSettings: remoteUpdatedAtMs > lastSyncedRemoteTs,
+        );
         _localFavorites.onExternalDataChanged();
         await _commentFilter.load(notify: true);
         await _downloadGroups.reload();
@@ -134,7 +140,7 @@ class CloudSyncService {
           ? requestedUploadAtMs
           : remoteUpdatedAtMs + 1;
       await _uploadSnapshot(client, committedAtMs);
-      await _configStore.saveLastSyncedRemoteTs(committedAtMs);
+      await _configStore.saveLastSyncedRemoteTs(committedAtMs, config);
     });
   }
 

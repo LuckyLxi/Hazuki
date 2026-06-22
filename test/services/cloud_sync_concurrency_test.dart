@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hazuki/app/app_preferences.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_config_store.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_remote_client.dart';
@@ -163,6 +164,131 @@ void main() {
     );
     expect(remote.files[CloudSyncConfigStore.manifestFileName], isNotNull);
     expect(remote.lockToken, isNull);
+  });
+
+  test('applies newer remote user settings before uploading', () async {
+    final remote = _SharedRemote()
+      ..files[CloudSyncConfigStore.manifestFileName] = jsonEncode({
+        'version': 2,
+        'updatedAtMs': 200,
+      })
+      ..files[CloudSyncConfigStore.settingsFileName] = jsonEncode({
+        'version': 2,
+        'data': {
+          'test_user_setting': 'remote',
+          hazukiFirstUseDatePreferenceKey: '2024-01-02T00:00:00.000Z',
+          CloudSyncConfigStore.passwordKey: 'remote-password',
+        },
+      });
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('test_user_setting', 'local');
+    await prefs.setString(
+      hazukiFirstUseDatePreferenceKey,
+      '2026-01-02T00:00:00.000Z',
+    );
+    await prefs.setString(CloudSyncConfigStore.passwordKey, 'local-password');
+    await prefs.setString('removed_user_setting', 'stale');
+    await CloudSyncConfigStore().saveLastSyncedRemoteTs(
+      100,
+      _FakeLockedRemoteClient._config,
+    );
+    final device = await _createDevice(remote, 'A');
+    addTearDown(device.dispose);
+
+    await device.service.uploadBackup(
+      configOverride: _FakeLockedRemoteClient._config,
+      uploadAtMs: 300,
+    );
+
+    expect(prefs.getString('test_user_setting'), 'remote');
+    expect(
+      prefs.getString(hazukiFirstUseDatePreferenceKey),
+      '2024-01-02T00:00:00.000Z',
+    );
+    expect(prefs.getString(CloudSyncConfigStore.passwordKey), 'local-password');
+    expect(prefs.containsKey('removed_user_setting'), isFalse);
+    final uploaded =
+        jsonDecode(remote.files[CloudSyncConfigStore.settingsFileName]!)
+            as Map<String, dynamic>;
+    final uploadedData = uploaded['data'] as Map<String, dynamic>;
+    expect(uploadedData['test_user_setting'], 'remote');
+    expect(
+      uploadedData[hazukiFirstUseDatePreferenceKey],
+      '2024-01-02T00:00:00.000Z',
+    );
+    expect(uploadedData, isNot(contains(CloudSyncConfigStore.passwordKey)));
+    expect(
+      uploadedData,
+      isNot(contains(CloudSyncConfigStore.lastSyncedRemoteTsKey)),
+    );
+    expect(uploadedData, isNot(contains('removed_user_setting')));
+  });
+
+  test(
+    'keeps local user settings when remote is already synchronized',
+    () async {
+      final remote = _SharedRemote()
+        ..files[CloudSyncConfigStore.manifestFileName] = jsonEncode({
+          'version': 2,
+          'updatedAtMs': 200,
+        })
+        ..files[CloudSyncConfigStore.settingsFileName] = jsonEncode({
+          'version': 2,
+          'data': {'test_user_setting': 'remote'},
+        });
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('test_user_setting', 'local');
+      await CloudSyncConfigStore().saveLastSyncedRemoteTs(
+        200,
+        _FakeLockedRemoteClient._config,
+      );
+      final device = await _createDevice(remote, 'A');
+      addTearDown(device.dispose);
+
+      await device.service.uploadBackup(
+        configOverride: _FakeLockedRemoteClient._config,
+        uploadAtMs: 300,
+      );
+
+      expect(prefs.getString('test_user_setting'), 'local');
+      final uploaded =
+          jsonDecode(remote.files[CloudSyncConfigStore.settingsFileName]!)
+              as Map<String, dynamic>;
+      expect((uploaded['data'] as Map)['test_user_setting'], 'local');
+    },
+  );
+
+  test('does not reuse the settings cursor for another remote', () async {
+    const otherConfig = CloudSyncConfig(
+      enabled: true,
+      url: 'https://other.example.test',
+      username: 'other-user',
+      password: 'pass',
+    );
+    final remote = _SharedRemote()
+      ..files[CloudSyncConfigStore.manifestFileName] = jsonEncode({
+        'version': 2,
+        'updatedAtMs': 200,
+      })
+      ..files[CloudSyncConfigStore.settingsFileName] = jsonEncode({
+        'version': 2,
+        'data': {'test_user_setting': 'other-remote'},
+      });
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('test_user_setting', 'local');
+    await CloudSyncConfigStore().saveLastSyncedRemoteTs(
+      500,
+      _FakeLockedRemoteClient._config,
+    );
+    final device = await _createDevice(remote, 'A');
+    addTearDown(device.dispose);
+
+    await device.service.uploadBackup(
+      configOverride: otherConfig,
+      uploadAtMs: 300,
+    );
+
+    expect(prefs.getString('test_user_setting'), 'other-remote');
   });
 
   test('recovers a stale remote lock before uploading', () async {

@@ -4,6 +4,17 @@ import 'package:hazuki/models/hazuki_models.dart';
 
 void main() {
   group('HistoryPageData', () {
+    test('exiting selection mode clears the current selection', () {
+      final data = HistoryPageData()..applyLoaded(const [_comicA, _comicB]);
+      data.toggleSelectionMode();
+      data.toggleSelection(_comicA.scopedId.storageKey);
+
+      data.exitSelectionMode();
+
+      expect(data.selectionMode, isFalse);
+      expect(data.selectedStorageKeys, isEmpty);
+    });
+
     test('entering and leaving selection mode clears selected items', () {
       final data = HistoryPageData()..applyLoaded(const [_comicA, _comicB]);
 

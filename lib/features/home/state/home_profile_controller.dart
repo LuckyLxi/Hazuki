@@ -10,8 +10,6 @@ class HomeProfileController extends ChangeNotifier {
   HomeProfileController({required HazukiSourceService sourceService})
     : _sourceService = sourceService;
 
-  static const _firstUseDateKey = 'app_first_use_date';
-
   final HazukiSourceService _sourceService;
 
   bool _disposed = false;
@@ -114,11 +112,11 @@ class HomeProfileController extends ChangeNotifier {
 
   Future<void> loadFirstUseText(BuildContext context) async {
     final prefs = await SharedPreferences.getInstance();
-    var firstUseRaw = prefs.getString(_firstUseDateKey);
+    var firstUseRaw = prefs.getString(hazukiFirstUseDatePreferenceKey);
 
     if (firstUseRaw == null || firstUseRaw.isEmpty) {
       firstUseRaw = DateTime.now().toIso8601String();
-      await prefs.setString(_firstUseDateKey, firstUseRaw);
+      await prefs.setString(hazukiFirstUseDatePreferenceKey, firstUseRaw);
     }
 
     if (!context.mounted) {

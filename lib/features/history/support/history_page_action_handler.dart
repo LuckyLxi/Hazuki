@@ -1,9 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
 import 'package:hazuki/shared/windows/windows_comic_detail.dart';
+import 'package:hazuki/widgets/widgets.dart';
 
 import '../state/history_page_controller.dart';
 import 'history_actions.dart';
@@ -22,6 +24,12 @@ class HistoryPageActionHandler {
 
   Future<void> deleteSelected(BuildContext context) async {
     if (_controller.selectedCount == 0) {
+      unawaited(
+        showHazukiPrompt(
+          context,
+          AppLocalizations.of(context)!.historyDeleteSelectionRequired,
+        ),
+      );
       return;
     }
 

@@ -78,8 +78,12 @@ const _picacgSourceUrls = [
   'https://cdn.jsdelivr.net/gh/venera-app/venera-configs@main/picacg.js',
 ];
 
+const _relaManhuaSourceUrls = [
+  'https://cdn.jsdelivr.net/gh/LuckyLxi/source@main/relamanhua.js',
+];
+
 const _sourceIndexUrls = [
-  'https://cdn.jsdelivr.net/gh/venera-app/venera-configs@main/index.json',
+  'https://cdn.jsdelivr.net/gh/LuckyLxi/source@main/index.json',
 ];
 
 const _bundledInitAssetPath = 'assets/init.js';
@@ -162,6 +166,12 @@ const List<SourceCatalogEntry> hazukiAllowedSourceCatalog = [
     name: 'Picacg',
     fileName: 'picacg.js',
     directUrls: _picacgSourceUrls,
+  ),
+  SourceCatalogEntry(
+    key: 'relamanhua',
+    name: '热辣漫画',
+    fileName: 'relamanhua.js',
+    directUrls: _relaManhuaSourceUrls,
   ),
 ];
 

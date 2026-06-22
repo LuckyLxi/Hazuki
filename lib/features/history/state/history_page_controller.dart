@@ -127,6 +127,14 @@ class HistoryPageController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void exitSelectionMode() {
+    if (!_state.selectionMode) {
+      return;
+    }
+    _state.exitSelectionMode();
+    notifyListeners();
+  }
+
   void toggleSelection(String storageKey, {bool? selected}) {
     _state.toggleSelection(storageKey, selected: selected);
     notifyListeners();

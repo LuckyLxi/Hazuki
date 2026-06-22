@@ -73,36 +73,44 @@ class _HistoryPageState extends State<HistoryPage> {
     return AnimatedBuilder(
       animation: _pageListenable,
       builder: (context, _) {
-        return WindowsComicDetailHost(
-          child: Scaffold(
-            appBar: HistoryPageAppBar(
-              hasHistory: _controller.hasHistory,
-              selectionMode: _controller.selectionMode,
-              onToggleSelectionMode: _controller.toggleSelectionMode,
-              onDeleteSelected: () => _actions.deleteSelected(context),
-              onClearAll: () => _actions.clearAll(context),
-            ),
-            body: HistoryPageContent(
-              loading: _controller.loading,
-              history: _controller.history,
-              scrollController: _scrollCoordinator.controller,
-              showBackToTop: _scrollCoordinator.showBackToTop,
-              playItemEntryAnimation: _controller.playItemEntryAnimation,
-              selectionMode: _controller.selectionMode,
-              selectedStorageKeys: _controller.selectedStorageKeys,
-              strings: strings,
-              comicCoverHeroTagBuilder: widget.comicCoverHeroTagBuilder,
-              onOpenComic: (comic, heroTag) =>
-                  _actions.openComic(context, comic, heroTag),
-              onToggleSelection: _controller.toggleSelection,
-              onShowMenu: (comic, globalPosition, itemContext) =>
-                  _actions.showComicMenu(
-                    context: context,
-                    comic: comic,
-                    globalPosition: globalPosition,
-                    itemContext: itemContext,
-                  ),
-              onBackToTopPressed: _scrollCoordinator.scrollToTop,
+        return PopScope(
+          canPop: !_controller.selectionMode,
+          onPopInvokedWithResult: (didPop, result) {
+            if (!didPop) {
+              _controller.exitSelectionMode();
+            }
+          },
+          child: WindowsComicDetailHost(
+            child: Scaffold(
+              appBar: HistoryPageAppBar(
+                hasHistory: _controller.hasHistory,
+                selectionMode: _controller.selectionMode,
+                onToggleSelectionMode: _controller.toggleSelectionMode,
+                onDeleteSelected: () => _actions.deleteSelected(context),
+                onClearAll: () => _actions.clearAll(context),
+              ),
+              body: HistoryPageContent(
+                loading: _controller.loading,
+                history: _controller.history,
+                scrollController: _scrollCoordinator.controller,
+                showBackToTop: _scrollCoordinator.showBackToTop,
+                playItemEntryAnimation: _controller.playItemEntryAnimation,
+                selectionMode: _controller.selectionMode,
+                selectedStorageKeys: _controller.selectedStorageKeys,
+                strings: strings,
+                comicCoverHeroTagBuilder: widget.comicCoverHeroTagBuilder,
+                onOpenComic: (comic, heroTag) =>
+                    _actions.openComic(context, comic, heroTag),
+                onToggleSelection: _controller.toggleSelection,
+                onShowMenu: (comic, globalPosition, itemContext) =>
+                    _actions.showComicMenu(
+                      context: context,
+                      comic: comic,
+                      globalPosition: globalPosition,
+                      itemContext: itemContext,
+                    ),
+                onBackToTopPressed: _scrollCoordinator.scrollToTop,
+              ),
             ),
           ),
         );

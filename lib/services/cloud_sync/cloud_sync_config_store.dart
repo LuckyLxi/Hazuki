@@ -11,6 +11,8 @@ class CloudSyncConfigStore {
   static const usernameKey = 'cloud_sync_username';
   static const passwordKey = 'cloud_sync_password';
   static const lastSyncedRemoteTsKey = 'cloud_sync_last_synced_remote_ts';
+  static const lastSyncedRemoteTargetKey =
+      'cloud_sync_last_synced_remote_target';
   static const downloadStateKey = 'manga_download_service_state_v2';
   static const downloadsRootPathKey = 'manga_download_root_path_v1';
 
@@ -39,6 +41,7 @@ class CloudSyncConfigStore {
 
   static bool shouldAlwaysSkipSetting(String key) {
     return alwaysSkippedSettings.contains(key) ||
+        key.startsWith('cloud_sync_') ||
         key.startsWith('cookie_store_v2_');
   }
 
@@ -75,15 +78,22 @@ class CloudSyncConfigStore {
     await prefs.setString(passwordKey, config.password);
   }
 
-  Future<int> loadLastSyncedRemoteTs() async {
+  Future<int> loadLastSyncedRemoteTs(CloudSyncConfig config) async {
     final prefs = await SharedPreferences.getInstance();
+    if (prefs.getString(lastSyncedRemoteTargetKey) != _syncTarget(config)) {
+      return 0;
+    }
     return prefs.getInt(lastSyncedRemoteTsKey) ?? 0;
   }
 
-  Future<void> saveLastSyncedRemoteTs(int value) async {
+  Future<void> saveLastSyncedRemoteTs(int value, CloudSyncConfig config) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(lastSyncedRemoteTsKey, value);
+    await prefs.setString(lastSyncedRemoteTargetKey, _syncTarget(config));
   }
+
+  String _syncTarget(CloudSyncConfig config) =>
+      '${rootUrl(config.url)}\n${config.username.trim()}';
 
   String rootUrl(String raw) {
     final trimmed = raw.trim();

@@ -147,6 +147,7 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
                       DiscoverSectionSortBar(
                         sortOptions: _controller.sortOptions,
                         sortOptionGroups: _controller.sortOptionGroups,
+                        useDateMorphSelector: _usesWeeklyMustReadDateSelector(),
                         selectedSortValue: _controller.selectedSortValue,
                         selectedSortValues: _controller.selectedSortValues,
                         onSelectSortOption: _onSelectSortOption,
@@ -168,15 +169,35 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
                     errorMessage: _controller.errorMessage!,
                     onRetry: _triggerLoadMore,
                   ),
-                DiscoverSectionBackToTopButton(
-                  showBackToTop: _showBackToTop,
-                  onPressed: _scrollToTop,
-                ),
+                if (!_usesWeeklyMustReadDateSelector())
+                  DiscoverSectionBackToTopButton(
+                    showBackToTop: _showBackToTop,
+                    onPressed: _scrollToTop,
+                  ),
+                if (_usesWeeklyMustReadDateSelector() &&
+                    _controller.sortOptionGroups.isNotEmpty &&
+                    _controller.sortOptionGroups.first.isNotEmpty)
+                  DiscoverSectionIssueNavigationButtons(
+                    options: _controller.sortOptionGroups.first,
+                    selectedValue: _controller.selectedSortValues.isEmpty
+                        ? _controller.selectedSortValue
+                        : _controller.selectedSortValues.first,
+                    onSelected: (value) => _onSelectSortOptionInGroup(0, value),
+                  ),
               ],
             );
           },
         ),
       ),
     );
+  }
+
+  bool _usesWeeklyMustReadDateSelector() {
+    final title = widget.section.title.trim();
+    final viewMoreUrl = widget.section.viewMoreUrl?.trim() ?? '';
+    return title.contains('每周必看') ||
+        title.contains('每週必看') ||
+        viewMoreUrl.startsWith('category:每周必看@') ||
+        viewMoreUrl.startsWith('category:每週必看@');
   }
 }

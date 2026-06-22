@@ -8,12 +8,14 @@ import 'package:hazuki/widgets/widgets.dart';
 
 import '../state/discover_section_page_controller.dart';
 import 'discover_comic_tile.dart';
+import 'discover_section_date_selector.dart';
 
 class DiscoverSectionSortBar extends StatelessWidget {
   const DiscoverSectionSortBar({
     super.key,
     required this.sortOptions,
     this.sortOptionGroups = const <List<CategoryRankingOption>>[],
+    this.useDateMorphSelector = false,
     required this.selectedSortValue,
     this.selectedSortValues = const <String>[],
     required this.onSelectSortOption,
@@ -22,6 +24,7 @@ class DiscoverSectionSortBar extends StatelessWidget {
 
   final List<CategoryRankingOption> sortOptions;
   final List<List<CategoryRankingOption>> sortOptionGroups;
+  final bool useDateMorphSelector;
   final String? selectedSortValue;
   final List<String> selectedSortValues;
   final ValueChanged<String> onSelectSortOption;
@@ -32,13 +35,16 @@ class DiscoverSectionSortBar extends StatelessWidget {
     final groups = sortOptionGroups.isEmpty
         ? <List<CategoryRankingOption>>[sortOptions]
         : sortOptionGroups;
+    final dateGroupIndex = useDateMorphSelector
+        ? groups.indexWhere((group) => group.isNotEmpty)
+        : -1;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           for (var groupIndex = 0; groupIndex < groups.length; groupIndex++)
-            if (groups[groupIndex].isNotEmpty)
+            if (groups[groupIndex].isNotEmpty && groupIndex != dateGroupIndex)
               Padding(
                 padding: EdgeInsets.only(
                   bottom: groupIndex == groups.length - 1 ? 0 : 8,
@@ -74,6 +80,21 @@ class DiscoverSectionSortBar extends StatelessWidget {
                   ),
                 ),
               ),
+          if (dateGroupIndex >= 0)
+            DiscoverSectionDateSelector(
+              options: groups[dateGroupIndex],
+              selectedValue: selectedSortValues.length > dateGroupIndex
+                  ? selectedSortValues[dateGroupIndex]
+                  : selectedSortValue,
+              onSelected: (value) {
+                final handler = onSelectSortOptionInGroup;
+                if (handler != null) {
+                  handler(dateGroupIndex, value);
+                  return;
+                }
+                onSelectSortOption(value);
+              },
+            ),
         ],
       ),
     );
@@ -268,6 +289,59 @@ class DiscoverSectionBackToTopButton extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class DiscoverSectionIssueNavigationButtons extends StatelessWidget {
+  const DiscoverSectionIssueNavigationButtons({
+    super.key,
+    required this.options,
+    required this.selectedValue,
+    required this.onSelected,
+  });
+
+  final List<CategoryRankingOption> options;
+  final String? selectedValue;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = AppLocalizations.of(context)!;
+    final selectedIndex = options.indexWhere(
+      (option) => option.value == selectedValue,
+    );
+    final normalizedIndex = selectedIndex < 0 ? 0 : selectedIndex;
+    final hasPreviousIssue = normalizedIndex > 0;
+    final hasNextIssue = normalizedIndex < options.length - 1;
+
+    return Positioned(
+      right: 16,
+      bottom: 16 + MediaQuery.paddingOf(context).bottom,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FloatingActionButton(
+            key: const ValueKey<String>('weekly_date_previous'),
+            heroTag: 'weekly_date_previous',
+            tooltip: strings.discoverSectionPreviousIssue,
+            onPressed: hasPreviousIssue
+                ? () => onSelected(options[normalizedIndex - 1].value)
+                : null,
+            child: const Icon(Icons.chevron_left_rounded),
+          ),
+          const SizedBox(width: 12),
+          FloatingActionButton(
+            key: const ValueKey<String>('weekly_date_next'),
+            heroTag: 'weekly_date_next',
+            tooltip: strings.discoverSectionNextIssue,
+            onPressed: hasNextIssue
+                ? () => onSelected(options[normalizedIndex + 1].value)
+                : null,
+            child: const Icon(Icons.chevron_right_rounded),
+          ),
+        ],
       ),
     );
   }

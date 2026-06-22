@@ -265,6 +265,7 @@
   "historySelectionCancelTooltip": "Exit multi-select",
   "historySelectionEnterTooltip": "Multi-select",
   "historyDeleteSelectedTooltip": "Delete selected history",
+  "historyDeleteSelectionRequired": "Select at least one comic to delete",
   "historyClearAllTooltip": "Clear all history",
   "historyDeleteSelectedTitle": "Delete history",
   "historyDeleteSelectedContent": "Are you sure you want to delete the history of {count} selected comics?",
@@ -1027,6 +1028,9 @@
     }
   },
   "discoverSectionEmpty": "No comics available",
+  "discoverSectionChooseDate": "Choose date",
+  "discoverSectionPreviousIssue": "Previous issue",
+  "discoverSectionNextIssue": "Next issue",
   "commentsTitle": "Comments",
   "commentsLoadFailed": "Failed to load comments: {error}",
   "@commentsLoadFailed": {

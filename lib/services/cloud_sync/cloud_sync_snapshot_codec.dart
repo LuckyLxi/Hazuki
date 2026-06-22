@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:hazuki/app/service_locator.dart';
 
 import 'package:shared_preferences/shared_preferences.dart';
@@ -42,7 +43,10 @@ class CloudSyncSnapshotCodec {
   final DownloadGroupsService _downloadGroupsService;
   final SearchHistoryService _searchHistoryService;
 
-  Future<void> mergeRemoteIntoLocal(CloudSyncRemoteClient client) async {
+  Future<void> mergeRemoteIntoLocal(
+    CloudSyncRemoteClient client, {
+    bool applyRemoteSettings = false,
+  }) async {
     // Fetch remote files first, then snapshot local state — this ensures any
     // user actions during the network round-trip are captured in the snapshot
     // and won't be silently overwritten by the merge result.
@@ -228,6 +232,9 @@ class CloudSyncSnapshotCodec {
         if (settingsDecoded is Map) {
           final data = settingsDecoded['data'];
           if (data is Map) {
+            if (applyRemoteSettings) {
+              await _applyRemotePreferences(prefs, data);
+            }
             await _mergeLocalFavorites(
               prefs,
               data,
@@ -251,6 +258,82 @@ class CloudSyncSnapshotCodec {
           }
         }
       } catch (_) {}
+    }
+  }
+
+  Future<void> _applyRemotePreferences(
+    SharedPreferences prefs,
+    Map<dynamic, dynamic> remoteData,
+  ) async {
+    final remoteKeys = remoteData.keys
+        .map((key) => key.toString().trim())
+        .where((key) => key.isNotEmpty)
+        .toSet();
+    for (final key in prefs.getKeys()) {
+      if (remoteKeys.contains(key) ||
+          key == hazukiFirstUseDatePreferenceKey ||
+          key == hazukiCommentFilterKeywordsKey ||
+          CloudSyncConfigStore.shouldAlwaysSkipSetting(key) ||
+          CloudSyncConfigStore.restoreSkippedSettings.contains(key) ||
+          CloudSyncConfigStore.windowsOnlySettings.contains(key) ||
+          CloudSyncConfigStore.androidOnlySettings.contains(key)) {
+        continue;
+      }
+      await prefs.remove(key);
+    }
+
+    for (final entry in remoteData.entries) {
+      final key = entry.key.toString().trim();
+      if (key.isEmpty ||
+          CloudSyncConfigStore.shouldAlwaysSkipSetting(key) ||
+          CloudSyncConfigStore.restoreSkippedSettings.contains(key) ||
+          (CloudSyncConfigStore.windowsOnlySettings.contains(key) &&
+              !Platform.isWindows) ||
+          (CloudSyncConfigStore.androidOnlySettings.contains(key) &&
+              !Platform.isAndroid)) {
+        continue;
+      }
+
+      var value = entry.value;
+      if (key == hazukiFirstUseDatePreferenceKey) {
+        value = _earliestFirstUseDate(prefs.getString(key), value);
+      } else if (key.startsWith('source_data_') && value is String) {
+        value = _stripAccountFromSourceData(value);
+      }
+      await _setPrefValue(prefs, key, value);
+    }
+  }
+
+  String? _earliestFirstUseDate(String? localRaw, dynamic remoteValue) {
+    final remoteRaw = remoteValue is String ? remoteValue : null;
+    final localDate = localRaw == null ? null : DateTime.tryParse(localRaw);
+    final remoteDate = remoteRaw == null ? null : DateTime.tryParse(remoteRaw);
+    if (localDate == null) {
+      return remoteRaw;
+    }
+    if (remoteDate == null) {
+      return localRaw;
+    }
+    return remoteDate.isBefore(localDate) ? remoteRaw : localRaw;
+  }
+
+  Future<void> _setPrefValue(
+    SharedPreferences prefs,
+    String key,
+    dynamic value,
+  ) async {
+    if (value == null) {
+      await prefs.remove(key);
+    } else if (value is bool) {
+      await prefs.setBool(key, value);
+    } else if (value is int) {
+      await prefs.setInt(key, value);
+    } else if (value is double) {
+      await prefs.setDouble(key, value);
+    } else if (value is String) {
+      await prefs.setString(key, value);
+    } else if (value is List) {
+      await prefs.setStringList(key, value.map((item) => '$item').toList());
     }
   }
 

@@ -51,6 +51,11 @@ class HistoryPageData {
     selectedStorageKeys.clear();
   }
 
+  void exitSelectionMode() {
+    selectionMode = false;
+    selectedStorageKeys.clear();
+  }
+
   void toggleSelection(String storageKey, {bool? selected}) {
     if (selected ?? !selectedStorageKeys.contains(storageKey)) {
       selectedStorageKeys.add(storageKey);
@@ -60,8 +65,7 @@ class HistoryPageData {
   }
 
   void clearSelection() {
-    selectedStorageKeys.clear();
-    selectionMode = false;
+    exitSelectionMode();
   }
 
   List<ExploreComic> removeComic(ExploreComic comic) {

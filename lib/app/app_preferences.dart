@@ -16,5 +16,6 @@ const hazukiComicIdSearchEnhancePreferenceKey =
 const hazukiAggregateSearchEnabledPreferenceKey = 'search_aggregate_enabled';
 const hazukiCommentFilterKeywordsKey = 'comment_filter_keywords';
 const hazukiCommentFilterModeKey = 'comment_filter_mode';
+const hazukiFirstUseDatePreferenceKey = 'app_first_use_date';
 const hazukiReadHistoryMaxCount = 300;
 const hazukiSearchHistoryMaxCount = 50;

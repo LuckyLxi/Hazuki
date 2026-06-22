@@ -174,6 +174,7 @@ void main() {
       'jm',
       'copy_manga',
       'picacg',
+      'relamanhua',
     ]);
     expect(
       registry.allowedSources
