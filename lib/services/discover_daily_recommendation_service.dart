@@ -170,6 +170,79 @@ bool _isDiscoverRecommendationAuthorKey(String key) {
       key.trim() == '\u4f5c\u8005';
 }
 
+@visibleForTesting
+List<DiscoverDailyRecommendationEntry> mergeDiscoverRecommendationEntries({
+  required List<DiscoverDailyRecommendationEntry> previous,
+  required List<DiscoverDailyRecommendationEntry> incoming,
+  required int count,
+  math.Random? random,
+}) {
+  if (count <= 0) {
+    return const <DiscoverDailyRecommendationEntry>[];
+  }
+
+  final resolvedRandom = random ?? math.Random();
+  final uniqueIncoming = _dedupeRecommendationEntries(incoming);
+  if (uniqueIncoming.length >= count) {
+    uniqueIncoming.shuffle(resolvedRandom);
+    return uniqueIncoming.take(count).toList(growable: false);
+  }
+
+  final uniquePrevious = _dedupeRecommendationEntries(previous);
+  final previousKeys = uniquePrevious
+      .map((entry) => _discoverRecommendationComicKey(entry.comic))
+      .toSet();
+  final newEntries = uniqueIncoming
+      .where(
+        (entry) => !previousKeys.contains(
+          _discoverRecommendationComicKey(entry.comic),
+        ),
+      )
+      .toList(growable: true);
+
+  if (uniquePrevious.length < count) {
+    final availableSlots = count - uniquePrevious.length;
+    newEntries.shuffle(resolvedRandom);
+    final combined = <DiscoverDailyRecommendationEntry>[
+      ...uniquePrevious,
+      ...newEntries.take(availableSlots),
+    ]..shuffle(resolvedRandom);
+    return combined;
+  }
+
+  newEntries.shuffle(resolvedRandom);
+  final replacements = newEntries.take(count).toList(growable: false);
+  uniquePrevious.shuffle(resolvedRandom);
+  final retainedCount = count - replacements.length;
+  final combined = <DiscoverDailyRecommendationEntry>[
+    ...uniquePrevious.take(retainedCount),
+    ...replacements,
+  ]..shuffle(resolvedRandom);
+  return combined;
+}
+
+List<DiscoverDailyRecommendationEntry> _dedupeRecommendationEntries(
+  List<DiscoverDailyRecommendationEntry> entries,
+) {
+  final deduped = <String, DiscoverDailyRecommendationEntry>{};
+  for (final entry in entries) {
+    final key = _discoverRecommendationComicKey(entry.comic);
+    if (key.isNotEmpty) {
+      deduped.putIfAbsent(key, () => entry);
+    }
+  }
+  return deduped.values.toList(growable: true);
+}
+
+String _discoverRecommendationComicKey(ExploreComic comic) {
+  final id = comic.id.trim();
+  final title = comic.title.trim();
+  return SourceScopedComicId(
+    sourceKey: comic.sourceKey,
+    comicId: id.isNotEmpty ? id : title,
+  ).storageKey;
+}
+
 class DiscoverDailyRecommendationService extends ChangeNotifier {
   DiscoverDailyRecommendationService({required HazukiSourceService source})
     : _source = source {
@@ -183,6 +256,8 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
   static const int _cacheSchemaVersion = 2;
   static const Duration _cacheTtl = Duration(minutes: 15);
   static const int recommendationCount = 7;
+  static const int _maxAuthorSearchAttempts = 20;
+  static const int _maxConsecutiveSearchFailures = 3;
 
   final math.Random _random = math.Random();
 
@@ -513,40 +588,125 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
     if (!_supportsActiveSource) {
       return null;
     }
+    final sourceKey = _source.activeSourceKey.trim();
+    bool hasSameActiveSource() {
+      return _supportsActiveSource &&
+          _source.activeSourceKey.trim() == sourceKey;
+    }
+
     final authors = await _loadAuthors();
-    if (authors.isEmpty) {
+    if (authors.isEmpty || !hasSameActiveSource()) {
       return null;
     }
 
-    final author = authors[_random.nextInt(authors.length)];
-    final result = await _source.searchComics(
-      keyword: author,
-      page: 1,
-      order: 'mr',
-    );
-    if (!_supportsActiveSource) {
-      return null;
+    final shuffledAuthors = authors.toSet().toList(growable: true)
+      ..shuffle(_random);
+    final previous =
+        _state.displayedRecommendations.length == recommendationCount
+        ? _state.displayedRecommendations
+        : const <DiscoverDailyRecommendationEntry>[];
+    var recommendations = previous;
+    final contributingAuthors = <String>[];
+    var authorSearchAttempts = 0;
+    var consecutiveSearchFailures = 0;
+
+    for (final author in shuffledAuthors) {
+      if (!hasSameActiveSource()) {
+        return null;
+      }
+      if (authorSearchAttempts >= _maxAuthorSearchAttempts) {
+        break;
+      }
+      authorSearchAttempts++;
+
+      SearchComicsResult result;
+      try {
+        result = await _source.searchComics(
+          keyword: author,
+          page: 1,
+          order: 'mr',
+          sourceKey: sourceKey,
+        );
+      } catch (_) {
+        if (!hasSameActiveSource()) {
+          return null;
+        }
+        consecutiveSearchFailures++;
+        if (consecutiveSearchFailures >= _maxConsecutiveSearchFailures) {
+          break;
+        }
+        continue;
+      }
+      consecutiveSearchFailures = 0;
+      if (!hasSameActiveSource()) {
+        return null;
+      }
+
+      final candidates = _uniqueShuffledComics(result.comics);
+      if (candidates.isEmpty) {
+        continue;
+      }
+
+      final replacesWholeGroup =
+          candidates.length >= recommendationCount &&
+          (recommendations.isEmpty || previous.isNotEmpty);
+      final existingKeys = recommendations
+          .map((entry) => _discoverRecommendationComicKey(entry.comic))
+          .toSet();
+      final eligibleCandidates = replacesWholeGroup
+          ? candidates
+          : candidates
+                .where(
+                  (comic) => !existingKeys.contains(
+                    _discoverRecommendationComicKey(comic),
+                  ),
+                )
+                .toList(growable: false);
+      if (eligibleCandidates.isEmpty) {
+        continue;
+      }
+      final needed = replacesWholeGroup
+          ? recommendationCount
+          : previous.isEmpty
+          ? recommendationCount - recommendations.length
+          : eligibleCandidates.length;
+      final sampledComics = eligibleCandidates
+          .take(needed)
+          .toList(growable: false);
+      final incoming = await _buildRecommendationEntries(
+        sampledComics,
+        fallbackAuthor: author,
+      );
+      if (!hasSameActiveSource()) {
+        return null;
+      }
+      if (incoming.isEmpty) {
+        continue;
+      }
+
+      recommendations = mergeDiscoverRecommendationEntries(
+        previous: recommendations,
+        incoming: incoming,
+        count: recommendationCount,
+        random: _random,
+      );
+      contributingAuthors.add(author);
+      if (recommendations.length == recommendationCount) {
+        break;
+      }
     }
-    final sampledComics = _sampleUniqueComics(
-      result.comics,
-      count: recommendationCount,
-    );
-    if (sampledComics.length != recommendationCount) {
-      return null;
-    }
-    final recommendations = await _buildRecommendationEntries(
-      sampledComics,
-      fallbackAuthor: author,
-    );
-    if (recommendations.length != recommendationCount) {
+
+    if (!hasSameActiveSource() ||
+        recommendations.length != recommendationCount ||
+        contributingAuthors.isEmpty) {
       return null;
     }
 
     return _DiscoverDailyRecommendationSnapshot(
       recommendations: recommendations,
-      selectedAuthor: author,
+      selectedAuthor: contributingAuthors.join(' / '),
       generatedAt: DateTime.now(),
-      sourceKey: _source.activeSourceKey,
+      sourceKey: sourceKey,
       schemaVersion: _cacheSchemaVersion,
     );
   }
@@ -627,28 +787,16 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
     }
   }
 
-  List<ExploreComic> _sampleUniqueComics(
-    List<ExploreComic> comics, {
-    required int count,
-  }) {
+  List<ExploreComic> _uniqueShuffledComics(List<ExploreComic> comics) {
     final deduped = <String, ExploreComic>{};
     for (final comic in comics) {
-      final id = comic.id.trim();
-      final title = comic.title.trim();
-      final key = SourceScopedComicId(
-        sourceKey: comic.sourceKey,
-        comicId: id.isNotEmpty ? id : title,
-      ).storageKey;
+      final key = _discoverRecommendationComicKey(comic);
       if (key.isEmpty || deduped.containsKey(key)) {
         continue;
       }
       deduped[key] = comic;
     }
-    final candidates = deduped.values.toList(growable: true)..shuffle(_random);
-    if (candidates.length < count) {
-      return const <ExploreComic>[];
-    }
-    return candidates.take(count).toList(growable: false);
+    return deduped.values.toList(growable: true)..shuffle(_random);
   }
 }
 
