@@ -111,6 +111,25 @@ void main() {
       reason: 'Depend on a source gateway: $violations',
     );
   });
+
+  test('source gateways are backed by focused adapters', () {
+    final forbidden =
+        'HazukiSource'
+        'Capabilities';
+    final violations = <String>[];
+    for (final root in const ['lib', 'test']) {
+      for (final file in _dartFilesUnder(root)) {
+        if (file.readAsStringSync().contains(forbidden)) {
+          violations.add(file.path);
+        }
+      }
+    }
+    expect(
+      violations,
+      isEmpty,
+      reason: 'Do not reintroduce the aggregate source adapter: $violations',
+    );
+  });
 }
 
 Iterable<File> _dartFilesUnder(String path) sync* {

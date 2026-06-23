@@ -135,84 +135,79 @@ void registerServices() {
   if (!sl.isRegistered<HazukiSourceService>()) {
     sl.registerLazySingleton<HazukiSourceService>(() => HazukiSourceService());
   }
-  if (!sl.isRegistered<HazukiSourceCapabilities>()) {
-    sl.registerLazySingleton<HazukiSourceCapabilities>(
-      () => HazukiSourceCapabilities(sl<HazukiSourceService>()),
-    );
-  }
   if (!sl.isRegistered<SourceSearchGateway>()) {
     sl.registerLazySingleton<SourceSearchGateway>(
-      () => sl<HazukiSourceCapabilities>(),
+      () => HazukiSourceSearchAdapter(sl<HazukiSourceService>()),
     );
   }
   if (!sl.isRegistered<SourceDiscoverGateway>()) {
     sl.registerLazySingleton<SourceDiscoverGateway>(
-      () => sl<HazukiSourceCapabilities>(),
+      () => HazukiSourceDiscoverAdapter(sl<HazukiSourceService>()),
     );
   }
   if (!sl.isRegistered<SourceFavoriteGateway>()) {
     sl.registerLazySingleton<SourceFavoriteGateway>(
-      () => sl<HazukiSourceCapabilities>(),
+      () => HazukiSourceFavoriteAdapter(sl<HazukiSourceService>()),
     );
   }
   if (!sl.isRegistered<SourceReaderGateway>()) {
     sl.registerLazySingleton<SourceReaderGateway>(
-      () => sl<HazukiSourceCapabilities>(),
+      () => HazukiSourceReaderAdapter(sl<HazukiSourceService>()),
     );
   }
   if (!sl.isRegistered<SourceSettingsGateway>()) {
     sl.registerLazySingleton<SourceSettingsGateway>(
-      () => sl<HazukiSourceCapabilities>(),
+      () => HazukiSourceSettingsAdapter(sl<HazukiSourceService>()),
     );
   }
   if (!sl.isRegistered<SourceAccountGateway>()) {
     sl.registerLazySingleton<SourceAccountGateway>(
-      () => sl<HazukiSourceCapabilities>(),
+      () => HazukiSourceAccountAdapter(sl<HazukiSourceService>()),
     );
   }
   if (!sl.isRegistered<SourceDebugGateway>()) {
     sl.registerLazySingleton<SourceDebugGateway>(
-      () => sl<HazukiSourceCapabilities>(),
+      () => HazukiSourceDebugAdapter(sl<HazukiSourceService>()),
     );
   }
   if (!sl.isRegistered<SourceImageGateway>()) {
     sl.registerLazySingleton<SourceImageGateway>(
-      () => sl<HazukiSourceCapabilities>(),
+      () => HazukiSourceImageAdapter(sl<HazukiSourceService>()),
     );
   }
   if (!sl.isRegistered<SourceRecommendationGateway>()) {
     sl.registerLazySingleton<SourceRecommendationGateway>(
-      () => sl<HazukiSourceCapabilities>(),
+      () => HazukiSourceRecommendationAdapter(sl<HazukiSourceService>()),
     );
   }
   if (!sl.isRegistered<SourceDailyRecommendationGateway>()) {
     sl.registerLazySingleton<SourceDailyRecommendationGateway>(
-      () => sl<HazukiSourceCapabilities>(),
+      () => HazukiSourceDailyRecommendationAdapter(sl<HazukiSourceService>()),
     );
   }
   if (!sl.isRegistered<SourceSyncGateway>()) {
     sl.registerLazySingleton<SourceSyncGateway>(
-      () => sl<HazukiSourceCapabilities>(),
+      () => HazukiSourceSyncAdapter(sl<HazukiSourceService>()),
     );
   }
   if (!sl.isRegistered<SourceRuntimeGateway>()) {
     sl.registerLazySingleton<SourceRuntimeGateway>(
-      () => sl<HazukiSourceCapabilities>(),
+      () => HazukiSourceRuntimeAdapter(sl<HazukiSourceService>()),
     );
   }
   if (!sl.isRegistered<SourceCategoryGateway>()) {
     sl.registerLazySingleton<SourceCategoryGateway>(
-      () => sl<HazukiSourceCapabilities>(),
+      () => HazukiSourceCategoryAdapter(sl<HazukiSourceService>()),
     );
   }
   if (!sl.isRegistered<SourceCommentsGateway>()) {
     sl.registerLazySingleton<SourceCommentsGateway>(
-      () => sl<HazukiSourceCapabilities>(),
+      () => HazukiSourceCommentsAdapter(sl<HazukiSourceService>()),
     );
   }
   if (!sl.isRegistered<SourceComicDetailGateway>()) {
     sl.registerLazySingleton<SourceComicDetailGateway>(
-      () => sl<HazukiSourceCapabilities>(),
+      () => HazukiSourceComicDetailAdapter(sl<HazukiSourceService>()),
     );
   }
 }

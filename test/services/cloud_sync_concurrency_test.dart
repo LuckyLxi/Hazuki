@@ -372,7 +372,7 @@ Future<_TestDevice> _createDevice(
   final readingProgress = ReadingProgressService(database: database);
   final searchHistory = SearchHistoryService(database: database);
   final participants = createCloudSyncParticipantSet(
-    source: HazukiSourceCapabilities(source),
+    source: HazukiSourceSyncAdapter(source),
     readHistory: readHistory,
     readingProgress: readingProgress,
     localFavorites: favorites,

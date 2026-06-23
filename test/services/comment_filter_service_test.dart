@@ -145,7 +145,7 @@ void main() {
         mode: CommentFilterMode.collapse,
       );
       final controller = CommentsPageController(
-        sourceService: HazukiSourceCapabilities(HazukiSourceService()),
+        sourceService: HazukiSourceCommentsAdapter(HazukiSourceService()),
         filterService: service,
       );
       const comments = [
@@ -176,7 +176,7 @@ void main() {
         mode: CommentFilterMode.hide,
       );
       final controller = CommentsPageController(
-        sourceService: HazukiSourceCapabilities(HazukiSourceService()),
+        sourceService: HazukiSourceCommentsAdapter(HazukiSourceService()),
         filterService: service,
       );
       const comments = [

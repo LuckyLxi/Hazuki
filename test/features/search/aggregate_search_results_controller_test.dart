@@ -27,7 +27,7 @@ void main() {
 
     final requestedOrders = <String, String>{};
     final controller = AggregateSearchResultsController.withLoader(
-      sourceService: HazukiSourceCapabilities(HazukiSourceService()),
+      sourceService: HazukiSourceSearchAdapter(HazukiSourceService()),
       loader:
           ({
             required sourceKey,

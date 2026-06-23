@@ -215,8 +215,3 @@ class ComicDetailFeatureFacade implements FavoriteFoldersRepository {
     required ComicDetailsData details,
   }) => _readHistory.recordHistory(comic: comic, details: details);
 }
-
-@Deprecated(
-  'Use ComicDetailFeatureFacade; this type coordinates feature use cases.',
-)
-typedef ComicDetailRepository = ComicDetailFeatureFacade;

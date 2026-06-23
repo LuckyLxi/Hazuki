@@ -51,7 +51,7 @@ class _CloudSyncFixture {
       downloadGroups: downloadGroups,
       searchHistory: searchHistory,
       participants: createCloudSyncParticipantSet(
-        source: HazukiSourceCapabilities(source),
+        source: HazukiSourceSyncAdapter(source),
         readHistory: readHistory,
         readingProgress: readingProgress,
         localFavorites: localFavorites,

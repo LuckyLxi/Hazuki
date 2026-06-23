@@ -139,7 +139,7 @@ void main() {
     test('stops after three consecutive search failures', () async {
       final source = _SearchCountingSource(throwOnSearch: true);
       final service = DiscoverDailyRecommendationService(
-        source: HazukiSourceCapabilities(source),
+        source: HazukiSourceDailyRecommendationAdapter(source),
       );
       addTearDown(source.dispose);
       addTearDown(service.dispose);
@@ -153,7 +153,7 @@ void main() {
     test('limits attempts when searches return no comics', () async {
       final source = _SearchCountingSource();
       final service = DiscoverDailyRecommendationService(
-        source: HazukiSourceCapabilities(source),
+        source: HazukiSourceDailyRecommendationAdapter(source),
       );
       addTearDown(source.dispose);
       addTearDown(service.dispose);
@@ -167,7 +167,7 @@ void main() {
     test('stops retrying when the active source changes', () async {
       final source = _SearchCountingSource(switchSourceOnFirstSearch: true);
       final service = DiscoverDailyRecommendationService(
-        source: HazukiSourceCapabilities(source),
+        source: HazukiSourceDailyRecommendationAdapter(source),
       );
       addTearDown(source.dispose);
       addTearDown(service.dispose);

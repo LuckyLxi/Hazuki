@@ -31,7 +31,7 @@ void main() {
       await groups.moveComicToGroup('comic-a', group.id);
 
       final participants = createCloudSyncParticipantSet(
-        source: HazukiSourceCapabilities(source),
+        source: HazukiSourceSyncAdapter(source),
         readHistory: ReadHistoryService(database: database),
         readingProgress: ReadingProgressService(database: database),
         localFavorites: LocalFavoritesService(database: database),
