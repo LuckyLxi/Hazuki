@@ -581,18 +581,19 @@ class LocalFavoritesService extends ChangeNotifier
       await _database.delete(_database.localFavoriteComicFolders).go();
       await _database.delete(_database.localFavoriteComics).go();
       await _database.delete(_database.localFavoriteFolders).go();
+      final folderRows = <LocalFavoriteFoldersCompanion>[];
       for (final folder in store.folders) {
-        await _database
-            .into(_database.localFavoriteFolders)
-            .insertOnConflictUpdate(
-              LocalFavoriteFoldersCompanion.insert(
-                id: folder.id,
-                name: folder.name,
-                sourceKey: Value(folder.sourceKey),
-                updatedAtMs: Value(folder.updatedAtMs),
-              ),
-            );
+        folderRows.add(
+          LocalFavoriteFoldersCompanion.insert(
+            id: folder.id,
+            name: folder.name,
+            sourceKey: Value(folder.sourceKey),
+            updatedAtMs: Value(folder.updatedAtMs),
+          ),
+        );
       }
+      final comicRows = <LocalFavoriteComicsCompanion>[];
+      final comicFolderRows = <LocalFavoriteComicFoldersCompanion>[];
       for (final entry in store.entries) {
         if (entry.comicId.isEmpty || entry.folderSavedAtMs.isEmpty) {
           continue;
@@ -601,31 +602,47 @@ class LocalFavoritesService extends ChangeNotifier
           sourceKey: entry.sourceKey,
           comicId: entry.comicId,
         ).storageKey;
-        await _database
-            .into(_database.localFavoriteComics)
-            .insertOnConflictUpdate(
-              LocalFavoriteComicsCompanion.insert(
-                storageKey: storageKey,
-                comicId: entry.comicId,
-                sourceKey: Value(entry.sourceKey),
-                title: entry.title,
-                subTitle: entry.subTitle,
-                cover: entry.cover,
-                updateTime: entry.updateTime,
-              ),
-            );
+        comicRows.add(
+          LocalFavoriteComicsCompanion.insert(
+            storageKey: storageKey,
+            comicId: entry.comicId,
+            sourceKey: Value(entry.sourceKey),
+            title: entry.title,
+            subTitle: entry.subTitle,
+            cover: entry.cover,
+            updateTime: entry.updateTime,
+          ),
+        );
         for (final saved in entry.folderSavedAtMs.entries) {
-          await _database
-              .into(_database.localFavoriteComicFolders)
-              .insertOnConflictUpdate(
-                LocalFavoriteComicFoldersCompanion.insert(
-                  comicStorageKey: storageKey,
-                  folderId: saved.key,
-                  savedAtMs: saved.value,
-                ),
-              );
+          comicFolderRows.add(
+            LocalFavoriteComicFoldersCompanion.insert(
+              comicStorageKey: storageKey,
+              folderId: saved.key,
+              savedAtMs: saved.value,
+            ),
+          );
         }
       }
+      await _database.batch((batch) {
+        if (folderRows.isNotEmpty) {
+          batch.insertAllOnConflictUpdate(
+            _database.localFavoriteFolders,
+            folderRows,
+          );
+        }
+        if (comicRows.isNotEmpty) {
+          batch.insertAllOnConflictUpdate(
+            _database.localFavoriteComics,
+            comicRows,
+          );
+        }
+        if (comicFolderRows.isNotEmpty) {
+          batch.insertAllOnConflictUpdate(
+            _database.localFavoriteComicFolders,
+            comicFolderRows,
+          );
+        }
+      });
     });
   }
 

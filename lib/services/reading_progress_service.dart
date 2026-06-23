@@ -133,6 +133,7 @@ class ReadingProgressService {
     return _serialized(() async {
       await _database.transaction(() async {
         await _database.delete(_database.readingProgressEntries).go();
+        final rows = <ReadingProgressEntriesCompanion>[];
         for (final entry in entries) {
           final comicId = (entry['comicId'] ?? '').toString().trim();
           if (comicId.isEmpty) {
@@ -145,10 +146,20 @@ class ReadingProgressService {
             sourceKey: sourceKey,
             comicId: comicId,
           ).storageKey;
-          await _upsertMap(
-            storageKey: storageKey,
-            data: entry,
-            fallbackSourceKey: sourceKey,
+          rows.add(
+            _companionFromMap(
+              storageKey: storageKey,
+              data: entry,
+              fallbackSourceKey: sourceKey,
+            ),
+          );
+        }
+        if (rows.isNotEmpty) {
+          await _database.batch(
+            (batch) => batch.insertAllOnConflictUpdate(
+              _database.readingProgressEntries,
+              rows,
+            ),
           );
         }
       });
@@ -192,6 +203,21 @@ class ReadingProgressService {
     required Map<String, dynamic> data,
     required String fallbackSourceKey,
   }) async {
+    final companion = _companionFromMap(
+      storageKey: storageKey,
+      data: data,
+      fallbackSourceKey: fallbackSourceKey,
+    );
+    await _database
+        .into(_database.readingProgressEntries)
+        .insertOnConflictUpdate(companion);
+  }
+
+  ReadingProgressEntriesCompanion _companionFromMap({
+    required String storageKey,
+    required Map<String, dynamic> data,
+    required String fallbackSourceKey,
+  }) {
     final scoped = SourceScopedComicId.fromStorageKey(
       storageKey,
       fallbackSourceKey: fallbackSourceKey,
@@ -203,20 +229,16 @@ class ReadingProgressService {
       sourceKey: sourceKey,
       comicId: scoped.comicId,
     );
-    await _database
-        .into(_database.readingProgressEntries)
-        .insertOnConflictUpdate(
-          ReadingProgressEntriesCompanion.insert(
-            storageKey: resolved.storageKey,
-            comicId: resolved.comicId,
-            sourceKey: resolved.sourceKey,
-            epId: (data['epId'] ?? '').toString(),
-            title: (data['title'] ?? '').toString(),
-            chapterIndex: (data['index'] as num?)?.toInt() ?? 0,
-            pageIndex: Value((data['pageIndex'] as num?)?.toInt() ?? 0),
-            timestampMs: (data['timestamp'] as num?)?.toInt() ?? 0,
-          ),
-        );
+    return ReadingProgressEntriesCompanion.insert(
+      storageKey: resolved.storageKey,
+      comicId: resolved.comicId,
+      sourceKey: resolved.sourceKey,
+      epId: (data['epId'] ?? '').toString(),
+      title: (data['title'] ?? '').toString(),
+      chapterIndex: (data['index'] as num?)?.toInt() ?? 0,
+      pageIndex: Value((data['pageIndex'] as num?)?.toInt() ?? 0),
+      timestampMs: (data['timestamp'] as num?)?.toInt() ?? 0,
+    );
   }
 
   Future<void> _markMigrated() async {

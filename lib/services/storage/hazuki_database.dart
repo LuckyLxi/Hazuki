@@ -243,7 +243,9 @@ LazyDatabase _openConnection() {
     try {
       final dir = await getApplicationSupportDirectory();
       await dir.create(recursive: true);
-      return NativeDatabase(File(p.join(dir.path, 'hazuki.sqlite')));
+      return NativeDatabase.createInBackground(
+        File(p.join(dir.path, 'hazuki.sqlite')),
+      );
     } catch (_) {
       return NativeDatabase.memory();
     }

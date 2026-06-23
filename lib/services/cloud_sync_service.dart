@@ -65,6 +65,7 @@ class CloudSyncService {
   );
 
   bool _autoSyncRunning = false;
+  Future<void> _uploadQueue = Future<void>.value();
 
   Future<CloudSyncConfig> loadConfig() => _configStore.loadConfig();
 
@@ -108,12 +109,30 @@ class CloudSyncService {
   Future<void> uploadBackup({
     CloudSyncConfig? configOverride,
     int? uploadAtMs,
+  }) {
+    final result = _uploadQueue.then(
+      (_) =>
+          _uploadBackup(configOverride: configOverride, uploadAtMs: uploadAtMs),
+    );
+    _uploadQueue = result.catchError((Object _, StackTrace _) {});
+    return result;
+  }
+
+  Future<void> _uploadBackup({
+    CloudSyncConfig? configOverride,
+    int? uploadAtMs,
   }) async {
     final config = configOverride ?? await loadConfig();
     if (!config.isComplete) {
       throw Exception('cloud_sync_config_incomplete');
     }
 
+    // Capture the cursor before waiting for the remote lock. Another device
+    // may commit while this upload is waiting, and that newer snapshot must
+    // still be merged after the lock is acquired.
+    final lastSyncedRemoteTs = await _configStore.loadLastSyncedRemoteTs(
+      config,
+    );
     final client = facade.remoteClient(config);
     await client.ensureRootDir();
     await client.ensureBackupDirs();
@@ -124,16 +143,17 @@ class CloudSyncService {
       );
       final remoteUpdatedAtMs = _manifestUpdatedAtMs(remoteManifestText);
       if (remoteManifestText != null) {
-        final lastSyncedRemoteTs = await _configStore.loadLastSyncedRemoteTs(
-          config,
-        );
-        await _snapshotCodec.mergeRemoteIntoLocal(
-          client,
-          applyRemoteSettings: remoteUpdatedAtMs > lastSyncedRemoteTs,
-        );
-        _localFavorites.onExternalDataChanged();
-        await _commentFilter.load(notify: true);
-        await _downloadGroups.reload();
+        final shouldMergeRemote =
+            remoteUpdatedAtMs <= 0 || remoteUpdatedAtMs > lastSyncedRemoteTs;
+        if (shouldMergeRemote) {
+          await _snapshotCodec.mergeRemoteIntoLocal(
+            client,
+            applyRemoteSettings: remoteUpdatedAtMs > lastSyncedRemoteTs,
+          );
+          _localFavorites.onExternalDataChanged();
+          await _commentFilter.load(notify: true);
+          await _downloadGroups.reload();
+        }
       }
 
       final requestedUploadAtMs =

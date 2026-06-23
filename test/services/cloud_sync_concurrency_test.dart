@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -20,6 +21,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class _SharedRemote {
   final Map<String, String> files = <String, String>{};
+  final Map<String, int> downloadCounts = <String, int>{};
+  final Completer<void> firstSettingsUpload = Completer<void>();
   String? lockToken;
   bool failNextSettingsUpload = false;
   Duration uploadDelay = const Duration(milliseconds: 10);
@@ -87,6 +90,11 @@ class _FakeLockedRemoteClient extends CloudSyncRemoteClient {
 
   @override
   Future<String?> tryGetBackupFile(String fileName) async {
+    remote.downloadCounts.update(
+      fileName,
+      (count) => count + 1,
+      ifAbsent: () => 1,
+    );
     return remote.files[fileName];
   }
 
@@ -99,6 +107,10 @@ class _FakeLockedRemoteClient extends CloudSyncRemoteClient {
       throw Exception('simulated_upload_failure');
     }
     remote.files[fileName] = content;
+    if (fileName == CloudSyncConfigStore.settingsFileName &&
+        !remote.firstSettingsUpload.isCompleted) {
+      remote.firstSettingsUpload.complete();
+    }
   }
 
   @override
@@ -167,6 +179,33 @@ void main() {
     );
     expect(remote.files[CloudSyncConfigStore.manifestFileName], isNotNull);
     expect(remote.lockToken, isNull);
+  });
+
+  test('serializes local uploads before capturing the sync cursor', () async {
+    final remote = _SharedRemote()
+      ..uploadDelay = const Duration(milliseconds: 20);
+    final device = await _createDevice(remote, 'A');
+    addTearDown(device.dispose);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('test_user_setting', 'before');
+
+    final firstUpload = device.service.uploadBackup(
+      configOverride: _FakeLockedRemoteClient._config,
+    );
+    await remote.firstSettingsUpload.future;
+    final secondUpload = device.service.uploadBackup(
+      configOverride: _FakeLockedRemoteClient._config,
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 1));
+    await prefs.setString('test_user_setting', 'after');
+
+    await Future.wait([firstUpload, secondUpload]);
+
+    expect(prefs.getString('test_user_setting'), 'after');
+    final uploaded =
+        jsonDecode(remote.files[CloudSyncConfigStore.settingsFileName]!)
+            as Map<String, dynamic>;
+    expect((uploaded['data'] as Map)['test_user_setting'], 'after');
   });
 
   test('applies newer remote user settings before uploading', () async {
@@ -241,6 +280,8 @@ void main() {
         });
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('test_user_setting', 'local');
+      await prefs.setString('hazuki_read_history', '[{"id":"legacy"}]');
+      await prefs.setString('reading_progress_legacy', '{"epId":"legacy"}');
       await CloudSyncConfigStore().saveLastSyncedRemoteTs(
         200,
         _FakeLockedRemoteClient._config,
@@ -258,6 +299,15 @@ void main() {
           jsonDecode(remote.files[CloudSyncConfigStore.settingsFileName]!)
               as Map<String, dynamic>;
       expect((uploaded['data'] as Map)['test_user_setting'], 'local');
+      expect(
+        uploaded['data'] as Map,
+        isNot(contains(CloudSyncConfigStore.legacyReadHistoryKey)),
+      );
+      expect(
+        uploaded['data'] as Map,
+        isNot(contains('reading_progress_legacy')),
+      );
+      expect(remote.downloadCounts, {CloudSyncConfigStore.manifestFileName: 1});
     },
   );
 
