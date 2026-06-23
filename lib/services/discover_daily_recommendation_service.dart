@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../app/app_preferences.dart';
+import '../shared/preferences/hazuki_preference_keys.dart';
 import '../models/hazuki_models.dart';
 import 'source/source_capabilities.dart';
 

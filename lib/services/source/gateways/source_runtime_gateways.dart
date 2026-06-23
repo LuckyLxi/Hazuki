@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../models/hazuki_models.dart';
-import '../../hazuki_source_service.dart';
+import '../models/source_contract_models.dart';
 
 abstract interface class SourceAccountGateway implements Listenable {
   String get activeSourceKey;

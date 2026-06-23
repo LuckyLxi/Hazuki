@@ -16,8 +16,8 @@ import 'package:pointycastle/block/aes.dart';
 import 'package:pointycastle/block/modes/ecb.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../app/app_preferences.dart';
 import '../shared/chapter_title_resolver.dart';
+import '../shared/preferences/hazuki_preference_keys.dart';
 import '../models/hazuki_models.dart';
 import 'source/common/source_json_coerce.dart';
 import 'source/common/source_prefs_keys.dart';
@@ -26,10 +26,15 @@ import 'source/debug/debug_log_internals.dart';
 import 'source/debug/source_network_log_sink.dart';
 import 'source/http/source_http_gateway.dart';
 import 'source/image/image_cache_capability.dart';
+import 'source/models/source_contract_models.dart';
+import 'source/models/source_identity.dart';
 import 'source/runtime/explore_cache_capability.dart';
 import 'source/runtime/line_settings_capability.dart';
 import 'source/runtime/source_secure_session_storage.dart';
 import 'network/hazuki_network.dart';
+
+export 'source/models/source_contract_models.dart';
+export 'source/models/source_identity.dart';
 
 part 'source/explore_capability.dart';
 
@@ -83,19 +88,6 @@ const _sourceIndexUrls = [
 ];
 
 const _bundledInitAssetPath = 'assets/init.js';
-const hazukiDefaultSourceKey = 'jm';
-
-bool isHazukiJmSourceKey(String sourceKey) {
-  return sourceKey.trim() == hazukiDefaultSourceKey;
-}
-
-bool isHazukiCopyMangaSourceKey(String sourceKey) {
-  return sourceKey.trim() == 'copy_manga';
-}
-
-bool isHazukiPicacgSourceKey(String sourceKey) {
-  return sourceKey.trim() == 'picacg';
-}
 
 Dio _createSourceDio() {
   return createHazukiDio(
@@ -107,41 +99,6 @@ Dio _createSourceDio() {
       sendTimeout: const Duration(seconds: 35),
     ),
   );
-}
-
-class SourceCatalogEntry {
-  const SourceCatalogEntry({
-    required this.key,
-    required this.name,
-    required this.fileName,
-    this.directUrls = const [],
-  });
-
-  final String key;
-  final String name;
-  final String fileName;
-  final List<String> directUrls;
-
-  String get normalizedKey => key.trim();
-  String get normalizedFileName => fileName.trim();
-
-  bool matchesIndexEntry(Map<String, dynamic> map) {
-    final indexKey = map['key']?.toString().trim();
-    final indexFileName = map['fileName']?.toString().trim();
-    return indexKey == normalizedKey ||
-        (indexFileName?.toLowerCase() == normalizedFileName.toLowerCase());
-  }
-
-  List<String> fallbackUrls() {
-    if (directUrls.isNotEmpty) {
-      return directUrls;
-    }
-    final file = normalizedFileName;
-    if (file.isEmpty) {
-      return const [];
-    }
-    return ['https://cdn.jsdelivr.net/gh/venera-app/venera-configs@main/$file'];
-  }
 }
 
 const List<SourceCatalogEntry> hazukiAllowedSourceCatalog = [
@@ -164,96 +121,6 @@ const List<SourceCatalogEntry> hazukiAllowedSourceCatalog = [
     directUrls: _picacgSourceUrls,
   ),
 ];
-
-enum DailyCheckInStatus { success, alreadyCheckedIn, skipped }
-
-class DailyCheckInResult {
-  const DailyCheckInResult._(this.status, [this.message]);
-
-  const DailyCheckInResult.success([String? message])
-    : this._(DailyCheckInStatus.success, message);
-
-  const DailyCheckInResult.alreadyCheckedIn([String? message])
-    : this._(DailyCheckInStatus.alreadyCheckedIn, message);
-
-  const DailyCheckInResult.skipped([String? message])
-    : this._(DailyCheckInStatus.skipped, message);
-
-  final DailyCheckInStatus status;
-  final String? message;
-
-  bool get isSuccess => status == DailyCheckInStatus.success;
-  bool get isAlreadyCheckedIn => status == DailyCheckInStatus.alreadyCheckedIn;
-  bool get isSkipped => status == DailyCheckInStatus.skipped;
-}
-
-enum SourceRuntimePhase {
-  idle,
-  prewarming,
-  loading,
-  ready,
-  failed,
-  retrying,
-  waitingForRestart,
-}
-
-enum SourceRuntimeStep {
-  none,
-  loadingCache,
-  downloadingSource,
-  creatingEngine,
-  runningSourceInit,
-}
-
-@immutable
-class SourceRuntimeState {
-  const SourceRuntimeState({
-    required this.phase,
-    required this.step,
-    required this.statusText,
-    required this.updatedAt,
-    this.debugDetail,
-    this.error,
-  });
-
-  const SourceRuntimeState.idle()
-    : this(
-        phase: SourceRuntimePhase.idle,
-        step: SourceRuntimeStep.none,
-        statusText: 'source_idle',
-        updatedAt: null,
-      );
-
-  final SourceRuntimePhase phase;
-  final SourceRuntimeStep step;
-  final String statusText;
-  final DateTime? updatedAt;
-  final String? debugDetail;
-  final String? error;
-
-  bool get isBusy =>
-      phase == SourceRuntimePhase.prewarming ||
-      phase == SourceRuntimePhase.loading ||
-      phase == SourceRuntimePhase.retrying;
-  bool get isReady => phase == SourceRuntimePhase.ready;
-  bool get hasFailure => phase == SourceRuntimePhase.failed;
-  bool get canRetry => phase == SourceRuntimePhase.failed;
-  bool get isWaitingForRestart => phase == SourceRuntimePhase.waitingForRestart;
-  bool get shouldSurfaceOnPage => isBusy || hasFailure || isWaitingForRestart;
-
-  Map<String, dynamic> toDebugMap() {
-    return <String, dynamic>{
-      'phase': phase.name,
-      'step': step.name,
-      'statusText': statusText,
-      'updatedAt': updatedAt?.toIso8601String(),
-      'debugDetail': debugDetail,
-      'error': error,
-      'canRetry': canRetry,
-      'shouldSurfaceOnPage': shouldSurfaceOnPage,
-    };
-  }
-}
 
 class SourceRuntimeRegistry extends ChangeNotifier {
   SourceRuntimeRegistry._();

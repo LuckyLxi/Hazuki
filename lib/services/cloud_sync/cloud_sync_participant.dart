@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import '../../app/app_preferences.dart';
+import '../../shared/preferences/hazuki_preference_keys.dart';
 import '../search_history_service.dart';
 import '../download_groups_service.dart';
 

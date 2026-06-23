@@ -5,7 +5,7 @@ import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:hazuki/app/app_preferences.dart';
+import 'package:hazuki/shared/preferences/hazuki_preference_keys.dart';
 import 'package:hazuki/services/storage/hazuki_database.dart';
 
 class SearchHistoryService extends ChangeNotifier {

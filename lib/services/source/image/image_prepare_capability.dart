@@ -1,19 +1,5 @@
 part of '../../hazuki_source_service.dart';
 
-class PreparedChapterImageData {
-  const PreparedChapterImageData({
-    required this.bytes,
-    required this.extension,
-    required this.wasProcessed,
-    this.aspectRatio,
-  });
-
-  final Uint8List bytes;
-  final String extension;
-  final bool wasProcessed;
-  final double? aspectRatio;
-}
-
 extension HazukiSourceServiceImagePrepareCapability on HazukiSourceService {
   bool isLocalImagePath(String value) {
     final normalized = value.trim();

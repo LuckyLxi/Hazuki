@@ -9,7 +9,10 @@ import '../services/hazuki_source_service.dart';
 import '../services/source/source_capabilities.dart';
 import '../services/local_favorites_service.dart';
 import '../services/local_favorites/local_favorites_contracts.dart';
+import '../services/local_favorites/local_favorites_migration.dart';
+import '../services/local_favorites/local_favorites_persistence.dart';
 import '../services/local_favorites/local_favorites_preferences_store.dart';
+import '../services/local_favorites/local_favorites_sync_codec.dart';
 import '../services/manga_download/manga_download_service.dart';
 import '../services/password_lock_service.dart';
 import '../services/reading_progress_service.dart';
@@ -41,11 +44,28 @@ void registerServices() {
       SharedPreferencesLocalFavoritesPreferencesStore.new,
     );
   }
+  if (!sl.isRegistered<LocalFavoritesPersistence>()) {
+    sl.registerLazySingleton<LocalFavoritesPersistence>(
+      () => DriftLocalFavoritesPersistence(sl<HazukiDatabase>()),
+    );
+  }
+  if (!sl.isRegistered<LocalFavoritesSyncCodec>()) {
+    sl.registerLazySingleton<LocalFavoritesSyncCodec>(
+      () => LocalFavoritesSyncCodec(sl<LocalFavoritesPersistence>()),
+    );
+  }
+  if (!sl.isRegistered<LocalFavoritesMigration>()) {
+    sl.registerLazySingleton<LocalFavoritesMigration>(
+      () => LocalFavoritesMigration(syncCodec: sl<LocalFavoritesSyncCodec>()),
+    );
+  }
   if (!sl.isRegistered<LocalFavoritesService>()) {
     sl.registerLazySingleton<LocalFavoritesService>(
       () => LocalFavoritesService(
-        database: sl<HazukiDatabase>(),
         preferences: sl<LocalFavoritesPreferencesStore>(),
+        persistence: sl<LocalFavoritesPersistence>(),
+        syncCodec: sl<LocalFavoritesSyncCodec>(),
+        migration: sl<LocalFavoritesMigration>(),
       ),
     );
   }

@@ -19,6 +19,34 @@ void main() {
     expect(violations, isEmpty, reason: 'service -> feature: $violations');
   });
 
+  test('services do not import the app layer', () {
+    final violations = <String>[];
+    for (final file in _dartFilesUnder('lib/services')) {
+      for (final line in file.readAsLinesSync()) {
+        if (!line.trimLeft().startsWith('import ')) continue;
+        final normalized = line.replaceAll('\\', '/');
+        if (normalized.contains('/app/') ||
+            normalized.contains("'../app/") ||
+            normalized.contains("'../../app/")) {
+          violations.add('${file.path}: $line');
+        }
+      }
+    }
+    expect(violations, isEmpty, reason: violations.join('\n'));
+  });
+
+  test('source gateways do not import the concrete source service', () {
+    final violations = <String>[];
+    for (final file in _dartFilesUnder('lib/services/source/gateways')) {
+      for (final line in file.readAsLinesSync()) {
+        if (line.contains('hazuki_source_service.dart')) {
+          violations.add('${file.path}: $line');
+        }
+      }
+    }
+    expect(violations, isEmpty, reason: violations.join('\n'));
+  });
+
   test('cloud sync participants do not use the global service locator', () {
     final violations = <String>[];
     for (final file in _dartFilesUnder('lib/services/cloud_sync')) {
