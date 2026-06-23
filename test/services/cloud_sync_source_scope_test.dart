@@ -13,6 +13,7 @@ import 'package:hazuki/services/cloud_sync/cloud_sync_snapshot_codec.dart';
 import 'package:hazuki/services/local_favorites_service.dart';
 import 'package:hazuki/services/download_groups_service.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/reading_progress_service.dart';
 import 'package:hazuki/services/read_history_service.dart';
 import 'package:hazuki/services/storage/hazuki_database.dart';
@@ -50,7 +51,7 @@ class _CloudSyncFixture {
       downloadGroups: downloadGroups,
       searchHistory: searchHistory,
       participants: createCloudSyncParticipantSet(
-        source: source,
+        source: HazukiSourceCapabilities(source),
         readHistory: readHistory,
         readingProgress: readingProgress,
         localFavorites: localFavorites,

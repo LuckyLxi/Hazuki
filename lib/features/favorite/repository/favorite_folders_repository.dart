@@ -1,19 +1,19 @@
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
-import 'package:hazuki/services/local_favorites_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
+import 'package:hazuki/services/local_favorites/local_favorites_contracts.dart';
 import 'package:hazuki/shared/favorites/favorite_folders_repository.dart';
 
 export 'package:hazuki/shared/favorites/favorite_folders_repository.dart';
 
 class DefaultFavoriteFoldersRepository implements FavoriteFoldersRepository {
   const DefaultFavoriteFoldersRepository({
-    required HazukiSourceService source,
-    required LocalFavoritesService local,
+    required SourceFavoriteGateway source,
+    required LocalFavoritesRepository local,
   }) : _source = source,
        _local = local;
 
-  final HazukiSourceService _source;
-  final LocalFavoritesService _local;
+  final SourceFavoriteGateway _source;
+  final LocalFavoritesRepository _local;
 
   @override
   bool get isLogged => _source.isLogged;

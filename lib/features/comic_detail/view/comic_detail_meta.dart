@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 
 List<String> normalizeComicMetaValues(List<String> rawValues, {String? label}) {
   final values = <String>[];

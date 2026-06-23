@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 
 import '../shared/ui_flags.dart';
 import '../models/hazuki_models.dart';
-import '../services/hazuki_source_service.dart';
+import '../services/source/source_capabilities.dart';
 
 enum HazukiCachedImageLoadState { idle, deferred, loading, loaded, error }
 
@@ -125,7 +125,7 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
     if (explicit.isNotEmpty) {
       return explicit;
     }
-    return sl<HazukiSourceService>().activeSourceKey;
+    return sl<SourceImageGateway>().activeSourceKey;
   }
 
   void _reportState(HazukiCachedImageLoadState state) {
@@ -281,7 +281,7 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
     final sourceKey = _resolvedSourceKey;
     final cached =
         takeHazukiWidgetImageMemory(normalized, sourceKey: sourceKey) ??
-        sl<HazukiSourceService>().peekImageBytesFromMemory(
+        sl<SourceImageGateway>().peekImageBytesFromMemory(
           normalized,
           sourceKey: sourceKey,
         );
@@ -350,7 +350,7 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
     final sourceKey = _resolvedSourceKey;
     final cached =
         takeHazukiWidgetImageMemory(normalized, sourceKey: sourceKey) ??
-        sl<HazukiSourceService>().peekImageBytesFromMemory(
+        sl<SourceImageGateway>().peekImageBytesFromMemory(
           normalized,
           sourceKey: sourceKey,
         );
@@ -395,7 +395,7 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
     }
 
     try {
-      final bytes = await sl<HazukiSourceService>().downloadImageBytes(
+      final bytes = await sl<SourceImageGateway>().downloadImageBytes(
         normalized,
         keepInMemory: widget.keepInMemory,
         sourceKey: sourceKey,
@@ -666,7 +666,7 @@ class _HazukiCachedCircleAvatarState extends State<HazukiCachedCircleAvatar> {
     }
 
     try {
-      final bytes = await sl<HazukiSourceService>().downloadImageBytes(
+      final bytes = await sl<SourceImageGateway>().downloadImageBytes(
         normalized,
       );
       putHazukiWidgetImageMemory(normalized, bytes);

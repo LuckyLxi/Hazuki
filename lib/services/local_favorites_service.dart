@@ -6,13 +6,21 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/hazuki_models.dart';
+import 'local_favorites/local_favorites_contracts.dart';
+import 'local_favorites/local_favorites_preferences_store.dart';
 import 'storage/hazuki_database.dart';
 
-class LocalFavoritesService extends ChangeNotifier {
-  LocalFavoritesService({HazukiDatabase? database})
-    : _database = database ?? HazukiDatabase();
+class LocalFavoritesService extends ChangeNotifier
+    implements LocalFavoritesRepository, LocalFavoritesSyncStore {
+  LocalFavoritesService({
+    HazukiDatabase? database,
+    LocalFavoritesPreferencesStore? preferences,
+  }) : _database = database ?? HazukiDatabase(),
+       _preferences =
+           preferences ?? SharedPreferencesLocalFavoritesPreferencesStore();
 
   final HazukiDatabase _database;
+  final LocalFavoritesPreferencesStore _preferences;
   Future<void> _migration = Future.value();
   Future<void> _opQueue = Future.value();
 
@@ -37,17 +45,6 @@ class LocalFavoritesService extends ChangeNotifier {
   static const String _comicFolderTombstonesKey =
       'local_favorite_comic_folder_tombstones_v1';
   static const String _migrationDoneKey = 'local_favorite_drift_migrated_v1';
-  static const String _sortOrderKey = 'local_favorite_sort_order_v1';
-  static const String _pageModeKey = 'favorite_page_mode_v1';
-  static const String _pageModeSourcePrefix = 'favorite_page_mode_source_v1_';
-  static const String _selectedCloudFolderKey =
-      'favorite_selected_cloud_folder_v1';
-  static const String _selectedLocalFolderKey =
-      'favorite_selected_local_folder_v1';
-  static const String _selectedCloudFolderSourcePrefix =
-      'favorite_selected_cloud_folder_source_v1_';
-  static const String _selectedLocalFolderSourcePrefix =
-      'favorite_selected_local_folder_source_v1_';
   static const String _legacyLocalFavoriteSourceKey = 'jm';
   static const int _tombstoneTtlMs = 90 * 24 * 60 * 60 * 1000;
   static const int _pageSize = 24;
@@ -61,6 +58,7 @@ class LocalFavoritesService extends ChangeNotifier {
     '-datetime_browse',
   };
 
+  @override
   void onExternalDataChanged() {
     notifyListeners();
   }
@@ -88,103 +86,34 @@ class LocalFavoritesService extends ChangeNotifier {
     return _migration;
   }
 
-  Future<String> loadSortOrder() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_sortOrderKey)?.trim();
-    return _supportedSortOrders.contains(raw) ? raw! : 'mr';
-  }
+  Future<String> loadSortOrder() => _preferences.loadSortOrder();
 
-  Future<void> saveSortOrder(String order) async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = order.trim();
-    final normalized = _supportedSortOrders.contains(raw) ? raw : 'mr';
-    await prefs.setString(_sortOrderKey, normalized);
-  }
+  Future<void> saveSortOrder(String order) => _preferences.saveSortOrder(order);
 
-  Future<FavoritePageMode> loadFavoritePageMode({String sourceKey = ''}) async {
-    final prefs = await SharedPreferences.getInstance();
-    final sourceScopedKey = _pageModeKeyForSource(sourceKey);
-    final raw = sourceScopedKey == null
-        ? prefs.getString(_pageModeKey)
-        : prefs.getString(sourceScopedKey) ?? prefs.getString(_pageModeKey);
-    return raw == 'local' ? FavoritePageMode.local : FavoritePageMode.cloud;
-  }
+  Future<FavoritePageMode> loadFavoritePageMode({String sourceKey = ''}) =>
+      _preferences.loadFavoritePageMode(sourceKey: sourceKey);
 
   Future<void> saveFavoritePageMode(
     FavoritePageMode mode, {
     String sourceKey = '',
-  }) async {
-    final prefs = await SharedPreferences.getInstance();
-    final sourceScopedKey = _pageModeKeyForSource(sourceKey);
-    await prefs.setString(
-      sourceScopedKey ?? _pageModeKey,
-      mode == FavoritePageMode.local ? 'local' : 'cloud',
-    );
-  }
-
-  String? _pageModeKeyForSource(String sourceKey) {
-    final normalized = sourceKey.trim();
-    if (normalized.isEmpty) {
-      return null;
-    }
-    return '$_pageModeSourcePrefix${Uri.encodeComponent(normalized)}';
-  }
+  }) => _preferences.saveFavoritePageMode(mode, sourceKey: sourceKey);
 
   Future<String> loadSelectedFavoriteFolderId(
     FavoritePageMode mode, {
     String sourceKey = '',
-  }) async {
-    final prefs = await SharedPreferences.getInstance();
-    final legacyKey = mode == FavoritePageMode.local
-        ? _selectedLocalFolderKey
-        : _selectedCloudFolderKey;
-    final sourceScopedKey = _selectedFolderKeyForSource(mode, sourceKey);
-    final raw =
-        (sourceScopedKey == null
-                ? prefs.getString(legacyKey)
-                : prefs.getString(sourceScopedKey) ??
-                      prefs.getString(legacyKey))
-            ?.trim() ??
-        '';
-    if (mode == FavoritePageMode.cloud && raw.isEmpty) {
-      return '0';
-    }
-    return raw;
-  }
+  }) => _preferences.loadSelectedFavoriteFolderId(mode, sourceKey: sourceKey);
 
   Future<void> saveSelectedFavoriteFolderId(
     FavoritePageMode mode,
     String folderId, {
     String sourceKey = '',
-  }) async {
-    final prefs = await SharedPreferences.getInstance();
-    final key =
-        _selectedFolderKeyForSource(mode, sourceKey) ??
-        (mode == FavoritePageMode.local
-            ? _selectedLocalFolderKey
-            : _selectedCloudFolderKey);
-    final normalized = folderId.trim();
-    if (mode == FavoritePageMode.local && normalized.isEmpty) {
-      await prefs.remove(key);
-      return;
-    }
-    await prefs.setString(
-      key,
-      mode == FavoritePageMode.cloud && normalized.isEmpty ? '0' : normalized,
-    );
-  }
+  }) => _preferences.saveSelectedFavoriteFolderId(
+    mode,
+    folderId,
+    sourceKey: sourceKey,
+  );
 
-  String? _selectedFolderKeyForSource(FavoritePageMode mode, String sourceKey) {
-    final normalized = sourceKey.trim();
-    if (normalized.isEmpty) {
-      return null;
-    }
-    final prefix = mode == FavoritePageMode.local
-        ? _selectedLocalFolderSourcePrefix
-        : _selectedCloudFolderSourcePrefix;
-    return '$prefix${Uri.encodeComponent(normalized)}';
-  }
-
+  @override
   Future<FavoriteFoldersResult> loadFavoriteFolders({
     String? comicId,
     String sourceKey = '',
@@ -223,6 +152,7 @@ class LocalFavoritesService extends ChangeNotifier {
     );
   }
 
+  @override
   Future<FavoriteComicsResult> loadFavoriteComics({
     required int page,
     required String folderId,
@@ -286,6 +216,7 @@ class LocalFavoritesService extends ChangeNotifier {
     return _supportedSortOrders.contains(normalized) ? normalized : 'mr';
   }
 
+  @override
   Future<void> addFavoriteFolder(String name, {String sourceKey = ''}) {
     final normalizedName = name.trim();
     if (normalizedName.isEmpty) {
@@ -316,6 +247,7 @@ class LocalFavoritesService extends ChangeNotifier {
     return candidate.toString();
   }
 
+  @override
   Future<void> renameFavoriteFolder({
     required String folderId,
     required String name,
@@ -352,6 +284,7 @@ class LocalFavoritesService extends ChangeNotifier {
     });
   }
 
+  @override
   Future<void> deleteFavoriteFolder(String folderId, {String sourceKey = ''}) {
     final normalizedFolderId = folderId.trim();
     if (normalizedFolderId.isEmpty) {
@@ -377,6 +310,7 @@ class LocalFavoritesService extends ChangeNotifier {
     });
   }
 
+  @override
   Future<void> toggleFavorite({
     required ComicDetailsData details,
     required bool isAdding,
@@ -463,6 +397,7 @@ class LocalFavoritesService extends ChangeNotifier {
     });
   }
 
+  @override
   Future<bool> isComicFavorited(String comicId, {String sourceKey = ''}) async {
     final normalizedComicId = comicId.trim();
     if (normalizedComicId.isEmpty) {
@@ -694,18 +629,21 @@ class LocalFavoritesService extends ChangeNotifier {
     });
   }
 
+  @override
   Future<String> exportFoldersJsonString() async {
     await _ensureMigrated();
     final store = await _loadStore();
     return jsonEncode(store.folders.map((folder) => folder.toJson()).toList());
   }
 
+  @override
   Future<String> exportEntriesJsonString() async {
     await _ensureMigrated();
     final store = await _loadStore();
     return jsonEncode(store.entries.map((entry) => entry.toJson()).toList());
   }
 
+  @override
   Future<String> exportFolderTombstonesJsonString() async {
     await _ensureMigrated();
     await _pruneTombstones();
@@ -719,6 +657,7 @@ class LocalFavoritesService extends ChangeNotifier {
     );
   }
 
+  @override
   Future<String> exportEntryTombstonesJsonString() async {
     await _ensureMigrated();
     await _pruneTombstones();
@@ -738,6 +677,7 @@ class LocalFavoritesService extends ChangeNotifier {
     );
   }
 
+  @override
   Future<String> exportComicFolderTombstonesJsonString() async {
     await _ensureMigrated();
     await _pruneTombstones();
@@ -757,6 +697,7 @@ class LocalFavoritesService extends ChangeNotifier {
     );
   }
 
+  @override
   Future<void> importJsonStrings({
     String? foldersRaw,
     String? entriesRaw,

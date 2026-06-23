@@ -5,7 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   test('services do not depend on feature implementations', () {
     final violations = <String>[];
-    for (final file in _dartFiles(Directory('lib/services'))) {
+    for (final file in _dartFilesUnder('lib/services')) {
       final content = file.readAsStringSync();
       final hasFeatureImport = content
           .split('\n')
@@ -14,16 +14,14 @@ void main() {
                 line.trimLeft().startsWith('import ') &&
                 line.contains('features/'),
           );
-      if (hasFeatureImport) {
-        violations.add(file.path);
-      }
+      if (hasFeatureImport) violations.add(file.path);
     }
     expect(violations, isEmpty, reason: 'service -> feature: $violations');
   });
 
   test('cloud sync participants do not use the global service locator', () {
     final violations = <String>[];
-    for (final file in _dartFiles(Directory('lib/services/cloud_sync'))) {
+    for (final file in _dartFilesUnder('lib/services/cloud_sync')) {
       final content = file.readAsStringSync();
       if (content.contains('app/service_locator.dart') ||
           RegExp(r'\bsl<').hasMatch(content)) {
@@ -38,7 +36,7 @@ void main() {
     final graph = <String, Set<String>>{};
     final importPattern = RegExp(r'package:hazuki/features/([^/]+)/');
 
-    for (final file in _dartFiles(root)) {
+    for (final file in _dartFilesUnder(root.path)) {
       final relative = file.path.substring(root.path.length + 1);
       final from = relative.split(Platform.pathSeparator).first;
       final targets = graph.putIfAbsent(from, () => <String>{});
@@ -76,12 +74,48 @@ void main() {
     }
     expect(cycle, isNull, reason: 'feature dependency cycle: $cycle');
   });
+
+  test(
+    'services do not resolve dependencies through the app service locator',
+    () {
+      final violations = _dartFilesUnder('lib/services')
+          .where(
+            (file) =>
+                file.readAsStringSync().contains('app/service_locator.dart'),
+          )
+          .map((file) => file.path)
+          .toList();
+
+      expect(
+        violations,
+        isEmpty,
+        reason: 'Inject service dependencies: $violations',
+      );
+    },
+  );
+
+  test('features do not depend on the concrete source service or facade', () {
+    final violations = <String>[];
+    for (final file in _dartFilesUnder('lib/features')) {
+      final content = file.readAsStringSync();
+      if (content.contains('services/hazuki_source_service.dart') ||
+          content.contains('sl<HazukiSourceService>') ||
+          content.contains('.facade')) {
+        violations.add(file.path);
+      }
+    }
+
+    expect(
+      violations,
+      isEmpty,
+      reason: 'Depend on a source gateway: $violations',
+    );
+  });
 }
 
-Iterable<File> _dartFiles(Directory directory) sync* {
+Iterable<File> _dartFilesUnder(String path) sync* {
+  final directory = Directory(path);
   for (final entity in directory.listSync(recursive: true)) {
-    if (entity is File && entity.path.endsWith('.dart')) {
-      yield entity;
-    }
+    if (entity is File && entity.path.endsWith('.dart')) yield entity;
   }
 }

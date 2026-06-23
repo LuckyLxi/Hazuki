@@ -6,7 +6,7 @@ import 'package:flutter/services.dart';
 
 import 'package:hazuki/features/favorite/favorite.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/features/home/state/home_profile_controller.dart';
 import 'package:hazuki/features/home/support/home_profile_flow.dart';
 import 'package:hazuki/features/home/state/home_shell_controller.dart';
@@ -14,7 +14,7 @@ import 'package:hazuki/features/home/state/home_shell_controller.dart';
 class HomeCoordinator extends ChangeNotifier {
   HomeCoordinator({
     required int initialTabIndex,
-    required HazukiSourceService sourceService,
+    required SourceRuntimeGateway sourceService,
     required DiscoverDailyRecommendationService dailyRecommendationService,
   }) : _sourceService = sourceService,
        _dailyRecommendationService = dailyRecommendationService,
@@ -33,7 +33,7 @@ class HomeCoordinator extends ChangeNotifier {
     'hazuki.comics/media',
   );
 
-  final HazukiSourceService _sourceService;
+  final SourceRuntimeGateway _sourceService;
   final HomeProfileController _profileController;
   final HomeShellController _shellController;
   final DiscoverDailyRecommendationService _dailyRecommendationService;

@@ -10,7 +10,7 @@ import 'package:hazuki/features/favorite/favorite.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/manga_download/manga_download_service.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
 import 'package:hazuki/shared/search_box_outline.dart';
@@ -124,7 +124,7 @@ class HomeScaffoldShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final downloadService = sl<MangaDownloadService>();
-    final sourceService = sl<HazukiSourceService>();
+    final sourceService = sl<SourceRuntimeGateway>();
     final drawerVisualKey =
         '${sourceService.activeSourceKey}|${avatarUrl ?? ''}|$profileLoading|$isLogged|$username';
     final homeContent = HomeContentStack(

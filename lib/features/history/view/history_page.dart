@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/read_history_service.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
 import 'package:hazuki/widgets/windows_comic_detail_host.dart';
@@ -39,7 +39,7 @@ class _HistoryPageState extends State<HistoryPage> {
     super.initState();
     _controller = HistoryPageController(
       readHistoryService: sl<ReadHistoryService>(),
-      sourceService: sl<HazukiSourceService>(),
+      sourceService: sl<SourceRuntimeGateway>(),
     );
     _scrollCoordinator = HistoryPageScrollCoordinator();
     _pageListenable = Listenable.merge([_controller, _scrollCoordinator]);

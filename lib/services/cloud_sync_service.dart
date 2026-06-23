@@ -10,14 +10,14 @@ import 'cloud_sync/cloud_sync_remote_client.dart';
 import 'cloud_sync/cloud_sync_restore_applier.dart';
 import 'cloud_sync/cloud_sync_snapshot_codec.dart';
 import 'comment_filter_service.dart';
-import 'local_favorites_service.dart';
+import 'local_favorites/local_favorites_contracts.dart';
 import 'download_groups_service.dart';
 
 export 'cloud_sync/cloud_sync_models.dart';
 
 class CloudSyncService {
   CloudSyncService({
-    required LocalFavoritesService localFavorites,
+    required LocalFavoritesRepository localFavorites,
     required CommentFilterService commentFilter,
     required DownloadGroupsService downloadGroups,
     required CloudSyncParticipantSet participants,
@@ -39,7 +39,7 @@ class CloudSyncService {
            ((config, configStore) =>
                CloudSyncRemoteClient(config, configStore: configStore));
 
-  final LocalFavoritesService _localFavorites;
+  final LocalFavoritesRepository _localFavorites;
   final CommentFilterService _commentFilter;
   final DownloadGroupsService _downloadGroups;
   final CloudSyncParticipantSet _participants;

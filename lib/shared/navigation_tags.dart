@@ -5,7 +5,7 @@ import 'package:flutter/widgets.dart';
 import 'package:hazuki/app/service_locator.dart';
 
 import '../models/hazuki_models.dart';
-import '../services/hazuki_source_service.dart';
+import '../services/source/source_capabilities.dart';
 import '../widgets/cached_image_widgets.dart';
 import 'ui_flags.dart';
 
@@ -46,15 +46,15 @@ Future<void> precacheComicCoverHeroImages(
   }
   final resolvedSourceKey = sourceKey.trim().isNotEmpty
       ? sourceKey.trim()
-      : sl<HazukiSourceService>().activeSourceKey;
+      : sl<SourceImageGateway>().activeSourceKey;
   try {
     var bytes =
         peekHazukiWidgetImageMemory(normalized, sourceKey: resolvedSourceKey) ??
-        sl<HazukiSourceService>().peekImageBytesFromMemory(
+        sl<SourceImageGateway>().peekImageBytesFromMemory(
           normalized,
           sourceKey: resolvedSourceKey,
         );
-    bytes ??= await sl<HazukiSourceService>().downloadImageBytes(
+    bytes ??= await sl<SourceImageGateway>().downloadImageBytes(
       normalized,
       keepInMemory: true,
       sourceKey: resolvedSourceKey,
@@ -164,10 +164,10 @@ Widget buildComicCoverHeroFlightShuttle(
     if (url.isNotEmpty) {
       final sourceKey = cachedImage.sourceKey.trim().isNotEmpty
           ? cachedImage.sourceKey
-          : sl<HazukiSourceService>().activeSourceKey;
+          : sl<SourceImageGateway>().activeSourceKey;
       var bytes = peekHazukiWidgetImageMemory(url, sourceKey: sourceKey);
       if (bytes == null) {
-        bytes = sl<HazukiSourceService>().peekImageBytesFromMemory(
+        bytes = sl<SourceImageGateway>().peekImageBytesFromMemory(
           url,
           sourceKey: sourceKey,
         );

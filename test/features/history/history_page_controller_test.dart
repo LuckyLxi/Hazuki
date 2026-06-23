@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/features/history/state/history_page_controller.dart';
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/read_history_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -30,7 +30,7 @@ void main() {
 
       final controller = HistoryPageController(
         readHistoryService: service,
-        sourceService: sl<HazukiSourceService>(),
+        sourceService: sl<SourceRuntimeGateway>(),
       );
       addTearDown(controller.dispose);
 
@@ -63,7 +63,7 @@ void main() {
 
       final controller = HistoryPageController(
         readHistoryService: service,
-        sourceService: sl<HazukiSourceService>(),
+        sourceService: sl<SourceRuntimeGateway>(),
       );
       addTearDown(controller.dispose);
 
@@ -91,7 +91,7 @@ void main() {
 
     final controller = HistoryPageController(
       readHistoryService: service,
-      sourceService: sl<HazukiSourceService>(),
+      sourceService: sl<SourceRuntimeGateway>(),
     );
     addTearDown(controller.dispose);
 
@@ -127,7 +127,7 @@ void main() {
 
       final controller = HistoryPageController(
         readHistoryService: service,
-        sourceService: sl<HazukiSourceService>(),
+        sourceService: sl<SourceRuntimeGateway>(),
       );
       addTearDown(controller.dispose);
 
@@ -151,7 +151,7 @@ void main() {
 
       final reenteredController = HistoryPageController(
         readHistoryService: service,
-        sourceService: sl<HazukiSourceService>(),
+        sourceService: sl<SourceRuntimeGateway>(),
       );
       addTearDown(reenteredController.dispose);
       await reenteredController.loadInitial();

@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/app/service_locator.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
 import 'source_account_dialogs.dart';
@@ -16,8 +16,8 @@ Future<void> showHomeSourceSwitchDialog(
   BuildContext context, {
   Future<void> Function()? onSourceSwitched,
 }) async {
-  final registry = sl<SourceRuntimeRegistry>();
-  final sourceService = sl<HazukiSourceService>();
+  final sourceService = sl<SourceRuntimeGateway>();
+  final registry = sourceService;
   final strings = l10n(context);
   await registry.loadActiveSourcePreference();
   if (!context.mounted) {
@@ -155,7 +155,7 @@ Future<void> saveHomeAvatarToDownloads(
   BuildContext context, {
   required MethodChannel mediaChannel,
   required String imageUrl,
-  HazukiSourceService? sourceService,
+  SourceImageGateway? sourceService,
 }) async {
   final normalized = imageUrl.trim();
   if (normalized.isEmpty) {
@@ -163,7 +163,7 @@ Future<void> saveHomeAvatarToDownloads(
   }
 
   final strings = l10n(context);
-  final service = sourceService ?? sl<HazukiSourceService>();
+  final service = sourceService ?? sl<SourceImageGateway>();
   try {
     final bytes = await service.downloadImageBytes(normalized);
     final directory = Directory('/storage/emulated/0/Pictures/Hazuki');

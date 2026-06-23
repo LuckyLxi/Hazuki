@@ -5,6 +5,7 @@ import 'package:hazuki/features/comments/support/comments_content_support.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/comment_filter_service.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -144,7 +145,7 @@ void main() {
         mode: CommentFilterMode.collapse,
       );
       final controller = CommentsPageController(
-        sourceService: HazukiSourceService(),
+        sourceService: HazukiSourceCapabilities(HazukiSourceService()),
         filterService: service,
       );
       const comments = [
@@ -175,7 +176,7 @@ void main() {
         mode: CommentFilterMode.hide,
       );
       final controller = CommentsPageController(
-        sourceService: HazukiSourceService(),
+        sourceService: HazukiSourceCapabilities(HazukiSourceService()),
         filterService: service,
       );
       const comments = [

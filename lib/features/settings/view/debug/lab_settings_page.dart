@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hazuki/app/app.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../settings_group.dart';
@@ -16,7 +16,7 @@ class LabSettingsPage extends StatefulWidget {
 }
 
 class _LabSettingsPageState extends State<LabSettingsPage> {
-  final HazukiSourceService _sourceService = sl<HazukiSourceService>();
+  final SourceRuntimeGateway _sourceService = sl<SourceRuntimeGateway>();
   bool _comicIdSearchEnhance = false;
   bool _loading = true;
 

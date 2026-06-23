@@ -5,15 +5,15 @@ import 'package:hazuki/features/favorite/favorite.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
-import 'package:hazuki/services/local_favorites_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
+import 'package:hazuki/services/local_favorites/local_favorites_contracts.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
 Future<void> toggleFavoriteFromHistory(
   BuildContext context,
   ExploreComic comic,
 ) async {
-  final service = sl<HazukiSourceService>();
+  final service = sl<SourceSearchGateway>();
   final strings = AppLocalizations.of(context)!;
 
   try {
@@ -45,8 +45,8 @@ Future<void> _showFavoriteFoldersPanelFromHistory(
   ComicDetailsData details,
 ) async {
   final repository = DefaultFavoriteFoldersRepository(
-    source: sl<HazukiSourceService>(),
-    local: sl<LocalFavoritesService>(),
+    source: sl<SourceFavoriteGateway>(),
+    local: sl<LocalFavoritesRepository>(),
   );
   final singleFolderOnly = repository.favoriteSingleFolderForSingleComic;
   final viewModel = FavoriteFoldersViewModel(

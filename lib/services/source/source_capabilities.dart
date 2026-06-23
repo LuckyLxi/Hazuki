@@ -9,6 +9,7 @@ export '../hazuki_source_service.dart'
         DailyCheckInResult,
         SourceCatalogEntry,
         SourceRuntimeState,
+        hazukiDefaultSourceKey,
         isHazukiCopyMangaSourceKey,
         isHazukiJmSourceKey,
         isHazukiPicacgSourceKey;
@@ -66,6 +67,199 @@ abstract interface class SourceDebugGateway {
     String source = 'reader',
   });
   Future<Map<String, dynamic>> collectTypedDebugInfo(String type);
+  void clearCapturedLogs();
+}
+
+/// Image loading and cache surface shared by widgets and non-UI services.
+abstract interface class SourceImageGateway {
+  String get activeSourceKey;
+
+  Uint8List? peekImageBytesFromMemory(String url, {String sourceKey = ''});
+  Future<Uint8List> downloadImageBytes(
+    String url, {
+    String comicId = '',
+    String epId = '',
+    bool keepInMemory = false,
+    bool useDiskCache = true,
+    String sourceKey = '',
+  });
+}
+
+abstract interface class SourceRecommendationGateway
+    implements SourceImageGateway, SourceDebugGateway {}
+
+abstract interface class SourceDailyRecommendationGateway
+    implements SourceSearchGateway, SourceImageGateway {
+  bool get isInitialized;
+}
+
+abstract interface class SourceSyncGateway {
+  String get activeSourceKey;
+  Future<bool> hasCustomEditedActiveSource();
+  Future<String?> readLocalActiveSourceIfExists();
+  Future<void> writeLocalActiveSource(String content);
+  Future<void> reloadFromLocalSourceFiles();
+}
+
+/// Runtime and source-file administration used by app/settings composition.
+abstract interface class SourceRuntimeGateway implements Listenable {
+  String get activeSourceKey;
+  bool get isActiveJmSource;
+  bool get isActiveCopyMangaSource;
+  bool get isLogged;
+  bool get isInitialized;
+  bool get isActiveDailyCheckInSource;
+  String? get currentAccount;
+  SourceMeta? get sourceMeta;
+  SourceRuntimeState get runtimeState;
+  List<SourceCatalogEntry> get allowedSources;
+
+  bool isLoggedForSource(String sourceKey);
+  String? currentAccountForSource(String sourceKey);
+  Future<void> loadActiveSourcePreference();
+  Future<void> ensureInitialized({String? sourceKey});
+  Future<void> activateSource(String sourceKey);
+  Future<void> prewarmInBackground();
+  Future<void> warmUpFavoritesDebugInfo();
+  Future<void> login({required String account, required String password});
+  Future<void> logout();
+  Future<String?> loadCurrentAvatarUrl();
+  Future<bool> isDailyCheckInCompletedToday();
+  Future<DailyCheckInResult> performDailyCheckIn();
+
+  Future<bool> hasLocalSourceFile(String sourceKey);
+  Future<void> downloadSourceFile(
+    String sourceKey, {
+    void Function(int received, int total)? onProgress,
+  });
+  Future<void> deleteLocalSourceFile(String sourceKey);
+  Future<String> loadEditableActiveSource();
+  Future<void> saveEditedActiveSource(String content);
+  Future<bool> hasCustomEditedActiveSource();
+  Future<bool> downloadActiveSourceAndReload({
+    void Function(int received, int total)? onProgress,
+  });
+  Future<bool> loadSoftwareLogCaptureEnabled();
+  Future<void> setSoftwareLogCaptureEnabled(bool enabled);
+  Future<void> clearCopyMangaDeviceInfo();
+}
+
+/// Category/ranking surface used by category feature pages.
+abstract interface class SourceCategoryGateway {
+  bool get softwareLogCaptureEnabled;
+  Future<List<CategoryTagGroup>> loadCategoryTagGroups({
+    bool forceRefresh = false,
+    String sourceKey = '',
+  });
+  Future<List<CategoryRankingOption>> loadCategoryRankingOptions();
+  Future<CategoryComicsResult> loadCategoryRankingComics({
+    required String rankingOption,
+    required int page,
+  });
+  void addApplicationLog({
+    required String level,
+    required String title,
+    Object? content,
+    String source = 'app',
+  });
+}
+
+/// Comment mutations and capability checks.
+abstract interface class SourceCommentsGateway {
+  bool get isLogged;
+  bool get supportCommentSend;
+  bool get supportCommentLike;
+  bool isLoggedForSource(String sourceKey);
+  bool supportCommentSendForSource(String sourceKey);
+  bool supportCommentLikeForSource(String sourceKey);
+  bool supportCommentRepliesForSource(String sourceKey);
+  Future<ComicCommentsPageResult> loadCommentsPage({
+    required String comicId,
+    String? subId,
+    String sourceKey = '',
+    int page = 1,
+    int pageSize = 16,
+    String? replyTo,
+  });
+  Future<void> sendComment({
+    required String comicId,
+    String? subId,
+    String sourceKey = '',
+    required String content,
+    String? replyTo,
+  });
+  Future<void> likeComment({
+    required String comicId,
+    String? subId,
+    String sourceKey = '',
+    required String commentId,
+    required bool isLike,
+  });
+  void addApplicationLog({
+    required String level,
+    required String title,
+    Object? content,
+    String source = 'app',
+  });
+}
+
+/// Source operations coordinated by the comic-detail feature.
+abstract interface class SourceComicDetailGateway {
+  String get activeSourceKey;
+  bool isLoggedForSource(String sourceKey);
+  bool supportFavoriteFolderLoadForSource(String sourceKey);
+  bool supportFavoriteFolderAddForSource(String sourceKey);
+  bool supportFavoriteFolderDeleteForSource(String sourceKey);
+  bool supportFavoriteToggleForSource(String sourceKey);
+  bool supportComicLikeForSource(String sourceKey);
+  bool favoriteSingleFolderForSingleComicForSource(String sourceKey);
+  Future<ComicDetailsData> loadComicDetails(
+    String comicId, {
+    String sourceKey = '',
+  });
+  Future<List<CategoryTagGroup>> loadCategoryTagGroups({
+    bool forceRefresh = false,
+    String sourceKey = '',
+  });
+  Future<Uint8List> downloadImageBytes(
+    String url, {
+    String comicId = '',
+    String epId = '',
+    bool keepInMemory = false,
+    bool useDiskCache = true,
+    String sourceKey = '',
+  });
+  Future<List<String>> loadChapterImages({
+    required String comicId,
+    required String epId,
+    String sourceKey = '',
+  });
+  Future<void> prefetchComicImages({
+    required String comicId,
+    required String epId,
+    required List<String> imageUrls,
+    required int count,
+    required int memoryCount,
+    String sourceKey = '',
+  });
+  Future<FavoriteFoldersResult> loadFavoriteFolders({
+    String? comicId,
+    String sourceKey = '',
+  });
+  Future<void> addFavoriteFolder(String name, {String sourceKey = ''});
+  Future<void> deleteFavoriteFolder(String folderId, {String sourceKey = ''});
+  Future<void> toggleFavorite({
+    required String comicId,
+    required bool isAdding,
+    String folderId = '0',
+    String? favoriteId,
+    String sourceKey = '',
+  });
+  Future<void> toggleComicLike({
+    required String comicId,
+    required bool isLike,
+    String sourceKey = '',
+  });
 }
 
 /// Narrow source surface used by discover controllers.
@@ -98,6 +292,8 @@ abstract interface class SourceFavoriteGateway implements Listenable {
   bool get supportFavoriteFolderAdd;
   bool get supportFavoriteFolderLoad;
   bool get supportFavoriteSortOrder;
+  bool get supportFavoriteToggle;
+  bool get favoriteSingleFolderForSingleComic;
   String get favoriteSortOrder;
   List<String> get favoriteSortOrders;
   Stream<void> get cloudFavoritesChangedStream;
@@ -115,6 +311,13 @@ abstract interface class SourceFavoriteGateway implements Listenable {
   });
   Future<void> addFavoriteFolder(String name, {String sourceKey = ''});
   Future<void> deleteFavoriteFolder(String folderId, {String sourceKey = ''});
+  Future<void> toggleFavorite({
+    required String comicId,
+    required bool isAdding,
+    String folderId = '0',
+    String? favoriteId,
+    String sourceKey = '',
+  });
   Future<void> setFavoriteSortOrder(String order);
 }
 
@@ -193,7 +396,15 @@ class HazukiSourceCapabilities
         SourceReaderGateway,
         SourceSettingsGateway,
         SourceAccountGateway,
-        SourceDebugGateway {
+        SourceDebugGateway,
+        SourceImageGateway,
+        SourceRecommendationGateway,
+        SourceDailyRecommendationGateway,
+        SourceSyncGateway,
+        SourceRuntimeGateway,
+        SourceCategoryGateway,
+        SourceCommentsGateway,
+        SourceComicDetailGateway {
   const HazukiSourceCapabilities(this._service);
 
   final HazukiSourceService _service;
@@ -285,6 +496,11 @@ class HazukiSourceCapabilities
   @override
   bool get supportFavoriteSortOrder => _service.supportFavoriteSortOrder;
   @override
+  bool get supportFavoriteToggle => _service.supportFavoriteToggle;
+  @override
+  bool get favoriteSingleFolderForSingleComic =>
+      _service.favoriteSingleFolderForSingleComic;
+  @override
   String get favoriteSortOrder => _service.favoriteSortOrder;
   @override
   List<String> get favoriteSortOrders => _service.favoriteSortOrders;
@@ -299,6 +515,10 @@ class HazukiSourceCapabilities
   @override
   Future<void> loadActiveSourcePreference() =>
       _service.loadActiveSourcePreference();
+
+  @override
+  Future<void> activateSource(String sourceKey) =>
+      _service.activateSource(sourceKey);
 
   @override
   Future<void> login({required String account, required String password}) =>
@@ -490,4 +710,241 @@ class HazukiSourceCapabilities
 
   @override
   Future<void> clearImageCache() => _service.clearImageCache();
+
+  @override
+  void clearCapturedLogs() => _service.facade.clearCapturedLogs();
+
+  @override
+  Uint8List? peekImageBytesFromMemory(String url, {String sourceKey = ''}) =>
+      _service.peekImageBytesFromMemory(url, sourceKey: sourceKey);
+
+  @override
+  SourceMeta? get sourceMeta => _service.sourceMeta;
+
+  @override
+  SourceRuntimeState get runtimeState => _service.runtimeState;
+
+  @override
+  bool isLoggedForSource(String sourceKey) =>
+      _service.isLoggedForSource(sourceKey);
+
+  @override
+  String? currentAccountForSource(String sourceKey) =>
+      _service.currentAccountForSource(sourceKey);
+
+  @override
+  Future<void> prewarmInBackground() => _service.prewarmInBackground();
+
+  @override
+  Future<void> warmUpFavoritesDebugInfo() =>
+      _service.warmUpFavoritesDebugInfo();
+
+  @override
+  Future<bool> hasLocalSourceFile(String sourceKey) =>
+      _service.hasLocalSourceFile(sourceKey);
+
+  @override
+  Future<void> downloadSourceFile(
+    String sourceKey, {
+    void Function(int received, int total)? onProgress,
+  }) => _service.downloadSourceFile(sourceKey, onProgress: onProgress);
+
+  @override
+  Future<void> deleteLocalSourceFile(String sourceKey) =>
+      _service.deleteLocalSourceFile(sourceKey);
+
+  @override
+  Future<String> loadEditableActiveSource() =>
+      _service.loadEditableActiveSource();
+
+  @override
+  Future<void> saveEditedActiveSource(String content) =>
+      _service.saveEditedActiveSource(content);
+
+  @override
+  Future<bool> hasCustomEditedActiveSource() =>
+      _service.hasCustomEditedActiveSource();
+
+  @override
+  Future<bool> downloadActiveSourceAndReload({
+    void Function(int received, int total)? onProgress,
+  }) => _service.downloadActiveSourceAndReload(onProgress: onProgress);
+
+  @override
+  Future<bool> loadSoftwareLogCaptureEnabled() =>
+      _service.loadSoftwareLogCaptureEnabled();
+
+  @override
+  Future<void> setSoftwareLogCaptureEnabled(bool enabled) =>
+      _service.setSoftwareLogCaptureEnabled(enabled);
+
+  @override
+  Future<void> clearCopyMangaDeviceInfo() =>
+      _service.clearCopyMangaDeviceInfo();
+
+  @override
+  Future<String?> readLocalActiveSourceIfExists() =>
+      _service.readLocalActiveSourceIfExists();
+
+  @override
+  Future<void> writeLocalActiveSource(String content) =>
+      _service.writeLocalActiveSource(content);
+
+  @override
+  Future<void> reloadFromLocalSourceFiles() =>
+      _service.reloadFromLocalSourceFiles();
+
+  @override
+  Future<List<CategoryTagGroup>> loadCategoryTagGroups({
+    bool forceRefresh = false,
+    String sourceKey = '',
+  }) => _service.loadCategoryTagGroups(
+    forceRefresh: forceRefresh,
+    sourceKey: sourceKey,
+  );
+
+  @override
+  Future<List<CategoryRankingOption>> loadCategoryRankingOptions() =>
+      _service.loadCategoryRankingOptions();
+
+  @override
+  Future<CategoryComicsResult> loadCategoryRankingComics({
+    required String rankingOption,
+    required int page,
+  }) => _service.loadCategoryRankingComics(
+    rankingOption: rankingOption,
+    page: page,
+  );
+
+  @override
+  bool get supportCommentSend => _service.supportCommentSend;
+
+  @override
+  bool get supportCommentLike => _service.supportCommentLike;
+
+  @override
+  bool supportCommentSendForSource(String sourceKey) =>
+      _service.supportCommentSendForSource(sourceKey);
+
+  @override
+  bool supportCommentLikeForSource(String sourceKey) =>
+      _service.supportCommentLikeForSource(sourceKey);
+
+  @override
+  bool supportCommentRepliesForSource(String sourceKey) =>
+      _service.supportCommentRepliesForSource(sourceKey);
+
+  @override
+  Future<ComicCommentsPageResult> loadCommentsPage({
+    required String comicId,
+    String? subId,
+    String sourceKey = '',
+    int page = 1,
+    int pageSize = 16,
+    String? replyTo,
+  }) => _service.loadCommentsPage(
+    comicId: comicId,
+    subId: subId,
+    sourceKey: sourceKey,
+    page: page,
+    pageSize: pageSize,
+    replyTo: replyTo,
+  );
+
+  @override
+  Future<void> sendComment({
+    required String comicId,
+    String? subId,
+    String sourceKey = '',
+    required String content,
+    String? replyTo,
+  }) => _service.sendComment(
+    comicId: comicId,
+    subId: subId,
+    sourceKey: sourceKey,
+    content: content,
+    replyTo: replyTo,
+  );
+
+  @override
+  Future<void> likeComment({
+    required String comicId,
+    String? subId,
+    String sourceKey = '',
+    required String commentId,
+    required bool isLike,
+  }) => _service.likeComment(
+    comicId: comicId,
+    subId: subId,
+    sourceKey: sourceKey,
+    commentId: commentId,
+    isLike: isLike,
+  );
+
+  @override
+  bool supportFavoriteFolderLoadForSource(String sourceKey) =>
+      _service.supportFavoriteFolderLoadForSource(sourceKey);
+
+  @override
+  bool supportFavoriteFolderAddForSource(String sourceKey) =>
+      _service.supportFavoriteFolderAddForSource(sourceKey);
+
+  @override
+  bool supportFavoriteFolderDeleteForSource(String sourceKey) =>
+      _service.supportFavoriteFolderDeleteForSource(sourceKey);
+
+  @override
+  bool supportFavoriteToggleForSource(String sourceKey) =>
+      _service.supportFavoriteToggleForSource(sourceKey);
+
+  @override
+  bool supportComicLikeForSource(String sourceKey) =>
+      _service.supportComicLikeForSource(sourceKey);
+
+  @override
+  bool favoriteSingleFolderForSingleComicForSource(String sourceKey) =>
+      _service.favoriteSingleFolderForSingleComicForSource(sourceKey);
+
+  @override
+  Future<void> prefetchComicImages({
+    required String comicId,
+    required String epId,
+    required List<String> imageUrls,
+    required int count,
+    required int memoryCount,
+    String sourceKey = '',
+  }) => _service.prefetchComicImages(
+    comicId: comicId,
+    epId: epId,
+    imageUrls: imageUrls,
+    count: count,
+    memoryCount: memoryCount,
+    sourceKey: sourceKey,
+  );
+
+  @override
+  Future<void> toggleFavorite({
+    required String comicId,
+    required bool isAdding,
+    String folderId = '0',
+    String? favoriteId,
+    String sourceKey = '',
+  }) => _service.toggleFavorite(
+    comicId: comicId,
+    isAdding: isAdding,
+    folderId: folderId,
+    favoriteId: favoriteId,
+    sourceKey: sourceKey,
+  );
+
+  @override
+  Future<void> toggleComicLike({
+    required String comicId,
+    required bool isLike,
+    String sourceKey = '',
+  }) => _service.toggleComicLike(
+    comicId: comicId,
+    isLike: isLike,
+    sourceKey: sourceKey,
+  );
 }

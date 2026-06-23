@@ -8,6 +8,8 @@ import '../services/download_groups_service.dart';
 import '../services/hazuki_source_service.dart';
 import '../services/source/source_capabilities.dart';
 import '../services/local_favorites_service.dart';
+import '../services/local_favorites/local_favorites_contracts.dart';
+import '../services/local_favorites/local_favorites_preferences_store.dart';
 import '../services/manga_download/manga_download_service.dart';
 import '../services/password_lock_service.dart';
 import '../services/reading_progress_service.dart';
@@ -34,9 +36,27 @@ void registerServices() {
       () => CommentFilterService(),
     );
   }
+  if (!sl.isRegistered<LocalFavoritesPreferencesStore>()) {
+    sl.registerLazySingleton<LocalFavoritesPreferencesStore>(
+      SharedPreferencesLocalFavoritesPreferencesStore.new,
+    );
+  }
   if (!sl.isRegistered<LocalFavoritesService>()) {
     sl.registerLazySingleton<LocalFavoritesService>(
-      () => LocalFavoritesService(database: sl<HazukiDatabase>()),
+      () => LocalFavoritesService(
+        database: sl<HazukiDatabase>(),
+        preferences: sl<LocalFavoritesPreferencesStore>(),
+      ),
+    );
+  }
+  if (!sl.isRegistered<LocalFavoritesRepository>()) {
+    sl.registerLazySingleton<LocalFavoritesRepository>(
+      () => sl<LocalFavoritesService>(),
+    );
+  }
+  if (!sl.isRegistered<LocalFavoritesSyncStore>()) {
+    sl.registerLazySingleton<LocalFavoritesSyncStore>(
+      () => sl<LocalFavoritesService>(),
     );
   }
   if (!sl.isRegistered<DownloadGroupsService>()) {
@@ -75,13 +95,14 @@ void registerServices() {
   }
   if (!sl.isRegistered<MangaDownloadService>()) {
     sl.registerLazySingleton<MangaDownloadService>(
-      () => MangaDownloadService(),
+      () => MangaDownloadService(sourceReader: sl<SourceReaderGateway>()),
     );
   }
   if (!sl.isRegistered<DiscoverDailyRecommendationService>()) {
     sl.registerLazySingleton<DiscoverDailyRecommendationService>(
-      () =>
-          DiscoverDailyRecommendationService(source: sl<HazukiSourceService>()),
+      () => DiscoverDailyRecommendationService(
+        source: sl<SourceDailyRecommendationGateway>(),
+      ),
     );
   }
   if (!sl.isRegistered<SourceRuntimeRegistry>()) {
@@ -92,10 +113,10 @@ void registerServices() {
   if (!sl.isRegistered<CloudSyncParticipantSet>()) {
     sl.registerLazySingleton<CloudSyncParticipantSet>(
       () => createCloudSyncParticipantSet(
-        source: sl<HazukiSourceService>(),
+        source: sl<SourceSyncGateway>(),
         readHistory: sl<ReadHistoryService>(),
         readingProgress: sl<ReadingProgressService>(),
-        localFavorites: sl<LocalFavoritesService>(),
+        localFavorites: sl<LocalFavoritesSyncStore>(),
         downloadGroups: sl<DownloadGroupsService>(),
         searchHistory: sl<SearchHistoryService>(),
       ),
@@ -104,7 +125,7 @@ void registerServices() {
   if (!sl.isRegistered<CloudSyncService>()) {
     sl.registerLazySingleton<CloudSyncService>(
       () => CloudSyncService(
-        localFavorites: sl<LocalFavoritesService>(),
+        localFavorites: sl<LocalFavoritesRepository>(),
         commentFilter: sl<CommentFilterService>(),
         downloadGroups: sl<DownloadGroupsService>(),
         participants: sl<CloudSyncParticipantSet>(),
@@ -151,6 +172,46 @@ void registerServices() {
   }
   if (!sl.isRegistered<SourceDebugGateway>()) {
     sl.registerLazySingleton<SourceDebugGateway>(
+      () => sl<HazukiSourceCapabilities>(),
+    );
+  }
+  if (!sl.isRegistered<SourceImageGateway>()) {
+    sl.registerLazySingleton<SourceImageGateway>(
+      () => sl<HazukiSourceCapabilities>(),
+    );
+  }
+  if (!sl.isRegistered<SourceRecommendationGateway>()) {
+    sl.registerLazySingleton<SourceRecommendationGateway>(
+      () => sl<HazukiSourceCapabilities>(),
+    );
+  }
+  if (!sl.isRegistered<SourceDailyRecommendationGateway>()) {
+    sl.registerLazySingleton<SourceDailyRecommendationGateway>(
+      () => sl<HazukiSourceCapabilities>(),
+    );
+  }
+  if (!sl.isRegistered<SourceSyncGateway>()) {
+    sl.registerLazySingleton<SourceSyncGateway>(
+      () => sl<HazukiSourceCapabilities>(),
+    );
+  }
+  if (!sl.isRegistered<SourceRuntimeGateway>()) {
+    sl.registerLazySingleton<SourceRuntimeGateway>(
+      () => sl<HazukiSourceCapabilities>(),
+    );
+  }
+  if (!sl.isRegistered<SourceCategoryGateway>()) {
+    sl.registerLazySingleton<SourceCategoryGateway>(
+      () => sl<HazukiSourceCapabilities>(),
+    );
+  }
+  if (!sl.isRegistered<SourceCommentsGateway>()) {
+    sl.registerLazySingleton<SourceCommentsGateway>(
+      () => sl<HazukiSourceCapabilities>(),
+    );
+  }
+  if (!sl.isRegistered<SourceComicDetailGateway>()) {
+    sl.registerLazySingleton<SourceComicDetailGateway>(
       () => sl<HazukiSourceCapabilities>(),
     );
   }

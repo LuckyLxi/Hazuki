@@ -6,6 +6,7 @@ import 'package:hazuki/services/cloud_sync/cloud_sync_participant_set.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_snapshot_codec.dart';
 import 'package:hazuki/services/download_groups_service.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/local_favorites_service.dart';
 import 'package:hazuki/services/read_history_service.dart';
 import 'package:hazuki/services/reading_progress_service.dart';
@@ -30,7 +31,7 @@ void main() {
       await groups.moveComicToGroup('comic-a', group.id);
 
       final participants = createCloudSyncParticipantSet(
-        source: source,
+        source: HazukiSourceCapabilities(source),
         readHistory: ReadHistoryService(database: database),
         readingProgress: ReadingProgressService(database: database),
         localFavorites: LocalFavoritesService(database: database),

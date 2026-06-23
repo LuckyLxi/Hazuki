@@ -4,14 +4,13 @@ import 'dart:convert';
 import 'package:drift/drift.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../app/service_locator.dart';
 import '../models/hazuki_models.dart';
 import 'hazuki_source_service.dart';
 import 'storage/hazuki_database.dart';
 
 class ReadingProgressService {
-  ReadingProgressService({HazukiDatabase? database})
-    : _database = database ?? sl<HazukiDatabase>();
+  ReadingProgressService({required HazukiDatabase database})
+    : _database = database;
 
   final HazukiDatabase _database;
   Future<void> _migration = Future.value();

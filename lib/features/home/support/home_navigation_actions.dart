@@ -15,7 +15,7 @@ import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/features/discover/view/ranking_page.dart';
 import 'package:hazuki/features/discover/view/tag_category_page.dart';
 import 'package:hazuki/l10n/l10n.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
 import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 
@@ -87,7 +87,7 @@ class HomeNavigationActions {
   }
 
   Future<void> openRanking() async {
-    if (sl<HazukiSourceService>().isActiveCopyMangaSource) {
+    if (sl<SourceSettingsGateway>().isActiveCopyMangaSource) {
       await _openDrawerDestination(
         hideComicDetailPanel: true,
         (_) => DiscoverSectionPage(

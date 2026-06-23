@@ -5,8 +5,8 @@ import 'cloud_sync_reading_participant.dart';
 import 'cloud_sync_settings_participant.dart';
 import 'cloud_sync_source_participant.dart';
 import '../download_groups_service.dart';
-import '../hazuki_source_service.dart';
-import '../local_favorites_service.dart';
+import '../source/source_capabilities.dart';
+import '../local_favorites/local_favorites_contracts.dart';
 import '../read_history_service.dart';
 import '../reading_progress_service.dart';
 import '../search_history_service.dart';
@@ -32,10 +32,10 @@ class CloudSyncParticipantSet {
 }
 
 CloudSyncParticipantSet createCloudSyncParticipantSet({
-  required HazukiSourceService source,
+  required SourceSyncGateway source,
   required ReadHistoryService readHistory,
   required ReadingProgressService readingProgress,
-  required LocalFavoritesService localFavorites,
+  required LocalFavoritesSyncStore localFavorites,
   required DownloadGroupsService downloadGroups,
   required SearchHistoryService searchHistory,
 }) {

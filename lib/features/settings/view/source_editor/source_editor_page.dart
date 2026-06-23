@@ -3,7 +3,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/l10n/l10n.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'source_editor_content.dart';
 import 'source_editor_controller.dart';
@@ -87,7 +87,7 @@ class _ComicSourceEditorPageState extends State<ComicSourceEditorPage> {
       _inlineErrorText = null;
     });
     try {
-      final content = await sl<HazukiSourceService>()
+      final content = await sl<SourceRuntimeGateway>()
           .loadEditableActiveSource();
       if (!mounted) {
         return;
@@ -119,7 +119,7 @@ class _ComicSourceEditorPageState extends State<ComicSourceEditorPage> {
     });
     try {
       final content = _controller.text;
-      await sl<HazukiSourceService>().saveEditedActiveSource(content);
+      await sl<SourceRuntimeGateway>().saveEditedActiveSource(content);
       if (!mounted) {
         return;
       }

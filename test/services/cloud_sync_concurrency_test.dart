@@ -11,6 +11,7 @@ import 'package:hazuki/services/comment_filter_service.dart';
 import 'package:hazuki/services/download_groups_service.dart';
 import 'package:hazuki/services/local_favorites_service.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/read_history_service.dart';
 import 'package:hazuki/services/reading_progress_service.dart';
 import 'package:hazuki/services/search_history_service.dart';
@@ -371,7 +372,7 @@ Future<_TestDevice> _createDevice(
   final readingProgress = ReadingProgressService(database: database);
   final searchHistory = SearchHistoryService(database: database);
   final participants = createCloudSyncParticipantSet(
-    source: source,
+    source: HazukiSourceCapabilities(source),
     readHistory: readHistory,
     readingProgress: readingProgress,
     localFavorites: favorites,

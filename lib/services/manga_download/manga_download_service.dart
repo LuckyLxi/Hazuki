@@ -5,9 +5,8 @@ import 'dart:io';
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../app/service_locator.dart';
 import '../../models/hazuki_models.dart';
-import '../hazuki_source_service.dart';
+import '../source/source_capabilities.dart';
 import 'manga_download_models.dart';
 import 'manga_download_queue_support.dart';
 import 'manga_download_recovery_support.dart';
@@ -16,7 +15,8 @@ import 'manga_download_storage_support.dart';
 export 'manga_download_models.dart';
 
 class MangaDownloadService extends ChangeNotifier {
-  MangaDownloadService() {
+  MangaDownloadService({SourceReaderGateway? sourceReader})
+    : _sourceReader = sourceReader {
     _stateStore = MangaDownloadStateStore(logScan: _logScan);
     _access = MangaDownloadAccess(logScan: _logScan);
     _recoveryScanner = MangaDownloadRecoveryScanner(
@@ -44,11 +44,14 @@ class MangaDownloadService extends ChangeNotifier {
       chapterDirForTarget: _chapterDirForTarget,
       shouldSuspendDownloads: _shouldSuspendDownloads,
       shouldRecoverTransientNetworkError: _shouldRecoverTransientDownloadError,
+      sourceReader: _sourceReader,
     );
   }
 
   static const String _metadataFileName = 'comic.json';
   static const String _legacyMetadataFileName = 'metadata.json';
+
+  final SourceReaderGateway? _sourceReader;
 
   SharedPreferences? _prefs;
   Future<void>? _initFuture;
@@ -901,7 +904,11 @@ class MangaDownloadService extends ChangeNotifier {
     }
     final target = File('${comicDir.path}/cover.jpg');
     try {
-      final bytes = await sl<HazukiSourceService>().downloadImageBytes(
+      final sourceReader = _sourceReader;
+      if (sourceReader == null) {
+        throw StateError('manga_download_source_reader_not_configured');
+      }
+      final bytes = await sourceReader.downloadImageBytes(
         normalized,
         keepInMemory: false,
         sourceKey: task.sourceKey,

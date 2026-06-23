@@ -1,13 +1,13 @@
 import 'dart:convert';
 
 import '../../models/hazuki_models.dart';
-import '../local_favorites_service.dart';
+import '../local_favorites/local_favorites_contracts.dart';
 import 'cloud_sync_config_store.dart';
 
 class LocalFavoritesSyncParticipant {
   const LocalFavoritesSyncParticipant(this._service);
 
-  final LocalFavoritesService _service;
+  final LocalFavoritesSyncStore _service;
 
   Future<String> exportFoldersJsonString() =>
       _service.exportFoldersJsonString();

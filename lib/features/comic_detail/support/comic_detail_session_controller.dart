@@ -9,7 +9,7 @@ import 'package:hazuki/shared/ui_flags.dart';
 
 class ComicDetailSessionController extends ChangeNotifier {
   ComicDetailSessionController({
-    required ComicDetailRepository repository,
+    required ComicDetailFeatureFacade repository,
     required ExploreComic comic,
     required String sourceKey,
     required void Function({
@@ -22,7 +22,7 @@ class ComicDetailSessionController extends ChangeNotifier {
        _sourceKey = sourceKey,
        _applyInitialFavoriteOverrides = applyInitialFavoriteOverrides;
 
-  final ComicDetailRepository _repository;
+  final ComicDetailFeatureFacade _repository;
   final ExploreComic _comic;
   final String _sourceKey;
   final void Function({

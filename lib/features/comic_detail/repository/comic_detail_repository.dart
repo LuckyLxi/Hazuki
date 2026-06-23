@@ -3,17 +3,17 @@ import 'dart:typed_data';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
-import 'package:hazuki/services/local_favorites_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
+import 'package:hazuki/services/local_favorites/local_favorites_contracts.dart';
 import 'package:hazuki/services/manga_download/manga_download_service.dart';
 import 'package:hazuki/services/reading_progress_service.dart';
 import 'package:hazuki/services/read_history_service.dart';
 import 'package:hazuki/shared/favorites/favorite_folders_repository.dart';
 
-class ComicDetailRepository implements FavoriteFoldersRepository {
-  ComicDetailRepository({
-    required HazukiSourceService source,
-    required LocalFavoritesService local,
+class ComicDetailFeatureFacade implements FavoriteFoldersRepository {
+  ComicDetailFeatureFacade({
+    required SourceComicDetailGateway source,
+    required LocalFavoritesRepository local,
     required MangaDownloadService downloader,
     required ReadingProgressService readingProgress,
     required ReadHistoryService readHistory,
@@ -27,8 +27,8 @@ class ComicDetailRepository implements FavoriteFoldersRepository {
            ? source.activeSourceKey
            : sourceKey.trim();
 
-  final HazukiSourceService _source;
-  final LocalFavoritesService _local;
+  final SourceComicDetailGateway _source;
+  final LocalFavoritesRepository _local;
   final MangaDownloadService _downloader;
   final ReadingProgressService _readingProgress;
   final ReadHistoryService _readHistory;
@@ -215,3 +215,8 @@ class ComicDetailRepository implements FavoriteFoldersRepository {
     required ComicDetailsData details,
   }) => _readHistory.recordHistory(comic: comic, details: details);
 }
+
+@Deprecated(
+  'Use ComicDetailFeatureFacade; this type coordinates feature use cases.',
+)
+typedef ComicDetailRepository = ComicDetailFeatureFacade;

@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:hazuki/shared/favorites/favorite_folders_morph_dialog.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 
 import '../support/comic_detail_scope.dart';
 import 'comic_detail_view_primitives.dart';

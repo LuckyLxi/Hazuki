@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../../models/hazuki_models.dart';
-import '../../../services/hazuki_source_service.dart';
+import '../../../services/source/source_capabilities.dart';
 import '../../../shared/navigation_tags.dart';
 import '../../../widgets/widgets.dart';
 import '../../../widgets/windows_comic_detail_host.dart';
@@ -74,7 +74,7 @@ class _TagCategoryGroupCard extends StatelessWidget {
 class _TagCategoryPageState extends State<TagCategoryPage> {
   static const _loadTimeout = Duration(seconds: 25);
 
-  final HazukiSourceService _sourceService = sl<HazukiSourceService>();
+  final SourceCategoryGateway _sourceService = sl<SourceCategoryGateway>();
 
   List<CategoryTagGroup> _tagGroups = const <CategoryTagGroup>[];
 

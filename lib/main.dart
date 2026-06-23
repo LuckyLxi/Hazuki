@@ -22,6 +22,7 @@ import 'app/windows/windows_title_bar_controller.dart';
 import 'app/software_update/software_update_dialog_support.dart';
 import 'features/comic_detail/view/comic_detail_page.dart';
 import 'features/comments/comments.dart';
+import 'features/discover/view/discover_section_page.dart';
 import 'features/reader/view/reader_page.dart';
 import 'features/search/search.dart';
 import 'l10n/app_localizations.dart';
@@ -244,6 +245,19 @@ class _HazukiAppState extends State<HazukiApp>
         initialKeyword: initialKeyword,
         comicDetailPageBuilder: _buildRootComicDetailPage,
       ),
+      categoryPageBuilder:
+          ({
+            required title,
+            required viewMoreUrl,
+            required comicDetailPageBuilder,
+          }) => DiscoverSectionPage(
+            section: ExploreSection(
+              title: title,
+              comics: const <ExploreComic>[],
+              viewMoreUrl: viewMoreUrl,
+            ),
+            comicDetailPageBuilder: comicDetailPageBuilder,
+          ),
     );
   }
 

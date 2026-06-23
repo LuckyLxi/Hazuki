@@ -11,7 +11,7 @@ import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/shared/search_box_outline.dart';
 import 'package:hazuki/services/comment_filter_service.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:loading_indicator_m3e/loading_indicator_m3e.dart';
 
@@ -120,7 +120,7 @@ class _CommentsPageState extends State<CommentsPage>
     _ownsScrollController = widget.scrollController == null;
     _scrollController = widget.scrollController ?? ScrollController();
     _controller = CommentsPageController(
-      sourceService: sl<HazukiSourceService>(),
+      sourceService: sl<SourceCommentsGateway>(),
       filterService: sl<CommentFilterService>(),
     );
     WidgetsBinding.instance.addObserver(this);

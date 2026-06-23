@@ -18,10 +18,10 @@ typedef ComicDetailFavoriteDialogBuilder =
     Widget Function(FavoriteFoldersViewModel viewModel);
 
 class ComicDetailFavoriteController extends ChangeNotifier {
-  ComicDetailFavoriteController({required ComicDetailRepository repository})
+  ComicDetailFavoriteController({required ComicDetailFeatureFacade repository})
     : _repository = repository;
 
-  final ComicDetailRepository _repository;
+  final ComicDetailFeatureFacade _repository;
   bool _disposed = false;
 
   bool _busy = false;

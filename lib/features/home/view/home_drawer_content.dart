@@ -7,7 +7,7 @@ import 'package:hazuki/features/home/support/home_sidebar_models.dart';
 import 'package:hazuki/features/home/view/home_profile_avatar.dart';
 import 'package:hazuki/features/home/view/home_source_switch_pill_button.dart';
 import 'package:hazuki/l10n/l10n.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
 class HomeDrawerContent extends StatelessWidget {
@@ -73,7 +73,7 @@ class HomeDrawerContent extends StatelessWidget {
         : profile.username;
     final resolvedAvatarUrl = (profile.avatarUrl ?? '').trim();
     final visualStateKey =
-        '${sl<HazukiSourceService>().activeSourceKey}|$resolvedAvatarUrl|'
+        '${sl<SourceImageGateway>().activeSourceKey}|$resolvedAvatarUrl|'
         '${profile.profileLoading}|$displayUsername';
     final usernameStyle = textTheme.titleLarge?.copyWith(
       fontWeight: FontWeight.bold,

@@ -8,6 +8,7 @@ import 'package:hazuki/app/app.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_page.dart';
 import 'package:hazuki/features/comments/comments.dart';
+import 'package:hazuki/features/discover/view/discover_section_page.dart';
 import 'package:hazuki/features/home/home.dart';
 import 'package:hazuki/shared/source_account/source_account_actions.dart';
 import 'package:hazuki/features/reader/view/reader_page.dart';
@@ -15,7 +16,7 @@ import 'package:hazuki/features/reader/support/reader_page_context.dart';
 import 'package:hazuki/features/search/search.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 import 'package:hazuki/shared/chapter_title_resolver.dart';
 
@@ -109,6 +110,19 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
       heroTag: heroTag,
       readerWidgetBuilder: _buildReaderPage,
       searchPageBuilder: _buildSearchPage,
+      categoryPageBuilder:
+          ({
+            required title,
+            required viewMoreUrl,
+            required comicDetailPageBuilder,
+          }) => DiscoverSectionPage(
+            section: ExploreSection(
+              title: title,
+              comics: const <ExploreComic>[],
+              viewMoreUrl: viewMoreUrl,
+            ),
+            comicDetailPageBuilder: comicDetailPageBuilder,
+          ),
       isDesktopPanel: isDesktopPanel,
       shouldAnimateInitialRevealOverride: shouldAnimateInitialRevealOverride,
       onCloseRequested: onCloseRequested,
@@ -120,7 +134,7 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
     super.initState();
     _coordinator = HomeCoordinator(
       initialTabIndex: widget.initialTabIndex,
-      sourceService: sl<HazukiSourceService>(),
+      sourceService: sl<SourceRuntimeGateway>(),
       dailyRecommendationService: sl<DiscoverDailyRecommendationService>(),
     );
     _coordinator.start(context);

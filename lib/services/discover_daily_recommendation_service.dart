@@ -8,7 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../app/app_preferences.dart';
 import '../models/hazuki_models.dart';
-import 'hazuki_source_service.dart';
+import 'source/source_capabilities.dart';
 
 class DiscoverDailyRecommendationEntry {
   const DiscoverDailyRecommendationEntry({
@@ -244,12 +244,13 @@ String _discoverRecommendationComicKey(ExploreComic comic) {
 }
 
 class DiscoverDailyRecommendationService extends ChangeNotifier {
-  DiscoverDailyRecommendationService({required HazukiSourceService source})
-    : _source = source {
+  DiscoverDailyRecommendationService({
+    required SourceDailyRecommendationGateway source,
+  }) : _source = source {
     _source.addListener(_handleSourceChanged);
   }
 
-  final HazukiSourceService _source;
+  final SourceDailyRecommendationGateway _source;
 
   static const String authorsAssetPath = 'assets/data/authors.txt';
   static const String _cachePayloadKey = 'discover_daily_recommendation_cache';

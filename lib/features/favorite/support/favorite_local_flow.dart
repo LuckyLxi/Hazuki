@@ -1,41 +1,40 @@
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/services/local_favorites_service.dart';
+import 'package:hazuki/services/local_favorites/local_favorites_contracts.dart';
+import 'package:hazuki/services/local_favorites/local_favorites_preferences_store.dart';
 
 class FavoriteLocalFlow {
-  const FavoriteLocalFlow(this.localFavoritesService);
+  const FavoriteLocalFlow({
+    required this.repository,
+    required this.preferences,
+  });
 
-  final LocalFavoritesService localFavoritesService;
+  final LocalFavoritesRepository repository;
+  final LocalFavoritesPreferencesStore preferences;
 
   Future<String> loadSortOrder() {
-    return localFavoritesService.loadSortOrder();
+    return preferences.loadSortOrder();
   }
 
   Future<void> saveSortOrder(String order) {
-    return localFavoritesService.saveSortOrder(order);
+    return preferences.saveSortOrder(order);
   }
 
   Future<FavoritePageMode> loadFavoritePageMode({String sourceKey = ''}) {
-    return localFavoritesService.loadFavoritePageMode(sourceKey: sourceKey);
+    return preferences.loadFavoritePageMode(sourceKey: sourceKey);
   }
 
   Future<void> saveFavoritePageMode(
     FavoritePageMode mode, {
     String sourceKey = '',
   }) {
-    return localFavoritesService.saveFavoritePageMode(
-      mode,
-      sourceKey: sourceKey,
-    );
+    return preferences.saveFavoritePageMode(mode, sourceKey: sourceKey);
   }
 
   Future<String> loadSelectedFolderId(
     FavoritePageMode mode, {
     String sourceKey = '',
   }) {
-    return localFavoritesService.loadSelectedFavoriteFolderId(
-      mode,
-      sourceKey: sourceKey,
-    );
+    return preferences.loadSelectedFavoriteFolderId(mode, sourceKey: sourceKey);
   }
 
   Future<void> saveSelectedFolderId(
@@ -43,7 +42,7 @@ class FavoriteLocalFlow {
     String folderId, {
     String sourceKey = '',
   }) {
-    return localFavoritesService.saveSelectedFavoriteFolderId(
+    return preferences.saveSelectedFavoriteFolderId(
       mode,
       folderId,
       sourceKey: sourceKey,
@@ -51,11 +50,11 @@ class FavoriteLocalFlow {
   }
 
   Future<FavoriteFoldersResult> loadFolders() {
-    return localFavoritesService.loadFavoriteFolders();
+    return repository.loadFavoriteFolders();
   }
 
   Future<FavoriteFoldersResult> loadFoldersForSource(String sourceKey) {
-    return localFavoritesService.loadFavoriteFolders(sourceKey: sourceKey);
+    return repository.loadFavoriteFolders(sourceKey: sourceKey);
   }
 
   Future<FavoriteComicsResult> loadPage({
@@ -64,7 +63,7 @@ class FavoriteLocalFlow {
     required String sortOrder,
     String sourceKey = '',
   }) {
-    return localFavoritesService.loadFavoriteComics(
+    return repository.loadFavoriteComics(
       page: page,
       folderId: folderId.trim(),
       sortOrder: sortOrder,
@@ -73,7 +72,7 @@ class FavoriteLocalFlow {
   }
 
   Future<void> addFolder(String name, {String sourceKey = ''}) {
-    return localFavoritesService.addFavoriteFolder(name, sourceKey: sourceKey);
+    return repository.addFavoriteFolder(name, sourceKey: sourceKey);
   }
 
   Future<void> renameFolder({
@@ -81,7 +80,7 @@ class FavoriteLocalFlow {
     required String name,
     String sourceKey = '',
   }) {
-    return localFavoritesService.renameFavoriteFolder(
+    return repository.renameFavoriteFolder(
       folderId: folderId,
       name: name,
       sourceKey: sourceKey,
@@ -89,9 +88,6 @@ class FavoriteLocalFlow {
   }
 
   Future<void> deleteFolder(String folderId, {String sourceKey = ''}) {
-    return localFavoritesService.deleteFavoriteFolder(
-      folderId,
-      sourceKey: sourceKey,
-    );
+    return repository.deleteFavoriteFolder(folderId, sourceKey: sourceKey);
   }
 }

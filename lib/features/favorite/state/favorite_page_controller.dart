@@ -3,7 +3,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
-import 'package:hazuki/services/local_favorites_service.dart';
+import 'package:hazuki/services/local_favorites/local_favorites_contracts.dart';
+import 'package:hazuki/services/local_favorites/local_favorites_preferences_store.dart';
 
 import 'favorite_app_bar_actions_state.dart';
 import 'favorite_page_state.dart';
@@ -13,13 +14,17 @@ import '../support/favorite_local_flow.dart';
 class FavoritePageController extends ChangeNotifier {
   FavoritePageController({
     required SourceFavoriteGateway sourceService,
-    required LocalFavoritesService localFavoritesService,
+    required LocalFavoritesRepository localFavoritesRepository,
+    required LocalFavoritesPreferencesStore localFavoritesPreferences,
   }) : _sourceService = sourceService,
-       _localFavoritesService = localFavoritesService,
+       _localFavoritesRepository = localFavoritesRepository,
        _cloudFlow = FavoriteCloudFlow(sourceService),
-       _localFlow = FavoriteLocalFlow(localFavoritesService) {
+       _localFlow = FavoriteLocalFlow(
+         repository: localFavoritesRepository,
+         preferences: localFavoritesPreferences,
+       ) {
     _lastActiveSourceKey = _activeSourceKey;
-    _localFavoritesService.addListener(_handleLocalFavoritesChanged);
+    _localFavoritesRepository.addListener(_handleLocalFavoritesChanged);
     _sourceService.addListener(_handleSourceServiceChanged);
     _cloudFavoritesSubscription = _sourceService.cloudFavoritesChangedStream
         .listen((_) {
@@ -32,7 +37,7 @@ class FavoritePageController extends ChangeNotifier {
   final SourceFavoriteGateway _sourceService;
   final FavoriteCloudFlow _cloudFlow;
   final FavoriteLocalFlow _localFlow;
-  final LocalFavoritesService _localFavoritesService;
+  final LocalFavoritesRepository _localFavoritesRepository;
   final FavoritePageData _state = FavoritePageData();
 
   bool _disposed = false;
@@ -505,7 +510,7 @@ class FavoritePageController extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _cloudFavoritesSubscription?.cancel();
-    _localFavoritesService.removeListener(_handleLocalFavoritesChanged);
+    _localFavoritesRepository.removeListener(_handleLocalFavoritesChanged);
     _sourceService.removeListener(_handleSourceServiceChanged);
     super.dispose();
   }

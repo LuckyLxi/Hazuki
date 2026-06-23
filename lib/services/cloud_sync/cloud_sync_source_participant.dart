@@ -1,9 +1,9 @@
-import '../hazuki_source_service.dart';
+import '../source/source_capabilities.dart';
 
 class CloudSyncSourceParticipant {
   const CloudSyncSourceParticipant(this._source);
 
-  final HazukiSourceService _source;
+  final SourceSyncGateway _source;
 
   Future<String?> exportSnapshot() async {
     if (!await _source.hasCustomEditedActiveSource()) return null;
