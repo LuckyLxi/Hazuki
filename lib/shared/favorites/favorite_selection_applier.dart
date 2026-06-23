@@ -1,6 +1,6 @@
 import 'package:hazuki/models/hazuki_models.dart';
+import 'package:hazuki/shared/favorites/favorite_folders_repository.dart';
 
-import '../repository/favorite_folders_repository.dart';
 import 'favorite_selection_result.dart';
 
 class FavoriteSelectionApplyResult {

@@ -2,11 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import 'package:hazuki/features/search/search.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
 
 import '../state/discover_page_controller.dart';
@@ -23,6 +22,7 @@ class DiscoverPage extends StatefulWidget {
         const DiscoverDailyRecommendationState.disabled(),
     this.onSearchMorphProgressChanged,
     this.onSearchTap,
+    this.searchPageBuilder,
     this.onRequestLogin,
     this.allowInitialLoad = true,
     this.hideLoadingUntilInitialLoadAllowed = false,
@@ -34,6 +34,7 @@ class DiscoverPage extends StatefulWidget {
   final DiscoverDailyRecommendationState dailyRecommendationState;
   final ValueChanged<double>? onSearchMorphProgressChanged;
   final VoidCallback? onSearchTap;
+  final WidgetBuilder? searchPageBuilder;
   final Future<void> Function()? onRequestLogin;
   final bool allowInitialLoad;
   final bool hideLoadingUntilInitialLoadAllowed;
@@ -54,7 +55,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
   void initState() {
     super.initState();
     _controller = DiscoverPageController(
-      sourceService: sl<HazukiSourceService>(),
+      sourceService: sl<SourceDiscoverGateway>(),
       // 源切换时后台触发刷新，重新加载当前源的发现页数据
       onSourceSwitched: () {
         if (mounted) {
@@ -137,15 +138,11 @@ class _DiscoverPageState extends State<DiscoverPage> {
       widget.onSearchTap!.call();
       return;
     }
-    Navigator.of(context).push(
-      buildSearchEntryPageRoute<void>(
-        builder: (_) => SearchPage(
-          initialKeyword: null,
-          comicDetailPageBuilder: widget.comicDetailPageBuilder,
-          comicCoverHeroTagBuilder: widget.comicCoverHeroTagBuilder,
-        ),
-      ),
-    );
+    final pageBuilder = widget.searchPageBuilder;
+    if (pageBuilder == null) {
+      return;
+    }
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: pageBuilder));
   }
 
   Future<void> _requestLogin() async {

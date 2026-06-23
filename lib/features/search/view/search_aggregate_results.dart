@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hazuki/features/discover/view/discover_comic_tile.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/widgets/widgets.dart';
@@ -222,7 +221,7 @@ class _AggregateSourceSectionState extends State<_AggregateSourceSection> {
           );
           return SizedBox(
             width: 130,
-            child: DiscoverComicCoverTile(
+            child: ComicCoverTile(
               comic: comic,
               heroTag: heroTag,
               coverCacheWidth: coverCacheWidth,
@@ -327,7 +326,7 @@ class _SearchAggregateSectionPageState
             final coverCacheWidth =
                 (contentWidth / 3 * MediaQuery.devicePixelRatioOf(context))
                     .round();
-            return DiscoverComicCoverTile(
+            return ComicCoverTile(
               comic: comic,
               heroTag: heroTag,
               coverCacheWidth: coverCacheWidth,

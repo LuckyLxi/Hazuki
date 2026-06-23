@@ -1,11 +1,11 @@
 import 'package:flutter/foundation.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 
 class LineSettingsController extends ChangeNotifier {
-  LineSettingsController({required HazukiSourceService sourceService})
+  LineSettingsController({required SourceSettingsGateway sourceService})
     : _sourceService = sourceService;
 
-  final HazukiSourceService _sourceService;
+  final SourceSettingsGateway _sourceService;
 
   bool _loading = true;
   bool _refreshingStatus = false;

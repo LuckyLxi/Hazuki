@@ -8,9 +8,9 @@ import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
-import 'home_profile_dialogs.dart';
+import 'source_account_dialogs.dart';
 
-export 'home_profile_dialogs.dart';
+export 'source_account_dialogs.dart';
 
 Future<void> showHomeSourceSwitchDialog(
   BuildContext context, {

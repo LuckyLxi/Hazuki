@@ -3,7 +3,8 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:hazuki/features/reader/reader.dart';
+import 'reader_filter_color.dart';
+import 'reader_mode.dart';
 
 class ReaderSettingsSnapshot {
   const ReaderSettingsSnapshot({

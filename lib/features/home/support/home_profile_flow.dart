@@ -6,8 +6,8 @@ import 'package:flutter/services.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
-import 'package:hazuki/features/home/support/home_profile_actions.dart';
-import 'package:hazuki/features/home/support/home_source_account_login.dart';
+import 'package:hazuki/shared/source_account/source_account_actions.dart';
+import 'package:hazuki/shared/source_account/source_account_login.dart';
 import 'package:hazuki/features/home/state/home_profile_controller.dart';
 
 class HomeProfileFlow {

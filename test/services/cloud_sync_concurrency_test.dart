@@ -9,6 +9,10 @@ import 'package:hazuki/services/cloud_sync_service.dart';
 import 'package:hazuki/services/comment_filter_service.dart';
 import 'package:hazuki/services/download_groups_service.dart';
 import 'package:hazuki/services/local_favorites_service.dart';
+import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/read_history_service.dart';
+import 'package:hazuki/services/reading_progress_service.dart';
+import 'package:hazuki/services/search_history_service.dart';
 import 'package:hazuki/services/storage/hazuki_database.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -368,6 +372,10 @@ Future<_TestDevice> _createDevice(
     localFavorites: favorites,
     commentFilter: CommentFilterService(),
     downloadGroups: groups,
+    sourceService: HazukiSourceService(),
+    readHistoryService: ReadHistoryService(database: database),
+    readingProgressService: ReadingProgressService(database: database),
+    searchHistoryService: SearchHistoryService(database: database),
     remoteClientFactory: (_, _) => _FakeLockedRemoteClient(remote),
     syncLockStaleAfter: syncLockStaleAfter,
     syncLockRenewInterval: syncLockRenewInterval,

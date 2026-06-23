@@ -5,15 +5,16 @@ import '../services/comment_filter_service.dart';
 import '../services/discover_daily_recommendation_service.dart';
 import '../services/download_groups_service.dart';
 import '../services/hazuki_source_service.dart';
+import '../services/source/source_capabilities.dart';
 import '../services/local_favorites_service.dart';
 import '../services/manga_download/manga_download_service.dart';
 import '../services/password_lock_service.dart';
 import '../services/reading_progress_service.dart';
 import '../services/read_history_service.dart';
+import '../services/search_history_service.dart';
 import '../services/software_update/software_update_download_service.dart';
 import '../services/software_update/software_update_service.dart';
 import '../services/storage/hazuki_database.dart';
-import '../features/search/support/search_history_service.dart';
 
 final GetIt sl = GetIt.instance;
 
@@ -93,10 +94,54 @@ void registerServices() {
         localFavorites: sl<LocalFavoritesService>(),
         commentFilter: sl<CommentFilterService>(),
         downloadGroups: sl<DownloadGroupsService>(),
+        sourceService: sl<HazukiSourceService>(),
+        readHistoryService: sl<ReadHistoryService>(),
+        readingProgressService: sl<ReadingProgressService>(),
+        searchHistoryService: sl<SearchHistoryService>(),
       ),
     );
   }
   if (!sl.isRegistered<HazukiSourceService>()) {
     sl.registerLazySingleton<HazukiSourceService>(() => HazukiSourceService());
+  }
+  if (!sl.isRegistered<HazukiSourceCapabilities>()) {
+    sl.registerLazySingleton<HazukiSourceCapabilities>(
+      () => HazukiSourceCapabilities(sl<HazukiSourceService>()),
+    );
+  }
+  if (!sl.isRegistered<SourceSearchGateway>()) {
+    sl.registerLazySingleton<SourceSearchGateway>(
+      () => sl<HazukiSourceCapabilities>(),
+    );
+  }
+  if (!sl.isRegistered<SourceDiscoverGateway>()) {
+    sl.registerLazySingleton<SourceDiscoverGateway>(
+      () => sl<HazukiSourceCapabilities>(),
+    );
+  }
+  if (!sl.isRegistered<SourceFavoriteGateway>()) {
+    sl.registerLazySingleton<SourceFavoriteGateway>(
+      () => sl<HazukiSourceCapabilities>(),
+    );
+  }
+  if (!sl.isRegistered<SourceReaderGateway>()) {
+    sl.registerLazySingleton<SourceReaderGateway>(
+      () => sl<HazukiSourceCapabilities>(),
+    );
+  }
+  if (!sl.isRegistered<SourceSettingsGateway>()) {
+    sl.registerLazySingleton<SourceSettingsGateway>(
+      () => sl<HazukiSourceCapabilities>(),
+    );
+  }
+  if (!sl.isRegistered<SourceAccountGateway>()) {
+    sl.registerLazySingleton<SourceAccountGateway>(
+      () => sl<HazukiSourceCapabilities>(),
+    );
+  }
+  if (!sl.isRegistered<SourceDebugGateway>()) {
+    sl.registerLazySingleton<SourceDebugGateway>(
+      () => sl<HazukiSourceCapabilities>(),
+    );
   }
 }

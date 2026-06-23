@@ -9,23 +9,24 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:hazuki/features/reader/support/reader_diagnostics_support.dart';
 import 'package:hazuki/features/reader/state/reader_image_pipeline_state.dart';
-import 'package:hazuki/features/reader/state/reader_filter_color.dart';
-import 'package:hazuki/features/reader/state/reader_mode.dart';
+import 'package:hazuki/shared/reading/reader_filter_color.dart';
+import 'package:hazuki/shared/reading/reader_mode.dart';
 import 'package:hazuki/features/reader/support/reader_display_bridge.dart';
 import 'package:hazuki/features/reader/support/reader_image_pipeline_controller.dart';
 import 'package:hazuki/features/reader/support/reader_navigation_controller.dart';
 import 'package:hazuki/features/reader/support/reader_page_context.dart';
 import 'package:hazuki/features/reader/support/reader_session_controller.dart';
 import 'package:hazuki/features/reader/support/reader_settings_controller.dart';
-import 'package:hazuki/features/reader/support/reader_source_image_quality_settings.dart';
+import 'package:hazuki/shared/reading/reader_source_image_quality_settings.dart';
 import 'package:hazuki/features/reader/support/reader_zoom_controller.dart';
 import 'package:hazuki/features/settings/state/reading_settings_controller.dart';
 import 'package:hazuki/features/reader/view/reader_overlay_layout.dart';
-import 'package:hazuki/features/reader/view/reader_settings_content.dart';
+import 'package:hazuki/widgets/reader_settings_content.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/reading_progress_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
-import 'package:hazuki/features/reader/state/reader_settings_store.dart';
+import 'package:hazuki/shared/reading/reader_settings_store.dart';
 import '../../support/test_service_locator.dart';
 
 void main() {
@@ -287,7 +288,8 @@ void main() {
           chapterTitle: 'Chapter 1',
           chapterIndex: 0,
           widgetImages: const [],
-          sourceService: sl<HazukiSourceService>(),
+          sourceService: sl<SourceReaderGateway>(),
+          readingProgressService: sl<ReadingProgressService>(),
         );
         final controller = ReaderSettingsController(
           runtimeState: runtimeState,
@@ -385,7 +387,8 @@ void main() {
         chapterTitle: 'Chapter 1',
         chapterIndex: 0,
         widgetImages: const [],
-        sourceService: sl<HazukiSourceService>(),
+        sourceService: sl<SourceReaderGateway>(),
+        readingProgressService: sl<ReadingProgressService>(),
         offlineMode: true,
       );
 
@@ -475,7 +478,8 @@ void main() {
         chapterTitle: 'Chapter 1',
         chapterIndex: 0,
         widgetImages: const [],
-        sourceService: sl<HazukiSourceService>(),
+        sourceService: sl<SourceReaderGateway>(),
+        readingProgressService: sl<ReadingProgressService>(),
       );
 
       sessionController.initialize();
@@ -534,7 +538,7 @@ void main() {
     test('persists reading settings to existing preference keys', () async {
       SharedPreferences.setMockInitialValues({});
       final controller = ReadingSettingsController(
-        sourceService: sl<HazukiSourceService>(),
+        sourceService: sl<SourceSettingsGateway>(),
       );
       addTearDown(controller.dispose);
 
@@ -768,7 +772,7 @@ void main() {
             home: Builder(
               builder: (context) {
                 controller = ReaderImagePipelineController(
-                  sourceService: sl<HazukiSourceService>(),
+                  sourceService: sl<SourceReaderGateway>(),
                   runtimeState: runtimeState,
                   pipelineState: pipelineState,
                   diagnosticsState: diagnosticsState,
@@ -842,7 +846,7 @@ void main() {
             home: Builder(
               builder: (context) {
                 controller = ReaderImagePipelineController(
-                  sourceService: sl<HazukiSourceService>(),
+                  sourceService: sl<SourceReaderGateway>(),
                   runtimeState: runtimeState,
                   pipelineState: pipelineState,
                   diagnosticsState: diagnosticsState,

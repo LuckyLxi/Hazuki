@@ -5,11 +5,11 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/features/reader/support/reader_controller_support.dart';
 import 'package:hazuki/features/reader/support/reader_diagnostics_support.dart';
 import 'package:hazuki/features/reader/state/reader_image_pipeline_state.dart';
-import 'package:hazuki/features/reader/state/reader_mode.dart';
+import 'package:hazuki/shared/reading/reader_mode.dart';
 import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
 
 class ReaderImagePipelineController {
@@ -34,7 +34,7 @@ class ReaderImagePipelineController {
     void Function(Iterable<String>)? evictImageBytesFromMemory,
     Future<void> Function(Iterable<String>)? evictImageCacheEntries,
     Future<void> Function(ImageProvider provider)? precacheImageCallback,
-    required HazukiSourceService sourceService,
+    required SourceReaderGateway sourceService,
   }) : _runtimeState = runtimeState,
        _pipelineState = pipelineState,
        _diagnosticsState = diagnosticsState,
@@ -85,7 +85,7 @@ class ReaderImagePipelineController {
   final String Function(Object error) _loadImagesErrorBuilder;
   final Future<ImageProvider> Function(String url, {bool useDiskCache})?
   _imageProviderBuilder;
-  final HazukiSourceService _sourceService;
+  final SourceReaderGateway _sourceService;
   final void Function(Iterable<String>) _evictImageBytesFromMemory;
   final Future<void> Function(Iterable<String>) _evictImageCacheEntries;
   final Future<void> Function(ImageProvider provider)? _precacheImageCallback;

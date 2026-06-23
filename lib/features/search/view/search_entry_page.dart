@@ -3,14 +3,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
+import 'package:hazuki/services/search_history_service.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:hazuki/widgets/windows_comic_detail_host.dart';
 
 import '../state/search_focus_coordinator.dart';
 import '../state/search_id_extract_controller.dart';
-import '../support/search_history_service.dart';
 import '../support/search_shared.dart';
 import 'search_bar_shell.dart';
 import 'search_entry_widgets.dart';
@@ -41,7 +41,7 @@ class _SearchEntryPageState extends State<SearchEntryPage>
     isMounted: () => mounted,
     allowCollapsedFocus: false,
   );
-  final HazukiSourceService _sourceService = sl<HazukiSourceService>();
+  final SourceSearchGateway _sourceService = sl<SourceSearchGateway>();
   late final SearchIdExtractController _idExtractController =
       SearchIdExtractController(
         sourceService: _sourceService,

@@ -7,7 +7,7 @@ import 'package:hazuki/features/favorite/state/favorite_page_controller.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/local_favorites_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:hazuki/widgets/windows_comic_detail_host.dart';
@@ -59,7 +59,7 @@ class FavoritePageState extends State<FavoritePage>
   void initState() {
     super.initState();
     _controller = FavoritePageController(
-      sourceService: sl<HazukiSourceService>(),
+      sourceService: sl<SourceFavoriteGateway>(),
       localFavoritesService: sl<LocalFavoritesService>(),
     );
     _controller.addListener(_handleControllerChanged);

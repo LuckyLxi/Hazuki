@@ -10,10 +10,11 @@ import '../local_favorites_service.dart';
 import '../download_groups_service.dart';
 import '../reading_progress_service.dart';
 import '../read_history_service.dart';
-import '../../features/search/support/search_history_service.dart';
+import '../search_history_service.dart';
 import '../../models/hazuki_models.dart';
 import 'cloud_sync_config_store.dart';
 import 'cloud_sync_models.dart';
+import 'cloud_sync_participant.dart';
 import 'cloud_sync_remote_client.dart';
 
 class CloudSyncSnapshotCodec {
@@ -25,23 +26,35 @@ class CloudSyncSnapshotCodec {
     LocalFavoritesService? localFavoritesService,
     DownloadGroupsService? downloadGroupsService,
     SearchHistoryService? searchHistoryService,
+    SearchHistorySyncParticipant? searchHistoryParticipant,
+    LocalFavoritesSyncParticipant? localFavoritesParticipant,
+    DownloadGroupsSyncParticipant? downloadGroupsParticipant,
   }) : _sourceService = sourceService ?? sl<HazukiSourceService>(),
        _readHistoryService = readHistoryService ?? sl<ReadHistoryService>(),
        _readingProgressService =
            readingProgressService ?? sl<ReadingProgressService>(),
        _localFavoritesService =
-           localFavoritesService ?? sl<LocalFavoritesService>(),
+           localFavoritesParticipant ??
+           LocalFavoritesSyncParticipant(
+             localFavoritesService ?? sl<LocalFavoritesService>(),
+           ),
        _downloadGroupsService =
-           downloadGroupsService ?? sl<DownloadGroupsService>(),
-       _searchHistoryService =
-           searchHistoryService ?? sl<SearchHistoryService>();
+           downloadGroupsParticipant ??
+           DownloadGroupsSyncParticipant(
+             downloadGroupsService ?? sl<DownloadGroupsService>(),
+           ),
+       _searchHistoryParticipant =
+           searchHistoryParticipant ??
+           SearchHistorySyncParticipant(
+             searchHistoryService ?? sl<SearchHistoryService>(),
+           );
 
   final HazukiSourceService _sourceService;
   final ReadHistoryService _readHistoryService;
   final ReadingProgressService _readingProgressService;
-  final LocalFavoritesService _localFavoritesService;
-  final DownloadGroupsService _downloadGroupsService;
-  final SearchHistoryService _searchHistoryService;
+  final LocalFavoritesSyncParticipant _localFavoritesService;
+  final DownloadGroupsSyncParticipant _downloadGroupsService;
+  final SearchHistorySyncParticipant _searchHistoryParticipant;
 
   Future<void> mergeRemoteIntoLocal(
     CloudSyncRemoteClient client, {
@@ -208,7 +221,7 @@ class CloudSyncSnapshotCodec {
     }
 
     if (searchText != null) {
-      await _searchHistoryService.mergeSyncJsonl(searchText);
+      await _searchHistoryParticipant.mergeSnapshot(searchText);
     } else if (settingsText != null) {
       try {
         final decoded = jsonDecode(settingsText);
@@ -217,7 +230,7 @@ class CloudSyncSnapshotCodec {
           if (data is Map) {
             final raw = data['search_history'];
             if (raw is List) {
-              await _searchHistoryService.mergeSyncJsonl(
+              await _searchHistoryParticipant.mergeSnapshot(
                 raw
                     .map((keyword) => jsonEncode({'keyword': keyword}))
                     .join('\n'),
@@ -392,10 +405,9 @@ class CloudSyncSnapshotCodec {
       'progress': progress,
     });
 
-    final search = (await _searchHistoryService.load()).take(
-      hazukiSearchHistoryMaxCount,
-    );
-    final lines = await _searchHistoryService.exportSyncJsonl();
+    final search = (await _searchHistoryParticipant.exportLegacyKeywords())
+        .take(hazukiSearchHistoryMaxCount);
+    final lines = await _searchHistoryParticipant.exportSnapshot();
 
     // 仅当用户手动编辑过源文件时才将其上传到云端，
     // 避免把自动下载的官方源错误地同步到其他设备。

@@ -6,10 +6,9 @@ import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
-/// Shared comic cover tile used in both the discover section horizontal list
-/// and the section detail grid page.
-class DiscoverComicCoverTile extends StatelessWidget {
-  const DiscoverComicCoverTile({
+/// Shared comic cover tile used by feature result lists and grids.
+class ComicCoverTile extends StatelessWidget {
+  const ComicCoverTile({
     super.key,
     required this.comic,
     required this.heroTag,

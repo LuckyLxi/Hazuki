@@ -1,12 +1,12 @@
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 
 import '../state/favorite_page_state.dart';
 
 class FavoriteCloudFlow {
   const FavoriteCloudFlow(this.sourceService);
 
-  final HazukiSourceService sourceService;
+  final SourceFavoriteGateway sourceService;
 
   bool get isLogged => sourceService.isLogged;
   bool get supportsFolderDelete => sourceService.supportFavoriteFolderDelete;

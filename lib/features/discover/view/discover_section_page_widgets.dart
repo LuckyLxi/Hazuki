@@ -7,7 +7,6 @@ import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
 import '../state/discover_section_page_controller.dart';
-import 'discover_comic_tile.dart';
 import 'discover_section_date_selector.dart';
 
 class DiscoverSectionSortBar extends StatelessWidget {
@@ -167,7 +166,7 @@ class DiscoverSectionContent extends StatelessWidget {
                       salt: 'discover-more-${section.title}-$index',
                     );
                     final entryKey = _comicEntryKey(comic, index);
-                    return DiscoverComicCoverTile(
+                    return ComicCoverTile(
                       key: ValueKey<String>('tile-$entryKey'),
                       comic: comic,
                       heroTag: heroTag,

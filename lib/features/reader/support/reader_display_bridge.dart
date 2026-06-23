@@ -1,6 +1,6 @@
 import 'package:flutter/services.dart';
 
-import 'package:hazuki/features/reader/state/reader_settings_store.dart';
+import 'package:hazuki/shared/reading/reader_settings_store.dart';
 
 typedef ReaderVolumeButtonPressed = Future<void> Function(String? direction);
 

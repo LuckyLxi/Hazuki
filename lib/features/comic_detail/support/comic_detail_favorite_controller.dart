@@ -8,7 +8,9 @@ import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/widgets/hazuki_prompt.dart';
 
-import 'package:hazuki/features/favorite/favorite.dart';
+import 'package:hazuki/shared/favorites/favorite_folders_view_model.dart';
+import 'package:hazuki/shared/favorites/favorite_selection_applier.dart';
+import 'package:hazuki/shared/favorites/favorite_selection_result.dart';
 
 import '../repository/comic_detail_repository.dart';
 

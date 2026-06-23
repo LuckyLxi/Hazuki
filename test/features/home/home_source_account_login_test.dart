@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hazuki/features/home/support/home_source_account_login.dart';
+import 'package:hazuki/shared/source_account/source_account_login.dart';
 
 void main() {
   test('builds dialog profile from shared source login flow', () async {

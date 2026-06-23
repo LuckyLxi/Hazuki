@@ -5,7 +5,7 @@ import 'package:flutter/rendering.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
 import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 import 'package:hazuki/widgets/widgets.dart';
@@ -55,7 +55,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
     isMounted: () => mounted,
     initialText: widget.initialKeyword,
   );
-  final HazukiSourceService _sourceService = sl<HazukiSourceService>();
+  final SourceSearchGateway _sourceService = sl<SourceSearchGateway>();
   late final SearchIdExtractController _idExtractController =
       SearchIdExtractController(
         sourceService: _sourceService,
@@ -143,7 +143,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
     _aggregateSearchEnabled = widget.aggregateSearchEnabled ?? false;
     _resultsController = SearchResultsController(
       initialOrder: widget.initialOrder,
-      sourceService: sl<HazukiSourceService>(),
+      sourceService: sl<SourceSearchGateway>(),
       searchPageLoader: widget.searchPageLoader,
       comicDetailsLoader: widget.comicDetailsLoader,
     );

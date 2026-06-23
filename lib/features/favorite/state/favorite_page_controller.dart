@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/local_favorites_service.dart';
 
 import 'favorite_app_bar_actions_state.dart';
@@ -12,7 +12,7 @@ import '../support/favorite_local_flow.dart';
 
 class FavoritePageController extends ChangeNotifier {
   FavoritePageController({
-    required HazukiSourceService sourceService,
+    required SourceFavoriteGateway sourceService,
     required LocalFavoritesService localFavoritesService,
   }) : _sourceService = sourceService,
        _localFavoritesService = localFavoritesService,
@@ -29,7 +29,7 @@ class FavoritePageController extends ChangeNotifier {
 
   static const favoriteLoadTimeout = Duration(seconds: 90);
 
-  final HazukiSourceService _sourceService;
+  final SourceFavoriteGateway _sourceService;
   final FavoriteCloudFlow _cloudFlow;
   final FavoriteLocalFlow _localFlow;
   final LocalFavoritesService _localFavoritesService;

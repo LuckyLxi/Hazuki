@@ -6,6 +6,8 @@ import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/services/local_favorites_service.dart';
 import 'package:hazuki/services/manga_download/manga_download_service.dart';
+import 'package:hazuki/services/reading_progress_service.dart';
+import 'package:hazuki/services/read_history_service.dart';
 
 import '../repository/comic_detail_repository.dart';
 import '../support/comic_detail_actions_controller.dart';
@@ -16,7 +18,7 @@ import '../support/comic_detail_session_controller.dart';
 import '../support/comic_detail_theme_controller.dart';
 import '../support/comic_detail_ui_state_controller.dart';
 import 'comic_detail_app_bar.dart';
-import 'package:hazuki/features/favorite/favorite.dart';
+import 'package:hazuki/shared/favorites/favorite_folders_morph_dialog.dart';
 
 import 'comic_detail_background.dart';
 import 'comic_detail_cover.dart';
@@ -37,6 +39,7 @@ class ComicDetailPage extends StatefulWidget {
     this.isDesktopPanel = false,
     this.shouldAnimateInitialRevealOverride,
     this.onCloseRequested,
+    this.repository,
   });
 
   final ExploreComic comic;
@@ -46,6 +49,7 @@ class ComicDetailPage extends StatefulWidget {
   final bool isDesktopPanel;
   final bool? shouldAnimateInitialRevealOverride;
   final VoidCallback? onCloseRequested;
+  final ComicDetailRepository? repository;
 
   @override
   State<ComicDetailPage> createState() => _ComicDetailPageState();
@@ -73,12 +77,16 @@ class _ComicDetailPageState extends State<ComicDetailPage>
     final comicSourceKey = widget.comic.sourceKey.trim().isNotEmpty
         ? widget.comic.sourceKey
         : sl<HazukiSourceService>().activeSourceKey;
-    _repository = ComicDetailRepository(
-      source: sl<HazukiSourceService>(),
-      local: sl<LocalFavoritesService>(),
-      downloader: sl<MangaDownloadService>(),
-      sourceKey: comicSourceKey,
-    );
+    _repository =
+        widget.repository ??
+        ComicDetailRepository(
+          source: sl<HazukiSourceService>(),
+          local: sl<LocalFavoritesService>(),
+          downloader: sl<MangaDownloadService>(),
+          readingProgress: sl<ReadingProgressService>(),
+          readHistory: sl<ReadHistoryService>(),
+          sourceKey: comicSourceKey,
+        );
     _supportsJmExclusiveActions = isHazukiJmSourceKey(comicSourceKey);
     _supportsComicLikeAction =
         isHazukiJmSourceKey(comicSourceKey) ||

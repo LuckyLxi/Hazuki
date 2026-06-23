@@ -1,12 +1,12 @@
 import 'package:flutter/widgets.dart';
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 
 import 'discover_section_page_state.dart';
 
 class DiscoverSectionPageController extends ChangeNotifier {
   DiscoverSectionPageController({
-    required HazukiSourceService sourceService,
+    required SourceDiscoverGateway sourceService,
     String? viewMoreUrl,
     List<ExploreComic>? initialComics,
   }) : _viewMoreUrl = viewMoreUrl,
@@ -18,7 +18,7 @@ class DiscoverSectionPageController extends ChangeNotifier {
     }
   }
 
-  final HazukiSourceService _sourceService;
+  final SourceDiscoverGateway _sourceService;
   final String? _viewMoreUrl;
   String Function(String)? _loadFailedMessage;
   final DiscoverSectionPageState _state = DiscoverSectionPageState();

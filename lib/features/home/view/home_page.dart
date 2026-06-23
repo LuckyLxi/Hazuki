@@ -9,7 +9,7 @@ import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_page.dart';
 import 'package:hazuki/features/comments/comments.dart';
 import 'package:hazuki/features/home/home.dart';
-import 'package:hazuki/features/home/support/home_profile_actions.dart';
+import 'package:hazuki/shared/source_account/source_account_actions.dart';
 import 'package:hazuki/features/reader/view/reader_page.dart';
 import 'package:hazuki/features/reader/support/reader_page_context.dart';
 import 'package:hazuki/features/search/search.dart';

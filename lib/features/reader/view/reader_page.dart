@@ -9,7 +9,7 @@ import 'package:hazuki/app/windows/windows_title_bar_controller.dart';
 import 'package:hazuki/features/reader/reader.dart';
 import 'package:hazuki/features/reader/state/reader_image_pipeline_state.dart';
 import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
-import 'package:hazuki/features/reader/state/reader_settings_store.dart';
+import 'package:hazuki/shared/reading/reader_settings_store.dart';
 import 'package:hazuki/features/reader/support/reader_actions_controller.dart';
 import 'package:hazuki/features/reader/support/reader_callbacks.dart';
 import 'package:hazuki/features/reader/support/reader_diagnostics_support.dart';
@@ -20,14 +20,15 @@ import 'package:hazuki/features/reader/support/reader_page_context.dart';
 import 'package:hazuki/features/reader/support/reader_save_image_controller.dart';
 import 'package:hazuki/features/reader/support/reader_session_controller.dart';
 import 'package:hazuki/features/reader/support/reader_settings_controller.dart';
-import 'package:hazuki/features/reader/support/reader_source_image_quality_settings.dart';
+import 'package:hazuki/shared/reading/reader_source_image_quality_settings.dart';
 import 'package:hazuki/features/reader/support/reader_zoom_controller.dart';
 import 'package:hazuki/features/reader/view/reader_image_views.dart';
 import 'package:hazuki/features/reader/view/reader_overlay_builders.dart';
 import 'package:hazuki/features/reader/view/reader_overlay_host.dart';
 import 'package:hazuki/features/reader/view/reader_state_views.dart';
 import 'package:hazuki/l10n/l10n.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/reading_progress_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/shared/ui_flags.dart';
 
 typedef CommentsWidgetBuilder = ReaderCommentsWidgetBuilder;
@@ -69,7 +70,8 @@ class ReaderPage extends StatefulWidget {
 class _ReaderPageState extends State<ReaderPage>
     with SingleTickerProviderStateMixin {
   static const _readerSettingsStore = ReaderSettingsStore();
-  late final HazukiSourceService _sourceService = sl<HazukiSourceService>();
+  late final SourceSettingsGateway _sourceSettings =
+      sl<SourceSettingsGateway>();
 
   ReaderSourceImageQualitySnapshot _sourceImageQuality =
       ReaderSourceImageQualitySnapshot.defaults;
@@ -123,7 +125,7 @@ class _ReaderPageState extends State<ReaderPage>
         sourceKey: widget.sourceKey,
         loadImagesErrorBuilder: (error) =>
             l10n(context).readerChapterLoadFailed('$error'),
-        sourceService: sl<HazukiSourceService>(),
+        sourceService: sl<SourceReaderGateway>(),
       );
   late final ReaderZoomController _readerZoomController = ReaderZoomController(
     transformationController: _zoomController,
@@ -176,7 +178,8 @@ class _ReaderPageState extends State<ReaderPage>
         chapterTitle: widget.chapterTitle,
         chapterIndex: widget.chapterIndex,
         widgetImages: widget.images,
-        sourceService: sl<HazukiSourceService>(),
+        sourceService: sl<SourceReaderGateway>(),
+        readingProgressService: sl<ReadingProgressService>(),
         offlineMode: widget.offlineMode,
       );
   late final ReaderSettingsController _settingsController =
@@ -246,7 +249,7 @@ class _ReaderPageState extends State<ReaderPage>
     super.initState();
     _sessionController.initialize();
     _sourceImageQuality = ReaderSourceImageQualitySettings.load(
-      _sourceService,
+      _sourceSettings,
       widget.sourceKey,
     );
   }
@@ -482,7 +485,7 @@ class _ReaderPageState extends State<ReaderPage>
           );
         });
         await ReaderSourceImageQualitySettings.updateCopyMangaImageQuality(
-          _sourceService,
+          _sourceSettings,
           widget.sourceKey,
           normalized,
         );
@@ -498,7 +501,7 @@ class _ReaderPageState extends State<ReaderPage>
           );
         });
         await ReaderSourceImageQualitySettings.updatePicacgImageQuality(
-          _sourceService,
+          _sourceSettings,
           widget.sourceKey,
           normalized,
         );

@@ -9,26 +9,40 @@ import '../hazuki_source_service.dart';
 import '../local_favorites_service.dart';
 import '../reading_progress_service.dart';
 import '../read_history_service.dart';
-import '../../features/search/support/search_history_service.dart';
+import '../search_history_service.dart';
 import 'cloud_sync_config_store.dart';
 import 'cloud_sync_models.dart';
+import 'cloud_sync_participant.dart';
 
 class CloudSyncRestoreApplier {
   CloudSyncRestoreApplier({
     HazukiSourceService? sourceService,
     LocalFavoritesService? localFavoritesService,
+    ReadHistoryService? readHistoryService,
+    ReadingProgressService? readingProgressService,
+    SearchHistoryService? searchHistoryService,
+    SearchHistorySyncParticipant? searchHistoryParticipant,
+    LocalFavoritesSyncParticipant? localFavoritesParticipant,
   }) : _sourceService = sourceService ?? sl<HazukiSourceService>(),
        _localFavoritesService =
-           localFavoritesService ?? sl<LocalFavoritesService>(),
-       _readHistoryService = sl<ReadHistoryService>(),
-       _readingProgressService = sl<ReadingProgressService>(),
-       _searchHistoryService = sl<SearchHistoryService>();
+           localFavoritesParticipant ??
+           LocalFavoritesSyncParticipant(
+             localFavoritesService ?? sl<LocalFavoritesService>(),
+           ),
+       _readHistoryService = readHistoryService ?? sl<ReadHistoryService>(),
+       _readingProgressService =
+           readingProgressService ?? sl<ReadingProgressService>(),
+       _searchHistoryParticipant =
+           searchHistoryParticipant ??
+           SearchHistorySyncParticipant(
+             searchHistoryService ?? sl<SearchHistoryService>(),
+           );
 
   final HazukiSourceService _sourceService;
-  final LocalFavoritesService _localFavoritesService;
+  final LocalFavoritesSyncParticipant _localFavoritesService;
   final ReadHistoryService _readHistoryService;
   final ReadingProgressService _readingProgressService;
-  final SearchHistoryService _searchHistoryService;
+  final SearchHistorySyncParticipant _searchHistoryParticipant;
 
   Future<CloudSyncApplySettingsResult> applySettingsJson(String content) async {
     dynamic decoded;
@@ -155,7 +169,7 @@ class CloudSyncRestoreApplier {
   }
 
   Future<void> applySearchHistoryJsonl(String content) async {
-    await _searchHistoryService.restoreSyncJsonl(content);
+    await _searchHistoryParticipant.restoreSnapshot(content);
   }
 
   Future<bool> applySourceFile({

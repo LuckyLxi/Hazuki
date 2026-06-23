@@ -4,9 +4,9 @@ import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
 import 'package:hazuki/shared/windows/windows_comic_detail.dart';
+import 'package:hazuki/widgets/widgets.dart';
 import 'package:loading_indicator_m3e/loading_indicator_m3e.dart';
 
-import 'discover_comic_tile.dart';
 import 'discover_section_page.dart';
 
 class DiscoverSectionBlock extends StatefulWidget {
@@ -134,7 +134,7 @@ class _DiscoverSectionBlockState extends State<DiscoverSectionBlock> {
                 );
                 return SizedBox(
                   width: 130,
-                  child: DiscoverComicCoverTile(
+                  child: ComicCoverTile(
                     comic: comic,
                     heroTag: heroTag,
                     coverCacheWidth: coverCacheWidth,

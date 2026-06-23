@@ -11,6 +11,10 @@ import 'cloud_sync/cloud_sync_snapshot_codec.dart';
 import 'comment_filter_service.dart';
 import 'local_favorites_service.dart';
 import 'download_groups_service.dart';
+import 'hazuki_source_service.dart';
+import 'reading_progress_service.dart';
+import 'read_history_service.dart';
+import 'search_history_service.dart';
 
 export 'cloud_sync/cloud_sync_models.dart';
 
@@ -19,6 +23,10 @@ class CloudSyncService {
     required LocalFavoritesService localFavorites,
     required CommentFilterService commentFilter,
     required DownloadGroupsService downloadGroups,
+    required HazukiSourceService sourceService,
+    required ReadHistoryService readHistoryService,
+    required ReadingProgressService readingProgressService,
+    required SearchHistoryService searchHistoryService,
     CloudSyncRemoteClient Function(
       CloudSyncConfig config,
       CloudSyncConfigStore configStore,
@@ -29,6 +37,10 @@ class CloudSyncService {
   }) : _localFavorites = localFavorites,
        _commentFilter = commentFilter,
        _downloadGroups = downloadGroups,
+       _sourceService = sourceService,
+       _readHistoryService = readHistoryService,
+       _readingProgressService = readingProgressService,
+       _searchHistoryService = searchHistoryService,
        _syncLockStaleAfter = syncLockStaleAfter,
        _syncLockRenewInterval = syncLockRenewInterval,
        _remoteClientFactory =
@@ -39,6 +51,10 @@ class CloudSyncService {
   final LocalFavoritesService _localFavorites;
   final CommentFilterService _commentFilter;
   final DownloadGroupsService _downloadGroups;
+  final HazukiSourceService _sourceService;
+  final ReadHistoryService _readHistoryService;
+  final ReadingProgressService _readingProgressService;
+  final SearchHistoryService _searchHistoryService;
   final Duration _syncLockStaleAfter;
   final Duration _syncLockRenewInterval;
   final CloudSyncRemoteClient Function(
@@ -51,9 +67,17 @@ class CloudSyncService {
     configStore: _configStore,
     localFavoritesService: _localFavorites,
     downloadGroupsService: _downloadGroups,
+    sourceService: _sourceService,
+    readHistoryService: _readHistoryService,
+    readingProgressService: _readingProgressService,
+    searchHistoryService: _searchHistoryService,
   );
   late final CloudSyncRestoreApplier _restoreApplier = CloudSyncRestoreApplier(
     localFavoritesService: _localFavorites,
+    sourceService: _sourceService,
+    readHistoryService: _readHistoryService,
+    readingProgressService: _readingProgressService,
+    searchHistoryService: _searchHistoryService,
   );
   late final CloudSyncFacade facade = CloudSyncFacade._(
     configStore: _configStore,

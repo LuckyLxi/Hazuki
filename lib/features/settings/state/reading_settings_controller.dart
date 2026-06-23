@@ -1,14 +1,14 @@
 import 'package:flutter/foundation.dart';
 
-import 'package:hazuki/features/reader/state/reader_mode.dart';
-import 'package:hazuki/features/reader/state/reader_settings_store.dart';
-import 'package:hazuki/features/reader/state/reader_filter_color.dart';
-import 'package:hazuki/features/reader/support/reader_source_image_quality_settings.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/shared/reading/reader_mode.dart';
+import 'package:hazuki/shared/reading/reader_settings_store.dart';
+import 'package:hazuki/shared/reading/reader_filter_color.dart';
+import 'package:hazuki/shared/reading/reader_source_image_quality_settings.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 
 class ReadingSettingsController extends ChangeNotifier {
   ReadingSettingsController({
-    required HazukiSourceService sourceService,
+    required SourceSettingsGateway sourceService,
     ReaderSettingsStore settingsStore = const ReaderSettingsStore(),
   }) : _sourceService = sourceService,
        _settingsStore = settingsStore {
@@ -18,7 +18,7 @@ class ReadingSettingsController extends ChangeNotifier {
     );
   }
 
-  final HazukiSourceService _sourceService;
+  final SourceSettingsGateway _sourceService;
   final ReaderSettingsStore _settingsStore;
 
   bool _disposed = false;

@@ -6,7 +6,7 @@ import 'package:flutter/services.dart';
 
 import 'package:hazuki/features/reader/reader.dart';
 import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
-import 'package:hazuki/features/reader/support/reader_source_image_quality_settings.dart';
+import 'package:hazuki/shared/reading/reader_source_image_quality_settings.dart';
 import 'package:hazuki/features/reader/view/reader_overlay_controls.dart';
 import 'package:hazuki/features/reader/view/reader_settings_drawer_content.dart';
 import 'package:hazuki/l10n/l10n.dart';

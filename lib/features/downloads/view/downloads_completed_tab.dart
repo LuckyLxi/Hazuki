@@ -9,6 +9,7 @@ import 'package:hazuki/services/manga_download/manga_download_service.dart';
 import 'package:hazuki/services/download_groups_service.dart';
 import 'downloads_cover_widgets.dart';
 import 'downloads_shell_widgets.dart';
+import '../state/downloads_completed_list_controller.dart';
 
 class DownloadsCompletedTab extends StatefulWidget {
   const DownloadsCompletedTab({
@@ -83,8 +84,7 @@ class _DownloadsCompletedTabState extends State<DownloadsCompletedTab> {
 
   final GlobalKey _stackKey = GlobalKey();
   final ScrollController _scrollController = ScrollController();
-  List<_AnimatedDownloadedComicEntry> _visibleComics =
-      const <_AnimatedDownloadedComicEntry>[];
+  late final DownloadsCompletedListController _listController;
   _DownloadedComicSwipeReveal? _swipeReveal;
   bool _showBackToTop = false;
   bool _categoryShellOpen = false;
@@ -94,15 +94,19 @@ class _DownloadsCompletedTabState extends State<DownloadsCompletedTab> {
   void initState() {
     super.initState();
     _scrollController.addListener(_handleScrollChanged);
-    _visibleComics = widget.comics
-        .map((comic) => _AnimatedDownloadedComicEntry(comic: comic))
-        .toList(growable: false);
+    _listController = DownloadsCompletedListController(
+      comics: widget.comics,
+      transitionDuration: DownloadsCompletedTab.dismissDuration,
+    )..addListener(_handleListChanged);
   }
 
   @override
   void dispose() {
     _scrollController.removeListener(_handleScrollChanged);
     _scrollController.dispose();
+    _listController
+      ..removeListener(_handleListChanged)
+      ..dispose();
     super.dispose();
   }
 
@@ -120,7 +124,11 @@ class _DownloadsCompletedTabState extends State<DownloadsCompletedTab> {
     if ((!widget.active || widget.comics.isEmpty) && _showBackToTop) {
       _showBackToTop = false;
     }
-    _syncVisibleComics();
+    _listController.sync(widget.comics);
+  }
+
+  void _handleListChanged() {
+    if (mounted) setState(() {});
   }
 
   void _handleScrollChanged() {
@@ -188,115 +196,10 @@ class _DownloadsCompletedTabState extends State<DownloadsCompletedTab> {
     return false;
   }
 
-  void _syncVisibleComics() {
-    final nextById = <String, DownloadedMangaComic>{
-      for (final comic in widget.comics) comic.storageKey: comic,
-    };
-    final currentById = <String, _AnimatedDownloadedComicEntry>{
-      for (final entry in _visibleComics) entry.comic.storageKey: entry,
-    };
-    final exitingEntries =
-        <({int index, _AnimatedDownloadedComicEntry entry})>[];
-    final nextVisible = <_AnimatedDownloadedComicEntry>[];
-
-    for (int i = 0; i < _visibleComics.length; i++) {
-      final entry = _visibleComics[i];
-      final nextComic = nextById[entry.comic.storageKey];
-      if (nextComic == null) {
-        final exitingEntry = entry.copyWith(exiting: true, entering: false);
-        exitingEntries.add((index: i, entry: exitingEntry));
-        if (!entry.exiting) {
-          _scheduleRemoval(entry.comic.storageKey);
-        }
-        continue;
-      }
-    }
-
-    for (final comic in widget.comics) {
-      final currentEntry = currentById[comic.storageKey];
-      if (currentEntry == null) {
-        nextVisible.add(
-          _AnimatedDownloadedComicEntry(comic: comic, entering: true),
-        );
-        _scheduleEnterComplete(comic.storageKey);
-        continue;
-      }
-      nextVisible.add(
-        _AnimatedDownloadedComicEntry(
-          comic: comic,
-          entering: currentEntry.entering,
-        ),
-      );
-    }
-
-    for (final exiting in exitingEntries) {
-      final index = exiting.index.clamp(0, nextVisible.length);
-      nextVisible.insert(index, exiting.entry);
-    }
-
-    if (!_sameEntries(_visibleComics, nextVisible)) {
-      setState(() {
-        _visibleComics = nextVisible;
-      });
-    }
-  }
-
-  bool _sameEntries(
-    List<_AnimatedDownloadedComicEntry> current,
-    List<_AnimatedDownloadedComicEntry> next,
-  ) {
-    if (current.length != next.length) {
-      return false;
-    }
-    for (int i = 0; i < current.length; i++) {
-      final a = current[i];
-      final b = next[i];
-      if (a.comic != b.comic ||
-          a.exiting != b.exiting ||
-          a.entering != b.entering) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  void _scheduleEnterComplete(String storageKey) {
-    Future<void>.delayed(DownloadsCompletedTab.dismissDuration, () {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _visibleComics = _visibleComics
-            .map((entry) {
-              if (entry.comic.storageKey != storageKey || entry.exiting) {
-                return entry;
-              }
-              return entry.copyWith(entering: false);
-            })
-            .toList(growable: false);
-      });
-    });
-  }
-
-  void _scheduleRemoval(String storageKey) {
-    Future<void>.delayed(DownloadsCompletedTab.dismissDuration, () {
-      if (!mounted) {
-        return;
-      }
-      if (widget.comics.any((comic) => comic.storageKey == storageKey)) {
-        return;
-      }
-      setState(() {
-        _visibleComics = _visibleComics
-            .where((entry) => entry.comic.storageKey != storageKey)
-            .toList(growable: false);
-      });
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
-    final listContent = _visibleComics.isEmpty
+    final visibleComics = _listController.entries;
+    final listContent = visibleComics.isEmpty
         ? Center(child: Text(l10n(context).downloadsEmptyDownloaded))
         : NotificationListener<ScrollNotification>(
             onNotification: _handleScrollNotification,
@@ -309,13 +212,13 @@ class _DownloadsCompletedTabState extends State<DownloadsCompletedTab> {
                 16,
                 96,
               ),
-              itemCount: _visibleComics.length,
+              itemCount: visibleComics.length,
               itemBuilder: (context, index) {
-                final entry = _visibleComics[index];
+                final entry = visibleComics[index];
                 return _AnimatedDownloadedComicCard(
                   key: ValueKey<String>('downloaded_${entry.comic.storageKey}'),
                   entry: entry,
-                  bottomSpacing: index == _visibleComics.length - 1 ? 0 : 12,
+                  bottomSpacing: index == visibleComics.length - 1 ? 0 : 12,
                   selectionMode: widget.selectionMode,
                   selected: widget.selectedComicIds.contains(
                     entry.comic.storageKey,
@@ -1144,7 +1047,7 @@ class _AnimatedDownloadedComicCard extends StatelessWidget {
     required this.onShowComicMenu,
   });
 
-  final _AnimatedDownloadedComicEntry entry;
+  final AnimatedDownloadedComicEntry entry;
   final double bottomSpacing;
   final bool selectionMode;
   final bool selected;
@@ -1821,30 +1724,6 @@ Future<String?> _showRenameGroupDialog(
   await Future<void>.delayed(const Duration(milliseconds: 280));
   controller.dispose();
   return value;
-}
-
-class _AnimatedDownloadedComicEntry {
-  const _AnimatedDownloadedComicEntry({
-    required this.comic,
-    this.entering = false,
-    this.exiting = false,
-  });
-
-  final DownloadedMangaComic comic;
-  final bool entering;
-  final bool exiting;
-
-  _AnimatedDownloadedComicEntry copyWith({
-    DownloadedMangaComic? comic,
-    bool? entering,
-    bool? exiting,
-  }) {
-    return _AnimatedDownloadedComicEntry(
-      comic: comic ?? this.comic,
-      entering: entering ?? this.entering,
-      exiting: exiting ?? this.exiting,
-    );
-  }
 }
 
 class _IntegrityWarningBanner extends StatelessWidget {
