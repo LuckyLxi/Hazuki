@@ -1,6 +1,7 @@
 import 'package:get_it/get_it.dart';
 
 import '../services/cloud_sync_service.dart';
+import '../services/cloud_sync/cloud_sync_participant_set.dart';
 import '../services/comment_filter_service.dart';
 import '../services/discover_daily_recommendation_service.dart';
 import '../services/download_groups_service.dart';
@@ -88,16 +89,25 @@ void registerServices() {
       () => sl<HazukiSourceService>().runtimeRegistry,
     );
   }
+  if (!sl.isRegistered<CloudSyncParticipantSet>()) {
+    sl.registerLazySingleton<CloudSyncParticipantSet>(
+      () => createCloudSyncParticipantSet(
+        source: sl<HazukiSourceService>(),
+        readHistory: sl<ReadHistoryService>(),
+        readingProgress: sl<ReadingProgressService>(),
+        localFavorites: sl<LocalFavoritesService>(),
+        downloadGroups: sl<DownloadGroupsService>(),
+        searchHistory: sl<SearchHistoryService>(),
+      ),
+    );
+  }
   if (!sl.isRegistered<CloudSyncService>()) {
     sl.registerLazySingleton<CloudSyncService>(
       () => CloudSyncService(
         localFavorites: sl<LocalFavoritesService>(),
         commentFilter: sl<CommentFilterService>(),
         downloadGroups: sl<DownloadGroupsService>(),
-        sourceService: sl<HazukiSourceService>(),
-        readHistoryService: sl<ReadHistoryService>(),
-        readingProgressService: sl<ReadingProgressService>(),
-        searchHistoryService: sl<SearchHistoryService>(),
+        participants: sl<CloudSyncParticipantSet>(),
       ),
     );
   }

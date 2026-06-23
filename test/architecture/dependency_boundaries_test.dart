@@ -21,6 +21,18 @@ void main() {
     expect(violations, isEmpty, reason: 'service -> feature: $violations');
   });
 
+  test('cloud sync participants do not use the global service locator', () {
+    final violations = <String>[];
+    for (final file in _dartFiles(Directory('lib/services/cloud_sync'))) {
+      final content = file.readAsStringSync();
+      if (content.contains('app/service_locator.dart') ||
+          RegExp(r'\bsl<').hasMatch(content)) {
+        violations.add(file.path);
+      }
+    }
+    expect(violations, isEmpty, reason: 'cloud sync locator use: $violations');
+  });
+
   test('feature package imports do not form cycles', () {
     final root = Directory('lib/features');
     final graph = <String, Set<String>>{};

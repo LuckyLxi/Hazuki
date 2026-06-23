@@ -5,6 +5,7 @@ import 'package:hazuki/app/app_preferences.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_config_store.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_remote_client.dart';
+import 'package:hazuki/services/cloud_sync/cloud_sync_participant_set.dart';
 import 'package:hazuki/services/cloud_sync_service.dart';
 import 'package:hazuki/services/comment_filter_service.dart';
 import 'package:hazuki/services/download_groups_service.dart';
@@ -15,8 +16,6 @@ import 'package:hazuki/services/reading_progress_service.dart';
 import 'package:hazuki/services/search_history_service.dart';
 import 'package:hazuki/services/storage/hazuki_database.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
-import '../support/test_service_locator.dart';
 
 class _SharedRemote {
   final Map<String, String> files = <String, String>{};
@@ -116,7 +115,6 @@ void main() {
 
   setUp(() async {
     SharedPreferences.setMockInitialValues(const {});
-    await ensureTestServiceLocator();
   });
 
   test('concurrent uploads merge both devices under the remote lock', () async {
@@ -368,14 +366,23 @@ Future<_TestDevice> _createDevice(
   final database = HazukiDatabase.memory();
   final favorites = LocalFavoritesService(database: database);
   final groups = DownloadGroupsService(database: database);
+  final source = HazukiSourceService();
+  final readHistory = ReadHistoryService(database: database);
+  final readingProgress = ReadingProgressService(database: database);
+  final searchHistory = SearchHistoryService(database: database);
+  final participants = createCloudSyncParticipantSet(
+    source: source,
+    readHistory: readHistory,
+    readingProgress: readingProgress,
+    localFavorites: favorites,
+    downloadGroups: groups,
+    searchHistory: searchHistory,
+  );
   final service = CloudSyncService(
     localFavorites: favorites,
     commentFilter: CommentFilterService(),
     downloadGroups: groups,
-    sourceService: HazukiSourceService(),
-    readHistoryService: ReadHistoryService(database: database),
-    readingProgressService: ReadingProgressService(database: database),
-    searchHistoryService: SearchHistoryService(database: database),
+    participants: participants,
     remoteClientFactory: (_, _) => _FakeLockedRemoteClient(remote),
     syncLockStaleAfter: syncLockStaleAfter,
     syncLockRenewInterval: syncLockRenewInterval,
@@ -404,7 +411,12 @@ Future<_TestDevice> _createDevice(
     isAdding: true,
     folderId: folder.id,
   );
-  return _TestDevice(service: service, database: database, groups: groups);
+  return _TestDevice(
+    service: service,
+    database: database,
+    groups: groups,
+    source: source,
+  );
 }
 
 class _TestDevice {
@@ -412,14 +424,17 @@ class _TestDevice {
     required this.service,
     required this.database,
     required this.groups,
+    required this.source,
   });
 
   final CloudSyncService service;
   final HazukiDatabase database;
   final DownloadGroupsService groups;
+  final HazukiSourceService source;
 
   Future<void> dispose() async {
     groups.dispose();
+    source.dispose();
     await database.close();
   }
 }

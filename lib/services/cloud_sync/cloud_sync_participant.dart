@@ -1,5 +1,7 @@
+import 'dart:convert';
+
+import '../../app/app_preferences.dart';
 import '../search_history_service.dart';
-import '../local_favorites_service.dart';
 import '../download_groups_service.dart';
 
 /// A data owner that can export, merge, and restore its own sync format.
@@ -20,6 +22,30 @@ class SearchHistorySyncParticipant implements CloudSyncParticipant<String> {
 
   Future<List<String>> exportLegacyKeywords() => _service.load();
 
+  Future<int> exportCount() async {
+    return (await _service.load()).take(hazukiSearchHistoryMaxCount).length;
+  }
+
+  Future<void> mergeRemote({
+    required String? jsonl,
+    required String? legacySettingsJson,
+  }) async {
+    if (jsonl != null) {
+      await mergeSnapshot(jsonl);
+      return;
+    }
+    if (legacySettingsJson == null) return;
+    try {
+      final decoded = jsonDecode(legacySettingsJson);
+      if (decoded is! Map || decoded['data'] is! Map) return;
+      final raw = (decoded['data'] as Map)['search_history'];
+      if (raw is! List) return;
+      await mergeSnapshot(
+        raw.map((keyword) => jsonEncode({'keyword': keyword})).join('\n'),
+      );
+    } catch (_) {}
+  }
+
   @override
   Future<void> mergeSnapshot(String snapshot) =>
       _service.mergeSyncJsonl(snapshot);
@@ -27,39 +53,6 @@ class SearchHistorySyncParticipant implements CloudSyncParticipant<String> {
   @override
   Future<void> restoreSnapshot(String snapshot) =>
       _service.restoreSyncJsonl(snapshot);
-}
-
-class LocalFavoritesSyncParticipant {
-  const LocalFavoritesSyncParticipant(this._service);
-
-  final LocalFavoritesService _service;
-
-  Future<String> exportFoldersJsonString() =>
-      _service.exportFoldersJsonString();
-  Future<String> exportEntriesJsonString() =>
-      _service.exportEntriesJsonString();
-  Future<String> exportFolderTombstonesJsonString() =>
-      _service.exportFolderTombstonesJsonString();
-  Future<String> exportEntryTombstonesJsonString() =>
-      _service.exportEntryTombstonesJsonString();
-  Future<String> exportComicFolderTombstonesJsonString() =>
-      _service.exportComicFolderTombstonesJsonString();
-
-  Future<void> importJsonStrings({
-    String? foldersRaw,
-    String? entriesRaw,
-    String? folderTombstonesRaw,
-    String? entryTombstonesRaw,
-    String? comicFolderTombstonesRaw,
-    required bool replace,
-  }) => _service.importJsonStrings(
-    foldersRaw: foldersRaw,
-    entriesRaw: entriesRaw,
-    folderTombstonesRaw: folderTombstonesRaw,
-    entryTombstonesRaw: entryTombstonesRaw,
-    comicFolderTombstonesRaw: comicFolderTombstonesRaw,
-    replace: replace,
-  );
 }
 
 class DownloadGroupsSyncParticipant implements CloudSyncParticipant<String?> {
@@ -78,5 +71,6 @@ class DownloadGroupsSyncParticipant implements CloudSyncParticipant<String?> {
   Future<void> mergeSnapshot(String? snapshot) => importJsonString(snapshot);
 
   @override
-  Future<void> restoreSnapshot(String? snapshot) => importJsonString(snapshot);
+  Future<void> restoreSnapshot(String? snapshot) =>
+      _service.importJsonString(snapshot, replace: true);
 }

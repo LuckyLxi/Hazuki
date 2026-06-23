@@ -745,7 +745,19 @@ class HazukiSourceService extends ChangeNotifier {
     }
     final saved = prefs.getString(SourcePrefsKeys.activeSourceKey);
     if (saved != null && saved.trim().isNotEmpty) {
-      _activeSourceKey = _normalizeAllowedSourceKey(saved);
+      final normalized = saved.trim();
+      final allowed = hazukiAllowedSourceCatalog.any(
+        (entry) => entry.normalizedKey == normalized,
+      );
+      if (allowed) {
+        _activeSourceKey = normalized;
+      } else {
+        _activeSourceKey = hazukiDefaultSourceKey;
+        await prefs.setString(
+          SourcePrefsKeys.activeSourceKey,
+          hazukiDefaultSourceKey,
+        );
+      }
     }
   }
 

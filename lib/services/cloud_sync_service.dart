@@ -5,16 +5,13 @@ import 'package:flutter/foundation.dart';
 
 import 'cloud_sync/cloud_sync_config_store.dart';
 import 'cloud_sync/cloud_sync_models.dart';
+import 'cloud_sync/cloud_sync_participant_set.dart';
 import 'cloud_sync/cloud_sync_remote_client.dart';
 import 'cloud_sync/cloud_sync_restore_applier.dart';
 import 'cloud_sync/cloud_sync_snapshot_codec.dart';
 import 'comment_filter_service.dart';
 import 'local_favorites_service.dart';
 import 'download_groups_service.dart';
-import 'hazuki_source_service.dart';
-import 'reading_progress_service.dart';
-import 'read_history_service.dart';
-import 'search_history_service.dart';
 
 export 'cloud_sync/cloud_sync_models.dart';
 
@@ -23,10 +20,7 @@ class CloudSyncService {
     required LocalFavoritesService localFavorites,
     required CommentFilterService commentFilter,
     required DownloadGroupsService downloadGroups,
-    required HazukiSourceService sourceService,
-    required ReadHistoryService readHistoryService,
-    required ReadingProgressService readingProgressService,
-    required SearchHistoryService searchHistoryService,
+    required CloudSyncParticipantSet participants,
     CloudSyncRemoteClient Function(
       CloudSyncConfig config,
       CloudSyncConfigStore configStore,
@@ -37,10 +31,7 @@ class CloudSyncService {
   }) : _localFavorites = localFavorites,
        _commentFilter = commentFilter,
        _downloadGroups = downloadGroups,
-       _sourceService = sourceService,
-       _readHistoryService = readHistoryService,
-       _readingProgressService = readingProgressService,
-       _searchHistoryService = searchHistoryService,
+       _participants = participants,
        _syncLockStaleAfter = syncLockStaleAfter,
        _syncLockRenewInterval = syncLockRenewInterval,
        _remoteClientFactory =
@@ -51,10 +42,7 @@ class CloudSyncService {
   final LocalFavoritesService _localFavorites;
   final CommentFilterService _commentFilter;
   final DownloadGroupsService _downloadGroups;
-  final HazukiSourceService _sourceService;
-  final ReadHistoryService _readHistoryService;
-  final ReadingProgressService _readingProgressService;
-  final SearchHistoryService _searchHistoryService;
+  final CloudSyncParticipantSet _participants;
   final Duration _syncLockStaleAfter;
   final Duration _syncLockRenewInterval;
   final CloudSyncRemoteClient Function(
@@ -64,20 +52,10 @@ class CloudSyncService {
   _remoteClientFactory;
   final CloudSyncConfigStore _configStore = CloudSyncConfigStore();
   late final CloudSyncSnapshotCodec _snapshotCodec = CloudSyncSnapshotCodec(
-    configStore: _configStore,
-    localFavoritesService: _localFavorites,
-    downloadGroupsService: _downloadGroups,
-    sourceService: _sourceService,
-    readHistoryService: _readHistoryService,
-    readingProgressService: _readingProgressService,
-    searchHistoryService: _searchHistoryService,
+    participants: _participants,
   );
   late final CloudSyncRestoreApplier _restoreApplier = CloudSyncRestoreApplier(
-    localFavoritesService: _localFavorites,
-    sourceService: _sourceService,
-    readHistoryService: _readHistoryService,
-    readingProgressService: _readingProgressService,
-    searchHistoryService: _searchHistoryService,
+    participants: _participants,
   );
   late final CloudSyncFacade facade = CloudSyncFacade._(
     configStore: _configStore,
@@ -331,15 +309,6 @@ class CloudSyncService {
     final settingsResult = await _restoreApplier.applySettingsJson(
       settingsText,
     );
-    final settingsDecoded = jsonDecode(settingsText);
-    if (settingsDecoded is Map && settingsDecoded['data'] is Map) {
-      final data = settingsDecoded['data'] as Map;
-      final downloadGroupsRaw = data[CloudSyncConfigStore.downloadGroupsKey];
-      await _downloadGroups.importJsonString(
-        downloadGroupsRaw is String ? downloadGroupsRaw : null,
-        replace: true,
-      );
-    }
     await _commentFilter.load(notify: true);
     await _restoreApplier.applyReadingSnapshot(readingText);
     await _restoreApplier.applySearchHistoryJsonl(searchHistoryText);

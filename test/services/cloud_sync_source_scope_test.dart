@@ -2,19 +2,79 @@ import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/app/app_preferences.dart';
-import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/services/search_history_service.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_config_store.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_models.dart';
+import 'package:hazuki/services/cloud_sync/cloud_sync_participant_set.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_remote_client.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_restore_applier.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_snapshot_codec.dart';
 import 'package:hazuki/services/local_favorites_service.dart';
+import 'package:hazuki/services/download_groups_service.dart';
+import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/services/reading_progress_service.dart';
 import 'package:hazuki/services/read_history_service.dart';
+import 'package:hazuki/services/storage/hazuki_database.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../support/test_service_locator.dart';
+
+late CloudSyncParticipantSet _participants;
+late _CloudSyncFixture _fixture;
+
+class _CloudSyncFixture {
+  _CloudSyncFixture._({
+    required this.database,
+    required this.source,
+    required this.readHistory,
+    required this.readingProgress,
+    required this.localFavorites,
+    required this.downloadGroups,
+    required this.searchHistory,
+    required this.participants,
+  });
+
+  factory _CloudSyncFixture.create() {
+    final database = HazukiDatabase.memory();
+    final source = HazukiSourceService();
+    final readHistory = ReadHistoryService(database: database);
+    final readingProgress = ReadingProgressService(database: database);
+    final localFavorites = LocalFavoritesService(database: database);
+    final downloadGroups = DownloadGroupsService(database: database);
+    final searchHistory = SearchHistoryService(database: database);
+    return _CloudSyncFixture._(
+      database: database,
+      source: source,
+      readHistory: readHistory,
+      readingProgress: readingProgress,
+      localFavorites: localFavorites,
+      downloadGroups: downloadGroups,
+      searchHistory: searchHistory,
+      participants: createCloudSyncParticipantSet(
+        source: source,
+        readHistory: readHistory,
+        readingProgress: readingProgress,
+        localFavorites: localFavorites,
+        downloadGroups: downloadGroups,
+        searchHistory: searchHistory,
+      ),
+    );
+  }
+
+  final HazukiDatabase database;
+  final HazukiSourceService source;
+  final ReadHistoryService readHistory;
+  final ReadingProgressService readingProgress;
+  final LocalFavoritesService localFavorites;
+  final DownloadGroupsService downloadGroups;
+  final SearchHistoryService searchHistory;
+  final CloudSyncParticipantSet participants;
+
+  Future<void> dispose() async {
+    downloadGroups.dispose();
+    source.dispose();
+    await database.close();
+  }
+}
 
 class _FakeCloudSyncRemoteClient extends CloudSyncRemoteClient {
   _FakeCloudSyncRemoteClient(this.files)
@@ -37,8 +97,10 @@ class _FakeCloudSyncRemoteClient extends CloudSyncRemoteClient {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() async {
-    await ensureTestServiceLocator();
+    _fixture = _CloudSyncFixture.create();
+    _participants = _fixture.participants;
   });
+  tearDown(() => _fixture.dispose());
 
   group('CloudSyncRestoreApplier source-scoped reading data', () {
     setUp(() {
@@ -48,7 +110,9 @@ void main() {
     test(
       'restores progress with sourceKey in the preference key and payload',
       () async {
-        await CloudSyncRestoreApplier().applyReadingSnapshot(
+        await CloudSyncRestoreApplier(
+          participants: _participants,
+        ).applyReadingSnapshot(
           jsonEncode({
             'history': [
               {
@@ -71,11 +135,11 @@ void main() {
           }),
         );
 
-        final progress = await sl<ReadingProgressService>().load(
+        final progress = await _fixture.readingProgress.load(
           comicId: '123',
           sourceKey: 'jm',
         );
-        final history = await sl<ReadHistoryService>().exportJsonList();
+        final history = await _fixture.readHistory.exportJsonList();
 
         expect(progress, isNotNull);
         expect(progress!['sourceKey'], 'jm');
@@ -123,7 +187,7 @@ void main() {
       });
 
       await CloudSyncSnapshotCodec(
-        configStore: CloudSyncConfigStore(),
+        participants: _participants,
       ).mergeRemoteIntoLocal(
         _FakeCloudSyncRemoteClient({
           CloudSyncConfigStore.settingsFileName: remoteSettings,
@@ -131,17 +195,14 @@ void main() {
       );
 
       final entries =
-          jsonDecode(
-                await sl<LocalFavoritesService>().exportEntriesJsonString(),
-              )
+          jsonDecode(await _fixture.localFavorites.exportEntriesJsonString())
               as List<dynamic>;
       expect(entries, hasLength(1));
       expect((entries.single as Map<String, dynamic>)['sourceKey'], 'other');
 
       final tombstones =
           jsonDecode(
-                await sl<LocalFavoritesService>()
-                    .exportEntryTombstonesJsonString(),
+                await _fixture.localFavorites.exportEntryTombstonesJsonString(),
               )
               as List<dynamic>;
       final tombstone = tombstones.single as Map<String, dynamic>;
@@ -162,7 +223,7 @@ void main() {
       });
 
       await CloudSyncSnapshotCodec(
-        configStore: CloudSyncConfigStore(),
+        participants: _participants,
       ).mergeRemoteIntoLocal(
         _FakeCloudSyncRemoteClient({
           CloudSyncConfigStore.settingsFileName: remoteSettings,
@@ -190,7 +251,7 @@ void main() {
       });
 
       await CloudSyncSnapshotCodec(
-        configStore: CloudSyncConfigStore(),
+        participants: _participants,
       ).mergeRemoteIntoLocal(
         _FakeCloudSyncRemoteClient({
           CloudSyncConfigStore.settingsFileName: remoteSettings,
@@ -216,7 +277,7 @@ void main() {
       });
 
       await CloudSyncSnapshotCodec(
-        configStore: CloudSyncConfigStore(),
+        participants: _participants,
       ).mergeRemoteIntoLocal(
         _FakeCloudSyncRemoteClient({
           CloudSyncConfigStore.settingsFileName: remoteSettings,
@@ -240,14 +301,14 @@ void main() {
       ).join('\n');
 
       await CloudSyncSnapshotCodec(
-        configStore: CloudSyncConfigStore(),
+        participants: _participants,
       ).mergeRemoteIntoLocal(
         _FakeCloudSyncRemoteClient({
           CloudSyncConfigStore.searchHistoryFileName: remoteSearchHistory,
         }),
       );
 
-      final history = await sl<SearchHistoryService>().load();
+      final history = await _fixture.searchHistory.load();
       expect(history, hasLength(hazukiSearchHistoryMaxCount));
       expect(
         history,
@@ -263,7 +324,7 @@ void main() {
         });
 
         await CloudSyncSnapshotCodec(
-          configStore: CloudSyncConfigStore(),
+          participants: _participants,
         ).mergeRemoteIntoLocal(
           _FakeCloudSyncRemoteClient({
             CloudSyncConfigStore.searchHistoryFileName: jsonEncode({
@@ -272,7 +333,7 @@ void main() {
           }),
         );
 
-        expect(await sl<SearchHistoryService>().load(), [
+        expect(await _fixture.searchHistory.load(), [
           'remote-keyword',
           'local-keyword',
         ]);
@@ -280,12 +341,12 @@ void main() {
     );
 
     test('notifies listeners after merging remote search history', () async {
-      final historyService = sl<SearchHistoryService>();
+      final historyService = _fixture.searchHistory;
       var notificationCount = 0;
       historyService.addListener(() => notificationCount++);
 
       await CloudSyncSnapshotCodec(
-        configStore: CloudSyncConfigStore(),
+        participants: _participants,
       ).mergeRemoteIntoLocal(
         _FakeCloudSyncRemoteClient({
           CloudSyncConfigStore.searchHistoryFileName: jsonEncode({
@@ -301,7 +362,7 @@ void main() {
     test(
       'does not revive a deleted search keyword from an old device',
       () async {
-        final historyService = sl<SearchHistoryService>();
+        final historyService = _fixture.searchHistory;
         await historyService.add('keep');
         await historyService.add('delete');
         final oldSnapshot = await historyService.exportSyncJsonl();
@@ -315,7 +376,7 @@ void main() {
         expect(tombstone['deletedKeyword'], 'delete');
         expect(tombstone.containsKey('keyword'), isFalse);
         await CloudSyncSnapshotCodec(
-          configStore: CloudSyncConfigStore(),
+          participants: _participants,
         ).mergeRemoteIntoLocal(
           _FakeCloudSyncRemoteClient({
             CloudSyncConfigStore.searchHistoryFileName: oldSnapshot,
@@ -327,13 +388,13 @@ void main() {
     );
 
     test('does not revive search history after it was cleared', () async {
-      final historyService = sl<SearchHistoryService>();
+      final historyService = _fixture.searchHistory;
       await historyService.add('old-keyword');
       final oldSnapshot = await historyService.exportSyncJsonl();
 
       await historyService.clear();
       await CloudSyncSnapshotCodec(
-        configStore: CloudSyncConfigStore(),
+        participants: _participants,
       ).mergeRemoteIntoLocal(
         _FakeCloudSyncRemoteClient({
           CloudSyncConfigStore.searchHistoryFileName: oldSnapshot,
@@ -346,7 +407,7 @@ void main() {
     test(
       'accepts a search keyword created after history was cleared',
       () async {
-        final historyService = sl<SearchHistoryService>();
+        final historyService = _fixture.searchHistory;
         await historyService.add('old-keyword');
         await historyService.clear();
         final clearedSnapshot = await historyService.exportSyncJsonl();
@@ -356,7 +417,7 @@ void main() {
             .firstWhere((item) => item['type'] == 'clear');
 
         await CloudSyncSnapshotCodec(
-          configStore: CloudSyncConfigStore(),
+          participants: _participants,
         ).mergeRemoteIntoLocal(
           _FakeCloudSyncRemoteClient({
             CloudSyncConfigStore.searchHistoryFileName: jsonEncode({
@@ -372,14 +433,16 @@ void main() {
     );
 
     test('syncs a search keyword added again after deletion', () async {
-      final historyService = sl<SearchHistoryService>();
+      final historyService = _fixture.searchHistory;
       await historyService.add('keyword');
       await historyService.remove('keyword');
       await historyService.add('keyword');
 
       final snapshot = await historyService.exportSyncJsonl();
       await historyService.clear();
-      await CloudSyncRestoreApplier().applySearchHistoryJsonl(snapshot);
+      await CloudSyncRestoreApplier(
+        participants: _participants,
+      ).applySearchHistoryJsonl(snapshot);
 
       expect(await historyService.load(), ['keyword']);
     });
@@ -390,11 +453,11 @@ void main() {
         (index) => jsonEncode({'keyword': 'keyword-$index'}),
       ).join('\n');
 
-      await CloudSyncRestoreApplier().applySearchHistoryJsonl(
-        backupSearchHistory,
-      );
+      await CloudSyncRestoreApplier(
+        participants: _participants,
+      ).applySearchHistoryJsonl(backupSearchHistory);
 
-      final history = await sl<SearchHistoryService>().load();
+      final history = await _fixture.searchHistory.load();
       expect(history, hasLength(hazukiSearchHistoryMaxCount));
       expect(history.first, 'keyword-0');
       expect(history.last, 'keyword-${hazukiSearchHistoryMaxCount - 1}');
@@ -409,7 +472,7 @@ void main() {
       });
 
       final snapshot = await CloudSyncSnapshotCodec(
-        configStore: CloudSyncConfigStore(),
+        participants: _participants,
       ).buildLocalSnapshotFiles();
       final lines = snapshot.searchHistoryJsonl
           .split('\n')
@@ -425,7 +488,7 @@ void main() {
     });
 
     test('backs up local favorites stored in Drift', () async {
-      final favorites = sl<LocalFavoritesService>();
+      final favorites = _fixture.localFavorites;
       await favorites.addFavoriteFolder('Synced folder', sourceKey: 'jm');
       final folder = (await favorites.loadFavoriteFolders(
         sourceKey: 'jm',
@@ -451,7 +514,7 @@ void main() {
       );
 
       final snapshot = await CloudSyncSnapshotCodec(
-        configStore: CloudSyncConfigStore(),
+        participants: _participants,
       ).buildLocalSnapshotFiles();
       final settings = jsonDecode(snapshot.settings) as Map<String, dynamic>;
       final data = settings['data'] as Map<String, dynamic>;
@@ -473,7 +536,9 @@ void main() {
     });
 
     test('restores local favorites into Drift', () async {
-      await CloudSyncRestoreApplier().applySettingsJson(
+      await CloudSyncRestoreApplier(
+        participants: _participants,
+      ).applySettingsJson(
         jsonEncode({
           'version': 2,
           'data': {
@@ -493,7 +558,7 @@ void main() {
         }),
       );
 
-      final favorites = sl<LocalFavoritesService>();
+      final favorites = _fixture.localFavorites;
       final folders = await favorites.loadFavoriteFolders(sourceKey: 'jm');
       final comics = await favorites.loadFavoriteComics(
         page: 1,
@@ -509,7 +574,7 @@ void main() {
     test(
       'does not revive a removed comic-folder link from an old device',
       () async {
-        final favorites = sl<LocalFavoritesService>();
+        final favorites = _fixture.localFavorites;
         await favorites.addFavoriteFolder('Folder A', sourceKey: 'jm');
         await favorites.addFavoriteFolder('Folder B', sourceKey: 'jm');
         final folders = (await favorites.loadFavoriteFolders(
@@ -547,7 +612,7 @@ void main() {
           folderId: folderB.id,
         );
         final oldSnapshot = await CloudSyncSnapshotCodec(
-          configStore: CloudSyncConfigStore(),
+          participants: _participants,
         ).buildLocalSnapshotFiles();
 
         await favorites.toggleFavorite(
@@ -556,7 +621,7 @@ void main() {
           folderId: folderA.id,
         );
         await CloudSyncSnapshotCodec(
-          configStore: CloudSyncConfigStore(),
+          participants: _participants,
         ).mergeRemoteIntoLocal(
           _FakeCloudSyncRemoteClient({
             CloudSyncConfigStore.settingsFileName: oldSnapshot.settings,
@@ -579,7 +644,7 @@ void main() {
     );
 
     test('keeps a comic-folder link re-added after its removal', () async {
-      final favorites = sl<LocalFavoritesService>();
+      final favorites = _fixture.localFavorites;
       await favorites.addFavoriteFolder('Folder', sourceKey: 'jm');
       final folder = (await favorites.loadFavoriteFolders(
         sourceKey: 'jm',
@@ -617,10 +682,10 @@ void main() {
       );
 
       final snapshot = await CloudSyncSnapshotCodec(
-        configStore: CloudSyncConfigStore(),
+        participants: _participants,
       ).buildLocalSnapshotFiles();
       await CloudSyncSnapshotCodec(
-        configStore: CloudSyncConfigStore(),
+        participants: _participants,
       ).mergeRemoteIntoLocal(
         _FakeCloudSyncRemoteClient({
           CloudSyncConfigStore.settingsFileName: snapshot.settings,
@@ -638,7 +703,7 @@ void main() {
     test(
       'keeps a deleted comic when it is later added to another folder',
       () async {
-        final favorites = sl<LocalFavoritesService>();
+        final favorites = _fixture.localFavorites;
         await favorites.addFavoriteFolder('Old folder', sourceKey: 'jm');
         await favorites.addFavoriteFolder('New folder', sourceKey: 'jm');
         final folders = (await favorites.loadFavoriteFolders(
@@ -682,10 +747,10 @@ void main() {
         );
 
         final snapshot = await CloudSyncSnapshotCodec(
-          configStore: CloudSyncConfigStore(),
+          participants: _participants,
         ).buildLocalSnapshotFiles();
         await CloudSyncSnapshotCodec(
-          configStore: CloudSyncConfigStore(),
+          participants: _participants,
         ).mergeRemoteIntoLocal(
           _FakeCloudSyncRemoteClient({
             CloudSyncConfigStore.settingsFileName: snapshot.settings,
@@ -702,7 +767,7 @@ void main() {
     );
 
     test('applies the latest folder rename from another device', () async {
-      final favorites = sl<LocalFavoritesService>();
+      final favorites = _fixture.localFavorites;
       await favorites.addFavoriteFolder('Old name', sourceKey: 'jm');
       final localFolders =
           jsonDecode(await favorites.exportFoldersJsonString())
@@ -713,7 +778,7 @@ void main() {
         ..['updatedAtMs'] = (localFolder['updatedAtMs'] as int) + 1;
 
       await CloudSyncSnapshotCodec(
-        configStore: CloudSyncConfigStore(),
+        participants: _participants,
       ).mergeRemoteIntoLocal(
         _FakeCloudSyncRemoteClient({
           CloudSyncConfigStore.settingsFileName: jsonEncode({
