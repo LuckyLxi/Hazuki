@@ -8,15 +8,13 @@ import 'package:crypto/crypto.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../../models/hazuki_models.dart';
-import '../../hazuki_source_service.dart';
 import '../common/source_prefs_keys.dart';
+import '../runtime/source_runtime_facade.dart';
 
 class ImageCacheCapability {
-  ImageCacheCapability(this._handle);
+  ImageCacheCapability(this._facade);
 
-  final SourceRuntimeHandle _handle;
-
-  HazukiSourceFacade get _facade => _handle.facade;
+  final HazukiSourceFacade _facade;
 
   static const int _maxConcurrent = 4;
   int _activeCount = 0;

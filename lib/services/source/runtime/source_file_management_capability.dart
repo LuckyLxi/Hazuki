@@ -129,7 +129,7 @@ extension HazukiSourceServiceSourceFileManagementCapability
       await sourceFile.delete();
     }
     await _setCustomEditedSourceFlag(normalizedSourceKey, false);
-    _runtimeHandles.remove(normalizedSourceKey)?.requestDispose();
+    _runtimeCoordinator.remove(normalizedSourceKey);
   }
 
   Future<void> downloadSourceFile(

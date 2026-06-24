@@ -1,4 +1,4 @@
-import '../../hazuki_source_service.dart';
+import 'source_runtime_facade.dart';
 
 class LineSettingsCapability {
   LineSettingsCapability(this._facade);

@@ -1,13 +1,11 @@
 import '../../../models/hazuki_models.dart';
-import '../../hazuki_source_service.dart';
 import '../common/source_prefs_keys.dart';
+import 'source_runtime_facade.dart';
 
 class ExploreCacheCapability {
-  ExploreCacheCapability(this._handle);
+  ExploreCacheCapability(this._facade);
 
-  final SourceRuntimeHandle _handle;
-
-  HazukiSourceFacade get _facade => _handle.facade;
+  final HazukiSourceFacade _facade;
 
   Future<void> init() async {
     _facade.cache.exploreSectionsMemoryCache = null;

@@ -1,26 +1,30 @@
 import 'package:dio/dio.dart';
 
-import '../../hazuki_source_service.dart';
 import '../../network/hazuki_network.dart';
+import '../debug/source_network_log_sink.dart';
+import '../runtime/source_cookie_store.dart';
 
 class SourceHttpGateway {
-  SourceHttpGateway(this._service, SourceRuntimeHandle handle)
-    : _handle = handle,
-      _client = HazukiNetworkClient(
-        dio: handle.dio,
-        sourceKey: handle.sourceKey,
-      );
+  SourceHttpGateway({
+    required Dio dio,
+    required String sourceKey,
+    required SourceCookieStore cookieStore,
+    required SourceNetworkLogSink networkLogSink,
+  }) : _cookieStore = cookieStore,
+       _networkLogSink = networkLogSink,
+       _client = HazukiNetworkClient(dio: dio, sourceKey: sourceKey);
 
-  final HazukiSourceService _service;
-  final SourceRuntimeHandle _handle;
+  final SourceCookieStore _cookieStore;
+  final SourceNetworkLogSink _networkLogSink;
   final HazukiNetworkClient _client;
+  bool _cookieBridgeConfigured = false;
 
   Dio get dio => _client.dio;
 
   String normalizeUrl(String url) => _client.normalizeUrl(url);
 
   String? buildCookieHeader(String url) =>
-      _service.buildCookieHeaderForHandle(_handle, normalizeUrl(url));
+      _cookieStore.buildHeader(normalizeUrl(url));
 
   Future<Response<T>> request<T>(
     String url, {
@@ -97,7 +101,7 @@ class SourceHttpGateway {
       }
       error = e.toString();
     } finally {
-      _handle.facade.networkLogSink.append(
+      _networkLogSink.append(
         method: method,
         url: requestUrl,
         statusCode: response?.statusCode,
@@ -121,11 +125,11 @@ class SourceHttpGateway {
   }
 
   void configureCookieBridge() {
-    if (_handle.dioCookieBridgeConfigured) {
+    if (_cookieBridgeConfigured) {
       return;
     }
-    _handle.dioCookieBridgeConfigured = true;
-    _handle.dio.interceptors.add(
+    _cookieBridgeConfigured = true;
+    dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) {
           final normalizedUrl = normalizeUrl(options.uri.toString());
@@ -134,10 +138,7 @@ class SourceHttpGateway {
           }
           options.extra['hazukiStartedAt'] = DateTime.now();
           if (options.extra['hazukiSkipCookieBridge'] != true) {
-            final cookieHeader = _service.buildCookieHeaderForHandle(
-              _handle,
-              normalizedUrl,
-            );
+            final cookieHeader = _cookieStore.buildHeader(normalizedUrl);
             if (cookieHeader != null && cookieHeader.isNotEmpty) {
               final existing = options.headers['cookie'];
               if (existing is String && existing.trim().isNotEmpty) {
@@ -151,16 +152,12 @@ class SourceHttpGateway {
         },
         onResponse: (response, handler) async {
           final requestUrl = response.requestOptions.uri.toString();
-          await _service.saveCookiesFromHeadersForHandle(
-            _handle,
-            requestUrl,
-            response.headers.map,
-          );
+          await _cookieStore.saveFromHeaders(requestUrl, response.headers.map);
 
           final skipLog =
               response.requestOptions.extra['skipNetworkDebugLog'] == true;
           if (!skipLog) {
-            _handle.facade.networkLogSink.append(
+            _networkLogSink.append(
               method: response.requestOptions.method,
               url: requestUrl,
               statusCode: response.statusCode,
@@ -183,7 +180,7 @@ class SourceHttpGateway {
           final options = error.requestOptions;
           final skipLog = options.extra['skipNetworkDebugLog'] == true;
           if (!skipLog) {
-            _handle.facade.networkLogSink.append(
+            _networkLogSink.append(
               method: options.method,
               url: options.uri.toString(),
               statusCode: error.response?.statusCode,

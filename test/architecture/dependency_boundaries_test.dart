@@ -47,6 +47,26 @@ void main() {
     expect(violations, isEmpty, reason: violations.join('\n'));
   });
 
+  test('source runtime components do not import the concrete service', () {
+    final violations = <String>[];
+    for (final directory in const [
+      'lib/services/source/runtime',
+      'lib/services/source/http',
+      'lib/services/source/image',
+      'lib/services/source/debug',
+    ]) {
+      for (final file in _dartFilesUnder(directory)) {
+        for (final line in file.readAsLinesSync()) {
+          if (line.trimLeft().startsWith('import ') &&
+              line.contains('hazuki_source_service.dart')) {
+            violations.add('${file.path}: $line');
+          }
+        }
+      }
+    }
+    expect(violations, isEmpty, reason: violations.join('\n'));
+  });
+
   test('cloud sync participants do not use the global service locator', () {
     final violations = <String>[];
     for (final file in _dartFilesUnder('lib/services/cloud_sync')) {

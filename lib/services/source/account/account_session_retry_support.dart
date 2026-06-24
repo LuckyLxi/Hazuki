@@ -85,7 +85,7 @@ extension HazukiSourceServiceAccountSessionRetrySupport on HazukiSourceService {
     HazukiSourceFacade? targetFacade,
   }) async {
     final facade = targetFacade ?? this.facade;
-    final all = facade._loadCookieStore();
+    final all = facade.loadCookieStore();
     all.removeWhere((cookie) {
       final domain = cookie.domain.toLowerCase();
       return domain.contains('jmcomic') ||
@@ -98,6 +98,6 @@ extension HazukiSourceServiceAccountSessionRetrySupport on HazukiSourceService {
           domain.contains('cdnaspa') ||
           domain.contains('cdnntr');
     });
-    await facade._saveCookieStore(all);
+    await facade.saveCookieStore(all);
   }
 }
