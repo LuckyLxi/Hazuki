@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_cover.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
+import 'package:hazuki/widgets/source_image_gateway_scope.dart';
 
 import '../../support/test_service_locator.dart';
 
@@ -57,12 +60,15 @@ void main() {
 }
 
 Widget _wrapPreview({VoidCallback? onLongPress}) {
-  return MaterialApp(
-    home: ComicCoverPreviewPage(
-      imageUrl: '',
-      sourceKey: '',
-      heroTag: 'preview-hero',
-      onLongPress: onLongPress ?? () {},
+  return SourceImageGatewayScope(
+    gateway: sl<SourceImageGateway>(),
+    child: MaterialApp(
+      home: ComicCoverPreviewPage(
+        imageUrl: '',
+        sourceKey: '',
+        heroTag: 'preview-hero',
+        onLongPress: onLongPress ?? () {},
+      ),
     ),
   );
 }

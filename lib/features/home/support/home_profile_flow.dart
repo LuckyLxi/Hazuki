@@ -16,6 +16,7 @@ class HomeProfileFlow {
     required this.isMounted,
     required this.profileController,
     required this.sourceService,
+    required this.imageService,
     required this.mediaChannel,
     required this.syncUserProfile,
   });
@@ -24,6 +25,7 @@ class HomeProfileFlow {
   final bool Function() isMounted;
   final HomeProfileController profileController;
   final SourceRuntimeGateway sourceService;
+  final SourceImageGateway imageService;
   final MethodChannel mediaChannel;
   final Future<void> Function() syncUserProfile;
 
@@ -98,6 +100,7 @@ class HomeProfileFlow {
       context,
       mediaChannel: mediaChannel,
       imageUrl: avatarUrl,
+      sourceService: imageService,
     );
   }
 

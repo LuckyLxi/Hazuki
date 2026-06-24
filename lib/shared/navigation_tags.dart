@@ -2,11 +2,10 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/widgets.dart';
-import 'package:hazuki/app/service_locator.dart';
 
 import '../models/hazuki_models.dart';
-import '../services/source/source_capabilities.dart';
 import '../widgets/cached_image_widgets.dart';
+import '../widgets/source_image_gateway_scope.dart';
 import 'ui_flags.dart';
 
 typedef ComicHeroTagBuilder =
@@ -44,17 +43,18 @@ Future<void> precacheComicCoverHeroImages(
   if (normalized.isEmpty || hazukiNoImageModeNotifier.value) {
     return;
   }
+  final imageGateway = SourceImageGatewayScope.of(context);
   final resolvedSourceKey = sourceKey.trim().isNotEmpty
       ? sourceKey.trim()
-      : sl<SourceImageGateway>().activeSourceKey;
+      : imageGateway.activeSourceKey;
   try {
     var bytes =
         peekHazukiWidgetImageMemory(normalized, sourceKey: resolvedSourceKey) ??
-        sl<SourceImageGateway>().peekImageBytesFromMemory(
+        imageGateway.peekImageBytesFromMemory(
           normalized,
           sourceKey: resolvedSourceKey,
         );
-    bytes ??= await sl<SourceImageGateway>().downloadImageBytes(
+    bytes ??= await imageGateway.downloadImageBytes(
       normalized,
       keepInMemory: true,
       sourceKey: resolvedSourceKey,
@@ -156,6 +156,7 @@ Widget buildComicCoverHeroFlightShuttle(
       (flightDirection == HeroFlightDirection.push ? toHero.tag : fromHero.tag)
           .toString();
   final borderRadius = comicCoverHeroBorderRadius(heroTag, fallback: 10);
+  final scopedImageGateway = SourceImageGatewayScope.of(flightContext);
 
   // 从 from 端的 widget tree 中提取 HazukiCachedImage 的实际参数
   final cachedImage = _findCachedImageInSubtree(fromHeroContext);
@@ -164,10 +165,11 @@ Widget buildComicCoverHeroFlightShuttle(
     if (url.isNotEmpty) {
       final sourceKey = cachedImage.sourceKey.trim().isNotEmpty
           ? cachedImage.sourceKey
-          : sl<SourceImageGateway>().activeSourceKey;
+          : (cachedImage.imageGateway ?? scopedImageGateway).activeSourceKey;
+      final imageGateway = cachedImage.imageGateway ?? scopedImageGateway;
       var bytes = peekHazukiWidgetImageMemory(url, sourceKey: sourceKey);
       if (bytes == null) {
-        bytes = sl<SourceImageGateway>().peekImageBytesFromMemory(
+        bytes = imageGateway.peekImageBytesFromMemory(
           url,
           sourceKey: sourceKey,
         );

@@ -15,8 +15,10 @@ class HomeCoordinator extends ChangeNotifier {
   HomeCoordinator({
     required int initialTabIndex,
     required SourceRuntimeGateway sourceService,
+    required SourceImageGateway imageService,
     required DiscoverDailyRecommendationService dailyRecommendationService,
   }) : _sourceService = sourceService,
+       _imageService = imageService,
        _dailyRecommendationService = dailyRecommendationService,
        _profileController = HomeProfileController(sourceService: sourceService),
        _shellController = HomeShellController(initialTabIndex: initialTabIndex),
@@ -34,6 +36,7 @@ class HomeCoordinator extends ChangeNotifier {
   );
 
   final SourceRuntimeGateway _sourceService;
+  final SourceImageGateway _imageService;
   final HomeProfileController _profileController;
   final HomeShellController _shellController;
   final DiscoverDailyRecommendationService _dailyRecommendationService;
@@ -54,6 +57,7 @@ class HomeCoordinator extends ChangeNotifier {
   bool get isCheckInAvailable => _profileController.isCheckInAvailable;
   int get authVersion => _profileController.authVersion;
   bool get isLogged => _profileController.isLogged;
+  SourceRuntimeGateway get sourceService => _sourceService;
 
   int get currentIndex => _shellController.currentIndex;
   double get discoverSearchMorphProgress =>
@@ -162,6 +166,7 @@ class HomeCoordinator extends ChangeNotifier {
       isMounted: isMounted,
       profileController: _profileController,
       sourceService: _sourceService,
+      imageService: _imageService,
       mediaChannel: _mediaChannel,
       syncUserProfile: () => syncUserProfile(context),
     );

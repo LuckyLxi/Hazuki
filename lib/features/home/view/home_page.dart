@@ -135,6 +135,7 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
     _coordinator = HomeCoordinator(
       initialTabIndex: widget.initialTabIndex,
       sourceService: sl<SourceRuntimeGateway>(),
+      imageService: sl<SourceImageGateway>(),
       dailyRecommendationService: sl<DiscoverDailyRecommendationService>(),
     );
     _coordinator.start(context);
@@ -295,6 +296,7 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
             unawaited(() async {
               await showHomeSourceSwitchDialog(
                 context,
+                sourceService: _coordinator.sourceService,
                 onSourceSwitched: () => _coordinator.syncUserProfile(context),
               );
               if (!mounted) {

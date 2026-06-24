@@ -7,4 +7,5 @@ export 'hazuki_pull_to_refresh.dart';
 export 'hazuki_prompt.dart';
 export 'reader_settings_content.dart';
 export 'shape_morphing_loader.dart';
+export 'source_image_gateway_scope.dart';
 export 'sticker_loading_indicator.dart';

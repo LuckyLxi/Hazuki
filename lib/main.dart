@@ -33,7 +33,9 @@ import 'services/cloud_sync_service.dart';
 import 'services/hazuki_source_service.dart';
 import 'services/manga_download/manga_download_service.dart';
 import 'services/password_lock_service.dart';
+import 'services/source/source_capabilities.dart';
 import 'widgets/hazuki_prompt.dart';
+import 'widgets/source_image_gateway_scope.dart';
 import 'features/password_lock/view/password_lock_widgets.dart';
 
 Future<void> main() async {
@@ -319,7 +321,7 @@ class _HazukiAppState extends State<HazukiApp>
               theme: HazukiThemeFactory.buildLight(appearance, lightDynamic),
               darkTheme: HazukiThemeFactory.buildDark(appearance, darkDynamic),
               builder: (context, child) {
-                return HazukiAppControllerScope(
+                final app = HazukiAppControllerScope(
                   controller: _appController,
                   child: HazukiWindowsTitleBarScope(
                     controller: _windowsTitleBarController,
@@ -416,6 +418,11 @@ class _HazukiAppState extends State<HazukiApp>
                       ),
                     ),
                   ),
+                );
+                return SourceImageGatewayScope(
+                  gateway: sl<SourceImageGateway>(),
+                  sourceListenable: sl<SourceRuntimeGateway>(),
+                  child: app,
                 );
               },
               home: HazukiHomePage(

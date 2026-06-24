@@ -79,6 +79,20 @@ void main() {
     expect(violations, isEmpty, reason: 'cloud sync locator use: $violations');
   });
 
+  test('shared and widget modules do not use the global service locator', () {
+    final violations = <String>[];
+    for (final directory in const ['lib/shared', 'lib/widgets']) {
+      for (final file in _dartFilesUnder(directory)) {
+        final content = file.readAsStringSync();
+        if (content.contains('app/service_locator.dart') ||
+            RegExp(r'\bsl<').hasMatch(content)) {
+          violations.add(file.path);
+        }
+      }
+    }
+    expect(violations, isEmpty, reason: violations.join('\n'));
+  });
+
   test('feature package imports do not form cycles', () {
     final root = Directory('lib/features');
     final graph = <String, Set<String>>{};
