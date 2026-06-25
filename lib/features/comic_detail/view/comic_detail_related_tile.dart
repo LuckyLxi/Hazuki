@@ -66,6 +66,8 @@ class ComicDetailRelatedTile extends StatelessWidget {
                         width: double.infinity,
                         keepInMemory: false,
                         cacheWidth: thumbnailCacheWidth,
+                        animateOnLoad: true,
+                        loadAnimationBeginScale: 1,
                         loading: Container(
                           color: Theme.of(
                             context,

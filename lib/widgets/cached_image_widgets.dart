@@ -76,6 +76,7 @@ class HazukiCachedImage extends StatefulWidget {
     this.cacheHeight,
     this.animateOnLoad = false,
     this.loadAnimationDuration = const Duration(milliseconds: 260),
+    this.loadAnimationBeginScale = 0.985,
     this.filterQuality = FilterQuality.medium,
     this.deferLoadingWhileScrolling = false,
     this.useShimmerLoading = true,
@@ -97,6 +98,7 @@ class HazukiCachedImage extends StatefulWidget {
   final int? cacheHeight;
   final bool animateOnLoad;
   final Duration loadAnimationDuration;
+  final double loadAnimationBeginScale;
   final FilterQuality filterQuality;
   final bool deferLoadingWhileScrolling;
   final bool useShimmerLoading;
@@ -509,7 +511,7 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
         curve: Curves.easeOutCubic,
         onEnd: _handleLoadedImageRevealEnd,
         child: AnimatedScale(
-          scale: _showLoadedImage ? 1.0 : 0.985,
+          scale: _showLoadedImage ? 1.0 : widget.loadAnimationBeginScale,
           duration: widget.loadAnimationDuration,
           curve: Curves.easeOutCubic,
           child: image,
