@@ -786,6 +786,42 @@ void main() {
     );
   });
 
+  testWidgets('category dialog opens around the selected group', (
+    tester,
+  ) async {
+    final groups = [
+      _defaultGroup,
+      for (var index = 0; index < 24; index++)
+        DownloadGroup(
+          id: 'group-$index',
+          name: 'Group $index',
+          createdAtMs: index + 1,
+          sortOrder: index + 1,
+        ),
+    ];
+
+    await tester.pumpWidget(
+      _wrapTab(groups: groups, selectedGroupId: 'group-18'),
+    );
+
+    await tester.tap(
+      find.byKey(const ValueKey<String>('downloads_category_launcher')),
+    );
+    await tester.pumpAndSettle();
+
+    final dialog = find.byKey(
+      const ValueKey<String>('downloads_category_dialog'),
+    );
+    expect(
+      find.descendant(of: dialog, matching: find.text('Group 18 (0)')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: dialog, matching: find.text('Default group (1)')),
+      findsNothing,
+    );
+  });
+
   testWidgets(
     'category launcher stays above comics while they scroll underneath',
     (tester) async {
@@ -871,6 +907,7 @@ Widget _wrapTab({
   Future<DownloadGroup> Function(String groupId, String name)? onRenameGroup,
   Future<void> Function(List<String> orderedGroupIds)? onReorderGroups,
   List<DownloadGroup> groups = const [_defaultGroup],
+  String selectedGroupId = DownloadGroupsService.defaultGroupId,
 }) {
   return MaterialApp(
     navigatorKey: navigatorKey,
@@ -887,6 +924,7 @@ Widget _wrapTab({
         onRenameGroup: onRenameGroup,
         onReorderGroups: onReorderGroups,
         groups: groups,
+        selectedGroupId: selectedGroupId,
       ),
     ),
   );
@@ -919,7 +957,17 @@ Widget _buildTab({
   Future<DownloadGroup> Function(String groupId, String name)? onRenameGroup,
   Future<void> Function(List<String> orderedGroupIds)? onReorderGroups,
   List<DownloadGroup> groups = const [_defaultGroup],
+  String selectedGroupId = DownloadGroupsService.defaultGroupId,
 }) {
+  final selectedGroup = groups.firstWhere(
+    (group) => group.id == selectedGroupId,
+    orElse: () => _defaultGroup,
+  );
+  final groupComicCounts = {
+    DownloadGroupsService.defaultGroupId: comics.length,
+    if (selectedGroupId != DownloadGroupsService.defaultGroupId)
+      selectedGroupId: 0,
+  };
   return DownloadsCompletedTab(
     model: DownloadsCompletedTabModel(
       comics: comics,
@@ -930,10 +978,12 @@ Widget _buildTab({
       selectedComicIds: const {},
       comicsWithIntegrityIssues: const {},
       groups: groups,
-      selectedGroupId: DownloadGroupsService.defaultGroupId,
-      selectedGroupName: 'Default group',
-      selectedGroupComicCount: comics.length,
-      groupComicCounts: {DownloadGroupsService.defaultGroupId: comics.length},
+      selectedGroupId: selectedGroupId,
+      selectedGroupName: selectedGroup.isDefault
+          ? 'Default group'
+          : selectedGroup.name,
+      selectedGroupComicCount: groupComicCounts[selectedGroupId] ?? 0,
+      groupComicCounts: groupComicCounts,
     ),
     actions: DownloadsCompletedTabActions(
       onToggleSelection: (_) {},

@@ -853,7 +853,7 @@ class _DownloadsCategoryLauncherContents extends StatelessWidget {
   }
 }
 
-class _DownloadsCategoryShellContents extends StatelessWidget {
+class _DownloadsCategoryShellContents extends StatefulWidget {
   const _DownloadsCategoryShellContents({
     required this.groups,
     required this.selectedGroupId,
@@ -877,6 +877,70 @@ class _DownloadsCategoryShellContents extends StatelessWidget {
   final VoidCallback onToggleSorting;
   final ReorderCallback onReorder;
   final ValueChanged<DownloadGroup> onDeleteGroup;
+
+  static const double _groupTileExtent = 56;
+
+  @override
+  State<_DownloadsCategoryShellContents> createState() =>
+      _DownloadsCategoryShellContentsState();
+}
+
+class _DownloadsCategoryShellContentsState
+    extends State<_DownloadsCategoryShellContents> {
+  late final ScrollController _scrollController = ScrollController();
+  bool _positionedSelectedGroup = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _positionSelectedGroup();
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant _DownloadsCategoryShellContents oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.selectedGroupId != oldWidget.selectedGroupId ||
+        widget.groups.length != oldWidget.groups.length) {
+      _positionedSelectedGroup = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _positionSelectedGroup();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _positionSelectedGroup() {
+    if (_positionedSelectedGroup || !mounted || !_scrollController.hasClients) {
+      return;
+    }
+    final selectedIndex = widget.groups.indexWhere(
+      (group) => group.id == widget.selectedGroupId,
+    );
+    if (selectedIndex <= 0) {
+      _positionedSelectedGroup = true;
+      return;
+    }
+    final position = _scrollController.position;
+    if (!position.hasContentDimensions) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _positionSelectedGroup();
+      });
+      return;
+    }
+    final viewport = position.viewportDimension;
+    final target =
+        selectedIndex * _DownloadsCategoryShellContents._groupTileExtent -
+        (viewport - _DownloadsCategoryShellContents._groupTileExtent) / 2;
+    _scrollController.jumpTo(target.clamp(0, position.maxScrollExtent));
+    _positionedSelectedGroup = true;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -903,12 +967,12 @@ class _DownloadsCategoryShellContents extends StatelessWidget {
                     alignment: Alignment.centerRight,
                     children: [...previousChildren, ?currentChild],
                   ),
-                  child: sorting
+                  child: widget.sorting
                       ? FilledButton.tonalIcon(
                           key: const ValueKey<String>(
                             'downloads_group_sort_save',
                           ),
-                          onPressed: onToggleSorting,
+                          onPressed: widget.onToggleSorting,
                           icon: const Icon(Icons.save_outlined),
                           label: Text(strings.commonSave),
                         )
@@ -917,13 +981,13 @@ class _DownloadsCategoryShellContents extends StatelessWidget {
                             'downloads_group_sort_start',
                           ),
                           tooltip: strings.downloadsSortGroups,
-                          onPressed: onToggleSorting,
+                          onPressed: widget.onToggleSorting,
                           icon: const Icon(Icons.sort_rounded),
                         ),
                 ),
                 IconButton(
                   tooltip: strings.downloadsNewGroup,
-                  onPressed: sorting ? null : onCreateGroup,
+                  onPressed: widget.sorting ? null : widget.onCreateGroup,
                   icon: const Icon(Icons.create_new_folder_outlined),
                 ),
               ],
@@ -931,13 +995,15 @@ class _DownloadsCategoryShellContents extends StatelessWidget {
             const SizedBox(height: 8),
             Expanded(
               child: ReorderableListView.builder(
+                scrollController: _scrollController,
+                itemExtent: _DownloadsCategoryShellContents._groupTileExtent,
                 padding: EdgeInsets.zero,
-                itemCount: groups.length,
-                onReorderItem: onReorder,
+                itemCount: widget.groups.length,
+                onReorderItem: widget.onReorder,
                 buildDefaultDragHandles: false,
                 itemBuilder: (context, index) {
-                  final group = groups[index];
-                  final selected = group.id == selectedGroupId;
+                  final group = widget.groups[index];
+                  final selected = group.id == widget.selectedGroupId;
                   return TweenAnimationBuilder<double>(
                     key: ValueKey<String>('download_group_${group.id}'),
                     tween: Tween(begin: 0, end: 1),
@@ -969,12 +1035,12 @@ class _DownloadsCategoryShellContents extends StatelessWidget {
                           borderRadius: BorderRadius.circular(16),
                           clipBehavior: Clip.antiAlias,
                           child: InkWell(
-                            onTap: sorting
+                            onTap: widget.sorting
                                 ? null
-                                : () => onSelectGroup(group.id),
-                            onLongPress: sorting || group.isDefault
+                                : () => widget.onSelectGroup(group.id),
+                            onLongPress: widget.sorting || group.isDefault
                                 ? null
-                                : () => onRenameGroup(group),
+                                : () => widget.onRenameGroup(group),
                             child: SizedBox(
                               height: 52,
                               child: Row(
@@ -989,8 +1055,8 @@ class _DownloadsCategoryShellContents extends StatelessWidget {
                                   Expanded(
                                     child: Text(
                                       group.isDefault
-                                          ? '${strings.downloadsDefaultGroup} (${groupComicCounts[group.id] ?? 0})'
-                                          : '${group.name} (${groupComicCounts[group.id] ?? 0})',
+                                          ? '${strings.downloadsDefaultGroup} (${widget.groupComicCounts[group.id] ?? 0})'
+                                          : '${group.name} (${widget.groupComicCounts[group.id] ?? 0})',
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                     ),
@@ -1000,16 +1066,16 @@ class _DownloadsCategoryShellContents extends StatelessWidget {
                                     child: Row(
                                       mainAxisAlignment: MainAxisAlignment.end,
                                       children: [
-                                        if (!group.isDefault && !sorting)
+                                        if (!group.isDefault && !widget.sorting)
                                           IconButton(
                                             tooltip: strings.comicDetailDelete,
                                             onPressed: () =>
-                                                onDeleteGroup(group),
+                                                widget.onDeleteGroup(group),
                                             icon: const Icon(
                                               Icons.delete_outline,
                                             ),
                                           ),
-                                        if (!group.isDefault && sorting)
+                                        if (!group.isDefault && widget.sorting)
                                           ReorderableDragStartListener(
                                             index: index,
                                             child: Tooltip(
