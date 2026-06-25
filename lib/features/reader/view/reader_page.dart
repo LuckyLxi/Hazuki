@@ -11,7 +11,6 @@ import 'package:hazuki/features/reader/state/reader_image_pipeline_state.dart';
 import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
 import 'package:hazuki/shared/reading/reader_settings_store.dart';
 import 'package:hazuki/features/reader/support/reader_actions_controller.dart';
-import 'package:hazuki/features/reader/support/reader_callbacks.dart';
 import 'package:hazuki/features/reader/support/reader_diagnostics_support.dart';
 import 'package:hazuki/features/reader/support/reader_display_bridge.dart';
 import 'package:hazuki/features/reader/support/reader_image_pipeline_controller.dart';
@@ -31,8 +30,6 @@ import 'package:hazuki/services/reading_progress_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/shared/ui_flags.dart';
 
-typedef CommentsWidgetBuilder = ReaderCommentsWidgetBuilder;
-
 class ReaderPage extends StatefulWidget {
   const ReaderPage({
     super.key,
@@ -42,10 +39,10 @@ class ReaderPage extends StatefulWidget {
     required this.epId,
     required this.chapterIndex,
     required this.images,
+    required this.commentsWidgetBuilder,
     this.sourceKey = '',
     this.comicTheme,
     this.onFavoriteRequested,
-    this.commentsWidgetBuilder,
     this.offlineMode = false,
     this.offlineChapters = const <ReaderOfflineChapterData>[],
   });
@@ -59,7 +56,7 @@ class ReaderPage extends StatefulWidget {
   final String sourceKey;
   final ThemeData? comicTheme;
   final Future<void> Function(BuildContext)? onFavoriteRequested;
-  final CommentsWidgetBuilder? commentsWidgetBuilder;
+  final ReaderCommentsWidgetBuilder commentsWidgetBuilder;
   final bool offlineMode;
   final List<ReaderOfflineChapterData> offlineChapters;
 

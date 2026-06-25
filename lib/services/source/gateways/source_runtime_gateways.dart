@@ -71,6 +71,7 @@ abstract interface class SourceRuntimeGateway implements Listenable {
   Future<String> loadEditableActiveSource();
   Future<void> saveEditedActiveSource(String content);
   Future<bool> hasCustomEditedActiveSource();
+  Future<void> reloadFromLocalSourceFiles();
   Future<bool> downloadActiveSourceAndReload({
     void Function(int received, int total)? onProgress,
   });

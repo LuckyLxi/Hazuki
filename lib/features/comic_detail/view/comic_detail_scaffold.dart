@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-import 'package:hazuki/features/comments/comments.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
+import 'package:hazuki/shared/comments/comments_widget_builder.dart';
 
 import '../support/comic_detail_scope.dart';
 import 'comic_detail_header.dart';
@@ -24,6 +24,7 @@ class ComicDetailBody extends StatelessWidget {
     required this.isDesktopPanel,
     required this.onCloseRequested,
     required this.buildComicDetailPage,
+    required this.commentsWidgetBuilder,
   });
 
   final ScrollController scrollController;
@@ -36,6 +37,7 @@ class ComicDetailBody extends StatelessWidget {
   final VoidCallback? onCloseRequested;
   final Widget Function(ExploreComic comic, String heroTag)
   buildComicDetailPage;
+  final CommentsWidgetBuilder commentsWidgetBuilder;
 
   @override
   Widget build(BuildContext context) {
@@ -174,12 +176,13 @@ class ComicDetailBody extends StatelessWidget {
                   builder: (context, shouldRender, _) {
                     return details != null
                         ? RepaintBoundary(
-                            child: CommentsPage(
+                            child: commentsWidgetBuilder(
                               comicId: details.id,
                               subId: details.subId.isEmpty
                                   ? null
                                   : details.subId,
                               sourceKey: details.sourceKey,
+                              showAppBar: true,
                               isTabView: true,
                               isActiveInTabView: shouldRender,
                               onRequestTabFullscreen:

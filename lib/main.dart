@@ -34,6 +34,7 @@ import 'services/hazuki_source_service.dart';
 import 'services/manga_download/manga_download_service.dart';
 import 'services/password_lock_service.dart';
 import 'services/source/source_capabilities.dart';
+import 'shared/comments/comments_widget_builder.dart';
 import 'widgets/hazuki_prompt.dart';
 import 'widgets/source_image_gateway_scope.dart';
 import 'features/password_lock/view/password_lock_widgets.dart';
@@ -126,6 +127,7 @@ class _HazukiAppState extends State<HazukiApp>
       settingsStore: widget.settingsStore,
       themeController: _themeController,
       windowsTitleBarController: _windowsTitleBarController,
+      sourceRuntime: sl<SourceRuntimeGateway>(),
       reloadLocale: _reloadLocalePreference,
       refreshHome: _startupCoordinator.refreshHome,
     );
@@ -202,6 +204,31 @@ class _HazukiAppState extends State<HazukiApp>
     };
   }
 
+  static Widget _buildCommentsPage({
+    required String comicId,
+    String? subId,
+    required String sourceKey,
+    ScrollController? scrollController,
+    Future<void> Function()? onRequestTabFullscreen,
+    bool showAppBar = false,
+    bool isTabView = false,
+    bool isActiveInTabView = true,
+    Map<String, Object?> Function()? debugOuterScrollStateBuilder,
+  }) => CommentsPage(
+    comicId: comicId,
+    subId: subId,
+    sourceKey: sourceKey,
+    showAppBar: showAppBar,
+    isTabView: isTabView,
+    isActiveInTabView: isActiveInTabView,
+    scrollController: scrollController,
+    onRequestTabFullscreen: onRequestTabFullscreen,
+    debugOuterScrollStateBuilder: debugOuterScrollStateBuilder,
+  );
+
+  static final ReaderCommentsWidgetBuilder _buildReaderCommentsPage =
+      readerCommentsWidgetBuilderFrom(_buildCommentsPage);
+
   Widget _buildRootComicDetailPage(ExploreComic comic, String heroTag) {
     return ComicDetailPage(
       comic: comic,
@@ -227,26 +254,13 @@ class _HazukiAppState extends State<HazukiApp>
             sourceKey: sourceKey,
             comicTheme: comicTheme,
             onFavoriteRequested: onFavoriteRequested,
-            commentsWidgetBuilder:
-                ({
-                  required comicId,
-                  subId,
-                  required sourceKey,
-                  scrollController,
-                  onRequestTabFullscreen,
-                }) => CommentsPage(
-                  comicId: comicId,
-                  subId: subId,
-                  sourceKey: sourceKey,
-                  showAppBar: false,
-                  scrollController: scrollController,
-                  onRequestTabFullscreen: onRequestTabFullscreen,
-                ),
+            commentsWidgetBuilder: _buildReaderCommentsPage,
           ),
       searchPageBuilder: (initialKeyword) => SearchPage(
         initialKeyword: initialKeyword,
         comicDetailPageBuilder: _buildRootComicDetailPage,
       ),
+      commentsWidgetBuilder: _buildCommentsPage,
       categoryPageBuilder:
           ({
             required title,

@@ -8,6 +8,7 @@ import 'package:hazuki/services/local_favorites/local_favorites_contracts.dart';
 import 'package:hazuki/services/manga_download/manga_download_service.dart';
 import 'package:hazuki/services/reading_progress_service.dart';
 import 'package:hazuki/services/read_history_service.dart';
+import 'package:hazuki/shared/comments/comments_widget_builder.dart';
 
 import '../repository/comic_detail_repository.dart';
 import '../support/comic_detail_actions_controller.dart';
@@ -36,6 +37,7 @@ class ComicDetailPage extends StatefulWidget {
     required this.heroTag,
     required this.readerWidgetBuilder,
     required this.searchPageBuilder,
+    required this.commentsWidgetBuilder,
     this.categoryPageBuilder,
     this.isDesktopPanel = false,
     this.shouldAnimateInitialRevealOverride,
@@ -47,6 +49,7 @@ class ComicDetailPage extends StatefulWidget {
   final String heroTag;
   final ReaderWidgetBuilder readerWidgetBuilder;
   final ComicDetailSearchPageBuilder searchPageBuilder;
+  final CommentsWidgetBuilder commentsWidgetBuilder;
   final ComicDetailCategoryPageBuilder? categoryPageBuilder;
   final bool isDesktopPanel;
   final bool? shouldAnimateInitialRevealOverride;
@@ -197,6 +200,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
         heroTag: heroTag,
         readerWidgetBuilder: widget.readerWidgetBuilder,
         searchPageBuilder: widget.searchPageBuilder,
+        commentsWidgetBuilder: widget.commentsWidgetBuilder,
         categoryPageBuilder: widget.categoryPageBuilder,
         isDesktopPanel: widget.isDesktopPanel,
         onCloseRequested: widget.onCloseRequested,
@@ -278,10 +282,12 @@ class _ComicDetailPageState extends State<ComicDetailPage>
                     heroTag: heroTag,
                     readerWidgetBuilder: widget.readerWidgetBuilder,
                     searchPageBuilder: widget.searchPageBuilder,
+                    commentsWidgetBuilder: widget.commentsWidgetBuilder,
                     categoryPageBuilder: widget.categoryPageBuilder,
                     isDesktopPanel: widget.isDesktopPanel,
                     onCloseRequested: widget.onCloseRequested,
                   ),
+                  commentsWidgetBuilder: widget.commentsWidgetBuilder,
                 ),
               ),
             ],

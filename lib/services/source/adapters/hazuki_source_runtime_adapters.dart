@@ -155,6 +155,9 @@ class HazukiSourceRuntimeAdapter extends HazukiSourceListenableAdapter
   Future<bool> hasCustomEditedActiveSource() =>
       source.hasCustomEditedActiveSource();
   @override
+  Future<void> reloadFromLocalSourceFiles() =>
+      source.reloadFromLocalSourceFiles();
+  @override
   Future<bool> downloadActiveSourceAndReload({
     void Function(int received, int total)? onProgress,
   }) => source.downloadActiveSourceAndReload(onProgress: onProgress);

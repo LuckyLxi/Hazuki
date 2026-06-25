@@ -921,34 +921,38 @@ Widget _buildTab({
   List<DownloadGroup> groups = const [_defaultGroup],
 }) {
   return DownloadsCompletedTab(
-    comics: comics,
-    active: active,
-    selectionMode: selectionMode,
-    scanning: false,
-    selectedCount: 0,
-    selectedComicIds: const {},
-    comicsWithIntegrityIssues: const {},
-    onToggleSelection: (_) {},
-    onDeleteSelected: () {},
-    onBatchGroup: () {},
-    onScanDownloaded: () {},
-    onOpenComic: onOpenComic ?? (_) {},
-    onDeleteComic: onDeleteComic ?? (_) {},
-    groups: groups,
-    selectedGroupId: DownloadGroupsService.defaultGroupId,
-    selectedGroupName: 'Default group',
-    selectedGroupComicCount: comics.length,
-    groupComicCounts: {DownloadGroupsService.defaultGroupId: comics.length},
-    onSelectGroup: (_) {},
-    onCreateGroup: (name) async =>
-        DownloadGroup(id: 'new-group', name: name, createdAtMs: 1),
-    onRenameGroup:
-        onRenameGroup ??
-        (groupId, name) async =>
-            DownloadGroup(id: groupId, name: name, createdAtMs: 1),
-    onReorderGroups: onReorderGroups ?? (_) async {},
-    onDeleteGroup: onDeleteGroup ?? (_) async {},
-    onShowComicMenu: (_, _, _) async {},
+    model: DownloadsCompletedTabModel(
+      comics: comics,
+      active: active,
+      selectionMode: selectionMode,
+      scanning: false,
+      selectedCount: 0,
+      selectedComicIds: const {},
+      comicsWithIntegrityIssues: const {},
+      groups: groups,
+      selectedGroupId: DownloadGroupsService.defaultGroupId,
+      selectedGroupName: 'Default group',
+      selectedGroupComicCount: comics.length,
+      groupComicCounts: {DownloadGroupsService.defaultGroupId: comics.length},
+    ),
+    actions: DownloadsCompletedTabActions(
+      onToggleSelection: (_) {},
+      onDeleteSelected: () {},
+      onBatchGroup: () {},
+      onScanDownloaded: () {},
+      onOpenComic: onOpenComic ?? (_) {},
+      onDeleteComic: onDeleteComic ?? (_) {},
+      onSelectGroup: (_) {},
+      onCreateGroup: (name) async =>
+          DownloadGroup(id: 'new-group', name: name, createdAtMs: 1),
+      onRenameGroup:
+          onRenameGroup ??
+          (groupId, name) async =>
+              DownloadGroup(id: groupId, name: name, createdAtMs: 1),
+      onReorderGroups: onReorderGroups ?? (_) async {},
+      onDeleteGroup: onDeleteGroup ?? (_) async {},
+      onShowComicMenu: (_, _, _) async {},
+    ),
   );
 }
 

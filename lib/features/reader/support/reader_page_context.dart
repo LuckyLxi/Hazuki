@@ -24,10 +24,10 @@ class ReaderPageContext {
     required this.epId,
     required this.chapterIndex,
     required this.images,
+    required this.commentsWidgetBuilder,
     this.sourceKey = '',
     this.comicTheme,
     this.onFavoriteRequested,
-    this.commentsWidgetBuilder,
     this.offlineMode = false,
     this.offlineChapters = const <ReaderOfflineChapterData>[],
   });
@@ -41,7 +41,7 @@ class ReaderPageContext {
   final String sourceKey;
   final ThemeData? comicTheme;
   final Future<void> Function(BuildContext)? onFavoriteRequested;
-  final ReaderCommentsWidgetBuilder? commentsWidgetBuilder;
+  final ReaderCommentsWidgetBuilder commentsWidgetBuilder;
   final bool offlineMode;
   final List<ReaderOfflineChapterData> offlineChapters;
 

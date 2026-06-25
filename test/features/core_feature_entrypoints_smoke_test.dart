@@ -11,7 +11,25 @@ import 'package:hazuki/features/reader/view/reader_page.dart';
 import 'package:hazuki/features/search/search.dart';
 import 'package:hazuki/features/settings/settings.dart';
 import 'package:hazuki/models/hazuki_models.dart';
+import 'package:hazuki/shared/comments/comments_widget_builder.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
+
+Widget _buildComments({
+  required String comicId,
+  String? subId,
+  required String sourceKey,
+  ScrollController? scrollController,
+  Future<void> Function()? onRequestTabFullscreen,
+  bool showAppBar = false,
+  bool isTabView = false,
+  bool isActiveInTabView = true,
+  Map<String, Object?> Function()? debugOuterScrollStateBuilder,
+}) {
+  return const SizedBox.shrink();
+}
+
+final ReaderCommentsWidgetBuilder _buildReaderComments =
+    readerCommentsWidgetBuilderFrom(_buildComments);
 
 void main() {
   test('feature-first entry widgets are constructible from public paths', () {
@@ -58,8 +76,10 @@ void main() {
             chapterIndex: chapterIndex,
             images: images,
             sourceKey: sourceKey,
+            commentsWidgetBuilder: _buildReaderComments,
           ),
       searchPageBuilder: (_) => const SizedBox.shrink(),
+      commentsWidgetBuilder: _buildComments,
     );
     Widget buildDetail(ExploreComic comic, String heroTag) => ComicDetailPage(
       comic: comic,
@@ -83,8 +103,10 @@ void main() {
             chapterIndex: chapterIndex,
             images: images,
             sourceKey: sourceKey,
+            commentsWidgetBuilder: _buildReaderComments,
           ),
       searchPageBuilder: (_) => const SizedBox.shrink(),
+      commentsWidgetBuilder: _buildComments,
     );
     final search = SearchPage(
       initialKeyword: comic.title,
@@ -98,7 +120,10 @@ void main() {
     final downloads = DownloadsPage(
       readerPageBuilder: (comic, chapter) => const SizedBox.shrink(),
     );
-    final history = HistoryPage(comicDetailPageBuilder: buildDetail);
+    final history = HistoryPage(
+      comicDetailPageBuilder: buildDetail,
+      onFavoriteRequested: (_, _) async {},
+    );
     final settings = SettingsPage(
       appearanceSettings: const AppearanceSettingsData(
         themeMode: ThemeMode.system,
@@ -128,6 +153,7 @@ void main() {
       chapterIndex: 0,
       images: const ['a', 'b'],
       comicTheme: ThemeData.light(),
+      commentsWidgetBuilder: _buildReaderComments,
     );
 
     expect(home.initialTabIndex, 1);

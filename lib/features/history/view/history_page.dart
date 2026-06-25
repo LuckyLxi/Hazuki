@@ -9,6 +9,7 @@ import 'package:hazuki/shared/navigation_tags.dart';
 import 'package:hazuki/widgets/windows_comic_detail_host.dart';
 
 import '../state/history_page_controller.dart';
+import '../support/history_callbacks.dart';
 import '../support/history_page_action_handler.dart';
 import '../support/history_page_scroll_coordinator.dart';
 import 'history_page_app_bar.dart';
@@ -18,10 +19,12 @@ class HistoryPage extends StatefulWidget {
   const HistoryPage({
     super.key,
     required this.comicDetailPageBuilder,
+    required this.onFavoriteRequested,
     this.comicCoverHeroTagBuilder = comicCoverHeroTag,
   });
 
   final ComicDetailPageBuilder comicDetailPageBuilder;
+  final HistoryFavoriteRequested onFavoriteRequested;
   final ComicHeroTagBuilder comicCoverHeroTagBuilder;
 
   @override
@@ -46,6 +49,7 @@ class _HistoryPageState extends State<HistoryPage> {
     _actions = HistoryPageActionHandler(
       controller: _controller,
       comicDetailPageBuilder: widget.comicDetailPageBuilder,
+      onFavoriteRequested: widget.onFavoriteRequested,
     );
     unawaited(_controller.loadInitial());
   }
@@ -56,6 +60,7 @@ class _HistoryPageState extends State<HistoryPage> {
     _actions = HistoryPageActionHandler(
       controller: _controller,
       comicDetailPageBuilder: widget.comicDetailPageBuilder,
+      onFavoriteRequested: widget.onFavoriteRequested,
     );
   }
 

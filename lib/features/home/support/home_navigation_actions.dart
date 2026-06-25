@@ -9,6 +9,7 @@ import 'package:hazuki/features/downloads/downloads.dart';
 import 'package:hazuki/features/history/history.dart';
 import 'package:hazuki/features/search/search.dart';
 import 'package:hazuki/features/settings/settings.dart';
+import 'package:hazuki/features/home/support/home_history_favorite_actions.dart';
 import 'package:hazuki/features/home/view/home_drawer.dart';
 import 'package:hazuki/features/discover/view/discover_section_page.dart';
 import 'package:hazuki/models/hazuki_models.dart';
@@ -72,7 +73,10 @@ class HomeNavigationActions {
   Future<void> openHistory() async {
     await _openDrawerDestination(
       hideComicDetailPanel: true,
-      (_) => HistoryPage(comicDetailPageBuilder: buildComicDetailPage),
+      (_) => HistoryPage(
+        comicDetailPageBuilder: buildComicDetailPage,
+        onFavoriteRequested: toggleFavoriteFromHomeHistory,
+      ),
     );
   }
 

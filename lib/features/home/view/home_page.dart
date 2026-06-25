@@ -17,6 +17,7 @@ import 'package:hazuki/features/search/search.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
+import 'package:hazuki/shared/comments/comments_widget_builder.dart';
 import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 import 'package:hazuki/shared/chapter_title_resolver.dart';
 
@@ -50,20 +51,30 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
   late final HomeCoordinator _coordinator;
   HomeDrawerDestination? _selectedDrawerDestination;
 
-  static Widget _buildReaderComments({
+  static Widget _buildComments({
     required String comicId,
     String? subId,
     required String sourceKey,
     ScrollController? scrollController,
     Future<void> Function()? onRequestTabFullscreen,
+    bool showAppBar = false,
+    bool isTabView = false,
+    bool isActiveInTabView = true,
+    Map<String, Object?> Function()? debugOuterScrollStateBuilder,
   }) => CommentsPage(
     comicId: comicId,
     subId: subId,
     sourceKey: sourceKey,
-    showAppBar: false,
+    showAppBar: showAppBar,
+    isTabView: isTabView,
+    isActiveInTabView: isActiveInTabView,
     scrollController: scrollController,
     onRequestTabFullscreen: onRequestTabFullscreen,
+    debugOuterScrollStateBuilder: debugOuterScrollStateBuilder,
   );
+
+  static final ReaderCommentsWidgetBuilder _buildReaderComments =
+      readerCommentsWidgetBuilderFrom(_buildComments);
 
   Widget _buildReaderPage({
     required String title,
@@ -110,6 +121,7 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
       heroTag: heroTag,
       readerWidgetBuilder: _buildReaderPage,
       searchPageBuilder: _buildSearchPage,
+      commentsWidgetBuilder: _buildComments,
       categoryPageBuilder:
           ({
             required title,
@@ -223,6 +235,7 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
             chapterIndex: chapter.index,
             images: chapter.imagePaths,
             sourceKey: comic.sourceKey,
+            commentsWidgetBuilder: _buildReaderComments,
             offlineMode: true,
             offlineChapters: [
               for (final downloadedChapter in comic.chapters)

@@ -1,8 +1,7 @@
 import 'package:flutter/widgets.dart';
-import 'package:hazuki/app/service_locator.dart';
 
 import '../services/cloud_sync_service.dart';
-import '../services/hazuki_source_service.dart';
+import '../services/source/source_capabilities.dart';
 import 'app_settings_store.dart';
 import 'theme/hazuki_theme_controller.dart';
 import 'windows/windows_title_bar_controller.dart';
@@ -22,17 +21,20 @@ class HazukiAppController {
     required HazukiAppSettingsStore settingsStore,
     required HazukiThemeController themeController,
     required HazukiWindowsTitleBarController windowsTitleBarController,
+    required SourceRuntimeGateway sourceRuntime,
     required Future<void> Function() reloadLocale,
     required VoidCallback refreshHome,
   }) : _settingsStore = settingsStore,
        _themeController = themeController,
        _windowsTitleBarController = windowsTitleBarController,
+       _sourceRuntime = sourceRuntime,
        _reloadLocale = reloadLocale,
        _refreshHome = refreshHome;
 
   final HazukiAppSettingsStore _settingsStore;
   final HazukiThemeController _themeController;
   final HazukiWindowsTitleBarController _windowsTitleBarController;
+  final SourceRuntimeGateway _sourceRuntime;
   final Future<void> Function() _reloadLocale;
   final VoidCallback _refreshHome;
 
@@ -50,7 +52,7 @@ class HazukiAppController {
     var sourceNeedsRestart = false;
     if (result.restoredSourceFile) {
       try {
-        await sl<HazukiSourceService>().reloadFromLocalSourceFiles();
+        await _sourceRuntime.reloadFromLocalSourceFiles();
         sourceReloaded = true;
       } catch (_) {
         sourceNeedsRestart = true;

@@ -138,6 +138,42 @@ void main() {
   });
 
   test(
+    'business features use injected builders for comments and favorites',
+    () {
+      final violations = <String>[];
+
+      for (final file in _dartFilesUnder('lib/features/reader')) {
+        final content = file.readAsStringSync();
+        if (content.contains('features/comments/')) {
+          violations.add('${file.path}: reader -> comments');
+        }
+      }
+
+      for (final file in _dartFilesUnder('lib/features/comic_detail')) {
+        final content = file.readAsStringSync();
+        if (content.contains('features/comments/')) {
+          violations.add('${file.path}: comic_detail -> comments');
+        }
+      }
+
+      for (final file in _dartFilesUnder('lib/features/history')) {
+        final content = file.readAsStringSync();
+        if (content.contains('features/favorite/')) {
+          violations.add('${file.path}: history -> favorite');
+        }
+      }
+
+      expect(
+        violations,
+        isEmpty,
+        reason:
+            'Reader/Comic Detail must receive comments builders; History must '
+            'receive favorite callbacks: $violations',
+      );
+    },
+  );
+
+  test(
     'services do not resolve dependencies through the app service locator',
     () {
       final violations = _dartFilesUnder('lib/services')

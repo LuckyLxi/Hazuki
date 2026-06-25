@@ -179,16 +179,19 @@ class FavoritePageController extends ChangeNotifier {
     required String timeoutMessage,
     ValueChanged<String>? onFolderLoadError,
   }) async {
-    _state.setMode(
-      _state.mode == FavoritePageMode.cloud
-          ? FavoritePageMode.local
-          : FavoritePageMode.cloud,
-    );
+    final nextMode = _state.mode == FavoritePageMode.cloud
+        ? FavoritePageMode.local
+        : FavoritePageMode.cloud;
+    _state.setMode(nextMode);
     await _localFlow.saveFavoritePageMode(
       _state.mode,
       sourceKey: _activeSourceKey,
     );
     _state.resetForModeChange();
+    if (nextMode == FavoritePageMode.local) {
+      await _loadInitialLocal(notifyIntermediate: false);
+      return;
+    }
     _notify();
 
     await loadInitial(
@@ -447,6 +450,11 @@ class FavoritePageController extends ChangeNotifier {
     try {
       if (_state.mode == FavoritePageMode.local) {
         await _localFlow.saveSortOrder(normalized);
+        if (_disposed) {
+          return null;
+        }
+        _state.favoriteSortOrder = normalized;
+        return _reloadLocalComicsAfterSort();
       } else {
         await _cloudFlow.setSortOrder(normalized);
       }
@@ -463,6 +471,42 @@ class FavoritePageController extends ChangeNotifier {
     } catch (e) {
       return '$e';
     }
+  }
+
+  Future<String?> _reloadLocalComicsAfterSort() async {
+    final requestVersion = ++_state.listRequestVersion;
+    final targetFolderId = _state.selectedLocalFolderId;
+
+    _state.refreshing = true;
+    _state.loadingMore = false;
+    _state.errorMessage = null;
+    _notify();
+
+    if (targetFolderId.isEmpty) {
+      if (!_disposed && requestVersion == _state.listRequestVersion) {
+        _state.comics = const <ExploreComic>[];
+        _state.currentPage = 1;
+        _state.hasMore = false;
+        _state.refreshing = false;
+        _notify();
+      }
+      return null;
+    }
+
+    final result = await _localFlow.loadPage(
+      page: 1,
+      folderId: targetFolderId,
+      sortOrder: _state.favoriteSortOrder,
+      sourceKey: _activeSourceKey,
+    );
+    if (_disposed || requestVersion != _state.listRequestVersion) {
+      return null;
+    }
+
+    _state.applyFirstPageResult(result);
+    _state.refreshing = false;
+    _notify();
+    return result.errorMessage;
   }
 
   Future<String?> deleteCurrentFolder({required String timeoutMessage}) async {
@@ -608,13 +652,13 @@ class FavoritePageController extends ChangeNotifier {
     );
   }
 
-  Future<void> _loadInitialLocal() async {
+  Future<void> _loadInitialLocal({bool notifyIntermediate = true}) async {
     final requestVersion = ++_state.listRequestVersion;
     _state.favoriteSortOrder = _normalizeFavoriteSortOrder(
       await _localFlow.loadSortOrder(),
       allowedOrders: _favoriteSortOrders,
     );
-    await _reloadLocalFolders();
+    await _reloadLocalFolders(notifyChanges: notifyIntermediate);
     if (_state.selectedLocalFolderId.isEmpty) {
       if (_disposed || requestVersion != _state.listRequestVersion) {
         return;
@@ -730,9 +774,11 @@ class FavoritePageController extends ChangeNotifier {
     }
   }
 
-  Future<void> _reloadLocalFolders() async {
+  Future<void> _reloadLocalFolders({bool notifyChanges = true}) async {
     _state.loadingFolders = true;
-    _notify();
+    if (notifyChanges) {
+      _notify();
+    }
 
     final result = await _localFlow.loadFoldersForSource(_activeSourceKey);
     if (_disposed) {
@@ -758,7 +804,9 @@ class FavoritePageController extends ChangeNotifier {
       _state.hasMore = false;
     }
     _state.loadingFolders = false;
-    _notify();
+    if (notifyChanges) {
+      _notify();
+    }
   }
 
   void _notify() {

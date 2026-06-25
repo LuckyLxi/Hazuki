@@ -12,9 +12,9 @@ import 'downloads_completed_status_widgets.dart';
 import 'downloads_shell_widgets.dart';
 import '../state/downloads_completed_list_controller.dart';
 
-class DownloadsCompletedTab extends StatefulWidget {
-  const DownloadsCompletedTab({
-    super.key,
+@immutable
+class DownloadsCompletedTabModel {
+  const DownloadsCompletedTabModel({
     required this.comics,
     required this.active,
     required this.selectionMode,
@@ -22,23 +22,11 @@ class DownloadsCompletedTab extends StatefulWidget {
     required this.selectedCount,
     required this.selectedComicIds,
     required this.comicsWithIntegrityIssues,
-    required this.onToggleSelection,
-    required this.onDeleteSelected,
-    required this.onScanDownloaded,
-    required this.onOpenComic,
-    required this.onDeleteComic,
     required this.groups,
     required this.selectedGroupId,
     required this.selectedGroupName,
     required this.selectedGroupComicCount,
     required this.groupComicCounts,
-    required this.onSelectGroup,
-    required this.onCreateGroup,
-    required this.onRenameGroup,
-    required this.onReorderGroups,
-    required this.onDeleteGroup,
-    required this.onShowComicMenu,
-    required this.onBatchGroup,
   });
 
   final List<DownloadedMangaComic> comics;
@@ -48,16 +36,35 @@ class DownloadsCompletedTab extends StatefulWidget {
   final int selectedCount;
   final Set<String> selectedComicIds;
   final Set<String> comicsWithIntegrityIssues;
-  final ValueChanged<String> onToggleSelection;
-  final VoidCallback onDeleteSelected;
-  final VoidCallback onScanDownloaded;
-  final ValueChanged<DownloadedMangaComic> onOpenComic;
-  final ValueChanged<DownloadedMangaComic> onDeleteComic;
   final List<DownloadGroup> groups;
   final String selectedGroupId;
   final String selectedGroupName;
   final int selectedGroupComicCount;
   final Map<String, int> groupComicCounts;
+}
+
+@immutable
+class DownloadsCompletedTabActions {
+  const DownloadsCompletedTabActions({
+    required this.onToggleSelection,
+    required this.onDeleteSelected,
+    required this.onScanDownloaded,
+    required this.onOpenComic,
+    required this.onDeleteComic,
+    required this.onSelectGroup,
+    required this.onCreateGroup,
+    required this.onRenameGroup,
+    required this.onReorderGroups,
+    required this.onDeleteGroup,
+    required this.onShowComicMenu,
+    required this.onBatchGroup,
+  });
+
+  final ValueChanged<String> onToggleSelection;
+  final VoidCallback onDeleteSelected;
+  final VoidCallback onScanDownloaded;
+  final ValueChanged<DownloadedMangaComic> onOpenComic;
+  final ValueChanged<DownloadedMangaComic> onDeleteComic;
   final ValueChanged<String> onSelectGroup;
   final Future<DownloadGroup> Function(String name) onCreateGroup;
   final Future<DownloadGroup> Function(String groupId, String name)
@@ -71,6 +78,51 @@ class DownloadsCompletedTab extends StatefulWidget {
   )
   onShowComicMenu;
   final VoidCallback onBatchGroup;
+}
+
+class DownloadsCompletedTab extends StatefulWidget {
+  const DownloadsCompletedTab({
+    super.key,
+    required this.model,
+    required this.actions,
+  });
+
+  final DownloadsCompletedTabModel model;
+  final DownloadsCompletedTabActions actions;
+
+  List<DownloadedMangaComic> get comics => model.comics;
+  bool get active => model.active;
+  bool get selectionMode => model.selectionMode;
+  bool get scanning => model.scanning;
+  int get selectedCount => model.selectedCount;
+  Set<String> get selectedComicIds => model.selectedComicIds;
+  Set<String> get comicsWithIntegrityIssues => model.comicsWithIntegrityIssues;
+  List<DownloadGroup> get groups => model.groups;
+  String get selectedGroupId => model.selectedGroupId;
+  String get selectedGroupName => model.selectedGroupName;
+  int get selectedGroupComicCount => model.selectedGroupComicCount;
+  Map<String, int> get groupComicCounts => model.groupComicCounts;
+  ValueChanged<String> get onToggleSelection => actions.onToggleSelection;
+  VoidCallback get onDeleteSelected => actions.onDeleteSelected;
+  VoidCallback get onScanDownloaded => actions.onScanDownloaded;
+  ValueChanged<DownloadedMangaComic> get onOpenComic => actions.onOpenComic;
+  ValueChanged<DownloadedMangaComic> get onDeleteComic => actions.onDeleteComic;
+  ValueChanged<String> get onSelectGroup => actions.onSelectGroup;
+  Future<DownloadGroup> Function(String name) get onCreateGroup =>
+      actions.onCreateGroup;
+  Future<DownloadGroup> Function(String groupId, String name)
+  get onRenameGroup => actions.onRenameGroup;
+  Future<void> Function(List<String> orderedGroupIds) get onReorderGroups =>
+      actions.onReorderGroups;
+  Future<void> Function(String groupId) get onDeleteGroup =>
+      actions.onDeleteGroup;
+  Future<void> Function(
+    DownloadedMangaComic comic,
+    Offset globalPosition,
+    BuildContext itemContext,
+  )
+  get onShowComicMenu => actions.onShowComicMenu;
+  VoidCallback get onBatchGroup => actions.onBatchGroup;
 
   static const Duration dismissDuration = Duration(milliseconds: 320);
 

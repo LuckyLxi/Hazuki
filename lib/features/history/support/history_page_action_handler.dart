@@ -9,18 +9,21 @@ import 'package:hazuki/widgets/widgets.dart';
 
 import '../state/history_page_controller.dart';
 import 'history_actions.dart';
-import 'history_favorite_support.dart';
+import 'history_callbacks.dart';
 import 'history_menu_support.dart';
 
 class HistoryPageActionHandler {
   HistoryPageActionHandler({
     required HistoryPageController controller,
     required ComicDetailPageBuilder comicDetailPageBuilder,
+    required HistoryFavoriteRequested onFavoriteRequested,
   }) : _controller = controller,
-       _comicDetailPageBuilder = comicDetailPageBuilder;
+       _comicDetailPageBuilder = comicDetailPageBuilder,
+       _onFavoriteRequested = onFavoriteRequested;
 
   final HistoryPageController _controller;
   final ComicDetailPageBuilder _comicDetailPageBuilder;
+  final HistoryFavoriteRequested _onFavoriteRequested;
 
   Future<void> deleteSelected(BuildContext context) async {
     if (_controller.selectedCount == 0) {
@@ -74,7 +77,7 @@ class HistoryPageActionHandler {
         await copyHistoryComicId(context, comic.id);
         break;
       case HistoryComicMenuAction.favorite:
-        await toggleFavoriteFromHistory(context, comic);
+        await _onFavoriteRequested(context, comic);
         break;
       case HistoryComicMenuAction.delete:
         await _controller.deleteComic(comic);

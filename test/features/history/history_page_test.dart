@@ -83,6 +83,7 @@ Widget _buildApp() {
       '/': (_) => const Scaffold(body: Text('Home')),
       '/history': (_) => HistoryPage(
         comicDetailPageBuilder: (_, _) => const SizedBox.shrink(),
+        onFavoriteRequested: (_, _) async {},
       ),
     },
   );
