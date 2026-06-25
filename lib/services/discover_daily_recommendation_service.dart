@@ -261,7 +261,7 @@ String _discoverRecommendationComicKey(ExploreComic comic) {
 }
 
 const String _discoverDailyRecommendationCachePayloadKey =
-    'discover_daily_recommendation_cache';
+    hazukiDiscoverDailyRecommendationCachePreferenceKey;
 const int _discoverDailyRecommendationCacheSchemaVersion = 2;
 const Duration _discoverDailyRecommendationCacheTtl = Duration(minutes: 15);
 

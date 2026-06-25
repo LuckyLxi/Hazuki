@@ -7,6 +7,8 @@ const hazukiSoftwareUpdateSourcePreferenceKey =
     'advanced_software_update_source';
 const hazukiDiscoverDailyRecommendationEnabledPreferenceKey =
     'other_discover_daily_recommendation_enabled';
+const hazukiDiscoverDailyRecommendationCachePreferenceKey =
+    'discover_daily_recommendation_cache';
 const hazukiUseSystemTitleBarPreferenceKey = 'other_use_system_title_bar';
 const hazukiLocalePreferenceKey = 'app_locale';
 const hazukiWindowsAdaptationNoticeAcceptedPreferenceKey =

@@ -165,4 +165,45 @@ void main() {
       expect(prefs.containsKey(platformOnlyKey), isFalse);
     },
   );
+
+  test(
+    'settings participant syncs recommendation toggle but skips cache',
+    () async {
+      SharedPreferences.setMockInitialValues({
+        hazukiDiscoverDailyRecommendationEnabledPreferenceKey: true,
+        hazukiDiscoverDailyRecommendationCachePreferenceKey: 'global-cache',
+        '${hazukiDiscoverDailyRecommendationCachePreferenceKey}_jm':
+            'scoped-cache',
+      });
+      final database = HazukiDatabase.memory();
+      addTearDown(database.close);
+      final groups = DownloadGroupsService(database: database);
+      addTearDown(groups.dispose);
+      final participant = CloudSyncSettingsParticipant(
+        localFavorites: LocalFavoritesSyncParticipant(
+          LocalFavoritesService(database: database),
+        ),
+        downloadGroups: DownloadGroupsSyncParticipant(groups),
+        commentFilter: const CommentFilterSyncParticipant(),
+      );
+
+      final exported = jsonDecode(await participant.exportSnapshot()) as Map;
+      final data = exported['data'] as Map;
+
+      expect(
+        data[hazukiDiscoverDailyRecommendationEnabledPreferenceKey],
+        isTrue,
+      );
+      expect(
+        data,
+        isNot(contains(hazukiDiscoverDailyRecommendationCachePreferenceKey)),
+      );
+      expect(
+        data,
+        isNot(
+          contains('${hazukiDiscoverDailyRecommendationCachePreferenceKey}_jm'),
+        ),
+      );
+    },
+  );
 }

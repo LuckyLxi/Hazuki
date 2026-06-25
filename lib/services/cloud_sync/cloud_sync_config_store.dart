@@ -45,6 +45,10 @@ class CloudSyncConfigStore {
     return alwaysSkippedSettings.contains(key) ||
         key == legacyReadHistoryKey ||
         key.startsWith(legacyReadingProgressPrefix) ||
+        key == hazukiDiscoverDailyRecommendationCachePreferenceKey ||
+        key.startsWith(
+          '${hazukiDiscoverDailyRecommendationCachePreferenceKey}_',
+        ) ||
         key.startsWith('cloud_sync_') ||
         key.startsWith('cookie_store_v2_');
   }
