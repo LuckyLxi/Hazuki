@@ -4,19 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:hazuki/app/app.dart';
-import 'package:hazuki/app/service_locator.dart';
-import 'package:hazuki/features/downloads/downloads.dart';
-import 'package:hazuki/features/history/history.dart';
-import 'package:hazuki/features/search/search.dart';
-import 'package:hazuki/features/settings/settings.dart';
-import 'package:hazuki/features/home/support/home_history_favorite_actions.dart';
+import 'package:hazuki/features/home/support/home_feature_contracts.dart';
 import 'package:hazuki/features/home/view/home_drawer.dart';
-import 'package:hazuki/features/discover/view/discover_section_page.dart';
-import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/features/discover/view/ranking_page.dart';
-import 'package:hazuki/features/discover/view/tag_category_page.dart';
 import 'package:hazuki/l10n/l10n.dart';
-import 'package:hazuki/services/source/source_capabilities.dart';
+import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
 import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 
@@ -29,6 +20,8 @@ class HomeNavigationActions {
     required this.onAppearanceChanged,
     required this.locale,
     required this.onLocaleChanged,
+    required this.featureEntrypoints,
+    required this.useLegacyRankingSection,
     required this.comicDetailPageBuilder,
     required this.downloadsReaderPageBuilder,
   });
@@ -40,8 +33,10 @@ class HomeNavigationActions {
   final AppearanceSettingsApplyCallback onAppearanceChanged;
   final Locale? locale;
   final Future<void> Function(Locale? locale) onLocaleChanged;
+  final HomeFeatureEntrypoints featureEntrypoints;
+  final bool useLegacyRankingSection;
   final ComicDetailPageBuilder comicDetailPageBuilder;
-  final DownloadedComicReaderPageBuilder downloadsReaderPageBuilder;
+  final HomeDownloadedComicReaderPageBuilder downloadsReaderPageBuilder;
 
   Widget buildComicDetailPage(ExploreComic comic, String heroTag) {
     return comicDetailPageBuilder(comic, heroTag);
@@ -56,8 +51,8 @@ class HomeNavigationActions {
     );
   }
 
-  SearchPage buildSearchPage({String? initialKeyword}) {
-    return SearchPage(
+  Widget buildSearchPage({String? initialKeyword}) {
+    return featureEntrypoints.buildSearchPage(
       initialKeyword: initialKeyword,
       autoFocusOnOpen: initialKeyword == null,
       comicDetailPageBuilder: buildComicDetailPage,
@@ -65,17 +60,19 @@ class HomeNavigationActions {
   }
 
   Future<void> openSearch() async {
-    await Navigator.of(
-      context,
-    ).push(buildSearchEntryPageRoute<void>(builder: (_) => buildSearchPage()));
+    await Navigator.of(context).push(
+      featureEntrypoints.buildSearchRoute<void>(
+        builder: (_) => buildSearchPage(),
+      ),
+    );
   }
 
   Future<void> openHistory() async {
     await _openDrawerDestination(
       hideComicDetailPanel: true,
-      (_) => HistoryPage(
+      (_) => featureEntrypoints.buildHistoryPage(
         comicDetailPageBuilder: buildComicDetailPage,
-        onFavoriteRequested: toggleFavoriteFromHomeHistory,
+        onFavoriteRequested: featureEntrypoints.onHistoryFavoriteRequested,
       ),
     );
   }
@@ -83,47 +80,39 @@ class HomeNavigationActions {
   Future<void> openCategories() async {
     await _openDrawerDestination(
       hideComicDetailPanel: true,
-      (_) => TagCategoryPage(
-        searchPageBuilder: (tag) => buildSearchPage(initialKeyword: tag),
+      (_) => featureEntrypoints.buildCategoriesPage(
+        searchPageBuilder: featureEntrypoints.buildSearchPage,
         comicDetailPageBuilder: buildComicDetailPage,
       ),
     );
   }
 
   Future<void> openRanking() async {
-    if (sl<SourceSettingsGateway>().isActiveCopyMangaSource) {
-      await _openDrawerDestination(
-        hideComicDetailPanel: true,
-        (_) => DiscoverSectionPage(
-          section: ExploreSection(
-            title: l10n(context).rankingTitle,
-            comics: const <ExploreComic>[],
-            viewMoreUrl: 'category:排行@ranking',
-          ),
-          comicDetailPageBuilder: buildComicDetailPage,
-        ),
-      );
-      return;
-    }
-
     await _openDrawerDestination(
       hideComicDetailPanel: true,
-      (_) => RankingPage(comicDetailPageBuilder: buildComicDetailPage),
+      (_) => featureEntrypoints.buildRankingPage(
+        useLegacyRankingSection: useLegacyRankingSection,
+        legacyRankingTitle: l10n(context).rankingTitle,
+        comicDetailPageBuilder: buildComicDetailPage,
+      ),
     );
   }
 
   Future<void> openDownloads() async {
     await _openDrawerDestination(
       hideComicDetailPanel: true,
-      (_) => DownloadsPage(readerPageBuilder: downloadsReaderPageBuilder),
+      (_) => featureEntrypoints.buildDownloadsPage(
+        readerPageBuilder: downloadsReaderPageBuilder,
+      ),
     );
   }
 
   Future<void> openDownloadsWithDefaultTransition() async {
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
-        builder: (_) =>
-            DownloadsPage(readerPageBuilder: downloadsReaderPageBuilder),
+        builder: (_) => featureEntrypoints.buildDownloadsPage(
+          readerPageBuilder: downloadsReaderPageBuilder,
+        ),
       ),
     );
   }
@@ -131,18 +120,11 @@ class HomeNavigationActions {
   Future<void> openSettings() async {
     await _openDrawerDestination(
       hideComicDetailPanel: true,
-      (_) => SettingsPage(
+      (_) => featureEntrypoints.buildSettingsPage(
         appearanceSettings: appearanceSettings,
         onAppearanceChanged: onAppearanceChanged,
         locale: locale,
         onLocaleChanged: onLocaleChanged,
-        cloudSyncPageBuilder: (_) => const CloudSyncPage(),
-        labSettingsPageBuilder: (_) => const LabSettingsPage(),
-        advancedSettingsPageBuilder: (_) => AdvancedSettingsPage(
-          logsPageBuilder: (_) => const LogsPage(),
-          comicSourceEditorPageBuilder: (_) => const ComicSourceEditorPage(),
-          restoreComicSource: showComicSourceRestoreDialog,
-        ),
       ),
     );
   }
@@ -150,7 +132,7 @@ class HomeNavigationActions {
   Future<void> openLines() async {
     await _openDrawerDestination(
       hideComicDetailPanel: true,
-      (_) => const LineSettingsPage(),
+      featureEntrypoints.buildLinesPage,
     );
   }
 

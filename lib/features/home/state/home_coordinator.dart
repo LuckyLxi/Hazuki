@@ -4,12 +4,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
-import 'package:hazuki/features/favorite/favorite.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/features/home/state/home_profile_controller.dart';
 import 'package:hazuki/features/home/support/home_profile_flow.dart';
 import 'package:hazuki/features/home/state/home_shell_controller.dart';
+import 'package:hazuki/shared/favorites/favorite_app_bar_actions_state.dart';
+import 'package:hazuki/shared/favorites/favorite_page_actions.dart';
 
 class HomeCoordinator extends ChangeNotifier {
   HomeCoordinator({

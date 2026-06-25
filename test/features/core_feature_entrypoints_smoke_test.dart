@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/app/app.dart';
+import 'package:hazuki/app/home/home_feature_entrypoints.dart';
+import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/features/comments/comments.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_page.dart';
 import 'package:hazuki/features/downloads/downloads.dart';
@@ -33,6 +35,8 @@ final ReaderCommentsWidgetBuilder _buildReaderComments =
 
 void main() {
   test('feature-first entry widgets are constructible from public paths', () {
+    registerServices();
+    final homeFeatureEntrypoints = buildHazukiHomeFeatureEntrypoints();
     final home = HazukiHomePage(
       initialTabIndex: 1,
       appearanceSettings: const AppearanceSettingsData(
@@ -47,6 +51,8 @@ void main() {
       onAppearanceChanged: (_, {revealOrigin}) async {},
       locale: const Locale('en'),
       onLocaleChanged: (_) async {},
+      featureEntrypoints: homeFeatureEntrypoints,
+      services: buildHazukiHomeServices(),
     );
     const comic = ExploreComic(
       id: 'comic-id',

@@ -8,6 +8,7 @@ import 'app/app_settings_store.dart';
 import 'app/app_startup_coordinator.dart';
 import 'app/appearance_settings.dart';
 import 'app/hazuki_app_controller.dart';
+import 'app/home/home_feature_entrypoints.dart';
 import 'app/service_locator.dart';
 import 'app/startup/app_bootstrap.dart';
 import 'app/theme/hazuki_theme_controller.dart';
@@ -20,13 +21,10 @@ import 'app/source_runtime/source_update_dialog_support.dart';
 import 'app/theme/theme_reveal_support.dart';
 import 'app/windows/windows_title_bar_controller.dart';
 import 'app/software_update/software_update_dialog_support.dart';
-import 'features/comic_detail/view/comic_detail_page.dart';
-import 'features/comments/comments.dart';
-import 'features/discover/view/discover_section_page.dart';
-import 'features/reader/view/reader_page.dart';
-import 'features/search/search.dart';
 import 'l10n/app_localizations.dart';
 import 'l10n/l10n.dart';
+import 'package:hazuki/features/home/home.dart'
+    show HomeFeatureEntrypoints, HomeServices;
 import 'package:hazuki/features/home/view/home_page.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'services/cloud_sync_service.dart';
@@ -34,7 +32,6 @@ import 'services/hazuki_source_service.dart';
 import 'services/manga_download/manga_download_service.dart';
 import 'services/password_lock_service.dart';
 import 'services/source/source_capabilities.dart';
-import 'shared/comments/comments_widget_builder.dart';
 import 'widgets/hazuki_prompt.dart';
 import 'widgets/source_image_gateway_scope.dart';
 import 'features/password_lock/view/password_lock_widgets.dart';
@@ -85,6 +82,8 @@ class _HazukiAppState extends State<HazukiApp>
   late final HazukiThemeRevealSupport _themeRevealSupport;
   late final HazukiAppStartupCoordinator _startupCoordinator;
   late final HazukiLaunchShortcutCoordinator _launchShortcutCoordinator;
+  late final HomeFeatureEntrypoints _homeFeatureEntrypoints;
+  late final HomeServices _homeServices;
   late final Listenable _appListenable;
   late Locale? _locale;
 
@@ -117,6 +116,8 @@ class _HazukiAppState extends State<HazukiApp>
       softwareUpdateDialogSupport: _softwareUpdateDialogSupport,
       isMounted: () => mounted,
     );
+    _homeFeatureEntrypoints = buildHazukiHomeFeatureEntrypoints();
+    _homeServices = buildHazukiHomeServices();
     _launchShortcutCoordinator = HazukiLaunchShortcutCoordinator(
       navigatorKey: _navigatorKey,
       actionSource: HazukiLaunchShortcutBridge(),
@@ -204,77 +205,8 @@ class _HazukiAppState extends State<HazukiApp>
     };
   }
 
-  static Widget _buildCommentsPage({
-    required String comicId,
-    String? subId,
-    required String sourceKey,
-    ScrollController? scrollController,
-    Future<void> Function()? onRequestTabFullscreen,
-    bool showAppBar = false,
-    bool isTabView = false,
-    bool isActiveInTabView = true,
-    Map<String, Object?> Function()? debugOuterScrollStateBuilder,
-  }) => CommentsPage(
-    comicId: comicId,
-    subId: subId,
-    sourceKey: sourceKey,
-    showAppBar: showAppBar,
-    isTabView: isTabView,
-    isActiveInTabView: isActiveInTabView,
-    scrollController: scrollController,
-    onRequestTabFullscreen: onRequestTabFullscreen,
-    debugOuterScrollStateBuilder: debugOuterScrollStateBuilder,
-  );
-
-  static final ReaderCommentsWidgetBuilder _buildReaderCommentsPage =
-      readerCommentsWidgetBuilderFrom(_buildCommentsPage);
-
   Widget _buildRootComicDetailPage(ExploreComic comic, String heroTag) {
-    return ComicDetailPage(
-      comic: comic,
-      heroTag: heroTag,
-      readerWidgetBuilder:
-          ({
-            required title,
-            required chapterTitle,
-            required comicId,
-            required epId,
-            required chapterIndex,
-            required images,
-            required sourceKey,
-            comicTheme,
-            onFavoriteRequested,
-          }) => ReaderPage(
-            title: title,
-            chapterTitle: chapterTitle,
-            comicId: comicId,
-            epId: epId,
-            chapterIndex: chapterIndex,
-            images: images,
-            sourceKey: sourceKey,
-            comicTheme: comicTheme,
-            onFavoriteRequested: onFavoriteRequested,
-            commentsWidgetBuilder: _buildReaderCommentsPage,
-          ),
-      searchPageBuilder: (initialKeyword) => SearchPage(
-        initialKeyword: initialKeyword,
-        comicDetailPageBuilder: _buildRootComicDetailPage,
-      ),
-      commentsWidgetBuilder: _buildCommentsPage,
-      categoryPageBuilder:
-          ({
-            required title,
-            required viewMoreUrl,
-            required comicDetailPageBuilder,
-          }) => DiscoverSectionPage(
-            section: ExploreSection(
-              title: title,
-              comics: const <ExploreComic>[],
-              viewMoreUrl: viewMoreUrl,
-            ),
-            comicDetailPageBuilder: comicDetailPageBuilder,
-          ),
-    );
+    return _homeFeatureEntrypoints.buildComicDetailPage(comic, heroTag);
   }
 
   Future<void> _handleLaunchShortcutAction(
@@ -284,8 +216,10 @@ class _HazukiAppState extends State<HazukiApp>
       case HazukiLaunchShortcutAction.search:
         await _navigatorKey.currentState?.push<void>(
           MaterialPageRoute<void>(
-            builder: (_) =>
-                SearchPage(comicDetailPageBuilder: _buildRootComicDetailPage),
+            builder: (_) => _homeFeatureEntrypoints.buildSearchPage(
+              comicDetailPageBuilder: _buildRootComicDetailPage,
+              autoFocusOnOpen: true,
+            ),
           ),
         );
     }
@@ -444,6 +378,8 @@ class _HazukiAppState extends State<HazukiApp>
                 onAppearanceChanged: _updateAppearance,
                 locale: _locale,
                 onLocaleChanged: _updateLocalePreference,
+                featureEntrypoints: _homeFeatureEntrypoints,
+                services: _homeServices,
                 allowDiscoverInitialLoad:
                     _startupCoordinator.allowDiscoverInitialLoad,
                 hideDiscoverLoadingUntilAllowed:

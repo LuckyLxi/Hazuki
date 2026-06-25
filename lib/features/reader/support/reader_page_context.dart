@@ -1,20 +1,9 @@
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/features/reader/support/reader_callbacks.dart';
+import 'package:hazuki/shared/reading/reader_offline_chapter_data.dart';
 
-class ReaderOfflineChapterData {
-  const ReaderOfflineChapterData({
-    required this.epId,
-    required this.title,
-    required this.index,
-    required this.images,
-  });
-
-  final String epId;
-  final String title;
-  final int index;
-  final List<String> images;
-}
+export 'package:hazuki/shared/reading/reader_offline_chapter_data.dart';
 
 class ReaderPageContext {
   const ReaderPageContext({

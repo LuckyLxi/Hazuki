@@ -173,6 +173,31 @@ void main() {
     },
   );
 
+  test('home feature receives sibling features through app entrypoints', () {
+    final violations = <String>[];
+    final featureImportPattern = RegExp(r'package:hazuki/features/([^/]+)/');
+
+    for (final file in _dartFilesUnder('lib/features/home')) {
+      final content = file.readAsStringSync();
+      for (final match in featureImportPattern.allMatches(content)) {
+        final feature = match.group(1)!;
+        if (feature != 'home') {
+          violations.add('${file.path}: features/$feature');
+        }
+      }
+      if (content.contains('app/service_locator.dart') ||
+          RegExp(r'\bsl<').hasMatch(content)) {
+        violations.add('${file.path}: service locator');
+      }
+    }
+
+    expect(
+      violations,
+      isEmpty,
+      reason: 'Inject home feature entrypoints/services: $violations',
+    );
+  });
+
   test(
     'services do not resolve dependencies through the app service locator',
     () {

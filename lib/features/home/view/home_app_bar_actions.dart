@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'package:hazuki/features/favorite/favorite.dart';
+import 'package:hazuki/shared/favorites/favorite_app_bar_actions_state.dart';
 
 import 'favorite_app_bar_actions.dart';
 
