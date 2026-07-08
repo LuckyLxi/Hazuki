@@ -786,6 +786,44 @@ void main() {
     );
   });
 
+  testWidgets('category dialog keeps default group fixed while sorting', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _wrapTab(groups: const [_defaultGroup, _firstGroup, _secondGroup]),
+    );
+
+    await tester.tap(
+      find.byKey(const ValueKey<String>('downloads_category_launcher')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey<String>('downloads_group_sort_start')),
+    );
+    await tester.pumpAndSettle();
+
+    final defaultGroupBackground = find.byKey(
+      const ValueKey<String>(
+        'download_group_background_${DownloadGroupsService.defaultGroupId}',
+      ),
+    );
+    final defaultTopBefore = tester.getTopLeft(defaultGroupBackground).dy;
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byType(ReorderableDragStartListener).first),
+    );
+    await tester.pump();
+    await gesture.moveBy(const Offset(0, -80));
+    await tester.pump();
+
+    expect(
+      tester.getTopLeft(defaultGroupBackground).dy,
+      closeTo(defaultTopBefore, 0.1),
+    );
+
+    await gesture.up();
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('category dialog opens around the selected group', (
     tester,
   ) async {

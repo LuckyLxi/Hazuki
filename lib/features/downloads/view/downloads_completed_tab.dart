@@ -771,11 +771,20 @@ class _DownloadsCategoryShellDialogState
   }
 
   void _reorder(int oldIndex, int newIndex) {
-    if (oldIndex == 0) return;
-    newIndex = newIndex.clamp(1, _groups.length - 1);
     setState(() {
-      final group = _groups.removeAt(oldIndex);
-      _groups.insert(newIndex, group);
+      final defaultGroups = [
+        for (final group in _groups)
+          if (group.isDefault) group,
+      ];
+      final movableGroups = [
+        for (final group in _groups)
+          if (!group.isDefault) group,
+      ];
+      if (oldIndex < 0 || oldIndex >= movableGroups.length) return;
+      final group = movableGroups.removeAt(oldIndex);
+      final insertIndex = newIndex.clamp(0, movableGroups.length);
+      movableGroups.insert(insertIndex, group);
+      _groups = [...defaultGroups, ...movableGroups];
     });
   }
 
@@ -923,7 +932,13 @@ class _DownloadsCategoryShellContentsState
     final selectedIndex = widget.groups.indexWhere(
       (group) => group.id == widget.selectedGroupId,
     );
-    if (selectedIndex <= 0) {
+    if (selectedIndex < 0) {
+      _positionedSelectedGroup = true;
+      return;
+    }
+    final selectedGroup = widget.groups[selectedIndex];
+    if (selectedGroup.isDefault) {
+      _scrollController.jumpTo(0);
       _positionedSelectedGroup = true;
       return;
     }
@@ -934,18 +949,176 @@ class _DownloadsCategoryShellContentsState
       });
       return;
     }
+    final hasDefaultGroup = widget.groups.any((group) => group.isDefault);
+    final nonDefaultIndex = widget.groups
+        .where((group) => !group.isDefault)
+        .toList(growable: false)
+        .indexWhere((group) => group.id == widget.selectedGroupId);
+    if (nonDefaultIndex < 0) {
+      _positionedSelectedGroup = true;
+      return;
+    }
     final viewport = position.viewportDimension;
     final target =
-        selectedIndex * _DownloadsCategoryShellContents._groupTileExtent -
+        (hasDefaultGroup
+            ? _DownloadsCategoryShellContents._groupTileExtent
+            : 0) +
+        nonDefaultIndex * _DownloadsCategoryShellContents._groupTileExtent -
         (viewport - _DownloadsCategoryShellContents._groupTileExtent) / 2;
     _scrollController.jumpTo(target.clamp(0, position.maxScrollExtent));
     _positionedSelectedGroup = true;
+  }
+
+  Widget _buildReorderProxy(
+    Widget child,
+    int index,
+    Animation<double> animation,
+  ) {
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (context, child) {
+        final progress = Curves.easeInOut.transform(animation.value);
+        final colorScheme = Theme.of(context).colorScheme;
+        return Material(
+          color: Colors.transparent,
+          elevation: 6 * progress,
+          shadowColor: colorScheme.shadow.withValues(alpha: 0.18),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: child,
+        );
+      },
+      child: child,
+    );
+  }
+
+  Widget _buildGroupTile(
+    BuildContext context, {
+    required DownloadGroup group,
+    required bool selected,
+    int? reorderIndex,
+  }) {
+    final strings = l10n(context);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final canReorder = reorderIndex != null && !group.isDefault;
+    final tile = Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: AnimatedContainer(
+        key: ValueKey<String>('download_group_background_${group.id}'),
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        decoration: BoxDecoration(
+          color: selected
+              ? colorScheme.secondaryContainer
+              : colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: selected
+                ? colorScheme.primary.withValues(alpha: 0.28)
+                : colorScheme.outlineVariant.withValues(alpha: 0.36),
+          ),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: widget.sorting ? null : () => widget.onSelectGroup(group.id),
+            onLongPress: widget.sorting || group.isDefault
+                ? null
+                : () => widget.onRenameGroup(group),
+            child: SizedBox(
+              height: 52,
+              child: Row(
+                children: [
+                  const SizedBox(width: 12),
+                  Icon(
+                    selected
+                        ? Icons.folder_open_rounded
+                        : Icons.folder_outlined,
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Text(
+                      group.isDefault
+                          ? '${strings.downloadsDefaultGroup} (${widget.groupComicCounts[group.id] ?? 0})'
+                          : '${group.name} (${widget.groupComicCounts[group.id] ?? 0})',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  SizedBox(
+                    width: group.isDefault ? 12 : 54,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        if (!group.isDefault && !widget.sorting)
+                          IconButton(
+                            tooltip: strings.comicDetailDelete,
+                            onPressed: () => widget.onDeleteGroup(group),
+                            icon: const Icon(Icons.delete_outline),
+                          ),
+                        if (canReorder && widget.sorting)
+                          ReorderableDragStartListener(
+                            index: reorderIndex,
+                            child: Tooltip(
+                              message: strings.downloadsReorderGroup,
+                              child: const Padding(
+                                padding: EdgeInsets.all(12),
+                                child: Icon(Icons.drag_handle_rounded),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    if (widget.sorting) {
+      return KeyedSubtree(
+        key: ValueKey<String>('download_group_${group.id}'),
+        child: tile,
+      );
+    }
+    return TweenAnimationBuilder<double>(
+      key: ValueKey<String>('download_group_${group.id}'),
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) => Opacity(
+        opacity: value,
+        child: Transform.translate(
+          offset: Offset(0, 10 * (1 - value)),
+          child: child,
+        ),
+      ),
+      child: tile,
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final strings = l10n(context);
     final theme = Theme.of(context);
+    DownloadGroup? defaultGroup;
+    for (final group in widget.groups) {
+      if (group.isDefault) {
+        defaultGroup = group;
+        break;
+      }
+    }
+    final sortableGroups = [
+      for (final group in widget.groups)
+        if (!group.isDefault) group,
+    ];
     return SizedBox(
       height: DownloadsCategoryShellDialog._dialogHeight,
       child: Padding(
@@ -998,107 +1171,25 @@ class _DownloadsCategoryShellContentsState
                 scrollController: _scrollController,
                 itemExtent: _DownloadsCategoryShellContents._groupTileExtent,
                 padding: EdgeInsets.zero,
-                itemCount: widget.groups.length,
+                header: defaultGroup == null
+                    ? null
+                    : _buildGroupTile(
+                        context,
+                        group: defaultGroup,
+                        selected: defaultGroup.id == widget.selectedGroupId,
+                      ),
+                itemCount: sortableGroups.length,
                 onReorderItem: widget.onReorder,
+                proxyDecorator: _buildReorderProxy,
                 buildDefaultDragHandles: false,
                 itemBuilder: (context, index) {
-                  final group = widget.groups[index];
+                  final group = sortableGroups[index];
                   final selected = group.id == widget.selectedGroupId;
-                  return TweenAnimationBuilder<double>(
-                    key: ValueKey<String>('download_group_${group.id}'),
-                    tween: Tween(begin: 0, end: 1),
-                    duration: const Duration(milliseconds: 280),
-                    curve: Curves.easeOutCubic,
-                    builder: (context, value, child) => Opacity(
-                      opacity: value,
-                      child: Transform.translate(
-                        offset: Offset(0, 10 * (1 - value)),
-                        child: child,
-                      ),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
-                      child: AnimatedContainer(
-                        key: ValueKey<String>(
-                          'download_group_background_${group.id}',
-                        ),
-                        duration: const Duration(milliseconds: 180),
-                        curve: Curves.easeOutCubic,
-                        decoration: BoxDecoration(
-                          color: selected
-                              ? theme.colorScheme.secondaryContainer
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Material(
-                          color: Colors.transparent,
-                          borderRadius: BorderRadius.circular(16),
-                          clipBehavior: Clip.antiAlias,
-                          child: InkWell(
-                            onTap: widget.sorting
-                                ? null
-                                : () => widget.onSelectGroup(group.id),
-                            onLongPress: widget.sorting || group.isDefault
-                                ? null
-                                : () => widget.onRenameGroup(group),
-                            child: SizedBox(
-                              height: 52,
-                              child: Row(
-                                children: [
-                                  const SizedBox(width: 12),
-                                  Icon(
-                                    selected
-                                        ? Icons.folder_open_rounded
-                                        : Icons.folder_outlined,
-                                  ),
-                                  const SizedBox(width: 16),
-                                  Expanded(
-                                    child: Text(
-                                      group.isDefault
-                                          ? '${strings.downloadsDefaultGroup} (${widget.groupComicCounts[group.id] ?? 0})'
-                                          : '${group.name} (${widget.groupComicCounts[group.id] ?? 0})',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                  SizedBox(
-                                    width: group.isDefault ? 12 : 54,
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.end,
-                                      children: [
-                                        if (!group.isDefault && !widget.sorting)
-                                          IconButton(
-                                            tooltip: strings.comicDetailDelete,
-                                            onPressed: () =>
-                                                widget.onDeleteGroup(group),
-                                            icon: const Icon(
-                                              Icons.delete_outline,
-                                            ),
-                                          ),
-                                        if (!group.isDefault && widget.sorting)
-                                          ReorderableDragStartListener(
-                                            index: index,
-                                            child: Tooltip(
-                                              message:
-                                                  strings.downloadsReorderGroup,
-                                              child: const Padding(
-                                                padding: EdgeInsets.all(12),
-                                                child: Icon(
-                                                  Icons.drag_handle_rounded,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
+                  return _buildGroupTile(
+                    context,
+                    group: group,
+                    selected: selected,
+                    reorderIndex: index,
                   );
                 },
               ),
