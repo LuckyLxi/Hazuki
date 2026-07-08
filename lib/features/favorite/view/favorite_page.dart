@@ -10,6 +10,7 @@ import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/local_favorites/local_favorites_contracts.dart';
 import 'package:hazuki/services/local_favorites/local_favorites_preferences_store.dart';
+import 'package:hazuki/shared/comic_cover_prefetcher.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:hazuki/widgets/windows_comic_detail_host.dart';
 import 'favorite_page_content.dart';
@@ -48,6 +49,7 @@ class FavoritePageState extends State<FavoritePage>
   bool get wantKeepAlive => true;
 
   late final FavoritePageController _controller;
+  late final ComicCoverPrefetcher _coverPrefetcher;
   final ScrollController _scrollController = ScrollController();
   bool _showBackToTop = false;
   FavoriteAppBarActionsState? _lastReportedAppBarActionsState;
@@ -63,6 +65,9 @@ class FavoritePageState extends State<FavoritePage>
       sourceService: sl<SourceFavoriteGateway>(),
       localFavoritesRepository: sl<LocalFavoritesRepository>(),
       localFavoritesPreferences: sl<LocalFavoritesPreferencesStore>(),
+    );
+    _coverPrefetcher = ComicCoverPrefetcher(
+      imageGateway: sl<SourceImageGateway>(),
     );
     _controller.addListener(_handleControllerChanged);
     _scrollController.addListener(_onScroll);
@@ -124,6 +129,7 @@ class FavoritePageState extends State<FavoritePage>
     );
     _controller.removeListener(_handleControllerChanged);
     _controller.dispose();
+    _coverPrefetcher.dispose();
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     super.dispose();
@@ -193,6 +199,7 @@ class FavoritePageState extends State<FavoritePage>
     }
     _notifyAppBarActions();
     _syncEntryAnimationTargets();
+    _scheduleCoverPrefetch();
   }
 
   void _notifyAppBarActions() {
@@ -218,6 +225,7 @@ class FavoritePageState extends State<FavoritePage>
     if (position.pixels >= position.maxScrollExtent - 240) {
       unawaited(_handleLoadMore());
     }
+    _prefetchVisibleCovers();
   }
 
   Future<void> _deleteCurrentFolder() async {
@@ -380,6 +388,29 @@ class FavoritePageState extends State<FavoritePage>
         _strings(context).favoriteFoldersLoadFailed(rawError),
         isError: true,
       ),
+    );
+  }
+
+  void _scheduleCoverPrefetch() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      _prefetchVisibleCovers();
+    });
+  }
+
+  void _prefetchVisibleCovers() {
+    if (_controller.mode != FavoritePageMode.local) {
+      return;
+    }
+    _coverPrefetcher.prefetchAroundScroll(
+      comics: _controller.comics,
+      scrollController: _scrollController,
+      estimatedItemExtent: 122,
+      extraBefore: 6,
+      extraAfter: 30,
+      maxRequests: 30,
     );
   }
 
