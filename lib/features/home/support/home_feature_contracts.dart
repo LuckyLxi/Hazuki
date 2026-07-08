@@ -60,6 +60,7 @@ typedef HomeReaderPageBuilder =
       required int chapterIndex,
       required List<String> images,
       required String sourceKey,
+      String coverUrl,
       ThemeData? comicTheme,
       Future<void> Function(BuildContext context)? onFavoriteRequested,
       bool offlineMode,

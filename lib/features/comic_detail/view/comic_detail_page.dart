@@ -183,6 +183,9 @@ class _ComicDetailPageState extends State<ComicDetailPage>
             chapterIndex: chapterIndex,
             images: const [],
             sourceKey: details.sourceKey,
+            coverUrl: details.cover.trim().isNotEmpty
+                ? details.cover
+                : widget.comic.cover,
             comicTheme: comicTheme,
             onFavoriteRequested: (ctx) => _favoriteController.showFoldersDialog(
               ctx,

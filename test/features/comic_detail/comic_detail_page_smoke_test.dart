@@ -61,6 +61,7 @@ void main() {
                 required chapterIndex,
                 required images,
                 required sourceKey,
+                coverUrl = '',
                 comicTheme,
                 onFavoriteRequested,
               }) => ReaderPage(
@@ -71,6 +72,7 @@ void main() {
                 chapterIndex: chapterIndex,
                 images: images,
                 sourceKey: sourceKey,
+                coverUrl: coverUrl,
                 commentsWidgetBuilder: _buildReaderComments,
               ),
           searchPageBuilder: (_) => const SizedBox.shrink(),
@@ -115,6 +117,7 @@ void main() {
                 required chapterIndex,
                 required images,
                 required sourceKey,
+                coverUrl = '',
                 comicTheme,
                 onFavoriteRequested,
               }) => ReaderPage(
@@ -125,6 +128,7 @@ void main() {
                 chapterIndex: chapterIndex,
                 images: images,
                 sourceKey: sourceKey,
+                coverUrl: coverUrl,
                 commentsWidgetBuilder: _buildReaderComments,
               ),
           searchPageBuilder: (_) => const SizedBox.shrink(),

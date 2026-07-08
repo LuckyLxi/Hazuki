@@ -15,6 +15,7 @@ class ReaderPageContext {
     required this.images,
     required this.commentsWidgetBuilder,
     this.sourceKey = '',
+    this.coverUrl = '',
     this.comicTheme,
     this.onFavoriteRequested,
     this.offlineMode = false,
@@ -28,6 +29,7 @@ class ReaderPageContext {
   final int chapterIndex;
   final List<String> images;
   final String sourceKey;
+  final String coverUrl;
   final ThemeData? comicTheme;
   final Future<void> Function(BuildContext)? onFavoriteRequested;
   final ReaderCommentsWidgetBuilder commentsWidgetBuilder;
@@ -57,6 +59,7 @@ class ReaderPageContext {
           ? images
           : (offlineChapter?.images ?? const <String>[]),
       sourceKey: sourceKey,
+      coverUrl: coverUrl,
       comicTheme: comicTheme,
       onFavoriteRequested: onFavoriteRequested,
       commentsWidgetBuilder: commentsWidgetBuilder,

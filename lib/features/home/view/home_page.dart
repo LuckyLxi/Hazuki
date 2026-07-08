@@ -161,6 +161,7 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
                 chapterIndex: chapter.index,
                 images: chapter.imagePaths,
                 sourceKey: comic.sourceKey,
+                coverUrl: comic.coverUrl,
                 offlineMode: true,
                 offlineChapters: [
                   for (final downloadedChapter in comic.chapters)

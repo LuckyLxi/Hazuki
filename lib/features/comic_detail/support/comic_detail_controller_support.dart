@@ -48,6 +48,7 @@ typedef ReaderWidgetBuilder =
       required int chapterIndex,
       required List<String> images,
       required String sourceKey,
+      String coverUrl,
       ThemeData? comicTheme,
       Future<void> Function(BuildContext)? onFavoriteRequested,
     });

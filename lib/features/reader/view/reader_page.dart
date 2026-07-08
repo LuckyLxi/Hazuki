@@ -26,6 +26,7 @@ import 'package:hazuki/features/reader/view/reader_overlay_builders.dart';
 import 'package:hazuki/features/reader/view/reader_overlay_host.dart';
 import 'package:hazuki/features/reader/view/reader_state_views.dart';
 import 'package:hazuki/l10n/l10n.dart';
+import 'package:hazuki/services/manga_download/manga_download_service.dart';
 import 'package:hazuki/services/reading_progress_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/shared/ui_flags.dart';
@@ -41,6 +42,7 @@ class ReaderPage extends StatefulWidget {
     required this.images,
     required this.commentsWidgetBuilder,
     this.sourceKey = '',
+    this.coverUrl = '',
     this.comicTheme,
     this.onFavoriteRequested,
     this.offlineMode = false,
@@ -54,6 +56,7 @@ class ReaderPage extends StatefulWidget {
   final int chapterIndex;
   final List<String> images;
   final String sourceKey;
+  final String coverUrl;
   final ThemeData? comicTheme;
   final Future<void> Function(BuildContext)? onFavoriteRequested;
   final ReaderCommentsWidgetBuilder commentsWidgetBuilder;
@@ -90,6 +93,7 @@ class _ReaderPageState extends State<ReaderPage>
     chapterIndex: widget.chapterIndex,
     images: widget.images,
     sourceKey: widget.sourceKey,
+    coverUrl: widget.coverUrl,
     comicTheme: widget.comicTheme,
     onFavoriteRequested: widget.onFavoriteRequested,
     commentsWidgetBuilder: widget.commentsWidgetBuilder,
@@ -200,6 +204,7 @@ class _ReaderPageState extends State<ReaderPage>
         sessionController: _sessionController,
         pageContext: _pageContext,
         buildReplacementPage: _buildReaderPageFromContext,
+        downloader: sl<MangaDownloadService>(),
       );
   late final ReaderSaveImageController _saveImageController =
       ReaderSaveImageController(
@@ -428,6 +433,7 @@ class _ReaderPageState extends State<ReaderPage>
       chapterIndex: pageContext.chapterIndex,
       images: pageContext.images,
       sourceKey: pageContext.sourceKey,
+      coverUrl: pageContext.coverUrl,
       comicTheme: pageContext.comicTheme,
       onFavoriteRequested: pageContext.onFavoriteRequested,
       commentsWidgetBuilder: pageContext.commentsWidgetBuilder,
