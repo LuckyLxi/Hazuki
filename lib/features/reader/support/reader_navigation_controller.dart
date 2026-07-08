@@ -151,6 +151,17 @@ class ReaderNavigationController {
     }
 
     normalizedIndex = _runtimeState.normalizeSpreadIndex(normalizedIndex);
+    final activeProgrammaticTarget =
+        _diagnosticsState.activeProgrammaticListTargetIndex;
+    if (activeProgrammaticTarget != null) {
+      final target = _runtimeState.normalizeSpreadIndex(
+        activeProgrammaticTarget,
+      );
+      _runtimeState.currentPageIndex = target;
+      _runtimeState.setDisplayedPageIndex(target);
+      _diagnosticsState.lastObservedListPixels = currentPixels;
+      return;
+    }
     if (_runtimeState.currentPageIndex != normalizedIndex) {
       _runtimeState.currentPageIndex = normalizedIndex;
       _logVisiblePageChange(index: normalizedIndex, trigger: 'scroll');
@@ -275,10 +286,15 @@ class ReaderNavigationController {
         'targetPage': target + 1,
       }),
     );
+    final previousIndex = _runtimeState.currentPageIndex;
+    _runtimeState.currentPageIndex = target;
     _runtimeState.setDisplayedPageIndex(target);
+    if (!_noImageModeEnabled()) {
+      _prefetchAround(target);
+      _requestPrefetchAhead(target);
+    }
     if (_runtimeState.readerMode == ReaderMode.rightToLeft) {
-      if (!_pageController.hasClients ||
-          target == _runtimeState.currentPageIndex) {
+      if (!_pageController.hasClients || target == previousIndex) {
         return;
       }
       _resetZoomImmediately(reason: 'page_navigation_request');

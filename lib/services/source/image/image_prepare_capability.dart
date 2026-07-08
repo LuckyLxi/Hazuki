@@ -28,6 +28,7 @@ extension HazukiSourceServiceImagePrepareCapability on HazukiSourceService {
     required String comicId,
     required String epId,
     bool useDiskCache = true,
+    bool priority = false,
     String sourceKey = '',
   }) async {
     final rawBytes = await downloadImageBytes(
@@ -36,6 +37,7 @@ extension HazukiSourceServiceImagePrepareCapability on HazukiSourceService {
       epId: epId,
       keepInMemory: false,
       useDiskCache: useDiskCache,
+      priority: priority,
       sourceKey: sourceKey,
     );
     final declaredSegments = await _resolveSourceDeclaredImageSegments(

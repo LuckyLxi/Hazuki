@@ -102,6 +102,7 @@ void main() {
       'epId': 'chapter',
       'keepInMemory': true,
       'useDiskCache': false,
+      'priority': false,
       'sourceKey': 'picacg',
     });
   });
@@ -137,6 +138,7 @@ class _RecordingSource extends HazukiSourceService {
     String? epId,
     bool keepInMemory = false,
     bool useDiskCache = true,
+    bool priority = false,
     String sourceKey = '',
   }) async {
     imageArguments = {
@@ -145,6 +147,7 @@ class _RecordingSource extends HazukiSourceService {
       'epId': epId,
       'keepInMemory': keepInMemory,
       'useDiskCache': useDiskCache,
+      'priority': priority,
       'sourceKey': sourceKey,
     };
     return Uint8List.fromList([1, 2, 3]);

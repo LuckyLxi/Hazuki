@@ -13,6 +13,7 @@ abstract interface class SourceImageGateway {
     String epId = '',
     bool keepInMemory = false,
     bool useDiskCache = true,
+    bool priority = false,
     String sourceKey = '',
   });
 }

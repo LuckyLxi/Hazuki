@@ -12,6 +12,7 @@ class ReaderRuntimeState {
   bool sliderDragging = false;
   double sliderDragValue = 0;
   int? lastSliderHapticPageIndex;
+  DateTime? lastSliderHapticAt;
   List<String> images = const <String>[];
   bool loadingImages = true;
   String? loadImagesError;
@@ -65,6 +66,7 @@ class ReaderRuntimeState {
     sliderDragging = false;
     sliderDragValue = 0;
     lastSliderHapticPageIndex = null;
+    lastSliderHapticAt = null;
     rebuildSpreadItemKeys();
     setDisplayedPageIndex(0);
   }

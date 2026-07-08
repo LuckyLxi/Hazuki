@@ -18,7 +18,8 @@ class ImageCacheCapability {
 
   static const int _maxConcurrent = 4;
   int _activeCount = 0;
-  final Queue<Completer<void>> _waiters = Queue<Completer<void>>();
+  final Queue<_ImageDownloadSlotWaiter> _waiters =
+      Queue<_ImageDownloadSlotWaiter>();
   Future<void>? _enforcePolicyInFlight;
 
   // ---------- Cache size config ----------
@@ -150,6 +151,7 @@ class ImageCacheCapability {
     String? epId,
     bool keepInMemory = true,
     bool useDiskCache = true,
+    bool priority = false,
     String sourceKey = '',
   }) async {
     final normalizedUrl = url.trim();
@@ -186,6 +188,9 @@ class ImageCacheCapability {
     final inFlightMap = _facade.cache.imageDownloadInFlight;
     final inFlight = inFlightMap[cacheKey];
     if (inFlight != null) {
+      if (priority) {
+        _promoteWaitingDownload(cacheKey);
+      }
       final bytes = await inFlight;
       if (keepInMemory) {
         _putInMemoryCache(cacheKey, bytes);
@@ -194,7 +199,7 @@ class ImageCacheCapability {
     }
 
     final future = () async {
-      await _acquireSlot();
+      await _acquireSlot(cacheKey, priority: priority);
       try {
         return await _downloadFromNetwork(
           normalizedUrl,
@@ -267,26 +272,46 @@ class ImageCacheCapability {
     return Uint8List.fromList(data);
   }
 
-  Future<void> _acquireSlot() async {
+  Future<void> _acquireSlot(String cacheKey, {required bool priority}) async {
     if (_activeCount < _maxConcurrent) {
       _activeCount++;
       return;
     }
-    final completer = Completer<void>();
-    _waiters.addLast(completer);
-    await completer.future;
+    final waiter = _ImageDownloadSlotWaiter(cacheKey);
+    if (priority) {
+      _waiters.addFirst(waiter);
+    } else {
+      _waiters.addLast(waiter);
+    }
+    await waiter.completer.future;
   }
 
   void _releaseSlot() {
     if (_waiters.isNotEmpty) {
       final next = _waiters.removeFirst();
-      if (!next.isCompleted) {
-        next.complete();
+      if (!next.completer.isCompleted) {
+        next.completer.complete();
       }
       return;
     }
     if (_activeCount > 0) {
       _activeCount--;
+    }
+  }
+
+  void _promoteWaitingDownload(String cacheKey) {
+    _ImageDownloadSlotWaiter? pending;
+    for (final waiter in _waiters) {
+      if (waiter.cacheKey == cacheKey) {
+        pending = waiter;
+        break;
+      }
+    }
+    if (pending == null || pending.completer.isCompleted) {
+      return;
+    }
+    if (_waiters.remove(pending)) {
+      _waiters.addFirst(pending);
     }
   }
 
@@ -555,4 +580,11 @@ class ImageCacheCapability {
       }
     }
   }
+}
+
+class _ImageDownloadSlotWaiter {
+  _ImageDownloadSlotWaiter(this.cacheKey);
+
+  final String cacheKey;
+  final Completer<void> completer = Completer<void>();
 }

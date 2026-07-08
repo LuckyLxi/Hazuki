@@ -390,6 +390,7 @@ class HazukiSourceService extends ChangeNotifier {
     String? epId,
     bool keepInMemory = true,
     bool useDiskCache = true,
+    bool priority = false,
     String sourceKey = '',
   }) => _imageCacheForSourceRequest(sourceKey).downloadImageBytes(
     url,
@@ -397,6 +398,7 @@ class HazukiSourceService extends ChangeNotifier {
     epId: epId,
     keepInMemory: keepInMemory,
     useDiskCache: useDiskCache,
+    priority: priority,
     sourceKey: sourceKey,
   );
 

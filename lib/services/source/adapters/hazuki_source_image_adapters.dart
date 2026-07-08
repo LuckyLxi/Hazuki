@@ -21,6 +21,7 @@ class HazukiSourceImageAdapter extends HazukiSourceAdapterBase
     String epId = '',
     bool keepInMemory = false,
     bool useDiskCache = true,
+    bool priority = false,
     String sourceKey = '',
   }) => source.downloadImageBytes(
     url,
@@ -28,6 +29,7 @@ class HazukiSourceImageAdapter extends HazukiSourceAdapterBase
     epId: epId,
     keepInMemory: keepInMemory,
     useDiskCache: useDiskCache,
+    priority: priority,
     sourceKey: sourceKey,
   );
 }
@@ -115,6 +117,7 @@ class HazukiSourceDailyRecommendationAdapter
     String epId = '',
     bool keepInMemory = false,
     bool useDiskCache = true,
+    bool priority = false,
     String sourceKey = '',
   }) => source.downloadImageBytes(
     url,
@@ -122,6 +125,7 @@ class HazukiSourceDailyRecommendationAdapter
     epId: epId,
     keepInMemory: keepInMemory,
     useDiskCache: useDiskCache,
+    priority: priority,
     sourceKey: sourceKey,
   );
 }

@@ -241,6 +241,7 @@ class HazukiSourceComicDetailAdapter extends HazukiSourceAdapterBase
     String epId = '',
     bool keepInMemory = false,
     bool useDiskCache = true,
+    bool priority = false,
     String sourceKey = '',
   }) => source.downloadImageBytes(
     url,
@@ -248,6 +249,7 @@ class HazukiSourceComicDetailAdapter extends HazukiSourceAdapterBase
     epId: epId,
     keepInMemory: keepInMemory,
     useDiskCache: useDiskCache,
+    priority: priority,
     sourceKey: sourceKey,
   );
   @override
@@ -408,12 +410,14 @@ class HazukiSourceReaderAdapter extends HazukiSourceAdapterBase
     required String comicId,
     required String epId,
     bool useDiskCache = true,
+    bool priority = false,
     String sourceKey = '',
   }) => source.prepareChapterImageData(
     imageUrl,
     comicId: comicId,
     epId: epId,
     useDiskCache: useDiskCache,
+    priority: priority,
     sourceKey: sourceKey,
   );
   @override
@@ -423,6 +427,7 @@ class HazukiSourceReaderAdapter extends HazukiSourceAdapterBase
     String epId = '',
     bool keepInMemory = false,
     bool useDiskCache = true,
+    bool priority = false,
     String sourceKey = '',
   }) => source.downloadImageBytes(
     url,
@@ -430,6 +435,7 @@ class HazukiSourceReaderAdapter extends HazukiSourceAdapterBase
     epId: epId,
     keepInMemory: keepInMemory,
     useDiskCache: useDiskCache,
+    priority: priority,
     sourceKey: sourceKey,
   );
   @override

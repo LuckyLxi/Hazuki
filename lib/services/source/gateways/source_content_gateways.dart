@@ -120,6 +120,7 @@ abstract interface class SourceComicDetailGateway {
     String epId = '',
     bool keepInMemory = false,
     bool useDiskCache = true,
+    bool priority = false,
     String sourceKey = '',
   });
   Future<List<String>> loadChapterImages({
@@ -206,6 +207,7 @@ abstract interface class SourceReaderGateway {
     required String comicId,
     required String epId,
     bool useDiskCache = true,
+    bool priority = false,
     String sourceKey = '',
   });
   Future<Uint8List> downloadImageBytes(
@@ -214,6 +216,7 @@ abstract interface class SourceReaderGateway {
     String epId = '',
     bool keepInMemory = false,
     bool useDiskCache = true,
+    bool priority = false,
     String sourceKey = '',
   });
   bool isLocalImagePath(String value);

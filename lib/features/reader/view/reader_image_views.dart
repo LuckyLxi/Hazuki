@@ -156,7 +156,7 @@ class ReaderImageViews {
 
     return FutureBuilder<ImageProvider>(
       key: ValueKey('reader-page-future-$url'),
-      future: imagePipelineController.getImageProvider(url),
+      future: imagePipelineController.getImageProvider(url, priority: true),
       builder: (context, snapshot) {
         if (snapshot.hasData) {
           return buildImage(snapshot.data!);
@@ -335,7 +335,7 @@ class ReaderImageViews {
 
     return FutureBuilder<ImageProvider>(
       key: ValueKey(url),
-      future: imagePipelineController.getImageProvider(url),
+      future: imagePipelineController.getImageProvider(url, priority: true),
       builder: (context, snapshot) {
         if (snapshot.hasData) {
           return buildImage(snapshot.data!);

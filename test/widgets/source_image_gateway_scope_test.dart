@@ -228,6 +228,7 @@ class _FakeSourceImageGateway implements SourceImageGateway {
     String epId = '',
     bool keepInMemory = false,
     bool useDiskCache = true,
+    bool priority = false,
     String sourceKey = '',
   }) async {
     final resolvedSourceKey = sourceKey.trim().isEmpty
@@ -270,6 +271,7 @@ class _ControlledSourceImageGateway implements SourceImageGateway {
     String epId = '',
     bool keepInMemory = false,
     bool useDiskCache = true,
+    bool priority = false,
     String sourceKey = '',
   }) {
     return _download.future;

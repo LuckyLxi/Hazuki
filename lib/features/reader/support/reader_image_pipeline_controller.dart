@@ -201,7 +201,25 @@ class ReaderImagePipelineController {
       end = max;
     }
 
+    final visibleImageIndices = _runtimeState
+        .spreadImageIndices(currentSpreadIndex)
+        .where((index) => index >= start && index < end)
+        .toSet();
+
+    for (final index in visibleImageIndices) {
+      final url = _runtimeState.images[index];
+      if (providerCache.containsKey(url) ||
+          (providerFutureCache.containsKey(url) &&
+              _pipelineState.priorityProviderRequests.contains(url))) {
+        continue;
+      }
+      _prefetchImageProvider(url, priority: true);
+    }
+
     for (var i = start; i < end; i++) {
+      if (visibleImageIndices.contains(i)) {
+        continue;
+      }
       final url = _runtimeState.images[i];
       if (providerCache.containsKey(url) ||
           providerFutureCache.containsKey(url)) {
@@ -224,14 +242,14 @@ class ReaderImagePipelineController {
     unawaited(_drainPrefetchAheadQueue());
   }
 
-  Future<ImageProvider> getImageProvider(String url) {
-    return _getImageProvider(url, useDiskCache: true);
+  Future<ImageProvider> getImageProvider(String url, {bool priority = false}) {
+    return _getImageProvider(url, useDiskCache: true, priority: priority);
   }
 
-  void _prefetchImageProvider(String url) {
+  void _prefetchImageProvider(String url, {bool priority = false}) {
     unawaited(() async {
       try {
-        await getImageProvider(url);
+        await getImageProvider(url, priority: priority);
       } catch (_) {
         // Prefetch is best-effort; visible image builders and retries surface
         // load failures through their own awaited futures.
@@ -242,36 +260,46 @@ class ReaderImagePipelineController {
   Future<ImageProvider> _getImageProvider(
     String url, {
     required bool useDiskCache,
+    bool priority = false,
   }) {
     final existing = providerFutureCache[url];
-    if (existing != null) {
+    if (existing != null &&
+        (!priority || _pipelineState.priorityProviderRequests.contains(url))) {
       return existing;
     }
 
-    final created = _buildImageProvider(url, useDiskCache: useDiskCache)
-        .then((provider) async {
-          if (_pipelineState.disposed) return provider;
-          if (_isMounted()) {
-            try {
-              final precacheImageCallback = _precacheImageCallback;
-              if (precacheImageCallback != null) {
-                await precacheImageCallback(provider);
-              } else {
-                await precacheImage(provider, _context());
+    if (priority) {
+      _pipelineState.priorityProviderRequests.add(url);
+    }
+    late final Future<ImageProvider> created;
+    created =
+        _buildImageProvider(url, useDiskCache: useDiskCache, priority: priority)
+            .then((provider) async {
+              if (_pipelineState.disposed) return provider;
+              if (_isMounted()) {
+                try {
+                  final precacheImageCallback = _precacheImageCallback;
+                  if (precacheImageCallback != null) {
+                    await precacheImageCallback(provider);
+                  } else {
+                    await precacheImage(provider, _context());
+                  }
+                } catch (_) {}
               }
-            } catch (_) {}
-          }
-          if (_pipelineState.disposed) return provider;
-          providerCache[url] = provider;
-          if (_isMounted()) {
-            _updateState(() {});
-          }
-          return provider;
-        })
-        .catchError((Object error, StackTrace stackTrace) {
-          providerFutureCache.remove(url);
-          throw error;
-        });
+              if (_pipelineState.disposed) return provider;
+              providerCache[url] = provider;
+              if (_isMounted()) {
+                _updateState(() {});
+              }
+              return provider;
+            })
+            .catchError((Object error, StackTrace stackTrace) {
+              if (identical(providerFutureCache[url], created)) {
+                providerFutureCache.remove(url);
+                _pipelineState.priorityProviderRequests.remove(url);
+              }
+              throw error;
+            });
 
     providerFutureCache[url] = created;
     return created;
@@ -297,7 +325,7 @@ class ReaderImagePipelineController {
     await _evictImageCacheEntries([normalized]);
 
     try {
-      await _getImageProvider(normalized, useDiskCache: false);
+      await _getImageProvider(normalized, useDiskCache: false, priority: true);
       _logEvent(
         'Reader image retry finished',
         source: 'reader_data',
@@ -414,6 +442,7 @@ class ReaderImagePipelineController {
     });
     for (final key in staleFutureKeys) {
       providerFutureCache.remove(key);
+      _pipelineState.priorityProviderRequests.remove(key);
     }
 
     final staleByteUrls = <String>[];
@@ -507,14 +536,18 @@ class ReaderImagePipelineController {
     }
   }
 
-  Future<bool> _acquireUnscramblePermit() async {
+  Future<bool> _acquireUnscramblePermit({required bool priority}) async {
     if (_pipelineState.activeUnscrambleTasks < _maxUnscrambleConcurrency) {
       _pipelineState.activeUnscrambleTasks++;
       return true;
     }
-    final waiter = Completer<void>();
-    _pipelineState.decodeWaiters.add(waiter);
-    await waiter.future;
+    final waiter = ReaderImagePipelinePermitWaiter();
+    if (priority) {
+      _pipelineState.decodeWaiters.insert(0, waiter);
+    } else {
+      _pipelineState.decodeWaiters.add(waiter);
+    }
+    await waiter.completer.future;
     if (_pipelineState.disposed) return false;
     _pipelineState.activeUnscrambleTasks++;
     return true;
@@ -526,8 +559,8 @@ class ReaderImagePipelineController {
     }
     while (_pipelineState.decodeWaiters.isNotEmpty) {
       final waiter = _pipelineState.decodeWaiters.removeAt(0);
-      if (!waiter.isCompleted) {
-        waiter.complete();
+      if (!waiter.completer.isCompleted) {
+        waiter.completer.complete();
         break;
       }
     }
@@ -591,6 +624,7 @@ class ReaderImagePipelineController {
   Future<ImageProvider> _buildImageProvider(
     String url, {
     required bool useDiskCache,
+    bool priority = false,
   }) async {
     final overrideBuilder = _imageProviderBuilder;
     if (overrideBuilder != null) {
@@ -609,7 +643,7 @@ class ReaderImagePipelineController {
       return FileImage(file);
     }
 
-    if (!await _acquireUnscramblePermit()) {
+    if (!await _acquireUnscramblePermit(priority: priority)) {
       throw StateError('reader_disposed');
     }
     try {
@@ -618,6 +652,7 @@ class ReaderImagePipelineController {
         comicId: _comicId,
         epId: _epId,
         useDiskCache: useDiskCache,
+        priority: priority,
         sourceKey: _sourceKey,
       );
       _rememberAspectRatio(url, prepared.aspectRatio);
@@ -632,7 +667,7 @@ class ReaderImagePipelineController {
         await _evictImageCacheEntries([url]);
         providerCache.remove(url);
         providerFutureCache.remove(url);
-        return _buildImageProvider(url, useDiskCache: false);
+        return _buildImageProvider(url, useDiskCache: false, priority: true);
       }
       return MemoryImage(prepared.bytes);
     } finally {

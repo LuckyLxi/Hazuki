@@ -6,8 +6,10 @@ class ReaderImagePipelineState {
   final Map<String, ImageProvider> providerCache = <String, ImageProvider>{};
   final Map<String, Future<ImageProvider>> providerFutureCache =
       <String, Future<ImageProvider>>{};
+  final Set<String> priorityProviderRequests = <String>{};
   final Map<String, double> imageAspectRatioCache = <String, double>{};
-  final List<Completer<void>> decodeWaiters = <Completer<void>>[];
+  final List<ReaderImagePipelinePermitWaiter> decodeWaiters =
+      <ReaderImagePipelinePermitWaiter>[];
   final Map<String, int> imageIndexMap = <String, int>{};
   final Set<String> retryingImageUrls = <String>{};
 
@@ -40,12 +42,13 @@ class ReaderImagePipelineState {
   void clearProviderCaches() {
     providerCache.clear();
     providerFutureCache.clear();
+    priorityProviderRequests.clear();
   }
 
   void completeDecodeWaiters() {
     for (final waiter in decodeWaiters) {
-      if (!waiter.isCompleted) {
-        waiter.complete();
+      if (!waiter.completer.isCompleted) {
+        waiter.completer.complete();
       }
     }
     decodeWaiters.clear();
@@ -61,4 +64,10 @@ class ReaderImagePipelineState {
     queuedPrefetchAheadIndex = null;
     completeDecodeWaiters();
   }
+}
+
+class ReaderImagePipelinePermitWaiter {
+  ReaderImagePipelinePermitWaiter();
+
+  final Completer<void> completer = Completer<void>();
 }
