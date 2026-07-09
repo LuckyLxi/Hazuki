@@ -56,6 +56,56 @@ void main() {
     expect(prefs.getStringList('comment_filter_keywords'), ['blocked phrase']);
   });
 
+  testWidgets('sheet meets the keyboard and keeps save visible', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(400, 640);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    const keyboardHeight = 280.0;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        locale: const Locale('zh'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        builder: (context, child) {
+          final mediaQuery = MediaQuery.of(context);
+          return MediaQuery(
+            data: mediaQuery.copyWith(
+              viewInsets: const EdgeInsets.only(bottom: keyboardHeight),
+            ),
+            child: child!,
+          );
+        },
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: TextButton(
+              onPressed: () => showCommentFilterDialog(context),
+              child: const Text('open'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('open'));
+    await tester.pumpAndSettle();
+
+    final saveButtonRect = tester.getRect(
+      find.byKey(const ValueKey<String>('comment-filter-save-button')),
+    );
+    final sheetRect = tester.getRect(
+      find.byKey(const ValueKey<String>('comment-filter-sheet')),
+    );
+    final keyboardTop = tester.view.physicalSize.height - keyboardHeight;
+
+    expect(sheetRect.bottom, keyboardTop);
+    expect(saveButtonRect.bottom, lessThanOrEqualTo(keyboardTop - 8));
+  });
+
   testWidgets('add accepts a long pasted keyword after stripping its newline', (
     tester,
   ) async {
