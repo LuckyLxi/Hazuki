@@ -92,20 +92,38 @@ class _CommentsBottomComposer extends StatelessWidget {
                             child: FilledButton(
                               onPressed: sendingComment ? null : onSubmit,
                               style: FilledButton.styleFrom(
-                                minimumSize: Size.zero,
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 0,
-                                ),
+                                fixedSize: const Size.square(40),
+                                minimumSize: const Size.square(40),
+                                padding: EdgeInsets.zero,
                                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(20),
                                 ),
                               ),
-                              child: Text(
-                                sendingComment
+                              child: Tooltip(
+                                message: sendingComment
                                     ? l10n(context).commentsSending
                                     : l10n(context).commentsSend,
+                                child: AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 180),
+                                  switchInCurve: Curves.easeOutCubic,
+                                  switchOutCurve: Curves.easeInCubic,
+                                  child: sendingComment
+                                      ? const SizedBox.square(
+                                          key: ValueKey<String>(
+                                            'sending-indicator',
+                                          ),
+                                          dimension: 18,
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        )
+                                      : const Icon(
+                                          key: ValueKey<String>('send-icon'),
+                                          Icons.send_rounded,
+                                          size: 20,
+                                        ),
+                                ),
                               ),
                             ),
                           ),
