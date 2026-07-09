@@ -21,10 +21,13 @@ rootProject.allprojects {
 }
 
 apply plugin: 'com.android.library'
+apply plugin: 'org.jetbrains.kotlin.android'
+
+def flutterExtension = project.extensions.findByName('flutter')
 
 android {
     namespace 'dev.fluttercommunity.plus.device_info'
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = flutterExtension != null ? flutterExtension.compileSdkVersion : 36
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17

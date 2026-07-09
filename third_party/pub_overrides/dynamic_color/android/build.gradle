@@ -21,11 +21,12 @@ rootProject.allprojects {
 }
 
 apply plugin: 'com.android.library'
+apply plugin: 'org.jetbrains.kotlin.android'
 
 android {
     namespace 'io.material.plugins.dynamic_color'
 
-    compileSdkVersion 34
+    compileSdkVersion 36
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8

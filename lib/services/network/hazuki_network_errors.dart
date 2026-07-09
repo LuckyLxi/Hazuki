@@ -22,6 +22,7 @@ HazukiNetworkFailureKind classifyHazukiNetworkFailure(Object error) {
       case DioExceptionType.connectionTimeout:
       case DioExceptionType.receiveTimeout:
       case DioExceptionType.sendTimeout:
+      case DioExceptionType.transformTimeout: // 数据转换超时，归类为超时错误
         return HazukiNetworkFailureKind.timeout;
       case DioExceptionType.cancel:
         return HazukiNetworkFailureKind.canceled;
