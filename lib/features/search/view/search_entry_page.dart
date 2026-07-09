@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
@@ -201,6 +202,24 @@ class _SearchEntryPageState extends State<SearchEntryPage>
       _historyEditMode = false;
       _historyExpanded = false;
     });
+  }
+
+  Future<void> _copyHistoryKeyword(String keyword) async {
+    final copiedText = keyword.trim();
+    if (copiedText.isEmpty) {
+      return;
+    }
+    unawaited(HapticFeedback.mediumImpact());
+    await Clipboard.setData(ClipboardData(text: copiedText));
+    if (!mounted) {
+      return;
+    }
+    unawaited(
+      showHazukiPrompt(
+        context,
+        AppLocalizations.of(context)!.searchHistoryCopied,
+      ),
+    );
   }
 
   Future<void> _openResults(
@@ -436,6 +455,8 @@ class _SearchEntryPageState extends State<SearchEntryPage>
                     ),
                   );
                 },
+                onKeywordLongPressed: (keyword) =>
+                    unawaited(_copyHistoryKeyword(keyword)),
                 onKeywordDeleted: (keyword) =>
                     unawaited(_removeHistory(keyword)),
                 onHistoryExpandedChanged: (expanded) {

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/app/app.dart';
@@ -218,6 +219,57 @@ void main() {
 
     expect(find.text('Comic hazuki 0'), findsOneWidget);
     expect(tester.testTextInput.isVisible, isFalse);
+  });
+
+  testWidgets('long pressing a search history keyword copies it', (
+    tester,
+  ) async {
+    String? copiedText;
+    String? hapticType;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copiedText =
+              (call.arguments as Map<dynamic, dynamic>)['text'] as String?;
+        } else if (call.method == 'HapticFeedback.vibrate') {
+          hapticType = call.arguments as String?;
+        }
+        return null;
+      },
+    );
+    addTearDown(() {
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      );
+    });
+    SharedPreferences.setMockInitialValues({
+      'search_history': <String>['hazuki'],
+    });
+    await sl<SearchHistoryService>().load();
+
+    await tester.pumpWidget(
+      _buildTestApp(
+        SearchEntryPage(
+          comicDetailPageBuilder: _comicDetailPageBuilder,
+          comicCoverHeroTagBuilder: _testComicCoverHeroTag,
+          searchPageLoader: _fakeSearchPageLoader,
+        ),
+      ),
+    );
+    await _pumpSearchSettled(tester);
+
+    await tester.longPress(find.text('hazuki'));
+    await _pumpSearchSettled(tester);
+
+    expect(copiedText, 'hazuki');
+    expect(hapticType, 'HapticFeedbackType.mediumImpact');
+    expect(find.text('Search history copied'), findsOneWidget);
+    expect(find.text('Comic hazuki 0'), findsNothing);
+
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pumpAndSettle();
   });
 
   testWidgets(

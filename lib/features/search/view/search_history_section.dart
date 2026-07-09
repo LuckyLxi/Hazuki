@@ -12,6 +12,7 @@ class SearchHistorySection extends StatelessWidget {
     required this.historyEditMode,
     required this.historyExpanded,
     required this.onKeywordPressed,
+    required this.onKeywordLongPressed,
     required this.onKeywordDeleted,
     required this.onExpandedChanged,
     required this.onLayoutChanged,
@@ -21,6 +22,7 @@ class SearchHistorySection extends StatelessWidget {
   final bool historyEditMode;
   final bool historyExpanded;
   final ValueChanged<String> onKeywordPressed;
+  final ValueChanged<String> onKeywordLongPressed;
   final ValueChanged<String> onKeywordDeleted;
   final ValueChanged<bool> onExpandedChanged;
   final VoidCallback onLayoutChanged;
@@ -66,16 +68,22 @@ class SearchHistorySection extends StatelessWidget {
                   runSpacing: 8,
                   children: displayList.map((keyword) {
                     if (historyEditMode) {
-                      return InputChip(
-                        label: Text(keyword),
-                        deleteIcon: const Icon(Icons.cancel, size: 18),
-                        onDeleted: () => onKeywordDeleted(keyword),
-                        onPressed: () => onKeywordDeleted(keyword),
+                      return GestureDetector(
+                        onLongPress: () => onKeywordLongPressed(keyword),
+                        child: InputChip(
+                          label: Text(keyword),
+                          deleteIcon: const Icon(Icons.cancel, size: 18),
+                          onDeleted: () => onKeywordDeleted(keyword),
+                          onPressed: () => onKeywordDeleted(keyword),
+                        ),
                       );
                     }
-                    return ActionChip(
-                      label: Text(keyword),
-                      onPressed: () => onKeywordPressed(keyword),
+                    return GestureDetector(
+                      onLongPress: () => onKeywordLongPressed(keyword),
+                      child: ActionChip(
+                        label: Text(keyword),
+                        onPressed: () => onKeywordPressed(keyword),
+                      ),
                     );
                   }).toList(),
                 ),

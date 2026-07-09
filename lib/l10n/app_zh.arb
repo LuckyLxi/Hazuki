@@ -256,6 +256,7 @@
   "searchAggregateSearch": "聚合搜索",
   "searchAggregateSearchDescription": "同时搜索所有漫画源",
   "searchHistoryTitle": "搜索历史",
+  "searchHistoryCopied": "已复制搜索历史",
   "searchClearTooltip": "清空",
   "searchSubmitTooltip": "搜索",
   "searchClearHistoryTitle": "清空历史记录",
