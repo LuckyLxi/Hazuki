@@ -8,6 +8,8 @@ class ReaderImagePipelineState {
       <String, Future<ImageProvider>>{};
   final Set<String> priorityProviderRequests = <String>{};
   final Map<String, double> imageAspectRatioCache = <String, double>{};
+  final Map<String, double> listPlaceholderAspectRatioCache =
+      <String, double>{};
   final List<ReaderImagePipelinePermitWaiter> decodeWaiters =
       <ReaderImagePipelinePermitWaiter>[];
   final Map<String, int> imageIndexMap = <String, int>{};
@@ -21,6 +23,7 @@ class ReaderImagePipelineState {
   void resetForImages(List<String> images) {
     clearProviderCaches();
     imageAspectRatioCache.clear();
+    listPlaceholderAspectRatioCache.clear();
     retryingImageUrls.clear();
     activeUnscrambleTasks = 0;
     prefetchAheadRunning = false;
@@ -58,6 +61,7 @@ class ReaderImagePipelineState {
     disposed = true;
     clearProviderCaches();
     imageAspectRatioCache.clear();
+    listPlaceholderAspectRatioCache.clear();
     retryingImageUrls.clear();
     activeUnscrambleTasks = 0;
     prefetchAheadRunning = false;

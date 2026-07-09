@@ -34,6 +34,12 @@ class ReaderImagePipelineController {
     void Function(Iterable<String>)? evictImageBytesFromMemory,
     Future<void> Function(Iterable<String>)? evictImageCacheEntries,
     Future<void> Function(ImageProvider provider)? precacheImageCallback,
+    void Function({
+      required int imageIndex,
+      double? previousAspectRatio,
+      required double resolvedAspectRatio,
+    })?
+    onImageAspectRatioResolved,
     required SourceReaderGateway sourceService,
   }) : _runtimeState = runtimeState,
        _pipelineState = pipelineState,
@@ -56,7 +62,8 @@ class ReaderImagePipelineController {
            evictImageBytesFromMemory ?? sourceService.evictImageBytesFromMemory,
        _evictImageCacheEntries =
            evictImageCacheEntries ?? sourceService.evictImageCacheEntries,
-       _precacheImageCallback = precacheImageCallback;
+       _precacheImageCallback = precacheImageCallback,
+       _onImageAspectRatioResolved = onImageAspectRatioResolved;
 
   static const int _maxUnscrambleConcurrency = 5;
   static const int _prefetchAroundCount = 10;
@@ -89,6 +96,12 @@ class ReaderImagePipelineController {
   final void Function(Iterable<String>) _evictImageBytesFromMemory;
   final Future<void> Function(Iterable<String>) _evictImageCacheEntries;
   final Future<void> Function(ImageProvider provider)? _precacheImageCallback;
+  final void Function({
+    required int imageIndex,
+    double? previousAspectRatio,
+    required double resolvedAspectRatio,
+  })?
+  _onImageAspectRatioResolved;
 
   Map<String, ImageProvider> get providerCache => _pipelineState.providerCache;
   Map<String, Future<ImageProvider>> get providerFutureCache =>
@@ -291,6 +304,7 @@ class ReaderImagePipelineController {
               if (_isMounted()) {
                 _updateState(() {});
               }
+              _notifyImageAspectRatioResolved(url);
               return provider;
             })
             .catchError((Object error, StackTrace stackTrace) {
@@ -358,18 +372,26 @@ class ReaderImagePipelineController {
 
   double resolvePlaceholderAspectRatio(int index) {
     if (index >= 0 && index < _runtimeState.images.length) {
-      final exact = imageAspectRatioCache[_runtimeState.images[index]];
+      final url = _runtimeState.images[index];
+      final exact = imageAspectRatioCache[url];
       if (exact != null && exact.isFinite && exact > 0) {
         return exact;
       }
+      final remembered = _pipelineState.listPlaceholderAspectRatioCache[url];
+      if (remembered != null && remembered.isFinite && remembered > 0) {
+        return remembered;
+      }
     }
 
+    late final double placeholderAspectRatio;
     for (var distance = 1; distance <= 3; distance++) {
       final before = index - distance;
       if (before >= 0) {
         final ratio = imageAspectRatioCache[_runtimeState.images[before]];
         if (ratio != null && ratio.isFinite && ratio > 0) {
-          return ratio;
+          placeholderAspectRatio = ratio;
+          _rememberListPlaceholderAspectRatio(index, placeholderAspectRatio);
+          return placeholderAspectRatio;
         }
       }
 
@@ -377,7 +399,9 @@ class ReaderImagePipelineController {
       if (after < _runtimeState.images.length) {
         final ratio = imageAspectRatioCache[_runtimeState.images[after]];
         if (ratio != null && ratio.isFinite && ratio > 0) {
-          return ratio;
+          placeholderAspectRatio = ratio;
+          _rememberListPlaceholderAspectRatio(index, placeholderAspectRatio);
+          return placeholderAspectRatio;
         }
       }
     }
@@ -397,11 +421,15 @@ class ReaderImagePipelineController {
       }
       if (count > 0) {
         final average = total / count;
-        return average.clamp(0.45, 1.2).toDouble();
+        placeholderAspectRatio = average.clamp(0.45, 1.2).toDouble();
+        _rememberListPlaceholderAspectRatio(index, placeholderAspectRatio);
+        return placeholderAspectRatio;
       }
     }
 
-    return defaultPlaceholderAspectRatio;
+    placeholderAspectRatio = defaultPlaceholderAspectRatio;
+    _rememberListPlaceholderAspectRatio(index, placeholderAspectRatio);
+    return placeholderAspectRatio;
   }
 
   double readerListCacheExtent(BuildContext context) {
@@ -619,6 +647,40 @@ class ReaderImagePipelineController {
       return;
     }
     imageAspectRatioCache[url] = aspectRatio;
+  }
+
+  void _notifyImageAspectRatioResolved(String url) {
+    final resolvedAspectRatio = imageAspectRatioCache[url];
+    if (resolvedAspectRatio == null ||
+        !resolvedAspectRatio.isFinite ||
+        resolvedAspectRatio <= 0) {
+      return;
+    }
+    final index = _pipelineState.imageIndexMap[url];
+    if (index == null) {
+      return;
+    }
+    final previousAspectRatio = _pipelineState.listPlaceholderAspectRatioCache
+        .remove(url);
+    _onImageAspectRatioResolved?.call(
+      imageIndex: index,
+      previousAspectRatio: previousAspectRatio,
+      resolvedAspectRatio: resolvedAspectRatio,
+    );
+  }
+
+  void _rememberListPlaceholderAspectRatio(int index, double aspectRatio) {
+    if (index < 0 ||
+        index >= _runtimeState.images.length ||
+        !aspectRatio.isFinite ||
+        aspectRatio <= 0) {
+      return;
+    }
+    final url = _runtimeState.images[index];
+    if (imageAspectRatioCache.containsKey(url)) {
+      return;
+    }
+    _pipelineState.listPlaceholderAspectRatioCache[url] = aspectRatio;
   }
 
   Future<ImageProvider> _buildImageProvider(

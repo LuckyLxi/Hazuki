@@ -57,6 +57,8 @@ class ReaderNavigationController {
   final void Function(int index) _requestPrefetchAhead;
   final bool Function() _noImageModeEnabled;
   final void Function() _toggleControlsVisibility;
+  double _pendingListPixelCorrection = 0;
+  bool _listPixelCorrectionScheduled = false;
 
   KeyEventResult handleKeyEvent(FocusNode node, KeyEvent event) {
     if (!_runtimeState.volumeButtonTurnPage || event is! KeyDownEvent) {
@@ -96,6 +98,9 @@ class ReaderNavigationController {
     if (notification is ScrollStartNotification) {
       _diagnosticsState.listUserScrollInProgress =
           notification.dragDetails != null;
+      if (_diagnosticsState.listUserScrollInProgress) {
+        _diagnosticsState.clearProgrammaticListStabilization();
+      }
     } else if (notification is ScrollEndNotification) {
       _diagnosticsState.listUserScrollInProgress = false;
     } else if (notification is OverscrollNotification) {
@@ -156,6 +161,16 @@ class ReaderNavigationController {
     if (activeProgrammaticTarget != null) {
       final target = _runtimeState.normalizeSpreadIndex(
         activeProgrammaticTarget,
+      );
+      _runtimeState.currentPageIndex = target;
+      _runtimeState.setDisplayedPageIndex(target);
+      _diagnosticsState.lastObservedListPixels = currentPixels;
+      return;
+    }
+    if (_diagnosticsState.hasActiveProgrammaticListStabilization &&
+        !_diagnosticsState.listUserScrollInProgress) {
+      final target = _runtimeState.normalizeSpreadIndex(
+        _diagnosticsState.stabilizingProgrammaticListTargetIndex!,
       );
       _runtimeState.currentPageIndex = target;
       _runtimeState.setDisplayedPageIndex(target);
@@ -305,7 +320,11 @@ class ReaderNavigationController {
       );
       return;
     }
-    await _scrollToListReaderPage(target, trigger: trigger);
+    await _scrollToListReaderPage(
+      target,
+      trigger: trigger,
+      stabilizeAfterScroll: true,
+    );
   }
 
   Future<void> goPreviousPage({String trigger = 'tap_previous_zone'}) async {
@@ -326,17 +345,28 @@ class ReaderNavigationController {
     int targetImageIndex, {
     required String trigger,
   }) {
+    final safeImageIndex = _runtimeState.images.isEmpty
+        ? 0
+        : math.max(
+            0,
+            math.min(targetImageIndex, _runtimeState.images.length - 1),
+          );
+    final target = _runtimeState.readerSpreadCount <= 0
+        ? 0
+        : _runtimeState.normalizeSpreadIndex(
+            safeImageIndex ~/ _runtimeState.readerSpreadSize,
+          );
+    if (_runtimeState.readerMode == ReaderMode.topToBottom &&
+        _runtimeState.readerSpreadCount > 0) {
+      _diagnosticsState.activeProgrammaticListScrollReason = trigger;
+      _diagnosticsState.activeProgrammaticListTargetIndex = target;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_isMounted() || _runtimeState.images.isEmpty) {
+        _diagnosticsState.activeProgrammaticListScrollReason = null;
+        _diagnosticsState.activeProgrammaticListTargetIndex = null;
         return;
       }
-      final safeImageIndex = math.max(
-        0,
-        math.min(targetImageIndex, _runtimeState.images.length - 1),
-      );
-      final target = _runtimeState.normalizeSpreadIndex(
-        safeImageIndex ~/ _runtimeState.readerSpreadSize,
-      );
       _runtimeState.currentPageIndex = target;
       _runtimeState.setDisplayedPageIndex(target);
       _logEvent(
@@ -360,8 +390,94 @@ class ReaderNavigationController {
         }
       } else {
         unawaited(
-          _scrollToListReaderPage(target, animate: false, trigger: trigger),
+          _scrollToListReaderPage(
+            target,
+            animate: false,
+            trigger: trigger,
+            stabilizeAfterScroll: true,
+          ),
         );
+      }
+    });
+  }
+
+  void handleListImageAspectRatioResolved({
+    required int imageIndex,
+    double? previousAspectRatio,
+    required double resolvedAspectRatio,
+  }) {
+    if (_runtimeState.readerMode != ReaderMode.topToBottom ||
+        !_scrollController.hasClients ||
+        _runtimeState.readerSpreadSize != 1 ||
+        previousAspectRatio == null ||
+        !previousAspectRatio.isFinite ||
+        previousAspectRatio <= 0 ||
+        !resolvedAspectRatio.isFinite ||
+        resolvedAspectRatio <= 0 ||
+        !_diagnosticsState.hasActiveProgrammaticListStabilization) {
+      return;
+    }
+    final target = _runtimeState.normalizeSpreadIndex(
+      _diagnosticsState.stabilizingProgrammaticListTargetIndex!,
+    );
+    if (imageIndex >= _runtimeState.spreadStartIndex(target)) {
+      return;
+    }
+    final spreadIndex = imageIndex ~/ _runtimeState.readerSpreadSize;
+    final targetContext = spreadIndex < _runtimeState.itemKeys.length
+        ? _runtimeState.itemKeys[spreadIndex].currentContext
+        : null;
+    final renderObject = targetContext?.findRenderObject();
+    if (renderObject is! RenderBox || !renderObject.hasSize) {
+      return;
+    }
+    final itemWidth = renderObject.size.width;
+    if (!itemWidth.isFinite || itemWidth <= 0) {
+      return;
+    }
+    final previousHeight = itemWidth / previousAspectRatio;
+    final resolvedHeight = itemWidth / resolvedAspectRatio;
+    final correction = resolvedHeight - previousHeight;
+    if (!correction.isFinite || correction.abs() < 0.5) {
+      return;
+    }
+    _pendingListPixelCorrection += correction;
+    if (_listPixelCorrectionScheduled) {
+      return;
+    }
+    _listPixelCorrectionScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _listPixelCorrectionScheduled = false;
+      final correction = _pendingListPixelCorrection;
+      _pendingListPixelCorrection = 0;
+      if (!_isMounted() ||
+          _runtimeState.readerMode != ReaderMode.topToBottom ||
+          !_scrollController.hasClients ||
+          !_diagnosticsState.hasActiveProgrammaticListStabilization ||
+          _diagnosticsState.listUserScrollInProgress ||
+          correction.abs() < 0.5) {
+        return;
+      }
+      final position = _scrollController.position;
+      final nextPixels = (position.pixels + correction).clamp(
+        position.minScrollExtent,
+        position.maxScrollExtent,
+      );
+      if ((nextPixels - position.pixels).abs() < 0.5) {
+        return;
+      }
+      _diagnosticsState.activeProgrammaticListScrollReason =
+          'image_aspect_ratio_resolved_stabilization';
+      _diagnosticsState.activeProgrammaticListTargetIndex = target;
+      try {
+        position.jumpTo(nextPixels);
+        _diagnosticsState.markProgrammaticListScrollCompleted(
+          target,
+          stabilize: true,
+        );
+      } finally {
+        _diagnosticsState.activeProgrammaticListScrollReason = null;
+        _diagnosticsState.activeProgrammaticListTargetIndex = null;
       }
     });
   }
@@ -451,6 +567,7 @@ class ReaderNavigationController {
     int index, {
     bool animate = true,
     String trigger = 'manual',
+    bool stabilizeAfterScroll = false,
   }) async {
     if (!_scrollController.hasClients || _runtimeState.readerSpreadCount <= 0) {
       _logEvent(
@@ -485,7 +602,10 @@ class ReaderNavigationController {
         if (!_isMounted()) {
           return;
         }
-        _diagnosticsState.markProgrammaticListScrollCompleted(target);
+        _diagnosticsState.markProgrammaticListScrollCompleted(
+          target,
+          stabilize: stabilizeAfterScroll,
+        );
         return;
       }
 
@@ -510,7 +630,10 @@ class ReaderNavigationController {
       if (!_isMounted()) {
         return;
       }
-      _diagnosticsState.markProgrammaticListScrollCompleted(target);
+      _diagnosticsState.markProgrammaticListScrollCompleted(
+        target,
+        stabilize: stabilizeAfterScroll,
+      );
 
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!_isMounted()) {
@@ -540,7 +663,7 @@ class ReaderNavigationController {
         unawaited(
           Scrollable.ensureVisible(
             exactContext,
-            duration: animate
+            duration: animate && !stabilizeAfterScroll
                 ? const Duration(milliseconds: 220)
                 : Duration.zero,
             curve: Curves.easeOutCubic,
@@ -548,7 +671,10 @@ class ReaderNavigationController {
           ).then((_) {
             _diagnosticsState.activeProgrammaticListScrollReason = null;
             _diagnosticsState.activeProgrammaticListTargetIndex = null;
-            _diagnosticsState.markProgrammaticListScrollCompleted(target);
+            _diagnosticsState.markProgrammaticListScrollCompleted(
+              target,
+              stabilize: stabilizeAfterScroll,
+            );
           }),
         );
       });

@@ -4,7 +4,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/app/windows/windows_title_bar_controller.dart';
 import 'package:hazuki/features/reader/reader.dart';
 import 'package:hazuki/features/reader/state/reader_image_pipeline_state.dart';
@@ -26,9 +25,6 @@ import 'package:hazuki/features/reader/view/reader_overlay_builders.dart';
 import 'package:hazuki/features/reader/view/reader_overlay_host.dart';
 import 'package:hazuki/features/reader/view/reader_state_views.dart';
 import 'package:hazuki/l10n/l10n.dart';
-import 'package:hazuki/services/manga_download/manga_download_service.dart';
-import 'package:hazuki/services/reading_progress_service.dart';
-import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/shared/ui_flags.dart';
 
 class ReaderPage extends StatefulWidget {
@@ -40,6 +36,7 @@ class ReaderPage extends StatefulWidget {
     required this.epId,
     required this.chapterIndex,
     required this.images,
+    required this.dependencies,
     required this.commentsWidgetBuilder,
     this.sourceKey = '',
     this.coverUrl = '',
@@ -55,6 +52,7 @@ class ReaderPage extends StatefulWidget {
   final String epId;
   final int chapterIndex;
   final List<String> images;
+  final ReaderDependencies dependencies;
   final String sourceKey;
   final String coverUrl;
   final ThemeData? comicTheme;
@@ -70,8 +68,7 @@ class ReaderPage extends StatefulWidget {
 class _ReaderPageState extends State<ReaderPage>
     with SingleTickerProviderStateMixin {
   static const _readerSettingsStore = ReaderSettingsStore();
-  late final SourceSettingsGateway _sourceSettings =
-      sl<SourceSettingsGateway>();
+  late final _sourceSettings = widget.dependencies.sourceSettings;
 
   ReaderSourceImageQualitySnapshot _sourceImageQuality =
       ReaderSourceImageQualitySnapshot.defaults;
@@ -126,7 +123,8 @@ class _ReaderPageState extends State<ReaderPage>
         sourceKey: widget.sourceKey,
         loadImagesErrorBuilder: (error) =>
             l10n(context).readerChapterLoadFailed('$error'),
-        sourceService: sl<SourceReaderGateway>(),
+        onImageAspectRatioResolved: _handleImageAspectRatioResolved,
+        sourceService: widget.dependencies.sourceReader,
       );
   late final ReaderZoomController _readerZoomController = ReaderZoomController(
     transformationController: _zoomController,
@@ -179,8 +177,8 @@ class _ReaderPageState extends State<ReaderPage>
         chapterTitle: widget.chapterTitle,
         chapterIndex: widget.chapterIndex,
         widgetImages: widget.images,
-        sourceService: sl<SourceReaderGateway>(),
-        readingProgressService: sl<ReadingProgressService>(),
+        sourceService: widget.dependencies.sourceReader,
+        readingProgressService: widget.dependencies.readingProgressService,
         offlineMode: widget.offlineMode,
       );
   late final ReaderSettingsController _settingsController =
@@ -204,7 +202,7 @@ class _ReaderPageState extends State<ReaderPage>
         sessionController: _sessionController,
         pageContext: _pageContext,
         buildReplacementPage: _buildReaderPageFromContext,
-        downloader: sl<MangaDownloadService>(),
+        downloader: widget.dependencies.downloader,
       );
   late final ReaderSaveImageController _saveImageController =
       ReaderSaveImageController(
@@ -432,6 +430,7 @@ class _ReaderPageState extends State<ReaderPage>
       epId: pageContext.epId,
       chapterIndex: pageContext.chapterIndex,
       images: pageContext.images,
+      dependencies: widget.dependencies,
       sourceKey: pageContext.sourceKey,
       coverUrl: pageContext.coverUrl,
       comicTheme: pageContext.comicTheme,
@@ -526,6 +525,18 @@ class _ReaderPageState extends State<ReaderPage>
 
   Future<void> _handlePlatformVolumeButtonPressed(String? direction) {
     return _navigationController.handlePlatformVolumeButtonPressed(direction);
+  }
+
+  void _handleImageAspectRatioResolved({
+    required int imageIndex,
+    double? previousAspectRatio,
+    required double resolvedAspectRatio,
+  }) {
+    _navigationController.handleListImageAspectRatioResolved(
+      imageIndex: imageIndex,
+      previousAspectRatio: previousAspectRatio,
+      resolvedAspectRatio: resolvedAspectRatio,
+    );
   }
 
   void _openReaderSettingsDrawer() {

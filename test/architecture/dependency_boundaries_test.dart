@@ -173,6 +173,26 @@ void main() {
     },
   );
 
+  test(
+    'reader feature receives app services through injected dependencies',
+    () {
+      final violations = <String>[];
+      for (final file in _dartFilesUnder('lib/features/reader')) {
+        final content = file.readAsStringSync();
+        if (content.contains('app/service_locator.dart') ||
+            RegExp(r'\bsl<').hasMatch(content)) {
+          violations.add(file.path);
+        }
+      }
+
+      expect(
+        violations,
+        isEmpty,
+        reason: 'Inject reader services from the app layer: $violations',
+      );
+    },
+  );
+
   test('home feature receives sibling features through app entrypoints', () {
     final violations = <String>[];
     final featureImportPattern = RegExp(r'package:hazuki/features/([^/]+)/');

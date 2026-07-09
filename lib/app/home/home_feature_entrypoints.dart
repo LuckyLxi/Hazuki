@@ -10,6 +10,7 @@ import 'package:hazuki/features/downloads/downloads.dart';
 import 'package:hazuki/features/favorite/favorite.dart';
 import 'package:hazuki/features/history/history.dart';
 import 'package:hazuki/features/home/support/home_feature_contracts.dart';
+import 'package:hazuki/features/reader/support/reader_dependencies.dart';
 import 'package:hazuki/features/reader/view/reader_page.dart';
 import 'package:hazuki/features/search/search.dart';
 import 'package:hazuki/features/settings/settings.dart';
@@ -18,6 +19,7 @@ import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
 import 'package:hazuki/services/local_favorites/local_favorites_contracts.dart';
 import 'package:hazuki/services/manga_download/manga_download_service.dart';
+import 'package:hazuki/services/reading_progress_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/shared/comments/comments_widget_builder.dart';
 import 'package:hazuki/shared/reading/reader_offline_chapter_data.dart';
@@ -80,6 +82,12 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
   }
 
   final readerCommentsBuilder = readerCommentsWidgetBuilderFrom(buildComments);
+  final readerDependencies = ReaderDependencies(
+    sourceReader: sl<SourceReaderGateway>(),
+    sourceSettings: sl<SourceSettingsGateway>(),
+    readingProgressService: sl<ReadingProgressService>(),
+    downloader: sl<MangaDownloadService>(),
+  );
 
   Widget buildReaderPage({
     required String title,
@@ -103,6 +111,7 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
       epId: epId,
       chapterIndex: chapterIndex,
       images: images,
+      dependencies: readerDependencies,
       sourceKey: sourceKey,
       coverUrl: coverUrl,
       comicTheme: comicTheme,

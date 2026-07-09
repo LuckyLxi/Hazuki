@@ -9,10 +9,14 @@ import 'package:hazuki/features/downloads/downloads.dart';
 import 'package:hazuki/features/favorite/view/favorite_page.dart';
 import 'package:hazuki/features/history/history.dart';
 import 'package:hazuki/features/home/view/home_page.dart';
+import 'package:hazuki/features/reader/support/reader_dependencies.dart';
 import 'package:hazuki/features/reader/view/reader_page.dart';
 import 'package:hazuki/features/search/search.dart';
 import 'package:hazuki/features/settings/settings.dart';
 import 'package:hazuki/models/hazuki_models.dart';
+import 'package:hazuki/services/manga_download/manga_download_service.dart';
+import 'package:hazuki/services/reading_progress_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/shared/comments/comments_widget_builder.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
 
@@ -33,9 +37,19 @@ Widget _buildComments({
 final ReaderCommentsWidgetBuilder _buildReaderComments =
     readerCommentsWidgetBuilderFrom(_buildComments);
 
+ReaderDependencies _readerDependencies() {
+  return ReaderDependencies(
+    sourceReader: sl<SourceReaderGateway>(),
+    sourceSettings: sl<SourceSettingsGateway>(),
+    readingProgressService: sl<ReadingProgressService>(),
+    downloader: sl<MangaDownloadService>(),
+  );
+}
+
 void main() {
   test('feature-first entry widgets are constructible from public paths', () {
     registerServices();
+    final readerDependencies = _readerDependencies();
     final homeFeatureEntrypoints = buildHazukiHomeFeatureEntrypoints();
     final home = HazukiHomePage(
       initialTabIndex: 1,
@@ -82,6 +96,7 @@ void main() {
             epId: epId,
             chapterIndex: chapterIndex,
             images: images,
+            dependencies: readerDependencies,
             sourceKey: sourceKey,
             coverUrl: coverUrl,
             commentsWidgetBuilder: _buildReaderComments,
@@ -111,6 +126,7 @@ void main() {
             epId: epId,
             chapterIndex: chapterIndex,
             images: images,
+            dependencies: readerDependencies,
             sourceKey: sourceKey,
             coverUrl: coverUrl,
             commentsWidgetBuilder: _buildReaderComments,
@@ -162,6 +178,7 @@ void main() {
       epId: 'ep-id',
       chapterIndex: 0,
       images: const ['a', 'b'],
+      dependencies: readerDependencies,
       comicTheme: ThemeData.light(),
       commentsWidgetBuilder: _buildReaderComments,
     );
