@@ -46,6 +46,7 @@ android/gradle_error.txt
 **/*.cxx/
 **/build/
 android/local.properties
+third_party/flutter_qjs/android/local.properties
 android/key.properties
 android/bundle/
 android/app/build/
