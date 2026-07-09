@@ -601,11 +601,9 @@ class _SearchResultsPageState extends State<SearchResultsPage>
     }
     return SearchResultsBody(
       scrollController: _scrollController,
-      searchKeyword: _searchKeyword,
       searchComics: _searchComics,
       searchLoadingMore: _searchLoadingMore,
       searchErrorMessage: _searchErrorMessage,
-      currentSearchOrderLabel: _currentSearchOrderLabel,
       resultState: _buildSearchResultState(),
       onRefresh: _refreshSearchResults,
       onScrollNotification: _handleSearchResultsScrollNotification,
