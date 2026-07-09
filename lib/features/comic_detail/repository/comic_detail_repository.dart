@@ -2,31 +2,36 @@ import 'dart:typed_data';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:hazuki/app/service_locator.dart';
-import 'package:hazuki/features/favorite/favorite.dart';
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
-import 'package:hazuki/services/local_favorites_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
+import 'package:hazuki/services/local_favorites/local_favorites_contracts.dart';
 import 'package:hazuki/services/manga_download/manga_download_service.dart';
 import 'package:hazuki/services/reading_progress_service.dart';
 import 'package:hazuki/services/read_history_service.dart';
+import 'package:hazuki/shared/favorites/favorite_folders_repository.dart';
 
-class ComicDetailRepository implements FavoriteFoldersRepository {
-  ComicDetailRepository({
-    required HazukiSourceService source,
-    required LocalFavoritesService local,
+class ComicDetailFeatureFacade implements FavoriteFoldersRepository {
+  ComicDetailFeatureFacade({
+    required SourceComicDetailGateway source,
+    required LocalFavoritesRepository local,
     required MangaDownloadService downloader,
+    required ReadingProgressService readingProgress,
+    required ReadHistoryService readHistory,
     String sourceKey = '',
   }) : _source = source,
        _local = local,
        _downloader = downloader,
+       _readingProgress = readingProgress,
+       _readHistory = readHistory,
        _sourceKey = sourceKey.trim().isEmpty
            ? source.activeSourceKey
            : sourceKey.trim();
 
-  final HazukiSourceService _source;
-  final LocalFavoritesService _local;
+  final SourceComicDetailGateway _source;
+  final LocalFavoritesRepository _local;
   final MangaDownloadService _downloader;
+  final ReadingProgressService _readingProgress;
+  final ReadHistoryService _readHistory;
   final String _sourceKey;
 
   // ── Source capabilities ──────────────────────────────────────────────────
@@ -197,10 +202,7 @@ class ComicDetailRepository implements FavoriteFoldersRepository {
   // ── Persistence ──────────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>?> loadReadingProgress(String comicId) async {
-    return sl<ReadingProgressService>().load(
-      comicId: comicId,
-      sourceKey: _sourceKey,
-    );
+    return _readingProgress.load(comicId: comicId, sourceKey: _sourceKey);
   }
 
   Future<bool> loadComicDynamicColorEnabled() async {
@@ -211,5 +213,5 @@ class ComicDetailRepository implements FavoriteFoldersRepository {
   Future<void> recordHistory({
     required ExploreComic comic,
     required ComicDetailsData details,
-  }) => sl<ReadHistoryService>().recordHistory(comic: comic, details: details);
+  }) => _readHistory.recordHistory(comic: comic, details: details);
 }

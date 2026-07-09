@@ -1,14 +1,14 @@
 import 'package:flutter/foundation.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 
 const int _defaultCacheMaxBytes = 400 * 1024 * 1024;
 const String _defaultAutoCleanMode = 'size_overflow';
 
 class CacheSettingsController extends ChangeNotifier {
-  CacheSettingsController({required HazukiSourceService sourceService})
+  CacheSettingsController({required SourceSettingsGateway sourceService})
     : _sourceService = sourceService;
 
-  final HazukiSourceService _sourceService;
+  final SourceSettingsGateway _sourceService;
 
   bool _loading = true;
   int _maxBytes = _defaultCacheMaxBytes;

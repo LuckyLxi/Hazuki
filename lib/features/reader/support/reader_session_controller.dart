@@ -2,14 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/features/reader/support/reader_controller_support.dart';
 import 'package:hazuki/features/reader/support/reader_display_bridge.dart';
 import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
-import 'package:hazuki/features/reader/state/reader_settings_store.dart';
+import 'package:hazuki/shared/reading/reader_settings_store.dart';
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/services/reading_progress_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/shared/ui_flags.dart';
 
 class ReaderSessionController {
@@ -37,7 +36,8 @@ class ReaderSessionController {
     required String chapterTitle,
     required int chapterIndex,
     required List<String> widgetImages,
-    required HazukiSourceService sourceService,
+    required SourceReaderGateway sourceService,
+    required ReadingProgressService readingProgressService,
     bool offlineMode = false,
   }) : _runtimeState = runtimeState,
        _displayBridge = displayBridge,
@@ -62,6 +62,7 @@ class ReaderSessionController {
        _chapterIndex = chapterIndex,
        _widgetImages = widgetImages,
        _sourceService = sourceService,
+       _readingProgressService = readingProgressService,
        _offlineMode = offlineMode;
 
   final ReaderRuntimeState _runtimeState;
@@ -87,7 +88,8 @@ class ReaderSessionController {
   final String _chapterTitle;
   final int _chapterIndex;
   final List<String> _widgetImages;
-  final HazukiSourceService _sourceService;
+  final SourceReaderGateway _sourceService;
+  final ReadingProgressService _readingProgressService;
   final bool _offlineMode;
   Future<void> _displayOperation = Future<void>.value();
   bool _closed = false;
@@ -262,7 +264,7 @@ class ReaderSessionController {
 
   Future<void> _recordReadingProgress({int lastPageIndex = 0}) async {
     try {
-      await sl<ReadingProgressService>().save(
+      await _readingProgressService.save(
         comicId: _comicId,
         sourceKey: _sourceKey,
         epId: _epId,

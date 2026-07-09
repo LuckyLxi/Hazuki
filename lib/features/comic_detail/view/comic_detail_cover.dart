@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:hazuki/shared/lru_cache.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
 import 'package:hazuki/app/service_locator.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
 final LruCache<String, Uint8List> _comicStaticBlurredCoverCache =
@@ -124,7 +124,7 @@ class _ComicBlurredCoverBackgroundState
 
   Future<void> _loadBlurredCover(String normalizedUrl) async {
     try {
-      final bytes = await sl<HazukiSourceService>().downloadImageBytes(
+      final bytes = await sl<SourceImageGateway>().downloadImageBytes(
         normalizedUrl,
         keepInMemory: true,
         sourceKey: widget.sourceKey,

@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-import 'package:hazuki/features/reader/state/reader_filter_color.dart';
-import 'package:hazuki/features/reader/state/reader_mode.dart';
-import 'package:hazuki/features/reader/support/reader_source_image_quality_settings.dart';
-import 'package:hazuki/features/reader/view/reader_settings_content.dart';
+import 'package:hazuki/shared/reading/reader_filter_color.dart';
+import 'package:hazuki/shared/reading/reader_mode.dart';
+import 'package:hazuki/shared/reading/reader_source_image_quality_settings.dart';
+import 'package:hazuki/widgets/reader_settings_content.dart';
 
 class ReaderSettingsDrawerContent extends StatelessWidget {
   const ReaderSettingsDrawerContent({

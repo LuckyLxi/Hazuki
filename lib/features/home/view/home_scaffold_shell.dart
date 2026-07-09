@@ -6,17 +6,12 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
-import 'package:hazuki/features/favorite/favorite.dart';
-import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/l10n/l10n.dart';
-import 'package:hazuki/services/discover_daily_recommendation_service.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
-import 'package:hazuki/services/manga_download/manga_download_service.dart';
-import 'package:hazuki/shared/navigation_tags.dart';
+import 'package:hazuki/features/home/support/home_feature_contracts.dart';
+import 'package:hazuki/shared/favorites/favorite_app_bar_actions_state.dart';
 import 'package:hazuki/shared/search_box_outline.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:hazuki/widgets/windows_comic_detail_host.dart';
-import 'package:hazuki/features/discover/discover.dart';
 
 import 'home_app_bar_actions.dart';
 import 'home_bottom_navigation.dart';
@@ -40,7 +35,11 @@ class HomeScaffoldShell extends StatelessWidget {
     required this.currentIndex,
     required this.discoverSearchMorphProgress,
     required this.usePinnedDiscoverSearch,
-    required this.dailyRecommendationState,
+    required this.downloadStatus,
+    required this.activeSourceKey,
+    required this.supportsSourceAccount,
+    required this.discoverChild,
+    required this.favoriteChild,
     required this.favoriteAppBarActions,
     required this.isLogged,
     required this.profileLoading,
@@ -50,10 +49,6 @@ class HomeScaffoldShell extends StatelessWidget {
     required this.showCheckInActions,
     required this.checkInBusy,
     required this.checkedInToday,
-    required this.favoriteActionsBinding,
-    required this.authVersion,
-    required this.allowDiscoverInitialLoad,
-    required this.hideDiscoverLoadingUntilAllowed,
     required this.onWillPop,
     required this.onExitRequested,
     required this.onOpenSearch,
@@ -71,19 +66,18 @@ class HomeScaffoldShell extends StatelessWidget {
     required this.onOpenSettings,
     required this.onOpenLines,
     this.selectedDrawerDestination,
-    required this.onDiscoverSearchMorphProgressChanged,
-    required this.onFavoriteAppBarActionsChanged,
-    required this.onRequestLogin,
     required this.onDestinationSelected,
-    required this.comicDetailPageBuilder,
-    required this.favoriteComicTapHandler,
   });
 
   final GlobalKey<ScaffoldState> scaffoldKey;
   final int currentIndex;
   final double discoverSearchMorphProgress;
   final bool usePinnedDiscoverSearch;
-  final DiscoverDailyRecommendationState dailyRecommendationState;
+  final HomeDownloadStatusListenable downloadStatus;
+  final String activeSourceKey;
+  final bool supportsSourceAccount;
+  final Widget discoverChild;
+  final Widget favoriteChild;
   final FavoriteAppBarActionsState favoriteAppBarActions;
   final bool isLogged;
   final bool profileLoading;
@@ -93,10 +87,6 @@ class HomeScaffoldShell extends StatelessWidget {
   final bool showCheckInActions;
   final bool checkInBusy;
   final bool checkedInToday;
-  final FavoritePageActionsBinding favoriteActionsBinding;
-  final int authVersion;
-  final bool allowDiscoverInitialLoad;
-  final bool hideDiscoverLoadingUntilAllowed;
   final Future<bool> Function() onWillPop;
   final Future<void> Function() onExitRequested;
   final VoidCallback onOpenSearch;
@@ -114,38 +104,16 @@ class HomeScaffoldShell extends StatelessWidget {
   final VoidCallback onOpenSettings;
   final VoidCallback onOpenLines;
   final HomeDrawerDestination? selectedDrawerDestination;
-  final ValueChanged<double> onDiscoverSearchMorphProgressChanged;
-  final ValueChanged<FavoriteAppBarActionsState> onFavoriteAppBarActionsChanged;
-  final Future<void> Function() onRequestLogin;
   final ValueChanged<int> onDestinationSelected;
-  final ComicDetailPageBuilder comicDetailPageBuilder;
-  final FavoriteComicTapHandler favoriteComicTapHandler;
 
   @override
   Widget build(BuildContext context) {
-    final downloadService = sl<MangaDownloadService>();
-    final sourceService = sl<HazukiSourceService>();
     final drawerVisualKey =
-        '${sourceService.activeSourceKey}|${avatarUrl ?? ''}|$profileLoading|$isLogged|$username';
+        '$activeSourceKey|${avatarUrl ?? ''}|$profileLoading|$isLogged|$username';
     final homeContent = HomeContentStack(
       currentIndex: currentIndex,
-      discoverChild: DiscoverPage(
-        comicDetailPageBuilder: comicDetailPageBuilder,
-        usePinnedSearchInAppBar: true,
-        dailyRecommendationState: dailyRecommendationState,
-        allowInitialLoad: allowDiscoverInitialLoad,
-        hideLoadingUntilInitialLoadAllowed: hideDiscoverLoadingUntilAllowed,
-        onSearchMorphProgressChanged: onDiscoverSearchMorphProgressChanged,
-        onSearchTap: onOpenSearch,
-        onRequestLogin: onRequestLogin,
-      ),
-      favoriteChild: FavoritePage(
-        actionsBinding: favoriteActionsBinding,
-        authVersion: authVersion,
-        onAppBarActionsChanged: onFavoriteAppBarActionsChanged,
-        onRequestLogin: onRequestLogin,
-        onComicTap: favoriteComicTapHandler,
-      ),
+      discoverChild: discoverChild,
+      favoriteChild: favoriteChild,
     );
     final sidebarProfile = HomeSidebarProfileState(
       isLogged: isLogged,
@@ -158,9 +126,7 @@ class HomeScaffoldShell extends StatelessWidget {
       checkedInToday: checkedInToday,
     );
     final sidebarActions = HomeSidebarActions(
-      onProfileTap: sourceService.sourceMeta?.supportsAccount == true
-          ? onProfileTap
-          : null,
+      onProfileTap: supportsSourceAccount ? onProfileTap : null,
       onCheckInPressed: onCheckInPressed,
       onSwitchSourcePressed: onSwitchSourcePressed,
       onSelectDiscover: () => onDestinationSelected(0),
@@ -176,6 +142,7 @@ class HomeScaffoldShell extends StatelessWidget {
       key: ValueKey('home-mobile-drawer-$drawerVisualKey'),
       profile: sidebarProfile,
       actions: sidebarActions,
+      activeSourceKey: activeSourceKey,
       selectedDestination: selectedDrawerDestination,
     );
     final body = Platform.isWindows
@@ -227,9 +194,9 @@ class HomeScaffoldShell extends StatelessWidget {
       },
       child: WindowsComicDetailHost(
         child: ListenableBuilder(
-          listenable: downloadService,
+          listenable: downloadStatus,
           builder: (context, _) {
-            final hasDownloadTasks = downloadService.tasks.isNotEmpty;
+            final hasDownloadTasks = downloadStatus.hasTasks;
             return TweenAnimationBuilder<double>(
               tween: Tween<double>(end: hasDownloadTasks ? 118 : 56),
               duration: const Duration(milliseconds: 260),
@@ -243,8 +210,8 @@ class HomeScaffoldShell extends StatelessWidget {
                     leading: Platform.isWindows
                         ? null
                         : _HomeAppBarProfileButton(
-                            downloadService: downloadService,
-                            activeSourceKey: sourceService.activeSourceKey,
+                            downloadStatus: downloadStatus,
+                            activeSourceKey: activeSourceKey,
                             avatarUrl: avatarUrl,
                             profileLoading: profileLoading,
                             username: username,
@@ -301,7 +268,7 @@ class HomeScaffoldShell extends StatelessWidget {
 
 class _HomeAppBarProfileButton extends StatefulWidget {
   const _HomeAppBarProfileButton({
-    required this.downloadService,
+    required this.downloadStatus,
     required this.activeSourceKey,
     required this.avatarUrl,
     required this.profileLoading,
@@ -310,7 +277,7 @@ class _HomeAppBarProfileButton extends StatefulWidget {
     required this.onOpenDownloads,
   });
 
-  final MangaDownloadService downloadService;
+  final HomeDownloadStatusListenable downloadStatus;
   final String activeSourceKey;
   final String? avatarUrl;
   final bool profileLoading;
@@ -350,7 +317,7 @@ class _HomeAppBarProfileButtonState extends State<_HomeAppBarProfileButton> {
   }
 
   void _syncLastVisibleTaskCount() {
-    final taskCount = widget.downloadService.tasks.length;
+    final taskCount = widget.downloadStatus.taskCount;
     if (taskCount > 0) {
       _lastVisibleTaskCount = taskCount;
     }
@@ -392,13 +359,11 @@ class _HomeAppBarProfileButtonState extends State<_HomeAppBarProfileButton> {
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
           icon: TweenAnimationBuilder<double>(
-            tween: Tween<double>(
-              end: widget.downloadService.tasks.isNotEmpty ? 1 : 0,
-            ),
+            tween: Tween<double>(end: widget.downloadStatus.hasTasks ? 1 : 0),
             duration: const Duration(milliseconds: 260),
             curve: Curves.easeOutCubic,
             builder: (context, progress, _) {
-              final liveTaskCount = widget.downloadService.tasks.length;
+              final liveTaskCount = widget.downloadStatus.taskCount;
               final taskCount = liveTaskCount > 0
                   ? liveTaskCount
                   : _lastVisibleTaskCount;

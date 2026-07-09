@@ -786,6 +786,80 @@ void main() {
     );
   });
 
+  testWidgets('category dialog keeps default group fixed while sorting', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _wrapTab(groups: const [_defaultGroup, _firstGroup, _secondGroup]),
+    );
+
+    await tester.tap(
+      find.byKey(const ValueKey<String>('downloads_category_launcher')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey<String>('downloads_group_sort_start')),
+    );
+    await tester.pumpAndSettle();
+
+    final defaultGroupBackground = find.byKey(
+      const ValueKey<String>(
+        'download_group_background_${DownloadGroupsService.defaultGroupId}',
+      ),
+    );
+    final defaultTopBefore = tester.getTopLeft(defaultGroupBackground).dy;
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byType(ReorderableDragStartListener).first),
+    );
+    await tester.pump();
+    await gesture.moveBy(const Offset(0, -80));
+    await tester.pump();
+
+    expect(
+      tester.getTopLeft(defaultGroupBackground).dy,
+      closeTo(defaultTopBefore, 0.1),
+    );
+
+    await gesture.up();
+    await tester.pumpAndSettle();
+  });
+
+  testWidgets('category dialog opens around the selected group', (
+    tester,
+  ) async {
+    final groups = [
+      _defaultGroup,
+      for (var index = 0; index < 24; index++)
+        DownloadGroup(
+          id: 'group-$index',
+          name: 'Group $index',
+          createdAtMs: index + 1,
+          sortOrder: index + 1,
+        ),
+    ];
+
+    await tester.pumpWidget(
+      _wrapTab(groups: groups, selectedGroupId: 'group-18'),
+    );
+
+    await tester.tap(
+      find.byKey(const ValueKey<String>('downloads_category_launcher')),
+    );
+    await tester.pumpAndSettle();
+
+    final dialog = find.byKey(
+      const ValueKey<String>('downloads_category_dialog'),
+    );
+    expect(
+      find.descendant(of: dialog, matching: find.text('Group 18 (0)')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: dialog, matching: find.text('Default group (1)')),
+      findsNothing,
+    );
+  });
+
   testWidgets(
     'category launcher stays above comics while they scroll underneath',
     (tester) async {
@@ -871,6 +945,7 @@ Widget _wrapTab({
   Future<DownloadGroup> Function(String groupId, String name)? onRenameGroup,
   Future<void> Function(List<String> orderedGroupIds)? onReorderGroups,
   List<DownloadGroup> groups = const [_defaultGroup],
+  String selectedGroupId = DownloadGroupsService.defaultGroupId,
 }) {
   return MaterialApp(
     navigatorKey: navigatorKey,
@@ -887,6 +962,7 @@ Widget _wrapTab({
         onRenameGroup: onRenameGroup,
         onReorderGroups: onReorderGroups,
         groups: groups,
+        selectedGroupId: selectedGroupId,
       ),
     ),
   );
@@ -919,36 +995,52 @@ Widget _buildTab({
   Future<DownloadGroup> Function(String groupId, String name)? onRenameGroup,
   Future<void> Function(List<String> orderedGroupIds)? onReorderGroups,
   List<DownloadGroup> groups = const [_defaultGroup],
+  String selectedGroupId = DownloadGroupsService.defaultGroupId,
 }) {
+  final selectedGroup = groups.firstWhere(
+    (group) => group.id == selectedGroupId,
+    orElse: () => _defaultGroup,
+  );
+  final groupComicCounts = {
+    DownloadGroupsService.defaultGroupId: comics.length,
+    if (selectedGroupId != DownloadGroupsService.defaultGroupId)
+      selectedGroupId: 0,
+  };
   return DownloadsCompletedTab(
-    comics: comics,
-    active: active,
-    selectionMode: selectionMode,
-    scanning: false,
-    selectedCount: 0,
-    selectedComicIds: const {},
-    comicsWithIntegrityIssues: const {},
-    onToggleSelection: (_) {},
-    onDeleteSelected: () {},
-    onBatchGroup: () {},
-    onScanDownloaded: () {},
-    onOpenComic: onOpenComic ?? (_) {},
-    onDeleteComic: onDeleteComic ?? (_) {},
-    groups: groups,
-    selectedGroupId: DownloadGroupsService.defaultGroupId,
-    selectedGroupName: 'Default group',
-    selectedGroupComicCount: comics.length,
-    groupComicCounts: {DownloadGroupsService.defaultGroupId: comics.length},
-    onSelectGroup: (_) {},
-    onCreateGroup: (name) async =>
-        DownloadGroup(id: 'new-group', name: name, createdAtMs: 1),
-    onRenameGroup:
-        onRenameGroup ??
-        (groupId, name) async =>
-            DownloadGroup(id: groupId, name: name, createdAtMs: 1),
-    onReorderGroups: onReorderGroups ?? (_) async {},
-    onDeleteGroup: onDeleteGroup ?? (_) async {},
-    onShowComicMenu: (_, _, _) async {},
+    model: DownloadsCompletedTabModel(
+      comics: comics,
+      active: active,
+      selectionMode: selectionMode,
+      scanning: false,
+      selectedCount: 0,
+      selectedComicIds: const {},
+      comicsWithIntegrityIssues: const {},
+      groups: groups,
+      selectedGroupId: selectedGroupId,
+      selectedGroupName: selectedGroup.isDefault
+          ? 'Default group'
+          : selectedGroup.name,
+      selectedGroupComicCount: groupComicCounts[selectedGroupId] ?? 0,
+      groupComicCounts: groupComicCounts,
+    ),
+    actions: DownloadsCompletedTabActions(
+      onToggleSelection: (_) {},
+      onDeleteSelected: () {},
+      onBatchGroup: () {},
+      onScanDownloaded: () {},
+      onOpenComic: onOpenComic ?? (_) {},
+      onDeleteComic: onDeleteComic ?? (_) {},
+      onSelectGroup: (_) {},
+      onCreateGroup: (name) async =>
+          DownloadGroup(id: 'new-group', name: name, createdAtMs: 1),
+      onRenameGroup:
+          onRenameGroup ??
+          (groupId, name) async =>
+              DownloadGroup(id: groupId, name: name, createdAtMs: 1),
+      onReorderGroups: onReorderGroups ?? (_) async {},
+      onDeleteGroup: onDeleteGroup ?? (_) async {},
+      onShowComicMenu: (_, _, _) async {},
+    ),
   );
 }
 

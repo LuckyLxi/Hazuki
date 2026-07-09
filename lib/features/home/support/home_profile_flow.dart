@@ -4,10 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:hazuki/l10n/l10n.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/widgets/widgets.dart';
-import 'package:hazuki/features/home/support/home_profile_actions.dart';
-import 'package:hazuki/features/home/support/home_source_account_login.dart';
+import 'package:hazuki/shared/source_account/source_account_actions.dart';
+import 'package:hazuki/shared/source_account/source_account_login.dart';
 import 'package:hazuki/features/home/state/home_profile_controller.dart';
 
 class HomeProfileFlow {
@@ -16,6 +16,7 @@ class HomeProfileFlow {
     required this.isMounted,
     required this.profileController,
     required this.sourceService,
+    required this.imageService,
     required this.mediaChannel,
     required this.syncUserProfile,
   });
@@ -23,7 +24,8 @@ class HomeProfileFlow {
   final BuildContext context;
   final bool Function() isMounted;
   final HomeProfileController profileController;
-  final HazukiSourceService sourceService;
+  final SourceRuntimeGateway sourceService;
+  final SourceImageGateway imageService;
   final MethodChannel mediaChannel;
   final Future<void> Function() syncUserProfile;
 
@@ -98,7 +100,7 @@ class HomeProfileFlow {
       context,
       mediaChannel: mediaChannel,
       imageUrl: avatarUrl,
-      sourceService: sourceService,
+      sourceService: imageService,
     );
   }
 

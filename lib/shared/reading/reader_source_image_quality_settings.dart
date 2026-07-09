@@ -1,4 +1,4 @@
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 
 class ReaderSourceImageQualitySnapshot {
   const ReaderSourceImageQualitySnapshot({
@@ -51,7 +51,7 @@ class ReaderSourceImageQualitySettings {
   static const picacgImageQualityValues = <String>{'original', 'medium', 'low'};
 
   static ReaderSourceImageQualitySnapshot load(
-    HazukiSourceService sourceService,
+    SourceSettingsGateway sourceService,
     String sourceKey,
   ) {
     final copyMangaImageQuality = normalizeCopyMangaImageQuality(
@@ -84,7 +84,7 @@ class ReaderSourceImageQualitySettings {
   }
 
   static Future<void> updateCopyMangaImageQuality(
-    HazukiSourceService sourceService,
+    SourceSettingsGateway sourceService,
     String sourceKey,
     String value,
   ) {
@@ -96,7 +96,7 @@ class ReaderSourceImageQualitySettings {
   }
 
   static Future<void> updatePicacgImageQuality(
-    HazukiSourceService sourceService,
+    SourceSettingsGateway sourceService,
     String sourceKey,
     String value,
   ) {

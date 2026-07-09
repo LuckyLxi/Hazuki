@@ -1,9 +1,9 @@
 import 'dart:async';
 
-import 'package:hazuki/features/reader/state/reader_mode.dart';
-import 'package:hazuki/features/reader/state/reader_filter_color.dart';
+import 'package:hazuki/shared/reading/reader_mode.dart';
+import 'package:hazuki/shared/reading/reader_filter_color.dart';
 import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
-import 'package:hazuki/features/reader/state/reader_settings_store.dart';
+import 'package:hazuki/shared/reading/reader_settings_store.dart';
 import 'package:hazuki/features/reader/support/reader_controller_support.dart';
 import 'package:hazuki/features/reader/support/reader_navigation_controller.dart';
 import 'package:hazuki/features/reader/support/reader_session_controller.dart';

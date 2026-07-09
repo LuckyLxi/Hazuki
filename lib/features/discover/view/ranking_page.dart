@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../../models/hazuki_models.dart';
-import '../../../services/hazuki_source_service.dart';
+import '../../../services/source/source_capabilities.dart';
 import '../../../widgets/widgets.dart';
 import '../../../widgets/windows_comic_detail_host.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
@@ -28,7 +28,7 @@ class RankingPage extends StatefulWidget {
 class _RankingPageState extends State<RankingPage> {
   static const _loadTimeout = Duration(seconds: 25);
 
-  final HazukiSourceService _sourceService = sl<HazukiSourceService>();
+  final SourceCategoryGateway _sourceService = sl<SourceCategoryGateway>();
   final ScrollController _scrollController = ScrollController();
 
   List<CategoryRankingOption> _rankingOptions = const <CategoryRankingOption>[];

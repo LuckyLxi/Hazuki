@@ -2,9 +2,9 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import 'package:hazuki/features/reader/state/reader_filter_color.dart';
-import 'package:hazuki/features/reader/state/reader_mode.dart';
-import 'package:hazuki/features/reader/state/reader_settings_store.dart';
+import 'package:hazuki/shared/reading/reader_filter_color.dart';
+import 'package:hazuki/shared/reading/reader_mode.dart';
+import 'package:hazuki/shared/reading/reader_settings_store.dart';
 
 class ReaderRuntimeState {
   int currentPageIndex = 0;
@@ -12,6 +12,7 @@ class ReaderRuntimeState {
   bool sliderDragging = false;
   double sliderDragValue = 0;
   int? lastSliderHapticPageIndex;
+  DateTime? lastSliderHapticAt;
   List<String> images = const <String>[];
   bool loadingImages = true;
   String? loadImagesError;
@@ -65,6 +66,7 @@ class ReaderRuntimeState {
     sliderDragging = false;
     sliderDragValue = 0;
     lastSliderHapticPageIndex = null;
+    lastSliderHapticAt = null;
     rebuildSpreadItemKeys();
     setDisplayedPageIndex(0);
   }

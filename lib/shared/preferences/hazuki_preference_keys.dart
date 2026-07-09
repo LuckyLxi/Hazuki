@@ -1,0 +1,25 @@
+const hazukiAutoCheckInEnabledPreferenceKey = 'other_auto_check_in_enabled';
+const hazukiAutoSourceUpdateCheckEnabledPreferenceKey =
+    'other_auto_source_update_check_enabled';
+const hazukiAutoSoftwareUpdateCheckEnabledPreferenceKey =
+    'other_auto_software_update_check_enabled';
+const hazukiSoftwareUpdateSourcePreferenceKey =
+    'advanced_software_update_source';
+const hazukiDiscoverDailyRecommendationEnabledPreferenceKey =
+    'other_discover_daily_recommendation_enabled';
+const hazukiDiscoverDailyRecommendationCachePreferenceKey =
+    'discover_daily_recommendation_cache';
+const hazukiUseSystemTitleBarPreferenceKey = 'other_use_system_title_bar';
+const hazukiLocalePreferenceKey = 'app_locale';
+const hazukiWindowsAdaptationNoticeAcceptedPreferenceKey =
+    'windows_adaptation_notice_accepted';
+const hazukiComicIdSearchEnhancePreferenceKey =
+    'advanced_comic_id_search_enhance';
+const hazukiAggregateSearchEnabledPreferenceKey = 'search_aggregate_enabled';
+const hazukiCommentFilterKeywordsKey = 'comment_filter_keywords';
+const hazukiCommentFilterKeywordsUpdatedAtKey =
+    'comment_filter_keywords_updated_at_ms';
+const hazukiCommentFilterModeKey = 'comment_filter_mode';
+const hazukiFirstUseDatePreferenceKey = 'app_first_use_date';
+const hazukiReadHistoryMaxCount = 300;
+const hazukiSearchHistoryMaxCount = 50;

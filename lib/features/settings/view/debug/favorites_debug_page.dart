@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/app/service_locator.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import '../logs/logs_export_button.dart';
 import '../logs/logs_history_store.dart';
@@ -445,7 +445,7 @@ class _LogsPageState extends State<LogsPage> {
     if (confirm != true || !mounted) {
       return;
     }
-    sl<HazukiSourceService>().facade.clearCapturedLogs();
+    sl<SourceDebugGateway>().clearCapturedLogs();
     unawaited(showHazukiPrompt(context, strings.logsCleared));
     setState(() {
       _clearEpoch++;

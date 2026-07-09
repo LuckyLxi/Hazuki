@@ -7,7 +7,7 @@ import 'package:dio/dio.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../app/app_preferences.dart';
+import '../../shared/preferences/hazuki_preference_keys.dart';
 import '../network/hazuki_network.dart';
 import 'software_update_version_utils.dart';
 

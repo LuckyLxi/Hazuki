@@ -5,19 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:hazuki/app/app.dart';
-import 'package:hazuki/app/service_locator.dart';
-import 'package:hazuki/features/comic_detail/view/comic_detail_page.dart';
-import 'package:hazuki/features/comments/comments.dart';
 import 'package:hazuki/features/home/home.dart';
-import 'package:hazuki/features/home/support/home_profile_actions.dart';
-import 'package:hazuki/features/reader/view/reader_page.dart';
-import 'package:hazuki/features/reader/support/reader_page_context.dart';
-import 'package:hazuki/features/search/search.dart';
+import 'package:hazuki/shared/source_account/source_account_actions.dart';
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/services/discover_daily_recommendation_service.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 import 'package:hazuki/shared/chapter_title_resolver.dart';
+import 'package:hazuki/shared/reading/reader_offline_chapter_data.dart';
 
 class HazukiHomePage extends StatefulWidget {
   const HazukiHomePage({
@@ -27,6 +20,8 @@ class HazukiHomePage extends StatefulWidget {
     required this.onAppearanceChanged,
     required this.locale,
     required this.onLocaleChanged,
+    required this.featureEntrypoints,
+    required this.services,
     this.allowDiscoverInitialLoad = true,
     this.hideDiscoverLoadingUntilAllowed = false,
     this.refreshTick = 0,
@@ -37,6 +32,8 @@ class HazukiHomePage extends StatefulWidget {
   final AppearanceSettingsApplyCallback onAppearanceChanged;
   final Locale? locale;
   final Future<void> Function(Locale? locale) onLocaleChanged;
+  final HomeFeatureEntrypoints featureEntrypoints;
+  final HomeServices services;
   final bool allowDiscoverInitialLoad;
   final bool hideDiscoverLoadingUntilAllowed;
   final int refreshTick;
@@ -49,66 +46,16 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
   late final HomeCoordinator _coordinator;
   HomeDrawerDestination? _selectedDrawerDestination;
 
-  static Widget _buildReaderComments({
-    required String comicId,
-    String? subId,
-    required String sourceKey,
-    ScrollController? scrollController,
-    Future<void> Function()? onRequestTabFullscreen,
-  }) => CommentsPage(
-    comicId: comicId,
-    subId: subId,
-    sourceKey: sourceKey,
-    showAppBar: false,
-    scrollController: scrollController,
-    onRequestTabFullscreen: onRequestTabFullscreen,
-  );
-
-  Widget _buildReaderPage({
-    required String title,
-    required String chapterTitle,
-    required String comicId,
-    required String epId,
-    required int chapterIndex,
-    required List<String> images,
-    required String sourceKey,
-    ThemeData? comicTheme,
-    Future<void> Function(BuildContext)? onFavoriteRequested,
-  }) {
-    return ReaderPage(
-      title: title,
-      chapterTitle: chapterTitle,
-      comicId: comicId,
-      epId: epId,
-      chapterIndex: chapterIndex,
-      images: images,
-      sourceKey: sourceKey,
-      comicTheme: comicTheme,
-      onFavoriteRequested: onFavoriteRequested,
-      commentsWidgetBuilder: _buildReaderComments,
-    );
-  }
-
-  Widget _buildSearchPage(String initialKeyword) {
-    return SearchPage(
-      initialKeyword: initialKeyword,
-      comicDetailPageBuilder: (comic, heroTag) =>
-          _buildComicDetailPage(comic, heroTag),
-    );
-  }
-
-  ComicDetailPage _buildComicDetailPage(
+  Widget _buildComicDetailPage(
     ExploreComic comic,
     String heroTag, {
     bool isDesktopPanel = false,
     bool? shouldAnimateInitialRevealOverride,
     VoidCallback? onCloseRequested,
   }) {
-    return ComicDetailPage(
-      comic: comic,
-      heroTag: heroTag,
-      readerWidgetBuilder: _buildReaderPage,
-      searchPageBuilder: _buildSearchPage,
+    return widget.featureEntrypoints.buildComicDetailPage(
+      comic,
+      heroTag,
       isDesktopPanel: isDesktopPanel,
       shouldAnimateInitialRevealOverride: shouldAnimateInitialRevealOverride,
       onCloseRequested: onCloseRequested,
@@ -120,8 +67,9 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
     super.initState();
     _coordinator = HomeCoordinator(
       initialTabIndex: widget.initialTabIndex,
-      sourceService: sl<HazukiSourceService>(),
-      dailyRecommendationService: sl<DiscoverDailyRecommendationService>(),
+      sourceService: widget.services.sourceService,
+      imageService: widget.services.imageService,
+      dailyRecommendationService: widget.services.dailyRecommendationService,
     );
     _coordinator.start(context);
     WindowsComicDetailController.instance.panelBuilder =
@@ -192,36 +140,64 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
               : HomeDrawerContent(
                   profile: sidebarProfile,
                   actions: const HomeSidebarActions(),
+                  activeSourceKey: _coordinator.sourceService.activeSourceKey,
                   selectedDestination: _selectedDrawerDestination,
                 ),
           appearanceSettings: widget.appearanceSettings,
           onAppearanceChanged: widget.onAppearanceChanged,
           locale: widget.locale,
           onLocaleChanged: widget.onLocaleChanged,
+          featureEntrypoints: widget.featureEntrypoints,
+          useLegacyRankingSection:
+              _coordinator.sourceService.isActiveCopyMangaSource,
           comicDetailPageBuilder: (comic, heroTag) =>
               _buildComicDetailPage(comic, heroTag),
-          downloadsReaderPageBuilder: (comic, chapter) => ReaderPage(
-            title: comic.title,
-            chapterTitle: resolveHazukiChapterTitle(context, chapter.title),
-            comicId: comic.comicId,
-            epId: chapter.epId,
-            chapterIndex: chapter.index,
-            images: chapter.imagePaths,
-            sourceKey: comic.sourceKey,
-            offlineMode: true,
-            offlineChapters: [
-              for (final downloadedChapter in comic.chapters)
-                ReaderOfflineChapterData(
-                  epId: downloadedChapter.epId,
-                  title: resolveHazukiChapterTitle(
-                    context,
-                    downloadedChapter.title,
-                  ),
-                  index: downloadedChapter.index,
-                  images: downloadedChapter.imagePaths,
-                ),
-            ],
-          ),
+          downloadsReaderPageBuilder: (comic, chapter) =>
+              widget.featureEntrypoints.buildReaderPage(
+                title: comic.title,
+                chapterTitle: resolveHazukiChapterTitle(context, chapter.title),
+                comicId: comic.comicId,
+                epId: chapter.epId,
+                chapterIndex: chapter.index,
+                images: chapter.imagePaths,
+                sourceKey: comic.sourceKey,
+                coverUrl: comic.coverUrl,
+                offlineMode: true,
+                offlineChapters: [
+                  for (final downloadedChapter in comic.chapters)
+                    ReaderOfflineChapterData(
+                      epId: downloadedChapter.epId,
+                      title: resolveHazukiChapterTitle(
+                        context,
+                        downloadedChapter.title,
+                      ),
+                      index: downloadedChapter.index,
+                      images: downloadedChapter.imagePaths,
+                    ),
+                ],
+              ),
+        );
+
+        final discoverChild = widget.featureEntrypoints.buildDiscoverTab(
+          comicDetailPageBuilder: navigation.buildComicDetailPage,
+          dailyRecommendationState: _coordinator.dailyRecommendationState,
+          allowInitialLoad: widget.allowDiscoverInitialLoad,
+          hideLoadingUntilInitialLoadAllowed:
+              widget.hideDiscoverLoadingUntilAllowed,
+          onSearchMorphProgressChanged:
+              _coordinator.handleDiscoverSearchMorphProgressChanged,
+          onSearchTap: () {
+            unawaited(navigation.openSearch());
+          },
+          onRequestLogin: profileFlow.showLoginDialog,
+        );
+        final favoriteChild = widget.featureEntrypoints.buildFavoriteTab(
+          actionsBinding: _coordinator.favoriteActionsBinding,
+          authVersion: _coordinator.authVersion,
+          onAppBarActionsChanged:
+              _coordinator.handleFavoriteAppBarActionsChanged,
+          onRequestLogin: profileFlow.showLoginDialog,
+          onComicTap: navigation.openFavoriteDetail,
         );
 
         return HomeScaffoldShell(
@@ -230,7 +206,12 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
           discoverSearchMorphProgress: _coordinator.discoverSearchMorphProgress,
           usePinnedDiscoverSearch:
               _coordinator.dailyRecommendationState.hasRecommendations,
-          dailyRecommendationState: _coordinator.dailyRecommendationState,
+          downloadStatus: widget.services.downloadStatus,
+          activeSourceKey: _coordinator.sourceService.activeSourceKey,
+          supportsSourceAccount:
+              _coordinator.sourceService.sourceMeta?.supportsAccount == true,
+          discoverChild: discoverChild,
+          favoriteChild: favoriteChild,
           favoriteAppBarActions: _coordinator.favoriteAppBarActions,
           isLogged: isLogged,
           profileLoading: profileLoading,
@@ -240,11 +221,6 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
           showCheckInActions: _coordinator.isCheckInAvailable,
           checkInBusy: _coordinator.checkInBusy,
           checkedInToday: _coordinator.checkedInToday,
-          favoriteActionsBinding: _coordinator.favoriteActionsBinding,
-          authVersion: _coordinator.authVersion,
-          allowDiscoverInitialLoad: widget.allowDiscoverInitialLoad,
-          hideDiscoverLoadingUntilAllowed:
-              widget.hideDiscoverLoadingUntilAllowed,
           onWillPop: () => _coordinator.handleWillPop(context),
           onExitRequested: SystemNavigator.pop,
           onOpenSearch: () {
@@ -281,6 +257,7 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
             unawaited(() async {
               await showHomeSourceSwitchDialog(
                 context,
+                sourceService: _coordinator.sourceService,
                 onSourceSwitched: () => _coordinator.syncUserProfile(context),
               );
               if (!mounted) {
@@ -335,19 +312,12 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
             unawaited(navigation.openLines());
           },
           selectedDrawerDestination: _selectedDrawerDestination,
-          onDiscoverSearchMorphProgressChanged:
-              _coordinator.handleDiscoverSearchMorphProgressChanged,
-          onFavoriteAppBarActionsChanged:
-              _coordinator.handleFavoriteAppBarActionsChanged,
-          onRequestLogin: profileFlow.showLoginDialog,
           onDestinationSelected: (index) {
             setState(() {
               _selectedDrawerDestination = null;
             });
             unawaited(_coordinator.handleDestinationSelected(index));
           },
-          comicDetailPageBuilder: navigation.buildComicDetailPage,
-          favoriteComicTapHandler: navigation.openFavoriteDetail,
         );
       },
     );

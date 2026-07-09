@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/download_groups_service.dart';
 import 'package:hazuki/services/manga_download/manga_download_service.dart';
+import '../state/downloads_bulk_group_controller.dart';
 import '../view/downloads_cover_widgets.dart';
 
 enum DownloadsComicMenuAction { updateGroups, removeFromCurrentGroup, delete }
@@ -224,29 +225,43 @@ class _DownloadsBulkGroupDialog extends StatefulWidget {
       _DownloadsBulkGroupDialogState();
 }
 
-enum _DownloadsBulkDialogStage { actions, groups, removeConfirmation }
-
 class _DownloadsBulkGroupDialogState extends State<_DownloadsBulkGroupDialog> {
-  _DownloadsBulkDialogStage _stage = _DownloadsBulkDialogStage.actions;
-  late final Set<String> _selectedComicKeys = {
-    for (final comic in widget.selectedComics) comic.storageKey,
-  };
-  late final Map<String, Set<String>> _initialComicKeysByGroup = {
-    for (final group in widget.groups)
-      group.id: Set<String>.of(
-        widget.initialComicKeysByGroup[group.id] ?? const {},
-      ),
-  };
-  late final Map<String, Set<String>> _draftComicKeysByGroup = {
-    for (final entry in _initialComicKeysByGroup.entries)
-      entry.key: Set<String>.of(entry.value),
-  };
+  late final DownloadsBulkGroupController _controller;
+
+  DownloadsBulkDialogStage get _stage => _controller.stage;
+  Set<String> get _selectedComicKeys => _controller.selectedComicKeys;
+  Map<String, Set<String>> get _initialComicKeysByGroup =>
+      _controller.initialComicKeysByGroup;
+  Map<String, Set<String>> get _draftComicKeysByGroup =>
+      _controller.draftComicKeysByGroup;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = DownloadsBulkGroupController(
+      groups: widget.groups,
+      selectedComics: widget.selectedComics,
+      initialComicKeysByGroup: widget.initialComicKeysByGroup,
+    )..addListener(_handleControllerChanged);
+  }
+
+  void _handleControllerChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _controller
+      ..removeListener(_handleControllerChanged)
+      ..dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final choosingGroups = _stage == _DownloadsBulkDialogStage.groups;
+    final choosingGroups = _stage == DownloadsBulkDialogStage.groups;
     final confirmingRemoval =
-        _stage == _DownloadsBulkDialogStage.removeConfirmation;
+        _stage == DownloadsBulkDialogStage.removeConfirmation;
     return Center(
       child: AnimatedContainer(
         key: const ValueKey<String>('downloads_bulk_group_dialog'),
@@ -282,11 +297,11 @@ class _DownloadsBulkGroupDialogState extends State<_DownloadsBulkGroupDialog> {
               ),
             ),
             child: switch (_stage) {
-              _DownloadsBulkDialogStage.actions => _buildActionSelection(
+              DownloadsBulkDialogStage.actions => _buildActionSelection(
                 context,
               ),
-              _DownloadsBulkDialogStage.groups => _buildGroupSelection(context),
-              _DownloadsBulkDialogStage.removeConfirmation =>
+              DownloadsBulkDialogStage.groups => _buildGroupSelection(context),
+              DownloadsBulkDialogStage.removeConfirmation =>
                 _buildRemoveConfirmation(context),
             },
           ),
@@ -309,16 +324,13 @@ class _DownloadsBulkGroupDialogState extends State<_DownloadsBulkGroupDialog> {
           ),
           const SizedBox(height: 20),
           FilledButton.tonalIcon(
-            onPressed: () =>
-                setState(() => _stage = _DownloadsBulkDialogStage.groups),
+            onPressed: _controller.showGroups,
             icon: const Icon(Icons.playlist_add_rounded),
             label: Text(strings.downloadsMoveOrAddAction),
           ),
           const SizedBox(height: 8),
           FilledButton.tonalIcon(
-            onPressed: () => setState(
-              () => _stage = _DownloadsBulkDialogStage.removeConfirmation,
-            ),
+            onPressed: _controller.showRemoveConfirmation,
             icon: const Icon(Icons.remove_circle_outline),
             label: Text(strings.downloadsRemoveFromCurrentGroup),
           ),
@@ -423,8 +435,7 @@ class _DownloadsBulkGroupDialogState extends State<_DownloadsBulkGroupDialog> {
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               TextButton(
-                onPressed: () =>
-                    setState(() => _stage = _DownloadsBulkDialogStage.actions),
+                onPressed: _controller.showActions,
                 child: Text(strings.downloadsBack),
               ),
               const SizedBox(width: 8),
@@ -434,10 +445,7 @@ class _DownloadsBulkGroupDialogState extends State<_DownloadsBulkGroupDialog> {
                     context,
                     DownloadsBulkGroupSelection(
                       action: DownloadsBulkGroupAction.updateMemberships,
-                      comicKeysByGroup: {
-                        for (final entry in _draftComicKeysByGroup.entries)
-                          entry.key: Set<String>.of(entry.value),
-                      },
+                      comicKeysByGroup: _controller.snapshotDraftMemberships(),
                     ),
                   );
                 },
@@ -468,8 +476,7 @@ class _DownloadsBulkGroupDialogState extends State<_DownloadsBulkGroupDialog> {
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
               TextButton(
-                onPressed: () =>
-                    setState(() => _stage = _DownloadsBulkDialogStage.actions),
+                onPressed: _controller.showActions,
                 child: Text(strings.commonCancel),
               ),
               const SizedBox(width: 8),
@@ -494,14 +501,7 @@ class _DownloadsBulkGroupDialogState extends State<_DownloadsBulkGroupDialog> {
   }
 
   void _toggleGroup(String groupId) {
-    final initial = _initialComicKeysByGroup[groupId] ?? const <String>{};
-    final draft = _draftComicKeysByGroup[groupId] ?? const <String>{};
-    setState(() {
-      _draftComicKeysByGroup[groupId] =
-          draft.length == _selectedComicKeys.length
-          ? Set<String>.of(initial)
-          : Set<String>.of(_selectedComicKeys);
-    });
+    _controller.toggleGroup(groupId);
   }
 
   Future<void> _showGroupMembershipDetails(DownloadGroup group) async {
@@ -549,7 +549,7 @@ class _DownloadsBulkGroupDialogState extends State<_DownloadsBulkGroupDialog> {
       ),
     );
     if (updated == null || !mounted) return;
-    setState(() => _draftComicKeysByGroup[group.id] = updated);
+    _controller.updateGroupMembership(group.id, updated);
   }
 }
 

@@ -5,7 +5,7 @@ import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../app/app_preferences.dart';
+import '../shared/preferences/hazuki_preference_keys.dart';
 import '../models/hazuki_models.dart';
 import 'hazuki_source_service.dart';
 import 'storage/hazuki_database.dart';
@@ -235,6 +235,7 @@ class ReadHistoryService extends ChangeNotifier {
         if (replace) {
           await _database.delete(_database.readHistoryEntries).go();
         }
+        final rows = <ReadHistoryEntriesCompanion>[];
         for (final entry in entries) {
           final comicId = (entry['id'] ?? '').toString().trim();
           if (comicId.isEmpty) {
@@ -247,19 +248,25 @@ class ReadHistoryService extends ChangeNotifier {
             sourceKey: sourceKey,
             comicId: comicId,
           );
-          await _database
-              .into(_database.readHistoryEntries)
-              .insertOnConflictUpdate(
-                ReadHistoryEntriesCompanion.insert(
-                  storageKey: scoped.storageKey,
-                  comicId: comicId,
-                  sourceKey: sourceKey,
-                  title: (entry['title'] ?? '').toString(),
-                  cover: (entry['cover'] ?? '').toString(),
-                  subTitle: (entry['subTitle'] ?? '').toString(),
-                  timestampMs: (entry['timestamp'] as num?)?.toInt() ?? 0,
-                ),
-              );
+          rows.add(
+            ReadHistoryEntriesCompanion.insert(
+              storageKey: scoped.storageKey,
+              comicId: comicId,
+              sourceKey: sourceKey,
+              title: (entry['title'] ?? '').toString(),
+              cover: (entry['cover'] ?? '').toString(),
+              subTitle: (entry['subTitle'] ?? '').toString(),
+              timestampMs: (entry['timestamp'] as num?)?.toInt() ?? 0,
+            ),
+          );
+        }
+        if (rows.isNotEmpty) {
+          await _database.batch(
+            (batch) => batch.insertAllOnConflictUpdate(
+              _database.readHistoryEntries,
+              rows,
+            ),
+          );
         }
         await _trimHistoryLocked();
       });

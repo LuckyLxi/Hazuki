@@ -9,23 +9,25 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:hazuki/features/reader/support/reader_diagnostics_support.dart';
 import 'package:hazuki/features/reader/state/reader_image_pipeline_state.dart';
-import 'package:hazuki/features/reader/state/reader_filter_color.dart';
-import 'package:hazuki/features/reader/state/reader_mode.dart';
+import 'package:hazuki/shared/reading/reader_filter_color.dart';
+import 'package:hazuki/shared/reading/reader_mode.dart';
 import 'package:hazuki/features/reader/support/reader_display_bridge.dart';
 import 'package:hazuki/features/reader/support/reader_image_pipeline_controller.dart';
 import 'package:hazuki/features/reader/support/reader_navigation_controller.dart';
 import 'package:hazuki/features/reader/support/reader_page_context.dart';
 import 'package:hazuki/features/reader/support/reader_session_controller.dart';
 import 'package:hazuki/features/reader/support/reader_settings_controller.dart';
-import 'package:hazuki/features/reader/support/reader_source_image_quality_settings.dart';
+import 'package:hazuki/shared/reading/reader_source_image_quality_settings.dart';
 import 'package:hazuki/features/reader/support/reader_zoom_controller.dart';
 import 'package:hazuki/features/settings/state/reading_settings_controller.dart';
 import 'package:hazuki/features/reader/view/reader_overlay_layout.dart';
-import 'package:hazuki/features/reader/view/reader_settings_content.dart';
+import 'package:hazuki/features/reader/view/reader_overlay_builders.dart';
+import 'package:hazuki/widgets/reader_settings_content.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/reading_progress_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
-import 'package:hazuki/features/reader/state/reader_settings_store.dart';
+import 'package:hazuki/shared/reading/reader_settings_store.dart';
 import '../../support/test_service_locator.dart';
 
 void main() {
@@ -154,6 +156,7 @@ void main() {
         ..sliderDragging = true
         ..sliderDragValue = 2
         ..lastSliderHapticPageIndex = 2
+        ..lastSliderHapticAt = DateTime(2026)
         ..loadingImages = true
         ..loadImagesError = 'boom'
         ..isZoomed = true
@@ -172,8 +175,56 @@ void main() {
       expect(state.sliderDragging, isFalse);
       expect(state.sliderDragValue, 0);
       expect(state.lastSliderHapticPageIndex, isNull);
+      expect(state.lastSliderHapticAt, isNull);
       expect(state.pageIndexNotifier.value, 0);
       expect(state.itemKeys, hasLength(3));
+    });
+
+    test('reader slider haptics are throttled and page-count aware', () {
+      final state = ReaderRuntimeState()
+        ..applyImages(List<String>.generate(300, (index) => 'img$index'));
+      var hapticCount = 0;
+      final base = DateTime(2026);
+
+      expect(readerSliderHapticPageStep(40), 1);
+      expect(readerSliderHapticPageStep(120), 2);
+      expect(readerSliderHapticPageStep(300), 5);
+      expect(readerSliderHapticPageStep(800), 10);
+
+      maybeTriggerReaderSliderHaptic(
+        runtimeState: state,
+        value: 0,
+        now: base,
+        triggerHaptic: () => hapticCount++,
+      );
+      maybeTriggerReaderSliderHaptic(
+        runtimeState: state,
+        value: 3,
+        now: base.add(const Duration(milliseconds: 100)),
+        triggerHaptic: () => hapticCount++,
+      );
+      maybeTriggerReaderSliderHaptic(
+        runtimeState: state,
+        value: 5,
+        now: base.add(const Duration(milliseconds: 120)),
+        triggerHaptic: () => hapticCount++,
+      );
+      maybeTriggerReaderSliderHaptic(
+        runtimeState: state,
+        value: 10,
+        now: base.add(const Duration(milliseconds: 160)),
+        triggerHaptic: () => hapticCount++,
+      );
+      maybeTriggerReaderSliderHaptic(
+        runtimeState: state,
+        value: 10,
+        force: true,
+        now: base.add(const Duration(milliseconds: 161)),
+        triggerHaptic: () => hapticCount++,
+      );
+
+      expect(hapticCount, 3);
+      expect(state.lastSliderHapticPageIndex, 10);
     });
   });
 
@@ -287,7 +338,8 @@ void main() {
           chapterTitle: 'Chapter 1',
           chapterIndex: 0,
           widgetImages: const [],
-          sourceService: sl<HazukiSourceService>(),
+          sourceService: sl<SourceReaderGateway>(),
+          readingProgressService: sl<ReadingProgressService>(),
         );
         final controller = ReaderSettingsController(
           runtimeState: runtimeState,
@@ -385,7 +437,8 @@ void main() {
         chapterTitle: 'Chapter 1',
         chapterIndex: 0,
         widgetImages: const [],
-        sourceService: sl<HazukiSourceService>(),
+        sourceService: sl<SourceReaderGateway>(),
+        readingProgressService: sl<ReadingProgressService>(),
         offlineMode: true,
       );
 
@@ -475,7 +528,8 @@ void main() {
         chapterTitle: 'Chapter 1',
         chapterIndex: 0,
         widgetImages: const [],
-        sourceService: sl<HazukiSourceService>(),
+        sourceService: sl<SourceReaderGateway>(),
+        readingProgressService: sl<ReadingProgressService>(),
       );
 
       sessionController.initialize();
@@ -534,7 +588,7 @@ void main() {
     test('persists reading settings to existing preference keys', () async {
       SharedPreferences.setMockInitialValues({});
       final controller = ReadingSettingsController(
-        sourceService: sl<HazukiSourceService>(),
+        sourceService: sl<SourceSettingsGateway>(),
       );
       addTearDown(controller.dispose);
 
@@ -768,7 +822,7 @@ void main() {
             home: Builder(
               builder: (context) {
                 controller = ReaderImagePipelineController(
-                  sourceService: sl<HazukiSourceService>(),
+                  sourceService: sl<SourceReaderGateway>(),
                   runtimeState: runtimeState,
                   pipelineState: pipelineState,
                   diagnosticsState: diagnosticsState,
@@ -842,7 +896,7 @@ void main() {
             home: Builder(
               builder: (context) {
                 controller = ReaderImagePipelineController(
-                  sourceService: sl<HazukiSourceService>(),
+                  sourceService: sl<SourceReaderGateway>(),
                   runtimeState: runtimeState,
                   pipelineState: pipelineState,
                   diagnosticsState: diagnosticsState,
@@ -894,6 +948,59 @@ void main() {
         expect(pipelineState.retryingImageUrls, isEmpty);
       },
     );
+
+    testWidgets('prefetchAround schedules the visible page before neighbors', (
+      tester,
+    ) async {
+      final runtimeState = ReaderRuntimeState()
+        ..applyImages(['img0', 'img1', 'img2', 'img3', 'img4', 'img5']);
+      final pipelineState = ReaderImagePipelineState();
+      final diagnosticsState = ReaderDiagnosticsState();
+      final zoomController = TransformationController();
+      final requestedUrls = <String>[];
+      late ReaderImagePipelineController controller;
+      addTearDown(zoomController.dispose);
+      addTearDown(runtimeState.pageIndexNotifier.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) {
+              controller = ReaderImagePipelineController(
+                sourceService: sl<SourceReaderGateway>(),
+                runtimeState: runtimeState,
+                pipelineState: pipelineState,
+                diagnosticsState: diagnosticsState,
+                zoomController: zoomController,
+                context: () => context,
+                isMounted: () => true,
+                updateState: (update) => update(),
+                logEvent:
+                    (title, {level = 'info', source = 'reader_ui', content}) {},
+                logPayload: ([extra]) => extra ?? <String, dynamic>{},
+                logVisiblePageChange: ({required index, required trigger}) {},
+                noImageModeEnabled: () => false,
+                comicId: 'comic',
+                epId: 'ep',
+                loadImagesErrorBuilder: (error) => '$error',
+                imageProviderBuilder: (url, {bool useDiskCache = true}) async {
+                  requestedUrls.add(url);
+                  return MemoryImage(validPngBytes);
+                },
+                precacheImageCallback: (_) async {},
+              );
+
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      );
+
+      controller.prefetchAround(3);
+      await tester.pump();
+
+      expect(requestedUrls.first, 'img3');
+    });
   });
 
   group('ReaderNavigationController', () {
@@ -958,5 +1065,39 @@ void main() {
         expect(state.pageIndexNotifier.value, 1);
       },
     );
+
+    test('goToPage immediately prefetches the requested target page', () async {
+      final state = ReaderRuntimeState()..applyImages(['a', 'b', 'c', 'd']);
+      final scrollController = ScrollController();
+      final pageController = PageController();
+      final prefetched = <int>[];
+      final prefetchedAhead = <int>[];
+      addTearDown(scrollController.dispose);
+      addTearDown(pageController.dispose);
+      addTearDown(state.pageIndexNotifier.dispose);
+      final controller = ReaderNavigationController(
+        runtimeState: state,
+        diagnosticsState: ReaderDiagnosticsState(),
+        scrollController: scrollController,
+        pageController: pageController,
+        isMounted: () => true,
+        updateState: (update) => update(),
+        logEvent: (_, {level = 'info', source = 'reader_ui', content}) {},
+        logPayload: ([extra]) => extra ?? <String, dynamic>{},
+        logVisiblePageChange: ({required index, required trigger}) {},
+        resetZoomImmediately: ({reason = 'unspecified'}) {},
+        prefetchAround: prefetched.add,
+        requestPrefetchAhead: prefetchedAhead.add,
+        noImageModeEnabled: () => false,
+        toggleControlsVisibility: () {},
+      );
+
+      await controller.goToPage(3, trigger: 'bottom_slider');
+
+      expect(state.currentPageIndex, 3);
+      expect(state.pageIndexNotifier.value, 3);
+      expect(prefetched, [3]);
+      expect(prefetchedAhead, [3]);
+    });
   });
 }

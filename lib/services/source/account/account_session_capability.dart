@@ -154,7 +154,7 @@ extension HazukiSourceServiceAccountSessionCapability on HazukiSourceService {
     await facade.deleteSourceData(sourceKey, 'account');
     await facade.deleteSourceData(sourceKey, 'avatar_url');
     await facade.deleteSourceData(sourceKey, 'display_name');
-    await facade._saveCookieStore(const []);
+    await facade.saveCookieStore(const []);
     facade.runtime.transientAvatarUrl = null;
     await facade.deleteSourceData(sourceKey, 'token');
   }

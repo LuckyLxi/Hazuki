@@ -42,6 +42,7 @@ class HomeDrawer extends StatelessWidget {
     required this.onOpenDownloads,
     required this.onOpenSettings,
     required this.onOpenLines,
+    this.activeSourceKey = '',
     this.selectedDestination,
   });
 
@@ -62,6 +63,7 @@ class HomeDrawer extends StatelessWidget {
   final VoidCallback onOpenDownloads;
   final VoidCallback onOpenSettings;
   final VoidCallback onOpenLines;
+  final String activeSourceKey;
   final HomeDrawerDestination? selectedDestination;
 
   @override
@@ -90,6 +92,7 @@ class HomeDrawer extends StatelessWidget {
           onOpenSettings: onOpenSettings,
           onOpenLines: onOpenLines,
         ),
+        activeSourceKey: activeSourceKey,
         selectedDestination: selectedDestination,
       ),
     );

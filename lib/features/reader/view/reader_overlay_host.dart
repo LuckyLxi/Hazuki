@@ -81,10 +81,11 @@ class ReaderOverlayHost extends StatelessWidget {
             runtimeState: runtimeState,
             readerTheme: readerTheme,
             chapterPanelLoading: chapterPanelLoading,
-            maybeTriggerSliderHaptic: (value) {
+            maybeTriggerSliderHaptic: (value, {force = false}) {
               maybeTriggerReaderSliderHaptic(
                 runtimeState: runtimeState,
                 value: value,
+                force: force,
               );
             },
             updateState: updateState,

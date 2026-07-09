@@ -3,15 +3,14 @@ import 'dart:convert';
 
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
-import 'package:hazuki/app/service_locator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:hazuki/app/app_preferences.dart';
+import 'package:hazuki/shared/preferences/hazuki_preference_keys.dart';
 import 'package:hazuki/services/storage/hazuki_database.dart';
 
 class SearchHistoryService extends ChangeNotifier {
-  SearchHistoryService({HazukiDatabase? database})
-    : _database = database ?? sl<HazukiDatabase>();
+  SearchHistoryService({required HazukiDatabase database})
+    : _database = database;
 
   final HazukiDatabase _database;
   Future<void> _migration = Future.value();

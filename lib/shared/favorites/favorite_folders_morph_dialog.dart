@@ -7,7 +7,7 @@ import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
-import '../support/favorite_folders_view_model.dart';
+import 'favorite_folders_view_model.dart';
 
 class FavoriteFoldersMorphDialog extends StatefulWidget {
   const FavoriteFoldersMorphDialog({super.key, required this.viewModel});

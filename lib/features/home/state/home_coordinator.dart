@@ -4,19 +4,22 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
-import 'package:hazuki/features/favorite/favorite.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/features/home/state/home_profile_controller.dart';
 import 'package:hazuki/features/home/support/home_profile_flow.dart';
 import 'package:hazuki/features/home/state/home_shell_controller.dart';
+import 'package:hazuki/shared/favorites/favorite_app_bar_actions_state.dart';
+import 'package:hazuki/shared/favorites/favorite_page_actions.dart';
 
 class HomeCoordinator extends ChangeNotifier {
   HomeCoordinator({
     required int initialTabIndex,
-    required HazukiSourceService sourceService,
+    required SourceRuntimeGateway sourceService,
+    required SourceImageGateway imageService,
     required DiscoverDailyRecommendationService dailyRecommendationService,
   }) : _sourceService = sourceService,
+       _imageService = imageService,
        _dailyRecommendationService = dailyRecommendationService,
        _profileController = HomeProfileController(sourceService: sourceService),
        _shellController = HomeShellController(initialTabIndex: initialTabIndex),
@@ -33,7 +36,8 @@ class HomeCoordinator extends ChangeNotifier {
     'hazuki.comics/media',
   );
 
-  final HazukiSourceService _sourceService;
+  final SourceRuntimeGateway _sourceService;
+  final SourceImageGateway _imageService;
   final HomeProfileController _profileController;
   final HomeShellController _shellController;
   final DiscoverDailyRecommendationService _dailyRecommendationService;
@@ -54,6 +58,7 @@ class HomeCoordinator extends ChangeNotifier {
   bool get isCheckInAvailable => _profileController.isCheckInAvailable;
   int get authVersion => _profileController.authVersion;
   bool get isLogged => _profileController.isLogged;
+  SourceRuntimeGateway get sourceService => _sourceService;
 
   int get currentIndex => _shellController.currentIndex;
   double get discoverSearchMorphProgress =>
@@ -162,6 +167,7 @@ class HomeCoordinator extends ChangeNotifier {
       isMounted: isMounted,
       profileController: _profileController,
       sourceService: _sourceService,
+      imageService: _imageService,
       mediaChannel: _mediaChannel,
       syncUserProfile: () => syncUserProfile(context),
     );

@@ -6,9 +6,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../app/app_preferences.dart';
+import '../shared/preferences/hazuki_preference_keys.dart';
 import '../models/hazuki_models.dart';
-import 'hazuki_source_service.dart';
+import 'source/source_capabilities.dart';
 
 class DiscoverDailyRecommendationEntry {
   const DiscoverDailyRecommendationEntry({
@@ -129,6 +129,23 @@ class DiscoverDailyRecommendationState {
 
 const Object _discoverRecommendationUnset = Object();
 
+@immutable
+class DiscoverDailyRecommendationSnapshot {
+  const DiscoverDailyRecommendationSnapshot({
+    required this.recommendations,
+    required this.selectedAuthor,
+    required this.generatedAt,
+    required this.sourceKey,
+    required this.schemaVersion,
+  });
+
+  final List<DiscoverDailyRecommendationEntry> recommendations;
+  final String selectedAuthor;
+  final DateTime generatedAt;
+  final String sourceKey;
+  final int schemaVersion;
+}
+
 @visibleForTesting
 String extractDiscoverRecommendationAuthor(ComicDetailsData details) {
   final authors = normalizeDiscoverRecommendationMetaValues(
@@ -243,21 +260,408 @@ String _discoverRecommendationComicKey(ExploreComic comic) {
   ).storageKey;
 }
 
+const String _discoverDailyRecommendationCachePayloadKey =
+    hazukiDiscoverDailyRecommendationCachePreferenceKey;
+const int _discoverDailyRecommendationCacheSchemaVersion = 2;
+const Duration _discoverDailyRecommendationCacheTtl = Duration(minutes: 15);
+
+abstract interface class DiscoverDailyRecommendationCacheStore {
+  Future<void> setEnabled(bool enabled);
+  Future<bool> loadEnabled();
+  Future<void> persistSnapshot(DiscoverDailyRecommendationSnapshot snapshot);
+  Future<DiscoverDailyRecommendationSnapshot?> readSnapshot({
+    required String activeSourceKey,
+  });
+}
+
+class SharedPreferencesDiscoverDailyRecommendationCacheStore
+    implements DiscoverDailyRecommendationCacheStore {
+  const SharedPreferencesDiscoverDailyRecommendationCacheStore();
+
+  @override
+  Future<void> setEnabled(bool enabled) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(
+      hazukiDiscoverDailyRecommendationEnabledPreferenceKey,
+      enabled,
+    );
+  }
+
+  @override
+  Future<bool> loadEnabled() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(
+          hazukiDiscoverDailyRecommendationEnabledPreferenceKey,
+        ) ??
+        false;
+  }
+
+  @override
+  Future<void> persistSnapshot(
+    DiscoverDailyRecommendationSnapshot snapshot,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _sourceCachePayloadKey(snapshot.sourceKey),
+      jsonEncode(<String, dynamic>{
+        'version': _discoverDailyRecommendationCacheSchemaVersion,
+        'sourceKey': snapshot.sourceKey,
+        'generatedAt': snapshot.generatedAt.toIso8601String(),
+        'selectedAuthor': snapshot.selectedAuthor,
+        'entries': snapshot.recommendations
+            .map((entry) => entry.toJson())
+            .toList(),
+      }),
+    );
+  }
+
+  @override
+  Future<DiscoverDailyRecommendationSnapshot?> readSnapshot({
+    required String activeSourceKey,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    final hasActiveSourceKey = activeSourceKey.trim().isNotEmpty;
+    final candidates = <String>[
+      if (hasActiveSourceKey) _sourceCachePayloadKey(activeSourceKey),
+      _discoverDailyRecommendationCachePayloadKey,
+      if (!hasActiveSourceKey)
+        ...prefs
+            .getKeys()
+            .where(
+              (key) =>
+                  key.startsWith(
+                    '${_discoverDailyRecommendationCachePayloadKey}_',
+                  ) &&
+                  key != _discoverDailyRecommendationCachePayloadKey,
+            )
+            .toList()
+          ..sort(),
+    ];
+
+    DiscoverDailyRecommendationSnapshot? newestFallback;
+    for (final key in candidates) {
+      final snapshot = _parseCachePayload(
+        prefs.getString(key),
+        activeSourceKey: activeSourceKey,
+      );
+      if (snapshot == null) {
+        continue;
+      }
+      if (hasActiveSourceKey) {
+        return snapshot;
+      }
+      final currentFallback = newestFallback;
+      if (currentFallback == null ||
+          snapshot.generatedAt.isAfter(currentFallback.generatedAt)) {
+        newestFallback = snapshot;
+      }
+    }
+    return newestFallback;
+  }
+
+  static String _sourceCachePayloadKey(String sourceKey) {
+    final normalized = sourceKey.trim();
+    if (normalized.isEmpty) {
+      return _discoverDailyRecommendationCachePayloadKey;
+    }
+    return '${_discoverDailyRecommendationCachePayloadKey}_$normalized';
+  }
+
+  static DiscoverDailyRecommendationSnapshot? _parseCachePayload(
+    String? raw, {
+    required String activeSourceKey,
+  }) {
+    if (raw == null || raw.trim().isEmpty) {
+      return null;
+    }
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) {
+        return null;
+      }
+      final map = Map<String, dynamic>.from(decoded);
+      final version = map['version'] is int ? map['version'] as int : 1;
+      final sourceKey = (map['sourceKey'] ?? activeSourceKey).toString().trim();
+      final generatedAt = DateTime.tryParse(
+        (map['generatedAt'] ?? '').toString(),
+      )?.toLocal();
+      final selectedAuthor = (map['selectedAuthor'] ?? '').toString().trim();
+      final entriesRaw = map['entries'];
+      final entries = entriesRaw is List
+          ? entriesRaw
+                .map(DiscoverDailyRecommendationEntry.fromJson)
+                .whereType<DiscoverDailyRecommendationEntry>()
+                .toList(growable: false)
+          : const <DiscoverDailyRecommendationEntry>[];
+      if (generatedAt == null ||
+          selectedAuthor.isEmpty ||
+          entries.length !=
+              DiscoverDailyRecommendationService.recommendationCount) {
+        return null;
+      }
+      return DiscoverDailyRecommendationSnapshot(
+        recommendations: entries,
+        selectedAuthor: selectedAuthor,
+        generatedAt: generatedAt,
+        sourceKey: sourceKey,
+        schemaVersion: version,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+}
+
+abstract interface class DiscoverDailyRecommendationCandidateGenerator {
+  Future<DiscoverDailyRecommendationSnapshot?> generate({
+    required List<DiscoverDailyRecommendationEntry> previous,
+  });
+}
+
+class SourceDiscoverDailyRecommendationCandidateGenerator
+    implements DiscoverDailyRecommendationCandidateGenerator {
+  SourceDiscoverDailyRecommendationCandidateGenerator({
+    required SourceDailyRecommendationGateway source,
+    required math.Random random,
+    this.authorsAssetPath = DiscoverDailyRecommendationService.authorsAssetPath,
+  }) : _source = source,
+       _random = random;
+
+  final SourceDailyRecommendationGateway _source;
+  final math.Random _random;
+  final String authorsAssetPath;
+
+  bool get _supportsActiveSource => _source.isActiveJmSource;
+
+  @override
+  Future<DiscoverDailyRecommendationSnapshot?> generate({
+    required List<DiscoverDailyRecommendationEntry> previous,
+  }) async {
+    if (!_supportsActiveSource) {
+      return null;
+    }
+    final sourceKey = _source.activeSourceKey.trim();
+    bool hasSameActiveSource() {
+      return _supportsActiveSource &&
+          _source.activeSourceKey.trim() == sourceKey;
+    }
+
+    final authors = await _loadAuthors();
+    if (authors.isEmpty || !hasSameActiveSource()) {
+      return null;
+    }
+
+    final shuffledAuthors = authors.toSet().toList(growable: true)
+      ..shuffle(_random);
+    var recommendations = previous;
+    final contributingAuthors = <String>[];
+    var authorSearchAttempts = 0;
+    var consecutiveSearchFailures = 0;
+
+    for (final author in shuffledAuthors) {
+      if (!hasSameActiveSource()) {
+        return null;
+      }
+      if (authorSearchAttempts >=
+          DiscoverDailyRecommendationService.maxAuthorSearchAttempts) {
+        break;
+      }
+      authorSearchAttempts++;
+
+      SearchComicsResult result;
+      try {
+        result = await _source.searchComics(
+          keyword: author,
+          page: 1,
+          order: 'mr',
+          sourceKey: sourceKey,
+        );
+      } catch (_) {
+        if (!hasSameActiveSource()) {
+          return null;
+        }
+        consecutiveSearchFailures++;
+        if (consecutiveSearchFailures >=
+            DiscoverDailyRecommendationService.maxConsecutiveSearchFailures) {
+          break;
+        }
+        continue;
+      }
+      consecutiveSearchFailures = 0;
+      if (!hasSameActiveSource()) {
+        return null;
+      }
+
+      final candidates = uniqueShuffledDiscoverRecommendationComics(
+        result.comics,
+        random: _random,
+      );
+      if (candidates.isEmpty) {
+        continue;
+      }
+
+      final replacesWholeGroup =
+          candidates.length >=
+              DiscoverDailyRecommendationService.recommendationCount &&
+          (recommendations.isEmpty || previous.isNotEmpty);
+      final existingKeys = recommendations
+          .map((entry) => _discoverRecommendationComicKey(entry.comic))
+          .toSet();
+      final eligibleCandidates = replacesWholeGroup
+          ? candidates
+          : candidates
+                .where(
+                  (comic) => !existingKeys.contains(
+                    _discoverRecommendationComicKey(comic),
+                  ),
+                )
+                .toList(growable: false);
+      if (eligibleCandidates.isEmpty) {
+        continue;
+      }
+      final needed = replacesWholeGroup
+          ? DiscoverDailyRecommendationService.recommendationCount
+          : previous.isEmpty
+          ? DiscoverDailyRecommendationService.recommendationCount -
+                recommendations.length
+          : eligibleCandidates.length;
+      final sampledComics = eligibleCandidates
+          .take(needed)
+          .toList(growable: false);
+      final incoming = await _buildRecommendationEntries(
+        sampledComics,
+        fallbackAuthor: author,
+      );
+      if (!hasSameActiveSource()) {
+        return null;
+      }
+      if (incoming.isEmpty) {
+        continue;
+      }
+
+      recommendations = mergeDiscoverRecommendationEntries(
+        previous: recommendations,
+        incoming: incoming,
+        count: DiscoverDailyRecommendationService.recommendationCount,
+        random: _random,
+      );
+      contributingAuthors.add(author);
+      if (recommendations.length ==
+          DiscoverDailyRecommendationService.recommendationCount) {
+        break;
+      }
+    }
+
+    if (!hasSameActiveSource() ||
+        recommendations.length !=
+            DiscoverDailyRecommendationService.recommendationCount ||
+        contributingAuthors.isEmpty) {
+      return null;
+    }
+
+    return DiscoverDailyRecommendationSnapshot(
+      recommendations: recommendations,
+      selectedAuthor: contributingAuthors.join(' / '),
+      generatedAt: DateTime.now(),
+      sourceKey: sourceKey,
+      schemaVersion: _discoverDailyRecommendationCacheSchemaVersion,
+    );
+  }
+
+  Future<List<String>> _loadAuthors() async {
+    final raw = await rootBundle.loadString(authorsAssetPath);
+    final lines = const LineSplitter().convert(raw);
+    final authors = <String>[];
+    for (final line in lines) {
+      final normalized = line
+          .replaceFirst(RegExp(r'^\s*\d+\s*(?:[.\s]|\u3001)*'), '')
+          .trim();
+      if (normalized.isEmpty) {
+        continue;
+      }
+      authors.add(normalized);
+    }
+    return authors;
+  }
+
+  Future<List<DiscoverDailyRecommendationEntry>> _buildRecommendationEntries(
+    List<ExploreComic> comics, {
+    required String fallbackAuthor,
+  }) async {
+    final entries = <DiscoverDailyRecommendationEntry>[];
+    for (final comic in comics) {
+      final author = await _loadComicAuthor(comic);
+      final resolvedAuthor = author.isEmpty ? fallbackAuthor : author;
+      if (resolvedAuthor.isEmpty) {
+        continue;
+      }
+      entries.add(
+        DiscoverDailyRecommendationEntry(author: resolvedAuthor, comic: comic),
+      );
+      if (entries.length ==
+          DiscoverDailyRecommendationService.recommendationCount) {
+        break;
+      }
+    }
+    return entries;
+  }
+
+  Future<String> _loadComicAuthor(ExploreComic comic) async {
+    try {
+      final details = await _source.loadComicDetails(
+        comic.id,
+        sourceKey: comic.sourceKey,
+      );
+      return extractDiscoverRecommendationAuthor(details);
+    } catch (_) {
+      return '';
+    }
+  }
+}
+
+@visibleForTesting
+List<ExploreComic> uniqueShuffledDiscoverRecommendationComics(
+  List<ExploreComic> comics, {
+  math.Random? random,
+}) {
+  final deduped = <String, ExploreComic>{};
+  for (final comic in comics) {
+    final key = _discoverRecommendationComicKey(comic);
+    if (key.isEmpty || deduped.containsKey(key)) {
+      continue;
+    }
+    deduped[key] = comic;
+  }
+  return deduped.values.toList(growable: true)
+    ..shuffle(random ?? math.Random());
+}
+
 class DiscoverDailyRecommendationService extends ChangeNotifier {
-  DiscoverDailyRecommendationService({required HazukiSourceService source})
-    : _source = source {
+  DiscoverDailyRecommendationService({
+    required SourceDailyRecommendationGateway source,
+    DiscoverDailyRecommendationCacheStore? cacheStore,
+    DiscoverDailyRecommendationCandidateGenerator? candidateGenerator,
+  }) : _source = source,
+       _cacheStore =
+           cacheStore ??
+           const SharedPreferencesDiscoverDailyRecommendationCacheStore() {
+    _candidateGenerator =
+        candidateGenerator ??
+        SourceDiscoverDailyRecommendationCandidateGenerator(
+          source: source,
+          random: _random,
+        );
     _source.addListener(_handleSourceChanged);
   }
 
-  final HazukiSourceService _source;
+  final SourceDailyRecommendationGateway _source;
+  final DiscoverDailyRecommendationCacheStore _cacheStore;
+  late final DiscoverDailyRecommendationCandidateGenerator _candidateGenerator;
 
   static const String authorsAssetPath = 'assets/data/authors.txt';
-  static const String _cachePayloadKey = 'discover_daily_recommendation_cache';
-  static const int _cacheSchemaVersion = 2;
-  static const Duration _cacheTtl = Duration(minutes: 15);
   static const int recommendationCount = 7;
-  static const int _maxAuthorSearchAttempts = 20;
-  static const int _maxConsecutiveSearchFailures = 3;
+  static const int maxAuthorSearchAttempts = 20;
+  static const int maxConsecutiveSearchFailures = 3;
 
   final math.Random _random = math.Random();
 
@@ -270,11 +674,7 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
   bool get _supportsActiveSource => _source.isActiveJmSource;
 
   Future<void> setEnabled(bool enabled) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(
-      hazukiDiscoverDailyRecommendationEnabledPreferenceKey,
-      enabled,
-    );
+    await _cacheStore.setEnabled(enabled);
     if (!enabled) {
       _setState(const DiscoverDailyRecommendationState.disabled());
       return;
@@ -287,11 +687,7 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
   }
 
   Future<bool> loadEnabled() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(
-          hazukiDiscoverDailyRecommendationEnabledPreferenceKey,
-        ) ??
-        false;
+    return _cacheStore.loadEnabled();
   }
 
   Future<DiscoverDailyRecommendationState> ensurePrepared({
@@ -315,12 +711,13 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
       return _state;
     }
 
-    final prefs = await SharedPreferences.getInstance();
-    final cached = _readCache(prefs);
+    final cached = await _cacheStore.readSnapshot(
+      activeSourceKey: _source.activeSourceKey,
+    );
     if (cached != null) {
       _setState(_snapshotToDisplayedState(cached));
       if (!_isCacheFresh(cached)) {
-        unawaited(_refreshPendingRecommendations(prefs: prefs));
+        unawaited(_refreshPendingRecommendations());
       }
       return _state;
     }
@@ -336,7 +733,7 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
       return _state;
     }
 
-    await _persistSnapshot(prefs, generated);
+    await _cacheStore.persistSnapshot(generated);
     _setState(_snapshotToDisplayedState(generated));
     return _state;
   }
@@ -379,7 +776,7 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
   }
 
   DiscoverDailyRecommendationState _snapshotToDisplayedState(
-    _DiscoverDailyRecommendationSnapshot snapshot,
+    DiscoverDailyRecommendationSnapshot snapshot,
   ) {
     return DiscoverDailyRecommendationState(
       enabled: true,
@@ -391,9 +788,7 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
     );
   }
 
-  Future<void> _refreshPendingRecommendations({
-    SharedPreferences? prefs,
-  }) async {
+  Future<void> _refreshPendingRecommendations() async {
     if (_refreshInFlight != null ||
         !_state.enabled ||
         _state.isPendingReady ||
@@ -419,8 +814,7 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
         return;
       }
 
-      final resolvedPrefs = prefs ?? await SharedPreferences.getInstance();
-      await _persistSnapshot(resolvedPrefs, generated);
+      await _cacheStore.persistSnapshot(generated);
       _setState(
         _state.copyWith(
           pendingRecommendations: generated.recommendations,
@@ -470,245 +864,29 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
     }
   }
 
-  Future<void> _persistSnapshot(
-    SharedPreferences prefs,
-    _DiscoverDailyRecommendationSnapshot snapshot,
-  ) {
-    return prefs.setString(
-      _sourceCachePayloadKey(snapshot.sourceKey),
-      jsonEncode(<String, dynamic>{
-        'version': _cacheSchemaVersion,
-        'sourceKey': snapshot.sourceKey,
-        'generatedAt': snapshot.generatedAt.toIso8601String(),
-        'selectedAuthor': snapshot.selectedAuthor,
-        'entries': snapshot.recommendations
-            .map((entry) => entry.toJson())
-            .toList(),
-      }),
-    );
-  }
-
-  _DiscoverDailyRecommendationSnapshot? _readCache(SharedPreferences prefs) {
-    final activeSourceKey = _source.activeSourceKey;
-    final hasActiveSourceKey = activeSourceKey.trim().isNotEmpty;
-    final candidates = <String>[
-      if (hasActiveSourceKey) _sourceCachePayloadKey(activeSourceKey),
-      _cachePayloadKey,
-      if (!hasActiveSourceKey)
-        ...prefs
-            .getKeys()
-            .where(
-              (key) =>
-                  key.startsWith('${_cachePayloadKey}_') &&
-                  key != _cachePayloadKey,
-            )
-            .toList()
-          ..sort(),
-    ];
-
-    _DiscoverDailyRecommendationSnapshot? newestFallback;
-    for (final key in candidates) {
-      final snapshot = _parseCachePayload(
-        prefs.getString(key),
-        activeSourceKey: activeSourceKey,
-      );
-      if (snapshot == null) {
-        continue;
-      }
-      if (hasActiveSourceKey) {
-        return snapshot;
-      }
-      final currentFallback = newestFallback;
-      if (currentFallback == null ||
-          snapshot.generatedAt.isAfter(currentFallback.generatedAt)) {
-        newestFallback = snapshot;
-      }
-    }
-    return newestFallback;
-  }
-
-  _DiscoverDailyRecommendationSnapshot? _parseCachePayload(
-    String? raw, {
-    required String activeSourceKey,
-  }) {
-    if (raw == null || raw.trim().isEmpty) {
-      return null;
-    }
-    try {
-      final decoded = jsonDecode(raw);
-      if (decoded is! Map) {
-        return null;
-      }
-      final map = Map<String, dynamic>.from(decoded);
-      final version = map['version'] is int ? map['version'] as int : 1;
-      final sourceKey = (map['sourceKey'] ?? activeSourceKey).toString().trim();
-      final generatedAt = DateTime.tryParse(
-        (map['generatedAt'] ?? '').toString(),
-      )?.toLocal();
-      final selectedAuthor = (map['selectedAuthor'] ?? '').toString().trim();
-      final entriesRaw = map['entries'];
-      final entries = entriesRaw is List
-          ? entriesRaw
-                .map(DiscoverDailyRecommendationEntry.fromJson)
-                .whereType<DiscoverDailyRecommendationEntry>()
-                .toList(growable: false)
-          : const <DiscoverDailyRecommendationEntry>[];
-      if (generatedAt == null ||
-          selectedAuthor.isEmpty ||
-          entries.length != recommendationCount) {
-        return null;
-      }
-      return _DiscoverDailyRecommendationSnapshot(
-        recommendations: entries,
-        selectedAuthor: selectedAuthor,
-        generatedAt: generatedAt,
-        sourceKey: sourceKey,
-        schemaVersion: version,
-      );
-    } catch (_) {
-      return null;
-    }
-  }
-
   bool _isDisplayedFresh(DiscoverDailyRecommendationState state) {
     final generatedAt = state.generatedAt;
     if (generatedAt == null) {
       return false;
     }
-    return DateTime.now().difference(generatedAt) <= _cacheTtl;
+    return DateTime.now().difference(generatedAt) <=
+        _discoverDailyRecommendationCacheTtl;
   }
 
-  bool _isCacheFresh(_DiscoverDailyRecommendationSnapshot snapshot) {
-    return snapshot.schemaVersion == _cacheSchemaVersion &&
-        DateTime.now().difference(snapshot.generatedAt) <= _cacheTtl;
+  bool _isCacheFresh(DiscoverDailyRecommendationSnapshot snapshot) {
+    return snapshot.schemaVersion ==
+            _discoverDailyRecommendationCacheSchemaVersion &&
+        DateTime.now().difference(snapshot.generatedAt) <=
+            _discoverDailyRecommendationCacheTtl;
   }
 
-  Future<_DiscoverDailyRecommendationSnapshot?>
+  Future<DiscoverDailyRecommendationSnapshot?>
   _generateRecommendations() async {
-    if (!_supportsActiveSource) {
-      return null;
-    }
-    final sourceKey = _source.activeSourceKey.trim();
-    bool hasSameActiveSource() {
-      return _supportsActiveSource &&
-          _source.activeSourceKey.trim() == sourceKey;
-    }
-
-    final authors = await _loadAuthors();
-    if (authors.isEmpty || !hasSameActiveSource()) {
-      return null;
-    }
-
-    final shuffledAuthors = authors.toSet().toList(growable: true)
-      ..shuffle(_random);
     final previous =
         _state.displayedRecommendations.length == recommendationCount
         ? _state.displayedRecommendations
         : const <DiscoverDailyRecommendationEntry>[];
-    var recommendations = previous;
-    final contributingAuthors = <String>[];
-    var authorSearchAttempts = 0;
-    var consecutiveSearchFailures = 0;
-
-    for (final author in shuffledAuthors) {
-      if (!hasSameActiveSource()) {
-        return null;
-      }
-      if (authorSearchAttempts >= _maxAuthorSearchAttempts) {
-        break;
-      }
-      authorSearchAttempts++;
-
-      SearchComicsResult result;
-      try {
-        result = await _source.searchComics(
-          keyword: author,
-          page: 1,
-          order: 'mr',
-          sourceKey: sourceKey,
-        );
-      } catch (_) {
-        if (!hasSameActiveSource()) {
-          return null;
-        }
-        consecutiveSearchFailures++;
-        if (consecutiveSearchFailures >= _maxConsecutiveSearchFailures) {
-          break;
-        }
-        continue;
-      }
-      consecutiveSearchFailures = 0;
-      if (!hasSameActiveSource()) {
-        return null;
-      }
-
-      final candidates = _uniqueShuffledComics(result.comics);
-      if (candidates.isEmpty) {
-        continue;
-      }
-
-      final replacesWholeGroup =
-          candidates.length >= recommendationCount &&
-          (recommendations.isEmpty || previous.isNotEmpty);
-      final existingKeys = recommendations
-          .map((entry) => _discoverRecommendationComicKey(entry.comic))
-          .toSet();
-      final eligibleCandidates = replacesWholeGroup
-          ? candidates
-          : candidates
-                .where(
-                  (comic) => !existingKeys.contains(
-                    _discoverRecommendationComicKey(comic),
-                  ),
-                )
-                .toList(growable: false);
-      if (eligibleCandidates.isEmpty) {
-        continue;
-      }
-      final needed = replacesWholeGroup
-          ? recommendationCount
-          : previous.isEmpty
-          ? recommendationCount - recommendations.length
-          : eligibleCandidates.length;
-      final sampledComics = eligibleCandidates
-          .take(needed)
-          .toList(growable: false);
-      final incoming = await _buildRecommendationEntries(
-        sampledComics,
-        fallbackAuthor: author,
-      );
-      if (!hasSameActiveSource()) {
-        return null;
-      }
-      if (incoming.isEmpty) {
-        continue;
-      }
-
-      recommendations = mergeDiscoverRecommendationEntries(
-        previous: recommendations,
-        incoming: incoming,
-        count: recommendationCount,
-        random: _random,
-      );
-      contributingAuthors.add(author);
-      if (recommendations.length == recommendationCount) {
-        break;
-      }
-    }
-
-    if (!hasSameActiveSource() ||
-        recommendations.length != recommendationCount ||
-        contributingAuthors.isEmpty) {
-      return null;
-    }
-
-    return _DiscoverDailyRecommendationSnapshot(
-      recommendations: recommendations,
-      selectedAuthor: contributingAuthors.join(' / '),
-      generatedAt: DateTime.now(),
-      sourceKey: sourceKey,
-      schemaVersion: _cacheSchemaVersion,
-    );
+    return _candidateGenerator.generate(previous: previous);
   }
 
   void _handleSourceChanged() {
@@ -729,89 +907,4 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
     _source.removeListener(_handleSourceChanged);
     super.dispose();
   }
-
-  String _sourceCachePayloadKey(String sourceKey) {
-    final normalized = sourceKey.trim();
-    if (normalized.isEmpty) {
-      return _cachePayloadKey;
-    }
-    return '${_cachePayloadKey}_$normalized';
-  }
-
-  Future<List<String>> _loadAuthors() async {
-    final raw = await rootBundle.loadString(authorsAssetPath);
-    final lines = const LineSplitter().convert(raw);
-    final authors = <String>[];
-    for (final line in lines) {
-      final normalized = line
-          .replaceFirst(RegExp(r'^\s*\d+\s*[.\s、]*'), '')
-          .trim();
-      if (normalized.isEmpty) {
-        continue;
-      }
-      authors.add(normalized);
-    }
-    return authors;
-  }
-
-  Future<List<DiscoverDailyRecommendationEntry>> _buildRecommendationEntries(
-    List<ExploreComic> comics, {
-    required String fallbackAuthor,
-  }) async {
-    final entries = <DiscoverDailyRecommendationEntry>[];
-    for (final comic in comics) {
-      final author = await _loadComicAuthor(comic);
-      final resolvedAuthor = author.isEmpty ? fallbackAuthor : author;
-      if (resolvedAuthor.isEmpty) {
-        continue;
-      }
-      entries.add(
-        DiscoverDailyRecommendationEntry(author: resolvedAuthor, comic: comic),
-      );
-      if (entries.length == recommendationCount) {
-        break;
-      }
-    }
-    return entries;
-  }
-
-  Future<String> _loadComicAuthor(ExploreComic comic) async {
-    try {
-      final details = await _source.loadComicDetails(
-        comic.id,
-        sourceKey: comic.sourceKey,
-      );
-      return extractDiscoverRecommendationAuthor(details);
-    } catch (_) {
-      return '';
-    }
-  }
-
-  List<ExploreComic> _uniqueShuffledComics(List<ExploreComic> comics) {
-    final deduped = <String, ExploreComic>{};
-    for (final comic in comics) {
-      final key = _discoverRecommendationComicKey(comic);
-      if (key.isEmpty || deduped.containsKey(key)) {
-        continue;
-      }
-      deduped[key] = comic;
-    }
-    return deduped.values.toList(growable: true)..shuffle(_random);
-  }
-}
-
-class _DiscoverDailyRecommendationSnapshot {
-  const _DiscoverDailyRecommendationSnapshot({
-    required this.recommendations,
-    required this.selectedAuthor,
-    required this.generatedAt,
-    required this.sourceKey,
-    required this.schemaVersion,
-  });
-
-  final List<DiscoverDailyRecommendationEntry> recommendations;
-  final String selectedAuthor;
-  final DateTime generatedAt;
-  final String sourceKey;
-  final int schemaVersion;
 }

@@ -5,7 +5,25 @@ import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_page.dart';
 import 'package:hazuki/features/reader/view/reader_page.dart';
 import 'package:hazuki/models/hazuki_models.dart';
+import 'package:hazuki/shared/comments/comments_widget_builder.dart';
 import '../../support/test_service_locator.dart';
+
+Widget _buildComments({
+  required String comicId,
+  String? subId,
+  required String sourceKey,
+  ScrollController? scrollController,
+  Future<void> Function()? onRequestTabFullscreen,
+  bool showAppBar = false,
+  bool isTabView = false,
+  bool isActiveInTabView = true,
+  Map<String, Object?> Function()? debugOuterScrollStateBuilder,
+}) {
+  return const SizedBox.shrink();
+}
+
+final ReaderCommentsWidgetBuilder _buildReaderComments =
+    readerCommentsWidgetBuilderFrom(_buildComments);
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -43,6 +61,7 @@ void main() {
                 required chapterIndex,
                 required images,
                 required sourceKey,
+                coverUrl = '',
                 comicTheme,
                 onFavoriteRequested,
               }) => ReaderPage(
@@ -53,8 +72,11 @@ void main() {
                 chapterIndex: chapterIndex,
                 images: images,
                 sourceKey: sourceKey,
+                coverUrl: coverUrl,
+                commentsWidgetBuilder: _buildReaderComments,
               ),
           searchPageBuilder: (_) => const SizedBox.shrink(),
+          commentsWidgetBuilder: _buildComments,
         ),
       ),
     );
@@ -95,6 +117,7 @@ void main() {
                 required chapterIndex,
                 required images,
                 required sourceKey,
+                coverUrl = '',
                 comicTheme,
                 onFavoriteRequested,
               }) => ReaderPage(
@@ -105,8 +128,11 @@ void main() {
                 chapterIndex: chapterIndex,
                 images: images,
                 sourceKey: sourceKey,
+                coverUrl: coverUrl,
+                commentsWidgetBuilder: _buildReaderComments,
               ),
           searchPageBuilder: (_) => const SizedBox.shrink(),
+          commentsWidgetBuilder: _buildComments,
         ),
       ),
     );

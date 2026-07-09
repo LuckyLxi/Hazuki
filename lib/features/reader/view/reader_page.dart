@@ -9,9 +9,8 @@ import 'package:hazuki/app/windows/windows_title_bar_controller.dart';
 import 'package:hazuki/features/reader/reader.dart';
 import 'package:hazuki/features/reader/state/reader_image_pipeline_state.dart';
 import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
-import 'package:hazuki/features/reader/state/reader_settings_store.dart';
+import 'package:hazuki/shared/reading/reader_settings_store.dart';
 import 'package:hazuki/features/reader/support/reader_actions_controller.dart';
-import 'package:hazuki/features/reader/support/reader_callbacks.dart';
 import 'package:hazuki/features/reader/support/reader_diagnostics_support.dart';
 import 'package:hazuki/features/reader/support/reader_display_bridge.dart';
 import 'package:hazuki/features/reader/support/reader_image_pipeline_controller.dart';
@@ -20,17 +19,17 @@ import 'package:hazuki/features/reader/support/reader_page_context.dart';
 import 'package:hazuki/features/reader/support/reader_save_image_controller.dart';
 import 'package:hazuki/features/reader/support/reader_session_controller.dart';
 import 'package:hazuki/features/reader/support/reader_settings_controller.dart';
-import 'package:hazuki/features/reader/support/reader_source_image_quality_settings.dart';
+import 'package:hazuki/shared/reading/reader_source_image_quality_settings.dart';
 import 'package:hazuki/features/reader/support/reader_zoom_controller.dart';
 import 'package:hazuki/features/reader/view/reader_image_views.dart';
 import 'package:hazuki/features/reader/view/reader_overlay_builders.dart';
 import 'package:hazuki/features/reader/view/reader_overlay_host.dart';
 import 'package:hazuki/features/reader/view/reader_state_views.dart';
 import 'package:hazuki/l10n/l10n.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/manga_download/manga_download_service.dart';
+import 'package:hazuki/services/reading_progress_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/shared/ui_flags.dart';
-
-typedef CommentsWidgetBuilder = ReaderCommentsWidgetBuilder;
 
 class ReaderPage extends StatefulWidget {
   const ReaderPage({
@@ -41,10 +40,11 @@ class ReaderPage extends StatefulWidget {
     required this.epId,
     required this.chapterIndex,
     required this.images,
+    required this.commentsWidgetBuilder,
     this.sourceKey = '',
+    this.coverUrl = '',
     this.comicTheme,
     this.onFavoriteRequested,
-    this.commentsWidgetBuilder,
     this.offlineMode = false,
     this.offlineChapters = const <ReaderOfflineChapterData>[],
   });
@@ -56,9 +56,10 @@ class ReaderPage extends StatefulWidget {
   final int chapterIndex;
   final List<String> images;
   final String sourceKey;
+  final String coverUrl;
   final ThemeData? comicTheme;
   final Future<void> Function(BuildContext)? onFavoriteRequested;
-  final CommentsWidgetBuilder? commentsWidgetBuilder;
+  final ReaderCommentsWidgetBuilder commentsWidgetBuilder;
   final bool offlineMode;
   final List<ReaderOfflineChapterData> offlineChapters;
 
@@ -69,7 +70,8 @@ class ReaderPage extends StatefulWidget {
 class _ReaderPageState extends State<ReaderPage>
     with SingleTickerProviderStateMixin {
   static const _readerSettingsStore = ReaderSettingsStore();
-  late final HazukiSourceService _sourceService = sl<HazukiSourceService>();
+  late final SourceSettingsGateway _sourceSettings =
+      sl<SourceSettingsGateway>();
 
   ReaderSourceImageQualitySnapshot _sourceImageQuality =
       ReaderSourceImageQualitySnapshot.defaults;
@@ -91,6 +93,7 @@ class _ReaderPageState extends State<ReaderPage>
     chapterIndex: widget.chapterIndex,
     images: widget.images,
     sourceKey: widget.sourceKey,
+    coverUrl: widget.coverUrl,
     comicTheme: widget.comicTheme,
     onFavoriteRequested: widget.onFavoriteRequested,
     commentsWidgetBuilder: widget.commentsWidgetBuilder,
@@ -123,7 +126,7 @@ class _ReaderPageState extends State<ReaderPage>
         sourceKey: widget.sourceKey,
         loadImagesErrorBuilder: (error) =>
             l10n(context).readerChapterLoadFailed('$error'),
-        sourceService: sl<HazukiSourceService>(),
+        sourceService: sl<SourceReaderGateway>(),
       );
   late final ReaderZoomController _readerZoomController = ReaderZoomController(
     transformationController: _zoomController,
@@ -176,7 +179,8 @@ class _ReaderPageState extends State<ReaderPage>
         chapterTitle: widget.chapterTitle,
         chapterIndex: widget.chapterIndex,
         widgetImages: widget.images,
-        sourceService: sl<HazukiSourceService>(),
+        sourceService: sl<SourceReaderGateway>(),
+        readingProgressService: sl<ReadingProgressService>(),
         offlineMode: widget.offlineMode,
       );
   late final ReaderSettingsController _settingsController =
@@ -200,6 +204,7 @@ class _ReaderPageState extends State<ReaderPage>
         sessionController: _sessionController,
         pageContext: _pageContext,
         buildReplacementPage: _buildReaderPageFromContext,
+        downloader: sl<MangaDownloadService>(),
       );
   late final ReaderSaveImageController _saveImageController =
       ReaderSaveImageController(
@@ -246,7 +251,7 @@ class _ReaderPageState extends State<ReaderPage>
     super.initState();
     _sessionController.initialize();
     _sourceImageQuality = ReaderSourceImageQualitySettings.load(
-      _sourceService,
+      _sourceSettings,
       widget.sourceKey,
     );
   }
@@ -428,6 +433,7 @@ class _ReaderPageState extends State<ReaderPage>
       chapterIndex: pageContext.chapterIndex,
       images: pageContext.images,
       sourceKey: pageContext.sourceKey,
+      coverUrl: pageContext.coverUrl,
       comicTheme: pageContext.comicTheme,
       onFavoriteRequested: pageContext.onFavoriteRequested,
       commentsWidgetBuilder: pageContext.commentsWidgetBuilder,
@@ -482,7 +488,7 @@ class _ReaderPageState extends State<ReaderPage>
           );
         });
         await ReaderSourceImageQualitySettings.updateCopyMangaImageQuality(
-          _sourceService,
+          _sourceSettings,
           widget.sourceKey,
           normalized,
         );
@@ -498,7 +504,7 @@ class _ReaderPageState extends State<ReaderPage>
           );
         });
         await ReaderSourceImageQualitySettings.updatePicacgImageQuality(
-          _sourceService,
+          _sourceSettings,
           widget.sourceKey,
           normalized,
         );

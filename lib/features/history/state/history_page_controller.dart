@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/read_history_service.dart';
 
 import 'history_page_state.dart';
@@ -10,7 +10,7 @@ import 'history_page_state.dart';
 class HistoryPageController extends ChangeNotifier {
   HistoryPageController({
     required ReadHistoryService readHistoryService,
-    required HazukiSourceService sourceService,
+    required SourceRuntimeGateway sourceService,
   }) : _readHistoryService = readHistoryService,
        _sourceService = sourceService,
        _activeSourceKey = _normalizeSourceKey(sourceService.activeSourceKey) {
@@ -19,7 +19,7 @@ class HistoryPageController extends ChangeNotifier {
   }
 
   final ReadHistoryService _readHistoryService;
-  final HazukiSourceService _sourceService;
+  final SourceRuntimeGateway _sourceService;
   final HistoryPageData _state = HistoryPageData();
 
   bool _disposed = false;

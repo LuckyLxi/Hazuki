@@ -9,8 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:hazuki/shared/chapter_title_resolver.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
 import 'package:hazuki/app/windows/windows_title_bar_controller.dart';
-import 'package:hazuki/features/discover/support/category_tag_navigation.dart';
-import 'package:hazuki/features/discover/view/discover_section_page.dart';
+import 'package:hazuki/shared/category_tag_navigation.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/manga_download/manga_download_service.dart';
@@ -22,7 +21,7 @@ import 'comic_detail_download_conflict_dialog.dart';
 
 class ComicDetailActionsController extends ChangeNotifier {
   ComicDetailActionsController({
-    required ComicDetailRepository repository,
+    required ComicDetailFeatureFacade repository,
     required ExploreComic comic,
     required String heroTag,
     required ThemeData Function(ThemeData) detailThemeApplier,
@@ -33,6 +32,7 @@ class ComicDetailActionsController extends ChangeNotifier {
     required ComicDetailReaderPageBuilder readerPageBuilder,
     required ComicDetailSearchPageBuilder searchPageBuilder,
     required ComicDetailNestedPageBuilder comicDetailPageBuilder,
+    ComicDetailCategoryPageBuilder? categoryPageBuilder,
     required MethodChannel mediaChannel,
   }) : _repository = repository,
        _comic = comic,
@@ -45,9 +45,10 @@ class ComicDetailActionsController extends ChangeNotifier {
        _readerPageBuilder = readerPageBuilder,
        _searchPageBuilder = searchPageBuilder,
        _comicDetailPageBuilder = comicDetailPageBuilder,
+       _categoryPageBuilder = categoryPageBuilder,
        _mediaChannel = mediaChannel;
 
-  final ComicDetailRepository _repository;
+  final ComicDetailFeatureFacade _repository;
   final ExploreComic _comic;
   final String _heroTag;
   final ThemeData Function(ThemeData) _detailThemeApplier;
@@ -58,6 +59,7 @@ class ComicDetailActionsController extends ChangeNotifier {
   final ComicDetailReaderPageBuilder _readerPageBuilder;
   final ComicDetailSearchPageBuilder _searchPageBuilder;
   final ComicDetailNestedPageBuilder _comicDetailPageBuilder;
+  final ComicDetailCategoryPageBuilder? _categoryPageBuilder;
   final MethodChannel _mediaChannel;
 
   bool _disposed = false;
@@ -273,15 +275,13 @@ class ComicDetailActionsController extends ChangeNotifier {
         return;
       }
       final target = resolveCategoryTagNavigationTarget(groups, trimmedValue);
-      if (target != null) {
+      final categoryPageBuilder = _categoryPageBuilder;
+      if (target != null && categoryPageBuilder != null) {
         await Navigator.of(context).push(
           MaterialPageRoute<void>(
-            builder: (_) => DiscoverSectionPage(
-              section: ExploreSection(
-                title: target.title,
-                comics: const <ExploreComic>[],
-                viewMoreUrl: target.viewMoreUrl,
-              ),
+            builder: (_) => categoryPageBuilder(
+              title: target.title,
+              viewMoreUrl: target.viewMoreUrl,
               comicDetailPageBuilder: _comicDetailPageBuilder,
             ),
           ),

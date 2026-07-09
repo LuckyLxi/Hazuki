@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../support/test_service_locator.dart';
@@ -137,7 +138,9 @@ void main() {
 
     test('stops after three consecutive search failures', () async {
       final source = _SearchCountingSource(throwOnSearch: true);
-      final service = DiscoverDailyRecommendationService(source: source);
+      final service = DiscoverDailyRecommendationService(
+        source: HazukiSourceDailyRecommendationAdapter(source),
+      );
       addTearDown(source.dispose);
       addTearDown(service.dispose);
 
@@ -149,7 +152,9 @@ void main() {
 
     test('limits attempts when searches return no comics', () async {
       final source = _SearchCountingSource();
-      final service = DiscoverDailyRecommendationService(source: source);
+      final service = DiscoverDailyRecommendationService(
+        source: HazukiSourceDailyRecommendationAdapter(source),
+      );
       addTearDown(source.dispose);
       addTearDown(service.dispose);
 
@@ -161,7 +166,9 @@ void main() {
 
     test('stops retrying when the active source changes', () async {
       final source = _SearchCountingSource(switchSourceOnFirstSearch: true);
-      final service = DiscoverDailyRecommendationService(source: source);
+      final service = DiscoverDailyRecommendationService(
+        source: HazukiSourceDailyRecommendationAdapter(source),
+      );
       addTearDown(source.dispose);
       addTearDown(service.dispose);
 

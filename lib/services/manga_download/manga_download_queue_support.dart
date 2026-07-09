@@ -1,8 +1,7 @@
 import 'dart:io';
-import 'package:hazuki/app/service_locator.dart';
 
-import '../hazuki_source_service.dart';
 import '../network/hazuki_network.dart';
+import '../source/source_capabilities.dart';
 import 'manga_download_models.dart';
 import 'manga_download_storage_support.dart';
 
@@ -53,6 +52,7 @@ class MangaDownloadQueueExecutor {
     required MangaDownloadSuspendCheck shouldSuspendDownloads,
     required MangaDownloadTransientRecoveryCheck
     shouldRecoverTransientNetworkError,
+    required SourceReaderGateway? sourceReader,
   }) : _tasks = tasks,
        _logDownload = logDownload,
        _replaceTask = replaceTask,
@@ -70,9 +70,11 @@ class MangaDownloadQueueExecutor {
        _writeMetadataFile = writeMetadataFile,
        _chapterDirForTarget = chapterDirForTarget,
        _shouldSuspendDownloads = shouldSuspendDownloads,
-       _shouldRecoverTransientNetworkError = shouldRecoverTransientNetworkError;
+       _shouldRecoverTransientNetworkError = shouldRecoverTransientNetworkError,
+       _sourceReader = sourceReader;
 
   final List<MangaDownloadTask> _tasks;
+  final SourceReaderGateway? _sourceReader;
   final MangaDownloadLogCallback _logDownload;
   final MangaDownloadReplaceTask _replaceTask;
   final MangaDownloadRemoveTask _removeTaskByComicId;
@@ -187,8 +189,10 @@ class MangaDownloadQueueExecutor {
         ...downloadedComic.chapters,
       ];
       final existingChapterIds = downloadedChapters.map((e) => e.epId).toSet();
-      final sourceService = sl<HazukiSourceService>();
-
+      final sourceReader = _sourceReader;
+      if (sourceReader == null) {
+        throw StateError('manga_download_source_reader_not_configured');
+      }
       for (final target in task.targets) {
         if (await _shouldAbortTask(task.storageKey)) {
           return;
@@ -210,7 +214,7 @@ class MangaDownloadQueueExecutor {
           continue;
         }
 
-        final imageUrls = await sourceService.loadChapterImages(
+        final imageUrls = await sourceReader.loadChapterImages(
           comicId: task.comicId,
           epId: target.epId,
           sourceKey: task.sourceKey,
@@ -253,7 +257,7 @@ class MangaDownloadQueueExecutor {
             return;
           }
           final imageUrl = imageUrls[i];
-          final prepared = await sourceService.prepareChapterImageData(
+          final prepared = await sourceReader.prepareChapterImageData(
             imageUrl,
             comicId: task.comicId,
             epId: target.epId,

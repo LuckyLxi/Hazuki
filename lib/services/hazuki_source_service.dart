@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:collection';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
@@ -16,20 +15,35 @@ import 'package:pointycastle/block/aes.dart';
 import 'package:pointycastle/block/modes/ecb.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../app/app_preferences.dart';
 import '../shared/chapter_title_resolver.dart';
+import '../shared/preferences/hazuki_preference_keys.dart';
 import '../models/hazuki_models.dart';
 import 'source/common/source_json_coerce.dart';
 import 'source/common/source_prefs_keys.dart';
 import 'source/debug/debug_log_capability.dart';
 import 'source/debug/debug_log_internals.dart';
-import 'source/debug/source_network_log_sink.dart';
-import 'source/http/source_http_gateway.dart';
 import 'source/image/image_cache_capability.dart';
+import 'source/models/source_contract_models.dart';
+import 'source/models/source_identity.dart';
 import 'source/runtime/explore_cache_capability.dart';
 import 'source/runtime/line_settings_capability.dart';
 import 'source/runtime/source_secure_session_storage.dart';
+import 'source/runtime/source_runtime_facade.dart';
+import 'source/runtime/source_runtime_handle.dart';
+import 'source/runtime/source_runtime_registry.dart';
+import 'source/runtime/source_runtime_coordinator.dart';
 import 'network/hazuki_network.dart';
+
+export 'source/models/source_contract_models.dart';
+export 'source/models/source_identity.dart';
+export 'source/runtime/source_cookie_store.dart';
+export 'source/runtime/source_cache_store.dart';
+export 'source/runtime/source_runtime_kernel.dart';
+export 'source/runtime/source_runtime_facade.dart';
+export 'source/runtime/source_runtime_handle.dart';
+export 'source/runtime/source_runtime_registry.dart';
+export 'source/runtime/source_session_store.dart';
+export 'source/debug/source_debug_log_store.dart';
 
 part 'source/explore_capability.dart';
 
@@ -83,66 +97,6 @@ const _sourceIndexUrls = [
 ];
 
 const _bundledInitAssetPath = 'assets/init.js';
-const hazukiDefaultSourceKey = 'jm';
-
-bool isHazukiJmSourceKey(String sourceKey) {
-  return sourceKey.trim() == hazukiDefaultSourceKey;
-}
-
-bool isHazukiCopyMangaSourceKey(String sourceKey) {
-  return sourceKey.trim() == 'copy_manga';
-}
-
-bool isHazukiPicacgSourceKey(String sourceKey) {
-  return sourceKey.trim() == 'picacg';
-}
-
-Dio _createSourceDio() {
-  return createHazukiDio(
-    baseOptions: BaseOptions(
-      responseType: ResponseType.plain,
-      validateStatus: (status) => true,
-      connectTimeout: const Duration(seconds: 35),
-      receiveTimeout: const Duration(seconds: 90),
-      sendTimeout: const Duration(seconds: 35),
-    ),
-  );
-}
-
-class SourceCatalogEntry {
-  const SourceCatalogEntry({
-    required this.key,
-    required this.name,
-    required this.fileName,
-    this.directUrls = const [],
-  });
-
-  final String key;
-  final String name;
-  final String fileName;
-  final List<String> directUrls;
-
-  String get normalizedKey => key.trim();
-  String get normalizedFileName => fileName.trim();
-
-  bool matchesIndexEntry(Map<String, dynamic> map) {
-    final indexKey = map['key']?.toString().trim();
-    final indexFileName = map['fileName']?.toString().trim();
-    return indexKey == normalizedKey ||
-        (indexFileName?.toLowerCase() == normalizedFileName.toLowerCase());
-  }
-
-  List<String> fallbackUrls() {
-    if (directUrls.isNotEmpty) {
-      return directUrls;
-    }
-    final file = normalizedFileName;
-    if (file.isEmpty) {
-      return const [];
-    }
-    return ['https://cdn.jsdelivr.net/gh/venera-app/venera-configs@main/$file'];
-  }
-}
 
 const List<SourceCatalogEntry> hazukiAllowedSourceCatalog = [
   SourceCatalogEntry(
@@ -165,260 +119,45 @@ const List<SourceCatalogEntry> hazukiAllowedSourceCatalog = [
   ),
 ];
 
-enum DailyCheckInStatus { success, alreadyCheckedIn, skipped }
-
-class DailyCheckInResult {
-  const DailyCheckInResult._(this.status, [this.message]);
-
-  const DailyCheckInResult.success([String? message])
-    : this._(DailyCheckInStatus.success, message);
-
-  const DailyCheckInResult.alreadyCheckedIn([String? message])
-    : this._(DailyCheckInStatus.alreadyCheckedIn, message);
-
-  const DailyCheckInResult.skipped([String? message])
-    : this._(DailyCheckInStatus.skipped, message);
-
-  final DailyCheckInStatus status;
-  final String? message;
-
-  bool get isSuccess => status == DailyCheckInStatus.success;
-  bool get isAlreadyCheckedIn => status == DailyCheckInStatus.alreadyCheckedIn;
-  bool get isSkipped => status == DailyCheckInStatus.skipped;
-}
-
-enum SourceRuntimePhase {
-  idle,
-  prewarming,
-  loading,
-  ready,
-  failed,
-  retrying,
-  waitingForRestart,
-}
-
-enum SourceRuntimeStep {
-  none,
-  loadingCache,
-  downloadingSource,
-  creatingEngine,
-  runningSourceInit,
-}
-
-@immutable
-class SourceRuntimeState {
-  const SourceRuntimeState({
-    required this.phase,
-    required this.step,
-    required this.statusText,
-    required this.updatedAt,
-    this.debugDetail,
-    this.error,
-  });
-
-  const SourceRuntimeState.idle()
-    : this(
-        phase: SourceRuntimePhase.idle,
-        step: SourceRuntimeStep.none,
-        statusText: 'source_idle',
-        updatedAt: null,
-      );
-
-  final SourceRuntimePhase phase;
-  final SourceRuntimeStep step;
-  final String statusText;
-  final DateTime? updatedAt;
-  final String? debugDetail;
-  final String? error;
-
-  bool get isBusy =>
-      phase == SourceRuntimePhase.prewarming ||
-      phase == SourceRuntimePhase.loading ||
-      phase == SourceRuntimePhase.retrying;
-  bool get isReady => phase == SourceRuntimePhase.ready;
-  bool get hasFailure => phase == SourceRuntimePhase.failed;
-  bool get canRetry => phase == SourceRuntimePhase.failed;
-  bool get isWaitingForRestart => phase == SourceRuntimePhase.waitingForRestart;
-  bool get shouldSurfaceOnPage => isBusy || hasFailure || isWaitingForRestart;
-
-  Map<String, dynamic> toDebugMap() {
-    return <String, dynamic>{
-      'phase': phase.name,
-      'step': step.name,
-      'statusText': statusText,
-      'updatedAt': updatedAt?.toIso8601String(),
-      'debugDetail': debugDetail,
-      'error': error,
-      'canRetry': canRetry,
-      'shouldSurfaceOnPage': shouldSurfaceOnPage,
-    };
-  }
-}
-
-class SourceRuntimeRegistry extends ChangeNotifier {
-  SourceRuntimeRegistry._();
-
-  HazukiSourceService? _service;
-
-  void _bind(HazukiSourceService service) {
-    _service = service;
-  }
-
-  HazukiSourceService get _boundService {
-    final service = _service;
-    if (service == null) {
-      throw StateError('source_runtime_registry_not_bound');
-    }
-    return service;
-  }
-
-  List<SourceCatalogEntry> get allowedSources => hazukiAllowedSourceCatalog;
-
-  String get activeSourceKey => _boundService.activeSourceKey;
-
-  SourceCatalogEntry activeSourceDefinition() => definitionFor(activeSourceKey);
-
-  SourceCatalogEntry definitionFor(String sourceKey) {
-    return _boundService._definitionForSourceKey(sourceKey);
-  }
-
-  bool isAllowedSourceKey(String sourceKey) {
-    final normalized = sourceKey.trim();
-    return allowedSources.any((entry) => entry.normalizedKey == normalized);
-  }
-
-  Future<void> loadActiveSourcePreference() {
-    return _boundService.loadActiveSourcePreference();
-  }
-
-  Future<void> activateSource(String sourceKey) {
-    return _boundService.activateSource(sourceKey);
-  }
-
-  Future<void> ensureInitialized({String? sourceKey}) {
-    return _boundService.ensureInitialized(sourceKey: sourceKey);
-  }
-
-  String? currentAccountForSource(String sourceKey) {
-    return _boundService.currentAccountForSource(sourceKey);
-  }
-
-  bool isLoggedForSource(String sourceKey) {
-    return _boundService.isLoggedForSource(sourceKey);
-  }
-
-  void _notify() {
-    notifyListeners();
-  }
-}
-
-class SourceRuntimeHandle {
-  SourceRuntimeHandle({required this.service, required this.sourceKey});
-
-  final HazukiSourceService service;
-  final String sourceKey;
-  final Dio dio = _createSourceDio();
-  final SourceRuntimeKernel runtime = SourceRuntimeKernel();
-  bool _disposed = false;
-  bool _disposeRequested = false;
-  int _activeOperationCount = 0;
-  late final SourceSessionStore session = SourceSessionStore(
-    sourceKey: sourceKey,
-    secureStorage: service._secureSessionStorage,
-  );
-  final SourceCacheStore cache = SourceCacheStore();
-  final SourceDebugLogStore debug = SourceDebugLogStore();
-  bool dioCookieBridgeConfigured = false;
-
-  late final SourceJsBridge js = SourceJsBridge._(this);
-  late final SourceNetworkLogSink networkLogSink = SourceNetworkLogSink(
-    service,
-    this,
-  );
-  late final SourceHttpGateway httpGateway = SourceHttpGateway(service, this);
-  late final HazukiSourceFacade facade = HazukiSourceFacade._(
-    service: service,
-    handle: this,
-    runtime: runtime,
-    session: session,
-    cache: cache,
-    debug: debug,
-    js: js,
-    networkLogSink: networkLogSink,
-    httpGateway: httpGateway,
-  );
-  late final LineSettingsCapability lineSettings = LineSettingsCapability(
-    facade,
-  );
-  late final ImageCacheCapability imageCache = ImageCacheCapability(this);
-  late final ExploreCacheCapability exploreCache = ExploreCacheCapability(this);
-  late final DebugLogCapability debugLog = DebugLogCapability(facade);
-
-  bool get isDisposed => _disposed;
-
-  Future<T> runOperation<T>(Future<T> Function() operation) async {
-    if (_disposed || _disposeRequested) {
-      throw StateError('source_runtime_disposed:$sourceKey');
-    }
-    _activeOperationCount += 1;
-    try {
-      return await operation();
-    } finally {
-      _activeOperationCount -= 1;
-      if (_disposeRequested && _activeOperationCount == 0) {
-        _disposeNow();
-      }
-    }
-  }
-
-  void requestDispose() {
-    if (_disposed || _disposeRequested) {
-      return;
-    }
-    _disposeRequested = true;
-    if (_activeOperationCount == 0) {
-      _disposeNow();
-    }
-  }
-
-  void _disposeNow() {
-    if (_disposed) {
-      return;
-    }
-    _disposed = true;
-
-    final engine = runtime.engine;
-    runtime
-      ..engine = null
-      ..initFuture = null
-      ..sourceMeta = null
-      ..lastReloginAt = null
-      ..transientAvatarUrl = null;
-    try {
-      dio.close(force: true);
-    } catch (_) {}
-    try {
-      engine?.close();
-    } catch (_) {}
-    session.clearMemory();
-    cache.clearMemory();
-    debug.clearCapturedLogs();
-  }
-}
-
 class HazukiSourceService extends ChangeNotifier {
   HazukiSourceService({SourceSecureSessionStorage? secureSessionStorage})
     : _secureSessionStorage =
           secureSessionStorage ?? FlutterSourceSecureSessionStorage() {
-    runtimeRegistry._bind(this);
+    runtimeRegistry = SourceRuntimeRegistry(
+      allowedSources: hazukiAllowedSourceCatalog,
+      activeSourceKey: () => activeSourceKey,
+      definitionFor: _definitionForSourceKey,
+      loadActiveSourcePreference: loadActiveSourcePreference,
+      activateSource: activateSource,
+      ensureInitialized: ensureInitialized,
+      currentAccountForSource: currentAccountForSource,
+      isLoggedForSource: isLoggedForSource,
+    );
+    _runtimeCoordinator = SourceRuntimeCoordinator<SourceRuntimeHandle>(
+      catalog: hazukiAllowedSourceCatalog,
+      defaultSourceKey: hazukiDefaultSourceKey,
+      createHandle: (sourceKey) => SourceRuntimeHandle(
+        sourceKey: sourceKey,
+        secureStorage: _secureSessionStorage,
+        ensureInitialized: ensureSourceInitialized,
+        notifyRuntimeStateChanged: (sourceKey) {
+          if (activeSourceKey == sourceKey) {
+            _notifyRuntimeStateChanged();
+          } else {
+            runtimeRegistry.notifyChanged();
+          }
+        },
+      ),
+      onActiveSourceChanged: () {
+        notifyListeners();
+        runtimeRegistry.notifyChanged();
+      },
+    );
   }
 
-  final SourceRuntimeRegistry runtimeRegistry = SourceRuntimeRegistry._();
+  late final SourceRuntimeRegistry runtimeRegistry;
   final SourceSecureSessionStorage _secureSessionStorage;
-  final Map<String, SourceRuntimeHandle> _runtimeHandles =
-      <String, SourceRuntimeHandle>{};
-  String _activeSourceKey = hazukiDefaultSourceKey;
-  Future<void> _activationTail = Future<void>.value();
+  late final SourceRuntimeCoordinator<SourceRuntimeHandle> _runtimeCoordinator;
 
   final StreamController<void> _cloudFavoritesChangedController =
       StreamController<void>.broadcast();
@@ -429,14 +168,10 @@ class HazukiSourceService extends ChangeNotifier {
     _cloudFavoritesChangedController.add(null);
   }
 
-  SourceRuntimeHandle get _activeHandle => _handleFor(_activeSourceKey);
+  SourceRuntimeHandle get _activeHandle => _runtimeCoordinator.activeHandle;
 
   SourceRuntimeHandle _handleFor(String sourceKey) {
-    final normalized = _normalizeAllowedSourceKey(sourceKey);
-    return _runtimeHandles.putIfAbsent(
-      normalized,
-      () => SourceRuntimeHandle(service: this, sourceKey: normalized),
-    );
+    return _runtimeCoordinator.handleFor(sourceKey);
   }
 
   Dio get dio => _activeHandle.dio;
@@ -655,6 +390,7 @@ class HazukiSourceService extends ChangeNotifier {
     String? epId,
     bool keepInMemory = true,
     bool useDiskCache = true,
+    bool priority = false,
     String sourceKey = '',
   }) => _imageCacheForSourceRequest(sourceKey).downloadImageBytes(
     url,
@@ -662,6 +398,7 @@ class HazukiSourceService extends ChangeNotifier {
     epId: epId,
     keepInMemory: keepInMemory,
     useDiskCache: useDiskCache,
+    priority: priority,
     sourceKey: sourceKey,
   );
 
@@ -692,89 +429,60 @@ class HazukiSourceService extends ChangeNotifier {
   String get statusText => _statusText;
   SourceRuntimeState get sourceRuntimeState => _runtimeState;
   SourceMeta? get sourceMeta => _sourceMeta;
-  String get activeSourceKey => _activeSourceKey;
-  bool get isActiveJmSource => isHazukiJmSourceKey(_activeSourceKey);
+  String get activeSourceKey => _runtimeCoordinator.activeSourceKey;
+  bool get isActiveJmSource => isHazukiJmSourceKey(activeSourceKey);
   bool get isActiveCopyMangaSource =>
-      isHazukiCopyMangaSourceKey(_activeSourceKey);
+      isHazukiCopyMangaSourceKey(activeSourceKey);
   bool get isActiveDailyCheckInSource =>
-      isHazukiJmSourceKey(_activeSourceKey) ||
-      isHazukiPicacgSourceKey(_activeSourceKey);
+      isHazukiJmSourceKey(activeSourceKey) ||
+      isHazukiPicacgSourceKey(activeSourceKey);
   bool get isInitialized => _engine != null && _sourceMeta != null;
   bool get softwareLogCaptureEnabled => _softwareLogCaptureEnabled;
 
   void _notifyRuntimeStateChanged() {
     notifyListeners();
-    runtimeRegistry._notify();
+    runtimeRegistry.notifyChanged();
   }
 
   SourceCatalogEntry _definitionForSourceKey(String sourceKey) {
-    final normalized = _normalizeAllowedSourceKey(sourceKey);
-    return hazukiAllowedSourceCatalog.firstWhere(
-      (entry) => entry.normalizedKey == normalized,
-    );
+    return _runtimeCoordinator.definitionFor(sourceKey);
   }
 
   String _normalizeAllowedSourceKey(String sourceKey) {
-    final normalized = sourceKey.trim().isEmpty
-        ? hazukiDefaultSourceKey
-        : sourceKey.trim();
-    final allowed = hazukiAllowedSourceCatalog.any(
-      (entry) => entry.normalizedKey == normalized,
-    );
-    if (!allowed) {
-      throw Exception('source_not_allowed:$normalized');
-    }
-    return normalized;
+    return _runtimeCoordinator.normalize(sourceKey);
   }
 
   Future<void> loadActiveSourcePreference() async {
-    final load = _activationTail.then<void>(
-      (_) => _loadActiveSourcePreferenceSerially(),
-      onError: (_, _) => _loadActiveSourcePreferenceSerially(),
+    SharedPreferences? loadedPreferences;
+    await _runtimeCoordinator.loadActiveSourcePreference(
+      readSavedSourceKey: () async {
+        final prefs = await _activeHandle.session.ensurePrefs();
+        loadedPreferences = prefs;
+        for (final source in hazukiAllowedSourceCatalog) {
+          final session = _handleFor(source.key).session;
+          session.prefs = prefs;
+          await session.ensurePrefs();
+        }
+        return prefs.getString(SourcePrefsKeys.activeSourceKey);
+      },
+      persistSourceKey: (sourceKey) => loadedPreferences!.setString(
+        SourcePrefsKeys.activeSourceKey,
+        sourceKey,
+      ),
     );
-    _activationTail = load;
-    await load;
-  }
-
-  Future<void> _loadActiveSourcePreferenceSerially() async {
-    final prefs = await _activeHandle.session.ensurePrefs();
-    for (final source in hazukiAllowedSourceCatalog) {
-      final session = _handleFor(source.key).session;
-      session.prefs = prefs;
-      await session.ensurePrefs();
-    }
-    final saved = prefs.getString(SourcePrefsKeys.activeSourceKey);
-    if (saved != null && saved.trim().isNotEmpty) {
-      _activeSourceKey = _normalizeAllowedSourceKey(saved);
-    }
   }
 
   Future<void> activateSource(String sourceKey) async {
-    final normalized = _normalizeAllowedSourceKey(sourceKey);
-    final activation = _activationTail.then<void>(
-      (_) => _activateSourceSerially(normalized),
-      onError: (_, _) => _activateSourceSerially(normalized),
+    await _runtimeCoordinator.activate(
+      sourceKey,
+      persistSelection: (nextHandle) async {
+        final prefs = await nextHandle.session.ensurePrefs();
+        await prefs.setString(
+          SourcePrefsKeys.activeSourceKey,
+          nextHandle.sourceKey,
+        );
+      },
     );
-    _activationTail = activation;
-    await activation;
-  }
-
-  Future<void> _activateSourceSerially(String normalized) async {
-    if (normalized == _activeSourceKey) {
-      return;
-    }
-    final previousSourceKey = _activeSourceKey;
-    final previousHandle = _runtimeHandles[previousSourceKey];
-    final nextHandle = _handleFor(normalized);
-    final prefs = await nextHandle.session.ensurePrefs();
-    await prefs.setString(SourcePrefsKeys.activeSourceKey, normalized);
-    _activeSourceKey = normalized;
-    if (identical(_runtimeHandles[previousSourceKey], previousHandle)) {
-      _runtimeHandles.remove(previousSourceKey);
-      previousHandle?.requestDispose();
-    }
-    notifyListeners();
-    runtimeRegistry._notify();
   }
 
   void clearLocalizedSourceTextCaches() {
@@ -940,735 +648,5 @@ class HazukiSourceService extends ChangeNotifier {
       return picacgSortModes.contains(normalized) ? normalized : 'dd';
     }
     return normalized.isEmpty ? 'mr' : normalized;
-  }
-}
-
-class SourceRuntimeKernel {
-  FlutterQjs? engine;
-  Future<void>? initFuture;
-  String statusText = 'source_idle';
-  SourceRuntimeState runtimeState = const SourceRuntimeState.idle();
-  SourceMeta? sourceMeta;
-  bool isRefreshingSource = false;
-  DateTime? lastReloginAt;
-  String? transientAvatarUrl;
-
-  bool shouldSkipRelogin(Duration minInterval) {
-    final last = lastReloginAt;
-    if (last == null) {
-      return false;
-    }
-    return DateTime.now().difference(last) < minInterval;
-  }
-}
-
-class SourceSessionStore {
-  SourceSessionStore({
-    required this.sourceKey,
-    required SourceSecureSessionStorage secureStorage,
-  }) : _secureStorage = secureStorage;
-
-  final String sourceKey;
-  final SourceSecureSessionStorage _secureStorage;
-  final Map<String, _SecureSourceSessionData> _secureCache =
-      <String, _SecureSourceSessionData>{};
-  SharedPreferences? prefs;
-
-  void clearMemory() {
-    _secureCache.clear();
-    prefs = null;
-  }
-
-  Future<SharedPreferences> ensurePrefs() async {
-    final current = prefs ??= await SharedPreferences.getInstance();
-    await _migrateLegacySessionData(current);
-    await _loadSecureSessionData(sourceKey);
-    return current;
-  }
-
-  Map<String, dynamic> loadSourceStore(String sourceKey) {
-    final currentPrefs = prefs;
-    if (currentPrefs == null || sourceKey.isEmpty) {
-      return {};
-    }
-
-    final raw = currentPrefs.getString('source_data_$sourceKey');
-    if (raw == null || raw.isEmpty) {
-      return {};
-    }
-
-    try {
-      final decoded = jsonDecode(raw);
-      if (decoded is Map) {
-        return Map<String, dynamic>.from(decoded);
-      }
-    } catch (_) {}
-    return {};
-  }
-
-  Future<void> saveSourceStore(
-    String sourceKey,
-    Map<String, dynamic> store,
-  ) async {
-    final currentPrefs = prefs;
-    if (currentPrefs == null || sourceKey.isEmpty) {
-      return;
-    }
-    await currentPrefs.setString('source_data_$sourceKey', jsonEncode(store));
-  }
-
-  dynamic loadSourceData(String sourceKey, String dataKey) {
-    final normalizedSourceKey = sourceKey.trim();
-    if (normalizedSourceKey.isEmpty || dataKey.isEmpty) {
-      return null;
-    }
-    if (dataKey == 'account') {
-      return _secureDataFor(normalizedSourceKey).account ??
-          loadSourceStore(normalizedSourceKey)['account'];
-    }
-    if (dataKey == 'token') {
-      return _secureDataFor(normalizedSourceKey).token ??
-          loadSourceStore(normalizedSourceKey)['token'];
-    }
-    return loadSourceStore(normalizedSourceKey)[dataKey];
-  }
-
-  Future<void> saveSourceData(
-    String sourceKey,
-    String dataKey,
-    dynamic data,
-  ) async {
-    final normalizedSourceKey = sourceKey.trim();
-    if (normalizedSourceKey.isEmpty || dataKey.isEmpty) {
-      return;
-    }
-    if (dataKey == 'account') {
-      final accountData = _normalizeAccountData(data);
-      if (accountData == null) {
-        await deleteSourceData(normalizedSourceKey, dataKey);
-        return;
-      }
-      await _secureStorage.write(
-        SourceSecureSessionStorageKeys.account(normalizedSourceKey),
-        jsonEncode(accountData),
-      );
-      _secureDataFor(normalizedSourceKey).account = accountData;
-      await _removeLegacySourceDataKey(normalizedSourceKey, dataKey);
-      return;
-    }
-    if (dataKey == 'token') {
-      final token = data?.toString();
-      if (token == null || token.isEmpty) {
-        await deleteSourceData(normalizedSourceKey, dataKey);
-        return;
-      }
-      await _secureStorage.write(
-        SourceSecureSessionStorageKeys.token(normalizedSourceKey),
-        token,
-      );
-      _secureDataFor(normalizedSourceKey).token = token;
-      await _removeLegacySourceDataKey(normalizedSourceKey, dataKey);
-      return;
-    }
-    final store = loadSourceStore(normalizedSourceKey);
-    store[dataKey] = data;
-    await saveSourceStore(normalizedSourceKey, store);
-  }
-
-  Future<void> deleteSourceData(String sourceKey, String dataKey) async {
-    final normalizedSourceKey = sourceKey.trim();
-    if (normalizedSourceKey.isEmpty || dataKey.isEmpty) {
-      return;
-    }
-    if (dataKey == 'account') {
-      await _secureStorage.delete(
-        SourceSecureSessionStorageKeys.account(normalizedSourceKey),
-      );
-      _secureDataFor(normalizedSourceKey).account = null;
-      await _removeLegacySourceDataKey(normalizedSourceKey, dataKey);
-      return;
-    }
-    if (dataKey == 'token') {
-      await _secureStorage.delete(
-        SourceSecureSessionStorageKeys.token(normalizedSourceKey),
-      );
-      _secureDataFor(normalizedSourceKey).token = null;
-      await _removeLegacySourceDataKey(normalizedSourceKey, dataKey);
-      return;
-    }
-    final store = loadSourceStore(normalizedSourceKey);
-    store.remove(dataKey);
-    await saveSourceStore(normalizedSourceKey, store);
-  }
-
-  dynamic loadSourceSetting({
-    required String sourceKey,
-    required String settingKey,
-    required SourceMeta? sourceMeta,
-  }) {
-    if (sourceKey.isEmpty || settingKey.isEmpty) {
-      return null;
-    }
-
-    final store = loadSourceStore(sourceKey);
-    final settings = store['settings'];
-    if (settings is Map && settings.containsKey(settingKey)) {
-      return settings[settingKey];
-    }
-
-    if (sourceMeta?.key == sourceKey) {
-      return sourceMeta?.settingsDefaults[settingKey];
-    }
-
-    return null;
-  }
-
-  Future<void> saveSourceSetting(
-    String sourceKey,
-    String settingKey,
-    dynamic value,
-  ) async {
-    if (sourceKey.isEmpty || settingKey.isEmpty) {
-      return;
-    }
-    final store = loadSourceStore(sourceKey);
-    final settingsRaw = store['settings'];
-    final settings = settingsRaw is Map
-        ? Map<String, dynamic>.from(settingsRaw)
-        : <String, dynamic>{};
-    settings[settingKey] = value;
-    store['settings'] = settings;
-    await saveSourceStore(sourceKey, store);
-  }
-
-  List<String>? loadAccountDataSync(
-    SourceMeta? sourceMeta, {
-    String? fallbackSourceKey,
-  }) {
-    final key = (sourceMeta?.key ?? fallbackSourceKey ?? sourceKey).trim();
-    if (key.isEmpty) {
-      return null;
-    }
-
-    final accountData = loadSourceData(key, 'account');
-    if (accountData is List && accountData.length >= 2) {
-      return [accountData[0].toString(), accountData[1].toString()];
-    }
-    return null;
-  }
-
-  List<_Cookie> _loadCookieStore() {
-    final raw =
-        _secureDataFor(sourceKey).cookiesRaw ??
-        prefs?.getString(_cookieStoreKey);
-    if (raw == null || raw.isEmpty) {
-      return [];
-    }
-
-    try {
-      final decoded = jsonDecode(raw);
-      if (decoded is List) {
-        return decoded
-            .whereType<Map>()
-            .map((e) => _Cookie.fromMap(Map<String, dynamic>.from(e)))
-            .toList();
-      }
-    } catch (_) {}
-    return [];
-  }
-
-  Future<void> _saveCookieStore(List<_Cookie> cookies) async {
-    if (cookies.isEmpty) {
-      await _secureStorage.delete(
-        SourceSecureSessionStorageKeys.cookies(sourceKey),
-      );
-      _secureDataFor(sourceKey).cookiesRaw = null;
-      await prefs?.remove(_cookieStoreKey);
-      return;
-    }
-    final raw = jsonEncode(cookies.map((e) => e.toMap()).toList());
-    await _secureStorage.write(
-      SourceSecureSessionStorageKeys.cookies(sourceKey),
-      raw,
-    );
-    _secureDataFor(sourceKey).cookiesRaw = raw;
-    await prefs?.remove(_cookieStoreKey);
-  }
-
-  String get _cookieStoreKey => 'cookie_store_v2_${sourceKey.trim()}';
-
-  Future<void> _migrateLegacySessionData(SharedPreferences prefs) async {
-    await prefs.remove('cookie_store_v1');
-    if (prefs.getBool(SourcePrefsKeys.sourceSecureSessionMigration) == true) {
-      return;
-    }
-
-    var migrationComplete = true;
-
-    for (final key in prefs.getKeys().where(_isSourceDataPrefsKey).toList()) {
-      final raw = prefs.getString(key);
-      if (raw == null || raw.trim().isEmpty) {
-        continue;
-      }
-      final migratedSourceKey = key.substring('source_data_'.length);
-      try {
-        final decoded = jsonDecode(raw);
-        if (decoded is! Map) {
-          continue;
-        }
-        final sanitized = Map<String, dynamic>.from(decoded);
-        var changed = false;
-
-        if (sanitized.containsKey('account')) {
-          final accountData = _normalizeAccountData(sanitized['account']);
-          if (accountData != null) {
-            try {
-              await _secureStorage.write(
-                SourceSecureSessionStorageKeys.account(migratedSourceKey),
-                jsonEncode(accountData),
-              );
-              _secureDataFor(migratedSourceKey).account = accountData;
-              sanitized.remove('account');
-              changed = true;
-            } catch (_) {
-              migrationComplete = false;
-            }
-          } else {
-            sanitized.remove('account');
-            changed = true;
-          }
-        }
-
-        if (sanitized.containsKey('token')) {
-          final token = sanitized['token']?.toString();
-          if (token != null && token.isNotEmpty) {
-            try {
-              await _secureStorage.write(
-                SourceSecureSessionStorageKeys.token(migratedSourceKey),
-                token,
-              );
-              _secureDataFor(migratedSourceKey).token = token;
-              sanitized.remove('token');
-              changed = true;
-            } catch (_) {
-              migrationComplete = false;
-            }
-          } else {
-            sanitized.remove('token');
-            changed = true;
-          }
-        }
-
-        if (changed) {
-          await prefs.setString(key, jsonEncode(sanitized));
-        }
-      } catch (_) {
-        migrationComplete = false;
-      }
-    }
-
-    for (final key in prefs.getKeys().where(_isCookiePrefsKey).toList()) {
-      final raw = prefs.getString(key);
-      if (raw == null || raw.trim().isEmpty) {
-        await prefs.remove(key);
-        continue;
-      }
-      final migratedSourceKey = key.substring('cookie_store_v2_'.length);
-      try {
-        await _secureStorage.write(
-          SourceSecureSessionStorageKeys.cookies(migratedSourceKey),
-          raw,
-        );
-        _secureDataFor(migratedSourceKey).cookiesRaw = raw;
-        await prefs.remove(key);
-      } catch (_) {
-        migrationComplete = false;
-      }
-    }
-
-    if (migrationComplete) {
-      await prefs.setBool(SourcePrefsKeys.sourceSecureSessionMigration, true);
-      await prefs.setBool(SourcePrefsKeys.sourceSessionScopeMigration, true);
-    }
-  }
-
-  Future<void> _loadSecureSessionData(String sourceKey) async {
-    final normalizedSourceKey = sourceKey.trim();
-    if (normalizedSourceKey.isEmpty) {
-      return;
-    }
-    final data = _secureDataFor(normalizedSourceKey);
-    data.account = _decodeAccountData(
-      await _safeRead(
-        SourceSecureSessionStorageKeys.account(normalizedSourceKey),
-      ),
-    );
-    data.token = await _safeRead(
-      SourceSecureSessionStorageKeys.token(normalizedSourceKey),
-    );
-    data.cookiesRaw = await _safeRead(
-      SourceSecureSessionStorageKeys.cookies(normalizedSourceKey),
-    );
-  }
-
-  Future<String?> _safeRead(String key) async {
-    try {
-      return await _secureStorage.read(key);
-    } catch (_) {
-      return null;
-    }
-  }
-
-  Future<void> _removeLegacySourceDataKey(
-    String sourceKey,
-    String dataKey,
-  ) async {
-    final store = loadSourceStore(sourceKey);
-    if (!store.containsKey(dataKey)) {
-      return;
-    }
-    store.remove(dataKey);
-    await saveSourceStore(sourceKey, store);
-  }
-
-  _SecureSourceSessionData _secureDataFor(String sourceKey) {
-    return _secureCache.putIfAbsent(
-      sourceKey.trim(),
-      _SecureSourceSessionData.new,
-    );
-  }
-
-  static bool _isSourceDataPrefsKey(String key) {
-    return key.startsWith('source_data_');
-  }
-
-  static bool _isCookiePrefsKey(String key) {
-    return key.startsWith('cookie_store_v2_');
-  }
-
-  static List<String>? _normalizeAccountData(dynamic value) {
-    if (value is! List || value.length < 2) {
-      return null;
-    }
-    return [value[0].toString(), value[1].toString()];
-  }
-
-  static List<String>? _decodeAccountData(String? raw) {
-    if (raw == null || raw.trim().isEmpty) {
-      return null;
-    }
-    try {
-      return _normalizeAccountData(jsonDecode(raw));
-    } catch (_) {
-      return null;
-    }
-  }
-}
-
-class _SecureSourceSessionData {
-  List<String>? account;
-  String? token;
-  String? cookiesRaw;
-}
-
-class SourceCacheStore {
-  final LinkedHashMap<String, Uint8List> imageBytesCache =
-      LinkedHashMap<String, Uint8List>();
-  final Map<String, Future<Uint8List>> imageDownloadInFlight =
-      <String, Future<Uint8List>>{};
-  final LinkedHashMap<String, ComicDetailsData> comicDetailsMemoryCache =
-      LinkedHashMap<String, ComicDetailsData>();
-  final Map<String, Future<ComicDetailsData>> comicDetailsInFlight =
-      <String, Future<ComicDetailsData>>{};
-  List<ExploreSection>? exploreSectionsMemoryCache;
-  DateTime? exploreSectionsMemoryCachedAt;
-  List<CategoryTagGroup>? categoryTagGroupsMemoryCache;
-  DateTime? categoryTagGroupsMemoryCachedAt;
-  Directory? imageCacheDir;
-  Directory? comicDetailsCacheDir;
-  Directory? discoverCacheDir;
-
-  void clearMemory() {
-    imageBytesCache.clear();
-    imageDownloadInFlight.clear();
-    comicDetailsMemoryCache.clear();
-    comicDetailsInFlight.clear();
-    exploreSectionsMemoryCache = null;
-    exploreSectionsMemoryCachedAt = null;
-    categoryTagGroupsMemoryCache = null;
-    categoryTagGroupsMemoryCachedAt = null;
-    imageCacheDir = null;
-    comicDetailsCacheDir = null;
-    discoverCacheDir = null;
-  }
-
-  Uint8List? touchImageBytes(String rawUrl) {
-    final normalizedUrl = rawUrl.trim();
-    if (normalizedUrl.isEmpty) {
-      return null;
-    }
-    final cached = imageBytesCache[normalizedUrl];
-    if (cached == null) {
-      return null;
-    }
-    imageBytesCache.remove(normalizedUrl);
-    imageBytesCache[normalizedUrl] = cached;
-    return cached;
-  }
-
-  void evictImageBytes(Iterable<String> urls) {
-    for (final url in urls) {
-      final normalizedUrl = url.trim();
-      if (normalizedUrl.isEmpty) {
-        continue;
-      }
-      imageBytesCache.remove(normalizedUrl);
-    }
-  }
-
-  void putImageBytes(String url, Uint8List bytes, {int maxEntries = 80}) {
-    imageBytesCache.remove(url);
-    imageBytesCache[url] = bytes;
-    while (imageBytesCache.length > maxEntries) {
-      imageBytesCache.remove(imageBytesCache.keys.first);
-    }
-  }
-
-  List<CategoryTagGroup>? getCategoryTagGroupsFromMemoryCache(Duration ttl) {
-    final groups = categoryTagGroupsMemoryCache;
-    final cachedAt = categoryTagGroupsMemoryCachedAt;
-    if (groups == null || cachedAt == null) {
-      return null;
-    }
-    if (DateTime.now().difference(cachedAt) > ttl) {
-      categoryTagGroupsMemoryCache = null;
-      categoryTagGroupsMemoryCachedAt = null;
-      return null;
-    }
-    return groups;
-  }
-
-  void clearCategoryTagGroupsMemoryCache() {
-    categoryTagGroupsMemoryCache = null;
-    categoryTagGroupsMemoryCachedAt = null;
-  }
-
-  void putCategoryTagGroupsInMemoryCache(List<CategoryTagGroup> groups) {
-    categoryTagGroupsMemoryCache = groups;
-    categoryTagGroupsMemoryCachedAt = DateTime.now();
-  }
-}
-
-class SourceDebugLogStore {
-  Map<String, dynamic>? favoritesDebugCache;
-  bool isWarmingUpFavoritesDebug = false;
-  bool softwareLogCaptureEnabled = false;
-  final List<Map<String, dynamic>> recentNetworkLogs = [];
-  final List<Map<String, dynamic>> recentApplicationLogs = [];
-  final List<Map<String, dynamic>> recentReaderLogs = [];
-  final List<Map<String, dynamic>> recentErrorLogs = [];
-  final List<Map<String, dynamic>> recentActionLogs = [];
-  final List<Map<String, dynamic>> recentSystemLogs = [];
-  final List<Map<String, dynamic>> recentPerformanceLogs = [];
-  int networkLogDedupedCount = 0;
-  DateTime? lastAgeCleanupAt;
-  Map<String, dynamic>? lastLoginDebugInfoStorage;
-  Map<String, dynamic>? lastSourceVersionDebugInfoStorage;
-
-  Map<String, dynamic>? get lastLoginDebugInfo =>
-      softwareLogCaptureEnabled ? lastLoginDebugInfoStorage : null;
-  set lastLoginDebugInfo(Map<String, dynamic>? value) {
-    lastLoginDebugInfoStorage = softwareLogCaptureEnabled ? value : null;
-  }
-
-  Map<String, dynamic>? get lastSourceVersionDebugInfo =>
-      softwareLogCaptureEnabled ? lastSourceVersionDebugInfoStorage : null;
-  set lastSourceVersionDebugInfo(Map<String, dynamic>? value) {
-    lastSourceVersionDebugInfoStorage = softwareLogCaptureEnabled
-        ? value
-        : null;
-  }
-
-  void clearCapturedLogs() {
-    favoritesDebugCache = null;
-    recentNetworkLogs.clear();
-    recentApplicationLogs.clear();
-    recentReaderLogs.clear();
-    recentErrorLogs.clear();
-    recentActionLogs.clear();
-    recentSystemLogs.clear();
-    recentPerformanceLogs.clear();
-    networkLogDedupedCount = 0;
-    lastLoginDebugInfoStorage = null;
-    lastSourceVersionDebugInfoStorage = null;
-  }
-}
-
-class SourceJsBridge {
-  SourceJsBridge._(this._handle);
-
-  final SourceRuntimeHandle _handle;
-
-  FlutterQjs? get engine => _handle.runtime.engine;
-
-  dynamic evaluate(String code, {String? name}) {
-    return engine?.evaluate(code, name: name);
-  }
-
-  Future<dynamic> resolve(dynamic value) {
-    return awaitJsResult(value);
-  }
-
-  bool asBool(dynamic value) => jsAsBool(value);
-
-  int? asInt(dynamic value) => jsAsInt(value);
-
-  String evaluateString(String code) {
-    return (evaluate(code) ?? '').toString().trim();
-  }
-}
-
-class HazukiSourceFacade {
-  HazukiSourceFacade._({
-    required HazukiSourceService service,
-    required this.handle,
-    required this.runtime,
-    required this.session,
-    required this.cache,
-    required this.debug,
-    required this.js,
-    required this.networkLogSink,
-    required this.httpGateway,
-  }) : _service = service;
-
-  final HazukiSourceService _service;
-  final SourceRuntimeHandle handle;
-  final SourceRuntimeKernel runtime;
-  final SourceSessionStore session;
-  final SourceCacheStore cache;
-  final SourceDebugLogStore debug;
-  final SourceJsBridge js;
-  final SourceNetworkLogSink networkLogSink;
-  final SourceHttpGateway httpGateway;
-
-  String get sourceKey => handle.sourceKey;
-
-  Future<void> ensureInitialized() =>
-      _service.ensureSourceInitialized(sourceKey);
-
-  Future<SharedPreferences> ensurePrefs() => session.ensurePrefs();
-
-  bool get isLogged =>
-      session.loadAccountDataSync(sourceMeta, fallbackSourceKey: sourceKey) !=
-      null;
-
-  SourceMeta? get sourceMeta => runtime.sourceMeta;
-
-  bool get softwareLogCaptureEnabled => debug.softwareLogCaptureEnabled;
-
-  DateTime? get lastReloginAt => runtime.lastReloginAt;
-  set lastReloginAt(DateTime? value) => runtime.lastReloginAt = value;
-
-  bool get isRefreshingSource => runtime.isRefreshingSource;
-  set isRefreshingSource(bool value) => runtime.isRefreshingSource = value;
-
-  SourceRuntimeState get runtimeState => runtime.runtimeState;
-  set runtimeState(SourceRuntimeState value) => runtime.runtimeState = value;
-
-  String get statusText => runtime.statusText;
-  set statusText(String value) => runtime.statusText = value;
-
-  Future<void>? get initFuture => runtime.initFuture;
-  set initFuture(Future<void>? value) => runtime.initFuture = value;
-
-  void notifyRuntimeStateChanged() {
-    if (_service.activeSourceKey == sourceKey) {
-      _service._notifyRuntimeStateChanged();
-    } else {
-      _service.runtimeRegistry._notify();
-    }
-  }
-
-  Map<String, dynamic>? get favoritesDebugCache => debug.favoritesDebugCache;
-  set favoritesDebugCache(Map<String, dynamic>? value) =>
-      debug.favoritesDebugCache = value;
-
-  Map<String, dynamic>? get lastLoginDebugInfo => debug.lastLoginDebugInfo;
-  set lastLoginDebugInfo(Map<String, dynamic>? value) =>
-      debug.lastLoginDebugInfo = value;
-
-  Map<String, dynamic>? get lastSourceVersionDebugInfo =>
-      debug.lastSourceVersionDebugInfo;
-  set lastSourceVersionDebugInfo(Map<String, dynamic>? value) =>
-      debug.lastSourceVersionDebugInfo = value;
-
-  void clearCapturedLogs() => debug.clearCapturedLogs();
-
-  dynamic loadSourceData(String sourceKey, String dataKey) {
-    return session.loadSourceData(sourceKey, dataKey);
-  }
-
-  Future<void> saveSourceData(String sourceKey, String dataKey, dynamic data) {
-    return session.saveSourceData(sourceKey, dataKey, data);
-  }
-
-  Future<void> deleteSourceData(String sourceKey, String dataKey) {
-    return session.deleteSourceData(sourceKey, dataKey);
-  }
-
-  void addApplicationLog({
-    required String title,
-    String level = 'info',
-    String source = 'app',
-    Object? content,
-  }) {
-    handle.debugLog.addApplicationLog(
-      title: title,
-      level: level,
-      source: source,
-      content: content,
-    );
-  }
-
-  Object? loadSourceSetting(String sourceKey, String settingKey) {
-    return session.loadSourceSetting(
-      sourceKey: sourceKey,
-      settingKey: settingKey,
-      sourceMeta: sourceMeta,
-    );
-  }
-
-  Future<void> saveSourceSetting(
-    String sourceKey,
-    String settingKey,
-    Object? value,
-  ) {
-    return session.saveSourceSetting(sourceKey, settingKey, value);
-  }
-
-  List<String>? loadAccountDataSync() =>
-      session.loadAccountDataSync(sourceMeta, fallbackSourceKey: sourceKey);
-
-  List<_Cookie> _loadCookieStore() => session._loadCookieStore();
-
-  Future<void> _saveCookieStore(List<_Cookie> cookies) {
-    return session._saveCookieStore(cookies);
-  }
-
-  Future<Directory> ensureImageCacheDir() => handle.imageCache.ensureCacheDir();
-
-  Future<int> computeImageCacheSizeBytes() =>
-      handle.imageCache.computeSizeBytes();
-
-  Future<void> enforceImageCachePolicy({bool force = false}) {
-    return handle.imageCache.enforcePolicy(force: force);
-  }
-
-  Uri resolveImageBaseUri(String imageUrl, Uri baseUri) {
-    final imageUri = Uri.tryParse(imageUrl);
-    if (imageUri != null && imageUri.hasScheme && imageUri.host.isNotEmpty) {
-      return imageUri;
-    }
-    return baseUri;
   }
 }

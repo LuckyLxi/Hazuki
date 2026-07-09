@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 
 import '../support/search_shared.dart';
 
@@ -30,23 +30,23 @@ class AggregateSearchSectionState {
 }
 
 class AggregateSearchResultsController extends ChangeNotifier {
-  AggregateSearchResultsController({required HazukiSourceService sourceService})
+  AggregateSearchResultsController({required SourceSearchGateway sourceService})
     : _sourceService = sourceService,
       _loader = null,
-      sections = sourceService.runtimeRegistry.allowedSources
+      sections = sourceService.allowedSources
           .map((source) => AggregateSearchSectionState(source: source))
           .toList(growable: false);
 
   AggregateSearchResultsController.withLoader({
-    required HazukiSourceService sourceService,
+    required SourceSearchGateway sourceService,
     required AggregateSearchPageLoader loader,
   }) : _sourceService = sourceService,
        _loader = loader,
-       sections = sourceService.runtimeRegistry.allowedSources
+       sections = sourceService.allowedSources
            .map((source) => AggregateSearchSectionState(source: source))
            .toList(growable: false);
 
-  final HazukiSourceService _sourceService;
+  final SourceSearchGateway _sourceService;
   final AggregateSearchPageLoader? _loader;
   final List<AggregateSearchSectionState> sections;
 

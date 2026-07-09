@@ -2,12 +2,10 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
-import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/features/home/support/home_sidebar_models.dart';
 import 'package:hazuki/features/home/view/home_profile_avatar.dart';
 import 'package:hazuki/features/home/view/home_source_switch_pill_button.dart';
 import 'package:hazuki/l10n/l10n.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
 class HomeDrawerContent extends StatelessWidget {
@@ -15,11 +13,13 @@ class HomeDrawerContent extends StatelessWidget {
     super.key,
     required this.profile,
     required this.actions,
+    required this.activeSourceKey,
     this.selectedDestination,
   });
 
   final HomeSidebarProfileState profile;
   final HomeSidebarActions actions;
+  final String activeSourceKey;
   final HomeDrawerDestination? selectedDestination;
 
   Widget _buildMenuItem(BuildContext context, HomeSidebarItem item) {
@@ -73,7 +73,7 @@ class HomeDrawerContent extends StatelessWidget {
         : profile.username;
     final resolvedAvatarUrl = (profile.avatarUrl ?? '').trim();
     final visualStateKey =
-        '${sl<HazukiSourceService>().activeSourceKey}|$resolvedAvatarUrl|'
+        '$activeSourceKey|$resolvedAvatarUrl|'
         '${profile.profileLoading}|$displayUsername';
     final usernameStyle = textTheme.titleLarge?.copyWith(
       fontWeight: FontWeight.bold,

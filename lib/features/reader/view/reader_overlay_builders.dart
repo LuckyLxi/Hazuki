@@ -6,24 +6,58 @@ import 'package:flutter/services.dart';
 
 import 'package:hazuki/features/reader/reader.dart';
 import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
-import 'package:hazuki/features/reader/support/reader_source_image_quality_settings.dart';
+import 'package:hazuki/shared/reading/reader_source_image_quality_settings.dart';
 import 'package:hazuki/features/reader/view/reader_overlay_controls.dart';
 import 'package:hazuki/features/reader/view/reader_settings_drawer_content.dart';
 import 'package:hazuki/l10n/l10n.dart';
 
+const Duration readerSliderHapticMinInterval = Duration(milliseconds: 90);
+
+int readerSliderHapticPageStep(int pageCount) {
+  if (pageCount <= 80) {
+    return 1;
+  }
+  if (pageCount <= 200) {
+    return 2;
+  }
+  if (pageCount <= 500) {
+    return 5;
+  }
+  return 10;
+}
+
 void maybeTriggerReaderSliderHaptic({
   required ReaderRuntimeState runtimeState,
   required double value,
+  bool force = false,
+  DateTime? now,
+  VoidCallback? triggerHaptic,
 }) {
   final targetIndex = math.max(
     0,
     math.min(value.round(), runtimeState.readerSpreadCount - 1),
   );
-  if (runtimeState.lastSliderHapticPageIndex == targetIndex) {
-    return;
+  final timestamp = now ?? DateTime.now();
+  if (!force) {
+    final step = readerSliderHapticPageStep(runtimeState.readerSpreadCount);
+    final lastIndex = runtimeState.lastSliderHapticPageIndex;
+    if (lastIndex != null && (targetIndex - lastIndex).abs() < step) {
+      return;
+    }
+    final lastAt = runtimeState.lastSliderHapticAt;
+    if (lastAt != null &&
+        timestamp.difference(lastAt) < readerSliderHapticMinInterval) {
+      return;
+    }
   }
   runtimeState.lastSliderHapticPageIndex = targetIndex;
-  unawaited(HapticFeedback.selectionClick());
+  runtimeState.lastSliderHapticAt = timestamp;
+  final callback = triggerHaptic;
+  if (callback != null) {
+    callback();
+  } else {
+    unawaited(HapticFeedback.selectionClick());
+  }
 }
 
 Widget buildReaderSettingsDrawer({
@@ -137,7 +171,7 @@ Widget buildReaderBottomControls({
   required ReaderRuntimeState runtimeState,
   required ThemeData readerTheme,
   required bool chapterPanelLoading,
-  required void Function(double value) maybeTriggerSliderHaptic,
+  required void Function(double value, {bool force}) maybeTriggerSliderHaptic,
   required void Function(VoidCallback update) updateState,
   required Future<void> Function(int target) goToPage,
   Future<void> Function()? onOpenChaptersPanel,
@@ -159,6 +193,11 @@ Widget buildReaderBottomControls({
     onSliderChangeStart: runtimeState.readerSpreadCount > 1
         ? (value) {
             runtimeState.lastSliderHapticPageIndex = null;
+            runtimeState.lastSliderHapticAt = null;
+          }
+        : null,
+    onSliderPointerDown: runtimeState.readerSpreadCount > 1
+        ? (value) {
             maybeTriggerSliderHaptic(value);
             updateState(() {
               runtimeState.sliderDragging = true;
@@ -177,8 +216,13 @@ Widget buildReaderBottomControls({
         : null,
     onSliderChangeEnd: runtimeState.readerSpreadCount > 1
         ? (value) {
-            final target = math.max(0, math.min(value.round(), maxIndex));
+            final latestValue = runtimeState.sliderDragging
+                ? runtimeState.sliderDragValue
+                : value;
+            final target = math.max(0, math.min(latestValue.round(), maxIndex));
             runtimeState.lastSliderHapticPageIndex = null;
+            runtimeState.lastSliderHapticAt = null;
+            maybeTriggerSliderHaptic(target.toDouble(), force: true);
             updateState(() {
               runtimeState.sliderDragging = false;
               runtimeState.sliderDragValue = target.toDouble();

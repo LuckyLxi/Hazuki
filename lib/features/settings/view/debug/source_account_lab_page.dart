@@ -2,11 +2,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:hazuki/app/service_locator.dart';
-import 'package:hazuki/features/home/support/home_profile_actions.dart';
-import 'package:hazuki/features/home/support/home_source_account_login.dart';
+import 'package:hazuki/shared/source_account/source_account_actions.dart';
+import 'package:hazuki/shared/source_account/source_account_login.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/l10n/l10n.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
 import '../settings_group.dart';
@@ -19,8 +19,8 @@ class SourceAccountLabPage extends StatefulWidget {
 }
 
 class _SourceAccountLabPageState extends State<SourceAccountLabPage> {
-  final SourceRuntimeRegistry _registry = sl<SourceRuntimeRegistry>();
-  final HazukiSourceService _sourceService = sl<HazukiSourceService>();
+  final SourceRuntimeGateway _registry = sl<SourceRuntimeGateway>();
+  final SourceRuntimeGateway _sourceService = sl<SourceRuntimeGateway>();
   String? _busySourceKey;
   String? _downloadingSourceKey;
   double? _downloadProgress;

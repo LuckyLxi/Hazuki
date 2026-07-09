@@ -2,13 +2,13 @@ import 'dart:math' as math;
 
 import 'package:flutter/widgets.dart';
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 
 import 'discover_page_state.dart';
 
 class DiscoverPageController extends ChangeNotifier {
   DiscoverPageController({
-    required HazukiSourceService sourceService,
+    required SourceDiscoverGateway sourceService,
     this.onSourceSwitched,
   }) : _sourceService = sourceService {
     _lastActiveSourceKey = _sourceService.activeSourceKey;
@@ -19,7 +19,7 @@ class DiscoverPageController extends ChangeNotifier {
   static const _initialVisibleSectionCount = 1;
   static const _sectionRevealBatchSize = 1;
 
-  final HazukiSourceService _sourceService;
+  final SourceDiscoverGateway _sourceService;
   final DiscoverPageState _state = DiscoverPageState();
   bool _disposed = false;
   late String _lastActiveSourceKey;

@@ -199,18 +199,20 @@ class HazukiDatabase extends _$HazukiDatabase {
         await m.createTable(downloadGroupTombstones);
         await m.createTable(downloadGroupComicTombstones);
       } else if (from < 5) {
-        await m.addColumn(downloadGroups, downloadGroups.sortOrder);
+        await _safeAddColumn(m, downloadGroups, downloadGroups.sortOrder);
       }
       if (from < 6) {
         await m.createTable(localFavoriteComicFolderTombstones);
-        await m.addColumn(
+        await _safeAddColumn(
+          m,
           localFavoriteFolders,
           localFavoriteFolders.updatedAtMs,
         );
       }
       if (from < 7) {
         if (from >= 2) {
-          await m.addColumn(
+          await _safeAddColumn(
+            m,
             searchHistoryEntries,
             searchHistoryEntries.updatedAtMs,
           );
@@ -220,6 +222,20 @@ class HazukiDatabase extends _$HazukiDatabase {
       }
     },
   );
+
+  Future<void> _safeAddColumn(
+    Migrator m,
+    TableInfo table,
+    GeneratedColumn column,
+  ) async {
+    try {
+      await m.addColumn(table, column);
+    } catch (e) {
+      if (!e.toString().contains('duplicate column name')) {
+        rethrow;
+      }
+    }
+  }
 }
 
 LazyDatabase _openConnection() {
@@ -227,7 +243,9 @@ LazyDatabase _openConnection() {
     try {
       final dir = await getApplicationSupportDirectory();
       await dir.create(recursive: true);
-      return NativeDatabase(File(p.join(dir.path, 'hazuki.sqlite')));
+      return NativeDatabase.createInBackground(
+        File(p.join(dir.path, 'hazuki.sqlite')),
+      );
     } catch (_) {
       return NativeDatabase.memory();
     }

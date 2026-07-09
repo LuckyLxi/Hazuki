@@ -1,10 +1,22 @@
-import '../../hazuki_source_service.dart';
+typedef SourceNetworkLogAppender =
+    void Function({
+      required String method,
+      required String url,
+      required int? statusCode,
+      required String? error,
+      required DateTime startedAt,
+      String source,
+      String? category,
+      Map<String, dynamic>? requestHeaders,
+      Object? requestData,
+      Map<String, dynamic>? responseHeaders,
+      Object? responseBody,
+    });
 
 class SourceNetworkLogSink {
-  SourceNetworkLogSink(this._service, this._handle);
+  const SourceNetworkLogSink(this._append);
 
-  final HazukiSourceService _service;
-  final SourceRuntimeHandle _handle;
+  final SourceNetworkLogAppender _append;
 
   void append({
     required String method,
@@ -18,20 +30,17 @@ class SourceNetworkLogSink {
     Object? requestData,
     Map<String, dynamic>? responseHeaders,
     Object? responseBody,
-  }) {
-    _service.appendNetworkLogEntryForHandle(
-      _handle,
-      method: method,
-      url: url,
-      statusCode: statusCode,
-      error: error,
-      startedAt: startedAt,
-      source: source,
-      category: category,
-      requestHeaders: requestHeaders,
-      requestData: requestData,
-      responseHeaders: responseHeaders,
-      responseBody: responseBody,
-    );
-  }
+  }) => _append(
+    method: method,
+    url: url,
+    statusCode: statusCode,
+    error: error,
+    startedAt: startedAt,
+    source: source,
+    category: category,
+    requestHeaders: requestHeaders,
+    requestData: requestData,
+    responseHeaders: responseHeaders,
+    responseBody: responseBody,
+  );
 }

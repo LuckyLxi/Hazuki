@@ -46,7 +46,7 @@ void _putComicDynamicColorScheme(
 
 class ComicDetailThemeController extends ChangeNotifier {
   ComicDetailThemeController({
-    required ComicDetailRepository repository,
+    required ComicDetailFeatureFacade repository,
     required String comicCoverUrl,
     required BuildContext Function() contextGetter,
     required Future<ComicDetailsData> Function() detailsFutureGetter,
@@ -55,7 +55,7 @@ class ComicDetailThemeController extends ChangeNotifier {
        _contextGetter = contextGetter,
        _detailsFutureGetter = detailsFutureGetter;
 
-  final ComicDetailRepository _repository;
+  final ComicDetailFeatureFacade _repository;
   final String _comicCoverUrl;
   final BuildContext Function() _contextGetter;
   final Future<ComicDetailsData> Function() _detailsFutureGetter;

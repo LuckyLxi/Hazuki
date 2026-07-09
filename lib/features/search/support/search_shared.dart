@@ -3,9 +3,8 @@ import 'package:hazuki/app/app.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
+import 'package:hazuki/services/search_history_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
-import 'search_history_service.dart';
 
 const searchLoadTimeout = Duration(seconds: 25);
 const searchHistoryCollapsedMaxRows = 4;

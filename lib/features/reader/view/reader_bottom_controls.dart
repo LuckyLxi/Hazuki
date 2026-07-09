@@ -16,6 +16,7 @@ class ReaderBottomControls extends StatelessWidget {
     required this.imageCount,
     required this.chapterPanelLoading,
     required this.onSliderChangeStart,
+    required this.onSliderPointerDown,
     required this.onSliderChanged,
     required this.onSliderChangeEnd,
     this.onOpenChaptersPanel,
@@ -41,6 +42,7 @@ class ReaderBottomControls extends StatelessWidget {
   final int imageCount;
   final bool chapterPanelLoading;
   final ValueChanged<double>? onSliderChangeStart;
+  final ValueChanged<double>? onSliderPointerDown;
   final ValueChanged<double>? onSliderChanged;
   final ValueChanged<double>? onSliderChangeEnd;
   final VoidCallback? onOpenChaptersPanel;
@@ -154,6 +156,7 @@ class ReaderBottomControls extends StatelessWidget {
                               nextTooltip: nextTooltip,
                               resetZoomLabel: resetZoomLabel,
                               onSliderChangeStart: onSliderChangeStart,
+                              onSliderPointerDown: onSliderPointerDown,
                               onSliderChanged: onSliderChanged,
                               onSliderChangeEnd: onSliderChangeEnd,
                               onPreviousChapter: onPreviousChapter,
@@ -195,6 +198,7 @@ class _ReaderUnifiedControlBar extends StatelessWidget {
     required this.nextTooltip,
     required this.resetZoomLabel,
     required this.onSliderChangeStart,
+    required this.onSliderPointerDown,
     required this.onSliderChanged,
     required this.onSliderChangeEnd,
     required this.onPreviousChapter,
@@ -220,6 +224,7 @@ class _ReaderUnifiedControlBar extends StatelessWidget {
   final String nextTooltip;
   final String resetZoomLabel;
   final ValueChanged<double>? onSliderChangeStart;
+  final ValueChanged<double>? onSliderPointerDown;
   final ValueChanged<double>? onSliderChanged;
   final ValueChanged<double>? onSliderChangeEnd;
   final VoidCallback? onPreviousChapter;
@@ -318,6 +323,7 @@ class _ReaderUnifiedControlBar extends StatelessWidget {
                   sliderValue: sliderValue,
                   canDrag: canDrag,
                   onSliderChangeStart: onSliderChangeStart,
+                  onSliderPointerDown: onSliderPointerDown,
                   onSliderChanged: onSliderChanged,
                   onSliderChangeEnd: onSliderChangeEnd,
                 ),
@@ -349,6 +355,7 @@ class _ReaderProgressSlider extends StatelessWidget {
     required this.sliderValue,
     required this.canDrag,
     required this.onSliderChangeStart,
+    required this.onSliderPointerDown,
     required this.onSliderChanged,
     required this.onSliderChangeEnd,
   });
@@ -360,6 +367,7 @@ class _ReaderProgressSlider extends StatelessWidget {
   final double sliderValue;
   final bool canDrag;
   final ValueChanged<double>? onSliderChangeStart;
+  final ValueChanged<double>? onSliderPointerDown;
   final ValueChanged<double>? onSliderChanged;
   final ValueChanged<double>? onSliderChangeEnd;
 
@@ -379,25 +387,45 @@ class _ReaderProgressSlider extends StatelessWidget {
           ),
         ),
         Expanded(
-          child: SliderTheme(
-            data: SliderTheme.of(context).copyWith(
-              activeTrackColor: readerTheme.colorScheme.primary,
-              inactiveTrackColor: Colors.white.withValues(alpha: 0.18),
-              thumbColor: readerTheme.colorScheme.primary,
-              overlayColor: readerTheme.colorScheme.primary.withValues(
-                alpha: 0.18,
-              ),
-              trackHeight: 3.2,
-            ),
-            child: Slider(
-              min: 0,
-              max: maxIndex.toDouble(),
-              divisions: canDrag ? maxIndex : null,
-              value: sliderValue,
-              onChangeStart: canDrag ? onSliderChangeStart : null,
-              onChanged: canDrag ? onSliderChanged : null,
-              onChangeEnd: canDrag ? onSliderChangeEnd : null,
-            ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              return Listener(
+                behavior: HitTestBehavior.translucent,
+                onPointerDown: canDrag
+                    ? (event) {
+                        final width = constraints.maxWidth;
+                        if (width <= 0) {
+                          return;
+                        }
+                        final ratio = (event.localPosition.dx / width).clamp(
+                          0.0,
+                          1.0,
+                        );
+                        onSliderPointerDown?.call(ratio * maxIndex);
+                      }
+                    : null,
+                child: SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    activeTrackColor: readerTheme.colorScheme.primary,
+                    inactiveTrackColor: Colors.white.withValues(alpha: 0.18),
+                    thumbColor: readerTheme.colorScheme.primary,
+                    overlayColor: readerTheme.colorScheme.primary.withValues(
+                      alpha: 0.18,
+                    ),
+                    trackHeight: 3.2,
+                  ),
+                  child: Slider(
+                    min: 0,
+                    max: maxIndex.toDouble(),
+                    divisions: null,
+                    value: sliderValue,
+                    onChangeStart: canDrag ? onSliderChangeStart : null,
+                    onChanged: canDrag ? onSliderChanged : null,
+                    onChangeEnd: canDrag ? onSliderChangeEnd : null,
+                  ),
+                ),
+              );
+            },
           ),
         ),
         SizedBox(

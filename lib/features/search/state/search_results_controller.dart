@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 
 import '../support/search_shared.dart';
 
@@ -10,7 +10,7 @@ class SearchResultsController extends ChangeNotifier {
 
   SearchResultsController({
     required String initialOrder,
-    required HazukiSourceService sourceService,
+    required SourceSearchGateway sourceService,
     SearchPageLoader? searchPageLoader,
     SearchComicDetailsLoader? comicDetailsLoader,
   }) : _searchPageLoader = searchPageLoader,
@@ -25,7 +25,7 @@ class SearchResultsController extends ChangeNotifier {
 
   final SearchPageLoader? _searchPageLoader;
   final SearchComicDetailsLoader? _comicDetailsLoader;
-  final HazukiSourceService _sourceService;
+  final SourceSearchGateway _sourceService;
 
   String _searchKeyword = '';
   String? _searchErrorMessage;

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/app/app.dart';
+import 'package:hazuki/app/home/home_feature_entrypoints.dart';
+import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/features/comments/comments.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_page.dart';
 import 'package:hazuki/features/downloads/downloads.dart';
@@ -11,10 +13,30 @@ import 'package:hazuki/features/reader/view/reader_page.dart';
 import 'package:hazuki/features/search/search.dart';
 import 'package:hazuki/features/settings/settings.dart';
 import 'package:hazuki/models/hazuki_models.dart';
+import 'package:hazuki/shared/comments/comments_widget_builder.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
+
+Widget _buildComments({
+  required String comicId,
+  String? subId,
+  required String sourceKey,
+  ScrollController? scrollController,
+  Future<void> Function()? onRequestTabFullscreen,
+  bool showAppBar = false,
+  bool isTabView = false,
+  bool isActiveInTabView = true,
+  Map<String, Object?> Function()? debugOuterScrollStateBuilder,
+}) {
+  return const SizedBox.shrink();
+}
+
+final ReaderCommentsWidgetBuilder _buildReaderComments =
+    readerCommentsWidgetBuilderFrom(_buildComments);
 
 void main() {
   test('feature-first entry widgets are constructible from public paths', () {
+    registerServices();
+    final homeFeatureEntrypoints = buildHazukiHomeFeatureEntrypoints();
     final home = HazukiHomePage(
       initialTabIndex: 1,
       appearanceSettings: const AppearanceSettingsData(
@@ -29,6 +51,8 @@ void main() {
       onAppearanceChanged: (_, {revealOrigin}) async {},
       locale: const Locale('en'),
       onLocaleChanged: (_) async {},
+      featureEntrypoints: homeFeatureEntrypoints,
+      services: buildHazukiHomeServices(),
     );
     const comic = ExploreComic(
       id: 'comic-id',
@@ -48,6 +72,7 @@ void main() {
             required chapterIndex,
             required images,
             required sourceKey,
+            coverUrl = '',
             comicTheme,
             onFavoriteRequested,
           }) => ReaderPage(
@@ -58,8 +83,11 @@ void main() {
             chapterIndex: chapterIndex,
             images: images,
             sourceKey: sourceKey,
+            coverUrl: coverUrl,
+            commentsWidgetBuilder: _buildReaderComments,
           ),
       searchPageBuilder: (_) => const SizedBox.shrink(),
+      commentsWidgetBuilder: _buildComments,
     );
     Widget buildDetail(ExploreComic comic, String heroTag) => ComicDetailPage(
       comic: comic,
@@ -73,6 +101,7 @@ void main() {
             required chapterIndex,
             required images,
             required sourceKey,
+            coverUrl = '',
             comicTheme,
             onFavoriteRequested,
           }) => ReaderPage(
@@ -83,8 +112,11 @@ void main() {
             chapterIndex: chapterIndex,
             images: images,
             sourceKey: sourceKey,
+            coverUrl: coverUrl,
+            commentsWidgetBuilder: _buildReaderComments,
           ),
       searchPageBuilder: (_) => const SizedBox.shrink(),
+      commentsWidgetBuilder: _buildComments,
     );
     final search = SearchPage(
       initialKeyword: comic.title,
@@ -98,7 +130,10 @@ void main() {
     final downloads = DownloadsPage(
       readerPageBuilder: (comic, chapter) => const SizedBox.shrink(),
     );
-    final history = HistoryPage(comicDetailPageBuilder: buildDetail);
+    final history = HistoryPage(
+      comicDetailPageBuilder: buildDetail,
+      onFavoriteRequested: (_, _) async {},
+    );
     final settings = SettingsPage(
       appearanceSettings: const AppearanceSettingsData(
         themeMode: ThemeMode.system,
@@ -128,6 +163,7 @@ void main() {
       chapterIndex: 0,
       images: const ['a', 'b'],
       comicTheme: ThemeData.light(),
+      commentsWidgetBuilder: _buildReaderComments,
     );
 
     expect(home.initialTabIndex, 1);

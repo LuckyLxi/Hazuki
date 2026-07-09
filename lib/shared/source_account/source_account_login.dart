@@ -1,5 +1,6 @@
-import 'package:hazuki/features/home/support/home_profile_actions.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
+
+import 'source_account_actions.dart';
 
 typedef SourceAccountLoginOperation =
     Future<void> Function({required String account, required String password});
@@ -7,7 +8,7 @@ typedef SourceAccountLoginOperation =
 typedef SourceAccountAvatarLoader = Future<String?> Function();
 
 Future<HomeLoginDialogProfile> loginSourceAccountForDialog({
-  required HazukiSourceService sourceService,
+  required SourceRuntimeGateway sourceService,
   required String account,
   required String password,
   Future<void> Function()? afterLogin,

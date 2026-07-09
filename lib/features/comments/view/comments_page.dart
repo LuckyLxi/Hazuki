@@ -11,7 +11,7 @@ import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/shared/search_box_outline.dart';
 import 'package:hazuki/services/comment_filter_service.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:loading_indicator_m3e/loading_indicator_m3e.dart';
 
@@ -62,26 +62,6 @@ class _CommentsPageState extends State<CommentsPage>
   final FocusNode _commentFocusNode = FocusNode();
   final Set<String> _animatedCommentKeys = <String>{};
 
-  List<ComicCommentData> _comments = const [];
-  String? _errorMessage;
-  bool _initialLoading = true;
-  bool _loadingMore = false;
-  int _loadEpoch = 0;
-  bool _hasMore = true;
-  bool _sendingComment = false;
-  bool _hideFilterLoadMoreQueued = false;
-  bool _supportCommentLike = false;
-  bool _supportCommentReplies = false;
-  int _currentPage = 1;
-  int? _maxPage;
-  ComicCommentData? _replyToComment;
-  final Set<String> _likingCommentIds = <String>{};
-  final Set<String> _expandedReplyIds = <String>{};
-  final Set<String> _loadingReplyIds = <String>{};
-  final Map<String, List<ComicCommentData>> _replyComments = {};
-  final Map<String, int> _replyPages = {};
-  final Map<String, int?> _replyMaxPages = {};
-  final Map<String, bool> _replyHasMore = {};
   bool? _tabScrollAtTop;
   int _fullscreenRequestEpoch = 0;
   final List<Timer> _fullscreenSyncTimers = [];
@@ -90,6 +70,46 @@ class _CommentsPageState extends State<CommentsPage>
   double? _lastInnerScrollMin;
   double? _lastInnerScrollMax;
   double? _lastInnerViewportDimension;
+
+  CommentsInteractionState get _interaction => _controller.state;
+  List<ComicCommentData> get _comments => _interaction.comments;
+  set _comments(List<ComicCommentData> value) => _interaction.comments = value;
+  String? get _errorMessage => _interaction.errorMessage;
+  set _errorMessage(String? value) => _interaction.errorMessage = value;
+  bool get _initialLoading => _interaction.initialLoading;
+  set _initialLoading(bool value) => _interaction.initialLoading = value;
+  bool get _loadingMore => _interaction.loadingMore;
+  set _loadingMore(bool value) => _interaction.loadingMore = value;
+  int get _loadEpoch => _interaction.loadEpoch;
+  set _loadEpoch(int value) => _interaction.loadEpoch = value;
+  bool get _hasMore => _interaction.hasMore;
+  set _hasMore(bool value) => _interaction.hasMore = value;
+  bool get _sendingComment => _interaction.sendingComment;
+  set _sendingComment(bool value) => _interaction.sendingComment = value;
+  bool get _hideFilterLoadMoreQueued => _interaction.hideFilterLoadMoreQueued;
+  set _hideFilterLoadMoreQueued(bool value) =>
+      _interaction.hideFilterLoadMoreQueued = value;
+  bool get _supportCommentLike => _interaction.supportCommentLike;
+  set _supportCommentLike(bool value) =>
+      _interaction.supportCommentLike = value;
+  bool get _supportCommentReplies => _interaction.supportCommentReplies;
+  set _supportCommentReplies(bool value) =>
+      _interaction.supportCommentReplies = value;
+  int get _currentPage => _interaction.currentPage;
+  set _currentPage(int value) => _interaction.currentPage = value;
+  int? get _maxPage => _interaction.maxPage;
+  set _maxPage(int? value) => _interaction.maxPage = value;
+  ComicCommentData? get _replyToComment => _interaction.replyToComment;
+  set _replyToComment(ComicCommentData? value) =>
+      _interaction.replyToComment = value;
+  Set<String> get _likingCommentIds => _interaction.likingCommentIds;
+  Set<String> get _expandedReplyIds => _interaction.expandedReplyIds;
+  Set<String> get _loadingReplyIds => _interaction.loadingReplyIds;
+  Map<String, List<ComicCommentData>> get _replyComments =>
+      _interaction.replyComments;
+  Map<String, int> get _replyPages => _interaction.replyPages;
+  Map<String, int?> get _replyMaxPages => _interaction.replyMaxPages;
+  Map<String, bool> get _replyHasMore => _interaction.replyHasMore;
 
   @override
   bool get wantKeepAlive => true;
@@ -100,7 +120,7 @@ class _CommentsPageState extends State<CommentsPage>
     _ownsScrollController = widget.scrollController == null;
     _scrollController = widget.scrollController ?? ScrollController();
     _controller = CommentsPageController(
-      sourceService: sl<HazukiSourceService>(),
+      sourceService: sl<SourceCommentsGateway>(),
       filterService: sl<CommentFilterService>(),
     );
     WidgetsBinding.instance.addObserver(this);

@@ -1,12 +1,12 @@
 import 'dart:async';
-import 'package:hazuki/app/service_locator.dart';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
 import '../shared/ui_flags.dart';
 import '../models/hazuki_models.dart';
-import '../services/hazuki_source_service.dart';
+import '../services/source/source_capabilities.dart';
+import 'source_image_gateway_scope.dart';
 
 enum HazukiCachedImageLoadState { idle, deferred, loading, loaded, error }
 
@@ -76,11 +76,13 @@ class HazukiCachedImage extends StatefulWidget {
     this.cacheHeight,
     this.animateOnLoad = false,
     this.loadAnimationDuration = const Duration(milliseconds: 260),
+    this.loadAnimationBeginScale = 0.985,
     this.filterQuality = FilterQuality.medium,
     this.deferLoadingWhileScrolling = false,
     this.useShimmerLoading = true,
     this.sourceKey = '',
     this.onStateChanged,
+    this.imageGateway,
   });
 
   final String url;
@@ -96,11 +98,13 @@ class HazukiCachedImage extends StatefulWidget {
   final int? cacheHeight;
   final bool animateOnLoad;
   final Duration loadAnimationDuration;
+  final double loadAnimationBeginScale;
   final FilterQuality filterQuality;
   final bool deferLoadingWhileScrolling;
   final bool useShimmerLoading;
   final String sourceKey;
   final HazukiCachedImageStateChanged? onStateChanged;
+  final SourceImageGateway? imageGateway;
 
   @override
   State<HazukiCachedImage> createState() => _HazukiCachedImageState();
@@ -115,18 +119,24 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
   Timer? _deferredLoadTimer;
   HazukiCachedImageLoadState _lastReportedState =
       HazukiCachedImageLoadState.idle;
+  late SourceImageGateway _imageGateway;
+  late String _sourceKeySnapshot;
+  bool _dependenciesInitialized = false;
+  int _loadGeneration = 0;
 
   bool get _noImageModeEnabled {
     return !widget.ignoreNoImageMode && hazukiNoImageModeNotifier.value;
   }
 
-  String get _resolvedSourceKey {
+  String _resolveSourceKey(SourceImageGateway gateway) {
     final explicit = widget.sourceKey.trim();
     if (explicit.isNotEmpty) {
       return explicit;
     }
-    return sl<HazukiSourceService>().activeSourceKey;
+    return gateway.activeSourceKey;
   }
+
+  String get _resolvedSourceKey => _sourceKeySnapshot;
 
   void _reportState(HazukiCachedImageLoadState state) {
     if (_lastReportedState == state) {
@@ -137,6 +147,7 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
   }
 
   void _resetStateWithoutImage() {
+    _loadGeneration++;
     _reportState(HazukiCachedImageLoadState.idle);
     if (!mounted) {
       _bytes = null;
@@ -159,6 +170,28 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
   void initState() {
     super.initState();
     hazukiNoImageModeNotifier.addListener(_handleNoImageModeChanged);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final nextGateway =
+        widget.imageGateway ?? SourceImageGatewayScope.of(context);
+    final nextSourceKey = _resolveSourceKey(nextGateway);
+    final gatewayChanged =
+        _dependenciesInitialized && !identical(_imageGateway, nextGateway);
+    final sourceKeyChanged =
+        _dependenciesInitialized && _sourceKeySnapshot != nextSourceKey;
+    _imageGateway = nextGateway;
+    _sourceKeySnapshot = nextSourceKey;
+    if (_dependenciesInitialized && !gatewayChanged && !sourceKeyChanged) {
+      return;
+    }
+    _dependenciesInitialized = true;
+    if (gatewayChanged || sourceKeyChanged) {
+      _cancelDeferredLoad();
+      _resetStateWithoutImage();
+    }
     if (_noImageModeEnabled) {
       _resetStateWithoutImage();
       return;
@@ -179,12 +212,23 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
   @override
   void didUpdateWidget(covariant HazukiCachedImage oldWidget) {
     super.didUpdateWidget(oldWidget);
+    final gatewayChanged = oldWidget.imageGateway != widget.imageGateway;
+    if (gatewayChanged) {
+      _imageGateway =
+          widget.imageGateway ?? SourceImageGatewayScope.read(context);
+    }
+    final nextSourceKey = _resolveSourceKey(_imageGateway);
+    final sourceKeyChanged = _sourceKeySnapshot != nextSourceKey;
+    _sourceKeySnapshot = nextSourceKey;
+    if (gatewayChanged || sourceKeyChanged) {
+      _resetStateWithoutImage();
+    }
     if (_noImageModeEnabled) {
       _resetStateWithoutImage();
       return;
     }
-    if (oldWidget.url != widget.url ||
-        oldWidget.sourceKey != widget.sourceKey) {
+    if (oldWidget.url != widget.url || sourceKeyChanged || gatewayChanged) {
+      _loadGeneration++;
       _cancelDeferredLoad();
       final primed = _primeFromMemory(widget.url);
       if (!primed) {
@@ -279,12 +323,10 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
       return false;
     }
     final sourceKey = _resolvedSourceKey;
+    final imageGateway = _imageGateway;
     final cached =
         takeHazukiWidgetImageMemory(normalized, sourceKey: sourceKey) ??
-        sl<HazukiSourceService>().peekImageBytesFromMemory(
-          normalized,
-          sourceKey: sourceKey,
-        );
+        imageGateway.peekImageBytesFromMemory(normalized, sourceKey: sourceKey);
     if (cached == null) {
       return false;
     }
@@ -328,6 +370,7 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
     }
 
     final normalized = url.trim();
+    final loadGeneration = ++_loadGeneration;
     if (normalized.isEmpty) {
       if (!mounted) {
         _bytes = null;
@@ -348,12 +391,10 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
     }
 
     final sourceKey = _resolvedSourceKey;
+    final imageGateway = _imageGateway;
     final cached =
         takeHazukiWidgetImageMemory(normalized, sourceKey: sourceKey) ??
-        sl<HazukiSourceService>().peekImageBytesFromMemory(
-          normalized,
-          sourceKey: sourceKey,
-        );
+        imageGateway.peekImageBytesFromMemory(normalized, sourceKey: sourceKey);
     if (cached != null) {
       if (widget.keepInMemory) {
         putHazukiWidgetImageMemory(normalized, cached, sourceKey: sourceKey);
@@ -395,16 +436,20 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
     }
 
     try {
-      final bytes = await sl<HazukiSourceService>().downloadImageBytes(
+      final bytes = await imageGateway.downloadImageBytes(
         normalized,
         keepInMemory: widget.keepInMemory,
         sourceKey: sourceKey,
       );
+      if (!mounted ||
+          widget.url.trim() != normalized ||
+          loadGeneration != _loadGeneration ||
+          !identical(_imageGateway, imageGateway) ||
+          _resolvedSourceKey != sourceKey) {
+        return;
+      }
       if (widget.keepInMemory) {
         putHazukiWidgetImageMemory(normalized, bytes, sourceKey: sourceKey);
-      }
-      if (!mounted || widget.url.trim() != normalized) {
-        return;
       }
       setState(() {
         _bytes = bytes;
@@ -418,7 +463,11 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
         _queueLoadedImageReveal();
       }
     } catch (e) {
-      if (!mounted || widget.url.trim() != normalized) {
+      if (!mounted ||
+          widget.url.trim() != normalized ||
+          loadGeneration != _loadGeneration ||
+          !identical(_imageGateway, imageGateway) ||
+          _resolvedSourceKey != sourceKey) {
         return;
       }
       setState(() {
@@ -434,6 +483,9 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.imageGateway == null) {
+      SourceImageGatewayScope.of(context);
+    }
     // 图片已加载完成：直接返回，跳过 AnimatedSwitcher
     // 避免 Hero 飞行期间内部状态切换触发额外动画导致闪烁
     if (_bytes != null && !_noImageModeEnabled) {
@@ -459,7 +511,7 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
         curve: Curves.easeOutCubic,
         onEnd: _handleLoadedImageRevealEnd,
         child: AnimatedScale(
-          scale: _showLoadedImage ? 1.0 : 0.985,
+          scale: _showLoadedImage ? 1.0 : widget.loadAnimationBeginScale,
           duration: widget.loadAnimationDuration,
           curve: Curves.easeOutCubic,
           child: image,
@@ -548,6 +600,7 @@ class HazukiCachedCircleAvatar extends StatefulWidget {
     this.fallbackIcon,
     this.useShimmerFallback = false,
     this.ignoreNoImageMode = false,
+    this.imageGateway,
   });
 
   final String url;
@@ -555,6 +608,7 @@ class HazukiCachedCircleAvatar extends StatefulWidget {
   final Icon? fallbackIcon;
   final bool useShimmerFallback;
   final bool ignoreNoImageMode;
+  final SourceImageGateway? imageGateway;
 
   @override
   State<HazukiCachedCircleAvatar> createState() =>
@@ -564,12 +618,21 @@ class HazukiCachedCircleAvatar extends StatefulWidget {
 class _HazukiCachedCircleAvatarState extends State<HazukiCachedCircleAvatar> {
   Uint8List? _bytes;
   bool _loading = false;
+  late SourceImageGateway _imageGateway;
+  late String _sourceKeySnapshot;
+  bool _dependenciesInitialized = false;
+  int _loadGeneration = 0;
 
   bool get _noImageModeEnabled {
     return !widget.ignoreNoImageMode && hazukiNoImageModeNotifier.value;
   }
 
+  String _resolveSourceKey(SourceImageGateway gateway) {
+    return gateway.activeSourceKey;
+  }
+
   void _resetWithoutImage() {
+    _loadGeneration++;
     if (!mounted) {
       _bytes = null;
       _loading = false;
@@ -585,6 +648,24 @@ class _HazukiCachedCircleAvatarState extends State<HazukiCachedCircleAvatar> {
   void initState() {
     super.initState();
     hazukiNoImageModeNotifier.addListener(_handleNoImageModeChanged);
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final nextGateway =
+        widget.imageGateway ?? SourceImageGatewayScope.of(context);
+    final nextSourceKey = _resolveSourceKey(nextGateway);
+    final gatewayChanged =
+        _dependenciesInitialized && !identical(_imageGateway, nextGateway);
+    final sourceKeyChanged =
+        _dependenciesInitialized && _sourceKeySnapshot != nextSourceKey;
+    _imageGateway = nextGateway;
+    _sourceKeySnapshot = nextSourceKey;
+    if (_dependenciesInitialized && !gatewayChanged && !sourceKeyChanged) {
+      return;
+    }
+    _dependenciesInitialized = true;
     if (_noImageModeEnabled) {
       _resetWithoutImage();
       return;
@@ -595,11 +676,19 @@ class _HazukiCachedCircleAvatarState extends State<HazukiCachedCircleAvatar> {
   @override
   void didUpdateWidget(covariant HazukiCachedCircleAvatar oldWidget) {
     super.didUpdateWidget(oldWidget);
+    final gatewayChanged = oldWidget.imageGateway != widget.imageGateway;
+    if (gatewayChanged) {
+      _imageGateway =
+          widget.imageGateway ?? SourceImageGatewayScope.read(context);
+    }
+    final nextSourceKey = _resolveSourceKey(_imageGateway);
+    final sourceKeyChanged = _sourceKeySnapshot != nextSourceKey;
+    _sourceKeySnapshot = nextSourceKey;
     if (_noImageModeEnabled) {
       _resetWithoutImage();
       return;
     }
-    if (oldWidget.url != widget.url) {
+    if (oldWidget.url != widget.url || gatewayChanged || sourceKeyChanged) {
       _load(widget.url);
     }
   }
@@ -628,6 +717,7 @@ class _HazukiCachedCircleAvatarState extends State<HazukiCachedCircleAvatar> {
     }
 
     final normalized = url.trim();
+    final loadGeneration = ++_loadGeneration;
     if (normalized.isEmpty) {
       if (!mounted) {
         _bytes = null;
@@ -641,7 +731,12 @@ class _HazukiCachedCircleAvatarState extends State<HazukiCachedCircleAvatar> {
       return;
     }
 
-    final cached = takeHazukiWidgetImageMemory(normalized);
+    final sourceKey = _sourceKeySnapshot;
+    final imageGateway = _imageGateway;
+    final cached = takeHazukiWidgetImageMemory(
+      normalized,
+      sourceKey: sourceKey,
+    );
     if (cached != null) {
       if (!mounted) {
         _bytes = cached;
@@ -666,19 +761,28 @@ class _HazukiCachedCircleAvatarState extends State<HazukiCachedCircleAvatar> {
     }
 
     try {
-      final bytes = await sl<HazukiSourceService>().downloadImageBytes(
+      final bytes = await imageGateway.downloadImageBytes(
         normalized,
+        sourceKey: sourceKey,
       );
-      putHazukiWidgetImageMemory(normalized, bytes);
-      if (!mounted || widget.url.trim() != normalized) {
+      if (!mounted ||
+          widget.url.trim() != normalized ||
+          loadGeneration != _loadGeneration ||
+          !identical(_imageGateway, imageGateway) ||
+          _sourceKeySnapshot != sourceKey) {
         return;
       }
+      putHazukiWidgetImageMemory(normalized, bytes, sourceKey: sourceKey);
       setState(() {
         _bytes = bytes;
         _loading = false;
       });
     } catch (_) {
-      if (!mounted || widget.url.trim() != normalized) {
+      if (!mounted ||
+          widget.url.trim() != normalized ||
+          loadGeneration != _loadGeneration ||
+          !identical(_imageGateway, imageGateway) ||
+          _sourceKeySnapshot != sourceKey) {
         return;
       }
       setState(() {
@@ -690,6 +794,9 @@ class _HazukiCachedCircleAvatarState extends State<HazukiCachedCircleAvatar> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.imageGateway == null) {
+      SourceImageGatewayScope.of(context);
+    }
     final fallback = widget.fallbackIcon ?? const Icon(Icons.person_outline);
     Widget currentWidget;
 

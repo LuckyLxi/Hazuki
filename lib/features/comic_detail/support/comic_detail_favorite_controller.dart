@@ -8,7 +8,9 @@ import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/widgets/hazuki_prompt.dart';
 
-import 'package:hazuki/features/favorite/favorite.dart';
+import 'package:hazuki/shared/favorites/favorite_folders_view_model.dart';
+import 'package:hazuki/shared/favorites/favorite_selection_applier.dart';
+import 'package:hazuki/shared/favorites/favorite_selection_result.dart';
 
 import '../repository/comic_detail_repository.dart';
 
@@ -16,10 +18,10 @@ typedef ComicDetailFavoriteDialogBuilder =
     Widget Function(FavoriteFoldersViewModel viewModel);
 
 class ComicDetailFavoriteController extends ChangeNotifier {
-  ComicDetailFavoriteController({required ComicDetailRepository repository})
+  ComicDetailFavoriteController({required ComicDetailFeatureFacade repository})
     : _repository = repository;
 
-  final ComicDetailRepository _repository;
+  final ComicDetailFeatureFacade _repository;
   bool _disposed = false;
 
   bool _busy = false;

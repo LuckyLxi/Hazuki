@@ -1,6 +1,6 @@
 import 'dart:convert';
 
-import '../../hazuki_source_service.dart';
+import '../runtime/source_runtime_facade.dart';
 import 'debug_log_internals.dart';
 
 class DebugLogCapability {

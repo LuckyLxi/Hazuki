@@ -2,7 +2,7 @@ import 'dart:io';
 
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../../app/app_preferences.dart';
+import '../../shared/preferences/hazuki_preference_keys.dart';
 import 'cloud_sync_models.dart';
 
 class CloudSyncConfigStore {
@@ -15,6 +15,8 @@ class CloudSyncConfigStore {
       'cloud_sync_last_synced_remote_target';
   static const downloadStateKey = 'manga_download_service_state_v2';
   static const downloadsRootPathKey = 'manga_download_root_path_v1';
+  static const legacyReadHistoryKey = 'hazuki_read_history';
+  static const legacyReadingProgressPrefix = 'reading_progress_';
 
   static const settingsFileName = 'settings.json';
   static const readingFileName = 'reading.json';
@@ -41,6 +43,12 @@ class CloudSyncConfigStore {
 
   static bool shouldAlwaysSkipSetting(String key) {
     return alwaysSkippedSettings.contains(key) ||
+        key == legacyReadHistoryKey ||
+        key.startsWith(legacyReadingProgressPrefix) ||
+        key == hazukiDiscoverDailyRecommendationCachePreferenceKey ||
+        key.startsWith(
+          '${hazukiDiscoverDailyRecommendationCachePreferenceKey}_',
+        ) ||
         key.startsWith('cloud_sync_') ||
         key.startsWith('cookie_store_v2_');
   }

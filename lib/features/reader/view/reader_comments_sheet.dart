@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import 'package:hazuki/features/comments/comments.dart';
 import 'package:hazuki/features/reader/support/reader_callbacks.dart';
 import 'package:hazuki/l10n/l10n.dart';
 
@@ -9,14 +8,14 @@ class ReaderCommentsSheet extends StatefulWidget {
     super.key,
     required this.comicId,
     required this.subId,
+    required this.commentsWidgetBuilder,
     this.sourceKey = '',
-    this.commentsWidgetBuilder,
   });
 
   final String comicId;
   final String? subId;
   final String sourceKey;
-  final ReaderCommentsWidgetBuilder? commentsWidgetBuilder;
+  final ReaderCommentsWidgetBuilder commentsWidgetBuilder;
 
   @override
   State<ReaderCommentsSheet> createState() => _ReaderCommentsSheetState();
@@ -132,22 +131,13 @@ class _ReaderCommentsSheetState extends State<ReaderCommentsSheet> {
                       color: cs.outlineVariant.withValues(alpha: 0.48),
                     ),
                     Expanded(
-                      child:
-                          widget.commentsWidgetBuilder?.call(
-                            comicId: widget.comicId,
-                            subId: widget.subId,
-                            sourceKey: widget.sourceKey,
-                            scrollController: scrollController,
-                            onRequestTabFullscreen: _expandToFullscreen,
-                          ) ??
-                          CommentsPage(
-                            comicId: widget.comicId,
-                            subId: widget.subId,
-                            sourceKey: widget.sourceKey,
-                            showAppBar: false,
-                            scrollController: scrollController,
-                            onRequestTabFullscreen: _expandToFullscreen,
-                          ),
+                      child: widget.commentsWidgetBuilder(
+                        comicId: widget.comicId,
+                        subId: widget.subId,
+                        sourceKey: widget.sourceKey,
+                        scrollController: scrollController,
+                        onRequestTabFullscreen: _expandToFullscreen,
+                      ),
                     ),
                   ],
                 ),

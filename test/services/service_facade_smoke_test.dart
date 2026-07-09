@@ -388,8 +388,10 @@ void main() {
     final secureStorage = MemorySourceSecureSessionStorage();
     final service = HazukiSourceService(secureSessionStorage: secureStorage);
     final handle = SourceRuntimeHandle(
-      service: service,
       sourceKey: hazukiDefaultSourceKey,
+      secureStorage: secureStorage,
+      ensureInitialized: service.ensureSourceInitialized,
+      notifyRuntimeStateChanged: (_) {},
     );
     await handle.facade.ensurePrefs();
     await handle.facade.saveSourceData('copy_manga', 'token', 'copy-token');

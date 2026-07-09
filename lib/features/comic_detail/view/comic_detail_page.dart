@@ -3,9 +3,12 @@ import 'package:flutter/services.dart';
 
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/app/service_locator.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
-import 'package:hazuki/services/local_favorites_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
+import 'package:hazuki/services/local_favorites/local_favorites_contracts.dart';
 import 'package:hazuki/services/manga_download/manga_download_service.dart';
+import 'package:hazuki/services/reading_progress_service.dart';
+import 'package:hazuki/services/read_history_service.dart';
+import 'package:hazuki/shared/comments/comments_widget_builder.dart';
 
 import '../repository/comic_detail_repository.dart';
 import '../support/comic_detail_actions_controller.dart';
@@ -16,7 +19,7 @@ import '../support/comic_detail_session_controller.dart';
 import '../support/comic_detail_theme_controller.dart';
 import '../support/comic_detail_ui_state_controller.dart';
 import 'comic_detail_app_bar.dart';
-import 'package:hazuki/features/favorite/favorite.dart';
+import 'package:hazuki/shared/favorites/favorite_folders_morph_dialog.dart';
 
 import 'comic_detail_background.dart';
 import 'comic_detail_cover.dart';
@@ -34,18 +37,24 @@ class ComicDetailPage extends StatefulWidget {
     required this.heroTag,
     required this.readerWidgetBuilder,
     required this.searchPageBuilder,
+    required this.commentsWidgetBuilder,
+    this.categoryPageBuilder,
     this.isDesktopPanel = false,
     this.shouldAnimateInitialRevealOverride,
     this.onCloseRequested,
+    this.repository,
   });
 
   final ExploreComic comic;
   final String heroTag;
   final ReaderWidgetBuilder readerWidgetBuilder;
   final ComicDetailSearchPageBuilder searchPageBuilder;
+  final CommentsWidgetBuilder commentsWidgetBuilder;
+  final ComicDetailCategoryPageBuilder? categoryPageBuilder;
   final bool isDesktopPanel;
   final bool? shouldAnimateInitialRevealOverride;
   final VoidCallback? onCloseRequested;
+  final ComicDetailFeatureFacade? repository;
 
   @override
   State<ComicDetailPage> createState() => _ComicDetailPageState();
@@ -58,7 +67,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
   final GlobalKey _favoriteRowKey = GlobalKey();
   final GlobalKey _headerTitleKey = GlobalKey();
 
-  late final ComicDetailRepository _repository;
+  late final ComicDetailFeatureFacade _repository;
   late final ComicDetailSessionController _sessionController;
   late final ComicDetailUiStateController _uiStateController;
   late final ComicDetailThemeController _themeController;
@@ -72,13 +81,17 @@ class _ComicDetailPageState extends State<ComicDetailPage>
     super.initState();
     final comicSourceKey = widget.comic.sourceKey.trim().isNotEmpty
         ? widget.comic.sourceKey
-        : sl<HazukiSourceService>().activeSourceKey;
-    _repository = ComicDetailRepository(
-      source: sl<HazukiSourceService>(),
-      local: sl<LocalFavoritesService>(),
-      downloader: sl<MangaDownloadService>(),
-      sourceKey: comicSourceKey,
-    );
+        : sl<SourceComicDetailGateway>().activeSourceKey;
+    _repository =
+        widget.repository ??
+        ComicDetailFeatureFacade(
+          source: sl<SourceComicDetailGateway>(),
+          local: sl<LocalFavoritesRepository>(),
+          downloader: sl<MangaDownloadService>(),
+          readingProgress: sl<ReadingProgressService>(),
+          readHistory: sl<ReadHistoryService>(),
+          sourceKey: comicSourceKey,
+        );
     _supportsJmExclusiveActions = isHazukiJmSourceKey(comicSourceKey);
     _supportsComicLikeAction =
         isHazukiJmSourceKey(comicSourceKey) ||
@@ -170,6 +183,9 @@ class _ComicDetailPageState extends State<ComicDetailPage>
             chapterIndex: chapterIndex,
             images: const [],
             sourceKey: details.sourceKey,
+            coverUrl: details.cover.trim().isNotEmpty
+                ? details.cover
+                : widget.comic.cover,
             comicTheme: comicTheme,
             onFavoriteRequested: (ctx) => _favoriteController.showFoldersDialog(
               ctx,
@@ -181,11 +197,14 @@ class _ComicDetailPageState extends State<ComicDetailPage>
             ),
           ),
       searchPageBuilder: widget.searchPageBuilder,
+      categoryPageBuilder: widget.categoryPageBuilder,
       comicDetailPageBuilder: (comic, heroTag) => ComicDetailPage(
         comic: comic,
         heroTag: heroTag,
         readerWidgetBuilder: widget.readerWidgetBuilder,
         searchPageBuilder: widget.searchPageBuilder,
+        commentsWidgetBuilder: widget.commentsWidgetBuilder,
+        categoryPageBuilder: widget.categoryPageBuilder,
         isDesktopPanel: widget.isDesktopPanel,
         onCloseRequested: widget.onCloseRequested,
       ),
@@ -266,9 +285,12 @@ class _ComicDetailPageState extends State<ComicDetailPage>
                     heroTag: heroTag,
                     readerWidgetBuilder: widget.readerWidgetBuilder,
                     searchPageBuilder: widget.searchPageBuilder,
+                    commentsWidgetBuilder: widget.commentsWidgetBuilder,
+                    categoryPageBuilder: widget.categoryPageBuilder,
                     isDesktopPanel: widget.isDesktopPanel,
                     onCloseRequested: widget.onCloseRequested,
                   ),
+                  commentsWidgetBuilder: widget.commentsWidgetBuilder,
                 ),
               ),
             ],

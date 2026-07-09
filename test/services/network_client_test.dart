@@ -158,7 +158,12 @@ void main() {
     test('keeps JS response shape and source-scoped cookies', () async {
       final secureStorage = MemorySourceSecureSessionStorage();
       final service = HazukiSourceService(secureSessionStorage: secureStorage);
-      final handle = SourceRuntimeHandle(service: service, sourceKey: 'jm');
+      final handle = SourceRuntimeHandle(
+        sourceKey: 'jm',
+        secureStorage: secureStorage,
+        ensureInitialized: service.ensureSourceInitialized,
+        notifyRuntimeStateChanged: (_) {},
+      );
       await handle.facade.ensurePrefs();
       handle.facade.httpGateway.configureCookieBridge();
 

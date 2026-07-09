@@ -8,11 +8,13 @@ import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/manga_download/manga_download_service.dart';
 import 'package:hazuki/services/download_groups_service.dart';
 import 'downloads_cover_widgets.dart';
+import 'downloads_completed_status_widgets.dart';
 import 'downloads_shell_widgets.dart';
+import '../state/downloads_completed_list_controller.dart';
 
-class DownloadsCompletedTab extends StatefulWidget {
-  const DownloadsCompletedTab({
-    super.key,
+@immutable
+class DownloadsCompletedTabModel {
+  const DownloadsCompletedTabModel({
     required this.comics,
     required this.active,
     required this.selectionMode,
@@ -20,23 +22,11 @@ class DownloadsCompletedTab extends StatefulWidget {
     required this.selectedCount,
     required this.selectedComicIds,
     required this.comicsWithIntegrityIssues,
-    required this.onToggleSelection,
-    required this.onDeleteSelected,
-    required this.onScanDownloaded,
-    required this.onOpenComic,
-    required this.onDeleteComic,
     required this.groups,
     required this.selectedGroupId,
     required this.selectedGroupName,
     required this.selectedGroupComicCount,
     required this.groupComicCounts,
-    required this.onSelectGroup,
-    required this.onCreateGroup,
-    required this.onRenameGroup,
-    required this.onReorderGroups,
-    required this.onDeleteGroup,
-    required this.onShowComicMenu,
-    required this.onBatchGroup,
   });
 
   final List<DownloadedMangaComic> comics;
@@ -46,16 +36,35 @@ class DownloadsCompletedTab extends StatefulWidget {
   final int selectedCount;
   final Set<String> selectedComicIds;
   final Set<String> comicsWithIntegrityIssues;
-  final ValueChanged<String> onToggleSelection;
-  final VoidCallback onDeleteSelected;
-  final VoidCallback onScanDownloaded;
-  final ValueChanged<DownloadedMangaComic> onOpenComic;
-  final ValueChanged<DownloadedMangaComic> onDeleteComic;
   final List<DownloadGroup> groups;
   final String selectedGroupId;
   final String selectedGroupName;
   final int selectedGroupComicCount;
   final Map<String, int> groupComicCounts;
+}
+
+@immutable
+class DownloadsCompletedTabActions {
+  const DownloadsCompletedTabActions({
+    required this.onToggleSelection,
+    required this.onDeleteSelected,
+    required this.onScanDownloaded,
+    required this.onOpenComic,
+    required this.onDeleteComic,
+    required this.onSelectGroup,
+    required this.onCreateGroup,
+    required this.onRenameGroup,
+    required this.onReorderGroups,
+    required this.onDeleteGroup,
+    required this.onShowComicMenu,
+    required this.onBatchGroup,
+  });
+
+  final ValueChanged<String> onToggleSelection;
+  final VoidCallback onDeleteSelected;
+  final VoidCallback onScanDownloaded;
+  final ValueChanged<DownloadedMangaComic> onOpenComic;
+  final ValueChanged<DownloadedMangaComic> onDeleteComic;
   final ValueChanged<String> onSelectGroup;
   final Future<DownloadGroup> Function(String name) onCreateGroup;
   final Future<DownloadGroup> Function(String groupId, String name)
@@ -69,6 +78,51 @@ class DownloadsCompletedTab extends StatefulWidget {
   )
   onShowComicMenu;
   final VoidCallback onBatchGroup;
+}
+
+class DownloadsCompletedTab extends StatefulWidget {
+  const DownloadsCompletedTab({
+    super.key,
+    required this.model,
+    required this.actions,
+  });
+
+  final DownloadsCompletedTabModel model;
+  final DownloadsCompletedTabActions actions;
+
+  List<DownloadedMangaComic> get comics => model.comics;
+  bool get active => model.active;
+  bool get selectionMode => model.selectionMode;
+  bool get scanning => model.scanning;
+  int get selectedCount => model.selectedCount;
+  Set<String> get selectedComicIds => model.selectedComicIds;
+  Set<String> get comicsWithIntegrityIssues => model.comicsWithIntegrityIssues;
+  List<DownloadGroup> get groups => model.groups;
+  String get selectedGroupId => model.selectedGroupId;
+  String get selectedGroupName => model.selectedGroupName;
+  int get selectedGroupComicCount => model.selectedGroupComicCount;
+  Map<String, int> get groupComicCounts => model.groupComicCounts;
+  ValueChanged<String> get onToggleSelection => actions.onToggleSelection;
+  VoidCallback get onDeleteSelected => actions.onDeleteSelected;
+  VoidCallback get onScanDownloaded => actions.onScanDownloaded;
+  ValueChanged<DownloadedMangaComic> get onOpenComic => actions.onOpenComic;
+  ValueChanged<DownloadedMangaComic> get onDeleteComic => actions.onDeleteComic;
+  ValueChanged<String> get onSelectGroup => actions.onSelectGroup;
+  Future<DownloadGroup> Function(String name) get onCreateGroup =>
+      actions.onCreateGroup;
+  Future<DownloadGroup> Function(String groupId, String name)
+  get onRenameGroup => actions.onRenameGroup;
+  Future<void> Function(List<String> orderedGroupIds) get onReorderGroups =>
+      actions.onReorderGroups;
+  Future<void> Function(String groupId) get onDeleteGroup =>
+      actions.onDeleteGroup;
+  Future<void> Function(
+    DownloadedMangaComic comic,
+    Offset globalPosition,
+    BuildContext itemContext,
+  )
+  get onShowComicMenu => actions.onShowComicMenu;
+  VoidCallback get onBatchGroup => actions.onBatchGroup;
 
   static const Duration dismissDuration = Duration(milliseconds: 320);
 
@@ -83,8 +137,7 @@ class _DownloadsCompletedTabState extends State<DownloadsCompletedTab> {
 
   final GlobalKey _stackKey = GlobalKey();
   final ScrollController _scrollController = ScrollController();
-  List<_AnimatedDownloadedComicEntry> _visibleComics =
-      const <_AnimatedDownloadedComicEntry>[];
+  late final DownloadsCompletedListController _listController;
   _DownloadedComicSwipeReveal? _swipeReveal;
   bool _showBackToTop = false;
   bool _categoryShellOpen = false;
@@ -94,15 +147,19 @@ class _DownloadsCompletedTabState extends State<DownloadsCompletedTab> {
   void initState() {
     super.initState();
     _scrollController.addListener(_handleScrollChanged);
-    _visibleComics = widget.comics
-        .map((comic) => _AnimatedDownloadedComicEntry(comic: comic))
-        .toList(growable: false);
+    _listController = DownloadsCompletedListController(
+      comics: widget.comics,
+      transitionDuration: DownloadsCompletedTab.dismissDuration,
+    )..addListener(_handleListChanged);
   }
 
   @override
   void dispose() {
     _scrollController.removeListener(_handleScrollChanged);
     _scrollController.dispose();
+    _listController
+      ..removeListener(_handleListChanged)
+      ..dispose();
     super.dispose();
   }
 
@@ -120,7 +177,11 @@ class _DownloadsCompletedTabState extends State<DownloadsCompletedTab> {
     if ((!widget.active || widget.comics.isEmpty) && _showBackToTop) {
       _showBackToTop = false;
     }
-    _syncVisibleComics();
+    _listController.sync(widget.comics);
+  }
+
+  void _handleListChanged() {
+    if (mounted) setState(() {});
   }
 
   void _handleScrollChanged() {
@@ -188,115 +249,10 @@ class _DownloadsCompletedTabState extends State<DownloadsCompletedTab> {
     return false;
   }
 
-  void _syncVisibleComics() {
-    final nextById = <String, DownloadedMangaComic>{
-      for (final comic in widget.comics) comic.storageKey: comic,
-    };
-    final currentById = <String, _AnimatedDownloadedComicEntry>{
-      for (final entry in _visibleComics) entry.comic.storageKey: entry,
-    };
-    final exitingEntries =
-        <({int index, _AnimatedDownloadedComicEntry entry})>[];
-    final nextVisible = <_AnimatedDownloadedComicEntry>[];
-
-    for (int i = 0; i < _visibleComics.length; i++) {
-      final entry = _visibleComics[i];
-      final nextComic = nextById[entry.comic.storageKey];
-      if (nextComic == null) {
-        final exitingEntry = entry.copyWith(exiting: true, entering: false);
-        exitingEntries.add((index: i, entry: exitingEntry));
-        if (!entry.exiting) {
-          _scheduleRemoval(entry.comic.storageKey);
-        }
-        continue;
-      }
-    }
-
-    for (final comic in widget.comics) {
-      final currentEntry = currentById[comic.storageKey];
-      if (currentEntry == null) {
-        nextVisible.add(
-          _AnimatedDownloadedComicEntry(comic: comic, entering: true),
-        );
-        _scheduleEnterComplete(comic.storageKey);
-        continue;
-      }
-      nextVisible.add(
-        _AnimatedDownloadedComicEntry(
-          comic: comic,
-          entering: currentEntry.entering,
-        ),
-      );
-    }
-
-    for (final exiting in exitingEntries) {
-      final index = exiting.index.clamp(0, nextVisible.length);
-      nextVisible.insert(index, exiting.entry);
-    }
-
-    if (!_sameEntries(_visibleComics, nextVisible)) {
-      setState(() {
-        _visibleComics = nextVisible;
-      });
-    }
-  }
-
-  bool _sameEntries(
-    List<_AnimatedDownloadedComicEntry> current,
-    List<_AnimatedDownloadedComicEntry> next,
-  ) {
-    if (current.length != next.length) {
-      return false;
-    }
-    for (int i = 0; i < current.length; i++) {
-      final a = current[i];
-      final b = next[i];
-      if (a.comic != b.comic ||
-          a.exiting != b.exiting ||
-          a.entering != b.entering) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  void _scheduleEnterComplete(String storageKey) {
-    Future<void>.delayed(DownloadsCompletedTab.dismissDuration, () {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _visibleComics = _visibleComics
-            .map((entry) {
-              if (entry.comic.storageKey != storageKey || entry.exiting) {
-                return entry;
-              }
-              return entry.copyWith(entering: false);
-            })
-            .toList(growable: false);
-      });
-    });
-  }
-
-  void _scheduleRemoval(String storageKey) {
-    Future<void>.delayed(DownloadsCompletedTab.dismissDuration, () {
-      if (!mounted) {
-        return;
-      }
-      if (widget.comics.any((comic) => comic.storageKey == storageKey)) {
-        return;
-      }
-      setState(() {
-        _visibleComics = _visibleComics
-            .where((entry) => entry.comic.storageKey != storageKey)
-            .toList(growable: false);
-      });
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
-    final listContent = _visibleComics.isEmpty
+    final visibleComics = _listController.entries;
+    final listContent = visibleComics.isEmpty
         ? Center(child: Text(l10n(context).downloadsEmptyDownloaded))
         : NotificationListener<ScrollNotification>(
             onNotification: _handleScrollNotification,
@@ -309,13 +265,13 @@ class _DownloadsCompletedTabState extends State<DownloadsCompletedTab> {
                 16,
                 96,
               ),
-              itemCount: _visibleComics.length,
+              itemCount: visibleComics.length,
               itemBuilder: (context, index) {
-                final entry = _visibleComics[index];
+                final entry = visibleComics[index];
                 return _AnimatedDownloadedComicCard(
                   key: ValueKey<String>('downloaded_${entry.comic.storageKey}'),
                   entry: entry,
-                  bottomSpacing: index == _visibleComics.length - 1 ? 0 : 12,
+                  bottomSpacing: index == visibleComics.length - 1 ? 0 : 12,
                   selectionMode: widget.selectionMode,
                   selected: widget.selectedComicIds.contains(
                     entry.comic.storageKey,
@@ -815,11 +771,20 @@ class _DownloadsCategoryShellDialogState
   }
 
   void _reorder(int oldIndex, int newIndex) {
-    if (oldIndex == 0) return;
-    newIndex = newIndex.clamp(1, _groups.length - 1);
     setState(() {
-      final group = _groups.removeAt(oldIndex);
-      _groups.insert(newIndex, group);
+      final defaultGroups = [
+        for (final group in _groups)
+          if (group.isDefault) group,
+      ];
+      final movableGroups = [
+        for (final group in _groups)
+          if (!group.isDefault) group,
+      ];
+      if (oldIndex < 0 || oldIndex >= movableGroups.length) return;
+      final group = movableGroups.removeAt(oldIndex);
+      final insertIndex = newIndex.clamp(0, movableGroups.length);
+      movableGroups.insert(insertIndex, group);
+      _groups = [...defaultGroups, ...movableGroups];
     });
   }
 
@@ -897,7 +862,7 @@ class _DownloadsCategoryLauncherContents extends StatelessWidget {
   }
 }
 
-class _DownloadsCategoryShellContents extends StatelessWidget {
+class _DownloadsCategoryShellContents extends StatefulWidget {
   const _DownloadsCategoryShellContents({
     required this.groups,
     required this.selectedGroupId,
@@ -922,10 +887,238 @@ class _DownloadsCategoryShellContents extends StatelessWidget {
   final ReorderCallback onReorder;
   final ValueChanged<DownloadGroup> onDeleteGroup;
 
+  static const double _groupTileExtent = 56;
+
+  @override
+  State<_DownloadsCategoryShellContents> createState() =>
+      _DownloadsCategoryShellContentsState();
+}
+
+class _DownloadsCategoryShellContentsState
+    extends State<_DownloadsCategoryShellContents> {
+  late final ScrollController _scrollController = ScrollController();
+  bool _positionedSelectedGroup = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _positionSelectedGroup();
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant _DownloadsCategoryShellContents oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.selectedGroupId != oldWidget.selectedGroupId ||
+        widget.groups.length != oldWidget.groups.length) {
+      _positionedSelectedGroup = false;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _positionSelectedGroup();
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _positionSelectedGroup() {
+    if (_positionedSelectedGroup || !mounted || !_scrollController.hasClients) {
+      return;
+    }
+    final selectedIndex = widget.groups.indexWhere(
+      (group) => group.id == widget.selectedGroupId,
+    );
+    if (selectedIndex < 0) {
+      _positionedSelectedGroup = true;
+      return;
+    }
+    final selectedGroup = widget.groups[selectedIndex];
+    if (selectedGroup.isDefault) {
+      _scrollController.jumpTo(0);
+      _positionedSelectedGroup = true;
+      return;
+    }
+    final position = _scrollController.position;
+    if (!position.hasContentDimensions) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _positionSelectedGroup();
+      });
+      return;
+    }
+    final hasDefaultGroup = widget.groups.any((group) => group.isDefault);
+    final nonDefaultIndex = widget.groups
+        .where((group) => !group.isDefault)
+        .toList(growable: false)
+        .indexWhere((group) => group.id == widget.selectedGroupId);
+    if (nonDefaultIndex < 0) {
+      _positionedSelectedGroup = true;
+      return;
+    }
+    final viewport = position.viewportDimension;
+    final target =
+        (hasDefaultGroup
+            ? _DownloadsCategoryShellContents._groupTileExtent
+            : 0) +
+        nonDefaultIndex * _DownloadsCategoryShellContents._groupTileExtent -
+        (viewport - _DownloadsCategoryShellContents._groupTileExtent) / 2;
+    _scrollController.jumpTo(target.clamp(0, position.maxScrollExtent));
+    _positionedSelectedGroup = true;
+  }
+
+  Widget _buildReorderProxy(
+    Widget child,
+    int index,
+    Animation<double> animation,
+  ) {
+    return AnimatedBuilder(
+      animation: animation,
+      builder: (context, child) {
+        final progress = Curves.easeInOut.transform(animation.value);
+        final colorScheme = Theme.of(context).colorScheme;
+        return Material(
+          color: Colors.transparent,
+          elevation: 6 * progress,
+          shadowColor: colorScheme.shadow.withValues(alpha: 0.18),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: child,
+        );
+      },
+      child: child,
+    );
+  }
+
+  Widget _buildGroupTile(
+    BuildContext context, {
+    required DownloadGroup group,
+    required bool selected,
+    int? reorderIndex,
+  }) {
+    final strings = l10n(context);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final canReorder = reorderIndex != null && !group.isDefault;
+    final tile = Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: AnimatedContainer(
+        key: ValueKey<String>('download_group_background_${group.id}'),
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOutCubic,
+        decoration: BoxDecoration(
+          color: selected
+              ? colorScheme.secondaryContainer
+              : colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: selected
+                ? colorScheme.primary.withValues(alpha: 0.28)
+                : colorScheme.outlineVariant.withValues(alpha: 0.36),
+          ),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: widget.sorting ? null : () => widget.onSelectGroup(group.id),
+            onLongPress: widget.sorting || group.isDefault
+                ? null
+                : () => widget.onRenameGroup(group),
+            child: SizedBox(
+              height: 52,
+              child: Row(
+                children: [
+                  const SizedBox(width: 12),
+                  Icon(
+                    selected
+                        ? Icons.folder_open_rounded
+                        : Icons.folder_outlined,
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Text(
+                      group.isDefault
+                          ? '${strings.downloadsDefaultGroup} (${widget.groupComicCounts[group.id] ?? 0})'
+                          : '${group.name} (${widget.groupComicCounts[group.id] ?? 0})',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  SizedBox(
+                    width: group.isDefault ? 12 : 54,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        if (!group.isDefault && !widget.sorting)
+                          IconButton(
+                            tooltip: strings.comicDetailDelete,
+                            onPressed: () => widget.onDeleteGroup(group),
+                            icon: const Icon(Icons.delete_outline),
+                          ),
+                        if (canReorder && widget.sorting)
+                          ReorderableDragStartListener(
+                            index: reorderIndex,
+                            child: Tooltip(
+                              message: strings.downloadsReorderGroup,
+                              child: const Padding(
+                                padding: EdgeInsets.all(12),
+                                child: Icon(Icons.drag_handle_rounded),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    if (widget.sorting) {
+      return KeyedSubtree(
+        key: ValueKey<String>('download_group_${group.id}'),
+        child: tile,
+      );
+    }
+    return TweenAnimationBuilder<double>(
+      key: ValueKey<String>('download_group_${group.id}'),
+      tween: Tween(begin: 0, end: 1),
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) => Opacity(
+        opacity: value,
+        child: Transform.translate(
+          offset: Offset(0, 10 * (1 - value)),
+          child: child,
+        ),
+      ),
+      child: tile,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final strings = l10n(context);
     final theme = Theme.of(context);
+    DownloadGroup? defaultGroup;
+    for (final group in widget.groups) {
+      if (group.isDefault) {
+        defaultGroup = group;
+        break;
+      }
+    }
+    final sortableGroups = [
+      for (final group in widget.groups)
+        if (!group.isDefault) group,
+    ];
     return SizedBox(
       height: DownloadsCategoryShellDialog._dialogHeight,
       child: Padding(
@@ -947,12 +1140,12 @@ class _DownloadsCategoryShellContents extends StatelessWidget {
                     alignment: Alignment.centerRight,
                     children: [...previousChildren, ?currentChild],
                   ),
-                  child: sorting
+                  child: widget.sorting
                       ? FilledButton.tonalIcon(
                           key: const ValueKey<String>(
                             'downloads_group_sort_save',
                           ),
-                          onPressed: onToggleSorting,
+                          onPressed: widget.onToggleSorting,
                           icon: const Icon(Icons.save_outlined),
                           label: Text(strings.commonSave),
                         )
@@ -961,13 +1154,13 @@ class _DownloadsCategoryShellContents extends StatelessWidget {
                             'downloads_group_sort_start',
                           ),
                           tooltip: strings.downloadsSortGroups,
-                          onPressed: onToggleSorting,
+                          onPressed: widget.onToggleSorting,
                           icon: const Icon(Icons.sort_rounded),
                         ),
                 ),
                 IconButton(
                   tooltip: strings.downloadsNewGroup,
-                  onPressed: sorting ? null : onCreateGroup,
+                  onPressed: widget.sorting ? null : widget.onCreateGroup,
                   icon: const Icon(Icons.create_new_folder_outlined),
                 ),
               ],
@@ -975,108 +1168,28 @@ class _DownloadsCategoryShellContents extends StatelessWidget {
             const SizedBox(height: 8),
             Expanded(
               child: ReorderableListView.builder(
+                scrollController: _scrollController,
+                itemExtent: _DownloadsCategoryShellContents._groupTileExtent,
                 padding: EdgeInsets.zero,
-                itemCount: groups.length,
-                onReorderItem: onReorder,
+                header: defaultGroup == null
+                    ? null
+                    : _buildGroupTile(
+                        context,
+                        group: defaultGroup,
+                        selected: defaultGroup.id == widget.selectedGroupId,
+                      ),
+                itemCount: sortableGroups.length,
+                onReorderItem: widget.onReorder,
+                proxyDecorator: _buildReorderProxy,
                 buildDefaultDragHandles: false,
                 itemBuilder: (context, index) {
-                  final group = groups[index];
-                  final selected = group.id == selectedGroupId;
-                  return TweenAnimationBuilder<double>(
-                    key: ValueKey<String>('download_group_${group.id}'),
-                    tween: Tween(begin: 0, end: 1),
-                    duration: const Duration(milliseconds: 280),
-                    curve: Curves.easeOutCubic,
-                    builder: (context, value, child) => Opacity(
-                      opacity: value,
-                      child: Transform.translate(
-                        offset: Offset(0, 10 * (1 - value)),
-                        child: child,
-                      ),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.only(bottom: 4),
-                      child: AnimatedContainer(
-                        key: ValueKey<String>(
-                          'download_group_background_${group.id}',
-                        ),
-                        duration: const Duration(milliseconds: 180),
-                        curve: Curves.easeOutCubic,
-                        decoration: BoxDecoration(
-                          color: selected
-                              ? theme.colorScheme.secondaryContainer
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Material(
-                          color: Colors.transparent,
-                          borderRadius: BorderRadius.circular(16),
-                          clipBehavior: Clip.antiAlias,
-                          child: InkWell(
-                            onTap: sorting
-                                ? null
-                                : () => onSelectGroup(group.id),
-                            onLongPress: sorting || group.isDefault
-                                ? null
-                                : () => onRenameGroup(group),
-                            child: SizedBox(
-                              height: 52,
-                              child: Row(
-                                children: [
-                                  const SizedBox(width: 12),
-                                  Icon(
-                                    selected
-                                        ? Icons.folder_open_rounded
-                                        : Icons.folder_outlined,
-                                  ),
-                                  const SizedBox(width: 16),
-                                  Expanded(
-                                    child: Text(
-                                      group.isDefault
-                                          ? '${strings.downloadsDefaultGroup} (${groupComicCounts[group.id] ?? 0})'
-                                          : '${group.name} (${groupComicCounts[group.id] ?? 0})',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                  SizedBox(
-                                    width: group.isDefault ? 12 : 54,
-                                    child: Row(
-                                      mainAxisAlignment: MainAxisAlignment.end,
-                                      children: [
-                                        if (!group.isDefault && !sorting)
-                                          IconButton(
-                                            tooltip: strings.comicDetailDelete,
-                                            onPressed: () =>
-                                                onDeleteGroup(group),
-                                            icon: const Icon(
-                                              Icons.delete_outline,
-                                            ),
-                                          ),
-                                        if (!group.isDefault && sorting)
-                                          ReorderableDragStartListener(
-                                            index: index,
-                                            child: Tooltip(
-                                              message:
-                                                  strings.downloadsReorderGroup,
-                                              child: const Padding(
-                                                padding: EdgeInsets.all(12),
-                                                child: Icon(
-                                                  Icons.drag_handle_rounded,
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
+                  final group = sortableGroups[index];
+                  final selected = group.id == widget.selectedGroupId;
+                  return _buildGroupTile(
+                    context,
+                    group: group,
+                    selected: selected,
+                    reorderIndex: index,
                   );
                 },
               ),
@@ -1144,7 +1257,7 @@ class _AnimatedDownloadedComicCard extends StatelessWidget {
     required this.onShowComicMenu,
   });
 
-  final _AnimatedDownloadedComicEntry entry;
+  final AnimatedDownloadedComicEntry entry;
   final double bottomSpacing;
   final bool selectionMode;
   final bool selected;
@@ -1663,7 +1776,7 @@ class _DownloadedComicCardContent extends StatelessWidget {
                             ],
                           ),
                         ),
-                        _DownloadedComicSelectionSlot(
+                        DownloadedComicSelectionSlot(
                           visible: selectionMode,
                           selected: selected,
                         ),
@@ -1671,7 +1784,7 @@ class _DownloadedComicCardContent extends StatelessWidget {
                     ),
                   ),
                   if (hasIntegrityIssue)
-                    _IntegrityWarningBanner(
+                    DownloadedComicIntegrityWarningBanner(
                       message: l10n(context).downloadsIntegrityWarning,
                     ),
                 ],
@@ -1821,160 +1934,4 @@ Future<String?> _showRenameGroupDialog(
   await Future<void>.delayed(const Duration(milliseconds: 280));
   controller.dispose();
   return value;
-}
-
-class _AnimatedDownloadedComicEntry {
-  const _AnimatedDownloadedComicEntry({
-    required this.comic,
-    this.entering = false,
-    this.exiting = false,
-  });
-
-  final DownloadedMangaComic comic;
-  final bool entering;
-  final bool exiting;
-
-  _AnimatedDownloadedComicEntry copyWith({
-    DownloadedMangaComic? comic,
-    bool? entering,
-    bool? exiting,
-  }) {
-    return _AnimatedDownloadedComicEntry(
-      comic: comic ?? this.comic,
-      entering: entering ?? this.entering,
-      exiting: exiting ?? this.exiting,
-    );
-  }
-}
-
-class _IntegrityWarningBanner extends StatelessWidget {
-  const _IntegrityWarningBanner({required this.message});
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-      color: const Color(0xFFB71C1C),
-      child: Row(
-        children: [
-          const Icon(
-            Icons.warning_amber_rounded,
-            color: Colors.white,
-            size: 14,
-          ),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Text(
-              message,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DownloadedComicSelectionSlot extends StatelessWidget {
-  const _DownloadedComicSelectionSlot({
-    required this.visible,
-    required this.selected,
-  });
-
-  final bool visible;
-  final bool selected;
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedSize(
-      duration: const Duration(milliseconds: 220),
-      curve: Curves.easeOutCubic,
-      alignment: Alignment.centerRight,
-      child: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 220),
-        switchInCurve: Curves.easeOutBack,
-        switchOutCurve: Curves.easeInCubic,
-        transitionBuilder: (child, animation) {
-          return FadeTransition(
-            opacity: animation,
-            child: SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0.45, 0),
-                end: Offset.zero,
-              ).animate(animation),
-              child: ScaleTransition(
-                scale: Tween<double>(begin: 0.78, end: 1).animate(animation),
-                child: child,
-              ),
-            ),
-          );
-        },
-        child: visible
-            ? Padding(
-                key: const ValueKey<String>(
-                  'downloaded_selection_indicator_visible',
-                ),
-                padding: const EdgeInsets.only(left: 8),
-                child: _DownloadedComicSelectionIndicator(selected: selected),
-              )
-            : const SizedBox.shrink(
-                key: ValueKey<String>('downloaded_selection_indicator_hidden'),
-              ),
-      ),
-    );
-  }
-}
-
-class _DownloadedComicSelectionIndicator extends StatelessWidget {
-  const _DownloadedComicSelectionIndicator({required this.selected});
-
-  final bool selected;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return SizedBox(
-      width: 42,
-      height: 42,
-      child: Center(
-        child: AnimatedContainer(
-          key: const ValueKey<String>('downloaded_selection_indicator'),
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOutCubic,
-          width: 30,
-          height: 30,
-          decoration: BoxDecoration(
-            color: selected ? colorScheme.primary : Colors.transparent,
-            borderRadius: BorderRadius.circular(9),
-            border: Border.all(
-              color: selected ? colorScheme.primary : colorScheme.outline,
-              width: selected ? 1 : 1.6,
-            ),
-          ),
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 160),
-            switchInCurve: Curves.easeOutBack,
-            switchOutCurve: Curves.easeInCubic,
-            child: selected
-                ? Icon(
-                    Icons.check_rounded,
-                    key: const ValueKey<String>('downloaded_selection_check'),
-                    size: 19,
-                    color: colorScheme.onPrimary,
-                  )
-                : const SizedBox.shrink(
-                    key: ValueKey<String>('downloaded_selection_empty'),
-                  ),
-          ),
-        ),
-      ),
-    );
-  }
 }

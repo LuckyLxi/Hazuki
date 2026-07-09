@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -5,17 +6,23 @@ import 'package:hazuki/app/app_preferences.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_config_store.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_remote_client.dart';
+import 'package:hazuki/services/cloud_sync/cloud_sync_participant_set.dart';
 import 'package:hazuki/services/cloud_sync_service.dart';
 import 'package:hazuki/services/comment_filter_service.dart';
 import 'package:hazuki/services/download_groups_service.dart';
 import 'package:hazuki/services/local_favorites_service.dart';
+import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
+import 'package:hazuki/services/read_history_service.dart';
+import 'package:hazuki/services/reading_progress_service.dart';
+import 'package:hazuki/services/search_history_service.dart';
 import 'package:hazuki/services/storage/hazuki_database.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../support/test_service_locator.dart';
-
 class _SharedRemote {
   final Map<String, String> files = <String, String>{};
+  final Map<String, int> downloadCounts = <String, int>{};
+  final Completer<void> firstSettingsUpload = Completer<void>();
   String? lockToken;
   bool failNextSettingsUpload = false;
   Duration uploadDelay = const Duration(milliseconds: 10);
@@ -83,6 +90,11 @@ class _FakeLockedRemoteClient extends CloudSyncRemoteClient {
 
   @override
   Future<String?> tryGetBackupFile(String fileName) async {
+    remote.downloadCounts.update(
+      fileName,
+      (count) => count + 1,
+      ifAbsent: () => 1,
+    );
     return remote.files[fileName];
   }
 
@@ -95,6 +107,10 @@ class _FakeLockedRemoteClient extends CloudSyncRemoteClient {
       throw Exception('simulated_upload_failure');
     }
     remote.files[fileName] = content;
+    if (fileName == CloudSyncConfigStore.settingsFileName &&
+        !remote.firstSettingsUpload.isCompleted) {
+      remote.firstSettingsUpload.complete();
+    }
   }
 
   @override
@@ -112,7 +128,6 @@ void main() {
 
   setUp(() async {
     SharedPreferences.setMockInitialValues(const {});
-    await ensureTestServiceLocator();
   });
 
   test('concurrent uploads merge both devices under the remote lock', () async {
@@ -164,6 +179,33 @@ void main() {
     );
     expect(remote.files[CloudSyncConfigStore.manifestFileName], isNotNull);
     expect(remote.lockToken, isNull);
+  });
+
+  test('serializes local uploads before capturing the sync cursor', () async {
+    final remote = _SharedRemote()
+      ..uploadDelay = const Duration(milliseconds: 20);
+    final device = await _createDevice(remote, 'A');
+    addTearDown(device.dispose);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('test_user_setting', 'before');
+
+    final firstUpload = device.service.uploadBackup(
+      configOverride: _FakeLockedRemoteClient._config,
+    );
+    await remote.firstSettingsUpload.future;
+    final secondUpload = device.service.uploadBackup(
+      configOverride: _FakeLockedRemoteClient._config,
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 1));
+    await prefs.setString('test_user_setting', 'after');
+
+    await Future.wait([firstUpload, secondUpload]);
+
+    expect(prefs.getString('test_user_setting'), 'after');
+    final uploaded =
+        jsonDecode(remote.files[CloudSyncConfigStore.settingsFileName]!)
+            as Map<String, dynamic>;
+    expect((uploaded['data'] as Map)['test_user_setting'], 'after');
   });
 
   test('applies newer remote user settings before uploading', () async {
@@ -238,6 +280,8 @@ void main() {
         });
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('test_user_setting', 'local');
+      await prefs.setString('hazuki_read_history', '[{"id":"legacy"}]');
+      await prefs.setString('reading_progress_legacy', '{"epId":"legacy"}');
       await CloudSyncConfigStore().saveLastSyncedRemoteTs(
         200,
         _FakeLockedRemoteClient._config,
@@ -255,6 +299,15 @@ void main() {
           jsonDecode(remote.files[CloudSyncConfigStore.settingsFileName]!)
               as Map<String, dynamic>;
       expect((uploaded['data'] as Map)['test_user_setting'], 'local');
+      expect(
+        uploaded['data'] as Map,
+        isNot(contains(CloudSyncConfigStore.legacyReadHistoryKey)),
+      );
+      expect(
+        uploaded['data'] as Map,
+        isNot(contains('reading_progress_legacy')),
+      );
+      expect(remote.downloadCounts, {CloudSyncConfigStore.manifestFileName: 1});
     },
   );
 
@@ -364,10 +417,23 @@ Future<_TestDevice> _createDevice(
   final database = HazukiDatabase.memory();
   final favorites = LocalFavoritesService(database: database);
   final groups = DownloadGroupsService(database: database);
+  final source = HazukiSourceService();
+  final readHistory = ReadHistoryService(database: database);
+  final readingProgress = ReadingProgressService(database: database);
+  final searchHistory = SearchHistoryService(database: database);
+  final participants = createCloudSyncParticipantSet(
+    source: HazukiSourceSyncAdapter(source),
+    readHistory: readHistory,
+    readingProgress: readingProgress,
+    localFavorites: favorites,
+    downloadGroups: groups,
+    searchHistory: searchHistory,
+  );
   final service = CloudSyncService(
     localFavorites: favorites,
     commentFilter: CommentFilterService(),
     downloadGroups: groups,
+    participants: participants,
     remoteClientFactory: (_, _) => _FakeLockedRemoteClient(remote),
     syncLockStaleAfter: syncLockStaleAfter,
     syncLockRenewInterval: syncLockRenewInterval,
@@ -396,7 +462,12 @@ Future<_TestDevice> _createDevice(
     isAdding: true,
     folderId: folder.id,
   );
-  return _TestDevice(service: service, database: database, groups: groups);
+  return _TestDevice(
+    service: service,
+    database: database,
+    groups: groups,
+    source: source,
+  );
 }
 
 class _TestDevice {
@@ -404,14 +475,17 @@ class _TestDevice {
     required this.service,
     required this.database,
     required this.groups,
+    required this.source,
   });
 
   final CloudSyncService service;
   final HazukiDatabase database;
   final DownloadGroupsService groups;
+  final HazukiSourceService source;
 
   Future<void> dispose() async {
     groups.dispose();
+    source.dispose();
     await database.close();
   }
 }

@@ -1,20 +1,9 @@
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/features/reader/support/reader_callbacks.dart';
+import 'package:hazuki/shared/reading/reader_offline_chapter_data.dart';
 
-class ReaderOfflineChapterData {
-  const ReaderOfflineChapterData({
-    required this.epId,
-    required this.title,
-    required this.index,
-    required this.images,
-  });
-
-  final String epId;
-  final String title;
-  final int index;
-  final List<String> images;
-}
+export 'package:hazuki/shared/reading/reader_offline_chapter_data.dart';
 
 class ReaderPageContext {
   const ReaderPageContext({
@@ -24,10 +13,11 @@ class ReaderPageContext {
     required this.epId,
     required this.chapterIndex,
     required this.images,
+    required this.commentsWidgetBuilder,
     this.sourceKey = '',
+    this.coverUrl = '',
     this.comicTheme,
     this.onFavoriteRequested,
-    this.commentsWidgetBuilder,
     this.offlineMode = false,
     this.offlineChapters = const <ReaderOfflineChapterData>[],
   });
@@ -39,9 +29,10 @@ class ReaderPageContext {
   final int chapterIndex;
   final List<String> images;
   final String sourceKey;
+  final String coverUrl;
   final ThemeData? comicTheme;
   final Future<void> Function(BuildContext)? onFavoriteRequested;
-  final ReaderCommentsWidgetBuilder? commentsWidgetBuilder;
+  final ReaderCommentsWidgetBuilder commentsWidgetBuilder;
   final bool offlineMode;
   final List<ReaderOfflineChapterData> offlineChapters;
 
@@ -68,6 +59,7 @@ class ReaderPageContext {
           ? images
           : (offlineChapter?.images ?? const <String>[]),
       sourceKey: sourceKey,
+      coverUrl: coverUrl,
       comicTheme: comicTheme,
       onFavoriteRequested: onFavoriteRequested,
       commentsWidgetBuilder: commentsWidgetBuilder,

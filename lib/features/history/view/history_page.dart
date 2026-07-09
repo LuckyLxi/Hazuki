@@ -3,12 +3,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/read_history_service.dart';
+import 'package:hazuki/shared/comic_cover_prefetcher.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
 import 'package:hazuki/widgets/windows_comic_detail_host.dart';
 
 import '../state/history_page_controller.dart';
+import '../support/history_callbacks.dart';
 import '../support/history_page_action_handler.dart';
 import '../support/history_page_scroll_coordinator.dart';
 import 'history_page_app_bar.dart';
@@ -18,10 +20,12 @@ class HistoryPage extends StatefulWidget {
   const HistoryPage({
     super.key,
     required this.comicDetailPageBuilder,
+    required this.onFavoriteRequested,
     this.comicCoverHeroTagBuilder = comicCoverHeroTag,
   });
 
   final ComicDetailPageBuilder comicDetailPageBuilder;
+  final HistoryFavoriteRequested onFavoriteRequested;
   final ComicHeroTagBuilder comicCoverHeroTagBuilder;
 
   @override
@@ -31,6 +35,7 @@ class HistoryPage extends StatefulWidget {
 class _HistoryPageState extends State<HistoryPage> {
   late final HistoryPageController _controller;
   late final HistoryPageScrollCoordinator _scrollCoordinator;
+  late final ComicCoverPrefetcher _coverPrefetcher;
   late final Listenable _pageListenable;
   late HistoryPageActionHandler _actions;
 
@@ -39,13 +44,19 @@ class _HistoryPageState extends State<HistoryPage> {
     super.initState();
     _controller = HistoryPageController(
       readHistoryService: sl<ReadHistoryService>(),
-      sourceService: sl<HazukiSourceService>(),
+      sourceService: sl<SourceRuntimeGateway>(),
     );
     _scrollCoordinator = HistoryPageScrollCoordinator();
+    _coverPrefetcher = ComicCoverPrefetcher(
+      imageGateway: sl<SourceImageGateway>(),
+    );
     _pageListenable = Listenable.merge([_controller, _scrollCoordinator]);
+    _controller.addListener(_scheduleCoverPrefetch);
+    _scrollCoordinator.controller.addListener(_prefetchVisibleCovers);
     _actions = HistoryPageActionHandler(
       controller: _controller,
       comicDetailPageBuilder: widget.comicDetailPageBuilder,
+      onFavoriteRequested: widget.onFavoriteRequested,
     );
     unawaited(_controller.loadInitial());
   }
@@ -56,14 +67,38 @@ class _HistoryPageState extends State<HistoryPage> {
     _actions = HistoryPageActionHandler(
       controller: _controller,
       comicDetailPageBuilder: widget.comicDetailPageBuilder,
+      onFavoriteRequested: widget.onFavoriteRequested,
     );
   }
 
   @override
   void dispose() {
+    _scrollCoordinator.controller.removeListener(_prefetchVisibleCovers);
+    _controller.removeListener(_scheduleCoverPrefetch);
+    _coverPrefetcher.dispose();
     _scrollCoordinator.dispose();
     _controller.dispose();
     super.dispose();
+  }
+
+  void _scheduleCoverPrefetch() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      _prefetchVisibleCovers();
+    });
+  }
+
+  void _prefetchVisibleCovers() {
+    _coverPrefetcher.prefetchAroundScroll(
+      comics: _controller.history,
+      scrollController: _scrollCoordinator.controller,
+      estimatedItemExtent: 112,
+      extraBefore: 6,
+      extraAfter: 28,
+      maxRequests: 28,
+    );
   }
 
   @override

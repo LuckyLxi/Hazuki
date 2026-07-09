@@ -5,20 +5,22 @@ import 'package:flutter/foundation.dart';
 
 import 'cloud_sync/cloud_sync_config_store.dart';
 import 'cloud_sync/cloud_sync_models.dart';
+import 'cloud_sync/cloud_sync_participant_set.dart';
 import 'cloud_sync/cloud_sync_remote_client.dart';
 import 'cloud_sync/cloud_sync_restore_applier.dart';
 import 'cloud_sync/cloud_sync_snapshot_codec.dart';
 import 'comment_filter_service.dart';
-import 'local_favorites_service.dart';
+import 'local_favorites/local_favorites_contracts.dart';
 import 'download_groups_service.dart';
 
 export 'cloud_sync/cloud_sync_models.dart';
 
 class CloudSyncService {
   CloudSyncService({
-    required LocalFavoritesService localFavorites,
+    required LocalFavoritesRepository localFavorites,
     required CommentFilterService commentFilter,
     required DownloadGroupsService downloadGroups,
+    required CloudSyncParticipantSet participants,
     CloudSyncRemoteClient Function(
       CloudSyncConfig config,
       CloudSyncConfigStore configStore,
@@ -29,6 +31,7 @@ class CloudSyncService {
   }) : _localFavorites = localFavorites,
        _commentFilter = commentFilter,
        _downloadGroups = downloadGroups,
+       _participants = participants,
        _syncLockStaleAfter = syncLockStaleAfter,
        _syncLockRenewInterval = syncLockRenewInterval,
        _remoteClientFactory =
@@ -36,9 +39,10 @@ class CloudSyncService {
            ((config, configStore) =>
                CloudSyncRemoteClient(config, configStore: configStore));
 
-  final LocalFavoritesService _localFavorites;
+  final LocalFavoritesRepository _localFavorites;
   final CommentFilterService _commentFilter;
   final DownloadGroupsService _downloadGroups;
+  final CloudSyncParticipantSet _participants;
   final Duration _syncLockStaleAfter;
   final Duration _syncLockRenewInterval;
   final CloudSyncRemoteClient Function(
@@ -48,12 +52,10 @@ class CloudSyncService {
   _remoteClientFactory;
   final CloudSyncConfigStore _configStore = CloudSyncConfigStore();
   late final CloudSyncSnapshotCodec _snapshotCodec = CloudSyncSnapshotCodec(
-    configStore: _configStore,
-    localFavoritesService: _localFavorites,
-    downloadGroupsService: _downloadGroups,
+    participants: _participants,
   );
   late final CloudSyncRestoreApplier _restoreApplier = CloudSyncRestoreApplier(
-    localFavoritesService: _localFavorites,
+    participants: _participants,
   );
   late final CloudSyncFacade facade = CloudSyncFacade._(
     configStore: _configStore,
@@ -63,6 +65,7 @@ class CloudSyncService {
   );
 
   bool _autoSyncRunning = false;
+  Future<void> _uploadQueue = Future<void>.value();
 
   Future<CloudSyncConfig> loadConfig() => _configStore.loadConfig();
 
@@ -106,12 +109,30 @@ class CloudSyncService {
   Future<void> uploadBackup({
     CloudSyncConfig? configOverride,
     int? uploadAtMs,
+  }) {
+    final result = _uploadQueue.then(
+      (_) =>
+          _uploadBackup(configOverride: configOverride, uploadAtMs: uploadAtMs),
+    );
+    _uploadQueue = result.catchError((Object _, StackTrace _) {});
+    return result;
+  }
+
+  Future<void> _uploadBackup({
+    CloudSyncConfig? configOverride,
+    int? uploadAtMs,
   }) async {
     final config = configOverride ?? await loadConfig();
     if (!config.isComplete) {
       throw Exception('cloud_sync_config_incomplete');
     }
 
+    // Capture the cursor before waiting for the remote lock. Another device
+    // may commit while this upload is waiting, and that newer snapshot must
+    // still be merged after the lock is acquired.
+    final lastSyncedRemoteTs = await _configStore.loadLastSyncedRemoteTs(
+      config,
+    );
     final client = facade.remoteClient(config);
     await client.ensureRootDir();
     await client.ensureBackupDirs();
@@ -122,16 +143,17 @@ class CloudSyncService {
       );
       final remoteUpdatedAtMs = _manifestUpdatedAtMs(remoteManifestText);
       if (remoteManifestText != null) {
-        final lastSyncedRemoteTs = await _configStore.loadLastSyncedRemoteTs(
-          config,
-        );
-        await _snapshotCodec.mergeRemoteIntoLocal(
-          client,
-          applyRemoteSettings: remoteUpdatedAtMs > lastSyncedRemoteTs,
-        );
-        _localFavorites.onExternalDataChanged();
-        await _commentFilter.load(notify: true);
-        await _downloadGroups.reload();
+        final shouldMergeRemote =
+            remoteUpdatedAtMs <= 0 || remoteUpdatedAtMs > lastSyncedRemoteTs;
+        if (shouldMergeRemote) {
+          await _snapshotCodec.mergeRemoteIntoLocal(
+            client,
+            applyRemoteSettings: remoteUpdatedAtMs > lastSyncedRemoteTs,
+          );
+          _localFavorites.onExternalDataChanged();
+          await _commentFilter.load(notify: true);
+          await _downloadGroups.reload();
+        }
       }
 
       final requestedUploadAtMs =
@@ -307,15 +329,6 @@ class CloudSyncService {
     final settingsResult = await _restoreApplier.applySettingsJson(
       settingsText,
     );
-    final settingsDecoded = jsonDecode(settingsText);
-    if (settingsDecoded is Map && settingsDecoded['data'] is Map) {
-      final data = settingsDecoded['data'] as Map;
-      final downloadGroupsRaw = data[CloudSyncConfigStore.downloadGroupsKey];
-      await _downloadGroups.importJsonString(
-        downloadGroupsRaw is String ? downloadGroupsRaw : null,
-        replace: true,
-      );
-    }
     await _commentFilter.load(notify: true);
     await _restoreApplier.applyReadingSnapshot(readingText);
     await _restoreApplier.applySearchHistoryJsonl(searchHistoryText);

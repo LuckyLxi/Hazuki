@@ -4,20 +4,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:hazuki/l10n/l10n.dart';
-import 'package:hazuki/app/service_locator.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
-import 'home_profile_dialogs.dart';
+import 'source_account_dialogs.dart';
 
-export 'home_profile_dialogs.dart';
+export 'source_account_dialogs.dart';
 
 Future<void> showHomeSourceSwitchDialog(
   BuildContext context, {
+  required SourceRuntimeGateway sourceService,
   Future<void> Function()? onSourceSwitched,
 }) async {
-  final registry = sl<SourceRuntimeRegistry>();
-  final sourceService = sl<HazukiSourceService>();
+  final registry = sourceService;
   final strings = l10n(context);
   await registry.loadActiveSourcePreference();
   if (!context.mounted) {
@@ -155,7 +154,7 @@ Future<void> saveHomeAvatarToDownloads(
   BuildContext context, {
   required MethodChannel mediaChannel,
   required String imageUrl,
-  HazukiSourceService? sourceService,
+  required SourceImageGateway sourceService,
 }) async {
   final normalized = imageUrl.trim();
   if (normalized.isEmpty) {
@@ -163,9 +162,8 @@ Future<void> saveHomeAvatarToDownloads(
   }
 
   final strings = l10n(context);
-  final service = sourceService ?? sl<HazukiSourceService>();
   try {
-    final bytes = await service.downloadImageBytes(normalized);
+    final bytes = await sourceService.downloadImageBytes(normalized);
     final directory = Directory('/storage/emulated/0/Pictures/Hazuki');
     if (!await directory.exists()) {
       await directory.create(recursive: true);

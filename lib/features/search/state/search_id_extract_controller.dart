@@ -1,14 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
 import '../support/search_shared.dart';
 
 class SearchIdExtractController extends ChangeNotifier {
   SearchIdExtractController({
-    required HazukiSourceService sourceService,
+    required SourceSearchGateway sourceService,
     required bool Function() isMounted,
     required bool Function() isInputFocused,
     required String Function() currentText,
@@ -21,7 +21,7 @@ class SearchIdExtractController extends ChangeNotifier {
 
   static const Duration hideDelay = Duration(milliseconds: 300);
 
-  final HazukiSourceService _sourceService;
+  final SourceSearchGateway _sourceService;
   final bool Function() _isMounted;
   final bool Function() _isInputFocused;
   final String Function() _currentText;
