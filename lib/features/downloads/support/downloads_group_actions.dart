@@ -262,48 +262,53 @@ class _DownloadsBulkGroupDialogState extends State<_DownloadsBulkGroupDialog> {
     final choosingGroups = _stage == DownloadsBulkDialogStage.groups;
     final confirmingRemoval =
         _stage == DownloadsBulkDialogStage.removeConfirmation;
-    return Center(
-      child: AnimatedContainer(
-        key: const ValueKey<String>('downloads_bulk_group_dialog'),
-        duration: const Duration(milliseconds: 320),
-        curve: Curves.easeOutCubic,
-        width: choosingGroups ? 420 : (confirmingRemoval ? 340 : 280),
-        height: choosingGroups ? 500 : (confirmingRemoval ? 220 : 250),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(confirmingRemoval ? 48 : 28),
-          border: Border.all(
-            color: confirmingRemoval
-                ? Theme.of(context).colorScheme.error
-                : Colors.transparent,
-            width: confirmingRemoval ? 2 : 0,
-          ),
-        ),
-        child: Material(
-          color: Theme.of(context).colorScheme.surfaceContainerHigh,
-          elevation: confirmingRemoval ? 12 : 8,
-          borderRadius: BorderRadius.circular(confirmingRemoval ? 48 : 28),
-          clipBehavior: Clip.antiAlias,
-          child: AnimatedSwitcher(
-            duration: const Duration(milliseconds: 260),
-            switchInCurve: Curves.easeOutCubic,
-            switchOutCurve: Curves.easeInCubic,
-            layoutBuilder: (currentChild, previousChildren) =>
-                currentChild ?? const SizedBox.shrink(),
-            transitionBuilder: (child, animation) => FadeTransition(
-              opacity: animation,
-              child: ScaleTransition(
-                scale: Tween<double>(begin: 0.96, end: 1).animate(animation),
-                child: child,
-              ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Center(
+        child: AnimatedContainer(
+          key: const ValueKey<String>('downloads_bulk_group_dialog'),
+          duration: const Duration(milliseconds: 320),
+          curve: Curves.easeOutCubic,
+          width: choosingGroups ? 420 : (confirmingRemoval ? 340 : 280),
+          height: choosingGroups ? 500 : (confirmingRemoval ? 220 : 250),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(confirmingRemoval ? 48 : 28),
+            border: Border.all(
+              color: confirmingRemoval
+                  ? Theme.of(context).colorScheme.error
+                  : Colors.transparent,
+              width: confirmingRemoval ? 2 : 0,
             ),
-            child: switch (_stage) {
-              DownloadsBulkDialogStage.actions => _buildActionSelection(
-                context,
+          ),
+          child: Material(
+            color: Theme.of(context).colorScheme.surfaceContainerHigh,
+            elevation: confirmingRemoval ? 12 : 8,
+            borderRadius: BorderRadius.circular(confirmingRemoval ? 48 : 28),
+            clipBehavior: Clip.antiAlias,
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 260),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              layoutBuilder: (currentChild, previousChildren) =>
+                  currentChild ?? const SizedBox.shrink(),
+              transitionBuilder: (child, animation) => FadeTransition(
+                opacity: animation,
+                child: ScaleTransition(
+                  scale: Tween<double>(begin: 0.96, end: 1).animate(animation),
+                  child: child,
+                ),
               ),
-              DownloadsBulkDialogStage.groups => _buildGroupSelection(context),
-              DownloadsBulkDialogStage.removeConfirmation =>
-                _buildRemoveConfirmation(context),
-            },
+              child: switch (_stage) {
+                DownloadsBulkDialogStage.actions => _buildActionSelection(
+                  context,
+                ),
+                DownloadsBulkDialogStage.groups => _buildGroupSelection(
+                  context,
+                ),
+                DownloadsBulkDialogStage.removeConfirmation =>
+                  _buildRemoveConfirmation(context),
+              },
+            ),
           ),
         ),
       ),
