@@ -11,6 +11,7 @@ import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import androidx.core.graphics.drawable.toDrawable
+import java.util.Locale
 import kotlin.system.exitProcess
 
 class PrivacyManager(
@@ -165,10 +166,32 @@ class PrivacyManager(
             },
         )
 
+        val localePreference =
+            activity
+                .getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
+                .getString("flutter.app_locale", "system")
+        val language =
+            when (localePreference) {
+                "zh", "en" -> localePreference
+                else -> Locale.getDefault().language
+            }
+        val isChinese = language.equals("zh", ignoreCase = true)
         val promptInfo = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("安全访问保护")
-            .setSubtitle("请完成指纹或面容认证以进入 Hazuki")
-            .setNegativeButtonText(if (requireAuth) "退出应用" else "取消")
+            .setTitle(if (isChinese) "安全访问保护" else "Secure access")
+            .setSubtitle(
+                if (isChinese) {
+                    "请完成生物识别认证以验证身份"
+                } else {
+                    "Use biometrics to verify your identity"
+                },
+            )
+            .setNegativeButtonText(
+                if (requireAuth) {
+                    if (isChinese) "退出应用" else "Exit app"
+                } else {
+                    if (isChinese) "取消" else "Cancel"
+                },
+            )
             .setConfirmationRequired(false)
             .build()
 

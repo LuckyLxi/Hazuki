@@ -63,8 +63,8 @@ class _PasswordLockIntroPageState extends State<PasswordLockIntroPage> {
                         builder: (_) => const PasswordLockSetupPage(),
                       ),
                     );
-                    if (enabled == true && context.mounted) {
-                      Navigator.of(context).pop(true);
+                    if (context.mounted) {
+                      Navigator.of(context).pop(enabled);
                     }
                   },
                   icon: const Icon(Icons.lock_outline_rounded),
