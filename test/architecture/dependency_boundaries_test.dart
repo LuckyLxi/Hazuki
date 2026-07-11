@@ -193,6 +193,50 @@ void main() {
     },
   );
 
+  test('core business features receive app services through injection', () {
+    final violations = <String>[];
+    for (final feature in const [
+      'comments',
+      'comic_detail',
+      'discover',
+      'downloads',
+      'favorite',
+      'history',
+      'search',
+    ]) {
+      for (final file in _dartFilesUnder('lib/features/$feature')) {
+        final content = file.readAsStringSync();
+        if (content.contains('app/service_locator.dart') ||
+            RegExp(r'\bsl<').hasMatch(content)) {
+          violations.add(file.path);
+        }
+      }
+    }
+
+    expect(
+      violations,
+      isEmpty,
+      reason: 'Inject core business feature services: $violations',
+    );
+  });
+
+  test('settings feature receives app services through injection', () {
+    final violations = <String>[];
+    for (final file in _dartFilesUnder('lib/features/settings')) {
+      final content = file.readAsStringSync();
+      if (content.contains('app/service_locator.dart') ||
+          RegExp(r'\bsl<').hasMatch(content)) {
+        violations.add(file.path);
+      }
+    }
+
+    expect(
+      violations,
+      isEmpty,
+      reason: 'Inject settings feature services: $violations',
+    );
+  });
+
   test('home feature receives sibling features through app entrypoints', () {
     final violations = <String>[];
     final featureImportPattern = RegExp(r'package:hazuki/features/([^/]+)/');

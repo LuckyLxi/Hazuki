@@ -3,13 +3,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hazuki/l10n/l10n.dart';
-import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/services/password_lock_service.dart';
 import 'package:hazuki/features/password_lock/view/password_lock_widgets.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
 class PasswordLockIntroPage extends StatefulWidget {
-  const PasswordLockIntroPage({super.key});
+  const PasswordLockIntroPage({super.key, required this.service});
+
+  final PasswordLockService service;
 
   @override
   State<PasswordLockIntroPage> createState() => _PasswordLockIntroPageState();
@@ -60,7 +61,8 @@ class _PasswordLockIntroPageState extends State<PasswordLockIntroPage> {
                   onPressed: () async {
                     final enabled = await Navigator.of(context).push<bool>(
                       MaterialPageRoute<bool>(
-                        builder: (_) => const PasswordLockSetupPage(),
+                        builder: (_) =>
+                            PasswordLockSetupPage(service: widget.service),
                       ),
                     );
                     if (context.mounted) {
@@ -80,7 +82,9 @@ class _PasswordLockIntroPageState extends State<PasswordLockIntroPage> {
 }
 
 class PasswordLockSetupPage extends StatefulWidget {
-  const PasswordLockSetupPage({super.key});
+  const PasswordLockSetupPage({super.key, required this.service});
+
+  final PasswordLockService service;
 
   @override
   State<PasswordLockSetupPage> createState() => _PasswordLockSetupPageState();
@@ -114,7 +118,7 @@ class _PasswordLockSetupPageState extends State<PasswordLockSetupPage> {
     });
     await Future<void>.delayed(const Duration(milliseconds: 180));
     try {
-      await sl<PasswordLockService>().enableWithPin(_input);
+      await widget.service.enableWithPin(_input);
       if (!mounted) {
         return;
       }

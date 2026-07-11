@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hazuki/l10n/l10n.dart';
-import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import '../logs/logs_export_button.dart';
@@ -12,7 +11,9 @@ import '../logs/logs_tabs.dart';
 import '../settings_group.dart';
 
 class LogsPage extends StatefulWidget {
-  const LogsPage({super.key});
+  const LogsPage({super.key, required this.debugGateway});
+
+  final SourceDebugGateway debugGateway;
 
   @override
   State<LogsPage> createState() => _LogsPageState();
@@ -46,6 +47,7 @@ class _LogsPageState extends State<LogsPage> {
       final spec = logsTabSpecs[i];
       try {
         logsByType[spec.type] = await collectVisibleLogsForIndex(
+          widget.debugGateway,
           i,
         ).timeout(const Duration(seconds: 10));
       } catch (error) {
@@ -82,7 +84,7 @@ class _LogsPageState extends State<LogsPage> {
     if (historyInfo != null) {
       return historyInfo;
     }
-    return collectVisibleLogsForIndex(index);
+    return collectVisibleLogsForIndex(widget.debugGateway, index);
   }
 
   Future<void> _copyCurrentLogs(TabController controller) async {
@@ -445,7 +447,7 @@ class _LogsPageState extends State<LogsPage> {
     if (confirm != true || !mounted) {
       return;
     }
-    sl<SourceDebugGateway>().clearCapturedLogs();
+    widget.debugGateway.clearCapturedLogs();
     unawaited(showHazukiPrompt(context, strings.logsCleared));
     setState(() {
       _clearEpoch++;
@@ -506,6 +508,7 @@ class _LogsPageState extends State<LogsPage> {
                         '${spec.type}-$_clearEpoch-${selectedHistory?.id ?? 'live'}',
                       ),
                       spec: spec,
+                      debugGateway: widget.debugGateway,
                       debugInfoOverride: selectedHistory?.logsByType[spec.type],
                     ),
                 ],
@@ -525,5 +528,5 @@ class _LogsPageState extends State<LogsPage> {
 
 @Deprecated('Use LogsPage')
 class FavoritesDebugPage extends LogsPage {
-  const FavoritesDebugPage({super.key});
+  const FavoritesDebugPage({super.key, required super.debugGateway});
 }

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_page.dart';
+import 'package:hazuki/features/comic_detail/support/comic_detail_dependencies.dart';
 import 'package:hazuki/features/comments/comments.dart';
 import 'package:hazuki/features/discover/discover.dart';
 import 'package:hazuki/features/downloads/downloads.dart';
@@ -14,13 +15,22 @@ import 'package:hazuki/features/reader/support/reader_dependencies.dart';
 import 'package:hazuki/features/reader/view/reader_page.dart';
 import 'package:hazuki/features/search/search.dart';
 import 'package:hazuki/features/settings/settings.dart';
+import 'package:hazuki/features/settings/support/settings_core_dependencies.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
+import 'package:hazuki/services/download_groups_service.dart';
+import 'package:hazuki/services/comment_filter_service.dart';
+import 'package:hazuki/services/cloud_sync_service.dart';
 import 'package:hazuki/services/local_favorites/local_favorites_contracts.dart';
+import 'package:hazuki/services/local_favorites/local_favorites_preferences_store.dart';
 import 'package:hazuki/services/manga_download/manga_download_service.dart';
+import 'package:hazuki/services/password_lock_service.dart';
 import 'package:hazuki/services/reading_progress_service.dart';
+import 'package:hazuki/services/read_history_service.dart';
+import 'package:hazuki/services/search_history_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
+import 'package:hazuki/services/software_update/software_update_service.dart';
 import 'package:hazuki/shared/comments/comments_widget_builder.dart';
 import 'package:hazuki/shared/reading/reader_offline_chapter_data.dart';
 import 'package:hazuki/widgets/widgets.dart';
@@ -69,6 +79,8 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
     Map<String, Object?> Function()? debugOuterScrollStateBuilder,
   }) {
     return CommentsPage(
+      sourceService: sl<SourceCommentsGateway>(),
+      filterService: sl<CommentFilterService>(),
       comicId: comicId,
       subId: subId,
       sourceKey: sourceKey,
@@ -82,6 +94,25 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
   }
 
   final readerCommentsBuilder = readerCommentsWidgetBuilderFrom(buildComments);
+  final comicDetailDependencies = ComicDetailDependencies(
+    source: sl<SourceComicDetailGateway>(),
+    localFavorites: sl<LocalFavoritesRepository>(),
+    downloader: sl<MangaDownloadService>(),
+    readingProgress: sl<ReadingProgressService>(),
+    readHistory: sl<ReadHistoryService>(),
+    imageGateway: sl<SourceImageGateway>(),
+  );
+  final settingsCoreDependencies = SettingsCoreDependencies(
+    sourceSettings: sl<SourceSettingsGateway>(),
+    sourceDebug: sl<SourceDebugGateway>(),
+    passwordLock: sl<PasswordLockService>(),
+    softwareUpdate: sl<SoftwareUpdateService>(),
+    cloudSync: sl<CloudSyncService>(),
+    commentFilter: sl<CommentFilterService>(),
+    dailyRecommendation: sl<DiscoverDailyRecommendationService>(),
+    downloader: sl<MangaDownloadService>(),
+    sourceRuntime: sl<SourceRuntimeGateway>(),
+  );
   final readerDependencies = ReaderDependencies(
     sourceReader: sl<SourceReaderGateway>(),
     sourceSettings: sl<SourceSettingsGateway>(),
@@ -134,6 +165,7 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
         }) {
           return ComicDetailPage(
             comic: comic,
+            dependencies: comicDetailDependencies,
             heroTag: heroTag,
             readerWidgetBuilder: buildReaderPage,
             searchPageBuilder: (initialKeyword) => entrypoints.buildSearchPage(
@@ -150,6 +182,7 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
                   required comicDetailPageBuilder,
                 }) {
                   return DiscoverSectionPage(
+                    sourceService: sl<SourceDiscoverGateway>(),
                     section: ExploreSection(
                       title: title,
                       comics: const <ExploreComic>[],
@@ -172,6 +205,8 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
           required comicDetailPageBuilder,
         }) {
           return SearchPage(
+            sourceService: sl<SourceSearchGateway>(),
+            historyService: sl<SearchHistoryService>(),
             initialKeyword: initialKeyword,
             autoFocusOnOpen: autoFocusOnOpen,
             comicDetailPageBuilder: comicDetailPageBuilder,
@@ -189,6 +224,9 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
           required onRequestLogin,
         }) {
           return DiscoverPage(
+            sourceService: sl<SourceDiscoverGateway>(),
+            recommendationSource: sl<SourceRecommendationGateway>(),
+            recommendationService: sl<DiscoverDailyRecommendationService>(),
             comicDetailPageBuilder: comicDetailPageBuilder,
             usePinnedSearchInAppBar: true,
             dailyRecommendationState: dailyRecommendationState,
@@ -209,6 +247,10 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
           required onComicTap,
         }) {
           return FavoritePage(
+            sourceService: sl<SourceFavoriteGateway>(),
+            localFavoritesRepository: sl<LocalFavoritesRepository>(),
+            localFavoritesPreferences: sl<LocalFavoritesPreferencesStore>(),
+            imageGateway: sl<SourceImageGateway>(),
             actionsBinding: actionsBinding,
             authVersion: authVersion,
             onAppBarActionsChanged: onAppBarActionsChanged,
@@ -219,6 +261,9 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
     buildHistoryPage:
         ({required comicDetailPageBuilder, required onFavoriteRequested}) {
           return HistoryPage(
+            readHistoryService: sl<ReadHistoryService>(),
+            sourceService: sl<SourceRuntimeGateway>(),
+            imageGateway: sl<SourceImageGateway>(),
             comicDetailPageBuilder: comicDetailPageBuilder,
             onFavoriteRequested: onFavoriteRequested,
           );
@@ -226,6 +271,8 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
     buildCategoriesPage:
         ({required searchPageBuilder, required comicDetailPageBuilder}) {
           return TagCategoryPage(
+            categorySource: sl<SourceCategoryGateway>(),
+            discoverSource: sl<SourceDiscoverGateway>(),
             searchPageBuilder: (tag) => searchPageBuilder(
               initialKeyword: tag,
               autoFocusOnOpen: false,
@@ -242,6 +289,7 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
         }) {
           if (useLegacyRankingSection) {
             return DiscoverSectionPage(
+              sourceService: sl<SourceDiscoverGateway>(),
               section: ExploreSection(
                 title: legacyRankingTitle,
                 comics: const <ExploreComic>[],
@@ -250,10 +298,17 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
               comicDetailPageBuilder: comicDetailPageBuilder,
             );
           }
-          return RankingPage(comicDetailPageBuilder: comicDetailPageBuilder);
+          return RankingPage(
+            sourceService: sl<SourceCategoryGateway>(),
+            comicDetailPageBuilder: comicDetailPageBuilder,
+          );
         },
     buildDownloadsPage: ({required readerPageBuilder}) {
-      return DownloadsPage(readerPageBuilder: readerPageBuilder);
+      return DownloadsPage(
+        readerPageBuilder: readerPageBuilder,
+        downloadService: sl<MangaDownloadService>(),
+        downloadGroupsService: sl<DownloadGroupsService>(),
+      );
     },
     buildSettingsPage:
         ({
@@ -263,21 +318,34 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
           required onLocaleChanged,
         }) {
           return SettingsPage(
+            coreDependencies: settingsCoreDependencies,
             appearanceSettings: appearanceSettings,
             onAppearanceChanged: onAppearanceChanged,
             locale: locale,
             onLocaleChanged: onLocaleChanged,
-            cloudSyncPageBuilder: (_) => const CloudSyncPage(),
-            labSettingsPageBuilder: (_) => const LabSettingsPage(),
+            cloudSyncPageBuilder: (_) =>
+                CloudSyncPage(service: settingsCoreDependencies.cloudSync),
+            labSettingsPageBuilder: (_) => LabSettingsPage(
+              sourceService: settingsCoreDependencies.sourceRuntime,
+            ),
             advancedSettingsPageBuilder: (_) => AdvancedSettingsPage(
-              logsPageBuilder: (_) => const LogsPage(),
-              comicSourceEditorPageBuilder: (_) =>
-                  const ComicSourceEditorPage(),
-              restoreComicSource: showComicSourceRestoreDialog,
+              sourceService: settingsCoreDependencies.sourceRuntime,
+              softwareUpdateService: settingsCoreDependencies.softwareUpdate,
+              logsPageBuilder: (_) =>
+                  LogsPage(debugGateway: settingsCoreDependencies.sourceDebug),
+              comicSourceEditorPageBuilder: (_) => ComicSourceEditorPage(
+                sourceService: settingsCoreDependencies.sourceRuntime,
+              ),
+              restoreComicSource: (context) => showComicSourceRestoreDialog(
+                context,
+                sourceService: settingsCoreDependencies.sourceRuntime,
+              ),
             ),
           );
         },
-    buildLinesPage: (_) => const LineSettingsPage(),
+    buildLinesPage: (_) => LineSettingsPage(
+      sourceService: settingsCoreDependencies.sourceSettings,
+    ),
     onHistoryFavoriteRequested: _toggleFavoriteFromHomeHistory,
   );
   return entrypoints;

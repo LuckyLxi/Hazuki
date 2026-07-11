@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/search_history_service.dart';
@@ -21,12 +20,16 @@ import 'search_settings_dialog.dart';
 class SearchEntryPage extends StatefulWidget {
   const SearchEntryPage({
     super.key,
+    required this.sourceService,
+    required this.historyService,
     this.autoFocusOnOpen = false,
     required this.comicDetailPageBuilder,
     required this.comicCoverHeroTagBuilder,
     this.searchPageLoader,
   });
 
+  final SourceSearchGateway sourceService;
+  final SearchHistoryService historyService;
   final bool autoFocusOnOpen;
   final ComicDetailPageBuilder comicDetailPageBuilder;
   final ComicHeroTagBuilder comicCoverHeroTagBuilder;
@@ -42,7 +45,7 @@ class _SearchEntryPageState extends State<SearchEntryPage>
     isMounted: () => mounted,
     allowCollapsedFocus: false,
   );
-  final SourceSearchGateway _sourceService = sl<SourceSearchGateway>();
+  SourceSearchGateway get _sourceService => widget.sourceService;
   late final SearchIdExtractController _idExtractController =
       SearchIdExtractController(
         sourceService: _sourceService,
@@ -51,7 +54,7 @@ class _SearchEntryPageState extends State<SearchEntryPage>
         currentText: () => _focusCoordinator.text,
       );
   final ScrollController _scrollController = ScrollController();
-  final SearchHistoryService _historyService = sl<SearchHistoryService>();
+  SearchHistoryService get _historyService => widget.historyService;
 
   List<String> _historyList = <String>[];
   Animation<double>? _initialDataLoadRouteAnimation;
@@ -241,6 +244,8 @@ class _SearchEntryPageState extends State<SearchEntryPage>
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => SearchResultsPage(
+          sourceService: widget.sourceService,
+          historyService: widget.historyService,
           initialKeyword: keyword,
           entryIntent: intent,
           comicDetailPageBuilder: widget.comicDetailPageBuilder,

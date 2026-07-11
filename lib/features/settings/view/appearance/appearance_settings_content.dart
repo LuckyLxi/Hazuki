@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:hazuki/app/app.dart';
-import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/widgets/sun_moon_icon.dart';
@@ -17,12 +16,14 @@ class AppearanceSettingsContent extends StatefulWidget {
     required this.locale,
     required this.onApply,
     required this.onApplyLocale,
+    required this.debugGateway,
   });
 
   final AppearanceSettingsData settings;
   final Locale? locale;
   final AppearanceSettingsApplyCallback onApply;
   final Future<void> Function(Locale? locale) onApplyLocale;
+  final SourceDebugGateway debugGateway;
 
   @override
   State<AppearanceSettingsContent> createState() =>
@@ -37,7 +38,7 @@ class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
     String level = 'info',
     Map<String, Object?>? content,
   }) {
-    sl<SourceDebugGateway>().addApplicationLog(
+    widget.debugGateway.addApplicationLog(
       level: level,
       title: title,
       source: 'appearance_theme_ui',

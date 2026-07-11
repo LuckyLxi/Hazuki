@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/downloads/downloads.dart';
+import 'package:hazuki/app/service_locator.dart';
+import 'package:hazuki/services/download_groups_service.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/manga_download/manga_download_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -26,6 +28,7 @@ void main() {
         supportedLocales: AppLocalizations.supportedLocales,
         home: DownloadsPage(
           downloadService: downloadService,
+          downloadGroupsService: sl<DownloadGroupsService>(),
           readerPageBuilder: (_, _) => const SizedBox.shrink(),
         ),
       ),
@@ -113,6 +116,7 @@ void main() {
                     MaterialPageRoute<void>(
                       builder: (_) => DownloadsPage(
                         downloadService: downloadService,
+                        downloadGroupsService: sl<DownloadGroupsService>(),
                         readerPageBuilder: (_, _) => const SizedBox.shrink(),
                       ),
                     ),
@@ -154,6 +158,7 @@ Widget _downloadsPage(MangaDownloadService downloadService) {
     supportedLocales: AppLocalizations.supportedLocales,
     home: DownloadsPage(
       downloadService: downloadService,
+      downloadGroupsService: sl<DownloadGroupsService>(),
       readerPageBuilder: (_, _) => const SizedBox.shrink(),
     ),
   );

@@ -36,7 +36,10 @@ void main() {
         home: Builder(
           builder: (context) => Scaffold(
             body: TextButton(
-              onPressed: () => showCommentFilterDialog(context),
+              onPressed: () => showCommentFilterDialog(
+                context,
+                service: sl<CommentFilterService>(),
+              ),
               child: const Text('open'),
             ),
           ),
@@ -83,7 +86,10 @@ void main() {
         home: Builder(
           builder: (context) => Scaffold(
             body: TextButton(
-              onPressed: () => showCommentFilterDialog(context),
+              onPressed: () => showCommentFilterDialog(
+                context,
+                service: sl<CommentFilterService>(),
+              ),
               child: const Text('open'),
             ),
           ),
@@ -117,7 +123,10 @@ void main() {
         home: Builder(
           builder: (context) => Scaffold(
             body: TextButton(
-              onPressed: () => showCommentFilterDialog(context),
+              onPressed: () => showCommentFilterDialog(
+                context,
+                service: sl<CommentFilterService>(),
+              ),
               child: const Text('open'),
             ),
           ),

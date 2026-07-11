@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/read_history_service.dart';
@@ -19,11 +18,17 @@ import 'history_page_content.dart';
 class HistoryPage extends StatefulWidget {
   const HistoryPage({
     super.key,
+    required this.readHistoryService,
+    required this.sourceService,
+    required this.imageGateway,
     required this.comicDetailPageBuilder,
     required this.onFavoriteRequested,
     this.comicCoverHeroTagBuilder = comicCoverHeroTag,
   });
 
+  final ReadHistoryService readHistoryService;
+  final SourceRuntimeGateway sourceService;
+  final SourceImageGateway imageGateway;
   final ComicDetailPageBuilder comicDetailPageBuilder;
   final HistoryFavoriteRequested onFavoriteRequested;
   final ComicHeroTagBuilder comicCoverHeroTagBuilder;
@@ -43,13 +48,11 @@ class _HistoryPageState extends State<HistoryPage> {
   void initState() {
     super.initState();
     _controller = HistoryPageController(
-      readHistoryService: sl<ReadHistoryService>(),
-      sourceService: sl<SourceRuntimeGateway>(),
+      readHistoryService: widget.readHistoryService,
+      sourceService: widget.sourceService,
     );
     _scrollCoordinator = HistoryPageScrollCoordinator();
-    _coverPrefetcher = ComicCoverPrefetcher(
-      imageGateway: sl<SourceImageGateway>(),
-    );
+    _coverPrefetcher = ComicCoverPrefetcher(imageGateway: widget.imageGateway);
     _pageListenable = Listenable.merge([_controller, _scrollCoordinator]);
     _controller.addListener(_scheduleCoverPrefetch);
     _scrollCoordinator.controller.addListener(_prefetchVisibleCovers);

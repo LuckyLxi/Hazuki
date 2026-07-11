@@ -5,6 +5,7 @@ import 'package:hazuki/app/home/home_feature_entrypoints.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/features/comments/comments.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_page.dart';
+import 'package:hazuki/features/comic_detail/support/comic_detail_dependencies.dart';
 import 'package:hazuki/features/downloads/downloads.dart';
 import 'package:hazuki/features/favorite/view/favorite_page.dart';
 import 'package:hazuki/features/history/history.dart';
@@ -13,10 +14,21 @@ import 'package:hazuki/features/reader/support/reader_dependencies.dart';
 import 'package:hazuki/features/reader/view/reader_page.dart';
 import 'package:hazuki/features/search/search.dart';
 import 'package:hazuki/features/settings/settings.dart';
+import 'package:hazuki/features/settings/support/settings_core_dependencies.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/manga_download/manga_download_service.dart';
+import 'package:hazuki/services/password_lock_service.dart';
+import 'package:hazuki/services/comment_filter_service.dart';
+import 'package:hazuki/services/cloud_sync_service.dart';
+import 'package:hazuki/services/discover_daily_recommendation_service.dart';
+import 'package:hazuki/services/download_groups_service.dart';
+import 'package:hazuki/services/local_favorites/local_favorites_contracts.dart';
+import 'package:hazuki/services/local_favorites/local_favorites_preferences_store.dart';
 import 'package:hazuki/services/reading_progress_service.dart';
+import 'package:hazuki/services/read_history_service.dart';
+import 'package:hazuki/services/search_history_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
+import 'package:hazuki/services/software_update/software_update_service.dart';
 import 'package:hazuki/shared/comments/comments_widget_builder.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
 
@@ -43,6 +55,17 @@ ReaderDependencies _readerDependencies() {
     sourceSettings: sl<SourceSettingsGateway>(),
     readingProgressService: sl<ReadingProgressService>(),
     downloader: sl<MangaDownloadService>(),
+  );
+}
+
+ComicDetailDependencies _comicDetailDependencies() {
+  return ComicDetailDependencies(
+    source: sl<SourceComicDetailGateway>(),
+    localFavorites: sl<LocalFavoritesRepository>(),
+    downloader: sl<MangaDownloadService>(),
+    readingProgress: sl<ReadingProgressService>(),
+    readHistory: sl<ReadHistoryService>(),
+    imageGateway: sl<SourceImageGateway>(),
   );
 }
 
@@ -76,6 +99,7 @@ void main() {
     );
     final detail = ComicDetailPage(
       comic: comic,
+      dependencies: _comicDetailDependencies(),
       heroTag: 'hero',
       readerWidgetBuilder:
           ({
@@ -106,6 +130,7 @@ void main() {
     );
     Widget buildDetail(ExploreComic comic, String heroTag) => ComicDetailPage(
       comic: comic,
+      dependencies: _comicDetailDependencies(),
       heroTag: heroTag,
       readerWidgetBuilder:
           ({
@@ -135,22 +160,48 @@ void main() {
       commentsWidgetBuilder: _buildComments,
     );
     final search = SearchPage(
+      sourceService: sl<SourceSearchGateway>(),
+      historyService: sl<SearchHistoryService>(),
       initialKeyword: comic.title,
       comicDetailPageBuilder: buildDetail,
     );
     final favorite = FavoritePage(
+      sourceService: sl<SourceFavoriteGateway>(),
+      localFavoritesRepository: sl<LocalFavoritesRepository>(),
+      localFavoritesPreferences: sl<LocalFavoritesPreferencesStore>(),
+      imageGateway: sl<SourceImageGateway>(),
       authVersion: 1,
       onComicTap: (comic, heroTag) async {},
     );
-    final comments = const CommentsPage(comicId: 'comic-id');
+    final comments = CommentsPage(
+      sourceService: sl<SourceCommentsGateway>(),
+      filterService: sl<CommentFilterService>(),
+      comicId: 'comic-id',
+    );
     final downloads = DownloadsPage(
+      downloadService: sl<MangaDownloadService>(),
+      downloadGroupsService: sl<DownloadGroupsService>(),
       readerPageBuilder: (comic, chapter) => const SizedBox.shrink(),
     );
     final history = HistoryPage(
+      readHistoryService: sl<ReadHistoryService>(),
+      sourceService: sl<SourceRuntimeGateway>(),
+      imageGateway: sl<SourceImageGateway>(),
       comicDetailPageBuilder: buildDetail,
       onFavoriteRequested: (_, _) async {},
     );
     final settings = SettingsPage(
+      coreDependencies: SettingsCoreDependencies(
+        sourceSettings: sl<SourceSettingsGateway>(),
+        sourceDebug: sl<SourceDebugGateway>(),
+        passwordLock: sl<PasswordLockService>(),
+        softwareUpdate: sl<SoftwareUpdateService>(),
+        cloudSync: sl<CloudSyncService>(),
+        commentFilter: sl<CommentFilterService>(),
+        dailyRecommendation: sl<DiscoverDailyRecommendationService>(),
+        downloader: sl<MangaDownloadService>(),
+        sourceRuntime: sl<SourceRuntimeGateway>(),
+      ),
       appearanceSettings: const AppearanceSettingsData(
         themeMode: ThemeMode.system,
         oledPureBlack: false,
@@ -163,11 +214,17 @@ void main() {
       onAppearanceChanged: (_, {revealOrigin}) async {},
       locale: const Locale('en'),
       onLocaleChanged: (_) async {},
-      cloudSyncPageBuilder: (_) => const CloudSyncPage(),
-      labSettingsPageBuilder: (_) => const LabSettingsPage(),
+      cloudSyncPageBuilder: (_) =>
+          CloudSyncPage(service: sl<CloudSyncService>()),
+      labSettingsPageBuilder: (_) =>
+          LabSettingsPage(sourceService: sl<SourceRuntimeGateway>()),
       advancedSettingsPageBuilder: (_) => AdvancedSettingsPage(
-        logsPageBuilder: (_) => const LogsPage(),
-        comicSourceEditorPageBuilder: (_) => const ComicSourceEditorPage(),
+        sourceService: sl<SourceRuntimeGateway>(),
+        softwareUpdateService: sl<SoftwareUpdateService>(),
+        logsPageBuilder: (_) =>
+            LogsPage(debugGateway: sl<SourceDebugGateway>()),
+        comicSourceEditorPageBuilder: (_) =>
+            ComicSourceEditorPage(sourceService: sl<SourceRuntimeGateway>()),
         restoreComicSource: (_) async => false,
       ),
     );

@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 
 import 'comic_detail_cover.dart';
 
@@ -10,11 +11,13 @@ class ComicDetailParallaxBackground extends StatefulWidget {
     required this.coverUrl,
     required this.sourceKey,
     required this.scrollController,
+    required this.imageGateway,
   });
 
   final String coverUrl;
   final String sourceKey;
   final ScrollController scrollController;
+  final SourceImageGateway imageGateway;
 
   @override
   State<ComicDetailParallaxBackground> createState() =>
@@ -94,6 +97,7 @@ class _ComicDetailParallaxBackgroundState
             child: ComicBlurredCoverBackground(
               coverUrl: widget.coverUrl,
               sourceKey: widget.sourceKey,
+              imageGateway: widget.imageGateway,
             ),
           ),
         ),

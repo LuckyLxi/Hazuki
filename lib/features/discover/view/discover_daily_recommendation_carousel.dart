@@ -4,7 +4,6 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
-import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
@@ -26,8 +25,8 @@ class DiscoverDailyRecommendationCarousel extends StatefulWidget {
     this.isPendingReady = false,
     required this.comicDetailPageBuilder,
     required this.comicCoverHeroTagBuilder,
-    this.sourceService,
-    this.recommendationService,
+    required this.sourceService,
+    required this.recommendationService,
     this.windowsComicDetailController,
   });
 
@@ -36,8 +35,8 @@ class DiscoverDailyRecommendationCarousel extends StatefulWidget {
   final bool isPendingReady;
   final ComicDetailPageBuilder comicDetailPageBuilder;
   final ComicHeroTagBuilder comicCoverHeroTagBuilder;
-  final SourceRecommendationGateway? sourceService;
-  final DiscoverDailyRecommendationService? recommendationService;
+  final SourceRecommendationGateway sourceService;
+  final DiscoverDailyRecommendationService recommendationService;
   final WindowsComicDetailController? windowsComicDetailController;
 
   @override
@@ -106,10 +105,9 @@ class _DiscoverDailyRecommendationCarouselState
 
   PageController get _pageController => _loopController.pageController;
 
-  SourceRecommendationGateway get _sourceService =>
-      widget.sourceService ?? sl<SourceRecommendationGateway>();
+  SourceRecommendationGateway get _sourceService => widget.sourceService;
   DiscoverDailyRecommendationService get _recommendationService =>
-      widget.recommendationService ?? sl<DiscoverDailyRecommendationService>();
+      widget.recommendationService;
   WindowsComicDetailController get _windowsController =>
       widget.windowsComicDetailController ??
       WindowsComicDetailController.instance;

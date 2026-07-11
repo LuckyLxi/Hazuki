@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/settings/view/security/password_lock_pages.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/services/password_lock_service.dart';
 
 void main() {
   testWidgets('returning from passcode setup returns to privacy settings', (
@@ -13,11 +14,11 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
 
     await tester.pumpWidget(
-      const MaterialApp(
-        locale: Locale('en'),
+      MaterialApp(
+        locale: const Locale('en'),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        home: _PrivacySettingsPage(),
+        home: _PrivacySettingsPage(service: PasswordLockService()),
       ),
     );
 
@@ -47,7 +48,9 @@ void main() {
 }
 
 class _PrivacySettingsPage extends StatelessWidget {
-  const _PrivacySettingsPage();
+  const _PrivacySettingsPage({required this.service});
+
+  final PasswordLockService service;
 
   @override
   Widget build(BuildContext context) {
@@ -57,7 +60,7 @@ class _PrivacySettingsPage extends StatelessWidget {
           onPressed: () {
             Navigator.of(context).push<void>(
               MaterialPageRoute<void>(
-                builder: (_) => const PasswordLockIntroPage(),
+                builder: (_) => PasswordLockIntroPage(service: service),
               ),
             );
           },

@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:hazuki/features/settings/state/cache_settings_controller.dart';
-import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/widgets/widgets.dart';
@@ -10,7 +9,9 @@ import 'package:loading_indicator_m3e/loading_indicator_m3e.dart';
 import 'settings_group.dart';
 
 class CacheSettingsPage extends StatefulWidget {
-  const CacheSettingsPage({super.key});
+  const CacheSettingsPage({super.key, required this.sourceService});
+
+  final SourceSettingsGateway sourceService;
 
   @override
   State<CacheSettingsPage> createState() => _CacheSettingsPageState();
@@ -22,9 +23,7 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
   @override
   void initState() {
     super.initState();
-    _controller = CacheSettingsController(
-      sourceService: sl<SourceSettingsGateway>(),
-    );
+    _controller = CacheSettingsController(sourceService: widget.sourceService);
     unawaited(_controller.loadStatus());
   }
 

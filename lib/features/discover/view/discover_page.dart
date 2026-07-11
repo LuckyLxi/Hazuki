@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
@@ -16,6 +15,9 @@ import 'discover_page_sections.dart';
 class DiscoverPage extends StatefulWidget {
   const DiscoverPage({
     super.key,
+    required this.sourceService,
+    required this.recommendationSource,
+    required this.recommendationService,
     required this.comicDetailPageBuilder,
     this.usePinnedSearchInAppBar = false,
     this.dailyRecommendationState =
@@ -29,6 +31,9 @@ class DiscoverPage extends StatefulWidget {
     this.comicCoverHeroTagBuilder = comicCoverHeroTag,
   });
 
+  final SourceDiscoverGateway sourceService;
+  final SourceRecommendationGateway recommendationSource;
+  final DiscoverDailyRecommendationService recommendationService;
   final ComicDetailPageBuilder comicDetailPageBuilder;
   final bool usePinnedSearchInAppBar;
   final DiscoverDailyRecommendationState dailyRecommendationState;
@@ -55,7 +60,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
   void initState() {
     super.initState();
     _controller = DiscoverPageController(
-      sourceService: sl<SourceDiscoverGateway>(),
+      sourceService: widget.sourceService,
       // 源切换时后台触发刷新，重新加载当前源的发现页数据
       onSourceSwitched: () {
         if (mounted) {
@@ -178,6 +183,8 @@ class _DiscoverPageState extends State<DiscoverPage> {
         isPendingReady: widget.dailyRecommendationState.isPendingReady,
         comicDetailPageBuilder: widget.comicDetailPageBuilder,
         comicCoverHeroTagBuilder: widget.comicCoverHeroTagBuilder,
+        sourceService: widget.recommendationSource,
+        recommendationService: widget.recommendationService,
       ),
     );
   }
@@ -217,6 +224,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
           widget.hideLoadingUntilInitialLoadAllowed,
       comicDetailPageBuilder: widget.comicDetailPageBuilder,
       comicCoverHeroTagBuilder: widget.comicCoverHeroTagBuilder,
+      sourceService: widget.sourceService,
     );
   }
 }

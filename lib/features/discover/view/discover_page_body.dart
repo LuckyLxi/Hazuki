@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/shared/navigation_tags.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
 import '../state/discover_page_controller.dart';
@@ -21,6 +22,7 @@ class DiscoverPageBody extends StatelessWidget {
     required this.hideLoadingUntilInitialLoadAllowed,
     required this.comicDetailPageBuilder,
     required this.comicCoverHeroTagBuilder,
+    required this.sourceService,
   });
 
   final DiscoverPageController controller;
@@ -33,6 +35,7 @@ class DiscoverPageBody extends StatelessWidget {
   final bool hideLoadingUntilInitialLoadAllowed;
   final ComicDetailPageBuilder comicDetailPageBuilder;
   final ComicHeroTagBuilder comicCoverHeroTagBuilder;
+  final SourceDiscoverGateway sourceService;
 
   @override
   Widget build(BuildContext context) {
@@ -85,6 +88,7 @@ class DiscoverPageBody extends StatelessWidget {
                 onLoadMore: () => controller.loadMoreSection(sectionIndex),
                 comicDetailPageBuilder: comicDetailPageBuilder,
                 comicCoverHeroTagBuilder: comicCoverHeroTagBuilder,
+                sourceService: sourceService,
               );
             },
           ),

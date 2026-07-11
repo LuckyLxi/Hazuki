@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:hazuki/app/app.dart';
-import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/widgets/widgets.dart';
@@ -9,14 +8,16 @@ import '../settings_group.dart';
 import 'source_account_lab_page.dart';
 
 class LabSettingsPage extends StatefulWidget {
-  const LabSettingsPage({super.key});
+  const LabSettingsPage({super.key, required this.sourceService});
+
+  final SourceRuntimeGateway sourceService;
 
   @override
   State<LabSettingsPage> createState() => _LabSettingsPageState();
 }
 
 class _LabSettingsPageState extends State<LabSettingsPage> {
-  final SourceRuntimeGateway _sourceService = sl<SourceRuntimeGateway>();
+  SourceRuntimeGateway get _sourceService => widget.sourceService;
   bool _comicIdSearchEnhance = false;
   bool _loading = true;
 
@@ -88,7 +89,9 @@ class _LabSettingsPageState extends State<LabSettingsPage> {
                         onTap: () {
                           Navigator.of(context).push(
                             MaterialPageRoute<void>(
-                              builder: (_) => const SourceAccountLabPage(),
+                              builder: (_) => SourceAccountLabPage(
+                                sourceService: widget.sourceService,
+                              ),
                             ),
                           );
                         },

@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:hazuki/services/manga_download/manga_download_service.dart';
 import 'package:hazuki/services/download_groups_service.dart';
 import 'package:hazuki/l10n/l10n.dart';
-import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/widgets/windows_comic_detail_host.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import '../downloads.dart';
@@ -15,12 +14,14 @@ class DownloadsPage extends StatefulWidget {
   const DownloadsPage({
     super.key,
     required this.readerPageBuilder,
-    this.downloadService,
+    required this.downloadService,
+    required this.downloadGroupsService,
     this.windowsComicDetailController,
   });
 
   final DownloadedComicReaderPageBuilder readerPageBuilder;
-  final MangaDownloadService? downloadService;
+  final MangaDownloadService downloadService;
+  final DownloadGroupsService downloadGroupsService;
   final WindowsComicDetailController? windowsComicDetailController;
 
   @override
@@ -46,8 +47,8 @@ class _DownloadsPageState extends State<DownloadsPage>
   void initState() {
     super.initState();
     _controller = DownloadsPageController(
-      downloadService: widget.downloadService ?? sl<MangaDownloadService>(),
-      downloadGroupsService: sl<DownloadGroupsService>(),
+      downloadService: widget.downloadService,
+      downloadGroupsService: widget.downloadGroupsService,
     );
     _initFuture = _controller.initialize();
     _initFuture.then((_) {

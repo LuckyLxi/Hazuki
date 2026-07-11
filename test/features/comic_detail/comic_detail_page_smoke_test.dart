@@ -3,11 +3,14 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_page.dart';
+import 'package:hazuki/features/comic_detail/support/comic_detail_dependencies.dart';
 import 'package:hazuki/features/reader/support/reader_dependencies.dart';
 import 'package:hazuki/features/reader/view/reader_page.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/services/manga_download/manga_download_service.dart';
+import 'package:hazuki/services/local_favorites/local_favorites_contracts.dart';
+import 'package:hazuki/services/read_history_service.dart';
 import 'package:hazuki/services/reading_progress_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/shared/comments/comments_widget_builder.dart';
@@ -39,6 +42,17 @@ ReaderDependencies _readerDependencies() {
   );
 }
 
+ComicDetailDependencies _comicDetailDependencies() {
+  return ComicDetailDependencies(
+    source: sl<SourceComicDetailGateway>(),
+    localFavorites: sl<LocalFavoritesRepository>(),
+    downloader: sl<MangaDownloadService>(),
+    readingProgress: sl<ReadingProgressService>(),
+    readHistory: sl<ReadHistoryService>(),
+    imageGateway: sl<SourceImageGateway>(),
+  );
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() async {
@@ -66,6 +80,7 @@ void main() {
         supportedLocales: AppLocalizations.supportedLocales,
         home: ComicDetailPage(
           comic: comic,
+          dependencies: _comicDetailDependencies(),
           heroTag: 'hero',
           readerWidgetBuilder:
               ({
@@ -124,6 +139,7 @@ void main() {
         supportedLocales: AppLocalizations.supportedLocales,
         home: ComicDetailPage(
           comic: comic,
+          dependencies: _comicDetailDependencies(),
           heroTag: 'hero',
           readerWidgetBuilder:
               ({

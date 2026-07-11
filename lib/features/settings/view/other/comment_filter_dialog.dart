@@ -3,10 +3,12 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
-import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/services/comment_filter_service.dart';
 
-Future<void> showCommentFilterDialog(BuildContext context) {
+Future<void> showCommentFilterDialog(
+  BuildContext context, {
+  required CommentFilterService service,
+}) {
   return showGeneralDialog<void>(
     context: context,
     barrierDismissible: true,
@@ -14,7 +16,7 @@ Future<void> showCommentFilterDialog(BuildContext context) {
     barrierColor: Colors.black.withValues(alpha: 0.68),
     transitionDuration: const Duration(milliseconds: 380),
     pageBuilder: (context, animation, secondaryAnimation) {
-      return const _CommentFilterSheet();
+      return _CommentFilterSheet(service: service);
     },
     transitionBuilder: (context, animation, secondaryAnimation, child) {
       final screenWidth = MediaQuery.sizeOf(context).width;
@@ -46,7 +48,9 @@ Future<void> showCommentFilterDialog(BuildContext context) {
 }
 
 class _CommentFilterSheet extends StatefulWidget {
-  const _CommentFilterSheet();
+  const _CommentFilterSheet({required this.service});
+
+  final CommentFilterService service;
 
   @override
   State<_CommentFilterSheet> createState() => _CommentFilterSheetState();
@@ -68,7 +72,7 @@ class _CommentFilterSheetState extends State<_CommentFilterSheet>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    final service = sl<CommentFilterService>();
+    final service = widget.service;
     _mode = service.mode;
     _userKeywords = List.of(service.userKeywords);
   }
@@ -105,10 +109,7 @@ class _CommentFilterSheetState extends State<_CommentFilterSheet>
         _userKeywords.add(pendingKeyword);
       }
     }
-    await sl<CommentFilterService>().save(
-      userKeywords: _userKeywords,
-      mode: _mode,
-    );
+    await widget.service.save(userKeywords: _userKeywords, mode: _mode);
   }
 
   Future<void> _setMode(CommentFilterMode mode) async {

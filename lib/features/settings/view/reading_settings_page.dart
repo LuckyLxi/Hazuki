@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
-import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/shared/reading/reader_mode.dart';
 import 'package:hazuki/features/settings/state/reading_settings_controller.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
@@ -12,7 +11,9 @@ import 'package:hazuki/widgets/widgets.dart';
 import 'settings_group.dart';
 
 class ReadingSettingsPage extends StatefulWidget {
-  const ReadingSettingsPage({super.key});
+  const ReadingSettingsPage({super.key, required this.sourceService});
+
+  final SourceSettingsGateway sourceService;
 
   @override
   State<ReadingSettingsPage> createState() => _ReadingSettingsPageState();
@@ -20,7 +21,7 @@ class ReadingSettingsPage extends StatefulWidget {
 
 class _ReadingSettingsPageState extends State<ReadingSettingsPage> {
   late final ReadingSettingsController _controller = ReadingSettingsController(
-    sourceService: sl<SourceSettingsGateway>(),
+    sourceService: widget.sourceService,
   );
 
   @override

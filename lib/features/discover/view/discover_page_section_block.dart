@@ -4,6 +4,7 @@ import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
 import 'package:hazuki/shared/windows/windows_comic_detail.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:loading_indicator_m3e/loading_indicator_m3e.dart';
 
@@ -19,6 +20,7 @@ class DiscoverSectionBlock extends StatefulWidget {
     required this.onLoadMore,
     required this.comicDetailPageBuilder,
     required this.comicCoverHeroTagBuilder,
+    required this.sourceService,
   });
 
   final ExploreSection section;
@@ -28,6 +30,7 @@ class DiscoverSectionBlock extends StatefulWidget {
   final Future<void> Function() onLoadMore;
   final ComicDetailPageBuilder comicDetailPageBuilder;
   final ComicHeroTagBuilder comicCoverHeroTagBuilder;
+  final SourceDiscoverGateway sourceService;
 
   @override
   State<DiscoverSectionBlock> createState() => _DiscoverSectionBlockState();
@@ -91,6 +94,7 @@ class _DiscoverSectionBlockState extends State<DiscoverSectionBlock> {
                           comicDetailPageBuilder: widget.comicDetailPageBuilder,
                           comicCoverHeroTagBuilder:
                               widget.comicCoverHeroTagBuilder,
+                          sourceService: widget.sourceService,
                         ),
                       ),
                     );

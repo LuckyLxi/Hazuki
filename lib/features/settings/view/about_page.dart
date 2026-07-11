@@ -5,14 +5,15 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:hazuki/app/software_update/software_update_dialog_support.dart';
-import 'package:hazuki/app/service_locator.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../services/software_update/software_update_service.dart';
 import 'settings_group.dart';
 import '../../../widgets/widgets.dart';
 
 class AboutPage extends StatefulWidget {
-  const AboutPage({super.key});
+  const AboutPage({super.key, required this.softwareUpdateService});
+
+  final SoftwareUpdateService softwareUpdateService;
 
   @override
   State<AboutPage> createState() => _AboutPageState();
@@ -97,7 +98,7 @@ class _AboutPageState extends State<AboutPage> {
 
     setState(() => _checkingUpdate = true);
     try {
-      final check = await sl<SoftwareUpdateService>().checkForUpdates();
+      final check = await widget.softwareUpdateService.checkForUpdates();
       if (!mounted) {
         return;
       }

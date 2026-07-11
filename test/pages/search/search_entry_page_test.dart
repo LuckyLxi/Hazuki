@@ -13,6 +13,7 @@ import 'package:hazuki/features/search/view/search_entry_page.dart';
 import 'package:hazuki/features/search/view/search_id_extract_pill.dart';
 import 'package:hazuki/services/search_history_service.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../support/test_service_locator.dart';
 
@@ -35,6 +36,8 @@ void main() {
     await tester.pumpWidget(
       _buildTestApp(
         SearchEntryPage(
+          sourceService: sl<SourceSearchGateway>(),
+          historyService: sl<SearchHistoryService>(),
           comicDetailPageBuilder: _comicDetailPageBuilder,
           comicCoverHeroTagBuilder: _testComicCoverHeroTag,
           searchPageLoader: _fakeSearchPageLoader,
@@ -80,6 +83,8 @@ void main() {
           );
         },
         home: SearchEntryPage(
+          sourceService: sl<SourceSearchGateway>(),
+          historyService: sl<SearchHistoryService>(),
           comicDetailPageBuilder: _comicDetailPageBuilder,
           comicCoverHeroTagBuilder: _testComicCoverHeroTag,
           searchPageLoader: _fakeSearchPageLoader,
@@ -107,6 +112,8 @@ void main() {
     await tester.pumpWidget(
       _buildTestApp(
         SearchEntryPage(
+          sourceService: sl<SourceSearchGateway>(),
+          historyService: sl<SearchHistoryService>(),
           comicDetailPageBuilder: _comicDetailPageBuilder,
           comicCoverHeroTagBuilder: _testComicCoverHeroTag,
           searchPageLoader: _fakeSearchPageLoader,
@@ -138,6 +145,8 @@ void main() {
     await tester.pumpWidget(
       _buildTestApp(
         SearchEntryPage(
+          sourceService: sl<SourceSearchGateway>(),
+          historyService: sl<SearchHistoryService>(),
           comicDetailPageBuilder: _comicDetailPageBuilder,
           comicCoverHeroTagBuilder: _testComicCoverHeroTag,
           searchPageLoader: _fakeSearchPageLoader,
@@ -164,6 +173,8 @@ void main() {
     await tester.pumpWidget(
       _buildTestApp(
         SearchEntryPage(
+          sourceService: sl<SourceSearchGateway>(),
+          historyService: sl<SearchHistoryService>(),
           comicDetailPageBuilder: _comicDetailPageBuilder,
           comicCoverHeroTagBuilder: _testComicCoverHeroTag,
           searchPageLoader: _fakeSearchPageLoader,
@@ -206,6 +217,8 @@ void main() {
     await tester.pumpWidget(
       _buildTestApp(
         SearchEntryPage(
+          sourceService: sl<SourceSearchGateway>(),
+          historyService: sl<SearchHistoryService>(),
           comicDetailPageBuilder: _comicDetailPageBuilder,
           comicCoverHeroTagBuilder: _testComicCoverHeroTag,
           searchPageLoader: _fakeSearchPageLoader,
@@ -252,6 +265,8 @@ void main() {
     await tester.pumpWidget(
       _buildTestApp(
         SearchEntryPage(
+          sourceService: sl<SourceSearchGateway>(),
+          historyService: sl<SearchHistoryService>(),
           comicDetailPageBuilder: _comicDetailPageBuilder,
           comicCoverHeroTagBuilder: _testComicCoverHeroTag,
           searchPageLoader: _fakeSearchPageLoader,
@@ -280,6 +295,8 @@ void main() {
       await tester.pumpWidget(
         _buildTestApp(
           SearchEntryPage(
+            sourceService: sl<SourceSearchGateway>(),
+            historyService: sl<SearchHistoryService>(),
             comicDetailPageBuilder: _comicDetailPageBuilder,
             comicCoverHeroTagBuilder: _testComicCoverHeroTag,
             searchPageLoader: _fakeSearchPageLoader,
@@ -319,6 +336,8 @@ void main() {
     await tester.pumpWidget(
       _buildTestApp(
         SearchEntryPage(
+          sourceService: sl<SourceSearchGateway>(),
+          historyService: sl<SearchHistoryService>(),
           comicDetailPageBuilder: _comicDetailPageBuilder,
           comicCoverHeroTagBuilder: _testComicCoverHeroTag,
           searchPageLoader: _recordingSearchPageLoader(requests),
@@ -371,6 +390,8 @@ void main() {
     await tester.pumpWidget(
       _buildTestApp(
         SearchEntryPage(
+          sourceService: sl<SourceSearchGateway>(),
+          historyService: sl<SearchHistoryService>(),
           comicDetailPageBuilder: _comicDetailPageBuilder,
           comicCoverHeroTagBuilder: _testComicCoverHeroTag,
           searchPageLoader: _recordingSearchPageLoader(requests),
@@ -408,6 +429,8 @@ void main() {
     await tester.pumpWidget(
       _buildTestApp(
         SearchEntryPage(
+          sourceService: sl<SourceSearchGateway>(),
+          historyService: sl<SearchHistoryService>(),
           comicDetailPageBuilder: _comicDetailPageBuilder,
           comicCoverHeroTagBuilder: _testComicCoverHeroTag,
           searchPageLoader: _fakeSearchPageLoader,
@@ -436,6 +459,8 @@ void main() {
     await tester.pumpWidget(
       _buildTestApp(
         SearchPage(
+          sourceService: sl<SourceSearchGateway>(),
+          historyService: sl<SearchHistoryService>(),
           initialKeyword: 'external-tag',
           comicDetailPageBuilder: _comicDetailPageBuilder,
           comicCoverHeroTagBuilder: _testComicCoverHeroTag,
@@ -457,6 +482,8 @@ void main() {
     await tester.pumpWidget(
       _buildTestApp(
         SearchPage(
+          sourceService: sl<SourceSearchGateway>(),
+          historyService: sl<SearchHistoryService>(),
           initialKeyword: 'keep-results',
           comicDetailPageBuilder: _comicDetailPageBuilder,
           comicCoverHeroTagBuilder: _testComicCoverHeroTag,
@@ -492,6 +519,8 @@ void main() {
     await tester.pumpWidget(
       _buildTestApp(
         SearchResultsPage(
+          sourceService: sl<SourceSearchGateway>(),
+          historyService: sl<SearchHistoryService>(),
           initialKeyword: '12345',
           aggregateSearchEnabled: true,
           comicDetailPageBuilder: _comicDetailPageBuilder,
@@ -544,6 +573,8 @@ void main() {
     await tester.pumpWidget(
       _buildTestApp(
         SearchPage(
+          sourceService: sl<SourceSearchGateway>(),
+          historyService: sl<SearchHistoryService>(),
           initialKeyword: 'hazuki',
           comicDetailPageBuilder: _comicDetailPageBuilder,
           comicCoverHeroTagBuilder: _testComicCoverHeroTag,

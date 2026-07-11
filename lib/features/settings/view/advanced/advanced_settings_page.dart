@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
-import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/software_update/software_update_service.dart';
 import 'package:hazuki/shared/ui_flags.dart';
@@ -15,20 +14,24 @@ class AdvancedSettingsPage extends StatefulWidget {
     required this.logsPageBuilder,
     required this.comicSourceEditorPageBuilder,
     required this.restoreComicSource,
+    required this.sourceService,
+    required this.softwareUpdateService,
   });
 
   final WidgetBuilder logsPageBuilder;
   final WidgetBuilder comicSourceEditorPageBuilder;
   final Future<bool> Function(BuildContext context) restoreComicSource;
+  final SourceRuntimeGateway sourceService;
+  final SoftwareUpdateService softwareUpdateService;
 
   @override
   State<AdvancedSettingsPage> createState() => _AdvancedSettingsPageState();
 }
 
 class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
-  final SourceRuntimeGateway _sourceService = sl<SourceRuntimeGateway>();
-  final SoftwareUpdateService _softwareUpdateService =
-      sl<SoftwareUpdateService>();
+  SourceRuntimeGateway get _sourceService => widget.sourceService;
+  SoftwareUpdateService get _softwareUpdateService =>
+      widget.softwareUpdateService;
   bool _noImageMode = false;
   bool _softwareLogCaptureEnabled = false;
   bool _hasCustomEditedSource = false;
