@@ -1,11 +1,14 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
-import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/services/comment_filter_service.dart';
 
-Future<void> showCommentFilterDialog(BuildContext context) {
+Future<void> showCommentFilterDialog(
+  BuildContext context, {
+  required CommentFilterService service,
+}) {
   return showGeneralDialog<void>(
     context: context,
     barrierDismissible: true,
@@ -13,7 +16,7 @@ Future<void> showCommentFilterDialog(BuildContext context) {
     barrierColor: Colors.black.withValues(alpha: 0.68),
     transitionDuration: const Duration(milliseconds: 380),
     pageBuilder: (context, animation, secondaryAnimation) {
-      return const _CommentFilterSheet();
+      return _CommentFilterSheet(service: service);
     },
     transitionBuilder: (context, animation, secondaryAnimation, child) {
       final screenWidth = MediaQuery.sizeOf(context).width;
@@ -45,19 +48,22 @@ Future<void> showCommentFilterDialog(BuildContext context) {
 }
 
 class _CommentFilterSheet extends StatefulWidget {
-  const _CommentFilterSheet();
+  const _CommentFilterSheet({required this.service});
+
+  final CommentFilterService service;
 
   @override
   State<_CommentFilterSheet> createState() => _CommentFilterSheetState();
 }
 
 class _CommentFilterSheetState extends State<_CommentFilterSheet>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late CommentFilterMode _mode;
   late List<String> _userKeywords;
   final _addController = TextEditingController();
   final _addFocusNode = FocusNode();
   String? _addKeywordError;
+  double _keyboardHeight = 0;
 
   // 关键词列表展开/收起
   bool _keywordsExpanded = false;
@@ -65,16 +71,34 @@ class _CommentFilterSheetState extends State<_CommentFilterSheet>
   @override
   void initState() {
     super.initState();
-    final service = sl<CommentFilterService>();
+    WidgetsBinding.instance.addObserver(this);
+    final service = widget.service;
     _mode = service.mode;
     _userKeywords = List.of(service.userKeywords);
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _addController.dispose();
     _addFocusNode.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeMetrics() {
+    if (!mounted) {
+      return;
+    }
+    final views = WidgetsBinding.instance.platformDispatcher.views;
+    if (views.isEmpty) {
+      return;
+    }
+    final view = views.first;
+    final nextKeyboardHeight = view.viewInsets.bottom / view.devicePixelRatio;
+    if (nextKeyboardHeight != _keyboardHeight) {
+      setState(() => _keyboardHeight = nextKeyboardHeight);
+    }
   }
 
   Future<void> _save({bool includePendingKeyword = false}) async {
@@ -85,10 +109,7 @@ class _CommentFilterSheetState extends State<_CommentFilterSheet>
         _userKeywords.add(pendingKeyword);
       }
     }
-    await sl<CommentFilterService>().save(
-      userKeywords: _userKeywords,
-      mode: _mode,
-    );
+    await widget.service.save(userKeywords: _userKeywords, mode: _mode);
   }
 
   Future<void> _setMode(CommentFilterMode mode) async {
@@ -205,7 +226,10 @@ class _CommentFilterSheetState extends State<_CommentFilterSheet>
     final colorScheme = theme.colorScheme;
     final mediaSize = MediaQuery.sizeOf(context);
     final mediaPadding = MediaQuery.paddingOf(context);
-    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+    final keyboardInset = math.max(
+      MediaQuery.viewInsetsOf(context).bottom,
+      _keyboardHeight,
+    );
     final sheetColor = colorScheme.surfaceContainerLow;
 
     final screenWidth = mediaSize.width;
@@ -224,13 +248,18 @@ class _CommentFilterSheetState extends State<_CommentFilterSheet>
         ? availableHeight
         : baseMaxHeight;
 
-    return Padding(
+    return AnimatedPadding(
+      duration: keyboardInset > 0
+          ? Duration.zero
+          : const Duration(milliseconds: 180),
+      curve: Curves.easeOutCubic,
       padding: EdgeInsets.only(bottom: keyboardInset),
       child: Align(
         alignment: sheetAlignment,
         child: Material(
           color: Colors.transparent,
           child: Container(
+            key: const ValueKey<String>('comment-filter-sheet'),
             width: sheetWidth,
             constraints: BoxConstraints(maxHeight: maxSheetHeight),
             decoration: BoxDecoration(
@@ -403,24 +432,26 @@ class _CommentFilterSheetState extends State<_CommentFilterSheet>
                               onRemove: _removeKeyword,
                             ),
                           ),
-                          const SizedBox(height: 24),
-                          // 保存按钮
-                          FilledButton(
-                            onPressed: () async {
-                              await _save(includePendingKeyword: true);
-                              if (context.mounted) Navigator.of(context).pop();
-                            },
-                            style: FilledButton.styleFrom(
-                              minimumSize: const Size.fromHeight(48),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                            ),
-                            child: Text(
-                              MaterialLocalizations.of(context).saveButtonLabel,
-                            ),
-                          ),
                         ],
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+                    child: FilledButton(
+                      key: const ValueKey<String>('comment-filter-save-button'),
+                      onPressed: () async {
+                        await _save(includePendingKeyword: true);
+                        if (context.mounted) Navigator.of(context).pop();
+                      },
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(48),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: Text(
+                        MaterialLocalizations.of(context).saveButtonLabel,
                       ),
                     ),
                   ),

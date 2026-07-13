@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/app/app.dart';
@@ -12,6 +13,7 @@ import 'package:hazuki/features/search/view/search_entry_page.dart';
 import 'package:hazuki/features/search/view/search_id_extract_pill.dart';
 import 'package:hazuki/services/search_history_service.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../support/test_service_locator.dart';
 
@@ -34,6 +36,8 @@ void main() {
     await tester.pumpWidget(
       _buildTestApp(
         SearchEntryPage(
+          sourceService: sl<SourceSearchGateway>(),
+          historyService: sl<SearchHistoryService>(),
           comicDetailPageBuilder: _comicDetailPageBuilder,
           comicCoverHeroTagBuilder: _testComicCoverHeroTag,
           searchPageLoader: _fakeSearchPageLoader,
@@ -79,6 +83,8 @@ void main() {
           );
         },
         home: SearchEntryPage(
+          sourceService: sl<SourceSearchGateway>(),
+          historyService: sl<SearchHistoryService>(),
           comicDetailPageBuilder: _comicDetailPageBuilder,
           comicCoverHeroTagBuilder: _testComicCoverHeroTag,
           searchPageLoader: _fakeSearchPageLoader,
@@ -106,6 +112,8 @@ void main() {
     await tester.pumpWidget(
       _buildTestApp(
         SearchEntryPage(
+          sourceService: sl<SourceSearchGateway>(),
+          historyService: sl<SearchHistoryService>(),
           comicDetailPageBuilder: _comicDetailPageBuilder,
           comicCoverHeroTagBuilder: _testComicCoverHeroTag,
           searchPageLoader: _fakeSearchPageLoader,
@@ -137,6 +145,8 @@ void main() {
     await tester.pumpWidget(
       _buildTestApp(
         SearchEntryPage(
+          sourceService: sl<SourceSearchGateway>(),
+          historyService: sl<SearchHistoryService>(),
           comicDetailPageBuilder: _comicDetailPageBuilder,
           comicCoverHeroTagBuilder: _testComicCoverHeroTag,
           searchPageLoader: _fakeSearchPageLoader,
@@ -163,6 +173,8 @@ void main() {
     await tester.pumpWidget(
       _buildTestApp(
         SearchEntryPage(
+          sourceService: sl<SourceSearchGateway>(),
+          historyService: sl<SearchHistoryService>(),
           comicDetailPageBuilder: _comicDetailPageBuilder,
           comicCoverHeroTagBuilder: _testComicCoverHeroTag,
           searchPageLoader: _fakeSearchPageLoader,
@@ -205,6 +217,8 @@ void main() {
     await tester.pumpWidget(
       _buildTestApp(
         SearchEntryPage(
+          sourceService: sl<SourceSearchGateway>(),
+          historyService: sl<SearchHistoryService>(),
           comicDetailPageBuilder: _comicDetailPageBuilder,
           comicCoverHeroTagBuilder: _testComicCoverHeroTag,
           searchPageLoader: _fakeSearchPageLoader,
@@ -220,6 +234,59 @@ void main() {
     expect(tester.testTextInput.isVisible, isFalse);
   });
 
+  testWidgets('long pressing a search history keyword copies it', (
+    tester,
+  ) async {
+    String? copiedText;
+    String? hapticType;
+    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      SystemChannels.platform,
+      (call) async {
+        if (call.method == 'Clipboard.setData') {
+          copiedText =
+              (call.arguments as Map<dynamic, dynamic>)['text'] as String?;
+        } else if (call.method == 'HapticFeedback.vibrate') {
+          hapticType = call.arguments as String?;
+        }
+        return null;
+      },
+    );
+    addTearDown(() {
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        SystemChannels.platform,
+        null,
+      );
+    });
+    SharedPreferences.setMockInitialValues({
+      'search_history': <String>['hazuki'],
+    });
+    await sl<SearchHistoryService>().load();
+
+    await tester.pumpWidget(
+      _buildTestApp(
+        SearchEntryPage(
+          sourceService: sl<SourceSearchGateway>(),
+          historyService: sl<SearchHistoryService>(),
+          comicDetailPageBuilder: _comicDetailPageBuilder,
+          comicCoverHeroTagBuilder: _testComicCoverHeroTag,
+          searchPageLoader: _fakeSearchPageLoader,
+        ),
+      ),
+    );
+    await _pumpSearchSettled(tester);
+
+    await tester.longPress(find.text('hazuki'));
+    await _pumpSearchSettled(tester);
+
+    expect(copiedText, 'hazuki');
+    expect(hapticType, 'HapticFeedbackType.mediumImpact');
+    expect(find.text('Search history copied'), findsOneWidget);
+    expect(find.text('Comic hazuki 0'), findsNothing);
+
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pumpAndSettle();
+  });
+
   testWidgets(
     'submitting from entry opens results without reopening keyboard',
     (tester) async {
@@ -228,6 +295,8 @@ void main() {
       await tester.pumpWidget(
         _buildTestApp(
           SearchEntryPage(
+            sourceService: sl<SourceSearchGateway>(),
+            historyService: sl<SearchHistoryService>(),
             comicDetailPageBuilder: _comicDetailPageBuilder,
             comicCoverHeroTagBuilder: _testComicCoverHeroTag,
             searchPageLoader: _fakeSearchPageLoader,
@@ -267,6 +336,8 @@ void main() {
     await tester.pumpWidget(
       _buildTestApp(
         SearchEntryPage(
+          sourceService: sl<SourceSearchGateway>(),
+          historyService: sl<SearchHistoryService>(),
           comicDetailPageBuilder: _comicDetailPageBuilder,
           comicCoverHeroTagBuilder: _testComicCoverHeroTag,
           searchPageLoader: _recordingSearchPageLoader(requests),
@@ -319,6 +390,8 @@ void main() {
     await tester.pumpWidget(
       _buildTestApp(
         SearchEntryPage(
+          sourceService: sl<SourceSearchGateway>(),
+          historyService: sl<SearchHistoryService>(),
           comicDetailPageBuilder: _comicDetailPageBuilder,
           comicCoverHeroTagBuilder: _testComicCoverHeroTag,
           searchPageLoader: _recordingSearchPageLoader(requests),
@@ -356,6 +429,8 @@ void main() {
     await tester.pumpWidget(
       _buildTestApp(
         SearchEntryPage(
+          sourceService: sl<SourceSearchGateway>(),
+          historyService: sl<SearchHistoryService>(),
           comicDetailPageBuilder: _comicDetailPageBuilder,
           comicCoverHeroTagBuilder: _testComicCoverHeroTag,
           searchPageLoader: _fakeSearchPageLoader,
@@ -384,6 +459,8 @@ void main() {
     await tester.pumpWidget(
       _buildTestApp(
         SearchPage(
+          sourceService: sl<SourceSearchGateway>(),
+          historyService: sl<SearchHistoryService>(),
           initialKeyword: 'external-tag',
           comicDetailPageBuilder: _comicDetailPageBuilder,
           comicCoverHeroTagBuilder: _testComicCoverHeroTag,
@@ -405,6 +482,8 @@ void main() {
     await tester.pumpWidget(
       _buildTestApp(
         SearchPage(
+          sourceService: sl<SourceSearchGateway>(),
+          historyService: sl<SearchHistoryService>(),
           initialKeyword: 'keep-results',
           comicDetailPageBuilder: _comicDetailPageBuilder,
           comicCoverHeroTagBuilder: _testComicCoverHeroTag,
@@ -440,6 +519,8 @@ void main() {
     await tester.pumpWidget(
       _buildTestApp(
         SearchResultsPage(
+          sourceService: sl<SourceSearchGateway>(),
+          historyService: sl<SearchHistoryService>(),
           initialKeyword: '12345',
           aggregateSearchEnabled: true,
           comicDetailPageBuilder: _comicDetailPageBuilder,
@@ -492,6 +573,8 @@ void main() {
     await tester.pumpWidget(
       _buildTestApp(
         SearchPage(
+          sourceService: sl<SourceSearchGateway>(),
+          historyService: sl<SearchHistoryService>(),
           initialKeyword: 'hazuki',
           comicDetailPageBuilder: _comicDetailPageBuilder,
           comicCoverHeroTagBuilder: _testComicCoverHeroTag,

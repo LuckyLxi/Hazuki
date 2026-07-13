@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
-import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/widgets/widgets.dart';
@@ -11,7 +10,9 @@ import 'source_editor_restore_dialog.dart';
 import '../settings_group.dart';
 
 class ComicSourceEditorPage extends StatefulWidget {
-  const ComicSourceEditorPage({super.key});
+  const ComicSourceEditorPage({super.key, required this.sourceService});
+
+  final SourceRuntimeGateway sourceService;
 
   @override
   State<ComicSourceEditorPage> createState() => _ComicSourceEditorPageState();
@@ -87,8 +88,7 @@ class _ComicSourceEditorPageState extends State<ComicSourceEditorPage> {
       _inlineErrorText = null;
     });
     try {
-      final content = await sl<SourceRuntimeGateway>()
-          .loadEditableActiveSource();
+      final content = await widget.sourceService.loadEditableActiveSource();
       if (!mounted) {
         return;
       }
@@ -119,7 +119,7 @@ class _ComicSourceEditorPageState extends State<ComicSourceEditorPage> {
     });
     try {
       final content = _controller.text;
-      await sl<SourceRuntimeGateway>().saveEditedActiveSource(content);
+      await widget.sourceService.saveEditedActiveSource(content);
       if (!mounted) {
         return;
       }
@@ -235,6 +235,9 @@ class _ComicSourceEditorPageState extends State<ComicSourceEditorPage> {
   }
 }
 
-Future<bool> showComicSourceRestoreDialog(BuildContext context) {
-  return showSourceEditorRestoreDialog(context);
+Future<bool> showComicSourceRestoreDialog(
+  BuildContext context, {
+  required SourceRuntimeGateway sourceService,
+}) {
+  return showSourceEditorRestoreDialog(context, sourceService: sourceService);
 }

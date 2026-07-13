@@ -84,11 +84,9 @@ class SearchResultsBody extends StatelessWidget {
   const SearchResultsBody({
     super.key,
     required this.scrollController,
-    required this.searchKeyword,
     required this.searchComics,
     required this.searchLoadingMore,
     required this.searchErrorMessage,
-    required this.currentSearchOrderLabel,
     required this.resultState,
     required this.onRefresh,
     required this.onScrollNotification,
@@ -97,11 +95,9 @@ class SearchResultsBody extends StatelessWidget {
   });
 
   final ScrollController scrollController;
-  final String searchKeyword;
   final List<ExploreComic> searchComics;
   final bool searchLoadingMore;
   final String? searchErrorMessage;
-  final String currentSearchOrderLabel;
   final Widget resultState;
   final Future<void> Function() onRefresh;
   final bool Function(ScrollNotification notification) onScrollNotification;
@@ -122,30 +118,6 @@ class SearchResultsBody extends StatelessWidget {
           ),
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
           children: [
-            if (searchComics.isNotEmpty) ...[
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12, left: 2, right: 2),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        searchKeyword,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      currentSearchOrderLabel,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
             resultState,
             if (searchComics.isNotEmpty) ...[
               for (int i = 0; i < searchComics.length; i++)

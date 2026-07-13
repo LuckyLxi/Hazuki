@@ -5,6 +5,7 @@ import 'package:hazuki/features/history/view/history_page.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/services/read_history_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../support/test_service_locator.dart';
@@ -82,6 +83,9 @@ Widget _buildApp() {
     routes: {
       '/': (_) => const Scaffold(body: Text('Home')),
       '/history': (_) => HistoryPage(
+        readHistoryService: sl<ReadHistoryService>(),
+        sourceService: sl<SourceRuntimeGateway>(),
+        imageGateway: sl<SourceImageGateway>(),
         comicDetailPageBuilder: (_, _) => const SizedBox.shrink(),
         onFavoriteRequested: (_, _) async {},
       ),

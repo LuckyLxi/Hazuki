@@ -647,6 +647,17 @@ void main() {
     await tester.enterText(find.byType(TextField), 'Favorites');
     await tester.pump();
     await tester.tap(find.text('Create'));
+    await tester.pump();
+
+    expect(
+      find.ancestor(
+        of: find.byKey(
+          const ValueKey<String>('download_group_background_new-group'),
+        ),
+        matching: _groupTileEntryAnimationFinder(),
+      ),
+      findsNothing,
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('Favorites (0)'), findsOneWidget);
@@ -657,6 +668,57 @@ void main() {
 
     expect(deleted, ['new-group']);
     expect(find.text('Favorites (0)'), findsNothing);
+  });
+
+  testWidgets('category dialog scrolls to and highlights a new group', (
+    tester,
+  ) async {
+    final groups = [
+      _defaultGroup,
+      for (var index = 0; index < 24; index++)
+        DownloadGroup(
+          id: 'group-$index',
+          name: 'Group $index',
+          createdAtMs: index + 1,
+          sortOrder: index + 1,
+        ),
+    ];
+
+    await tester.pumpWidget(_wrapTab(groups: groups));
+    await tester.tap(
+      find.byKey(const ValueKey<String>('downloads_category_launcher')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Group 23 (0)'), findsNothing);
+
+    await tester.tap(find.byIcon(Icons.create_new_folder_outlined));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField), 'New shelf');
+    await tester.pump();
+    await tester.tap(find.text('Create'));
+    await tester.pump();
+
+    expect(
+      find.byKey(const ValueKey<String>('download_group_highlight_new-group')),
+      findsNothing,
+    );
+
+    await tester.pumpAndSettle();
+    expect(find.text('New shelf (0)'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey<String>('download_group_highlight_new-group')),
+      findsOneWidget,
+    );
+    expect(
+      find.ancestor(
+        of: find.byKey(
+          const ValueKey<String>('download_group_background_new-group'),
+        ),
+        matching: _groupTileEntryAnimationFinder(),
+      ),
+      findsNothing,
+    );
   });
 
   testWidgets('category dialog renames custom groups with validation', (
@@ -775,6 +837,15 @@ void main() {
           .right,
       closeTo(saveButtonRight, 0.1),
     );
+    expect(
+      find.ancestor(
+        of: find.byKey(
+          const ValueKey<String>('download_group_background_first'),
+        ),
+        matching: _groupTileEntryAnimationFinder(),
+      ),
+      findsNothing,
+    );
     await tester.pumpAndSettle();
 
     expect(savedOrders, [
@@ -858,6 +929,136 @@ void main() {
       find.descendant(of: dialog, matching: find.text('Default group (1)')),
       findsNothing,
     );
+  });
+
+  testWidgets('category dialog does not recenter selected group after delete', (
+    tester,
+  ) async {
+    final groups = [
+      _defaultGroup,
+      for (var index = 0; index < 24; index++)
+        DownloadGroup(
+          id: 'group-$index',
+          name: 'Group $index',
+          createdAtMs: index + 1,
+          sortOrder: index + 1,
+        ),
+    ];
+
+    await tester.pumpWidget(
+      _wrapTab(groups: groups, selectedGroupId: 'group-18'),
+    );
+
+    await tester.tap(
+      find.byKey(const ValueKey<String>('downloads_category_launcher')),
+    );
+    await tester.pumpAndSettle();
+
+    final dialog = find.byKey(
+      const ValueKey<String>('downloads_category_dialog'),
+    );
+    expect(
+      find.descendant(of: dialog, matching: find.text('Group 18 (0)')),
+      findsOneWidget,
+    );
+
+    await tester.dragUntilVisible(
+      find.text('Default group (1)'),
+      find.byType(ReorderableListView),
+      const Offset(0, 500),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.descendant(of: dialog, matching: find.text('Default group (1)')),
+      findsOneWidget,
+    );
+
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(
+          const ValueKey<String>('download_group_background_group-0'),
+        ),
+        matching: find.byIcon(Icons.delete_outline),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final groupOneTopBefore = tester
+        .getTopLeft(
+          find.byKey(
+            const ValueKey<String>('download_group_background_group-1'),
+          ),
+        )
+        .dy;
+    await tester.tap(find.text('Delete'));
+    await tester.pump();
+
+    expect(
+      find.ancestor(
+        of: find.byKey(
+          const ValueKey<String>(
+            'download_group_background_${DownloadGroupsService.defaultGroupId}',
+          ),
+        ),
+        matching: _groupTileEntryAnimationFinder(),
+      ),
+      findsNothing,
+    );
+    await tester.pump(const Duration(milliseconds: 130));
+    expect(
+      tester
+          .getTopLeft(
+            find.byKey(
+              const ValueKey<String>('download_group_background_group-1'),
+            ),
+          )
+          .dy,
+      lessThan(groupOneTopBefore),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.descendant(of: dialog, matching: find.text('Default group (1)')),
+      findsOneWidget,
+    );
+    expect(
+      find.descendant(of: dialog, matching: find.text('Group 18 (0)')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('confirmed group delete survives category dialog disposal', (
+    tester,
+  ) async {
+    final deleted = <String>[];
+
+    await tester.pumpWidget(
+      _wrapTab(
+        groups: const [_defaultGroup, _firstGroup],
+        onDeleteGroup: (groupId) async => deleted.add(groupId),
+      ),
+    );
+
+    await tester.tap(
+      find.byKey(const ValueKey<String>('downloads_category_launcher')),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(
+      find.descendant(
+        of: find.byKey(
+          const ValueKey<String>('download_group_background_first'),
+        ),
+        matching: find.byIcon(Icons.delete_outline),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete'));
+    await tester.pump();
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 300));
+
+    expect(deleted, ['first']);
   });
 
   testWidgets(
@@ -1096,5 +1297,14 @@ DownloadedMangaComic _comicAt(int index) {
     localCoverPath: null,
     chapters: const [],
     updatedAtMillis: index,
+  );
+}
+
+Finder _groupTileEntryAnimationFinder() {
+  return find.byWidgetPredicate(
+    (widget) =>
+        widget is TweenAnimationBuilder<double> &&
+        widget.duration == const Duration(milliseconds: 280),
+    description: 'group tile entry TweenAnimationBuilder<double>',
   );
 }

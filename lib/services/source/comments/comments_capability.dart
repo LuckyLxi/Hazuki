@@ -4,6 +4,7 @@ extension HazukiSourceServiceCommentsCapability on HazukiSourceService {
   Future<ComicCommentsPageResult> loadCommentsPage({
     required String comicId,
     String? subId,
+    String? chapterId,
     String sourceKey = '',
     int page = 1,
     int pageSize = 16,
@@ -20,8 +21,18 @@ extension HazukiSourceServiceCommentsCapability on HazukiSourceService {
 
     final subIdArg = subId == null ? 'null' : jsonEncode(subId);
     final replyToArg = replyTo == null ? 'null' : jsonEncode(replyTo);
+    final chapterIdArg = chapterId == null ? 'null' : jsonEncode(chapterId);
+    final hasChapterComments =
+        chapterId?.isNotEmpty == true &&
+        facade.js.asBool(
+          facade.js.evaluate(
+            '!!this.__hazuki_source.comic?.loadChapterComments',
+          ),
+        );
     final dynamic result = engine.evaluate(
-      'this.__hazuki_source.comic.loadComments(${jsonEncode(comicId)}, $subIdArg, $page, $replyToArg)',
+      hasChapterComments
+          ? 'this.__hazuki_source.comic.loadChapterComments(${jsonEncode(comicId)}, $chapterIdArg, $page, $replyToArg)'
+          : 'this.__hazuki_source.comic.loadComments(${jsonEncode(comicId)}, $subIdArg, $page, $replyToArg)',
       name: 'source_comments.js',
     );
     final dynamic resolved = await facade.js.resolve(result);
@@ -66,6 +77,7 @@ extension HazukiSourceServiceCommentsCapability on HazukiSourceService {
   Future<List<ComicCommentData>> loadComments({
     required String comicId,
     String? subId,
+    String? chapterId,
     String sourceKey = '',
     int page = 1,
     int pageSize = 16,
@@ -74,6 +86,7 @@ extension HazukiSourceServiceCommentsCapability on HazukiSourceService {
     final result = await loadCommentsPage(
       comicId: comicId,
       subId: subId,
+      chapterId: chapterId,
       sourceKey: sourceKey,
       page: page,
       pageSize: pageSize,
@@ -85,6 +98,7 @@ extension HazukiSourceServiceCommentsCapability on HazukiSourceService {
   Future<void> sendComment({
     required String comicId,
     String? subId,
+    String? chapterId,
     String sourceKey = '',
     required String content,
     String? replyTo,
@@ -104,11 +118,21 @@ extension HazukiSourceServiceCommentsCapability on HazukiSourceService {
     }
 
     final subIdArg = subId == null ? 'null' : jsonEncode(subId);
+    final chapterIdArg = chapterId == null ? 'null' : jsonEncode(chapterId);
     final replyToArg = replyTo == null ? 'null' : jsonEncode(replyTo);
 
     Future<void> runSend() async {
+      final hasChapterComments =
+          chapterId?.isNotEmpty == true &&
+          facade.js.asBool(
+            facade.js.evaluate(
+              '!!this.__hazuki_source.comic?.sendChapterComment',
+            ),
+          );
       final dynamic result = engine.evaluate(
-        'this.__hazuki_source.comic.sendComment(${jsonEncode(comicId)}, $subIdArg, ${jsonEncode(text)}, $replyToArg)',
+        hasChapterComments
+            ? 'this.__hazuki_source.comic.sendChapterComment(${jsonEncode(comicId)}, $chapterIdArg, ${jsonEncode(text)}, $replyToArg)'
+            : 'this.__hazuki_source.comic.sendComment(${jsonEncode(comicId)}, $subIdArg, ${jsonEncode(text)}, $replyToArg)',
         name: 'source_send_comment.js',
       );
       await facade.js.resolve(result);

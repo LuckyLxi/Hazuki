@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hazuki/app/app.dart';
-import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/app/windows/windows_title_bar_controller.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
@@ -144,13 +143,17 @@ class OtherSettingsActions {
     );
   }
 
-  static Future<void> toggleDiscoverDailyRecommendation(bool value) {
-    return sl<DiscoverDailyRecommendationService>().setEnabled(value);
+  static Future<void> toggleDiscoverDailyRecommendation(
+    DiscoverDailyRecommendationService service,
+    bool value,
+  ) {
+    return service.setEnabled(value);
   }
 
   static Future<String?> editMangaDownloadPath(
     BuildContext context, {
     required String currentPath,
+    required MangaDownloadService downloadService,
   }) async {
     final strings = AppLocalizations.of(context)!;
     String? result;
@@ -184,7 +187,7 @@ class OtherSettingsActions {
     final normalized = MangaDownloadAccess.normalizeDownloadsRootPath(result);
     await MangaDownloadAccess.saveDownloadsRootPath(normalized);
     await MangaDownloadAccess.ensureNoMediaMarkerForPath(normalized);
-    await sl<MangaDownloadService>().handleRootPathChanged();
+    await downloadService.handleRootPathChanged();
     if (!context.mounted) {
       return null;
     }

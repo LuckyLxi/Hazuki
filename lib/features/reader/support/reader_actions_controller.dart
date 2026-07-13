@@ -142,6 +142,7 @@ class ReaderActionsController {
             child: ReaderCommentsSheet(
               comicId: details.id,
               subId: details.subId.isEmpty ? null : details.subId,
+              chapterId: _pageContext.epId,
               sourceKey: details.sourceKey.isNotEmpty
                   ? details.sourceKey
                   : _pageContext.sourceKey,

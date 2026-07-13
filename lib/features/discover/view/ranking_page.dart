@@ -8,17 +8,18 @@ import '../../../services/source/source_capabilities.dart';
 import '../../../widgets/widgets.dart';
 import '../../../widgets/windows_comic_detail_host.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
-import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 
 class RankingPage extends StatefulWidget {
   const RankingPage({
     super.key,
     required this.comicDetailPageBuilder,
+    required this.sourceService,
     this.comicCoverHeroTagBuilder = comicCoverHeroTag,
   });
 
   final ComicDetailPageBuilder comicDetailPageBuilder;
+  final SourceCategoryGateway sourceService;
   final ComicHeroTagBuilder comicCoverHeroTagBuilder;
 
   @override
@@ -28,7 +29,7 @@ class RankingPage extends StatefulWidget {
 class _RankingPageState extends State<RankingPage> {
   static const _loadTimeout = Duration(seconds: 25);
 
-  final SourceCategoryGateway _sourceService = sl<SourceCategoryGateway>();
+  SourceCategoryGateway get _sourceService => widget.sourceService;
   final ScrollController _scrollController = ScrollController();
 
   List<CategoryRankingOption> _rankingOptions = const <CategoryRankingOption>[];

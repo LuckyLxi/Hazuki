@@ -2,17 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
-import 'package:hazuki/services/local_favorites/local_favorites_contracts.dart';
-import 'package:hazuki/services/manga_download/manga_download_service.dart';
-import 'package:hazuki/services/reading_progress_service.dart';
-import 'package:hazuki/services/read_history_service.dart';
 import 'package:hazuki/shared/comments/comments_widget_builder.dart';
 
 import '../repository/comic_detail_repository.dart';
 import '../support/comic_detail_actions_controller.dart';
 import '../support/comic_detail_controller_support.dart';
+import '../support/comic_detail_dependencies.dart';
 import '../support/comic_detail_favorite_controller.dart';
 import '../support/comic_detail_scope.dart';
 import '../support/comic_detail_session_controller.dart';
@@ -34,6 +30,7 @@ class ComicDetailPage extends StatefulWidget {
   const ComicDetailPage({
     super.key,
     required this.comic,
+    required this.dependencies,
     required this.heroTag,
     required this.readerWidgetBuilder,
     required this.searchPageBuilder,
@@ -46,6 +43,7 @@ class ComicDetailPage extends StatefulWidget {
   });
 
   final ExploreComic comic;
+  final ComicDetailDependencies dependencies;
   final String heroTag;
   final ReaderWidgetBuilder readerWidgetBuilder;
   final ComicDetailSearchPageBuilder searchPageBuilder;
@@ -81,17 +79,10 @@ class _ComicDetailPageState extends State<ComicDetailPage>
     super.initState();
     final comicSourceKey = widget.comic.sourceKey.trim().isNotEmpty
         ? widget.comic.sourceKey
-        : sl<SourceComicDetailGateway>().activeSourceKey;
+        : widget.dependencies.source.activeSourceKey;
     _repository =
         widget.repository ??
-        ComicDetailFeatureFacade(
-          source: sl<SourceComicDetailGateway>(),
-          local: sl<LocalFavoritesRepository>(),
-          downloader: sl<MangaDownloadService>(),
-          readingProgress: sl<ReadingProgressService>(),
-          readHistory: sl<ReadHistoryService>(),
-          sourceKey: comicSourceKey,
-        );
+        widget.dependencies.createFacade(sourceKey: comicSourceKey);
     _supportsJmExclusiveActions = isHazukiJmSourceKey(comicSourceKey);
     _supportsComicLikeAction =
         isHazukiJmSourceKey(comicSourceKey) ||
@@ -200,6 +191,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
       categoryPageBuilder: widget.categoryPageBuilder,
       comicDetailPageBuilder: (comic, heroTag) => ComicDetailPage(
         comic: comic,
+        dependencies: widget.dependencies,
         heroTag: heroTag,
         readerWidgetBuilder: widget.readerWidgetBuilder,
         searchPageBuilder: widget.searchPageBuilder,
@@ -262,6 +254,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
                 coverUrl: widget.comic.cover.trim(),
                 sourceKey: widget.comic.sourceKey,
                 scrollController: _scrollController,
+                imageGateway: widget.dependencies.imageGateway,
               ),
               ComicDetailTopSurfaceOverlay(
                 progressListenable:
@@ -282,6 +275,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
                   onCloseRequested: widget.onCloseRequested,
                   buildComicDetailPage: (comic, heroTag) => ComicDetailPage(
                     comic: comic,
+                    dependencies: widget.dependencies,
                     heroTag: heroTag,
                     readerWidgetBuilder: widget.readerWidgetBuilder,
                     searchPageBuilder: widget.searchPageBuilder,

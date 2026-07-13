@@ -2,10 +2,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
+import 'package:hazuki/services/search_history_service.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
 import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 import 'package:hazuki/widgets/widgets.dart';
@@ -24,6 +24,8 @@ import 'search_results_widgets.dart';
 class SearchResultsPage extends StatefulWidget {
   const SearchResultsPage({
     super.key,
+    required this.sourceService,
+    required this.historyService,
     required this.initialKeyword,
     this.initialOrder = 'mr',
     this.entryIntent = SearchEntryIntent.externalKeyword,
@@ -34,6 +36,8 @@ class SearchResultsPage extends StatefulWidget {
     this.comicDetailsLoader,
   });
 
+  final SourceSearchGateway sourceService;
+  final SearchHistoryService historyService;
   final String initialKeyword;
   final String initialOrder;
   final SearchEntryIntent entryIntent;
@@ -55,7 +59,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
     isMounted: () => mounted,
     initialText: widget.initialKeyword,
   );
-  final SourceSearchGateway _sourceService = sl<SourceSearchGateway>();
+  SourceSearchGateway get _sourceService => widget.sourceService;
   late final SearchIdExtractController _idExtractController =
       SearchIdExtractController(
         sourceService: _sourceService,
@@ -143,7 +147,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
     _aggregateSearchEnabled = widget.aggregateSearchEnabled ?? false;
     _resultsController = SearchResultsController(
       initialOrder: widget.initialOrder,
-      sourceService: sl<SourceSearchGateway>(),
+      sourceService: widget.sourceService,
       searchPageLoader: widget.searchPageLoader,
       comicDetailsLoader: widget.comicDetailsLoader,
     );
@@ -358,7 +362,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
         cover: details.cover,
         sourceKey: details.sourceKey,
       );
-      await addSearchHistory(keyword);
+      await addSearchHistory(widget.historyService, keyword);
       if (!mounted) {
         return true;
       }
@@ -421,7 +425,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
           )
         : false;
     if (!openedById) {
-      await addSearchHistory(keyword);
+      await addSearchHistory(widget.historyService, keyword);
     }
 
     if (!mounted ||
@@ -601,11 +605,9 @@ class _SearchResultsPageState extends State<SearchResultsPage>
     }
     return SearchResultsBody(
       scrollController: _scrollController,
-      searchKeyword: _searchKeyword,
       searchComics: _searchComics,
       searchLoadingMore: _searchLoadingMore,
       searchErrorMessage: _searchErrorMessage,
-      currentSearchOrderLabel: _currentSearchOrderLabel,
       resultState: _buildSearchResultState(),
       onRefresh: _refreshSearchResults,
       onScrollNotification: _handleSearchResultsScrollNotification,

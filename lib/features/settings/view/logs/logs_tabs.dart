@@ -3,7 +3,6 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:hazuki/l10n/l10n.dart';
-import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/source/debug/debug_log_internals.dart';
 import 'logs_cards.dart';
@@ -49,10 +48,13 @@ String _systemLogsTitle(BuildContext context) => l10n(context).logsSystemTitle;
 String _performanceLogsTitle(BuildContext context) =>
     l10n(context).logsPerformanceTitle;
 
-Future<Map<String, dynamic>> collectVisibleLogsForIndex(int index) {
+Future<Map<String, dynamic>> collectVisibleLogsForIndex(
+  SourceDebugGateway debugGateway,
+  int index,
+) {
   final clampedIndex = index.clamp(0, logsTabSpecs.length - 1).toInt();
   final spec = logsTabSpecs[clampedIndex];
-  return sl<SourceDebugGateway>().collectTypedDebugInfo(spec.type);
+  return debugGateway.collectTypedDebugInfo(spec.type);
 }
 
 Map<String, dynamic>? debugInfoForVisibleIndex(
@@ -72,9 +74,15 @@ String formatVisibleLogs(Map<String, dynamic> debugInfo) {
 }
 
 class DebugLogsTab extends StatefulWidget {
-  const DebugLogsTab({super.key, required this.spec, this.debugInfoOverride});
+  const DebugLogsTab({
+    super.key,
+    required this.spec,
+    required this.debugGateway,
+    this.debugInfoOverride,
+  });
 
   final LogsTabSpec spec;
+  final SourceDebugGateway debugGateway;
   final Map<String, dynamic>? debugInfoOverride;
 
   @override
@@ -132,7 +140,7 @@ class _DebugLogsTabState extends State<DebugLogsTab>
       _errorText = null;
     });
     try {
-      final debugInfo = await sl<SourceDebugGateway>()
+      final debugInfo = await widget.debugGateway
           .collectTypedDebugInfo(widget.spec.type)
           .timeout(const Duration(seconds: 10));
       if (!mounted) {

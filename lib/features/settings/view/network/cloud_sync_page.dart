@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:hazuki/app/app.dart';
-import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/features/settings/state/cloud_sync_controller.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/cloud_sync_service.dart';
@@ -10,7 +9,9 @@ import 'package:hazuki/widgets/widgets.dart';
 import '../settings_group.dart';
 
 class CloudSyncPage extends StatefulWidget {
-  const CloudSyncPage({super.key});
+  const CloudSyncPage({super.key, required this.service});
+
+  final CloudSyncService service;
 
   @override
   State<CloudSyncPage> createState() => _CloudSyncPageState();
@@ -23,7 +24,7 @@ class _CloudSyncPageState extends State<CloudSyncPage> {
   @override
   void initState() {
     super.initState();
-    _controller = CloudSyncController(service: sl<CloudSyncService>());
+    _controller = CloudSyncController(service: widget.service);
     unawaited(_controller.loadConfig());
   }
 

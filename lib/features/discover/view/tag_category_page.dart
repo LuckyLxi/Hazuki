@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:hazuki/app/service_locator.dart';
 import 'dart:ui' show FrameTiming;
 
 import 'package:flutter/material.dart';
@@ -18,10 +17,14 @@ class TagCategoryPage extends StatefulWidget {
     super.key,
     required this.searchPageBuilder,
     required this.comicDetailPageBuilder,
+    required this.categorySource,
+    required this.discoverSource,
   });
 
   final Widget Function(String tag) searchPageBuilder;
   final ComicDetailPageBuilder comicDetailPageBuilder;
+  final SourceCategoryGateway categorySource;
+  final SourceDiscoverGateway discoverSource;
 
   @override
   State<TagCategoryPage> createState() => _TagCategoryPageState();
@@ -74,7 +77,7 @@ class _TagCategoryGroupCard extends StatelessWidget {
 class _TagCategoryPageState extends State<TagCategoryPage> {
   static const _loadTimeout = Duration(seconds: 25);
 
-  final SourceCategoryGateway _sourceService = sl<SourceCategoryGateway>();
+  SourceCategoryGateway get _sourceService => widget.categorySource;
 
   List<CategoryTagGroup> _tagGroups = const <CategoryTagGroup>[];
 
@@ -271,6 +274,7 @@ class _TagCategoryPageState extends State<TagCategoryPage> {
               viewMoreUrl: target.viewMoreUrl,
             ),
             comicDetailPageBuilder: widget.comicDetailPageBuilder,
+            sourceService: widget.discoverSource,
           ),
         ),
       );

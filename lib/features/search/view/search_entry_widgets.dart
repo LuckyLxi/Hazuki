@@ -36,6 +36,7 @@ class SearchEntryBody extends StatelessWidget {
     required this.historyExpanded,
     required this.extractedComicId,
     required this.onKeywordPressed,
+    required this.onKeywordLongPressed,
     required this.onKeywordDeleted,
     required this.onHistoryExpandedChanged,
     required this.onApplyExtractedComicId,
@@ -47,6 +48,7 @@ class SearchEntryBody extends StatelessWidget {
   final bool historyExpanded;
   final String? extractedComicId;
   final ValueChanged<String> onKeywordPressed;
+  final ValueChanged<String> onKeywordLongPressed;
   final ValueChanged<String> onKeywordDeleted;
   final ValueChanged<bool> onHistoryExpandedChanged;
   final VoidCallback onApplyExtractedComicId;
@@ -67,6 +69,7 @@ class SearchEntryBody extends StatelessWidget {
               historyEditMode: historyEditMode,
               historyExpanded: historyExpanded,
               onKeywordPressed: onKeywordPressed,
+              onKeywordLongPressed: onKeywordLongPressed,
               onKeywordDeleted: onKeywordDeleted,
               onExpandedChanged: onHistoryExpandedChanged,
               onLayoutChanged: () {},

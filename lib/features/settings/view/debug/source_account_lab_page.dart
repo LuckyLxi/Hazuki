@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/shared/source_account/source_account_actions.dart';
 import 'package:hazuki/shared/source_account/source_account_login.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
@@ -12,15 +11,17 @@ import 'package:hazuki/widgets/widgets.dart';
 import '../settings_group.dart';
 
 class SourceAccountLabPage extends StatefulWidget {
-  const SourceAccountLabPage({super.key});
+  const SourceAccountLabPage({super.key, required this.sourceService});
+
+  final SourceRuntimeGateway sourceService;
 
   @override
   State<SourceAccountLabPage> createState() => _SourceAccountLabPageState();
 }
 
 class _SourceAccountLabPageState extends State<SourceAccountLabPage> {
-  final SourceRuntimeGateway _registry = sl<SourceRuntimeGateway>();
-  final SourceRuntimeGateway _sourceService = sl<SourceRuntimeGateway>();
+  SourceRuntimeGateway get _registry => widget.sourceService;
+  SourceRuntimeGateway get _sourceService => widget.sourceService;
   String? _busySourceKey;
   String? _downloadingSourceKey;
   double? _downloadProgress;

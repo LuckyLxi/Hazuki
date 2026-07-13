@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hazuki/features/favorite/favorite.dart';
 import 'package:hazuki/features/favorite/state/favorite_page_controller.dart';
-import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
@@ -25,6 +24,10 @@ AppLocalizations _strings(BuildContext context) =>
 class FavoritePage extends StatefulWidget {
   const FavoritePage({
     super.key,
+    required this.sourceService,
+    required this.localFavoritesRepository,
+    required this.localFavoritesPreferences,
+    required this.imageGateway,
     required this.authVersion,
     required this.onComicTap,
     this.onAppBarActionsChanged,
@@ -32,6 +35,10 @@ class FavoritePage extends StatefulWidget {
     this.actionsBinding,
   });
 
+  final SourceFavoriteGateway sourceService;
+  final LocalFavoritesRepository localFavoritesRepository;
+  final LocalFavoritesPreferencesStore localFavoritesPreferences;
+  final SourceImageGateway imageGateway;
   final int authVersion;
   final FavoriteComicTapHandler onComicTap;
   final ValueChanged<FavoriteAppBarActionsState>? onAppBarActionsChanged;
@@ -62,13 +69,11 @@ class FavoritePageState extends State<FavoritePage>
   void initState() {
     super.initState();
     _controller = FavoritePageController(
-      sourceService: sl<SourceFavoriteGateway>(),
-      localFavoritesRepository: sl<LocalFavoritesRepository>(),
-      localFavoritesPreferences: sl<LocalFavoritesPreferencesStore>(),
+      sourceService: widget.sourceService,
+      localFavoritesRepository: widget.localFavoritesRepository,
+      localFavoritesPreferences: widget.localFavoritesPreferences,
     );
-    _coverPrefetcher = ComicCoverPrefetcher(
-      imageGateway: sl<SourceImageGateway>(),
-    );
+    _coverPrefetcher = ComicCoverPrefetcher(imageGateway: widget.imageGateway);
     _controller.addListener(_handleControllerChanged);
     _scrollController.addListener(_onScroll);
     widget.actionsBinding?.attach(this);

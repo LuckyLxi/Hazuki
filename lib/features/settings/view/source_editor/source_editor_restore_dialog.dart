@@ -2,11 +2,13 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:hazuki/l10n/l10n.dart';
-import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
-Future<bool> showSourceEditorRestoreDialog(BuildContext context) async {
+Future<bool> showSourceEditorRestoreDialog(
+  BuildContext context, {
+  required SourceRuntimeGateway sourceService,
+}) async {
   final strings = l10n(context);
   var phase = _ComicSourceRestoreDialogPhase.confirm;
   var progress = 0.0;
@@ -87,7 +89,7 @@ Future<bool> showSourceEditorRestoreDialog(BuildContext context) async {
                           indeterminate = true;
                         });
 
-                        final ok = await sl<SourceRuntimeGateway>()
+                        final ok = await sourceService
                             .downloadActiveSourceAndReload(
                               onProgress: (received, total) {
                                 if (!dialogContext.mounted) {

@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/l10n/app_localizations.dart';
-import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/widgets/widgets.dart';
@@ -20,11 +19,13 @@ class DiscoverSectionPage extends StatefulWidget {
     super.key,
     required this.section,
     required this.comicDetailPageBuilder,
+    required this.sourceService,
     this.comicCoverHeroTagBuilder = comicCoverHeroTag,
   });
 
   final ExploreSection section;
   final ComicDetailPageBuilder comicDetailPageBuilder;
+  final SourceDiscoverGateway sourceService;
   final ComicHeroTagBuilder comicCoverHeroTagBuilder;
 
   @override
@@ -40,7 +41,7 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
   void initState() {
     super.initState();
     _controller = DiscoverSectionPageController(
-      sourceService: sl<SourceDiscoverGateway>(),
+      sourceService: widget.sourceService,
       viewMoreUrl: widget.section.viewMoreUrl,
       initialComics: widget.section.viewMoreUrl == null
           ? widget.section.comics

@@ -3,6 +3,7 @@ import 'package:hazuki/app/service_locator.dart';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -733,6 +734,7 @@ void main() {
       Widget commentsBuilder({
         required String comicId,
         String? subId,
+        String? chapterId,
         required String sourceKey,
         ScrollController? scrollController,
         Future<void> Function()? onRequestTabFullscreen,
@@ -1001,6 +1003,56 @@ void main() {
 
       expect(requestedUrls.first, 'img3');
     });
+
+    testWidgets('placeholder aspect ratio stays stable until image resolves', (
+      tester,
+    ) async {
+      final runtimeState = ReaderRuntimeState()
+        ..applyImages(['img0', 'img1', 'img2']);
+      final pipelineState = ReaderImagePipelineState()
+        ..imageAspectRatioCache['img0'] = 0.6;
+      final diagnosticsState = ReaderDiagnosticsState();
+      final zoomController = TransformationController();
+      late ReaderImagePipelineController controller;
+      addTearDown(zoomController.dispose);
+      addTearDown(runtimeState.pageIndexNotifier.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) {
+              controller = ReaderImagePipelineController(
+                sourceService: sl<SourceReaderGateway>(),
+                runtimeState: runtimeState,
+                pipelineState: pipelineState,
+                diagnosticsState: diagnosticsState,
+                zoomController: zoomController,
+                context: () => context,
+                isMounted: () => true,
+                updateState: (update) => update(),
+                logEvent:
+                    (title, {level = 'info', source = 'reader_ui', content}) {},
+                logPayload: ([extra]) => extra ?? <String, dynamic>{},
+                logVisiblePageChange: ({required index, required trigger}) {},
+                noImageModeEnabled: () => false,
+                comicId: 'comic',
+                epId: 'ep',
+                loadImagesErrorBuilder: (error) => '$error',
+              );
+
+              return const SizedBox.shrink();
+            },
+          ),
+        ),
+      );
+
+      expect(controller.resolvePlaceholderAspectRatio(1), 0.6);
+
+      pipelineState.imageAspectRatioCache['img2'] = 1.1;
+
+      expect(controller.resolvePlaceholderAspectRatio(1), 0.6);
+      expect(pipelineState.listPlaceholderAspectRatioCache['img1'], 0.6);
+    });
   });
 
   group('ReaderNavigationController', () {
@@ -1099,5 +1151,199 @@ void main() {
       expect(prefetched, [3]);
       expect(prefetchedAhead, [3]);
     });
+
+    testWidgets('top-to-bottom goToPage stabilizes the programmatic target', (
+      tester,
+    ) async {
+      final state = ReaderRuntimeState()
+        ..applyImages(List<String>.generate(30, (index) => 'img$index'))
+        ..readerMode = ReaderMode.topToBottom;
+      final diagnosticsState = ReaderDiagnosticsState();
+      final scrollController = ScrollController();
+      final pageController = PageController();
+      addTearDown(scrollController.dispose);
+      addTearDown(pageController.dispose);
+      addTearDown(state.pageIndexNotifier.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SizedBox(
+            height: 400,
+            child: ListView.builder(
+              controller: scrollController,
+              itemCount: state.readerSpreadCount,
+              itemBuilder: (context, index) {
+                return SizedBox(
+                  key: state.itemKeys[index],
+                  height: 100,
+                  child: Text('page $index'),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+
+      final controller = ReaderNavigationController(
+        runtimeState: state,
+        diagnosticsState: diagnosticsState,
+        scrollController: scrollController,
+        pageController: pageController,
+        isMounted: () => true,
+        updateState: (update) => update(),
+        logEvent: (_, {level = 'info', source = 'reader_ui', content}) {},
+        logPayload: ([extra]) => extra ?? <String, dynamic>{},
+        logVisiblePageChange: ({required index, required trigger}) {},
+        resetZoomImmediately: ({reason = 'unspecified'}) {},
+        prefetchAround: (_) {},
+        requestPrefetchAhead: (_) {},
+        noImageModeEnabled: () => false,
+        toggleControlsVisibility: () {},
+      );
+
+      final navigation = controller.goToPage(12, trigger: 'bottom_slider');
+      await tester.pumpAndSettle();
+      await navigation;
+
+      expect(diagnosticsState.stabilizingProgrammaticListTargetIndex, 12);
+      expect(diagnosticsState.hasActiveProgrammaticListStabilization, isTrue);
+
+      controller.handleScrollNotification(
+        ScrollStartNotification(
+          metrics: scrollController.position,
+          context: tester.element(find.byType(ListView)),
+          dragDetails: DragStartDetails(),
+        ),
+      );
+
+      expect(diagnosticsState.stabilizingProgrammaticListTargetIndex, isNull);
+    });
+
+    testWidgets(
+      'top-to-bottom position sync stabilizes the programmatic target',
+      (tester) async {
+        final state = ReaderRuntimeState()
+          ..applyImages(List<String>.generate(30, (index) => 'img$index'))
+          ..readerMode = ReaderMode.topToBottom;
+        final diagnosticsState = ReaderDiagnosticsState();
+        final scrollController = ScrollController();
+        final pageController = PageController();
+        addTearDown(scrollController.dispose);
+        addTearDown(pageController.dispose);
+        addTearDown(state.pageIndexNotifier.dispose);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: SizedBox(
+              height: 400,
+              child: ListView.builder(
+                controller: scrollController,
+                itemCount: state.readerSpreadCount,
+                itemBuilder: (context, index) {
+                  return SizedBox(
+                    key: state.itemKeys[index],
+                    height: 100,
+                    child: Text('page $index'),
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+
+        final controller = ReaderNavigationController(
+          runtimeState: state,
+          diagnosticsState: diagnosticsState,
+          scrollController: scrollController,
+          pageController: pageController,
+          isMounted: () => true,
+          updateState: (update) => update(),
+          logEvent: (_, {level = 'info', source = 'reader_ui', content}) {},
+          logPayload: ([extra]) => extra ?? <String, dynamic>{},
+          logVisiblePageChange: ({required index, required trigger}) {},
+          resetZoomImmediately: ({reason = 'unspecified'}) {},
+          prefetchAround: (_) {},
+          requestPrefetchAhead: (_) {},
+          noImageModeEnabled: () => false,
+          toggleControlsVisibility: () {},
+        );
+
+        controller.syncPositionToImageIndex(12, trigger: 'mode_changed_sync');
+        expect(diagnosticsState.activeProgrammaticListTargetIndex, 12);
+        await tester.pumpAndSettle();
+
+        expect(diagnosticsState.stabilizingProgrammaticListTargetIndex, 12);
+        expect(diagnosticsState.hasActiveProgrammaticListStabilization, isTrue);
+      },
+    );
+
+    testWidgets(
+      'top-to-bottom stabilization compensates upstream height changes',
+      (tester) async {
+        final state = ReaderRuntimeState()
+          ..applyImages(List<String>.generate(30, (index) => 'img$index'))
+          ..readerMode = ReaderMode.topToBottom;
+        final diagnosticsState = ReaderDiagnosticsState();
+        final scrollController = ScrollController();
+        final pageController = PageController();
+        addTearDown(scrollController.dispose);
+        addTearDown(pageController.dispose);
+        addTearDown(state.pageIndexNotifier.dispose);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: SizedBox(
+              height: 400,
+              child: ListView.builder(
+                controller: scrollController,
+                scrollCacheExtent: ScrollCacheExtent.pixels(1000),
+                itemCount: state.readerSpreadCount,
+                itemBuilder: (context, index) {
+                  return SizedBox(
+                    key: state.itemKeys[index],
+                    height: 100,
+                    child: Text('page $index'),
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+
+        final controller = ReaderNavigationController(
+          runtimeState: state,
+          diagnosticsState: diagnosticsState,
+          scrollController: scrollController,
+          pageController: pageController,
+          isMounted: () => true,
+          updateState: (update) => update(),
+          logEvent: (_, {level = 'info', source = 'reader_ui', content}) {},
+          logPayload: ([extra]) => extra ?? <String, dynamic>{},
+          logVisiblePageChange: ({required index, required trigger}) {},
+          resetZoomImmediately: ({reason = 'unspecified'}) {},
+          prefetchAround: (_) {},
+          requestPrefetchAhead: (_) {},
+          noImageModeEnabled: () => false,
+          toggleControlsVisibility: () {},
+        );
+
+        scrollController.jumpTo(100);
+        diagnosticsState.markProgrammaticListScrollCompleted(
+          5,
+          stabilize: true,
+        );
+        await tester.pump();
+
+        final beforeCorrection = scrollController.position.pixels;
+        controller.handleListImageAspectRatioResolved(
+          imageIndex: 1,
+          previousAspectRatio: 1,
+          resolvedAspectRatio: 0.5,
+        );
+        await tester.pump();
+
+        expect(scrollController.position.pixels, greaterThan(beforeCorrection));
+      },
+    );
   });
 }

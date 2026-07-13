@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/widgets/widgets.dart';
@@ -9,23 +8,26 @@ import 'comment_filter_dialog.dart';
 import 'other_settings_sections.dart';
 import '../settings_group.dart';
 import '../../support/other_settings_actions.dart';
+import '../../support/settings_core_dependencies.dart';
 
 class OtherSettingsPage extends StatefulWidget {
   const OtherSettingsPage({
     super.key,
     this.initialUseSystemTitleBar = false,
     this.onUseSystemTitleBarChanged,
+    required this.dependencies,
   });
 
   final bool initialUseSystemTitleBar;
   final Future<void> Function(bool value)? onUseSystemTitleBarChanged;
+  final SettingsCoreDependencies dependencies;
 
   @override
   State<OtherSettingsPage> createState() => _OtherSettingsPageState();
 }
 
 class _OtherSettingsPageState extends State<OtherSettingsPage> {
-  final SourceRuntimeGateway _sourceService = sl<SourceRuntimeGateway>();
+  SourceRuntimeGateway get _sourceService => widget.dependencies.sourceRuntime;
   late OtherSettingsSnapshot _snapshot = OtherSettingsSnapshot.initial(
     useSystemTitleBar: widget.initialUseSystemTitleBar,
   );
@@ -86,7 +88,10 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
     setState(() {
       _snapshot = _snapshot.copyWith(discoverDailyRecommendationEnabled: value);
     });
-    await OtherSettingsActions.toggleDiscoverDailyRecommendation(value);
+    await OtherSettingsActions.toggleDiscoverDailyRecommendation(
+      widget.dependencies.dailyRecommendation,
+      value,
+    );
   }
 
   @override
@@ -108,13 +113,17 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
   }
 
   Future<void> _openCommentFilter() {
-    return showCommentFilterDialog(context);
+    return showCommentFilterDialog(
+      context,
+      service: widget.dependencies.commentFilter,
+    );
   }
 
   Future<void> _editMangaDownloadPath() async {
     final nextPath = await OtherSettingsActions.editMangaDownloadPath(
       context,
       currentPath: _snapshot.mangaDownloadsRootPath,
+      downloadService: widget.dependencies.downloader,
     );
     if (!mounted || nextPath == null) {
       return;

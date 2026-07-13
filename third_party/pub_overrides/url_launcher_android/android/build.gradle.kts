@@ -12,6 +12,7 @@ allprojects {
 
 plugins {
     id("com.android.library")
+    id("org.jetbrains.kotlin.android")
 }
 
 kotlin {
@@ -26,7 +27,7 @@ android {
     }
 
     namespace = "io.flutter.plugins.urllauncher"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 36
 
     defaultConfig {
         minSdk = 24

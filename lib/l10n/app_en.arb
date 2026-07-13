@@ -256,6 +256,7 @@
   "searchAggregateSearch": "Aggregate search",
   "searchAggregateSearchDescription": "Search all comic sources at once",
   "searchHistoryTitle": "Search history",
+  "searchHistoryCopied": "Search history copied",
   "searchClearTooltip": "Clear",
   "searchSubmitTooltip": "Search",
   "searchClearHistoryTitle": "Clear history",

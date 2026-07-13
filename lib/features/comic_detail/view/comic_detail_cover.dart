@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 
 import 'package:hazuki/shared/lru_cache.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
-import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
@@ -60,10 +59,12 @@ class ComicBlurredCoverBackground extends StatefulWidget {
     super.key,
     required this.coverUrl,
     required this.sourceKey,
+    required this.imageGateway,
   });
 
   final String coverUrl;
   final String sourceKey;
+  final SourceImageGateway imageGateway;
 
   @override
   State<ComicBlurredCoverBackground> createState() =>
@@ -124,7 +125,7 @@ class _ComicBlurredCoverBackgroundState
 
   Future<void> _loadBlurredCover(String normalizedUrl) async {
     try {
-      final bytes = await sl<SourceImageGateway>().downloadImageBytes(
+      final bytes = await widget.imageGateway.downloadImageBytes(
         normalizedUrl,
         keepInMemory: true,
         sourceKey: widget.sourceKey,

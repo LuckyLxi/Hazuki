@@ -35,6 +35,7 @@ class CommentsPageController {
   Future<ComicCommentsPageResult> loadCommentsPage({
     required String comicId,
     String? subId,
+    String? chapterId,
     String sourceKey = '',
     required int page,
     required int pageSize,
@@ -45,6 +46,7 @@ class CommentsPageController {
         .loadCommentsPage(
           comicId: comicId,
           subId: subId,
+          chapterId: chapterId,
           sourceKey: sourceKey,
           page: page,
           pageSize: pageSize,
@@ -72,6 +74,7 @@ class CommentsPageController {
   Future<void> sendComment({
     required String comicId,
     String? subId,
+    String? chapterId,
     String sourceKey = '',
     required String content,
     String? replyTo,
@@ -79,6 +82,7 @@ class CommentsPageController {
     return _sourceService.sendComment(
       comicId: comicId,
       subId: subId,
+      chapterId: chapterId,
       sourceKey: sourceKey,
       content: content,
       replyTo: replyTo,

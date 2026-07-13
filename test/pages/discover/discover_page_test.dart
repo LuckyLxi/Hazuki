@@ -8,6 +8,7 @@ import 'package:hazuki/features/discover/view/discover_page.dart';
 import 'package:hazuki/services/hazuki_source_service.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../support/test_service_locator.dart';
 
@@ -266,6 +267,9 @@ Widget _buildDiscoverPage(
     supportedLocales: AppLocalizations.supportedLocales,
     home: Scaffold(
       body: DiscoverPage(
+        sourceService: sl<SourceDiscoverGateway>(),
+        recommendationSource: sl<SourceRecommendationGateway>(),
+        recommendationService: sl<DiscoverDailyRecommendationService>(),
         comicDetailPageBuilder: (comic, heroTag) =>
             Scaffold(body: Center(child: Text('detail:${comic.id}'))),
         usePinnedSearchInAppBar: true,

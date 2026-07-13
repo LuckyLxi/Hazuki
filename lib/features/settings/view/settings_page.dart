@@ -7,6 +7,7 @@ import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:hazuki/widgets/windows_comic_detail_host.dart';
 import '../settings.dart';
+import '../support/settings_core_dependencies.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({
@@ -18,6 +19,7 @@ class SettingsPage extends StatefulWidget {
     required this.cloudSyncPageBuilder,
     required this.labSettingsPageBuilder,
     required this.advancedSettingsPageBuilder,
+    required this.coreDependencies,
   });
 
   final AppearanceSettingsData appearanceSettings;
@@ -27,6 +29,7 @@ class SettingsPage extends StatefulWidget {
   final WidgetBuilder cloudSyncPageBuilder;
   final WidgetBuilder labSettingsPageBuilder;
   final WidgetBuilder advancedSettingsPageBuilder;
+  final SettingsCoreDependencies coreDependencies;
 
   @override
   State<SettingsPage> createState() => _SettingsPageState();
@@ -92,7 +95,9 @@ class _SettingsPageState extends State<SettingsPage> {
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute<void>(
-                      builder: (_) => const CacheSettingsPage(),
+                      builder: (_) => CacheSettingsPage(
+                        sourceService: widget.coreDependencies.sourceSettings,
+                      ),
                     ),
                   );
                 },
@@ -109,6 +114,7 @@ class _SettingsPageState extends State<SettingsPage> {
                         onAppearanceChanged: _handleAppearanceChanged,
                         locale: _locale,
                         onLocaleChanged: _handleLocaleChanged,
+                        debugGateway: widget.coreDependencies.sourceDebug,
                       ),
                     ),
                   );
@@ -121,7 +127,9 @@ class _SettingsPageState extends State<SettingsPage> {
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute<void>(
-                      builder: (_) => const ReadingSettingsPage(),
+                      builder: (_) => ReadingSettingsPage(
+                        sourceService: widget.coreDependencies.sourceSettings,
+                      ),
                     ),
                   );
                 },
@@ -134,7 +142,10 @@ class _SettingsPageState extends State<SettingsPage> {
                   onTap: () {
                     Navigator.of(context).push(
                       MaterialPageRoute<void>(
-                        builder: (_) => const PrivacySettingsPage(),
+                        builder: (_) => PrivacySettingsPage(
+                          passwordLockService:
+                              widget.coreDependencies.passwordLock,
+                        ),
                       ),
                     );
                   },
@@ -162,6 +173,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   Navigator.of(context).push(
                     MaterialPageRoute<void>(
                       builder: (_) => OtherSettingsPage(
+                        dependencies: widget.coreDependencies,
                         initialUseSystemTitleBar:
                             titleBarController.useSystemTitleBar,
                         onUseSystemTitleBarChanged:
@@ -201,7 +213,12 @@ class _SettingsPageState extends State<SettingsPage> {
                 subtitle: const Text('Hazuki'),
                 onTap: () {
                   Navigator.of(context).push(
-                    MaterialPageRoute<void>(builder: (_) => const AboutPage()),
+                    MaterialPageRoute<void>(
+                      builder: (_) => AboutPage(
+                        softwareUpdateService:
+                            widget.coreDependencies.softwareUpdate,
+                      ),
+                    ),
                   );
                 },
               ),

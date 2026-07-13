@@ -28,6 +28,7 @@ tasks.withType<JavaCompile>().configureEach {
 
 plugins {
     id("com.android.library")
+    id("org.jetbrains.kotlin.android")
 }
 
 kotlin {
@@ -38,7 +39,7 @@ kotlin {
 
 android {
     namespace = "io.flutter.plugins.sharedpreferences"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 36
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

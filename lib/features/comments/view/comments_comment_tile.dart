@@ -238,15 +238,16 @@ class _CommentsCommentTileContent extends StatelessWidget {
 
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(begin: 0.0, end: 1.0),
-      duration: Duration(milliseconds: 350 + (index.clamp(0, 10)) * 60),
-      curve: Curves.easeOutBack,
+      duration: Duration(milliseconds: 260 + (index.clamp(0, 8)) * 36),
+      curve: Curves.easeOutCubic,
       builder: (context, value, child) {
-        return Transform.scale(
-          scale: 0.85 + 0.15 * value,
-          alignment: Alignment.bottomCenter,
-          child: Transform.translate(
-            offset: Offset(0, 50 * (1 - value)),
-            child: Opacity(opacity: value.clamp(0.0, 1.0), child: child),
+        final opacity = Curves.easeOut.transform(value);
+        return Transform.translate(
+          offset: Offset(0, 18 * (1 - value)),
+          child: Transform.scale(
+            scale: 0.98 + 0.02 * value,
+            alignment: Alignment.topCenter,
+            child: Opacity(opacity: opacity.clamp(0.0, 1.0), child: child),
           ),
         );
       },

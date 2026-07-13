@@ -22,6 +22,7 @@ allprojects {
 
 plugins {
     id("com.android.library")
+    id("org.jetbrains.kotlin.android")
 }
 
 kotlin {
@@ -32,7 +33,7 @@ kotlin {
 
 android {
     namespace = "dev.flutter.packages.file_selector_android"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 36
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

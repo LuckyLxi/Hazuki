@@ -4,7 +4,6 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:hazuki/features/comments/state/comments_page_controller.dart';
-import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/features/comments/support/comments_content_support.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/l10n/l10n.dart';
@@ -25,8 +24,11 @@ part 'comments_scroll_support.dart';
 class CommentsPage extends StatefulWidget {
   const CommentsPage({
     super.key,
+    required this.sourceService,
+    required this.filterService,
     required this.comicId,
     this.subId,
+    this.chapterId,
     this.sourceKey = '',
     this.isTabView = false,
     this.isActiveInTabView = true,
@@ -36,8 +38,11 @@ class CommentsPage extends StatefulWidget {
     this.debugOuterScrollStateBuilder,
   });
 
+  final SourceCommentsGateway sourceService;
+  final CommentFilterService filterService;
   final String comicId;
   final String? subId;
+  final String? chapterId;
   final String sourceKey;
   final bool isTabView;
   final bool isActiveInTabView;
@@ -120,8 +125,8 @@ class _CommentsPageState extends State<CommentsPage>
     _ownsScrollController = widget.scrollController == null;
     _scrollController = widget.scrollController ?? ScrollController();
     _controller = CommentsPageController(
-      sourceService: sl<SourceCommentsGateway>(),
-      filterService: sl<CommentFilterService>(),
+      sourceService: widget.sourceService,
+      filterService: widget.filterService,
     );
     WidgetsBinding.instance.addObserver(this);
     _commentFocusNode.addListener(_handleCommentFocusChanged);
@@ -450,6 +455,7 @@ class _CommentsPageState extends State<CommentsPage>
     return _controller.loadCommentsPage(
       comicId: widget.comicId,
       subId: widget.subId,
+      chapterId: widget.chapterId,
       sourceKey: widget.sourceKey,
       page: page,
       pageSize: _pageSize,
@@ -757,6 +763,7 @@ class _CommentsPageState extends State<CommentsPage>
       final pageResult = await _controller.loadCommentsPage(
         comicId: widget.comicId,
         subId: widget.subId,
+        chapterId: widget.chapterId,
         sourceKey: widget.sourceKey,
         page: page,
         pageSize: _pageSize,
@@ -827,6 +834,7 @@ class _CommentsPageState extends State<CommentsPage>
       await _controller.sendComment(
         comicId: widget.comicId,
         subId: widget.subId,
+        chapterId: widget.chapterId,
         sourceKey: widget.sourceKey,
         content: text,
         replyTo: _replyToComment?.id,

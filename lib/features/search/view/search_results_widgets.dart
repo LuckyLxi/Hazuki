@@ -113,6 +113,10 @@ class SearchResultsStateView extends StatelessWidget {
       child = const SizedBox(key: ValueKey('search-hidden'));
     }
 
+    if (searchComics.isNotEmpty) {
+      return child;
+    }
+
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 320),
       switchInCurve: Curves.easeOutCubic,

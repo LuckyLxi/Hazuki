@@ -2,13 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:hazuki/features/settings/state/line_settings_controller.dart';
-import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
 class LineSettingsPage extends StatefulWidget {
-  const LineSettingsPage({super.key});
+  const LineSettingsPage({super.key, required this.sourceService});
+
+  final SourceSettingsGateway sourceService;
 
   @override
   State<LineSettingsPage> createState() => _LineSettingsPageState();
@@ -20,9 +21,7 @@ class _LineSettingsPageState extends State<LineSettingsPage> {
   @override
   void initState() {
     super.initState();
-    _controller = LineSettingsController(
-      sourceService: sl<SourceSettingsGateway>(),
-    );
+    _controller = LineSettingsController(sourceService: widget.sourceService);
     unawaited(_loadInitial());
   }
 
