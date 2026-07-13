@@ -140,6 +140,7 @@ class HazukiSourceCommentsAdapter extends HazukiSourceAdapterBase
   Future<ComicCommentsPageResult> loadCommentsPage({
     required String comicId,
     String? subId,
+    String? chapterId,
     String sourceKey = '',
     int page = 1,
     int pageSize = 16,
@@ -147,6 +148,7 @@ class HazukiSourceCommentsAdapter extends HazukiSourceAdapterBase
   }) => source.loadCommentsPage(
     comicId: comicId,
     subId: subId,
+    chapterId: chapterId,
     sourceKey: sourceKey,
     page: page,
     pageSize: pageSize,
@@ -156,12 +158,14 @@ class HazukiSourceCommentsAdapter extends HazukiSourceAdapterBase
   Future<void> sendComment({
     required String comicId,
     String? subId,
+    String? chapterId,
     String sourceKey = '',
     required String content,
     String? replyTo,
   }) => source.sendComment(
     comicId: comicId,
     subId: subId,
+    chapterId: chapterId,
     sourceKey: sourceKey,
     content: content,
     replyTo: replyTo,

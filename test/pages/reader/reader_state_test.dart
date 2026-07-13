@@ -734,6 +734,7 @@ void main() {
       Widget commentsBuilder({
         required String comicId,
         String? subId,
+        String? chapterId,
         required String sourceKey,
         ScrollController? scrollController,
         Future<void> Function()? onRequestTabFullscreen,

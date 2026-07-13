@@ -8,12 +8,14 @@ class ReaderCommentsSheet extends StatefulWidget {
     super.key,
     required this.comicId,
     required this.subId,
+    required this.chapterId,
     required this.commentsWidgetBuilder,
     this.sourceKey = '',
   });
 
   final String comicId;
   final String? subId;
+  final String chapterId;
   final String sourceKey;
   final ReaderCommentsWidgetBuilder commentsWidgetBuilder;
 
@@ -134,6 +136,7 @@ class _ReaderCommentsSheetState extends State<ReaderCommentsSheet> {
                       child: widget.commentsWidgetBuilder(
                         comicId: widget.comicId,
                         subId: widget.subId,
+                        chapterId: widget.chapterId,
                         sourceKey: widget.sourceKey,
                         scrollController: scrollController,
                         onRequestTabFullscreen: _expandToFullscreen,

@@ -70,6 +70,7 @@ abstract interface class SourceCommentsGateway {
   Future<ComicCommentsPageResult> loadCommentsPage({
     required String comicId,
     String? subId,
+    String? chapterId,
     String sourceKey = '',
     int page = 1,
     int pageSize = 16,
@@ -78,6 +79,7 @@ abstract interface class SourceCommentsGateway {
   Future<void> sendComment({
     required String comicId,
     String? subId,
+    String? chapterId,
     String sourceKey = '',
     required String content,
     String? replyTo,
