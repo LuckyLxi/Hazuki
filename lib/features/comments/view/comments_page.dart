@@ -28,6 +28,7 @@ class CommentsPage extends StatefulWidget {
     required this.filterService,
     required this.comicId,
     this.subId,
+    this.chapterId,
     this.sourceKey = '',
     this.isTabView = false,
     this.isActiveInTabView = true,
@@ -41,6 +42,7 @@ class CommentsPage extends StatefulWidget {
   final CommentFilterService filterService;
   final String comicId;
   final String? subId;
+  final String? chapterId;
   final String sourceKey;
   final bool isTabView;
   final bool isActiveInTabView;
@@ -453,6 +455,7 @@ class _CommentsPageState extends State<CommentsPage>
     return _controller.loadCommentsPage(
       comicId: widget.comicId,
       subId: widget.subId,
+      chapterId: widget.chapterId,
       sourceKey: widget.sourceKey,
       page: page,
       pageSize: _pageSize,
@@ -760,6 +763,7 @@ class _CommentsPageState extends State<CommentsPage>
       final pageResult = await _controller.loadCommentsPage(
         comicId: widget.comicId,
         subId: widget.subId,
+        chapterId: widget.chapterId,
         sourceKey: widget.sourceKey,
         page: page,
         pageSize: _pageSize,
@@ -830,6 +834,7 @@ class _CommentsPageState extends State<CommentsPage>
       await _controller.sendComment(
         comicId: widget.comicId,
         subId: widget.subId,
+        chapterId: widget.chapterId,
         sourceKey: widget.sourceKey,
         content: text,
         replyTo: _replyToComment?.id,

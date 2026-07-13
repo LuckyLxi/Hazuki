@@ -4,6 +4,7 @@ typedef CommentsWidgetBuilder =
     Widget Function({
       required String comicId,
       String? subId,
+      String? chapterId,
       required String sourceKey,
       ScrollController? scrollController,
       Future<void> Function()? onRequestTabFullscreen,
@@ -17,6 +18,7 @@ typedef ReaderCommentsWidgetBuilder =
     Widget Function({
       required String comicId,
       String? subId,
+      String? chapterId,
       required String sourceKey,
       ScrollController? scrollController,
       Future<void> Function()? onRequestTabFullscreen,
@@ -28,12 +30,14 @@ ReaderCommentsWidgetBuilder readerCommentsWidgetBuilderFrom(
   return ({
     required comicId,
     subId,
+    chapterId,
     required sourceKey,
     scrollController,
     onRequestTabFullscreen,
   }) => builder(
     comicId: comicId,
     subId: subId,
+    chapterId: chapterId,
     sourceKey: sourceKey,
     scrollController: scrollController,
     onRequestTabFullscreen: onRequestTabFullscreen,

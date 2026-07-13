@@ -19,6 +19,7 @@ import '../../support/test_service_locator.dart';
 Widget _buildComments({
   required String comicId,
   String? subId,
+  String? chapterId,
   required String sourceKey,
   ScrollController? scrollController,
   Future<void> Function()? onRequestTabFullscreen,

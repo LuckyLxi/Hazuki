@@ -35,6 +35,7 @@ import 'package:hazuki/shared/navigation_tags.dart';
 Widget _buildComments({
   required String comicId,
   String? subId,
+  String? chapterId,
   required String sourceKey,
   ScrollController? scrollController,
   Future<void> Function()? onRequestTabFullscreen,

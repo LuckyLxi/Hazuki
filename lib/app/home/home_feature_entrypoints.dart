@@ -70,6 +70,7 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
   Widget buildComments({
     required String comicId,
     String? subId,
+    String? chapterId,
     required String sourceKey,
     ScrollController? scrollController,
     Future<void> Function()? onRequestTabFullscreen,
@@ -83,6 +84,7 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
       filterService: sl<CommentFilterService>(),
       comicId: comicId,
       subId: subId,
+      chapterId: chapterId,
       sourceKey: sourceKey,
       showAppBar: showAppBar,
       isTabView: isTabView,
