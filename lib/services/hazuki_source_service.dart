@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
-import 'dart:ui';
 
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
@@ -15,14 +14,21 @@ import 'package:pointycastle/block/aes.dart';
 import 'package:pointycastle/block/modes/ecb.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../shared/chapter_title_resolver.dart';
 import '../shared/preferences/hazuki_preference_keys.dart';
 import '../models/hazuki_models.dart';
 import 'source/common/source_json_coerce.dart';
 import 'source/common/source_prefs_keys.dart';
+import 'source/category/source_category_capability.dart';
+import 'source/comic/source_comic_details_cache.dart';
+import 'source/comic/comic_details_capability.dart';
+import 'source/account/source_daily_check_in_capability.dart';
+import 'source/account/source_relogin_coordinator.dart';
 import 'source/debug/debug_log_capability.dart';
 import 'source/debug/debug_log_internals.dart';
+import 'source/explore_capability.dart';
+import 'source/favorites/source_favorites_capability.dart';
 import 'source/image/image_cache_capability.dart';
+import 'source/image/source_image_preparation_capability.dart';
 import 'source/models/source_contract_models.dart';
 import 'source/models/source_identity.dart';
 import 'source/runtime/explore_cache_capability.dart';
@@ -30,9 +36,8 @@ import 'source/runtime/line_settings_capability.dart';
 import 'source/runtime/source_secure_session_storage.dart';
 import 'source/runtime/source_runtime_facade.dart';
 import 'source/runtime/source_runtime_handle.dart';
+import 'source/runtime/source_runtime_host.dart';
 import 'source/runtime/source_runtime_registry.dart';
-import 'source/runtime/source_runtime_coordinator.dart';
-import 'network/hazuki_network.dart';
 
 export 'source/models/source_contract_models.dart';
 export 'source/models/source_identity.dart';
@@ -45,32 +50,13 @@ export 'source/runtime/source_runtime_registry.dart';
 export 'source/runtime/source_session_store.dart';
 export 'source/debug/source_debug_log_store.dart';
 
-part 'source/explore_capability.dart';
-
 part 'source/account/account_session_capability.dart';
-part 'source/account/account_session_retry_support.dart';
-part 'source/account/check_in_capability.dart';
-
-part 'source/category/category_capability.dart';
-part 'source/category/category_ranking_capability.dart';
-part 'source/category/category_view_more_capability.dart';
-
-part 'source/comic/comic_details_cache_support.dart';
-part 'source/comic/comic_details_capability.dart';
 
 part 'source/comments/comments_avatar_support.dart';
 part 'source/comments/comments_capability.dart';
 
 part 'source/debug/debug_favorites_capability.dart';
 part 'source/debug/debug_report_capability.dart';
-
-part 'source/favorites/favorites_capability.dart';
-part 'source/favorites/favorites_collection_capability.dart';
-part 'source/favorites/favorites_management_capability.dart';
-
-part 'source/image/image_prepare_capability.dart';
-part 'source/image/image_prepare_segment_support.dart';
-part 'source/image/image_prepare_unscramble_support.dart';
 
 part 'source/runtime/cookie_store_support.dart';
 part 'source/runtime/js_bridge_support.dart';
@@ -123,41 +109,82 @@ class HazukiSourceService extends ChangeNotifier {
   HazukiSourceService({SourceSecureSessionStorage? secureSessionStorage})
     : _secureSessionStorage =
           secureSessionStorage ?? FlutterSourceSecureSessionStorage() {
-    runtimeRegistry = SourceRuntimeRegistry(
-      allowedSources: hazukiAllowedSourceCatalog,
-      activeSourceKey: () => activeSourceKey,
-      definitionFor: _definitionForSourceKey,
-      loadActiveSourcePreference: loadActiveSourcePreference,
-      activateSource: activateSource,
-      ensureInitialized: ensureInitialized,
+    _runtimeHost = SourceRuntimeHost(
+      catalog: hazukiAllowedSourceCatalog,
+      defaultSourceKey: hazukiDefaultSourceKey,
+      secureSessionStorage: _secureSessionStorage,
+      ensureSourceInitialized: ensureSourceInitialized,
       currentAccountForSource: currentAccountForSource,
       isLoggedForSource: isLoggedForSource,
     );
-    _runtimeCoordinator = SourceRuntimeCoordinator<SourceRuntimeHandle>(
-      catalog: hazukiAllowedSourceCatalog,
-      defaultSourceKey: hazukiDefaultSourceKey,
-      createHandle: (sourceKey) => SourceRuntimeHandle(
-        sourceKey: sourceKey,
-        secureStorage: _secureSessionStorage,
-        ensureInitialized: ensureSourceInitialized,
-        notifyRuntimeStateChanged: (sourceKey) {
-          if (activeSourceKey == sourceKey) {
-            _notifyRuntimeStateChanged();
-          } else {
-            runtimeRegistry.notifyChanged();
-          }
-        },
-      ),
-      onActiveSourceChanged: () {
-        notifyListeners();
-        runtimeRegistry.notifyChanged();
+    _runtimeHost.addListener(notifyListeners);
+    _reloginCoordinator = SourceReloginCoordinator(
+      loginWithStoredAccount: (context, {required account, required password}) {
+        final facade = (context as SourceFacadeReloginContext).facade;
+        return _loginWithFacade(facade, account: account, password: password);
       },
+    );
+    _dailyCheckInCapability = SourceDailyCheckInCapability(
+      runtimeHost: _runtimeHost,
+      reloginCoordinator: _reloginCoordinator,
+    );
+    _comicDetailsCache = SourceComicDetailsCache(runtimeHost: _runtimeHost);
+    _comicDetailsCapability = SourceComicDetailsCapability(
+      runtimeHost: _runtimeHost,
+      cache: _comicDetailsCache,
+      reloginCoordinator: _reloginCoordinator,
+      translateSourceText: _translateSourceText,
+    );
+    _exploreCapability = SourceExploreCapability(
+      runtimeHost: _runtimeHost,
+      translateSourceText: _translateSourceText,
+    );
+    _categoryCapability = SourceCategoryCapability(
+      runtimeHost: _runtimeHost,
+      translateSourceText: _translateSourceText,
+      parseExploreComics: _parseExploreComics,
+    );
+    _imagePreparationCapability = SourceImagePreparationCapability(
+      runtimeHost: _runtimeHost,
+      downloadImageBytes: downloadImageBytes,
+    );
+    _favoritesCapability = SourceFavoritesCapability(
+      runtimeHost: _runtimeHost,
+      reloginCoordinator: _reloginCoordinator,
+      parseExploreComics: _parseExploreComics,
+      updateComicDetailsFavoriteState:
+          ({required sourceKey, required comicId, required isFavorite}) {
+            final scopedKey = SourceScopedComicId(
+              sourceKey: sourceKey,
+              comicId: comicId,
+            ).storageKey;
+            final cached = _getComicDetailsFromMemoryCache(
+              scopedKey,
+              sourceKey: sourceKey,
+            );
+            if (cached != null) {
+              _comicDetailsCapability.updateFavoriteStateInMemoryCache(
+                cached.scopedId,
+                isFavorite: isFavorite,
+              );
+            }
+          },
+      notifyCloudFavoritesChanged: notifyCloudFavoritesChanged,
     );
   }
 
-  late final SourceRuntimeRegistry runtimeRegistry;
   final SourceSecureSessionStorage _secureSessionStorage;
-  late final SourceRuntimeCoordinator<SourceRuntimeHandle> _runtimeCoordinator;
+  late final SourceRuntimeHost _runtimeHost;
+  late final SourceReloginCoordinator _reloginCoordinator;
+  late final SourceDailyCheckInCapability _dailyCheckInCapability;
+  late final SourceComicDetailsCache _comicDetailsCache;
+  late final SourceComicDetailsCapability _comicDetailsCapability;
+  late final SourceExploreCapability _exploreCapability;
+  late final SourceCategoryCapability _categoryCapability;
+  late final SourceImagePreparationCapability _imagePreparationCapability;
+  late final SourceFavoritesCapability _favoritesCapability;
+
+  SourceRuntimeRegistry get runtimeRegistry => _runtimeHost.runtimeRegistry;
 
   final StreamController<void> _cloudFavoritesChangedController =
       StreamController<void>.broadcast();
@@ -168,10 +195,10 @@ class HazukiSourceService extends ChangeNotifier {
     _cloudFavoritesChangedController.add(null);
   }
 
-  SourceRuntimeHandle get _activeHandle => _runtimeCoordinator.activeHandle;
+  SourceRuntimeHandle get _activeHandle => _runtimeHost.activeHandle;
 
   SourceRuntimeHandle _handleFor(String sourceKey) {
-    return _runtimeCoordinator.handleFor(sourceKey);
+    return _runtimeHost.handleFor(sourceKey);
   }
 
   Dio get dio => _activeHandle.dio;
@@ -421,15 +448,10 @@ class HazukiSourceService extends ChangeNotifier {
   bool get _softwareLogCaptureEnabled =>
       _activeHandle.debug.softwareLogCaptureEnabled;
 
-  Directory? get _comicDetailsCacheDir =>
-      _activeHandle.cache.comicDetailsCacheDir;
-  set _comicDetailsCacheDir(Directory? value) =>
-      _activeHandle.cache.comicDetailsCacheDir = value;
-
   String get statusText => _statusText;
   SourceRuntimeState get sourceRuntimeState => _runtimeState;
   SourceMeta? get sourceMeta => _sourceMeta;
-  String get activeSourceKey => _runtimeCoordinator.activeSourceKey;
+  String get activeSourceKey => _runtimeHost.activeSourceKey;
   bool get isActiveJmSource => isHazukiJmSourceKey(activeSourceKey);
   bool get isActiveCopyMangaSource =>
       isHazukiCopyMangaSourceKey(activeSourceKey);
@@ -439,51 +461,19 @@ class HazukiSourceService extends ChangeNotifier {
   bool get isInitialized => _engine != null && _sourceMeta != null;
   bool get softwareLogCaptureEnabled => _softwareLogCaptureEnabled;
 
-  void _notifyRuntimeStateChanged() {
-    notifyListeners();
-    runtimeRegistry.notifyChanged();
-  }
-
   SourceCatalogEntry _definitionForSourceKey(String sourceKey) {
-    return _runtimeCoordinator.definitionFor(sourceKey);
+    return _runtimeHost.definitionFor(sourceKey);
   }
 
   String _normalizeAllowedSourceKey(String sourceKey) {
-    return _runtimeCoordinator.normalize(sourceKey);
+    return _runtimeHost.normalize(sourceKey);
   }
 
-  Future<void> loadActiveSourcePreference() async {
-    SharedPreferences? loadedPreferences;
-    await _runtimeCoordinator.loadActiveSourcePreference(
-      readSavedSourceKey: () async {
-        final prefs = await _activeHandle.session.ensurePrefs();
-        loadedPreferences = prefs;
-        for (final source in hazukiAllowedSourceCatalog) {
-          final session = _handleFor(source.key).session;
-          session.prefs = prefs;
-          await session.ensurePrefs();
-        }
-        return prefs.getString(SourcePrefsKeys.activeSourceKey);
-      },
-      persistSourceKey: (sourceKey) => loadedPreferences!.setString(
-        SourcePrefsKeys.activeSourceKey,
-        sourceKey,
-      ),
-    );
-  }
+  Future<void> loadActiveSourcePreference() =>
+      _runtimeHost.loadActiveSourcePreference();
 
-  Future<void> activateSource(String sourceKey) async {
-    await _runtimeCoordinator.activate(
-      sourceKey,
-      persistSelection: (nextHandle) async {
-        final prefs = await nextHandle.session.ensurePrefs();
-        await prefs.setString(
-          SourcePrefsKeys.activeSourceKey,
-          nextHandle.sourceKey,
-        );
-      },
-    );
-  }
+  Future<void> activateSource(String sourceKey) =>
+      _runtimeHost.activateSource(sourceKey);
 
   void clearLocalizedSourceTextCaches() {
     exploreCache.clearMemory();
@@ -569,6 +559,247 @@ class HazukiSourceService extends ChangeNotifier {
         : activeSourceKey;
   }
 
+  Future<List<ExploreSection>> loadExploreSections({
+    bool forceRefresh = false,
+  }) => _exploreCapability.load(forceRefresh: forceRefresh);
+
+  Future<bool> isDailyCheckInCompletedToday() =>
+      _dailyCheckInCapability.isCompletedToday();
+
+  Future<DailyCheckInResult> performDailyCheckIn() =>
+      _dailyCheckInCapability.perform();
+
+  ComicDetailsData? _getComicDetailsFromMemoryCache(
+    String comicId, {
+    String sourceKey = '',
+  }) => _comicDetailsCache.get(comicId, sourceKey: sourceKey);
+
+  Future<ComicDetailsData> loadComicDetails(
+    String comicId, {
+    String sourceKey = '',
+  }) => _comicDetailsCapability.loadComicDetails(comicId, sourceKey: sourceKey);
+
+  Future<List<String>> loadChapterImages({
+    required String comicId,
+    required String epId,
+    String sourceKey = '',
+  }) => _comicDetailsCapability.loadChapterImages(
+    comicId: comicId,
+    epId: epId,
+    sourceKey: sourceKey,
+  );
+
+  bool get supportComicLike => _comicDetailsCapability.supportComicLike;
+
+  bool supportComicLikeForSource(String sourceKey) =>
+      _comicDetailsCapability.supportComicLikeForSource(sourceKey);
+
+  Future<void> toggleComicLike({
+    required String comicId,
+    required bool isLike,
+    String sourceKey = '',
+  }) => _comicDetailsCapability.toggleComicLike(
+    comicId: comicId,
+    isLike: isLike,
+    sourceKey: sourceKey,
+  );
+
+  Future<List<CategoryTagGroup>> loadCategoryTagGroups({
+    bool forceRefresh = false,
+    String sourceKey = '',
+  }) => _categoryCapability.loadTagGroups(
+    forceRefresh: forceRefresh,
+    sourceKey: sourceKey,
+  );
+
+  Future<List<CategoryRankingOption>> loadCategoryRankingOptions() =>
+      _categoryCapability.loadRankingOptions();
+
+  Future<CategoryComicsResult> loadCategoryRankingComics({
+    required String rankingOption,
+    required int page,
+  }) => _categoryCapability.loadRankingComics(
+    rankingOption: rankingOption,
+    page: page,
+  );
+
+  Future<List<CategoryRankingOption>> loadCategoryRankingOptionsByViewMore({
+    required String viewMoreUrl,
+  }) => _categoryCapability.loadRankingOptionsByViewMore(
+    viewMoreUrl: viewMoreUrl,
+  );
+
+  Future<List<List<CategoryRankingOption>>> loadCategoryOptionGroupsByViewMore({
+    required String viewMoreUrl,
+  }) =>
+      _categoryCapability.loadOptionGroupsByViewMore(viewMoreUrl: viewMoreUrl);
+
+  Future<CategoryComicsResult> loadCategoryComicsByViewMore({
+    required String viewMoreUrl,
+    required int page,
+    String order = 'mr',
+    List<String>? orders,
+  }) => _categoryCapability.loadComicsByViewMore(
+    viewMoreUrl: viewMoreUrl,
+    page: page,
+    order: order,
+    orders: orders,
+  );
+
+  bool favoriteSingleFolderForSingleComicForSource(String sourceKey) =>
+      _favoritesCapability.favoriteSingleFolderForSingleComicForSource(
+        sourceKey,
+      );
+
+  bool supportFavoriteFolderAddForSource(String sourceKey) =>
+      _favoritesCapability.supportFavoriteFolderAddForSource(sourceKey);
+
+  bool supportFavoriteFolderDeleteForSource(String sourceKey) =>
+      _favoritesCapability.supportFavoriteFolderDeleteForSource(sourceKey);
+
+  bool supportFavoriteFolderLoadForSource(String sourceKey) =>
+      _favoritesCapability.supportFavoriteFolderLoadForSource(sourceKey);
+
+  bool supportFavoriteToggleForSource(String sourceKey) =>
+      _favoritesCapability.supportFavoriteToggleForSource(sourceKey);
+
+  bool get favoriteSingleFolderForSingleComic =>
+      _favoritesCapability.favoriteSingleFolderForSingleComic;
+  bool get supportFavoriteFolderManagement =>
+      _favoritesCapability.supportFavoriteFolderManagement;
+  bool get supportFavoriteFolderAdd =>
+      _favoritesCapability.supportFavoriteFolderAdd;
+  bool get supportFavoriteFolderDelete =>
+      _favoritesCapability.supportFavoriteFolderDelete;
+  bool get supportFavoriteFolderLoad =>
+      _favoritesCapability.supportFavoriteFolderLoad;
+  String get favoriteSortOrder => _favoritesCapability.favoriteSortOrder;
+  List<String> get favoriteSortOrders =>
+      _favoritesCapability.favoriteSortOrders;
+  bool get supportFavoriteSortOrder =>
+      _favoritesCapability.supportFavoriteSortOrder;
+  bool get supportFavoriteLoadComics =>
+      _favoritesCapability.supportFavoriteLoadComics;
+  bool get supportFavoriteLoadNext =>
+      _favoritesCapability.supportFavoriteLoadNext;
+  bool get supportFavoriteToggle => _favoritesCapability.supportFavoriteToggle;
+  bool get supportCommentSend => _favoritesCapability.supportCommentSend;
+  bool get supportCommentLike => _favoritesCapability.supportCommentLike;
+
+  Future<void> setFavoriteSortOrder(String order) =>
+      _favoritesCapability.setFavoriteSortOrder(order);
+
+  Future<FavoriteComicsResult> loadFavoriteComics({
+    required int page,
+    required String folderId,
+  }) => _favoritesCapability.loadFavoriteComics(page: page, folderId: folderId);
+
+  Future<FavoriteFoldersResult> loadFavoriteFolders({
+    String? comicId,
+    String sourceKey = '',
+  }) => _favoritesCapability.loadFavoriteFolders(
+    comicId: comicId,
+    sourceKey: sourceKey,
+  );
+
+  Future<void> addFavoriteFolder(String name, {String sourceKey = ''}) =>
+      _favoritesCapability.addFavoriteFolder(name, sourceKey: sourceKey);
+
+  Future<void> deleteFavoriteFolder(String folderId, {String sourceKey = ''}) =>
+      _favoritesCapability.deleteFavoriteFolder(folderId, sourceKey: sourceKey);
+
+  Future<void> toggleFavorite({
+    required String comicId,
+    required bool isAdding,
+    String folderId = '0',
+    String? favoriteId,
+    String sourceKey = '',
+  }) => _favoritesCapability.toggleFavorite(
+    comicId: comicId,
+    isAdding: isAdding,
+    folderId: folderId,
+    favoriteId: favoriteId,
+    sourceKey: sourceKey,
+  );
+
+  Future<T> _runWithReloginRetry<T>(
+    Future<T> Function() action, {
+    HazukiSourceFacade? targetFacade,
+  }) => _reloginCoordinator.runWithReloginRetry(
+    action,
+    context: SourceFacadeReloginContext(targetFacade ?? facade),
+  );
+
+  Future<bool> _ensureFavoriteSessionReady({
+    HazukiSourceFacade? targetFacade,
+  }) => _reloginCoordinator.ensureFavoriteSessionReady(
+    SourceFacadeReloginContext(targetFacade ?? facade),
+  );
+
+  Future<bool> _tryReloginFromStoredAccount({
+    bool force = false,
+    HazukiSourceFacade? targetFacade,
+  }) => _reloginCoordinator.tryReloginFromStoredAccount(
+    SourceFacadeReloginContext(targetFacade ?? facade),
+    force: force,
+  );
+
+  bool isLocalImagePath(String value) =>
+      _imagePreparationCapability.isLocalImagePath(value);
+
+  String normalizeLocalImagePath(String value) =>
+      _imagePreparationCapability.normalizeLocalImagePath(value);
+
+  int calculateJmImageSegments(
+    String epId,
+    String imageUrl, {
+    String sourceKey = '',
+  }) => _imagePreparationCapability.calculateJmImageSegments(
+    epId,
+    imageUrl,
+    sourceKey: sourceKey,
+  );
+
+  Future<PreparedChapterImageData> prepareChapterImageData(
+    String imageUrl, {
+    required String comicId,
+    required String epId,
+    bool useDiskCache = true,
+    bool priority = false,
+    String sourceKey = '',
+  }) => _imagePreparationCapability.prepareChapterImageData(
+    imageUrl,
+    comicId: comicId,
+    epId: epId,
+    useDiskCache: useDiskCache,
+    priority: priority,
+    sourceKey: sourceKey,
+  );
+
+  List<ExploreComic> _parseExploreComics(List list, {String sourceKey = ''}) {
+    final resolvedSourceKey = sourceKey.trim().isEmpty
+        ? activeSourceKey
+        : sourceKey.trim();
+    final comics = <ExploreComic>[];
+    for (final comic in list) {
+      if (comic is! Map) {
+        continue;
+      }
+      final comicMap = Map<String, dynamic>.from(comic);
+      comics.add(
+        ExploreComic(
+          id: comicMap['id']?.toString() ?? '',
+          title: comicMap['title']?.toString() ?? '',
+          subTitle: (comicMap['subTitle'] ?? comicMap['subtitle'] ?? '')
+              .toString(),
+          cover: comicMap['cover']?.toString() ?? '',
+          sourceKey: resolvedSourceKey,
+        ),
+      );
+    }
+    return comics;
+  }
+
   Future<SearchComicsResult> searchComics({
     required String keyword,
     required int page,
@@ -648,5 +879,13 @@ class HazukiSourceService extends ChangeNotifier {
       return picacgSortModes.contains(normalized) ? normalized : 'dd';
     }
     return normalized.isEmpty ? 'mr' : normalized;
+  }
+
+  @override
+  void dispose() {
+    _runtimeHost.removeListener(notifyListeners);
+    _runtimeHost.dispose();
+    unawaited(_cloudFavoritesChangedController.close());
+    super.dispose();
   }
 }

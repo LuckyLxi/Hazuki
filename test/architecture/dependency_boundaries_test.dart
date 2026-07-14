@@ -317,6 +317,36 @@ void main() {
       reason: 'Do not reintroduce the aggregate source adapter: $violations',
     );
   });
+
+  test('migrated source capabilities use explicit runtime dependencies', () {
+    const paths = [
+      'lib/services/source/explore_capability.dart',
+      'lib/services/source/category/source_category_capability.dart',
+      'lib/services/source/comic/source_comic_details_cache.dart',
+      'lib/services/source/comic/comic_details_capability.dart',
+      'lib/services/source/account/source_relogin_coordinator.dart',
+      'lib/services/source/account/source_daily_check_in_capability.dart',
+      'lib/services/source/favorites/source_favorites_capability.dart',
+      'lib/services/source/image/source_image_preparation_capability.dart',
+      'lib/services/source/runtime/source_runtime_host.dart',
+    ];
+    final violations = <String>[];
+    for (final path in paths) {
+      final content = File(path).readAsStringSync();
+      if (RegExp(r'^part of ', multiLine: true).hasMatch(content) ||
+          content.contains('hazuki_source_service.dart') ||
+          content.contains('app/service_locator.dart')) {
+        violations.add(path);
+      }
+    }
+    expect(
+      violations,
+      isEmpty,
+      reason:
+          'Migrated source collaborators must have explicit dependencies: '
+          '$violations',
+    );
+  });
 }
 
 Iterable<File> _dartFilesUnder(String path) sync* {

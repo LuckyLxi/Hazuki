@@ -418,6 +418,46 @@ void main() {
     expect(requests, isNot(contains('abc123def')));
   });
 
+  testWidgets('results comic id pill dismisses the keyboard', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      hazukiComicIdSearchEnhancePreferenceKey: true,
+    });
+    final requests = <String>[];
+
+    await tester.pumpWidget(
+      _buildTestApp(
+        SearchPage(
+          sourceService: sl<SourceSearchGateway>(),
+          historyService: sl<SearchHistoryService>(),
+          initialKeyword: 'hazuki',
+          comicDetailPageBuilder: _comicDetailPageBuilder,
+          comicCoverHeroTagBuilder: _testComicCoverHeroTag,
+          searchPageLoader: _recordingSearchPageLoader(requests),
+        ),
+      ),
+    );
+    await _pumpSearchSettled(tester);
+
+    final resultsSearch = find.byKey(
+      const ValueKey('search-results-app-bar-search-bar'),
+    );
+    await tester.tap(resultsSearch);
+    await tester.enterText(
+      find.descendant(of: resultsSearch, matching: find.byType(EditableText)),
+      'abc123def',
+    );
+    await tester.pumpAndSettle();
+
+    expect(_currentExtractedId(tester), '123');
+    expect(tester.testTextInput.isVisible, isTrue);
+
+    await tester.tap(find.text('Extracted: 123'));
+    await _pumpSearchSettled(tester);
+
+    expect(requests, contains('123'));
+    expect(tester.testTextInput.isVisible, isFalse);
+  });
+
   testWidgets('comic id enhancement is inactive on non-JM sources', (
     tester,
   ) async {

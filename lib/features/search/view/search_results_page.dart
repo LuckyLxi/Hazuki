@@ -687,6 +687,12 @@ class _SearchResultsPageState extends State<SearchResultsPage>
     if (id == null) return;
     _focusCoordinator.syncText(id);
     _idExtractController.hide();
-    unawaited(_submitSearch(submittedText: id));
+    unawaited(() async {
+      await _dismissSearchInputIfFocused();
+      if (!mounted) {
+        return;
+      }
+      await _submitSearch(submittedText: id);
+    }());
   }
 }

@@ -1,18 +1,84 @@
-part of '../../hazuki_source_service.dart';
+import 'dart:convert';
+import 'dart:math' as math;
 
-extension HazukiSourceServiceCheckInCapability on HazukiSourceService {
-  Future<bool> isDailyCheckInCompletedToday() async {
-    if (!isActiveDailyCheckInSource) {
-      return false;
+import 'package:crypto/crypto.dart';
+import 'package:dio/dio.dart';
+
+import '../../network/hazuki_network.dart';
+import '../models/source_identity.dart';
+import '../models/source_contract_models.dart';
+import '../runtime/source_runtime_facade.dart';
+import '../runtime/source_runtime_host.dart';
+import 'source_relogin_coordinator.dart';
+
+/// Performs daily check-in workflows through explicit source-runtime access.
+class SourceDailyCheckInCapability {
+  SourceDailyCheckInCapability({
+    required SourceRuntimeHost runtimeHost,
+    required SourceReloginCoordinator reloginCoordinator,
+  }) : _runtimeHost = runtimeHost,
+       _reloginCoordinator = reloginCoordinator;
+
+  final SourceRuntimeHost _runtimeHost;
+  final SourceReloginCoordinator _reloginCoordinator;
+
+  HazukiSourceFacade get _facade => _runtimeHost.activeHandle.facade;
+
+  static bool supportsSource(String sourceKey) =>
+      isHazukiJmSourceKey(sourceKey) || isHazukiPicacgSourceKey(sourceKey);
+
+  static String dailyCheckInDateTag(DateTime dateTime) {
+    final local = dateTime.toLocal();
+    return '${local.year}-${local.month.toString().padLeft(2, '0')}-${local.day.toString().padLeft(2, '0')}';
+  }
+
+  static Map<String, dynamic> parseDailyCheckInMap(String raw) {
+    if (raw.trim().isEmpty) return const <String, dynamic>{};
+    final decoded = jsonDecode(raw);
+    return decoded is Map
+        ? Map<String, dynamic>.from(decoded)
+        : const <String, dynamic>{};
+  }
+
+  static bool looksLikeAlreadyCheckedInMessage(String message) {
+    final lower = message.trim().toLowerCase();
+    return lower.contains('already checked') ||
+        message.contains('已签到') ||
+        message.contains('今天已签');
+  }
+
+  static bool? extractPicacgIsPunched(String body) {
+    final decoded = _jsonDecodeOrText(body);
+    if (decoded is! Map) return null;
+    final direct = _boolFromDynamic(decoded['isPunched']);
+    if (direct != null) return direct;
+    final data = decoded['data'];
+    if (data is Map) {
+      final fromData = _boolFromDynamic(data['isPunched']);
+      if (fromData != null) return fromData;
+      final user = data['user'];
+      if (user is Map) return _boolFromDynamic(user['isPunched']);
     }
+    final user = decoded['user'];
+    return user is Map ? _boolFromDynamic(user['isPunched']) : null;
+  }
 
-    final facade = this.facade;
+  static Map<String, dynamic> redactPicacgHeaders(
+    Map<String, String> headers,
+  ) => headers.map((key, value) {
+    final lower = key.toLowerCase();
+    if (lower == 'authorization' || lower == 'signature') {
+      return MapEntry(key, value.isEmpty ? value : '<redacted>');
+    }
+    return MapEntry(key, value);
+  });
+
+  Future<bool> isCompletedToday() async {
+    if (!supportsSource(_runtimeHost.activeSourceKey)) return false;
+    final facade = _facade;
     await facade.ensureInitialized();
-
     final sourceMeta = facade.sourceMeta;
-    if (sourceMeta == null || !isLogged) {
-      return false;
-    }
+    if (sourceMeta == null || !facade.isLogged) return false;
 
     if (isHazukiPicacgSourceKey(sourceMeta.key)) {
       final remoteChecked = await _isPicacgDailyCheckInCompleted(
@@ -24,98 +90,84 @@ extension HazukiSourceServiceCheckInCapability on HazukiSourceService {
           await facade.saveSourceData(
             sourceMeta.key,
             'lastCheckInDate',
-            _dailyCheckInDateTag(DateTime.now()),
+            dailyCheckInDateTag(DateTime.now()),
           );
         }
         return remoteChecked;
       }
     }
 
-    final today = _dailyCheckInDateTag(DateTime.now());
     final cachedDate =
         (facade.loadSourceData(sourceMeta.key, 'lastCheckInDate') ?? '')
             .toString()
             .trim();
-    return cachedDate == today;
+    return cachedDate == dailyCheckInDateTag(DateTime.now());
   }
 
-  Future<DailyCheckInResult> performDailyCheckIn() async {
-    if (!isActiveDailyCheckInSource) {
+  Future<DailyCheckInResult> perform() async {
+    if (!supportsSource(_runtimeHost.activeSourceKey)) {
       return const DailyCheckInResult.skipped();
     }
-
-    final facade = this.facade;
+    final facade = _facade;
     await facade.ensureInitialized();
-
     final engine = facade.js.engine;
     final sourceMeta = facade.sourceMeta;
     if (engine == null || sourceMeta == null) {
       throw Exception('source_not_initialized');
     }
-
-    if (!isLogged) {
-      return const DailyCheckInResult.skipped();
-    }
+    if (!facade.isLogged) return const DailyCheckInResult.skipped();
 
     if (isHazukiPicacgSourceKey(sourceMeta.key)) {
       return _performPicacgDailyCheckIn(facade, sourceKey: sourceMeta.key);
     }
 
-    final today = _dailyCheckInDateTag(DateTime.now());
+    final today = dailyCheckInDateTag(DateTime.now());
     final cachedDate =
         (facade.loadSourceData(sourceMeta.key, 'lastCheckInDate') ?? '')
             .toString()
             .trim();
-    if (cachedDate == today) {
-      return const DailyCheckInResult.alreadyCheckedIn();
-    }
+    if (cachedDate == today) return const DailyCheckInResult.alreadyCheckedIn();
 
     final uidRaw = engine.evaluate('this.__hazuki_source.loadData("uid")');
     final uid = (await facade.js.resolve(uidRaw) ?? '').toString().trim();
-    if (!RegExp(r'^\d+$').hasMatch(uid)) {
-      throw Exception('invalid_uid');
-    }
-
+    if (!RegExp(r'^\d+$').hasMatch(uid)) throw Exception('invalid_uid');
     final baseUrl = (engine.evaluate('this.__hazuki_source.baseUrl') ?? '')
         .toString()
         .trim();
-    if (baseUrl.isEmpty) {
-      throw Exception('invalid_base_url');
-    }
+    if (baseUrl.isEmpty) throw Exception('invalid_base_url');
 
-    final checkRecordText = await _runWithReloginRetry(() async {
-      final dynamic result = engine.evaluate(
-        'this.__hazuki_source.get(${jsonEncode('$baseUrl/daily?user_id=$uid')})',
-        name: 'source_daily_check_record.js',
-      );
-      return (await facade.js.resolve(result) ?? '').toString();
-    });
-
-    final checkRecord = _parseDailyCheckInMap(checkRecordText);
+    final context = SourceFacadeReloginContext(facade);
+    final checkRecordText = await _reloginCoordinator.runWithReloginRetry(
+      () async {
+        final dynamic result = engine.evaluate(
+          'this.__hazuki_source.get(${jsonEncode('$baseUrl/daily?user_id=$uid')})',
+          name: 'source_daily_check_record.js',
+        );
+        return (await facade.js.resolve(result) ?? '').toString();
+      },
+      context: context,
+    );
+    final checkRecord = parseDailyCheckInMap(checkRecordText);
     final dailyId = checkRecord['daily_id']?.toString().trim() ?? '';
-    if (dailyId.isEmpty) {
-      throw Exception('invalid_daily_id');
-    }
+    if (dailyId.isEmpty) throw Exception('invalid_daily_id');
 
-    final checkResultText = await _runWithReloginRetry(() async {
-      final dynamic result = engine.evaluate(
-        'this.__hazuki_source.post(${jsonEncode('$baseUrl/daily_chk')}, ${jsonEncode('user_id=$uid&daily_id=$dailyId')})',
-        name: 'source_daily_check_submit.js',
-      );
-      return (await facade.js.resolve(result) ?? '').toString();
-    });
-
-    final checkResult = _parseDailyCheckInMap(checkResultText);
+    final checkResultText = await _reloginCoordinator.runWithReloginRetry(
+      () async {
+        final dynamic result = engine.evaluate(
+          'this.__hazuki_source.post(${jsonEncode('$baseUrl/daily_chk')}, ${jsonEncode('user_id=$uid&daily_id=$dailyId')})',
+          name: 'source_daily_check_submit.js',
+        );
+        return (await facade.js.resolve(result) ?? '').toString();
+      },
+      context: context,
+    );
+    final checkResult = parseDailyCheckInMap(checkResultText);
     final message = checkResult['msg']?.toString().trim() ?? '';
-    if (message.isEmpty) {
-      throw Exception('invalid_check_in_result');
-    }
-
-    if (_looksLikeAlreadyCheckedInMessage(message)) {
+    if (message.isEmpty) throw Exception('invalid_check_in_result');
+    if (looksLikeAlreadyCheckedInMessage(message)) {
       await facade.saveSourceData(sourceMeta.key, 'lastCheckInDate', today);
       return DailyCheckInResult.alreadyCheckedIn(message);
     }
-
     await facade.saveSourceData(sourceMeta.key, 'lastCheckInDate', today);
     return DailyCheckInResult.success(message);
   }
@@ -124,14 +176,12 @@ extension HazukiSourceServiceCheckInCapability on HazukiSourceService {
     HazukiSourceFacade facade, {
     required String sourceKey,
   }) async {
-    final today = _dailyCheckInDateTag(DateTime.now());
+    final today = dailyCheckInDateTag(DateTime.now());
     final cachedDate =
         (facade.loadSourceData(sourceKey, 'lastCheckInDate') ?? '')
             .toString()
             .trim();
-    if (cachedDate == today) {
-      return const DailyCheckInResult.alreadyCheckedIn();
-    }
+    if (cachedDate == today) return const DailyCheckInResult.alreadyCheckedIn();
 
     final checkedBefore = await _isPicacgDailyCheckInCompleted(
       facade,
@@ -143,10 +193,7 @@ extension HazukiSourceServiceCheckInCapability on HazukiSourceService {
     }
 
     var token = _picacgStoredToken(facade, sourceKey);
-    if (token == null) {
-      throw Exception('picacg_token_missing');
-    }
-
+    if (token == null) throw Exception('picacg_token_missing');
     var response = await _picacgSignedRequest(
       facade,
       sourceKey: sourceKey,
@@ -155,7 +202,10 @@ extension HazukiSourceServiceCheckInCapability on HazukiSourceService {
       token: token,
     );
     if (response.statusCode == 401) {
-      final reloginOk = await _tryReloginFromStoredAccount(force: true);
+      final reloginOk = await _reloginCoordinator.tryReloginFromStoredAccount(
+        SourceFacadeReloginContext(facade),
+        force: true,
+      );
       token = _picacgStoredToken(facade, sourceKey);
       if (reloginOk && token != null) {
         response = await _picacgSignedRequest(
@@ -167,30 +217,17 @@ extension HazukiSourceServiceCheckInCapability on HazukiSourceService {
         );
       }
     }
-
-    if (response.statusCode == 401) {
-      throw Exception('picacg_login_expired');
-    }
+    if (response.statusCode == 401) throw Exception('picacg_login_expired');
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw Exception('picacg_check_in_failed:${response.statusCode}');
     }
-
     final status = _picacgResponseData(
       response.body,
     )['status']?.toString().trim().toLowerCase();
     if (status != null && status.isNotEmpty && status != 'ok') {
       throw Exception('picacg_check_in_failed:$status');
     }
-
-    final checkedAfter = await _isPicacgDailyCheckInCompleted(
-      facade,
-      sourceKey: sourceKey,
-    );
-    if (checkedAfter == true) {
-      await facade.saveSourceData(sourceKey, 'lastCheckInDate', today);
-      return const DailyCheckInResult.success();
-    }
-
+    await _isPicacgDailyCheckInCompleted(facade, sourceKey: sourceKey);
     await facade.saveSourceData(sourceKey, 'lastCheckInDate', today);
     return const DailyCheckInResult.success();
   }
@@ -200,10 +237,7 @@ extension HazukiSourceServiceCheckInCapability on HazukiSourceService {
     required String sourceKey,
   }) async {
     var token = _picacgStoredToken(facade, sourceKey);
-    if (token == null) {
-      return null;
-    }
-
+    if (token == null) return null;
     var response = await _picacgSignedRequest(
       facade,
       sourceKey: sourceKey,
@@ -212,7 +246,10 @@ extension HazukiSourceServiceCheckInCapability on HazukiSourceService {
       token: token,
     );
     if (response.statusCode == 401) {
-      final reloginOk = await _tryReloginFromStoredAccount(force: true);
+      final reloginOk = await _reloginCoordinator.tryReloginFromStoredAccount(
+        SourceFacadeReloginContext(facade),
+        force: true,
+      );
       token = _picacgStoredToken(facade, sourceKey);
       if (reloginOk && token != null) {
         response = await _picacgSignedRequest(
@@ -224,14 +261,9 @@ extension HazukiSourceServiceCheckInCapability on HazukiSourceService {
         );
       }
     }
-
-    if (response.statusCode == 401) {
-      throw Exception('picacg_login_expired');
-    }
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      return null;
-    }
-    return _extractPicacgIsPunched(response.body);
+    if (response.statusCode == 401) throw Exception('picacg_login_expired');
+    if (response.statusCode < 200 || response.statusCode >= 300) return null;
+    return extractPicacgIsPunched(response.body);
   }
 
   Future<_PicacgSignedResponse> _picacgSignedRequest(
@@ -245,8 +277,7 @@ extension HazukiSourceServiceCheckInCapability on HazukiSourceService {
     final normalizedEndpoint = endpoint.startsWith('/')
         ? endpoint
         : '/$endpoint';
-    final baseUrl = _picacgBaseUrl(facade, sourceKey);
-    final url = '$baseUrl$normalizedEndpoint';
+    final url = '${_picacgBaseUrl(facade, sourceKey)}$normalizedEndpoint';
     final signedHeaders = _picacgSignedHeaders(
       facade,
       sourceKey: sourceKey,
@@ -277,7 +308,7 @@ extension HazukiSourceServiceCheckInCapability on HazukiSourceService {
         error: null,
         startedAt: startedAt,
         source: 'picacg_check_in',
-        requestHeaders: _redactPicacgHeaders(signedHeaders),
+        requestHeaders: redactPicacgHeaders(signedHeaders),
         responseHeaders: _flattenDioHeaders(response.headers),
         responseBody: _jsonDecodeOrText(body),
       );
@@ -293,7 +324,7 @@ extension HazukiSourceServiceCheckInCapability on HazukiSourceService {
         error: error.toString(),
         startedAt: startedAt,
         source: 'picacg_check_in',
-        requestHeaders: _redactPicacgHeaders(signedHeaders),
+        requestHeaders: redactPicacgHeaders(signedHeaders),
       );
       rethrow;
     }
@@ -365,57 +396,22 @@ extension HazukiSourceServiceCheckInCapability on HazukiSourceService {
     );
   }
 
-  bool? _extractPicacgIsPunched(String body) {
-    final decoded = _jsonDecodeOrText(body);
-    if (decoded is! Map) {
-      return null;
-    }
-    final direct = _boolFromDynamic(decoded['isPunched']);
-    if (direct != null) {
-      return direct;
-    }
-    final data = decoded['data'];
-    if (data is Map) {
-      final fromData = _boolFromDynamic(data['isPunched']);
-      if (fromData != null) {
-        return fromData;
-      }
-      final user = data['user'];
-      if (user is Map) {
-        return _boolFromDynamic(user['isPunched']);
-      }
-    }
-    final user = decoded['user'];
-    if (user is Map) {
-      return _boolFromDynamic(user['isPunched']);
-    }
-    return null;
-  }
-
   Map<dynamic, dynamic> _picacgResponseData(String body) {
     final decoded = _jsonDecodeOrText(body);
-    if (decoded is! Map) {
-      return const {};
-    }
+    if (decoded is! Map) return const {};
     final data = decoded['data'];
     return data is Map ? data : const {};
   }
 
-  bool? _boolFromDynamic(dynamic value) {
-    if (value is bool) {
-      return value;
-    }
+  static bool? _boolFromDynamic(dynamic value) {
+    if (value is bool) return value;
     final text = value?.toString().trim().toLowerCase();
-    if (text == 'true') {
-      return true;
-    }
-    if (text == 'false') {
-      return false;
-    }
+    if (text == 'true') return true;
+    if (text == 'false') return false;
     return null;
   }
 
-  dynamic _jsonDecodeOrText(String text) {
+  static dynamic _jsonDecodeOrText(String text) {
     try {
       return jsonDecode(text);
     } catch (_) {
@@ -423,42 +419,8 @@ extension HazukiSourceServiceCheckInCapability on HazukiSourceService {
     }
   }
 
-  Map<String, dynamic> _redactPicacgHeaders(Map<String, String> headers) {
-    return headers.map((key, value) {
-      final lower = key.toLowerCase();
-      if (lower == 'authorization' || lower == 'signature') {
-        return MapEntry(key, value.isEmpty ? value : '<redacted>');
-      }
-      return MapEntry(key, value);
-    });
-  }
-
-  Map<String, dynamic> _flattenDioHeaders(Headers headers) {
-    return headers.map.map((key, values) => MapEntry(key, values.join(', ')));
-  }
-
-  String _dailyCheckInDateTag(DateTime dateTime) {
-    final local = dateTime.toLocal();
-    return '${local.year}-${local.month.toString().padLeft(2, '0')}-${local.day.toString().padLeft(2, '0')}';
-  }
-
-  Map<String, dynamic> _parseDailyCheckInMap(String raw) {
-    if (raw.trim().isEmpty) {
-      return const <String, dynamic>{};
-    }
-    final decoded = jsonDecode(raw);
-    if (decoded is Map) {
-      return Map<String, dynamic>.from(decoded);
-    }
-    return const <String, dynamic>{};
-  }
-
-  bool _looksLikeAlreadyCheckedInMessage(String message) {
-    final lower = message.trim().toLowerCase();
-    return lower.contains('already checked') ||
-        message.contains('\u5df2\u7b7e\u5230') ||
-        message.contains('\u4eca\u5929\u5df2\u7b7e');
-  }
+  Map<String, dynamic> _flattenDioHeaders(Headers headers) =>
+      headers.map.map((key, values) => MapEntry(key, values.join(', ')));
 }
 
 class _PicacgSignedResponse {

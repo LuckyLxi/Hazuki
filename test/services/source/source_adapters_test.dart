@@ -106,6 +106,71 @@ void main() {
       'sourceKey': 'picacg',
     });
   });
+
+  test('category adapter preserves the requested source scope', () async {
+    final source = _RecordingSource();
+    final adapter = HazukiSourceCategoryAdapter(source);
+
+    await adapter.loadCategoryTagGroups(
+      forceRefresh: true,
+      sourceKey: 'picacg',
+    );
+
+    expect(source.categoryTagArguments, {
+      'forceRefresh': true,
+      'sourceKey': 'picacg',
+    });
+  });
+
+  test(
+    'favorite adapter preserves folder, sorting, and source arguments',
+    () async {
+      final source = _RecordingSource();
+      final adapter = HazukiSourceFavoriteAdapter(source);
+
+      await adapter.loadFavoriteFolders(
+        comicId: 'comic',
+        sourceKey: 'copy_manga',
+      );
+      await adapter.loadFavoriteComics(page: 3, folderId: 'folder');
+      await adapter.toggleFavorite(
+        comicId: 'comic',
+        isAdding: true,
+        folderId: 'folder',
+        favoriteId: 'remote',
+        sourceKey: 'copy_manga',
+      );
+      await adapter.setFavoriteSortOrder('da');
+
+      expect(source.favoriteFolderArguments, {
+        'comicId': 'comic',
+        'sourceKey': 'copy_manga',
+      });
+      expect(source.favoriteComicsArguments, {'page': 3, 'folderId': 'folder'});
+      expect(source.favoriteToggleArguments, {
+        'comicId': 'comic',
+        'isAdding': true,
+        'folderId': 'folder',
+        'favoriteId': 'remote',
+        'sourceKey': 'copy_manga',
+      });
+      expect(source.favoriteSortOrderArgument, 'da');
+    },
+  );
+
+  test('account and runtime adapters forward daily check-in calls', () async {
+    final source = _RecordingSource();
+    final account = HazukiSourceAccountAdapter(source);
+    final runtime = HazukiSourceRuntimeAdapter(source);
+
+    expect(await account.isDailyCheckInCompletedToday(), isTrue);
+    expect(
+      (await runtime.performDailyCheckIn()).status,
+      DailyCheckInStatus.alreadyCheckedIn,
+    );
+    expect(source.dailyCheckInCompletionCalls, 1);
+    expect(source.dailyCheckInPerformCalls, 1);
+  });
 }
 
 class _RecordingSource extends HazukiSourceService {
@@ -114,6 +179,13 @@ class _RecordingSource extends HazukiSourceService {
 
   Map<String, Object?>? searchArguments;
   Map<String, Object?>? imageArguments;
+  Map<String, Object?>? categoryTagArguments;
+  Map<String, Object?>? favoriteFolderArguments;
+  Map<String, Object?>? favoriteComicsArguments;
+  Map<String, Object?>? favoriteToggleArguments;
+  String? favoriteSortOrderArgument;
+  int dailyCheckInCompletionCalls = 0;
+  int dailyCheckInPerformCalls = 0;
 
   @override
   Future<SearchComicsResult> searchComics({
@@ -151,5 +223,72 @@ class _RecordingSource extends HazukiSourceService {
       'sourceKey': sourceKey,
     };
     return Uint8List.fromList([1, 2, 3]);
+  }
+
+  @override
+  Future<List<CategoryTagGroup>> loadCategoryTagGroups({
+    bool forceRefresh = false,
+    String sourceKey = '',
+  }) async {
+    categoryTagArguments = {
+      'forceRefresh': forceRefresh,
+      'sourceKey': sourceKey,
+    };
+    return const [];
+  }
+
+  @override
+  Future<FavoriteFoldersResult> loadFavoriteFolders({
+    String? comicId,
+    String sourceKey = '',
+  }) async {
+    favoriteFolderArguments = {'comicId': comicId, 'sourceKey': sourceKey};
+    return const FavoriteFoldersResult.success(
+      folders: [],
+      favoritedFolderIds: {},
+    );
+  }
+
+  @override
+  Future<FavoriteComicsResult> loadFavoriteComics({
+    required int page,
+    required String folderId,
+  }) async {
+    favoriteComicsArguments = {'page': page, 'folderId': folderId};
+    return const FavoriteComicsResult.success([]);
+  }
+
+  @override
+  Future<void> toggleFavorite({
+    required String comicId,
+    required bool isAdding,
+    String folderId = '0',
+    String? favoriteId,
+    String sourceKey = '',
+  }) async {
+    favoriteToggleArguments = {
+      'comicId': comicId,
+      'isAdding': isAdding,
+      'folderId': folderId,
+      'favoriteId': favoriteId,
+      'sourceKey': sourceKey,
+    };
+  }
+
+  @override
+  Future<void> setFavoriteSortOrder(String order) async {
+    favoriteSortOrderArgument = order;
+  }
+
+  @override
+  Future<bool> isDailyCheckInCompletedToday() async {
+    dailyCheckInCompletionCalls++;
+    return true;
+  }
+
+  @override
+  Future<DailyCheckInResult> performDailyCheckIn() async {
+    dailyCheckInPerformCalls++;
+    return const DailyCheckInResult.alreadyCheckedIn();
   }
 }
