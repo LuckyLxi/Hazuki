@@ -1,8 +1,35 @@
-part of '../../hazuki_source_service.dart';
+import 'dart:io';
 
-extension HazukiSourceServiceFavoritesDebugCapability on HazukiSourceService {
+import '../../../models/hazuki_models.dart';
+import 'debug_log_internals.dart';
+import '../runtime/source_runtime_facade.dart';
+
+class SourceFavoritesDebugCapability {
+  SourceFavoritesDebugCapability({
+    required HazukiSourceFacade Function() activeFacade,
+    required String? Function() currentAccount,
+    required Future<bool> Function() ensureFavoriteSessionReady,
+    required Future<FavoriteComicsResult> Function({
+      required int page,
+      required String folderId,
+    })
+    loadFavoriteComics,
+  }) : _activeFacade = activeFacade,
+       _currentAccount = currentAccount,
+       _ensureFavoriteSessionReady = ensureFavoriteSessionReady,
+       _loadFavoriteComics = loadFavoriteComics;
+
+  final HazukiSourceFacade Function() _activeFacade;
+  final String? Function() _currentAccount;
+  final Future<bool> Function() _ensureFavoriteSessionReady;
+  final Future<FavoriteComicsResult> Function({
+    required int page,
+    required String folderId,
+  })
+  _loadFavoriteComics;
+
   Future<void> warmUpFavoritesDebugInfo() async {
-    final facade = this.facade;
+    final facade = _activeFacade();
     if (!facade.softwareLogCaptureEnabled || !facade.isLogged) {
       return;
     }
@@ -22,7 +49,7 @@ extension HazukiSourceServiceFavoritesDebugCapability on HazukiSourceService {
   Future<Map<String, dynamic>> collectFavoritesDebugInfo({
     bool forceRefresh = true,
   }) async {
-    final facade = this.facade;
+    final facade = _activeFacade();
     if (!facade.softwareLogCaptureEnabled) {
       return _buildDisabledFavoritesDebugInfo();
     }
@@ -35,7 +62,7 @@ extension HazukiSourceServiceFavoritesDebugCapability on HazukiSourceService {
   Future<Map<String, dynamic>> _collectFavoritesDebugInfoCore({
     required bool includeNetworkCalls,
   }) async {
-    final facade = this.facade;
+    final facade = _activeFacade();
     if (!facade.softwareLogCaptureEnabled) {
       return _buildDisabledFavoritesDebugInfo();
     }
@@ -57,7 +84,7 @@ extension HazukiSourceServiceFavoritesDebugCapability on HazukiSourceService {
         'supportsAccount': facade.sourceMeta?.supportsAccount,
       },
       'isLogged': facade.isLogged,
-      'currentAccount': currentAccount,
+      'currentAccount': _currentAccount(),
       'generatedAt': DateTime.now().toIso8601String(),
       'checks': <String, dynamic>{},
       'calls': <String, dynamic>{},
@@ -112,7 +139,7 @@ extension HazukiSourceServiceFavoritesDebugCapability on HazukiSourceService {
       name: 'debug_favorites_loadNext.js',
     );
 
-    final pageLoad = await loadFavoriteComics(page: 1, folderId: '0');
+    final pageLoad = await _loadFavoriteComics(page: 1, folderId: '0');
     final pageLoadInfo = info['favoritePageLoadResult'] as Map<String, dynamic>;
     pageLoadInfo['errorMessage'] = pageLoad.errorMessage;
     pageLoadInfo['count'] = pageLoad.comics.length;
@@ -133,7 +160,7 @@ extension HazukiSourceServiceFavoritesDebugCapability on HazukiSourceService {
   }
 
   Map<String, dynamic> _buildDisabledFavoritesDebugInfo() {
-    final facade = this.facade;
+    final facade = _activeFacade();
     return <String, dynamic>{
       'statusText': facade.statusText,
       'platform': Platform.operatingSystem,
@@ -144,7 +171,7 @@ extension HazukiSourceServiceFavoritesDebugCapability on HazukiSourceService {
         'supportsAccount': facade.sourceMeta?.supportsAccount,
       },
       'isLogged': facade.isLogged,
-      'currentAccount': currentAccount,
+      'currentAccount': _currentAccount(),
       'generatedAt': DateTime.now().toIso8601String(),
       'captureEnabled': false,
       'disabledReason': 'software_log_capture_disabled',
@@ -158,6 +185,7 @@ extension HazukiSourceServiceFavoritesDebugCapability on HazukiSourceService {
     required String code,
     required String name,
   }) async {
+    final facade = _activeFacade();
     final engine = facade.js.engine;
     if (engine == null) {
       return {'ok': false, 'error': 'engine is null'};

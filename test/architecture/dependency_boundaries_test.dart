@@ -67,6 +67,21 @@ void main() {
     expect(violations, isEmpty, reason: violations.join('\n'));
   });
 
+  test('source collaborators do not use service part libraries', () {
+    final violations = <String>[];
+    for (final file in _dartFilesUnder('lib/services/source')) {
+      final content = file.readAsStringSync();
+      if (RegExp(r'^part of ', multiLine: true).hasMatch(content)) {
+        violations.add('${file.path}: part of');
+      }
+      final isAdapter = file.path.replaceAll('\\', '/').contains('/adapters/');
+      if (!isAdapter && content.contains('hazuki_source_service.dart')) {
+        violations.add('${file.path}: concrete service import');
+      }
+    }
+    expect(violations, isEmpty, reason: violations.join('\n'));
+  });
+
   test('cloud sync participants do not use the global service locator', () {
     final violations = <String>[];
     for (final file in _dartFilesUnder('lib/services/cloud_sync')) {

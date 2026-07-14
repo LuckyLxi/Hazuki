@@ -1,30 +1,24 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
-import 'dart:math' as math;
 
-import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_qjs/flutter_qjs.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:pointycastle/api.dart' show KeyParameter;
-import 'package:pointycastle/block/aes.dart';
-import 'package:pointycastle/block/modes/ecb.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../shared/preferences/hazuki_preference_keys.dart';
 import '../models/hazuki_models.dart';
 import 'source/common/source_json_coerce.dart';
-import 'source/common/source_prefs_keys.dart';
 import 'source/category/source_category_capability.dart';
 import 'source/comic/source_comic_details_cache.dart';
 import 'source/comic/comic_details_capability.dart';
 import 'source/account/source_daily_check_in_capability.dart';
+import 'source/account/account_session_capability.dart';
 import 'source/account/source_relogin_coordinator.dart';
+import 'source/comments/comments_capability.dart';
 import 'source/debug/debug_log_capability.dart';
-import 'source/debug/debug_log_internals.dart';
+import 'source/debug/debug_favorites_capability.dart';
+import 'source/debug/debug_report_capability.dart';
 import 'source/explore_capability.dart';
 import 'source/favorites/source_favorites_capability.dart';
 import 'source/image/image_cache_capability.dart';
@@ -38,6 +32,10 @@ import 'source/runtime/source_runtime_facade.dart';
 import 'source/runtime/source_runtime_handle.dart';
 import 'source/runtime/source_runtime_host.dart';
 import 'source/runtime/source_runtime_registry.dart';
+import 'source/runtime/source_runtime_state_controller.dart';
+import 'source/runtime/source_script_storage.dart';
+import 'source/runtime/source_js_bridge_cookie_capability.dart';
+import 'source/runtime/source_runtime_capability.dart';
 
 export 'source/models/source_contract_models.dart';
 export 'source/models/source_identity.dart';
@@ -49,22 +47,10 @@ export 'source/runtime/source_runtime_handle.dart';
 export 'source/runtime/source_runtime_registry.dart';
 export 'source/runtime/source_session_store.dart';
 export 'source/debug/source_debug_log_store.dart';
-
-part 'source/account/account_session_capability.dart';
-
-part 'source/comments/comments_avatar_support.dart';
-part 'source/comments/comments_capability.dart';
-
-part 'source/debug/debug_favorites_capability.dart';
-part 'source/debug/debug_report_capability.dart';
-
-part 'source/runtime/cookie_store_support.dart';
-part 'source/runtime/js_bridge_support.dart';
-part 'source/runtime/source_bootstrap_support.dart';
-part 'source/runtime/source_file_management_capability.dart';
-part 'source/runtime/source_loader_capability.dart';
-part 'source/runtime/source_runtime_support.dart';
-part 'source/runtime/version_update_capability.dart';
+export 'source/comments/comments_avatar_support.dart'
+    show normalizeSourceAvatarUrl;
+export 'source/runtime/source_runtime_capability.dart'
+    show SourceVersionCheckResult;
 
 const _jmSourceUrls = [
   'https://cdn.jsdelivr.net/gh/venera-app/venera-configs@main/jm.js',
@@ -113,16 +99,39 @@ class HazukiSourceService extends ChangeNotifier {
       catalog: hazukiAllowedSourceCatalog,
       defaultSourceKey: hazukiDefaultSourceKey,
       secureSessionStorage: _secureSessionStorage,
-      ensureSourceInitialized: ensureSourceInitialized,
-      currentAccountForSource: currentAccountForSource,
-      isLoggedForSource: isLoggedForSource,
+      ensureSourceInitialized: (sourceKey) =>
+          _runtimeCapability.ensureSourceInitialized(sourceKey),
+      currentAccountForSource: (sourceKey) =>
+          _accountCapability.currentAccountForSource(sourceKey),
+      isLoggedForSource: (sourceKey) =>
+          _accountCapability.isLoggedForSource(sourceKey),
+    );
+    _accountCapability = SourceAccountSessionCapability(
+      runtimeHost: _runtimeHost,
     );
     _runtimeHost.addListener(notifyListeners);
     _reloginCoordinator = SourceReloginCoordinator(
       loginWithStoredAccount: (context, {required account, required password}) {
         final facade = (context as SourceFacadeReloginContext).facade;
-        return _loginWithFacade(facade, account: account, password: password);
+        return _accountCapability.loginWithFacade(
+          facade,
+          account: account,
+          password: password,
+        );
       },
+    );
+    _runtimeCapability = SourceRuntimeCapability(
+      runtimeHost: _runtimeHost,
+      scriptStorage: _scriptStorage,
+      jsBridgeCookieCapability: _jsBridgeCookieCapability,
+      runtimeStateController: _runtimeStateController,
+      reloginCoordinator: _reloginCoordinator,
+      bundledInitAssetPath: _bundledInitAssetPath,
+      sourceIndexUrls: _sourceIndexUrls,
+    );
+    _commentsCapability = SourceCommentsCapability(
+      runtimeHost: _runtimeHost,
+      reloginCoordinator: _reloginCoordinator,
     );
     _dailyCheckInCapability = SourceDailyCheckInCapability(
       runtimeHost: _runtimeHost,
@@ -171,11 +180,30 @@ class HazukiSourceService extends ChangeNotifier {
           },
       notifyCloudFavoritesChanged: notifyCloudFavoritesChanged,
     );
+    _favoritesDebugCapability = SourceFavoritesDebugCapability(
+      activeFacade: () => facade,
+      currentAccount: () => currentAccount,
+      ensureFavoriteSessionReady: () => _ensureFavoriteSessionReady(),
+      loadFavoriteComics: ({required page, required folderId}) =>
+          _favoritesCapability.loadFavoriteComics(
+            page: page,
+            folderId: folderId,
+          ),
+    );
+    _debugReportCapability = SourceDebugReportCapability(
+      activeFacade: () => facade,
+      currentAccount: () => currentAccount,
+    );
   }
 
   final SourceSecureSessionStorage _secureSessionStorage;
   late final SourceRuntimeHost _runtimeHost;
+  late final SourceAccountSessionCapability _accountCapability;
   late final SourceReloginCoordinator _reloginCoordinator;
+  late final SourceRuntimeCapability _runtimeCapability;
+  late final SourceCommentsCapability _commentsCapability;
+  late final SourceFavoritesDebugCapability _favoritesDebugCapability;
+  late final SourceDebugReportCapability _debugReportCapability;
   late final SourceDailyCheckInCapability _dailyCheckInCapability;
   late final SourceComicDetailsCache _comicDetailsCache;
   late final SourceComicDetailsCapability _comicDetailsCapability;
@@ -183,6 +211,16 @@ class HazukiSourceService extends ChangeNotifier {
   late final SourceCategoryCapability _categoryCapability;
   late final SourceImagePreparationCapability _imagePreparationCapability;
   late final SourceFavoritesCapability _favoritesCapability;
+  late final SourceScriptStorage _scriptStorage = SourceScriptStorage(
+    defaultSourceKey: hazukiDefaultSourceKey,
+    normalizeSourceKey: _normalizeAllowedSourceKey,
+    ensurePreferences: (sourceKey) =>
+        _handleFor(sourceKey).facade.ensurePrefs(),
+  );
+  late final SourceJsBridgeCookieCapability _jsBridgeCookieCapability =
+      SourceJsBridgeCookieCapability(activeHandle: () => _activeHandle);
+  final SourceRuntimeStateController _runtimeStateController =
+      SourceRuntimeStateController();
 
   SourceRuntimeRegistry get runtimeRegistry => _runtimeHost.runtimeRegistry;
 
@@ -210,8 +248,26 @@ class HazukiSourceService extends ChangeNotifier {
     SourceRuntimeHandle handle,
     dynamic message,
   ) {
-    return _handleJsMessageForHandle(handle, message);
+    return _jsBridgeCookieCapability.handleJsMessageForHandle(handle, message);
   }
+
+  String? buildCookieHeader(String url) =>
+      _jsBridgeCookieCapability.buildCookieHeader(url);
+
+  String? buildCookieHeaderForHandle(
+    SourceRuntimeHandleView handle,
+    String url,
+  ) => _jsBridgeCookieCapability.buildCookieHeaderForHandle(handle, url);
+
+  Future<void> saveCookiesFromHeadersForHandle(
+    SourceRuntimeHandleView handle,
+    String url,
+    Map<String, List<String>> headers,
+  ) => _jsBridgeCookieCapability.saveCookiesFromHeadersForHandle(
+    handle,
+    url,
+    headers,
+  );
 
   Future<Map<String, dynamic>> getLineSettingsSnapshot() =>
       lineSettings.getSnapshot();
@@ -450,6 +506,28 @@ class HazukiSourceService extends ChangeNotifier {
 
   String get statusText => _statusText;
   SourceRuntimeState get sourceRuntimeState => _runtimeState;
+  SourceRuntimeState get runtimeState => facade.runtimeState;
+
+  Future<void> prewarmInBackground() =>
+      _runtimeCapability.prewarmInBackground();
+
+  bool isSourceRuntimeRelatedError(Object? error) {
+    final raw = (error ?? '').toString().trim().toLowerCase();
+    return raw.isNotEmpty &&
+        (raw.contains('source_not_initialized') ||
+            raw.contains('source_init_failed') ||
+            raw.contains('source_download_failed_without_cache') ||
+            raw.contains('source_metadata_incomplete') ||
+            raw.contains('module handler timeout') ||
+            raw.contains('module not found') ||
+            raw.contains('discover_load_timeout') ||
+            raw.contains('search timeout') ||
+            (raw.contains('favorite') && raw.contains('timed out')));
+  }
+
+  void logRuntimeRetryRequested(String source) =>
+      _runtimeCapability.logRuntimeRetryRequested(source);
+
   SourceMeta? get sourceMeta => _sourceMeta;
   String get activeSourceKey => _runtimeHost.activeSourceKey;
   bool get isActiveJmSource => isHazukiJmSourceKey(activeSourceKey);
@@ -460,10 +538,6 @@ class HazukiSourceService extends ChangeNotifier {
       isHazukiPicacgSourceKey(activeSourceKey);
   bool get isInitialized => _engine != null && _sourceMeta != null;
   bool get softwareLogCaptureEnabled => _softwareLogCaptureEnabled;
-
-  SourceCatalogEntry _definitionForSourceKey(String sourceKey) {
-    return _runtimeHost.definitionFor(sourceKey);
-  }
 
   String _normalizeAllowedSourceKey(String sourceKey) {
     return _runtimeHost.normalize(sourceKey);
@@ -722,26 +796,10 @@ class HazukiSourceService extends ChangeNotifier {
     sourceKey: sourceKey,
   );
 
-  Future<T> _runWithReloginRetry<T>(
-    Future<T> Function() action, {
-    HazukiSourceFacade? targetFacade,
-  }) => _reloginCoordinator.runWithReloginRetry(
-    action,
-    context: SourceFacadeReloginContext(targetFacade ?? facade),
-  );
-
   Future<bool> _ensureFavoriteSessionReady({
     HazukiSourceFacade? targetFacade,
   }) => _reloginCoordinator.ensureFavoriteSessionReady(
     SourceFacadeReloginContext(targetFacade ?? facade),
-  );
-
-  Future<bool> _tryReloginFromStoredAccount({
-    bool force = false,
-    HazukiSourceFacade? targetFacade,
-  }) => _reloginCoordinator.tryReloginFromStoredAccount(
-    SourceFacadeReloginContext(targetFacade ?? facade),
-    force: force,
   );
 
   bool isLocalImagePath(String value) =>
@@ -880,6 +938,172 @@ class HazukiSourceService extends ChangeNotifier {
     }
     return normalized.isEmpty ? 'mr' : normalized;
   }
+
+  bool get isLogged => _accountCapability.isLogged;
+  String? get currentAccount => _accountCapability.currentAccount;
+
+  Future<void> login({required String account, required String password}) =>
+      _accountCapability.login(account: account, password: password);
+  Future<void> logout() => _accountCapability.logout();
+  Future<String?> loadCurrentAvatarUrl() =>
+      _accountCapability.loadCurrentAvatarUrl();
+
+  Future<void> init({
+    void Function(int received, int total)? onSourceDownloadProgress,
+    bool prewarm = false,
+  }) => _runtimeCapability.init(
+    onSourceDownloadProgress: onSourceDownloadProgress,
+    prewarm: prewarm,
+  );
+  Future<void> ensureInitialized({String? sourceKey}) =>
+      _runtimeCapability.ensureInitialized(sourceKey: sourceKey);
+  Future<void> ensureSourceInitialized(String sourceKey) =>
+      _runtimeCapability.ensureSourceInitialized(sourceKey);
+  Future<bool> loadSoftwareLogCaptureEnabled() =>
+      _runtimeCapability.loadSoftwareLogCaptureEnabled();
+  Future<void> setSoftwareLogCaptureEnabled(bool enabled) =>
+      _runtimeCapability.setSoftwareLogCaptureEnabled(enabled);
+  Future<bool> hasLocalJmSourceFile() =>
+      _runtimeCapability.hasLocalJmSourceFile();
+  Future<bool> hasLocalSourceFile(String sourceKey) =>
+      _runtimeCapability.hasLocalSourceFile(sourceKey);
+  Future<void> deleteLocalSourceFile(String sourceKey) =>
+      _runtimeCapability.deleteLocalSourceFile(sourceKey);
+  Future<void> downloadSourceFile(
+    String sourceKey, {
+    void Function(int received, int total)? onProgress,
+  }) =>
+      _runtimeCapability.downloadSourceFile(sourceKey, onProgress: onProgress);
+  Future<String?> readLocalActiveSourceIfExists() =>
+      _runtimeCapability.readLocalActiveSourceIfExists();
+  Future<String?> readLocalSourceIfExists(String sourceKey) =>
+      _runtimeCapability.readLocalSourceIfExists(sourceKey);
+  Future<String?> readLocalJmSourceIfExists() =>
+      _runtimeCapability.readLocalJmSourceIfExists();
+  Future<void> writeLocalActiveSource(String content) =>
+      _runtimeCapability.writeLocalActiveSource(content);
+  Future<void> writeLocalJmSource(String content) =>
+      _runtimeCapability.writeLocalJmSource(content);
+  Future<void> writeLocalSource(String sourceKey, String content) =>
+      _runtimeCapability.writeLocalSource(sourceKey, content);
+  Future<String> loadEditableActiveSource() =>
+      _runtimeCapability.loadEditableActiveSource();
+  Future<String> loadEditableJmSource() =>
+      _runtimeCapability.loadEditableJmSource();
+  Future<String> loadEditableSource(String sourceKey) =>
+      _runtimeCapability.loadEditableSource(sourceKey);
+  Future<void> saveEditedActiveSource(String content) =>
+      _runtimeCapability.saveEditedActiveSource(content);
+  Future<void> saveEditedJmSource(String content) =>
+      _runtimeCapability.saveEditedJmSource(content);
+  Future<void> saveEditedSource(String sourceKey, String content) =>
+      _runtimeCapability.saveEditedSource(sourceKey, content);
+  Future<bool> hasCustomEditedActiveSource() =>
+      _runtimeCapability.hasCustomEditedActiveSource();
+  Future<bool> hasCustomEditedSource(String sourceKey) =>
+      _runtimeCapability.hasCustomEditedSource(sourceKey);
+  Future<bool> hasCustomEditedJmSource() =>
+      _runtimeCapability.hasCustomEditedJmSource();
+  Future<void> reloadFromLocalSourceFiles() =>
+      _runtimeCapability.reloadFromLocalSourceFiles();
+  Future<SourceVersionCheckResult?> checkActiveSourceVersionFromCloud() =>
+      _runtimeCapability.checkActiveSourceVersionFromCloud();
+  Future<SourceVersionCheckResult?> checkJmSourceVersionFromCloud() =>
+      _runtimeCapability.checkJmSourceVersionFromCloud();
+  Future<bool> downloadActiveSourceAndReload({
+    void Function(int received, int total)? onProgress,
+  }) =>
+      _runtimeCapability.downloadActiveSourceAndReload(onProgress: onProgress);
+  Future<bool> downloadJmSourceAndReload({
+    void Function(int received, int total)? onProgress,
+  }) => _runtimeCapability.downloadJmSourceAndReload(onProgress: onProgress);
+  Future<bool> refreshSourceOnNetworkRecovery() =>
+      _runtimeCapability.refreshSourceOnNetworkRecovery();
+
+  Future<ComicCommentsPageResult> loadCommentsPage({
+    required String comicId,
+    String? subId,
+    String? chapterId,
+    String sourceKey = '',
+    int page = 1,
+    int pageSize = 16,
+    String? replyTo,
+  }) => _commentsCapability.loadCommentsPage(
+    comicId: comicId,
+    subId: subId,
+    chapterId: chapterId,
+    sourceKey: sourceKey,
+    page: page,
+    pageSize: pageSize,
+    replyTo: replyTo,
+  );
+  Future<List<ComicCommentData>> loadComments({
+    required String comicId,
+    String? subId,
+    String? chapterId,
+    String sourceKey = '',
+    int page = 1,
+    int pageSize = 16,
+    String? replyTo,
+  }) => _commentsCapability.loadComments(
+    comicId: comicId,
+    subId: subId,
+    chapterId: chapterId,
+    sourceKey: sourceKey,
+    page: page,
+    pageSize: pageSize,
+    replyTo: replyTo,
+  );
+  Future<void> sendComment({
+    required String comicId,
+    String? subId,
+    String? chapterId,
+    String sourceKey = '',
+    required String content,
+    String? replyTo,
+  }) => _commentsCapability.sendComment(
+    comicId: comicId,
+    subId: subId,
+    chapterId: chapterId,
+    sourceKey: sourceKey,
+    content: content,
+    replyTo: replyTo,
+  );
+  Future<void> likeComment({
+    required String comicId,
+    String? subId,
+    String sourceKey = '',
+    required String commentId,
+    required bool isLike,
+  }) => _commentsCapability.likeComment(
+    comicId: comicId,
+    subId: subId,
+    sourceKey: sourceKey,
+    commentId: commentId,
+    isLike: isLike,
+  );
+  bool supportCommentSendForSource(String sourceKey) =>
+      _commentsCapability.supportCommentSendForSource(sourceKey);
+  bool supportCommentLikeForSource(String sourceKey) =>
+      _commentsCapability.supportCommentLikeForSource(sourceKey);
+  bool supportCommentRepliesForSource(String sourceKey) =>
+      _commentsCapability.supportCommentRepliesForSource(sourceKey);
+
+  Future<void> warmUpFavoritesDebugInfo() =>
+      _favoritesDebugCapability.warmUpFavoritesDebugInfo();
+  Future<Map<String, dynamic>> collectFavoritesDebugInfo({
+    bool forceRefresh = true,
+  }) => _favoritesDebugCapability.collectFavoritesDebugInfo(
+    forceRefresh: forceRefresh,
+  );
+  Future<Map<String, dynamic>> collectTypedDebugInfo(String type) =>
+      _debugReportCapability.collectTypedDebugInfo(type);
+  Future<Map<String, dynamic>> collectNetworkDebugInfo() =>
+      _debugReportCapability.collectNetworkDebugInfo();
+  Future<Map<String, dynamic>> collectApplicationDebugInfo() =>
+      _debugReportCapability.collectApplicationDebugInfo();
+  Future<Map<String, dynamic>> collectReaderDebugInfo() =>
+      _debugReportCapability.collectReaderDebugInfo();
 
   @override
   void dispose() {

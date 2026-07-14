@@ -1,6 +1,25 @@
-part of '../../hazuki_source_service.dart';
+import 'dart:convert';
 
-extension HazukiSourceServiceAccountSessionCapability on HazukiSourceService {
+import '../comments/comments_avatar_support.dart';
+import '../debug/debug_log_internals.dart';
+import '../models/source_identity.dart';
+import '../runtime/source_runtime_facade.dart';
+import '../runtime/source_runtime_host.dart';
+
+class SourceAccountSessionCapability {
+  SourceAccountSessionCapability({required SourceRuntimeHost runtimeHost})
+    : _runtimeHost = runtimeHost {
+    _avatarCapability = SourceAvatarCapability(
+      activeFacade: () => facade,
+      persistLoginSideData: _persistLoginSideData,
+    );
+  }
+
+  final SourceRuntimeHost _runtimeHost;
+  late final SourceAvatarCapability _avatarCapability;
+
+  HazukiSourceFacade get facade => _runtimeHost.activeHandle.facade;
+
   String? get currentAccount {
     final sourceKey = facade.sourceMeta?.key ?? facade.sourceKey;
     final displayName = facade
@@ -20,9 +39,9 @@ extension HazukiSourceServiceAccountSessionCapability on HazukiSourceService {
   bool get isLogged => facade.loadAccountDataSync() != null;
 
   Future<void> login({required String account, required String password}) =>
-      _loginWithFacade(facade, account: account, password: password);
+      loginWithFacade(facade, account: account, password: password);
 
-  Future<void> _loginWithFacade(
+  Future<void> loginWithFacade(
     HazukiSourceFacade facade, {
     required String account,
     required String password,
@@ -158,6 +177,46 @@ extension HazukiSourceServiceAccountSessionCapability on HazukiSourceService {
     facade.runtime.transientAvatarUrl = null;
     await facade.deleteSourceData(sourceKey, 'token');
   }
+
+  String? currentAccountForSource(String sourceKey) {
+    final handle = _runtimeHost.handleFor(sourceKey);
+    final displayName = handle.session
+        .loadSourceData(handle.sourceKey, 'display_name')
+        ?.toString()
+        .trim();
+    if (displayName != null && displayName.isNotEmpty) return displayName;
+    final account = handle.session.loadAccountDataSync(
+      handle.runtime.sourceMeta,
+      fallbackSourceKey: handle.sourceKey,
+    );
+    return account == null || account.isEmpty ? null : account.first;
+  }
+
+  bool isLoggedForSource(String sourceKey) {
+    final handle = _runtimeHost.handleFor(sourceKey);
+    return handle.session.loadAccountDataSync(
+          handle.runtime.sourceMeta,
+          fallbackSourceKey: handle.sourceKey,
+        ) !=
+        null;
+  }
+
+  Future<String?> loadCurrentAvatarUrl() =>
+      _avatarCapability.loadCurrentAvatarUrl();
+}
+
+void _logAvatarEvent(
+  HazukiSourceFacade facade, {
+  required String title,
+  Object? content,
+  String level = 'info',
+}) {
+  facade.addApplicationLog(
+    level: level,
+    title: title,
+    source: 'source_avatar',
+    content: content,
+  );
 }
 
 String _picacgLoginWithResponseTraceScript({

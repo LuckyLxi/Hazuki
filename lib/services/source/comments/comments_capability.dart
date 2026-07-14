@@ -1,6 +1,37 @@
-part of '../../hazuki_source_service.dart';
+import 'dart:convert';
 
-extension HazukiSourceServiceCommentsCapability on HazukiSourceService {
+import '../../../models/hazuki_models.dart';
+import '../account/source_relogin_coordinator.dart';
+import '../common/source_json_coerce.dart';
+import '../models/source_identity.dart';
+import '../runtime/source_runtime_facade.dart';
+import '../runtime/source_runtime_host.dart';
+
+class SourceCommentsCapability {
+  SourceCommentsCapability({
+    required SourceRuntimeHost runtimeHost,
+    required SourceReloginCoordinator reloginCoordinator,
+  }) : _runtimeHost = runtimeHost,
+       _reloginCoordinator = reloginCoordinator;
+
+  final SourceRuntimeHost _runtimeHost;
+  final SourceReloginCoordinator _reloginCoordinator;
+
+  String _resolveSourceKey(String sourceKey) => sourceKey.trim().isEmpty
+      ? _runtimeHost.activeSourceKey
+      : _runtimeHost.normalize(sourceKey);
+
+  HazukiSourceFacade _facadeFor(String sourceKey) =>
+      _runtimeHost.handleFor(_resolveSourceKey(sourceKey)).facade;
+
+  Future<T> _runWithReloginRetry<T>(
+    Future<T> Function() action, {
+    required HazukiSourceFacade facade,
+  }) => _reloginCoordinator.runWithReloginRetry(
+    action,
+    context: SourceFacadeReloginContext(facade),
+  );
+
   Future<ComicCommentsPageResult> loadCommentsPage({
     required String comicId,
     String? subId,
@@ -10,8 +41,7 @@ extension HazukiSourceServiceCommentsCapability on HazukiSourceService {
     int pageSize = 16,
     String? replyTo,
   }) async {
-    final resolvedSourceKey = _resolveActiveSourceKey(sourceKey);
-    final facade = _handleFor(resolvedSourceKey).facade;
+    final facade = _facadeFor(sourceKey);
     await facade.ensureInitialized();
 
     final engine = facade.js.engine;
@@ -103,8 +133,7 @@ extension HazukiSourceServiceCommentsCapability on HazukiSourceService {
     required String content,
     String? replyTo,
   }) async {
-    final resolvedSourceKey = _resolveActiveSourceKey(sourceKey);
-    final facade = _handleFor(resolvedSourceKey).facade;
+    final facade = _facadeFor(sourceKey);
     await facade.ensureInitialized();
 
     final engine = facade.js.engine;
@@ -138,7 +167,7 @@ extension HazukiSourceServiceCommentsCapability on HazukiSourceService {
       await facade.js.resolve(result);
     }
 
-    await _runWithReloginRetry(runSend, targetFacade: facade);
+    await _runWithReloginRetry(runSend, facade: facade);
   }
 
   Future<void> likeComment({
@@ -148,8 +177,7 @@ extension HazukiSourceServiceCommentsCapability on HazukiSourceService {
     required String commentId,
     required bool isLike,
   }) async {
-    final resolvedSourceKey = _resolveActiveSourceKey(sourceKey);
-    final facade = _handleFor(resolvedSourceKey).facade;
+    final facade = _facadeFor(sourceKey);
     await facade.ensureInitialized();
 
     final engine = facade.js.engine;
@@ -167,12 +195,11 @@ extension HazukiSourceServiceCommentsCapability on HazukiSourceService {
       await facade.js.resolve(result);
     }
 
-    await _runWithReloginRetry(runLike, targetFacade: facade);
+    await _runWithReloginRetry(runLike, facade: facade);
   }
 
   bool supportCommentSendForSource(String sourceKey) {
-    final resolvedSourceKey = _resolveActiveSourceKey(sourceKey);
-    final facade = _handleFor(resolvedSourceKey).facade;
+    final facade = _facadeFor(sourceKey);
     final engine = facade.js.engine;
     if (engine == null) {
       return false;
@@ -183,8 +210,7 @@ extension HazukiSourceServiceCommentsCapability on HazukiSourceService {
   }
 
   bool supportCommentLikeForSource(String sourceKey) {
-    final resolvedSourceKey = _resolveActiveSourceKey(sourceKey);
-    final facade = _handleFor(resolvedSourceKey).facade;
+    final facade = _facadeFor(sourceKey);
     final engine = facade.js.engine;
     if (engine == null) {
       return false;
@@ -195,12 +221,12 @@ extension HazukiSourceServiceCommentsCapability on HazukiSourceService {
   }
 
   bool supportCommentRepliesForSource(String sourceKey) {
-    final resolvedSourceKey = _resolveActiveSourceKey(sourceKey);
+    final resolvedSourceKey = _resolveSourceKey(sourceKey);
     if (!isHazukiPicacgSourceKey(resolvedSourceKey) &&
         !isHazukiCopyMangaSourceKey(resolvedSourceKey)) {
       return false;
     }
-    final facade = _handleFor(resolvedSourceKey).facade;
+    final facade = _runtimeHost.handleFor(resolvedSourceKey).facade;
     final engine = facade.js.engine;
     if (engine == null) {
       return false;
