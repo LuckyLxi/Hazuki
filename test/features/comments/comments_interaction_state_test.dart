@@ -6,16 +6,19 @@ void main() {
     final state = CommentsInteractionState();
 
     expect(state.initialLoading, isTrue);
+    expect(state.initialLoadSucceeded, isFalse);
     expect(state.currentPage, 1);
     expect(state.replyComments, isEmpty);
 
     state
       ..initialLoading = false
+      ..initialLoadSucceeded = true
       ..currentPage = 3
       ..sendingComment = true;
     state.expandedReplyIds.add('comment-1');
 
     expect(state.initialLoading, isFalse);
+    expect(state.initialLoadSucceeded, isTrue);
     expect(state.currentPage, 3);
     expect(state.sendingComment, isTrue);
     expect(state.expandedReplyIds, {'comment-1'});

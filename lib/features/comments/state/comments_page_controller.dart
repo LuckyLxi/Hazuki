@@ -8,10 +8,12 @@ class CommentsPageController {
   CommentsPageController({
     required SourceCommentsGateway sourceService,
     required CommentFilterService filterService,
+    CommentsInteractionState? state,
   }) : _sourceService = sourceService,
-       _filterService = filterService;
+       _filterService = filterService,
+       state = state ?? CommentsInteractionState();
 
-  final CommentsInteractionState state = CommentsInteractionState();
+  final CommentsInteractionState state;
 
   final SourceCommentsGateway _sourceService;
   final CommentFilterService _filterService;
@@ -129,6 +131,7 @@ class CommentsInteractionState {
   List<ComicCommentData> comments = const [];
   String? errorMessage;
   bool initialLoading = true;
+  bool initialLoadSucceeded = false;
   bool loadingMore = false;
   int loadEpoch = 0;
   bool hasMore = true;

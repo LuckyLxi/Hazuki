@@ -1,4 +1,5 @@
 import 'package:flutter/widgets.dart';
+import 'package:hazuki/features/comments/state/comments_page_controller.dart';
 
 typedef CommentsWidgetBuilder =
     Widget Function({
@@ -12,6 +13,7 @@ typedef CommentsWidgetBuilder =
       bool isTabView,
       bool isActiveInTabView,
       Map<String, Object?> Function()? debugOuterScrollStateBuilder,
+      CommentsInteractionState? interactionState,
     });
 
 typedef ReaderCommentsWidgetBuilder =
@@ -22,6 +24,7 @@ typedef ReaderCommentsWidgetBuilder =
       required String sourceKey,
       ScrollController? scrollController,
       Future<void> Function()? onRequestTabFullscreen,
+      CommentsInteractionState? interactionState,
     });
 
 ReaderCommentsWidgetBuilder readerCommentsWidgetBuilderFrom(
@@ -34,6 +37,7 @@ ReaderCommentsWidgetBuilder readerCommentsWidgetBuilderFrom(
     required sourceKey,
     scrollController,
     onRequestTabFullscreen,
+    interactionState,
   }) => builder(
     comicId: comicId,
     subId: subId,
@@ -41,5 +45,6 @@ ReaderCommentsWidgetBuilder readerCommentsWidgetBuilderFrom(
     sourceKey: sourceKey,
     scrollController: scrollController,
     onRequestTabFullscreen: onRequestTabFullscreen,
+    interactionState: interactionState,
   );
 }

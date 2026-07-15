@@ -36,6 +36,7 @@ class CommentsPage extends StatefulWidget {
     this.scrollController,
     this.onRequestTabFullscreen,
     this.debugOuterScrollStateBuilder,
+    this.interactionState,
   });
 
   final SourceCommentsGateway sourceService;
@@ -50,6 +51,7 @@ class CommentsPage extends StatefulWidget {
   final ScrollController? scrollController;
   final Future<void> Function()? onRequestTabFullscreen;
   final Map<String, Object?> Function()? debugOuterScrollStateBuilder;
+  final CommentsInteractionState? interactionState;
 
   @override
   State<CommentsPage> createState() => _CommentsPageState();
@@ -127,12 +129,15 @@ class _CommentsPageState extends State<CommentsPage>
     _controller = CommentsPageController(
       sourceService: widget.sourceService,
       filterService: widget.filterService,
+      state: widget.interactionState,
     );
     WidgetsBinding.instance.addObserver(this);
     _commentFocusNode.addListener(_handleCommentFocusChanged);
     _controller.addFilterListener(_onFilterChanged);
     _refreshCommentCapabilities();
-    unawaited(_loadInitial());
+    if (!_interaction.initialLoadSucceeded) {
+      unawaited(_loadInitial());
+    }
   }
 
   void _refreshCommentCapabilities() {
@@ -511,6 +516,7 @@ class _CommentsPageState extends State<CommentsPage>
       _updateCommentsState(() {
         _comments = pageResult.comments;
         _errorMessage = null;
+        _interaction.initialLoadSucceeded = true;
         _refreshCommentCapabilities();
         _currentPage = 1;
         _maxPage = pageResult.maxPage;

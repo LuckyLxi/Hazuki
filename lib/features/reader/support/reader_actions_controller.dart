@@ -10,6 +10,7 @@ import 'package:hazuki/features/reader/support/reader_controller_support.dart';
 import 'package:hazuki/features/reader/support/reader_page_context.dart';
 import 'package:hazuki/features/reader/support/reader_session_controller.dart';
 import 'package:hazuki/features/reader/view/reader_comments_sheet.dart';
+import 'package:hazuki/features/comments/state/comments_page_controller.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/manga_download/manga_download_service.dart';
@@ -53,6 +54,8 @@ class ReaderActionsController {
 
   ComicDetailsData? _chapterDetailsCache;
   bool _chapterPanelLoading = false;
+  final CommentsInteractionState _commentsInteractionState =
+      CommentsInteractionState();
 
   bool get chapterPanelLoading => _chapterPanelLoading;
 
@@ -147,6 +150,7 @@ class ReaderActionsController {
                   ? details.sourceKey
                   : _pageContext.sourceKey,
               commentsWidgetBuilder: _pageContext.commentsWidgetBuilder,
+              interactionState: _commentsInteractionState,
             ),
           );
         },

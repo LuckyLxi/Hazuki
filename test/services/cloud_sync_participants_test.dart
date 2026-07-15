@@ -13,6 +13,7 @@ import 'package:hazuki/services/local_favorites_service.dart';
 import 'package:hazuki/services/read_history_service.dart';
 import 'package:hazuki/services/reading_progress_service.dart';
 import 'package:hazuki/services/storage/hazuki_database.dart';
+import 'package:hazuki/services/source/common/source_prefs_keys.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -206,4 +207,30 @@ void main() {
       );
     },
   );
+
+  test('settings participant syncs image storage cleanup mode only', () async {
+    SharedPreferences.setMockInitialValues({
+      SourcePrefsKeys.cacheMaxBytes: 1024 * 1024 * 1024,
+      SourcePrefsKeys.cacheAutoCleanMode: 'seven_days',
+      SourcePrefsKeys.cacheLastAutoCleanAt: 123456789,
+    });
+    final database = HazukiDatabase.memory();
+    addTearDown(database.close);
+    final groups = DownloadGroupsService(database: database);
+    addTearDown(groups.dispose);
+    final participant = CloudSyncSettingsParticipant(
+      localFavorites: LocalFavoritesSyncParticipant(
+        LocalFavoritesService(database: database),
+      ),
+      downloadGroups: DownloadGroupsSyncParticipant(groups),
+      commentFilter: const CommentFilterSyncParticipant(),
+    );
+
+    final exported = jsonDecode(await participant.exportSnapshot()) as Map;
+    final data = exported['data'] as Map;
+
+    expect(data, isNot(contains(SourcePrefsKeys.cacheMaxBytes)));
+    expect(data[SourcePrefsKeys.cacheAutoCleanMode], 'seven_days');
+    expect(data, isNot(contains(SourcePrefsKeys.cacheLastAutoCleanAt)));
+  });
 }

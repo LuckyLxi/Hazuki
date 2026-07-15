@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_page.dart';
+import 'package:hazuki/features/comments/state/comments_page_controller.dart';
 import 'package:hazuki/features/comic_detail/support/comic_detail_dependencies.dart';
 import 'package:hazuki/features/reader/support/reader_dependencies.dart';
 import 'package:hazuki/features/reader/view/reader_page.dart';
@@ -27,6 +28,7 @@ Widget _buildComments({
   bool isTabView = false,
   bool isActiveInTabView = true,
   Map<String, Object?> Function()? debugOuterScrollStateBuilder,
+  CommentsInteractionState? interactionState,
 }) {
   return const SizedBox.shrink();
 }

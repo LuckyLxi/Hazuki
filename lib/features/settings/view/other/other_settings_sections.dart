@@ -7,8 +7,6 @@ class OtherSettingsGeneralSection extends StatelessWidget {
   const OtherSettingsGeneralSection({
     super.key,
     required this.autoCheckInEnabled,
-    required this.autoSourceUpdateCheckEnabled,
-    required this.autoSoftwareUpdateCheckEnabled,
     required this.discoverDailyRecommendationEnabled,
     required this.showAutoCheckInSetting,
     required this.showJmExclusiveSettings,
@@ -16,8 +14,6 @@ class OtherSettingsGeneralSection extends StatelessWidget {
     required this.mangaDownloadsRootPath,
     required this.showWindowsTitleBarToggle,
     required this.onAutoCheckInChanged,
-    required this.onAutoSourceUpdateChanged,
-    required this.onAutoSoftwareUpdateChanged,
     required this.onDiscoverDailyRecommendationChanged,
     required this.onUseSystemTitleBarChanged,
     required this.onEditMangaDownloadPath,
@@ -25,8 +21,6 @@ class OtherSettingsGeneralSection extends StatelessWidget {
   });
 
   final bool autoCheckInEnabled;
-  final bool autoSourceUpdateCheckEnabled;
-  final bool autoSoftwareUpdateCheckEnabled;
   final bool discoverDailyRecommendationEnabled;
   final bool showAutoCheckInSetting;
   final bool showJmExclusiveSettings;
@@ -34,8 +28,6 @@ class OtherSettingsGeneralSection extends StatelessWidget {
   final String mangaDownloadsRootPath;
   final bool showWindowsTitleBarToggle;
   final ValueChanged<bool> onAutoCheckInChanged;
-  final ValueChanged<bool> onAutoSourceUpdateChanged;
-  final ValueChanged<bool> onAutoSoftwareUpdateChanged;
   final ValueChanged<bool> onDiscoverDailyRecommendationChanged;
   final ValueChanged<bool> onUseSystemTitleBarChanged;
   final VoidCallback onEditMangaDownloadPath;
@@ -54,20 +46,6 @@ class OtherSettingsGeneralSection extends StatelessWidget {
             value: autoCheckInEnabled,
             onChanged: onAutoCheckInChanged,
           ),
-        SwitchListTile(
-          secondary: const Icon(Icons.system_update_alt_rounded),
-          title: Text(strings.otherAutoSourceUpdateTitle),
-          subtitle: Text(strings.otherAutoSourceUpdateSubtitle),
-          value: autoSourceUpdateCheckEnabled,
-          onChanged: onAutoSourceUpdateChanged,
-        ),
-        SwitchListTile(
-          secondary: const Icon(Icons.mobile_friendly_rounded),
-          title: Text(strings.otherAutoSoftwareUpdateTitle),
-          subtitle: Text(strings.otherAutoSoftwareUpdateSubtitle),
-          value: autoSoftwareUpdateCheckEnabled,
-          onChanged: onAutoSoftwareUpdateChanged,
-        ),
         if (showJmExclusiveSettings)
           SwitchListTile(
             secondary: const Icon(Icons.auto_awesome_outlined),

@@ -6,6 +6,7 @@ import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_page.dart';
 import 'package:hazuki/features/comic_detail/support/comic_detail_dependencies.dart';
 import 'package:hazuki/features/comments/comments.dart';
+import 'package:hazuki/features/comments/state/comments_page_controller.dart';
 import 'package:hazuki/features/discover/discover.dart';
 import 'package:hazuki/features/downloads/downloads.dart';
 import 'package:hazuki/features/favorite/favorite.dart';
@@ -78,6 +79,7 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
     bool isTabView = false,
     bool isActiveInTabView = true,
     Map<String, Object?> Function()? debugOuterScrollStateBuilder,
+    CommentsInteractionState? interactionState,
   }) {
     return CommentsPage(
       sourceService: sl<SourceCommentsGateway>(),
@@ -92,6 +94,7 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
       scrollController: scrollController,
       onRequestTabFullscreen: onRequestTabFullscreen,
       debugOuterScrollStateBuilder: debugOuterScrollStateBuilder,
+      interactionState: interactionState,
     );
   }
 

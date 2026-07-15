@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/features/reader/support/reader_callbacks.dart';
+import 'package:hazuki/features/comments/state/comments_page_controller.dart';
 import 'package:hazuki/l10n/l10n.dart';
 
 class ReaderCommentsSheet extends StatefulWidget {
@@ -10,6 +11,7 @@ class ReaderCommentsSheet extends StatefulWidget {
     required this.subId,
     required this.chapterId,
     required this.commentsWidgetBuilder,
+    this.interactionState,
     this.sourceKey = '',
   });
 
@@ -18,6 +20,7 @@ class ReaderCommentsSheet extends StatefulWidget {
   final String chapterId;
   final String sourceKey;
   final ReaderCommentsWidgetBuilder commentsWidgetBuilder;
+  final CommentsInteractionState? interactionState;
 
   @override
   State<ReaderCommentsSheet> createState() => _ReaderCommentsSheetState();
@@ -140,6 +143,7 @@ class _ReaderCommentsSheetState extends State<ReaderCommentsSheet> {
                         sourceKey: widget.sourceKey,
                         scrollController: scrollController,
                         onRequestTabFullscreen: _expandToFullscreen,
+                        interactionState: widget.interactionState,
                       ),
                     ),
                   ],

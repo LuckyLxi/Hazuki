@@ -4,6 +4,7 @@ import 'package:hazuki/app/app.dart';
 import 'package:hazuki/app/home/home_feature_entrypoints.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/features/comments/comments.dart';
+import 'package:hazuki/features/comments/state/comments_page_controller.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_page.dart';
 import 'package:hazuki/features/comic_detail/support/comic_detail_dependencies.dart';
 import 'package:hazuki/features/downloads/downloads.dart';
@@ -43,6 +44,7 @@ Widget _buildComments({
   bool isTabView = false,
   bool isActiveInTabView = true,
   Map<String, Object?> Function()? debugOuterScrollStateBuilder,
+  CommentsInteractionState? interactionState,
 }) {
   return const SizedBox.shrink();
 }

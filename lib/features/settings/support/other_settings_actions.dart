@@ -69,21 +69,31 @@ class OtherSettingsSnapshot {
 class OtherSettingsActions {
   const OtherSettingsActions._();
 
+  static Future<({bool source, bool software})>
+  loadUpdateCheckSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    return (
+      source:
+          prefs.getBool(hazukiAutoSourceUpdateCheckEnabledPreferenceKey) ??
+          true,
+      software:
+          prefs.getBool(hazukiAutoSoftwareUpdateCheckEnabledPreferenceKey) ??
+          true,
+    );
+  }
+
   static Future<OtherSettingsSnapshot> loadSettings({
     required bool initialUseSystemTitleBar,
   }) async {
     final prefs = await SharedPreferences.getInstance();
+    final updateChecks = await loadUpdateCheckSettings();
     final mangaDownloadsRootPath =
         await MangaDownloadAccess.loadDownloadsRootPath(prefs: prefs);
     return OtherSettingsSnapshot(
       autoCheckInEnabled:
           prefs.getBool(hazukiAutoCheckInEnabledPreferenceKey) ?? false,
-      autoSourceUpdateCheckEnabled:
-          prefs.getBool(hazukiAutoSourceUpdateCheckEnabledPreferenceKey) ??
-          true,
-      autoSoftwareUpdateCheckEnabled:
-          prefs.getBool(hazukiAutoSoftwareUpdateCheckEnabledPreferenceKey) ??
-          true,
+      autoSourceUpdateCheckEnabled: updateChecks.source,
+      autoSoftwareUpdateCheckEnabled: updateChecks.software,
       discoverDailyRecommendationEnabled:
           prefs.getBool(
             hazukiDiscoverDailyRecommendationEnabledPreferenceKey,

@@ -9,12 +9,16 @@ class AdvancedSettingsContent extends StatelessWidget {
     required this.loading,
     required this.noImageMode,
     required this.softwareLogCaptureEnabled,
+    required this.autoSourceUpdateCheckEnabled,
+    required this.autoSoftwareUpdateCheckEnabled,
     required this.softwareUpdateSource,
     required this.hasCustomEditedSource,
     required this.showCopyMangaSettings,
     required this.logsPageBuilder,
     required this.onToggleNoImageMode,
     required this.onToggleSoftwareLogCaptureEnabled,
+    required this.onToggleAutoSourceUpdateCheck,
+    required this.onToggleAutoSoftwareUpdateCheck,
     required this.onSoftwareUpdateSourceChanged,
     required this.onOpenComicSourceEditor,
     required this.onRestoreComicSource,
@@ -24,12 +28,16 @@ class AdvancedSettingsContent extends StatelessWidget {
   final bool loading;
   final bool noImageMode;
   final bool softwareLogCaptureEnabled;
+  final bool autoSourceUpdateCheckEnabled;
+  final bool autoSoftwareUpdateCheckEnabled;
   final SoftwareUpdateSource softwareUpdateSource;
   final bool hasCustomEditedSource;
   final bool showCopyMangaSettings;
   final WidgetBuilder logsPageBuilder;
   final ValueChanged<bool> onToggleNoImageMode;
   final ValueChanged<bool> onToggleSoftwareLogCaptureEnabled;
+  final ValueChanged<bool> onToggleAutoSourceUpdateCheck;
+  final ValueChanged<bool> onToggleAutoSoftwareUpdateCheck;
   final ValueChanged<SoftwareUpdateSource> onSoftwareUpdateSourceChanged;
   final Future<void> Function() onOpenComicSourceEditor;
   final Future<void> Function() onRestoreComicSource;
@@ -74,6 +82,20 @@ class AdvancedSettingsContent extends StatelessWidget {
               subtitle: Text(strings.advancedSoftwareLogCaptureSubtitle),
               value: softwareLogCaptureEnabled,
               onChanged: onToggleSoftwareLogCaptureEnabled,
+            ),
+            SwitchListTile(
+              secondary: const Icon(Icons.system_update_alt_rounded),
+              title: Text(strings.otherAutoSourceUpdateTitle),
+              subtitle: Text(strings.otherAutoSourceUpdateSubtitle),
+              value: autoSourceUpdateCheckEnabled,
+              onChanged: onToggleAutoSourceUpdateCheck,
+            ),
+            SwitchListTile(
+              secondary: const Icon(Icons.mobile_friendly_rounded),
+              title: Text(strings.otherAutoSoftwareUpdateTitle),
+              subtitle: Text(strings.otherAutoSoftwareUpdateSubtitle),
+              value: autoSoftwareUpdateCheckEnabled,
+              onChanged: onToggleAutoSoftwareUpdateCheck,
             ),
             ListTile(
               leading: const Icon(Icons.system_update_alt_outlined),

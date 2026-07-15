@@ -70,20 +70,6 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
     await OtherSettingsActions.toggleAutoCheckIn(value);
   }
 
-  Future<void> _toggleAutoSourceUpdateCheck(bool value) async {
-    setState(() {
-      _snapshot = _snapshot.copyWith(autoSourceUpdateCheckEnabled: value);
-    });
-    await OtherSettingsActions.toggleAutoSourceUpdateCheck(context, value);
-  }
-
-  Future<void> _toggleAutoSoftwareUpdateCheck(bool value) async {
-    setState(() {
-      _snapshot = _snapshot.copyWith(autoSoftwareUpdateCheckEnabled: value);
-    });
-    await OtherSettingsActions.toggleAutoSoftwareUpdateCheck(context, value);
-  }
-
   Future<void> _toggleDiscoverDailyRecommendation(bool value) async {
     setState(() {
       _snapshot = _snapshot.copyWith(discoverDailyRecommendationEnabled: value);
@@ -149,10 +135,6 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
                 children: [
                   OtherSettingsGeneralSection(
                     autoCheckInEnabled: _snapshot.autoCheckInEnabled,
-                    autoSourceUpdateCheckEnabled:
-                        _snapshot.autoSourceUpdateCheckEnabled,
-                    autoSoftwareUpdateCheckEnabled:
-                        _snapshot.autoSoftwareUpdateCheckEnabled,
                     discoverDailyRecommendationEnabled:
                         _snapshot.discoverDailyRecommendationEnabled,
                     showAutoCheckInSetting:
@@ -163,8 +145,6 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
                     showWindowsTitleBarToggle:
                         Theme.of(context).platform == TargetPlatform.windows,
                     onAutoCheckInChanged: _toggleAutoCheckIn,
-                    onAutoSourceUpdateChanged: _toggleAutoSourceUpdateCheck,
-                    onAutoSoftwareUpdateChanged: _toggleAutoSoftwareUpdateCheck,
                     onDiscoverDailyRecommendationChanged:
                         _toggleDiscoverDailyRecommendation,
                     onUseSystemTitleBarChanged: _toggleUseSystemTitleBar,
