@@ -70,6 +70,13 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
     await OtherSettingsActions.toggleAutoCheckIn(value);
   }
 
+  Future<void> _toggleAggregateSearch(bool value) async {
+    setState(() {
+      _snapshot = _snapshot.copyWith(aggregateSearchEnabled: value);
+    });
+    await OtherSettingsActions.toggleAggregateSearch(value);
+  }
+
   Future<void> _toggleDiscoverDailyRecommendation(bool value) async {
     setState(() {
       _snapshot = _snapshot.copyWith(discoverDailyRecommendationEnabled: value);
@@ -135,6 +142,7 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
                 children: [
                   OtherSettingsGeneralSection(
                     autoCheckInEnabled: _snapshot.autoCheckInEnabled,
+                    aggregateSearchEnabled: _snapshot.aggregateSearchEnabled,
                     discoverDailyRecommendationEnabled:
                         _snapshot.discoverDailyRecommendationEnabled,
                     showAutoCheckInSetting:
@@ -145,6 +153,7 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
                     showWindowsTitleBarToggle:
                         Theme.of(context).platform == TargetPlatform.windows,
                     onAutoCheckInChanged: _toggleAutoCheckIn,
+                    onAggregateSearchChanged: _toggleAggregateSearch,
                     onDiscoverDailyRecommendationChanged:
                         _toggleDiscoverDailyRecommendation,
                     onUseSystemTitleBarChanged: _toggleUseSystemTitleBar,
