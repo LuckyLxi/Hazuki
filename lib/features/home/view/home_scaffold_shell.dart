@@ -28,7 +28,7 @@ Future<void> handleHomePopRequest({
   }
 }
 
-class HomeScaffoldShell extends StatelessWidget {
+class HomeScaffoldShell extends StatefulWidget {
   const HomeScaffoldShell({
     super.key,
     required this.scaffoldKey,
@@ -107,23 +107,89 @@ class HomeScaffoldShell extends StatelessWidget {
   final ValueChanged<int> onDestinationSelected;
 
   @override
+  State<HomeScaffoldShell> createState() => _HomeScaffoldShellState();
+}
+
+class _HomeScaffoldShellState extends State<HomeScaffoldShell>
+    with SingleTickerProviderStateMixin {
+  static const _profileDrawerDuration = Duration(milliseconds: 210);
+  static const _profileDrawerReverseDuration = Duration(milliseconds: 160);
+  late final AnimationController _profileDrawerController = AnimationController(
+    vsync: this,
+    duration: _profileDrawerDuration,
+    reverseDuration: _profileDrawerReverseDuration,
+  );
+
+  GlobalKey<ScaffoldState> get scaffoldKey => widget.scaffoldKey;
+  int get currentIndex => widget.currentIndex;
+  double get discoverSearchMorphProgress => widget.discoverSearchMorphProgress;
+  bool get usePinnedDiscoverSearch => widget.usePinnedDiscoverSearch;
+  HomeDownloadStatusListenable get downloadStatus => widget.downloadStatus;
+  String get activeSourceKey => widget.activeSourceKey;
+  bool get supportsSourceAccount => widget.supportsSourceAccount;
+  String? get avatarUrl => widget.avatarUrl;
+  bool get profileLoading => widget.profileLoading;
+  String get username => widget.username;
+  FavoriteAppBarActionsState get favoriteAppBarActions =>
+      widget.favoriteAppBarActions;
+  Future<bool> Function() get onWillPop => widget.onWillPop;
+  Future<void> Function() get onExitRequested => widget.onExitRequested;
+  VoidCallback get onOpenSearch => widget.onOpenSearch;
+  ValueChanged<String> get onFavoriteSortSelected =>
+      widget.onFavoriteSortSelected;
+  VoidCallback get onFavoriteCreateFolderPressed =>
+      widget.onFavoriteCreateFolderPressed;
+  VoidCallback get onFavoriteModeTogglePressed =>
+      widget.onFavoriteModeTogglePressed;
+  VoidCallback? get onProfileTap => widget.onProfileTap;
+  VoidCallback? get onCheckInPressed => widget.onCheckInPressed;
+  VoidCallback? get onSwitchSourcePressed => widget.onSwitchSourcePressed;
+  VoidCallback get onOpenHistory => widget.onOpenHistory;
+  VoidCallback get onOpenCategories => widget.onOpenCategories;
+  VoidCallback get onOpenRanking => widget.onOpenRanking;
+  VoidCallback get onOpenDownloads => widget.onOpenDownloads;
+  VoidCallback get onOpenDownloadTasks => widget.onOpenDownloadTasks;
+  VoidCallback get onOpenSettings => widget.onOpenSettings;
+  VoidCallback get onOpenLines => widget.onOpenLines;
+  HomeDrawerDestination? get selectedDrawerDestination =>
+      widget.selectedDrawerDestination;
+  ValueChanged<int> get onDestinationSelected => widget.onDestinationSelected;
+
+  @override
+  void dispose() {
+    _profileDrawerController.dispose();
+    super.dispose();
+  }
+
+  void _setProfileDrawerOpen(bool isOpen) {
+    if (!mounted) {
+      return;
+    }
+    if (isOpen) {
+      _profileDrawerController.forward();
+    } else {
+      _profileDrawerController.reverse();
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final drawerVisualKey =
-        '$activeSourceKey|${avatarUrl ?? ''}|$profileLoading|$isLogged|$username';
+        '$activeSourceKey|${avatarUrl ?? ''}|$profileLoading|${widget.isLogged}|$username';
     final homeContent = HomeContentStack(
       currentIndex: currentIndex,
-      discoverChild: discoverChild,
-      favoriteChild: favoriteChild,
+      discoverChild: widget.discoverChild,
+      favoriteChild: widget.favoriteChild,
     );
     final sidebarProfile = HomeSidebarProfileState(
-      isLogged: isLogged,
+      isLogged: widget.isLogged,
       profileLoading: profileLoading,
       avatarUrl: avatarUrl,
       username: username,
-      autoCheckInEnabled: autoCheckInEnabled,
-      showCheckInActions: showCheckInActions,
-      checkInBusy: checkInBusy,
-      checkedInToday: checkedInToday,
+      autoCheckInEnabled: widget.autoCheckInEnabled,
+      showCheckInActions: widget.showCheckInActions,
+      checkInBusy: widget.checkInBusy,
+      checkedInToday: widget.checkedInToday,
     );
     final sidebarActions = HomeSidebarActions(
       onProfileTap: supportsSourceAccount ? onProfileTap : null,
@@ -192,74 +258,91 @@ class HomeScaffoldShell extends StatelessWidget {
           ),
         );
       },
-      child: WindowsComicDetailHost(
-        child: ListenableBuilder(
-          listenable: downloadStatus,
-          builder: (context, _) {
-            final hasDownloadTasks = downloadStatus.hasTasks;
-            return TweenAnimationBuilder<double>(
-              tween: Tween<double>(end: hasDownloadTasks ? 118 : 56),
-              duration: const Duration(milliseconds: 260),
-              curve: Curves.easeOutCubic,
-              builder: (context, leadingWidth, _) {
-                return Scaffold(
-                  key: scaffoldKey,
-                  extendBody: true,
-                  appBar: hazukiFrostedAppBar(
-                    context: context,
-                    leading: Platform.isWindows
-                        ? null
-                        : _HomeAppBarProfileButton(
-                            downloadStatus: downloadStatus,
-                            activeSourceKey: activeSourceKey,
-                            avatarUrl: avatarUrl,
-                            profileLoading: profileLoading,
-                            username: username,
-                            drawerContent: mobileDrawerContent,
-                            onOpenDownloads: onOpenDownloadTasks,
-                          ),
-                    leadingWidth: Platform.isWindows ? null : leadingWidth,
-                    automaticallyImplyLeading: false,
-                    title: currentIndex == 1
-                        ? null
-                        : _HomeAppBarSearchBox(
+      child: ColoredBox(
+        color: Theme.of(context).colorScheme.surface,
+        child: AnimatedBuilder(
+          animation: _profileDrawerController,
+          child: WindowsComicDetailHost(
+            child: ListenableBuilder(
+              listenable: downloadStatus,
+              builder: (context, _) {
+                final hasDownloadTasks = downloadStatus.hasTasks;
+                return TweenAnimationBuilder<double>(
+                  tween: Tween<double>(end: hasDownloadTasks ? 118 : 56),
+                  duration: const Duration(milliseconds: 260),
+                  curve: Curves.easeOutCubic,
+                  builder: (context, leadingWidth, _) {
+                    return Scaffold(
+                      key: scaffoldKey,
+                      extendBody: true,
+                      appBar: hazukiFrostedAppBar(
+                        context: context,
+                        leading: Platform.isWindows
+                            ? null
+                            : _HomeAppBarProfileButton(
+                                downloadStatus: downloadStatus,
+                                activeSourceKey: activeSourceKey,
+                                avatarUrl: avatarUrl,
+                                profileLoading: profileLoading,
+                                username: username,
+                                drawerContent: mobileDrawerContent,
+                                onOpenDownloads: onOpenDownloadTasks,
+                                onDrawerVisibilityChanged:
+                                    _setProfileDrawerOpen,
+                              ),
+                        leadingWidth: Platform.isWindows ? null : leadingWidth,
+                        automaticallyImplyLeading: false,
+                        title: currentIndex == 1
+                            ? null
+                            : _HomeAppBarSearchBox(
+                                onOpenSearch: onOpenSearch,
+                                maxWidth: Platform.isWindows ? 320 : null,
+                              ),
+                        titleSpacing: Platform.isWindows ? null : 4,
+                        centerTitle: Platform.isWindows,
+                        enableBlur: currentIndex != 0 && currentIndex != 1,
+                        actions: [
+                          HomeAppBarActions(
+                            currentIndex: currentIndex,
+                            discoverSearchMorphProgress:
+                                discoverSearchMorphProgress,
+                            forceDiscoverSearchInAppBar:
+                                usePinnedDiscoverSearch,
+                            favoriteAppBarActions: favoriteAppBarActions,
                             onOpenSearch: onOpenSearch,
-                            maxWidth: Platform.isWindows ? 320 : null,
+                            onFavoriteSortSelected: onFavoriteSortSelected,
+                            onFavoriteCreateFolderPressed:
+                                onFavoriteCreateFolderPressed,
+                            onFavoriteModeTogglePressed:
+                                onFavoriteModeTogglePressed,
                           ),
-                    titleSpacing: Platform.isWindows ? null : 4,
-                    centerTitle: Platform.isWindows,
-                    enableBlur: currentIndex != 0 && currentIndex != 1,
-                    actions: [
-                      HomeAppBarActions(
-                        currentIndex: currentIndex,
-                        discoverSearchMorphProgress:
-                            discoverSearchMorphProgress,
-                        forceDiscoverSearchInAppBar: usePinnedDiscoverSearch,
-                        favoriteAppBarActions: favoriteAppBarActions,
-                        onOpenSearch: onOpenSearch,
-                        onFavoriteSortSelected: onFavoriteSortSelected,
-                        onFavoriteCreateFolderPressed:
-                            onFavoriteCreateFolderPressed,
-                        onFavoriteModeTogglePressed:
-                            onFavoriteModeTogglePressed,
+                        ],
                       ),
-                    ],
-                  ),
-                  drawerEnableOpenDragGesture: false,
-                  drawer: null,
-                  body: body,
-                  bottomNavigationBar: Platform.isWindows
-                      ? null
-                      : HomeBottomNavigation(
-                          currentIndex: currentIndex,
-                          onDestinationSelected: onDestinationSelected,
-                          discoverLabel: l10n(context).homeTabDiscover,
-                          favoriteLabel: l10n(context).homeTabFavorite,
-                        ),
+                      drawerEnableOpenDragGesture: false,
+                      drawer: null,
+                      body: body,
+                      bottomNavigationBar: Platform.isWindows
+                          ? null
+                          : HomeBottomNavigation(
+                              currentIndex: currentIndex,
+                              onDestinationSelected: onDestinationSelected,
+                              discoverLabel: l10n(context).homeTabDiscover,
+                              favoriteLabel: l10n(context).homeTabFavorite,
+                            ),
+                    );
+                  },
                 );
               },
-            );
-          },
+            ),
+          ),
+          builder: (context, child) => Transform.translate(
+            offset: Offset(18 * _profileDrawerController.value, 0),
+            child: Transform.scale(
+              scale: 1 - 0.035 * _profileDrawerController.value,
+              alignment: Alignment.centerRight,
+              child: child,
+            ),
+          ),
         ),
       ),
     );
@@ -275,6 +358,7 @@ class _HomeAppBarProfileButton extends StatefulWidget {
     required this.username,
     required this.drawerContent,
     required this.onOpenDownloads,
+    required this.onDrawerVisibilityChanged,
   });
 
   final HomeDownloadStatusListenable downloadStatus;
@@ -284,6 +368,7 @@ class _HomeAppBarProfileButton extends StatefulWidget {
   final String username;
   final Widget drawerContent;
   final VoidCallback onOpenDownloads;
+  final ValueChanged<bool> onDrawerVisibilityChanged;
 
   @override
   State<_HomeAppBarProfileButton> createState() =>
@@ -442,16 +527,19 @@ class _HomeAppBarProfileButtonState extends State<_HomeAppBarProfileButton> {
 
   void _openProfileDrawer() {
     final context = this.context;
-    Navigator.of(context).push(
-      _HomeProfileDrawerRoute(
-        drawerWidth: resolveHomeDrawerWidth(context),
-        drawerColor:
-            DrawerTheme.of(context).backgroundColor ??
-            Theme.of(context).drawerTheme.backgroundColor ??
-            Theme.of(context).colorScheme.surface,
-        drawerContentListenable: _drawerContentNotifier,
-      ),
-    );
+    widget.onDrawerVisibilityChanged(true);
+    Navigator.of(context)
+        .push(
+          _HomeProfileDrawerRoute(
+            drawerWidth: resolveHomeDrawerWidth(context),
+            drawerColor:
+                DrawerTheme.of(context).backgroundColor ??
+                Theme.of(context).drawerTheme.backgroundColor ??
+                Theme.of(context).colorScheme.surface,
+            drawerContentListenable: _drawerContentNotifier,
+          ),
+        )
+        .whenComplete(() => widget.onDrawerVisibilityChanged(false));
   }
 }
 
@@ -578,10 +666,10 @@ class _HomeProfileDrawerRoute extends PageRoute<void> {
   bool get maintainState => true;
 
   @override
-  Duration get transitionDuration => const Duration(milliseconds: 320);
+  Duration get transitionDuration => const Duration(milliseconds: 210);
 
   @override
-  Duration get reverseTransitionDuration => const Duration(milliseconds: 240);
+  Duration get reverseTransitionDuration => const Duration(milliseconds: 160);
 
   @override
   void didChangeNext(Route<dynamic>? nextRoute) {
