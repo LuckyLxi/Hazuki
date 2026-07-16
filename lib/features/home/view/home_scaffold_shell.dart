@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -715,13 +714,7 @@ class _HomeProfileDrawerRoute extends PageRoute<void> {
     );
     return Stack(
       children: [
-        FadeTransition(
-          opacity: animation,
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-            child: const SizedBox.expand(),
-          ),
-        ),
+        FadeTransition(opacity: animation, child: const SizedBox.expand()),
         SlideTransition(
           position: Tween<Offset>(
             begin: const Offset(-1, 0),
