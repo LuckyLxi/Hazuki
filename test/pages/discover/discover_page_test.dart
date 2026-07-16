@@ -5,7 +5,7 @@ import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/features/discover/view/discover_page.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/runtime/source_runtime_assembly.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
@@ -30,7 +30,9 @@ void main() {
     testWidgets('shows login action for Picacg discover before sign in', (
       tester,
     ) async {
-      await sl<HazukiSourceService>().activateSource('picacg');
+      await sl<SourceRuntimeAssembly>().runtimeRegistry.activateSource(
+        'picacg',
+      );
       var loginRequests = 0;
 
       await tester.pumpWidget(

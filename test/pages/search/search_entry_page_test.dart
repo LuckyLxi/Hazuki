@@ -12,7 +12,7 @@ import 'package:hazuki/features/search/search.dart';
 import 'package:hazuki/features/search/view/search_entry_page.dart';
 import 'package:hazuki/features/search/view/search_id_extract_pill.dart';
 import 'package:hazuki/services/search_history_service.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/runtime/source_runtime_assembly.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../support/test_service_locator.dart';
@@ -464,7 +464,9 @@ void main() {
     SharedPreferences.setMockInitialValues({
       hazukiComicIdSearchEnhancePreferenceKey: true,
     });
-    await sl<HazukiSourceService>().activateSource('copy_manga');
+    await sl<SourceRuntimeAssembly>().runtimeRegistry.activateSource(
+      'copy_manga',
+    );
 
     await tester.pumpWidget(
       _buildTestApp(

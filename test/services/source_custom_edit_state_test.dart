@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/app/service_locator.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/runtime/source_runtime_assembly.dart';
 import 'package:hazuki/services/source/common/source_prefs_keys.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -19,11 +19,19 @@ void main() {
       SourcePrefsKeys.customEditedSource('jm'): false,
     });
 
-    final sourceService = sl<HazukiSourceService>();
-    expect(await sourceService.hasCustomEditedActiveSource(), isFalse);
+    final sourceService = sl<SourceRuntimeAssembly>();
+    expect(
+      await sourceService.testing.runtimeOperations
+          .hasCustomEditedActiveSource(),
+      isFalse,
+    );
 
-    await sourceService.activateSource('copy_manga');
-    expect(await sourceService.hasCustomEditedActiveSource(), isTrue);
+    await sourceService.runtimeRegistry.activateSource('copy_manga');
+    expect(
+      await sourceService.testing.runtimeOperations
+          .hasCustomEditedActiveSource(),
+      isTrue,
+    );
   });
 
   test('legacy custom edited JM flag only applies to JM source', () async {
@@ -31,8 +39,16 @@ void main() {
       SourcePrefsKeys.customEditedJmSource: true,
     });
 
-    final sourceService = sl<HazukiSourceService>();
-    expect(await sourceService.hasCustomEditedSource('jm'), isTrue);
-    expect(await sourceService.hasCustomEditedSource('copy_manga'), isFalse);
+    final sourceService = sl<SourceRuntimeAssembly>();
+    expect(
+      await sourceService.testing.runtimeOperations.hasCustomEditedSource('jm'),
+      isTrue,
+    );
+    expect(
+      await sourceService.testing.runtimeOperations.hasCustomEditedSource(
+        'copy_manga',
+      ),
+      isFalse,
+    );
   });
 }

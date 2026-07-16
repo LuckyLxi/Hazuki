@@ -21,20 +21,20 @@ class HazukiAppController {
     required HazukiAppSettingsStore settingsStore,
     required HazukiThemeController themeController,
     required HazukiWindowsTitleBarController windowsTitleBarController,
-    required SourceRuntimeGateway sourceRuntime,
+    required SourceSyncGateway sourceSync,
     required Future<void> Function() reloadLocale,
     required VoidCallback refreshHome,
   }) : _settingsStore = settingsStore,
        _themeController = themeController,
        _windowsTitleBarController = windowsTitleBarController,
-       _sourceRuntime = sourceRuntime,
+       _sourceSync = sourceSync,
        _reloadLocale = reloadLocale,
        _refreshHome = refreshHome;
 
   final HazukiAppSettingsStore _settingsStore;
   final HazukiThemeController _themeController;
   final HazukiWindowsTitleBarController _windowsTitleBarController;
-  final SourceRuntimeGateway _sourceRuntime;
+  final SourceSyncGateway _sourceSync;
   final Future<void> Function() _reloadLocale;
   final VoidCallback _refreshHome;
 
@@ -52,7 +52,7 @@ class HazukiAppController {
     var sourceNeedsRestart = false;
     if (result.restoredSourceFile) {
       try {
-        await _sourceRuntime.reloadFromLocalSourceFiles();
+        await _sourceSync.reloadFromLocalSourceFiles();
         sourceReloaded = true;
       } catch (_) {
         sourceNeedsRestart = true;

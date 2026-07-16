@@ -3,6 +3,7 @@ import 'package:hazuki/features/comments/support/comments_content_support.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/comment_filter_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
+import 'package:hazuki/shared/comments/comments_interaction_state.dart';
 
 class CommentsPageController {
   CommentsPageController({
@@ -123,30 +124,4 @@ class CommentsPageController {
         .where((c) => !_filterService.isFiltered(commentFilterText(c.content)))
         .toList();
   }
-}
-
-/// Mutable interaction state owned by the comments controller. The widget
-/// remains responsible only for Flutter objects such as focus and scrolling.
-class CommentsInteractionState {
-  List<ComicCommentData> comments = const [];
-  String? errorMessage;
-  bool initialLoading = true;
-  bool initialLoadSucceeded = false;
-  bool loadingMore = false;
-  int loadEpoch = 0;
-  bool hasMore = true;
-  bool sendingComment = false;
-  bool hideFilterLoadMoreQueued = false;
-  bool supportCommentLike = false;
-  bool supportCommentReplies = false;
-  int currentPage = 1;
-  int? maxPage;
-  ComicCommentData? replyToComment;
-  final Set<String> likingCommentIds = <String>{};
-  final Set<String> expandedReplyIds = <String>{};
-  final Set<String> loadingReplyIds = <String>{};
-  final Map<String, List<ComicCommentData>> replyComments = {};
-  final Map<String, int> replyPages = {};
-  final Map<String, int?> replyMaxPages = {};
-  final Map<String, bool> replyHasMore = {};
 }

@@ -10,7 +10,7 @@ import 'history_page_state.dart';
 class HistoryPageController extends ChangeNotifier {
   HistoryPageController({
     required ReadHistoryService readHistoryService,
-    required SourceRuntimeGateway sourceService,
+    required SourceSelectionGateway sourceService,
   }) : _readHistoryService = readHistoryService,
        _sourceService = sourceService,
        _activeSourceKey = _normalizeSourceKey(sourceService.activeSourceKey) {
@@ -19,7 +19,7 @@ class HistoryPageController extends ChangeNotifier {
   }
 
   final ReadHistoryService _readHistoryService;
-  final SourceRuntimeGateway _sourceService;
+  final SourceSelectionGateway _sourceService;
   final HistoryPageData _state = HistoryPageData();
 
   bool _disposed = false;

@@ -2,10 +2,13 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'package:hazuki/app/service_locator.dart';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/runtime/source_runtime_assembly.dart';
+import 'package:hazuki/services/source/runtime/source_runtime_view.dart';
+import 'package:hazuki/services/source/content/source_content_operations.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -139,7 +142,11 @@ void main() {
     test('stops after three consecutive search failures', () async {
       final source = _SearchCountingSource(throwOnSearch: true);
       final service = DiscoverDailyRecommendationService(
-        source: HazukiSourceDailyRecommendationAdapter(source),
+        source: HazukiSourceDailyRecommendationAdapter(
+          runtime: source.testRuntimeView,
+          image: source.testing.image,
+          content: source.testContent,
+        ),
       );
       addTearDown(source.dispose);
       addTearDown(service.dispose);
@@ -153,7 +160,11 @@ void main() {
     test('limits attempts when searches return no comics', () async {
       final source = _SearchCountingSource();
       final service = DiscoverDailyRecommendationService(
-        source: HazukiSourceDailyRecommendationAdapter(source),
+        source: HazukiSourceDailyRecommendationAdapter(
+          runtime: source.testRuntimeView,
+          image: source.testing.image,
+          content: source.testContent,
+        ),
       );
       addTearDown(source.dispose);
       addTearDown(service.dispose);
@@ -167,7 +178,11 @@ void main() {
     test('stops retrying when the active source changes', () async {
       final source = _SearchCountingSource(switchSourceOnFirstSearch: true);
       final service = DiscoverDailyRecommendationService(
-        source: HazukiSourceDailyRecommendationAdapter(source),
+        source: HazukiSourceDailyRecommendationAdapter(
+          runtime: source.testRuntimeView,
+          image: source.testing.image,
+          content: source.testContent,
+        ),
       );
       addTearDown(source.dispose);
       addTearDown(service.dispose);
@@ -266,7 +281,9 @@ void main() {
             titlePrefix: 'Copy',
           ),
         });
-        await sl<HazukiSourceService>().activateSource('copy_manga');
+        await sl<SourceRuntimeAssembly>().runtimeRegistry.activateSource(
+          'copy_manga',
+        );
 
         final state = await sl<DiscoverDailyRecommendationService>()
             .ensurePrepared(enabled: true);
@@ -278,7 +295,7 @@ void main() {
   });
 }
 
-class _SearchCountingSource extends HazukiSourceService {
+class _SearchCountingSource extends SourceRuntimeAssembly {
   _SearchCountingSource({
     this.throwOnSearch = false,
     this.switchSourceOnFirstSearch = false,
@@ -288,17 +305,16 @@ class _SearchCountingSource extends HazukiSourceService {
   final bool switchSourceOnFirstSearch;
   int searchCalls = 0;
   String _activeSourceKey = 'jm';
+  late final _SearchCountingRuntimeView testRuntimeView =
+      _SearchCountingRuntimeView(this);
+  late final SourceContentOperations testContent = _SearchCountingContent(this);
 
-  @override
   String get activeSourceKey => _activeSourceKey;
 
-  @override
   bool get isActiveJmSource => _activeSourceKey == 'jm';
 
-  @override
   bool get isInitialized => true;
 
-  @override
   Future<SearchComicsResult> searchComics({
     required String keyword,
     required int page,
@@ -315,6 +331,62 @@ class _SearchCountingSource extends HazukiSourceService {
     }
     return const SearchComicsResult(comics: <ExploreComic>[], maxPage: 0);
   }
+}
+
+class _SearchCountingContent implements SourceContentOperations {
+  _SearchCountingContent(this._source);
+
+  final _SearchCountingSource _source;
+
+  @override
+  Future<SearchComicsResult> searchComics({
+    required String keyword,
+    required int page,
+    String order = 'mr',
+    String sourceKey = '',
+  }) => _source.searchComics(
+    keyword: keyword,
+    page: page,
+    order: order,
+    sourceKey: sourceKey,
+  );
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _SearchCountingRuntimeView extends ChangeNotifier
+    implements SourceRuntimeView {
+  _SearchCountingRuntimeView(this._source);
+
+  final _SearchCountingSource _source;
+
+  @override
+  String get activeSourceKey => _source.activeSourceKey;
+  @override
+  bool get isActiveJmSource => _source.isActiveJmSource;
+  @override
+  bool get isActiveCopyMangaSource => false;
+  @override
+  bool get isActiveDailyCheckInSource => false;
+  @override
+  bool get isInitialized => true;
+  @override
+  SourceRuntimeState get sourceRuntimeState => const SourceRuntimeState.idle();
+  @override
+  SourceRuntimeState get runtimeState => const SourceRuntimeState.idle();
+  @override
+  SourceMeta? get sourceMeta => null;
+  @override
+  SourceRuntimeRegistry get runtimeRegistry => _source.runtimeRegistry;
+  @override
+  Future<void> activateSource(String sourceKey) async {}
+  @override
+  Future<void> loadActiveSourcePreference() async {}
+  @override
+  Future<void> prewarmInBackground() async {}
+  @override
+  void logRuntimeRetryRequested(String source) {}
 }
 
 List<DiscoverDailyRecommendationEntry> _recommendationEntries(

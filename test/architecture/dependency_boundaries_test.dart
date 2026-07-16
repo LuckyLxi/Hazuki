@@ -35,11 +35,12 @@ void main() {
     expect(violations, isEmpty, reason: violations.join('\n'));
   });
 
-  test('source gateways do not import the concrete source service', () {
+  test('source gateways do not import runtime implementations', () {
     final violations = <String>[];
     for (final file in _dartFilesUnder('lib/services/source/gateways')) {
       for (final line in file.readAsLinesSync()) {
-        if (line.contains('hazuki_source_service.dart')) {
+        if (line.contains('source_runtime_assembly.dart') ||
+            line.contains('source_runtime_capability.dart')) {
           violations.add('${file.path}: $line');
         }
       }
@@ -47,7 +48,7 @@ void main() {
     expect(violations, isEmpty, reason: violations.join('\n'));
   });
 
-  test('source runtime components do not import the concrete service', () {
+  test('source runtime components do not import the source assembly', () {
     final violations = <String>[];
     for (final directory in const [
       'lib/services/source/runtime',
@@ -58,12 +59,16 @@ void main() {
       for (final file in _dartFilesUnder(directory)) {
         for (final line in file.readAsLinesSync()) {
           if (line.trimLeft().startsWith('import ') &&
-              line.contains('hazuki_source_service.dart')) {
+              line.contains('source_runtime_assembly.dart')) {
             violations.add('${file.path}: $line');
           }
         }
       }
     }
+    expect(
+      File('lib/services/hazuki_source_service.dart').existsSync(),
+      isFalse,
+    );
     expect(violations, isEmpty, reason: violations.join('\n'));
   });
 
@@ -75,8 +80,13 @@ void main() {
         violations.add('${file.path}: part of');
       }
       final isAdapter = file.path.replaceAll('\\', '/').contains('/adapters/');
-      if (!isAdapter && content.contains('hazuki_source_service.dart')) {
-        violations.add('${file.path}: concrete service import');
+      final isAssembly = file.path
+          .replaceAll('\\', '/')
+          .endsWith('source_runtime_assembly.dart');
+      if (!isAdapter &&
+          !isAssembly &&
+          content.contains('source_runtime_assembly.dart')) {
+        violations.add('${file.path}: source assembly import');
       }
     }
     expect(violations, isEmpty, reason: violations.join('\n'));
@@ -296,21 +306,33 @@ void main() {
     },
   );
 
-  test('features do not depend on the concrete source service or facade', () {
+  test('application and features do not depend on source implementations', () {
     final violations = <String>[];
-    for (final file in _dartFilesUnder('lib/features')) {
-      final content = file.readAsStringSync();
-      if (content.contains('services/hazuki_source_service.dart') ||
-          content.contains('sl<HazukiSourceService>') ||
-          content.contains('.facade')) {
-        violations.add(file.path);
+    for (final directory in const ['lib/app', 'lib/features']) {
+      for (final file in _dartFilesUnder(directory)) {
+        if (file.path
+            .replaceAll('\\', '/')
+            .endsWith('lib/app/service_locator.dart')) {
+          continue;
+        }
+        final content = file.readAsStringSync();
+        if (content.contains(
+              'services/source/runtime/source_runtime_assembly.dart',
+            ) ||
+            content.contains(
+              'services/source/runtime/source_runtime_capability.dart',
+            ) ||
+            content.contains('sl<SourceRuntimeAssembly>') ||
+            content.contains('.facade')) {
+          violations.add(file.path);
+        }
       }
     }
 
     expect(
       violations,
       isEmpty,
-      reason: 'Depend on a source gateway: $violations',
+      reason: 'Depend on source gateway contracts: $violations',
     );
   });
 
@@ -333,6 +355,30 @@ void main() {
     );
   });
 
+  test('source adapters do not depend on the runtime assembly', () {
+    final violations = <String>[];
+    for (final file in _dartFilesUnder('lib/services/source/adapters')) {
+      final content = file.readAsStringSync();
+      if (content.contains('source_runtime_assembly.dart') ||
+          RegExp(r'\bSourceRuntimeAssembly\b').hasMatch(content) ||
+          RegExp(r'\bdynamic\s+source\b').hasMatch(content)) {
+        violations.add(file.path);
+      }
+    }
+    expect(
+      violations,
+      isEmpty,
+      reason:
+          'Adapters must consume explicit runtime collaborators: $violations',
+    );
+  });
+
+  test('service locator obtains source gateways from the gateway set', () {
+    final content = File('lib/app/service_locator.dart').readAsStringSync();
+    expect(content.contains('HazukiSource'), isFalse);
+    expect(content.contains('.gateways.'), isTrue);
+  });
+
   test('migrated source capabilities use explicit runtime dependencies', () {
     const paths = [
       'lib/services/source/explore_capability.dart',
@@ -349,7 +395,7 @@ void main() {
     for (final path in paths) {
       final content = File(path).readAsStringSync();
       if (RegExp(r'^part of ', multiLine: true).hasMatch(content) ||
-          content.contains('hazuki_source_service.dart') ||
+          content.contains('source_runtime_assembly.dart') ||
           content.contains('app/service_locator.dart')) {
         violations.add(path);
       }

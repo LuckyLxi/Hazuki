@@ -7,7 +7,8 @@ import 'package:hazuki/app/app_settings_store.dart';
 import 'package:hazuki/app/appearance_settings.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/services/comment_filter_service.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
+import 'package:hazuki/services/source/runtime/source_runtime_registry.dart';
 import 'package:hazuki/services/manga_download/manga_download_service.dart';
 import 'package:hazuki/services/manga_download/manga_download_storage_support.dart';
 import 'package:hazuki/services/password_lock_service.dart';
@@ -32,7 +33,7 @@ Future<AppBootstrapResult> bootstrapApp() async {
   registerServices();
   await loadHazukiUiFlags();
   await sl<SourceRuntimeRegistry>().loadActiveSourcePreference();
-  await sl<HazukiSourceService>().loadSoftwareLogCaptureEnabled();
+  await sl<SourceDebugGateway>().loadSoftwareLogCaptureEnabled();
   await _ensureAndroidNoMediaMarker();
   await sl<MangaDownloadService>().ensureInitialized();
   await sl<PasswordLockService>().ensureInitialized();

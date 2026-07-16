@@ -7,10 +7,10 @@ import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
 class HomeProfileController extends ChangeNotifier {
-  HomeProfileController({required SourceRuntimeGateway sourceService})
+  HomeProfileController({required SourceHomeGateway sourceService})
     : _sourceService = sourceService;
 
-  final SourceRuntimeGateway _sourceService;
+  final SourceHomeGateway _sourceService;
 
   bool _disposed = false;
   String _username = '';

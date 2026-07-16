@@ -1,33 +1,48 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../models/hazuki_models.dart';
-import '../../hazuki_source_service.dart';
+import '../account/source_account_operations.dart';
+import '../comments/source_comments_operations.dart';
+import '../content/source_content_operations.dart';
+import '../debug/source_debug_operations.dart';
+import '../favorites/source_favorites_operations.dart';
 import '../gateways/source_content_gateways.dart';
+import '../image/source_image_operations.dart';
+import '../image/source_image_preparation_capability.dart';
+import '../models/source_contract_models.dart';
+import '../runtime/source_runtime_operations.dart';
+import '../runtime/source_runtime_view.dart';
 import 'hazuki_source_adapter_base.dart';
 
 class HazukiSourceSearchAdapter extends HazukiSourceListenableAdapter
     implements SourceSearchGateway {
-  const HazukiSourceSearchAdapter(super.source);
+  const HazukiSourceSearchAdapter({
+    required SourceRuntimeView runtime,
+    required SourceContentOperations content,
+  }) : _content = content,
+       super(runtime);
+
+  final SourceContentOperations _content;
 
   @override
-  String get activeSourceKey => source.activeSourceKey;
+  String get activeSourceKey => runtime.activeSourceKey;
   @override
-  bool get isActiveJmSource => source.isActiveJmSource;
+  bool get isActiveJmSource => runtime.isActiveJmSource;
   @override
-  SourceRuntimeState get sourceRuntimeState => source.sourceRuntimeState;
+  SourceRuntimeState get sourceRuntimeState => runtime.sourceRuntimeState;
   @override
   List<SourceCatalogEntry> get allowedSources =>
-      source.runtimeRegistry.allowedSources;
+      runtime.runtimeRegistry.allowedSources;
   @override
   void logRuntimeRetryRequested(String value) =>
-      source.logRuntimeRetryRequested(value);
+      runtime.logRuntimeRetryRequested(value);
   @override
   Future<SearchComicsResult> searchComics({
     required String keyword,
     required int page,
     String order = 'mr',
     String sourceKey = '',
-  }) => source.searchComics(
+  }) => _content.searchComics(
     keyword: keyword,
     page: page,
     order: order,
@@ -37,37 +52,46 @@ class HazukiSourceSearchAdapter extends HazukiSourceListenableAdapter
   Future<ComicDetailsData> loadComicDetails(
     String comicId, {
     String sourceKey = '',
-  }) => source.loadComicDetails(comicId, sourceKey: sourceKey);
+  }) => _content.loadComicDetails(comicId, sourceKey: sourceKey);
 }
 
 class HazukiSourceDiscoverAdapter extends HazukiSourceListenableAdapter
     implements SourceDiscoverGateway {
-  const HazukiSourceDiscoverAdapter(super.source);
+  HazukiSourceDiscoverAdapter({
+    required SourceRuntimeView runtime,
+    required SourceContentOperations content,
+    required SourceAccountOperations account,
+  }) : _content = content,
+       _account = account,
+       super(runtime);
+
+  final SourceContentOperations _content;
+  final SourceAccountOperations _account;
 
   @override
-  String get activeSourceKey => source.activeSourceKey;
+  String get activeSourceKey => runtime.activeSourceKey;
   @override
-  bool get isLogged => source.isLogged;
+  bool get isLogged => _account.isLogged;
   @override
-  SourceRuntimeState get sourceRuntimeState => source.sourceRuntimeState;
+  SourceRuntimeState get sourceRuntimeState => runtime.sourceRuntimeState;
   @override
   void logRuntimeRetryRequested(String value) =>
-      source.logRuntimeRetryRequested(value);
+      runtime.logRuntimeRetryRequested(value);
   @override
   Future<List<ExploreSection>> loadExploreSections({
     bool forceRefresh = false,
-  }) => source.loadExploreSections(forceRefresh: forceRefresh);
+  }) => _content.loadExploreSections(forceRefresh: forceRefresh);
   @override
   Future<List<List<CategoryRankingOption>>> loadCategoryOptionGroupsByViewMore({
     required String viewMoreUrl,
-  }) => source.loadCategoryOptionGroupsByViewMore(viewMoreUrl: viewMoreUrl);
+  }) => _content.loadCategoryOptionGroupsByViewMore(viewMoreUrl: viewMoreUrl);
   @override
   Future<CategoryComicsResult> loadCategoryComicsByViewMore({
     required String viewMoreUrl,
     required int page,
     String order = 'mr',
     List<String>? orders,
-  }) => source.loadCategoryComicsByViewMore(
+  }) => _content.loadCategoryComicsByViewMore(
     viewMoreUrl: viewMoreUrl,
     page: page,
     order: order,
@@ -75,28 +99,34 @@ class HazukiSourceDiscoverAdapter extends HazukiSourceListenableAdapter
   );
 }
 
-class HazukiSourceCategoryAdapter extends HazukiSourceAdapterBase
-    implements SourceCategoryGateway {
-  const HazukiSourceCategoryAdapter(super.source);
+class HazukiSourceCategoryAdapter implements SourceCategoryGateway {
+  const HazukiSourceCategoryAdapter({
+    required SourceContentOperations content,
+    required SourceDebugOperations debug,
+  }) : _content = content,
+       _debug = debug;
+
+  final SourceContentOperations _content;
+  final SourceDebugOperations _debug;
 
   @override
-  bool get softwareLogCaptureEnabled => source.softwareLogCaptureEnabled;
+  bool get softwareLogCaptureEnabled => _debug.softwareLogCaptureEnabled;
   @override
   Future<List<CategoryTagGroup>> loadCategoryTagGroups({
     bool forceRefresh = false,
     String sourceKey = '',
-  }) => source.loadCategoryTagGroups(
+  }) => _content.loadCategoryTagGroups(
     forceRefresh: forceRefresh,
     sourceKey: sourceKey,
   );
   @override
   Future<List<CategoryRankingOption>> loadCategoryRankingOptions() =>
-      source.loadCategoryRankingOptions();
+      _content.loadCategoryRankingOptions();
   @override
   Future<CategoryComicsResult> loadCategoryRankingComics({
     required String rankingOption,
     required int page,
-  }) => source.loadCategoryRankingComics(
+  }) => _content.loadCategoryRankingComics(
     rankingOption: rankingOption,
     page: page,
   );
@@ -106,7 +136,7 @@ class HazukiSourceCategoryAdapter extends HazukiSourceAdapterBase
     required String title,
     Object? content,
     String source = 'app',
-  }) => this.source.addApplicationLog(
+  }) => _debug.addApplicationLog(
     level: level,
     title: title,
     content: content,
@@ -114,28 +144,34 @@ class HazukiSourceCategoryAdapter extends HazukiSourceAdapterBase
   );
 }
 
-class HazukiSourceCommentsAdapter extends HazukiSourceAdapterBase
-    implements SourceCommentsGateway {
-  const HazukiSourceCommentsAdapter(super.source);
+class HazukiSourceCommentsAdapter implements SourceCommentsGateway {
+  const HazukiSourceCommentsAdapter({
+    required SourceCommentsOperations comments,
+    required SourceDebugOperations debug,
+  }) : _comments = comments,
+       _debug = debug;
+
+  final SourceCommentsOperations _comments;
+  final SourceDebugOperations _debug;
 
   @override
-  bool get isLogged => source.isLogged;
+  bool get isLogged => _comments.isLogged;
   @override
-  bool get supportCommentSend => source.supportCommentSend;
+  bool get supportCommentSend => _comments.supportCommentSend;
   @override
-  bool get supportCommentLike => source.supportCommentLike;
+  bool get supportCommentLike => _comments.supportCommentLike;
   @override
   bool isLoggedForSource(String sourceKey) =>
-      source.isLoggedForSource(sourceKey);
+      _comments.isLoggedForSource(sourceKey);
   @override
   bool supportCommentSendForSource(String sourceKey) =>
-      source.supportCommentSendForSource(sourceKey);
+      _comments.supportCommentSendForSource(sourceKey);
   @override
   bool supportCommentLikeForSource(String sourceKey) =>
-      source.supportCommentLikeForSource(sourceKey);
+      _comments.supportCommentLikeForSource(sourceKey);
   @override
   bool supportCommentRepliesForSource(String sourceKey) =>
-      source.supportCommentRepliesForSource(sourceKey);
+      _comments.supportCommentRepliesForSource(sourceKey);
   @override
   Future<ComicCommentsPageResult> loadCommentsPage({
     required String comicId,
@@ -145,7 +181,7 @@ class HazukiSourceCommentsAdapter extends HazukiSourceAdapterBase
     int page = 1,
     int pageSize = 16,
     String? replyTo,
-  }) => source.loadCommentsPage(
+  }) => _comments.loadCommentsPage(
     comicId: comicId,
     subId: subId,
     chapterId: chapterId,
@@ -162,7 +198,7 @@ class HazukiSourceCommentsAdapter extends HazukiSourceAdapterBase
     String sourceKey = '',
     required String content,
     String? replyTo,
-  }) => source.sendComment(
+  }) => _comments.sendComment(
     comicId: comicId,
     subId: subId,
     chapterId: chapterId,
@@ -177,7 +213,7 @@ class HazukiSourceCommentsAdapter extends HazukiSourceAdapterBase
     String sourceKey = '',
     required String commentId,
     required bool isLike,
-  }) => source.likeComment(
+  }) => _comments.likeComment(
     comicId: comicId,
     subId: subId,
     sourceKey: sourceKey,
@@ -190,7 +226,7 @@ class HazukiSourceCommentsAdapter extends HazukiSourceAdapterBase
     required String title,
     Object? content,
     String source = 'app',
-  }) => this.source.addApplicationLog(
+  }) => _debug.addApplicationLog(
     level: level,
     title: title,
     content: content,
@@ -198,43 +234,58 @@ class HazukiSourceCommentsAdapter extends HazukiSourceAdapterBase
   );
 }
 
-class HazukiSourceComicDetailAdapter extends HazukiSourceAdapterBase
-    implements SourceComicDetailGateway {
-  const HazukiSourceComicDetailAdapter(super.source);
+class HazukiSourceComicDetailAdapter implements SourceComicDetailGateway {
+  HazukiSourceComicDetailAdapter({
+    required SourceRuntimeView runtime,
+    required SourceAccountOperations account,
+    required SourceFavoritesOperations favorites,
+    required SourceContentOperations content,
+    required SourceImageOperations image,
+  }) : _account = account,
+       _favorites = favorites,
+       _content = content,
+       _image = image,
+       _runtime = runtime;
+
+  final SourceAccountOperations _account;
+  final SourceFavoritesOperations _favorites;
+  final SourceContentOperations _content;
+  final SourceImageOperations _image;
+  final SourceRuntimeView _runtime;
 
   @override
-  String get activeSourceKey => source.activeSourceKey;
+  String get activeSourceKey => _runtime.activeSourceKey;
   @override
   bool isLoggedForSource(String sourceKey) =>
-      source.isLoggedForSource(sourceKey);
+      _account.isLoggedForSource(sourceKey);
   @override
   bool supportFavoriteFolderLoadForSource(String sourceKey) =>
-      source.supportFavoriteFolderLoadForSource(sourceKey);
+      _favorites.supportFavoriteFolderLoadForSource(sourceKey);
   @override
   bool supportFavoriteFolderAddForSource(String sourceKey) =>
-      source.supportFavoriteFolderAddForSource(sourceKey);
+      _favorites.supportFavoriteFolderAddForSource(sourceKey);
   @override
   bool supportFavoriteFolderDeleteForSource(String sourceKey) =>
-      source.supportFavoriteFolderDeleteForSource(sourceKey);
+      _favorites.supportFavoriteFolderDeleteForSource(sourceKey);
   @override
   bool supportFavoriteToggleForSource(String sourceKey) =>
-      source.supportFavoriteToggleForSource(sourceKey);
+      _favorites.supportFavoriteToggleForSource(sourceKey);
   @override
   bool supportComicLikeForSource(String sourceKey) =>
-      source.supportComicLikeForSource(sourceKey);
+      _content.supportComicLikeForSource(sourceKey);
   @override
   bool favoriteSingleFolderForSingleComicForSource(String sourceKey) =>
-      source.favoriteSingleFolderForSingleComicForSource(sourceKey);
+      _favorites.favoriteSingleFolderForSingleComicForSource(sourceKey);
   @override
   Future<ComicDetailsData> loadComicDetails(
     String comicId, {
     String sourceKey = '',
-  }) => source.loadComicDetails(comicId, sourceKey: sourceKey);
+  }) => _content.loadComicDetails(comicId, sourceKey: sourceKey);
   @override
   Future<List<CategoryTagGroup>> loadCategoryTagGroups({
     bool forceRefresh = false,
     String sourceKey = '',
-  }) => source.loadCategoryTagGroups(
+  }) => _content.loadCategoryTagGroups(
     forceRefresh: forceRefresh,
     sourceKey: sourceKey,
   );
@@ -247,7 +298,7 @@ class HazukiSourceComicDetailAdapter extends HazukiSourceAdapterBase
     bool useDiskCache = true,
     bool priority = false,
     String sourceKey = '',
-  }) => source.downloadImageBytes(
+  }) => _image.downloadImageBytes(
     url,
     comicId: comicId,
     epId: epId,
@@ -261,7 +312,7 @@ class HazukiSourceComicDetailAdapter extends HazukiSourceAdapterBase
     required String comicId,
     required String epId,
     String sourceKey = '',
-  }) => source.loadChapterImages(
+  }) => _content.loadChapterImages(
     comicId: comicId,
     epId: epId,
     sourceKey: sourceKey,
@@ -274,7 +325,7 @@ class HazukiSourceComicDetailAdapter extends HazukiSourceAdapterBase
     required int count,
     required int memoryCount,
     String sourceKey = '',
-  }) => source.prefetchComicImages(
+  }) => _image.prefetchComicImages(
     comicId: comicId,
     epId: epId,
     imageUrls: imageUrls,
@@ -286,13 +337,13 @@ class HazukiSourceComicDetailAdapter extends HazukiSourceAdapterBase
   Future<FavoriteFoldersResult> loadFavoriteFolders({
     String? comicId,
     String sourceKey = '',
-  }) => source.loadFavoriteFolders(comicId: comicId, sourceKey: sourceKey);
+  }) => _favorites.loadFavoriteFolders(comicId: comicId, sourceKey: sourceKey);
   @override
   Future<void> addFavoriteFolder(String name, {String sourceKey = ''}) =>
-      source.addFavoriteFolder(name, sourceKey: sourceKey);
+      _favorites.addFavoriteFolder(name, sourceKey: sourceKey);
   @override
   Future<void> deleteFavoriteFolder(String folderId, {String sourceKey = ''}) =>
-      source.deleteFavoriteFolder(folderId, sourceKey: sourceKey);
+      _favorites.deleteFavoriteFolder(folderId, sourceKey: sourceKey);
   @override
   Future<void> toggleFavorite({
     required String comicId,
@@ -300,7 +351,7 @@ class HazukiSourceComicDetailAdapter extends HazukiSourceAdapterBase
     String folderId = '0',
     String? favoriteId,
     String sourceKey = '',
-  }) => source.toggleFavorite(
+  }) => _favorites.toggleFavorite(
     comicId: comicId,
     isAdding: isAdding,
     folderId: folderId,
@@ -312,7 +363,7 @@ class HazukiSourceComicDetailAdapter extends HazukiSourceAdapterBase
     required String comicId,
     required bool isLike,
     String sourceKey = '',
-  }) => source.toggleComicLike(
+  }) => _content.toggleComicLike(
     comicId: comicId,
     isLike: isLike,
     sourceKey: sourceKey,
@@ -321,55 +372,67 @@ class HazukiSourceComicDetailAdapter extends HazukiSourceAdapterBase
 
 class HazukiSourceFavoriteAdapter extends HazukiSourceListenableAdapter
     implements SourceFavoriteGateway {
-  const HazukiSourceFavoriteAdapter(super.source);
+  HazukiSourceFavoriteAdapter({
+    required SourceRuntimeView runtime,
+    required SourceAccountOperations account,
+    required SourceFavoritesOperations favorites,
+    required SourceRuntimeOperations runtimeOperations,
+  }) : _account = account,
+       _favorites = favorites,
+       _runtimeOperations = runtimeOperations,
+       super(runtime);
+
+  final SourceAccountOperations _account;
+  final SourceFavoritesOperations _favorites;
+  final SourceRuntimeOperations _runtimeOperations;
 
   @override
-  String get activeSourceKey => source.activeSourceKey;
+  String get activeSourceKey => runtime.activeSourceKey;
   @override
-  bool get isLogged => source.isLogged;
+  bool get isLogged => _account.isLogged;
   @override
-  bool get supportFavoriteFolderDelete => source.supportFavoriteFolderDelete;
+  bool get supportFavoriteFolderDelete =>
+      _favorites.supportFavoriteFolderDelete;
   @override
-  bool get supportFavoriteFolderAdd => source.supportFavoriteFolderAdd;
+  bool get supportFavoriteFolderAdd => _favorites.supportFavoriteFolderAdd;
   @override
-  bool get supportFavoriteFolderLoad => source.supportFavoriteFolderLoad;
+  bool get supportFavoriteFolderLoad => _favorites.supportFavoriteFolderLoad;
   @override
-  bool get supportFavoriteSortOrder => source.supportFavoriteSortOrder;
+  bool get supportFavoriteSortOrder => _favorites.supportFavoriteSortOrder;
   @override
-  bool get supportFavoriteToggle => source.supportFavoriteToggle;
+  bool get supportFavoriteToggle => _favorites.supportFavoriteToggle;
   @override
   bool get favoriteSingleFolderForSingleComic =>
-      source.favoriteSingleFolderForSingleComic;
+      _favorites.favoriteSingleFolderForSingleComic;
   @override
-  String get favoriteSortOrder => source.favoriteSortOrder;
+  String get favoriteSortOrder => _favorites.favoriteSortOrder;
   @override
-  List<String> get favoriteSortOrders => source.favoriteSortOrders;
+  List<String> get favoriteSortOrders => _favorites.favoriteSortOrders;
   @override
-  Stream<void> get cloudFavoritesChangedStream =>
-      source.cloudFavoritesChangedStream;
+  Stream<void> get cloudFavoritesChangedStream => _favorites.changedStream;
   @override
-  SourceRuntimeState get sourceRuntimeState => source.sourceRuntimeState;
+  SourceRuntimeState get sourceRuntimeState => runtime.sourceRuntimeState;
   @override
   void logRuntimeRetryRequested(String value) =>
-      source.logRuntimeRetryRequested(value);
+      runtime.logRuntimeRetryRequested(value);
   @override
-  Future<void> ensureInitialized() => source.ensureInitialized();
+  Future<void> ensureInitialized() => _runtimeOperations.ensureInitialized();
   @override
   Future<FavoriteFoldersResult> loadFavoriteFolders({
     String? comicId,
     String sourceKey = '',
-  }) => source.loadFavoriteFolders(comicId: comicId, sourceKey: sourceKey);
+  }) => _favorites.loadFavoriteFolders(comicId: comicId, sourceKey: sourceKey);
   @override
   Future<FavoriteComicsResult> loadFavoriteComics({
     required int page,
     required String folderId,
-  }) => source.loadFavoriteComics(page: page, folderId: folderId);
+  }) => _favorites.loadFavoriteComics(page: page, folderId: folderId);
   @override
   Future<void> addFavoriteFolder(String name, {String sourceKey = ''}) =>
-      source.addFavoriteFolder(name, sourceKey: sourceKey);
+      _favorites.addFavoriteFolder(name, sourceKey: sourceKey);
   @override
   Future<void> deleteFavoriteFolder(String folderId, {String sourceKey = ''}) =>
-      source.deleteFavoriteFolder(folderId, sourceKey: sourceKey);
+      _favorites.deleteFavoriteFolder(folderId, sourceKey: sourceKey);
   @override
   Future<void> toggleFavorite({
     required String comicId,
@@ -377,7 +440,7 @@ class HazukiSourceFavoriteAdapter extends HazukiSourceListenableAdapter
     String folderId = '0',
     String? favoriteId,
     String sourceKey = '',
-  }) => source.toggleFavorite(
+  }) => _favorites.toggleFavorite(
     comicId: comicId,
     isAdding: isAdding,
     folderId: folderId,
@@ -386,24 +449,36 @@ class HazukiSourceFavoriteAdapter extends HazukiSourceListenableAdapter
   );
   @override
   Future<void> setFavoriteSortOrder(String order) =>
-      source.setFavoriteSortOrder(order);
+      _favorites.setFavoriteSortOrder(order);
 }
 
-class HazukiSourceReaderAdapter extends HazukiSourceAdapterBase
-    implements SourceReaderGateway {
-  const HazukiSourceReaderAdapter(super.source);
+class HazukiSourceReaderAdapter implements SourceReaderGateway {
+  HazukiSourceReaderAdapter({
+    required SourceContentOperations content,
+    required SourceImagePreparationCapability imagePreparation,
+    required SourceImageOperations image,
+    required SourceDebugOperations debug,
+  }) : _content = content,
+       _imagePreparation = imagePreparation,
+       _image = image,
+       _debug = debug;
+
+  final SourceContentOperations _content;
+  final SourceImagePreparationCapability _imagePreparation;
+  final SourceImageOperations _image;
+  final SourceDebugOperations _debug;
 
   @override
   Future<ComicDetailsData> loadComicDetails(
     String comicId, {
     String sourceKey = '',
-  }) => source.loadComicDetails(comicId, sourceKey: sourceKey);
+  }) => _content.loadComicDetails(comicId, sourceKey: sourceKey);
   @override
   Future<List<String>> loadChapterImages({
     required String comicId,
     required String epId,
     String sourceKey = '',
-  }) => source.loadChapterImages(
+  }) => _content.loadChapterImages(
     comicId: comicId,
     epId: epId,
     sourceKey: sourceKey,
@@ -416,7 +491,7 @@ class HazukiSourceReaderAdapter extends HazukiSourceAdapterBase
     bool useDiskCache = true,
     bool priority = false,
     String sourceKey = '',
-  }) => source.prepareChapterImageData(
+  }) => _imagePreparation.prepareChapterImageData(
     imageUrl,
     comicId: comicId,
     epId: epId,
@@ -433,7 +508,7 @@ class HazukiSourceReaderAdapter extends HazukiSourceAdapterBase
     bool useDiskCache = true,
     bool priority = false,
     String sourceKey = '',
-  }) => source.downloadImageBytes(
+  }) => _image.downloadImageBytes(
     url,
     comicId: comicId,
     epId: epId,
@@ -443,27 +518,28 @@ class HazukiSourceReaderAdapter extends HazukiSourceAdapterBase
     sourceKey: sourceKey,
   );
   @override
-  bool isLocalImagePath(String value) => source.isLocalImagePath(value);
+  bool isLocalImagePath(String value) =>
+      _imagePreparation.isLocalImagePath(value);
   @override
   String normalizeLocalImagePath(String value) =>
-      source.normalizeLocalImagePath(value);
+      _imagePreparation.normalizeLocalImagePath(value);
   @override
   void evictImageBytesFromMemory(
     Iterable<String> urls, {
     String sourceKey = '',
-  }) => source.evictImageBytesFromMemory(urls, sourceKey: sourceKey);
+  }) => _image.evictImageBytesFromMemory(urls, sourceKey: sourceKey);
   @override
   Future<void> evictImageCacheEntries(
     Iterable<String> urls, {
     String sourceKey = '',
-  }) => source.evictImageCacheEntries(urls, sourceKey: sourceKey);
+  }) => _image.evictImageCacheEntries(urls, sourceKey: sourceKey);
   @override
   void addReaderLog({
     required String level,
     required String title,
     Object? content,
     String source = 'reader',
-  }) => this.source.addReaderLog(
+  }) => _debug.addReaderLog(
     level: level,
     title: title,
     content: content,

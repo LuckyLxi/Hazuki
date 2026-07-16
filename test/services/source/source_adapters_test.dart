@@ -1,191 +1,164 @@
-import 'dart:typed_data';
+import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
-import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
+import 'package:hazuki/services/source/account/source_account_operations.dart';
+import 'package:hazuki/services/source/content/source_content_operations.dart';
+import 'package:hazuki/services/source/favorites/source_favorites_operations.dart';
+import 'package:hazuki/services/source/runtime/source_runtime_assembly.dart';
+import 'package:hazuki/services/source/runtime/source_runtime_operations.dart';
+import 'package:hazuki/services/source/runtime/source_runtime_view.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../support/test_service_locator.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  tearDown(() async {
-    await sl.reset();
+  setUp(() => SharedPreferences.setMockInitialValues(const {}));
+  tearDown(() async => sl.reset());
+
+  test('service locator registers focused source gateways', () async {
+    await ensureTestServiceLocator();
+
+    expect(sl<SourceSearchGateway>(), isA<HazukiSourceSearchAdapter>());
+    expect(sl<SourceDiscoverGateway>(), isA<HazukiSourceDiscoverAdapter>());
+    expect(sl<SourceFavoriteGateway>(), isA<HazukiSourceFavoriteAdapter>());
+    expect(sl<SourceReaderGateway>(), isA<HazukiSourceReaderAdapter>());
+    expect(sl<SourceSettingsGateway>(), isA<HazukiSourceSettingsAdapter>());
+    expect(sl<SourceAccountGateway>(), isA<HazukiSourceAccountAdapter>());
+    expect(sl<SourceDebugGateway>(), isA<HazukiSourceDebugAdapter>());
+    expect(sl<SourceImageGateway>(), isA<HazukiSourceImageAdapter>());
+    expect(sl<SourceSyncGateway>(), isA<HazukiSourceSyncAdapter>());
+    expect(sl<SourceRuntimeGateway>(), isA<HazukiSourceRuntimeAdapter>());
+    expect(sl<SourceCommentsGateway>(), isA<HazukiSourceCommentsAdapter>());
   });
 
   test(
-    'service locator registers a focused adapter for every gateway',
-    () async {
-      await ensureTestServiceLocator();
+    'gateway set shares runtime adapters and forwards view notifications',
+    () {
+      final assembly = SourceRuntimeAssembly();
+      addTearDown(assembly.dispose);
+      final gateways = assembly.gateways;
+      var notifications = 0;
 
-      expect(sl<SourceSearchGateway>(), isA<HazukiSourceSearchAdapter>());
-      expect(sl<SourceDiscoverGateway>(), isA<HazukiSourceDiscoverAdapter>());
-      expect(sl<SourceFavoriteGateway>(), isA<HazukiSourceFavoriteAdapter>());
-      expect(sl<SourceReaderGateway>(), isA<HazukiSourceReaderAdapter>());
-      expect(sl<SourceSettingsGateway>(), isA<HazukiSourceSettingsAdapter>());
-      expect(sl<SourceAccountGateway>(), isA<HazukiSourceAccountAdapter>());
-      expect(sl<SourceDebugGateway>(), isA<HazukiSourceDebugAdapter>());
-      expect(sl<SourceImageGateway>(), isA<HazukiSourceImageAdapter>());
+      gateways.search.addListener(() => notifications++);
+      assembly.testing.notifyRuntimeView();
+
+      expect(notifications, 1);
+      expect(identical(gateways.runtimeGateway, gateways.selection), isTrue);
       expect(
-        sl<SourceRecommendationGateway>(),
-        isA<HazukiSourceRecommendationAdapter>(),
-      );
-      expect(
-        sl<SourceDailyRecommendationGateway>(),
-        isA<HazukiSourceDailyRecommendationAdapter>(),
-      );
-      expect(sl<SourceSyncGateway>(), isA<HazukiSourceSyncAdapter>());
-      expect(sl<SourceRuntimeGateway>(), isA<HazukiSourceRuntimeAdapter>());
-      expect(sl<SourceCategoryGateway>(), isA<HazukiSourceCategoryAdapter>());
-      expect(sl<SourceCommentsGateway>(), isA<HazukiSourceCommentsAdapter>());
-      expect(
-        sl<SourceComicDetailGateway>(),
-        isA<HazukiSourceComicDetailAdapter>(),
+        identical(gateways.runtimeGateway, gateways.switchGateway),
+        isTrue,
       );
     },
   );
 
-  test('listenable adapters forward source notifications', () {
-    final source = _RecordingSource();
-    final adapter = HazukiSourceSearchAdapter(source);
-    var notifications = 0;
-
-    void listener() => notifications++;
-    adapter.addListener(listener);
-    source.notifyListeners();
-    adapter.removeListener(listener);
-    source.notifyListeners();
-
-    expect(notifications, 1);
-  });
-
-  test('search adapter preserves arguments and result', () async {
-    final source = _RecordingSource();
-    final adapter = HazukiSourceSearchAdapter(source);
-
-    final result = await adapter.searchComics(
-      keyword: 'artist',
-      page: 3,
-      order: 'dd',
-      sourceKey: 'copy_manga',
-    );
-
-    expect(result.maxPage, 9);
-    expect(source.searchArguments, {
-      'keyword': 'artist',
-      'page': 3,
-      'order': 'dd',
-      'sourceKey': 'copy_manga',
-    });
-  });
-
-  test('image adapter preserves cache and source arguments', () async {
-    final source = _RecordingSource();
-    final adapter = HazukiSourceImageAdapter(source);
-
-    final bytes = await adapter.downloadImageBytes(
-      'https://example.test/image.jpg',
-      comicId: 'comic',
-      epId: 'chapter',
-      keepInMemory: true,
-      useDiskCache: false,
-      sourceKey: 'picacg',
-    );
-
-    expect(bytes, Uint8List.fromList([1, 2, 3]));
-    expect(source.imageArguments, {
-      'url': 'https://example.test/image.jpg',
-      'comicId': 'comic',
-      'epId': 'chapter',
-      'keepInMemory': true,
-      'useDiskCache': false,
-      'priority': false,
-      'sourceKey': 'picacg',
-    });
-  });
-
-  test('category adapter preserves the requested source scope', () async {
-    final source = _RecordingSource();
-    final adapter = HazukiSourceCategoryAdapter(source);
-
-    await adapter.loadCategoryTagGroups(
-      forceRefresh: true,
-      sourceKey: 'picacg',
-    );
-
-    expect(source.categoryTagArguments, {
-      'forceRefresh': true,
-      'sourceKey': 'picacg',
-    });
-  });
-
   test(
-    'favorite adapter preserves folder, sorting, and source arguments',
+    'sync gateway reads the active source through its runtime view',
     () async {
-      final source = _RecordingSource();
-      final adapter = HazukiSourceFavoriteAdapter(source);
+      final assembly = SourceRuntimeAssembly();
+      addTearDown(assembly.dispose);
 
-      await adapter.loadFavoriteFolders(
-        comicId: 'comic',
-        sourceKey: 'copy_manga',
-      );
-      await adapter.loadFavoriteComics(page: 3, folderId: 'folder');
-      await adapter.toggleFavorite(
-        comicId: 'comic',
-        isAdding: true,
-        folderId: 'folder',
-        favoriteId: 'remote',
-        sourceKey: 'copy_manga',
-      );
-      await adapter.setFavoriteSortOrder('da');
+      expect(assembly.gateways.sync.activeSourceKey, 'jm');
+      await assembly.runtimeRegistry.activateSource('copy_manga');
 
-      expect(source.favoriteFolderArguments, {
-        'comicId': 'comic',
-        'sourceKey': 'copy_manga',
-      });
-      expect(source.favoriteComicsArguments, {'page': 3, 'folderId': 'folder'});
-      expect(source.favoriteToggleArguments, {
-        'comicId': 'comic',
-        'isAdding': true,
-        'folderId': 'folder',
-        'favoriteId': 'remote',
-        'sourceKey': 'copy_manga',
-      });
-      expect(source.favoriteSortOrderArgument, 'da');
+      expect(assembly.gateways.sync.activeSourceKey, 'copy_manga');
     },
   );
 
-  test('account and runtime adapters forward daily check-in calls', () async {
-    final source = _RecordingSource();
-    final account = HazukiSourceAccountAdapter(source);
-    final runtime = HazukiSourceRuntimeAdapter(source);
+  test(
+    'search adapter forwards scope and listener through minimal fakes',
+    () async {
+      final runtime = _FakeRuntimeView(activeSourceKey: 'picacg');
+      final content = _FakeContentOperations();
+      final adapter = HazukiSourceSearchAdapter(
+        runtime: runtime,
+        content: content,
+      );
+      var notifications = 0;
+      adapter.addListener(() => notifications++);
 
-    expect(await account.isDailyCheckInCompletedToday(), isTrue);
-    expect(
-      (await runtime.performDailyCheckIn()).status,
-      DailyCheckInStatus.alreadyCheckedIn,
-    );
-    expect(source.dailyCheckInCompletionCalls, 1);
-    expect(source.dailyCheckInPerformCalls, 1);
-  });
+      runtime.emit();
+      await adapter.searchComics(
+        keyword: 'hazuki',
+        page: 2,
+        order: 'vd',
+        sourceKey: 'picacg',
+      );
+
+      expect(notifications, 1);
+      expect(content.searchCalls, [('hazuki', 2, 'vd', 'picacg')]);
+    },
+  );
+
+  test(
+    'favorite and sync adapters forward streams and runtime operations',
+    () async {
+      final runtime = _FakeRuntimeView();
+      final runtimeOperations = _FakeRuntimeOperations();
+      final favorites = _FakeFavoritesOperations();
+      final favorite = HazukiSourceFavoriteAdapter(
+        runtime: runtime,
+        account: _FakeAccountOperations(),
+        favorites: favorites,
+        runtimeOperations: runtimeOperations,
+      );
+      final received = <void>[];
+      final subscription = favorite.cloudFavoritesChangedStream.listen(
+        received.add,
+      );
+      final sync = HazukiSourceSyncAdapter(
+        runtime: runtime,
+        runtimeOperations: runtimeOperations,
+      );
+
+      favorites.emitChanged();
+      await Future<void>.delayed(Duration.zero);
+      await sync.writeLocalActiveSource('edited source');
+      await sync.reloadFromLocalSourceFiles();
+
+      expect(received, hasLength(1));
+      expect(runtimeOperations.writtenSource, 'edited source');
+      expect(runtimeOperations.reloadCalls, 1);
+      await subscription.cancel();
+      await favorites.dispose();
+    },
+  );
+
+  test(
+    'bootstrap adapter forwards initialization callback and source key',
+    () async {
+      final operations = _FakeRuntimeOperations();
+      final adapter = HazukiSourceBootstrapAdapter(operations);
+      void onProgress(int _, int _) {}
+
+      await adapter.init(onProgress: onProgress);
+      await adapter.ensureInitialized(sourceKey: 'copy_manga');
+
+      expect(operations.initProgress, same(onProgress));
+      expect(operations.ensureSourceKeys, ['copy_manga']);
+    },
+  );
 }
 
-class _RecordingSource extends HazukiSourceService {
-  _RecordingSource()
-    : super(secureSessionStorage: MemorySourceSecureSessionStorage());
+class _FakeRuntimeView extends ChangeNotifier implements SourceRuntimeView {
+  _FakeRuntimeView({this.activeSourceKey = 'jm'});
 
-  Map<String, Object?>? searchArguments;
-  Map<String, Object?>? imageArguments;
-  Map<String, Object?>? categoryTagArguments;
-  Map<String, Object?>? favoriteFolderArguments;
-  Map<String, Object?>? favoriteComicsArguments;
-  Map<String, Object?>? favoriteToggleArguments;
-  String? favoriteSortOrderArgument;
-  int dailyCheckInCompletionCalls = 0;
-  int dailyCheckInPerformCalls = 0;
+  @override
+  String activeSourceKey;
+
+  void emit() => notifyListeners();
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _FakeContentOperations implements SourceContentOperations {
+  final searchCalls = <(String, int, String, String)>[];
 
   @override
   Future<SearchComicsResult> searchComics({
@@ -194,101 +167,64 @@ class _RecordingSource extends HazukiSourceService {
     String order = 'mr',
     String sourceKey = '',
   }) async {
-    searchArguments = {
-      'keyword': keyword,
-      'page': page,
-      'order': order,
-      'sourceKey': sourceKey,
-    };
-    return const SearchComicsResult(comics: [], maxPage: 9);
+    searchCalls.add((keyword, page, order, sourceKey));
+    return const SearchComicsResult(comics: [], maxPage: 0);
   }
 
   @override
-  Future<Uint8List> downloadImageBytes(
-    String url, {
-    String? comicId,
-    String? epId,
-    bool keepInMemory = false,
-    bool useDiskCache = true,
-    bool priority = false,
-    String sourceKey = '',
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _FakeFavoritesOperations implements SourceFavoritesOperations {
+  final _changes = StreamController<void>.broadcast();
+
+  void emitChanged() => _changes.add(null);
+  Future<void> dispose() => _changes.close();
+
+  @override
+  Stream<void> get changedStream => _changes.stream;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _FakeAccountOperations implements SourceAccountOperations {
+  @override
+  bool get isLogged => false;
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _FakeRuntimeOperations implements SourceRuntimeOperations {
+  void Function(int received, int total)? initProgress;
+  final ensureSourceKeys = <String?>[];
+  String? writtenSource;
+  var reloadCalls = 0;
+
+  @override
+  Future<void> init({
+    void Function(int received, int total)? onSourceDownloadProgress,
+    bool prewarm = false,
   }) async {
-    imageArguments = {
-      'url': url,
-      'comicId': comicId,
-      'epId': epId,
-      'keepInMemory': keepInMemory,
-      'useDiskCache': useDiskCache,
-      'priority': priority,
-      'sourceKey': sourceKey,
-    };
-    return Uint8List.fromList([1, 2, 3]);
+    initProgress = onSourceDownloadProgress;
   }
 
   @override
-  Future<List<CategoryTagGroup>> loadCategoryTagGroups({
-    bool forceRefresh = false,
-    String sourceKey = '',
-  }) async {
-    categoryTagArguments = {
-      'forceRefresh': forceRefresh,
-      'sourceKey': sourceKey,
-    };
-    return const [];
+  Future<void> ensureInitialized({String? sourceKey}) async {
+    ensureSourceKeys.add(sourceKey);
   }
 
   @override
-  Future<FavoriteFoldersResult> loadFavoriteFolders({
-    String? comicId,
-    String sourceKey = '',
-  }) async {
-    favoriteFolderArguments = {'comicId': comicId, 'sourceKey': sourceKey};
-    return const FavoriteFoldersResult.success(
-      folders: [],
-      favoritedFolderIds: {},
-    );
+  Future<void> writeLocalActiveSource(String content) async {
+    writtenSource = content;
   }
 
   @override
-  Future<FavoriteComicsResult> loadFavoriteComics({
-    required int page,
-    required String folderId,
-  }) async {
-    favoriteComicsArguments = {'page': page, 'folderId': folderId};
-    return const FavoriteComicsResult.success([]);
+  Future<void> reloadFromLocalSourceFiles() async {
+    reloadCalls++;
   }
 
   @override
-  Future<void> toggleFavorite({
-    required String comicId,
-    required bool isAdding,
-    String folderId = '0',
-    String? favoriteId,
-    String sourceKey = '',
-  }) async {
-    favoriteToggleArguments = {
-      'comicId': comicId,
-      'isAdding': isAdding,
-      'folderId': folderId,
-      'favoriteId': favoriteId,
-      'sourceKey': sourceKey,
-    };
-  }
-
-  @override
-  Future<void> setFavoriteSortOrder(String order) async {
-    favoriteSortOrderArgument = order;
-  }
-
-  @override
-  Future<bool> isDailyCheckInCompletedToday() async {
-    dailyCheckInCompletionCalls++;
-    return true;
-  }
-
-  @override
-  Future<DailyCheckInResult> performDailyCheckIn() async {
-    dailyCheckInPerformCalls++;
-    return const DailyCheckInResult.alreadyCheckedIn();
-  }
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }

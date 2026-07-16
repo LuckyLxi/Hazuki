@@ -4,7 +4,7 @@ import 'package:hazuki/features/search/state/aggregate_search_results_controller
 import 'package:hazuki/features/search/view/search_aggregate_results.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/runtime/source_runtime_assembly.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 
 void main() {
@@ -27,7 +27,13 @@ void main() {
 
     final requestedOrders = <String, String>{};
     final controller = AggregateSearchResultsController.withLoader(
-      sourceService: HazukiSourceSearchAdapter(HazukiSourceService()),
+      sourceService: (() {
+        final source = SourceRuntimeAssembly();
+        return HazukiSourceSearchAdapter(
+          runtime: source.testing.runtime,
+          content: source.testing.content,
+        );
+      })(),
       loader:
           ({
             required sourceKey,

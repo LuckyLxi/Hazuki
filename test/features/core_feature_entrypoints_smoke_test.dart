@@ -4,7 +4,6 @@ import 'package:hazuki/app/app.dart';
 import 'package:hazuki/app/home/home_feature_entrypoints.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/features/comments/comments.dart';
-import 'package:hazuki/features/comments/state/comments_page_controller.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_page.dart';
 import 'package:hazuki/features/comic_detail/support/comic_detail_dependencies.dart';
 import 'package:hazuki/features/downloads/downloads.dart';
@@ -31,6 +30,7 @@ import 'package:hazuki/services/search_history_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/software_update/software_update_service.dart';
 import 'package:hazuki/shared/comments/comments_widget_builder.dart';
+import 'package:hazuki/shared/comments/comments_interaction_state.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
 
 Widget _buildComments({
@@ -188,7 +188,7 @@ void main() {
     );
     final history = HistoryPage(
       readHistoryService: sl<ReadHistoryService>(),
-      sourceService: sl<SourceRuntimeGateway>(),
+      sourceService: sl<SourceSelectionGateway>(),
       imageGateway: sl<SourceImageGateway>(),
       comicDetailPageBuilder: buildDetail,
       onFavoriteRequested: (_, _) async {},
@@ -204,6 +204,10 @@ void main() {
         dailyRecommendation: sl<DiscoverDailyRecommendationService>(),
         downloader: sl<MangaDownloadService>(),
         sourceRuntime: sl<SourceRuntimeGateway>(),
+        sourceSelection: sl<SourceSelectionGateway>(),
+        sourceAdvanced: sl<SourceAdvancedGateway>(),
+        sourceScript: sl<SourceScriptGateway>(),
+        sourceUpdate: sl<SourceUpdateGateway>(),
       ),
       appearanceSettings: const AppearanceSettingsData(
         themeMode: ThemeMode.system,
@@ -222,12 +226,12 @@ void main() {
       labSettingsPageBuilder: (_) =>
           LabSettingsPage(sourceService: sl<SourceRuntimeGateway>()),
       advancedSettingsPageBuilder: (_) => AdvancedSettingsPage(
-        sourceService: sl<SourceRuntimeGateway>(),
+        sourceService: sl<SourceAdvancedGateway>(),
         softwareUpdateService: sl<SoftwareUpdateService>(),
         logsPageBuilder: (_) =>
             LogsPage(debugGateway: sl<SourceDebugGateway>()),
         comicSourceEditorPageBuilder: (_) =>
-            ComicSourceEditorPage(sourceService: sl<SourceRuntimeGateway>()),
+            ComicSourceEditorPage(sourceService: sl<SourceScriptGateway>()),
         restoreComicSource: (_) async => false,
       ),
     );

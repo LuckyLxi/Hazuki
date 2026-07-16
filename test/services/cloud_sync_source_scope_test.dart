@@ -12,8 +12,7 @@ import 'package:hazuki/services/cloud_sync/cloud_sync_restore_applier.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_snapshot_codec.dart';
 import 'package:hazuki/services/local_favorites_service.dart';
 import 'package:hazuki/services/download_groups_service.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
-import 'package:hazuki/services/source/source_capabilities.dart';
+import 'package:hazuki/services/source/runtime/source_runtime_assembly.dart';
 import 'package:hazuki/services/reading_progress_service.dart';
 import 'package:hazuki/services/read_history_service.dart';
 import 'package:hazuki/services/storage/hazuki_database.dart';
@@ -36,7 +35,7 @@ class _CloudSyncFixture {
 
   factory _CloudSyncFixture.create() {
     final database = HazukiDatabase.memory();
-    final source = HazukiSourceService();
+    final source = SourceRuntimeAssembly();
     final readHistory = ReadHistoryService(database: database);
     final readingProgress = ReadingProgressService(database: database);
     final localFavorites = LocalFavoritesService(database: database);
@@ -51,7 +50,7 @@ class _CloudSyncFixture {
       downloadGroups: downloadGroups,
       searchHistory: searchHistory,
       participants: createCloudSyncParticipantSet(
-        source: HazukiSourceSyncAdapter(source),
+        source: source.gateways.sync,
         readHistory: readHistory,
         readingProgress: readingProgress,
         localFavorites: localFavorites,
@@ -62,7 +61,7 @@ class _CloudSyncFixture {
   }
 
   final HazukiDatabase database;
-  final HazukiSourceService source;
+  final SourceRuntimeAssembly source;
   final ReadHistoryService readHistory;
   final ReadingProgressService readingProgress;
   final LocalFavoritesService localFavorites;

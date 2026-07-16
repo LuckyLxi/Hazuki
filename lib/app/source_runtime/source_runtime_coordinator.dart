@@ -4,7 +4,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:hazuki/app/service_locator.dart';
 
-import '../../services/hazuki_source_service.dart';
+import '../../services/source/source_capabilities.dart';
 import 'source_runtime_widgets.dart';
 
 class SourceBootstrapState {
@@ -49,10 +49,14 @@ class SourceBootstrapState {
 }
 
 class SourceRuntimeCoordinator {
-  SourceRuntimeCoordinator({HazukiSourceService? sourceService})
-    : _sourceService = sourceService ?? sl<HazukiSourceService>();
+  SourceRuntimeCoordinator({
+    SourceBootstrapGateway? bootstrapGateway,
+    SourceUpdateGateway? updateGateway,
+  }) : _bootstrapGateway = bootstrapGateway ?? sl<SourceBootstrapGateway>(),
+       _updateGateway = updateGateway ?? sl<SourceUpdateGateway>();
 
-  final HazukiSourceService _sourceService;
+  final SourceBootstrapGateway _bootstrapGateway;
+  final SourceUpdateGateway _updateGateway;
   final Connectivity _connectivity = Connectivity();
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   bool _hasConnectivity = true;
@@ -65,7 +69,7 @@ class SourceRuntimeCoordinator {
     required VoidCallback onSourceReady,
     required VoidCallback scheduleSourceUpdateDialogCheck,
   }) async {
-    final hasLocalSource = await _sourceService.hasLocalJmSourceFile();
+    final hasLocalSource = await _bootstrapGateway.hasLocalJmSourceFile();
     if (!isMounted()) {
       return;
     }
@@ -95,8 +99,8 @@ class SourceRuntimeCoordinator {
         );
       }());
       try {
-        await _sourceService.init(
-          onSourceDownloadProgress: (received, total) {
+        await _bootstrapGateway.init(
+          onProgress: (received, total) {
             if (!isMounted()) {
               return;
             }
@@ -110,7 +114,7 @@ class SourceRuntimeCoordinator {
             );
           },
         );
-        await _sourceService.ensureInitialized();
+        await _bootstrapGateway.ensureInitialized();
         bootstrapSucceeded = true;
       } catch (e) {
         if (!isMounted()) {
@@ -218,7 +222,7 @@ class SourceRuntimeCoordinator {
     required bool Function() isMounted,
     required VoidCallback scheduleSourceUpdateDialogCheck,
   }) async {
-    final refreshed = await _sourceService.refreshSourceOnNetworkRecovery();
+    final refreshed = await _updateGateway.refreshSourceOnNetworkRecovery();
     if (!isMounted() || !refreshed) {
       return;
     }

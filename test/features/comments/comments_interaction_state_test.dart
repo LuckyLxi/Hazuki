@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hazuki/features/comments/state/comments_page_controller.dart';
+import 'package:hazuki/shared/comments/comments_interaction_state.dart';
 
 void main() {
   test('interaction state owns pagination and reply collections', () {

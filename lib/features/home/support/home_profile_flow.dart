@@ -24,7 +24,7 @@ class HomeProfileFlow {
   final BuildContext context;
   final bool Function() isMounted;
   final HomeProfileController profileController;
-  final SourceRuntimeGateway sourceService;
+  final SourceHomeGateway sourceService;
   final SourceImageGateway imageService;
   final MethodChannel mediaChannel;
   final Future<void> Function() syncUserProfile;

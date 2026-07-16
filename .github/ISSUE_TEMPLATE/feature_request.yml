@@ -24,7 +24,7 @@ body:
     id: solution
     attributes:
       label: 你希望的解决方案
-      description: 描述你希望 Hazuki 如何处理这个问题。
+      description: 描述你希望如何处理这个问题。
     validations:
       required: true
 

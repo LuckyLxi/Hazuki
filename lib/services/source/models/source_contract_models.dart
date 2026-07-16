@@ -138,3 +138,19 @@ class PreparedChapterImageData {
   final bool wasProcessed;
   final double? aspectRatio;
 }
+
+class SourceVersionCheckResult {
+  const SourceVersionCheckResult({
+    required this.sourceKey,
+    required this.sourceName,
+    required this.localVersion,
+    required this.remoteVersion,
+    required this.hasUpdate,
+  });
+
+  final String sourceKey;
+  final String sourceName;
+  final String localVersion;
+  final String remoteVersion;
+  final bool hasUpdate;
+}

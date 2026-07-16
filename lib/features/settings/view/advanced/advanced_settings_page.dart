@@ -22,7 +22,7 @@ class AdvancedSettingsPage extends StatefulWidget {
   final WidgetBuilder logsPageBuilder;
   final WidgetBuilder comicSourceEditorPageBuilder;
   final Future<bool> Function(BuildContext context) restoreComicSource;
-  final SourceRuntimeGateway sourceService;
+  final SourceAdvancedGateway sourceService;
   final SoftwareUpdateService softwareUpdateService;
 
   @override
@@ -30,7 +30,7 @@ class AdvancedSettingsPage extends StatefulWidget {
 }
 
 class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
-  SourceRuntimeGateway get _sourceService => widget.sourceService;
+  SourceAdvancedGateway get _sourceService => widget.sourceService;
   SoftwareUpdateService get _softwareUpdateService =>
       widget.softwareUpdateService;
   bool _noImageMode = false;

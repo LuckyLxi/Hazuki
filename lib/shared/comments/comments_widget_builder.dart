@@ -1,5 +1,5 @@
 import 'package:flutter/widgets.dart';
-import 'package:hazuki/features/comments/state/comments_page_controller.dart';
+import 'package:hazuki/shared/comments/comments_interaction_state.dart';
 
 typedef CommentsWidgetBuilder =
     Widget Function({

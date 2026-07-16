@@ -6,7 +6,7 @@ import 'package:hazuki/app/service_locator.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/cloud_sync_service.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/runtime/source_runtime_assembly.dart';
 import 'package:hazuki/services/source/debug/debug_log_internals.dart';
 import 'package:hazuki/services/source/common/source_prefs_keys.dart';
 import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
@@ -26,8 +26,8 @@ void main() {
   test(
     'HazukiSourceFacade keeps cache operations reachable via service API',
     () {
-      final service = sl<HazukiSourceService>();
-      final facade = service.facade;
+      final service = sl<SourceRuntimeAssembly>();
+      final facade = service.testing.facade;
       const url = 'https://example.com/image.jpg';
       final bytes = Uint8List.fromList([1, 2, 3]);
 
@@ -40,7 +40,7 @@ void main() {
         bytes,
       );
 
-      expect(service.peekImageBytesFromMemory(url), bytes);
+      expect(service.testing.image.peekImageBytesFromMemory(url), bytes);
       expect(
         facade
             .resolveImageBaseUri(
@@ -56,13 +56,13 @@ void main() {
   test(
     'switching source releases the previous source runtime and memory cache',
     () async {
-      final service = sl<HazukiSourceService>();
+      final service = sl<SourceRuntimeAssembly>();
       const url = 'https://example.com/shared-cover.jpg';
       final jmBytes = Uint8List.fromList([1, 2, 3]);
       final copyBytes = Uint8List.fromList([4, 5, 6]);
-      final originalJmFacade = service.facade;
+      final originalJmFacade = service.testing.facade;
 
-      service.facade.cache.putImageBytes(
+      service.testing.facade.cache.putImageBytes(
         SourceScopedComicId(
           sourceKey: hazukiDefaultSourceKey,
           comicId: url,
@@ -72,13 +72,13 @@ void main() {
 
       await service.runtimeRegistry.activateSource('copy_manga');
       expect(
-        service.peekImageBytesFromMemory(
+        service.testing.image.peekImageBytesFromMemory(
           url,
           sourceKey: hazukiDefaultSourceKey,
         ),
         isNull,
       );
-      service.facade.cache.putImageBytes(
+      service.testing.facade.cache.putImageBytes(
         SourceScopedComicId(
           sourceKey: 'copy_manga',
           comicId: url,
@@ -88,46 +88,62 @@ void main() {
 
       await service.runtimeRegistry.activateSource(hazukiDefaultSourceKey);
 
-      expect(service.activeSourceKey, hazukiDefaultSourceKey);
-      expect(service.facade, isNot(same(originalJmFacade)));
-      expect(service.peekImageBytesFromMemory(url), isNull);
+      expect(service.testing.runtime.activeSourceKey, hazukiDefaultSourceKey);
+      expect(service.testing.facade, isNot(same(originalJmFacade)));
+      expect(service.testing.image.peekImageBytesFromMemory(url), isNull);
       expect(
-        service.peekImageBytesFromMemory(url, sourceKey: 'copy_manga'),
+        service.testing.image.peekImageBytesFromMemory(
+          url,
+          sourceKey: 'copy_manga',
+        ),
         isNull,
       );
-      expect(service.activeSourceKey, hazukiDefaultSourceKey);
+      expect(service.testing.runtime.activeSourceKey, hazukiDefaultSourceKey);
     },
   );
 
   test('concurrent source switches commit in request order', () async {
-    final service = sl<HazukiSourceService>();
+    final service = sl<SourceRuntimeAssembly>();
 
-    final first = service.activateSource('copy_manga');
-    final second = service.activateSource('picacg');
+    final first = service.runtimeRegistry.activateSource('copy_manga');
+    final second = service.runtimeRegistry.activateSource('picacg');
     await Future.wait([first, second]);
 
     final prefs = await SharedPreferences.getInstance();
-    expect(service.activeSourceKey, 'picacg');
+    expect(service.testing.runtime.activeSourceKey, 'picacg');
     expect(prefs.getString(SourcePrefsKeys.activeSourceKey), 'picacg');
   });
 
   test(
     'resolving and updating another source does not switch active source',
     () async {
-      final service = sl<HazukiSourceService>();
-      await service.activateSource(hazukiDefaultSourceKey);
+      final service = sl<SourceRuntimeAssembly>();
+      await service.runtimeRegistry.activateSource(hazukiDefaultSourceKey);
 
-      expect(service.resolveActiveSourceKey('copy_manga'), 'copy_manga');
-      await service.updateSourceSetting('copy_manga', 'image_quality', '1200');
+      expect(
+        service.testing.resolveActiveSourceKey('copy_manga'),
+        'copy_manga',
+      );
+      await service.testing.settings.updateSourceSetting(
+        'copy_manga',
+        'image_quality',
+        '1200',
+      );
 
-      expect(service.activeSourceKey, hazukiDefaultSourceKey);
-      expect(service.loadSourceSetting('copy_manga', 'image_quality'), '1200');
+      expect(service.testing.runtime.activeSourceKey, hazukiDefaultSourceKey);
+      expect(
+        service.testing.settings.loadSourceSetting(
+          'copy_manga',
+          'image_quality',
+        ),
+        '1200',
+      );
     },
   );
 
   test('switching source defers disposal of a running runtime', () async {
-    final service = sl<HazukiSourceService>();
-    final originalHandle = service.facade.handle;
+    final service = sl<SourceRuntimeAssembly>();
+    final originalHandle = service.testing.facade.handle;
     final operationStarted = Completer<void>();
     final releaseOperation = Completer<void>();
 
@@ -137,7 +153,7 @@ void main() {
     });
     await operationStarted.future;
 
-    await service.activateSource('copy_manga');
+    await service.runtimeRegistry.activateSource('copy_manga');
     expect(originalHandle.isDisposed, isFalse);
 
     releaseOperation.complete();
@@ -281,9 +297,11 @@ void main() {
         }),
       });
       final secureStorage = MemorySourceSecureSessionStorage();
-      final service = HazukiSourceService(secureSessionStorage: secureStorage);
+      final service = SourceRuntimeAssembly(
+        secureSessionStorage: secureStorage,
+      );
 
-      final prefs = await service.facade.ensurePrefs();
+      final prefs = await service.testing.facade.ensurePrefs();
       final sourceData = jsonDecode(prefs.getString('source_data_jm')!);
 
       expect(prefs.getString('cookie_store_v1'), isNull);
@@ -304,8 +322,11 @@ void main() {
         secureStorage.values[SourceSecureSessionStorageKeys.cookies('jm')],
         legacyCookies,
       );
-      expect(service.facade.loadAccountDataSync(), ['user', 'pass']);
-      expect(service.facade.loadSourceData('jm', 'token'), 'source-token');
+      expect(service.testing.facade.loadAccountDataSync(), ['user', 'pass']);
+      expect(
+        service.testing.facade.loadSourceData('jm', 'token'),
+        'source-token',
+      );
     },
   );
 
@@ -330,19 +351,27 @@ void main() {
       });
       final secureStorage = MemorySourceSecureSessionStorage()
         ..failWrites = true;
-      final service = HazukiSourceService(secureSessionStorage: secureStorage);
+      final service = SourceRuntimeAssembly(
+        secureSessionStorage: secureStorage,
+      );
 
-      final prefs = await service.facade.ensurePrefs();
+      final prefs = await service.testing.facade.ensurePrefs();
       final sourceData = jsonDecode(prefs.getString('source_data_jm')!);
 
       expect((sourceData as Map)['account'], ['user', 'pass']);
       expect(sourceData['token'], 'source-token');
       expect(prefs.getString('cookie_store_v2_jm'), legacyCookies);
-      expect(service.facade.loadAccountDataSync(), ['user', 'pass']);
-      expect(service.facade.loadSourceData('jm', 'token'), 'source-token');
+      expect(service.testing.facade.loadAccountDataSync(), ['user', 'pass']);
+      expect(
+        service.testing.facade.loadSourceData('jm', 'token'),
+        'source-token',
+      );
 
       await expectLater(
-        service.facade.saveSourceData('jm', 'account', ['next', 'secret']),
+        service.testing.facade.saveSourceData('jm', 'account', [
+          'next',
+          'secret',
+        ]),
         throwsStateError,
       );
       final afterFailedLoginSave = jsonDecode(
@@ -366,13 +395,18 @@ void main() {
           ]),
         },
       );
-      final service = HazukiSourceService(secureSessionStorage: secureStorage);
+      final service = SourceRuntimeAssembly(
+        secureSessionStorage: secureStorage,
+      );
 
-      await service.loadActiveSourcePreference();
+      await service.runtimeRegistry.loadActiveSourcePreference();
 
-      expect(service.activeSourceKey, hazukiDefaultSourceKey);
-      expect(service.currentAccountForSource('copy_manga'), 'copy-user');
-      expect(service.isLoggedForSource('copy_manga'), isTrue);
+      expect(service.testing.runtime.activeSourceKey, hazukiDefaultSourceKey);
+      expect(
+        service.testing.account.currentAccountForSource('copy_manga'),
+        'copy-user',
+      );
+      expect(service.testing.account.isLoggedForSource('copy_manga'), isTrue);
     },
   );
 
@@ -386,18 +420,19 @@ void main() {
       }),
     });
     final secureStorage = MemorySourceSecureSessionStorage();
-    final service = HazukiSourceService(secureSessionStorage: secureStorage);
+    final service = SourceRuntimeAssembly(secureSessionStorage: secureStorage);
     final handle = SourceRuntimeHandle(
       sourceKey: hazukiDefaultSourceKey,
       secureStorage: secureStorage,
-      ensureInitialized: service.ensureSourceInitialized,
+      ensureInitialized:
+          service.testing.runtimeOperations.ensureSourceInitialized,
       notifyRuntimeStateChanged: (_) {},
     );
     await handle.facade.ensurePrefs();
     await handle.facade.saveSourceData('copy_manga', 'token', 'copy-token');
 
     dynamic invoke(Map<String, dynamic> message) {
-      return service.handleJsMessageForTesting(handle, message);
+      return service.testing.handleJsMessage(handle, message);
     }
 
     expect(
@@ -474,24 +509,33 @@ void main() {
         }),
       });
       final secureStorage = MemorySourceSecureSessionStorage();
-      final service = HazukiSourceService(secureSessionStorage: secureStorage);
-      await service.facade.ensurePrefs();
-      await service.facade.saveSourceData('jm', 'account', ['user', 'pass']);
-      await service.facade.saveSourceData('jm', 'token', 'source-token');
-      await service.saveCookiesFromHeadersForHandle(
-        service.facade.handle,
+      final service = SourceRuntimeAssembly(
+        secureSessionStorage: secureStorage,
+      );
+      await service.testing.facade.ensurePrefs();
+      await service.testing.facade.saveSourceData('jm', 'account', [
+        'user',
+        'pass',
+      ]);
+      await service.testing.facade.saveSourceData(
+        'jm',
+        'token',
+        'source-token',
+      );
+      await service.testing.saveCookiesFromHeaders(
+        service.testing.facade.handle,
         'https://example.com/path',
         {
           'set-cookie': ['sid=abc; Path=/'],
         },
       );
 
-      await service.logout();
+      await service.testing.account.logout();
       final prefs = await SharedPreferences.getInstance();
       final sourceData = jsonDecode(prefs.getString('source_data_jm')!);
 
-      expect(service.facade.loadAccountDataSync(), isNull);
-      expect(service.facade.loadSourceData('jm', 'token'), isNull);
+      expect(service.testing.facade.loadAccountDataSync(), isNull);
+      expect(service.testing.facade.loadSourceData('jm', 'token'), isNull);
       expect(
         secureStorage.values[SourceSecureSessionStorageKeys.account('jm')],
         isNull,
@@ -510,18 +554,20 @@ void main() {
   );
 
   test('debug export data keeps full typed log content', () async {
-    final service = sl<HazukiSourceService>();
-    await service.setSoftwareLogCaptureEnabled(true);
+    final service = sl<SourceRuntimeAssembly>();
+    await service.testing.runtimeOperations.setSoftwareLogCaptureEnabled(true);
     final longMessage = 'avatar-${'x' * 520}';
 
-    service.addApplicationLog(
+    service.testing.debug.addApplicationLog(
       level: 'info',
       title: 'Avatar diagnostic',
       source: 'source_avatar',
       content: {'message': longMessage},
     );
 
-    final debugInfo = await service.collectTypedDebugInfo(debugLogTypeSystem);
+    final debugInfo = await service.testing.debug.collectTypedDebugInfo(
+      debugLogTypeSystem,
+    );
     final logs = (debugInfo['logs'] as List).cast<Map>();
     final log = logs.last.cast<String, dynamic>();
 
@@ -530,18 +576,18 @@ void main() {
   });
 
   test('application debug export data keeps full log content', () async {
-    final service = sl<HazukiSourceService>();
-    await service.setSoftwareLogCaptureEnabled(true);
+    final service = sl<SourceRuntimeAssembly>();
+    await service.testing.runtimeOperations.setSoftwareLogCaptureEnabled(true);
     final longMessage = 'picacg-${'u' * 520}';
 
-    service.addApplicationLog(
+    service.testing.debug.addApplicationLog(
       level: 'info',
       title: 'Picacg login server response',
       source: 'source_login',
       content: {'body': longMessage},
     );
 
-    final debugInfo = await service.collectApplicationDebugInfo();
+    final debugInfo = await service.testing.debug.collectApplicationDebugInfo();
     final logs = (debugInfo['recentApplicationLogs'] as List).cast<Map>();
     final log = logs.last.cast<String, dynamic>();
 
@@ -550,11 +596,11 @@ void main() {
   });
 
   test('network debug export data keeps full response body', () async {
-    final service = sl<HazukiSourceService>();
-    await service.setSoftwareLogCaptureEnabled(true);
+    final service = sl<SourceRuntimeAssembly>();
+    await service.testing.runtimeOperations.setSoftwareLogCaptureEnabled(true);
     final longBody = '{"body":"${'y' * 1400}"}';
 
-    service.appendNetworkLogEntry(
+    service.testing.debug.appendNetworkLogEntry(
       method: 'POST',
       url: 'source://account.login',
       statusCode: 200,
@@ -564,7 +610,7 @@ void main() {
       responseBody: longBody,
     );
 
-    final debugInfo = await service.collectNetworkDebugInfo();
+    final debugInfo = await service.testing.debug.collectNetworkDebugInfo();
     final logs = (debugInfo['recentNetworkLogs'] as List).cast<Map>();
     final log = logs.last.cast<String, dynamic>();
 

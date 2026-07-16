@@ -27,7 +27,7 @@ class HistoryPage extends StatefulWidget {
   });
 
   final ReadHistoryService readHistoryService;
-  final SourceRuntimeGateway sourceService;
+  final SourceSelectionGateway sourceService;
   final SourceImageGateway imageGateway;
   final ComicDetailPageBuilder comicDetailPageBuilder;
   final HistoryFavoriteRequested onFavoriteRequested;

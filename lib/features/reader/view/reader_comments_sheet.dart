@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/features/reader/support/reader_callbacks.dart';
-import 'package:hazuki/features/comments/state/comments_page_controller.dart';
 import 'package:hazuki/l10n/l10n.dart';
+import 'package:hazuki/shared/comments/comments_interaction_state.dart';
 
 class ReaderCommentsSheet extends StatefulWidget {
   const ReaderCommentsSheet({

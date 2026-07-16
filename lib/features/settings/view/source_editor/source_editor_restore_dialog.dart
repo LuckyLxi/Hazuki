@@ -7,7 +7,7 @@ import 'package:hazuki/widgets/widgets.dart';
 
 Future<bool> showSourceEditorRestoreDialog(
   BuildContext context, {
-  required SourceRuntimeGateway sourceService,
+  required SourceUpdateGateway sourceService,
 }) async {
   final strings = l10n(context);
   var phase = _ComicSourceRestoreDialogPhase.confirm;

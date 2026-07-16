@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hazuki/app/service_locator.dart';
 
 import '../../l10n/l10n.dart';
-import '../../services/hazuki_source_service.dart';
+import '../../services/source/source_capabilities.dart';
 import 'source_runtime_dialog_view_support.dart';
 
 enum SourceUpdateDialogAction { skipToday, cancel, downloaded }
@@ -265,7 +265,7 @@ class _SourceUpdateDialogCardState extends State<SourceUpdateDialogCard> {
       _indeterminate = true;
     });
 
-    final ok = await sl<HazukiSourceService>().downloadActiveSourceAndReload(
+    final ok = await sl<SourceUpdateGateway>().downloadActiveSourceAndReload(
       onProgress: (received, total) {
         _updateDialogState(() {
           if (total > 0) {

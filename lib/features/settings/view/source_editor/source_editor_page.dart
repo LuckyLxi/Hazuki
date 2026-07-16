@@ -12,7 +12,7 @@ import '../settings_group.dart';
 class ComicSourceEditorPage extends StatefulWidget {
   const ComicSourceEditorPage({super.key, required this.sourceService});
 
-  final SourceRuntimeGateway sourceService;
+  final SourceScriptGateway sourceService;
 
   @override
   State<ComicSourceEditorPage> createState() => _ComicSourceEditorPageState();
@@ -237,7 +237,7 @@ class _ComicSourceEditorPageState extends State<ComicSourceEditorPage> {
 
 Future<bool> showComicSourceRestoreDialog(
   BuildContext context, {
-  required SourceRuntimeGateway sourceService,
+  required SourceUpdateGateway sourceService,
 }) {
   return showSourceEditorRestoreDialog(context, sourceService: sourceService);
 }

@@ -27,7 +27,8 @@ class OtherSettingsPage extends StatefulWidget {
 }
 
 class _OtherSettingsPageState extends State<OtherSettingsPage> {
-  SourceRuntimeGateway get _sourceService => widget.dependencies.sourceRuntime;
+  SourceSelectionGateway get _sourceService =>
+      widget.dependencies.sourceSelection;
   late OtherSettingsSnapshot _snapshot = OtherSettingsSnapshot.initial(
     useSystemTitleBar: widget.initialUseSystemTitleBar,
   );

@@ -1310,19 +1310,3 @@ class _SourceLoadResult {
   final File jmFile;
   final String message;
 }
-
-class SourceVersionCheckResult {
-  const SourceVersionCheckResult({
-    required this.sourceKey,
-    required this.sourceName,
-    required this.localVersion,
-    required this.remoteVersion,
-    required this.hasUpdate,
-  });
-
-  final String sourceKey;
-  final String sourceName;
-  final String localVersion;
-  final String remoteVersion;
-  final bool hasUpdate;
-}

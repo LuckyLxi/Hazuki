@@ -8,7 +8,7 @@ typedef SourceAccountLoginOperation =
 typedef SourceAccountAvatarLoader = Future<String?> Function();
 
 Future<HomeLoginDialogProfile> loginSourceAccountForDialog({
-  required SourceRuntimeGateway sourceService,
+  required SourceAccountGateway sourceService,
   required String account,
   required String password,
   Future<void> Function()? afterLogin,

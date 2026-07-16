@@ -1,5 +1,5 @@
 import 'package:hazuki/app/service_locator.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/runtime/source_runtime_assembly.dart';
 import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
 import 'package:hazuki/services/storage/hazuki_database.dart';
 
@@ -13,8 +13,8 @@ Future<void> ensureTestServiceLocator() async {
     () => HazukiDatabase.memory(),
     dispose: (database) => database.close(),
   );
-  sl.registerLazySingleton<HazukiSourceService>(
-    () => HazukiSourceService(
+  sl.registerLazySingleton<SourceRuntimeAssembly>(
+    () => SourceRuntimeAssembly(
       secureSessionStorage: MemorySourceSecureSessionStorage(),
     ),
   );
