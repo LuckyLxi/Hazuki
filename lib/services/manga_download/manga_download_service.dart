@@ -470,6 +470,48 @@ class MangaDownloadService extends ChangeNotifier {
     return childPath.startsWith('$parentPath/');
   }
 
+  Set<Directory> _downloadedComicDirectoriesWithinRoot(
+    DownloadedMangaComic comic,
+    Directory rootDir,
+  ) {
+    final paths = <String>[
+      if (comic.localCoverPath != null) comic.localCoverPath!,
+      for (final chapter in comic.chapters) ...chapter.imagePaths,
+    ];
+    final directories = <Directory>{};
+    for (final path in paths) {
+      final directory = _topLevelDirectoryWithinRoot(path, rootDir);
+      if (directory != null) {
+        directories.add(directory);
+      }
+    }
+    return directories;
+  }
+
+  Directory? _topLevelDirectoryWithinRoot(String path, Directory rootDir) {
+    String normalize(String value) {
+      final absolute = File(value).absolute.path.replaceAll('\\', '/');
+      final trimmed = absolute.endsWith('/')
+          ? absolute.substring(0, absolute.length - 1)
+          : absolute;
+      return Platform.isWindows ? trimmed.toLowerCase() : trimmed;
+    }
+
+    final rootPath = normalize(rootDir.path);
+    final filePath = normalize(path);
+    if (!filePath.startsWith('$rootPath/')) {
+      return null;
+    }
+    final relativeParts = filePath
+        .substring(rootPath.length + 1)
+        .split('/')
+        .where((part) => part.isNotEmpty);
+    if (relativeParts.isEmpty) {
+      return null;
+    }
+    return Directory('${rootDir.path}/${relativeParts.first}');
+  }
+
   Future<void> _deleteMetadataFiles(Directory comicDir) async {
     for (final name in const [_metadataFileName, _legacyMetadataFileName]) {
       final file = File('${comicDir.path}/$name');
@@ -498,12 +540,28 @@ class MangaDownloadService extends ChangeNotifier {
     for (final storageKey in ids) {
       try {
         final comic = _downloadedComicByStorageKey(storageKey);
-        final dirName =
-            comic?.downloadDirName ??
-            SourceScopedComicId.fromStorageKey(storageKey).downloadDirName;
-        final dir = Directory('${rootDir.path}/$dirName');
-        if (await dir.exists()) {
-          await dir.delete(recursive: true);
+        final scopedId = SourceScopedComicId.fromStorageKey(storageKey);
+        final removesLegacyDirectory =
+            scopedId.sourceKey.isEmpty ||
+            isHazukiJmSourceKey(scopedId.sourceKey);
+        final dirNames = <String>{
+          comic?.downloadDirName ?? scopedId.downloadDirName,
+          scopedId.downloadDirName,
+          // Downloads created before source-scoped IDs used the raw comic ID
+          // as their directory name. Keep deleting that legacy directory so a
+          // migrated download does not remain on disk after deletion.
+          if (removesLegacyDirectory && comic != null) comic.comicId,
+          if (removesLegacyDirectory) scopedId.comicId,
+        };
+        final directories = <Directory>{
+          for (final dirName in dirNames) Directory('${rootDir.path}/$dirName'),
+          if (comic != null)
+            ..._downloadedComicDirectoriesWithinRoot(comic, rootDir),
+        };
+        for (final dir in directories) {
+          if (_isPathWithin(dir, rootDir) && await dir.exists()) {
+            await dir.delete(recursive: true);
+          }
         }
       } catch (_) {}
     }
