@@ -331,6 +331,7 @@ class MainActivityChannels(
 
         pendingPickDirectoryResult = result
         try {
+            activity.prepareForSystemDirectoryPicker()
             val intent =
                     Intent(Intent.ACTION_OPEN_DOCUMENT_TREE).apply {
                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -340,6 +341,7 @@ class MainActivityChannels(
                     }
             pickDirectoryLauncher.launch(intent)
         } catch (e: Exception) {
+            activity.cancelSystemDirectoryPickerLaunch()
             pendingPickDirectoryResult = null
             result.error(
                     "pick_directory_launch_failed",
