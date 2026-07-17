@@ -8,5 +8,5 @@
     "x64_zip": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.1.6/hazuki-windows-x64-v1.1.6.zip",
     "x64_exe": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.1.6/hazuki-windows-x64-v1.1.6-setup.exe"
   },
-  "changelog": "发布 v1.1.6"
+  "changelog": "Hazuki v1.1.6\n\n- 长按搜索历史可复制关键词\n- 优化阅读体验\n- 优化下载管理\n- 优化封面预加载\n- 调整部分文本"
 }
