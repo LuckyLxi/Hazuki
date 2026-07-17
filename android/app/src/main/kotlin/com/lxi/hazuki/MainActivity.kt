@@ -17,6 +17,7 @@ class MainActivity : FlutterFragmentActivity() {
     private var isFirstLaunch = true
     private var wasInBackground = false
     private var pendingInitialLaunchAction: String? = null
+    private var isLaunchingSystemDirectoryPicker = false
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -66,22 +67,28 @@ class MainActivity : FlutterFragmentActivity() {
 
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
-        privacyManager.applyRecentsBlackoutIfEnabled()
+        if (!isLaunchingSystemDirectoryPicker) {
+            privacyManager.applyRecentsBlackoutIfEnabled()
+        }
     }
 
     override fun onPause() {
         super.onPause()
-        privacyManager.applyRecentsBlackoutIfEnabled()
+        if (!isLaunchingSystemDirectoryPicker) {
+            privacyManager.applyRecentsBlackoutIfEnabled()
+        }
     }
 
     override fun onStop() {
         super.onStop()
+        privacyManager.applyRecentsBlackoutIfEnabled()
         wasInBackground = true
         privacyManager.markUnauthenticated()
     }
 
     override fun onResume() {
         super.onResume()
+        isLaunchingSystemDirectoryPicker = false
         privacyManager.onResume(
             isFirstLaunch = isFirstLaunch,
             wasInBackground = wasInBackground
@@ -94,6 +101,14 @@ class MainActivity : FlutterFragmentActivity() {
         val launchAction = pendingInitialLaunchAction
         pendingInitialLaunchAction = null
         return launchAction
+    }
+
+    fun prepareForSystemDirectoryPicker() {
+        isLaunchingSystemDirectoryPicker = true
+    }
+
+    fun cancelSystemDirectoryPickerLaunch() {
+        isLaunchingSystemDirectoryPicker = false
     }
 
     private fun resolveLaunchAction(intent: Intent?): String? {
