@@ -14,6 +14,7 @@ import 'package:hazuki/services/read_history_service.dart';
 import 'package:hazuki/services/reading_progress_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/shared/comments/comments_widget_builder.dart';
+import 'package:hazuki/shared/comments/comments_interaction_state.dart';
 import '../../support/test_service_locator.dart';
 
 Widget _buildComments({
@@ -27,6 +28,7 @@ Widget _buildComments({
   bool isTabView = false,
   bool isActiveInTabView = true,
   Map<String, Object?> Function()? debugOuterScrollStateBuilder,
+  CommentsInteractionState? interactionState,
 }) {
   return const SizedBox.shrink();
 }

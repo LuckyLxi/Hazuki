@@ -5,7 +5,7 @@ import 'package:drift/drift.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/hazuki_models.dart';
-import 'hazuki_source_service.dart';
+import 'source/models/source_identity.dart';
 import 'storage/hazuki_database.dart';
 
 class ReadingProgressService {

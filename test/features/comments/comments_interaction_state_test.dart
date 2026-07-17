@@ -1,21 +1,24 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hazuki/features/comments/state/comments_page_controller.dart';
+import 'package:hazuki/shared/comments/comments_interaction_state.dart';
 
 void main() {
   test('interaction state owns pagination and reply collections', () {
     final state = CommentsInteractionState();
 
     expect(state.initialLoading, isTrue);
+    expect(state.initialLoadSucceeded, isFalse);
     expect(state.currentPage, 1);
     expect(state.replyComments, isEmpty);
 
     state
       ..initialLoading = false
+      ..initialLoadSucceeded = true
       ..currentPage = 3
       ..sendingComment = true;
     state.expandedReplyIds.add('comment-1');
 
     expect(state.initialLoading, isFalse);
+    expect(state.initialLoadSucceeded, isTrue);
     expect(state.currentPage, 3);
     expect(state.sendingComment, isTrue);
     expect(state.expandedReplyIds, {'comment-1'});

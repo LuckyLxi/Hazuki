@@ -7,8 +7,7 @@ class OtherSettingsGeneralSection extends StatelessWidget {
   const OtherSettingsGeneralSection({
     super.key,
     required this.autoCheckInEnabled,
-    required this.autoSourceUpdateCheckEnabled,
-    required this.autoSoftwareUpdateCheckEnabled,
+    required this.aggregateSearchEnabled,
     required this.discoverDailyRecommendationEnabled,
     required this.showAutoCheckInSetting,
     required this.showJmExclusiveSettings,
@@ -16,8 +15,7 @@ class OtherSettingsGeneralSection extends StatelessWidget {
     required this.mangaDownloadsRootPath,
     required this.showWindowsTitleBarToggle,
     required this.onAutoCheckInChanged,
-    required this.onAutoSourceUpdateChanged,
-    required this.onAutoSoftwareUpdateChanged,
+    required this.onAggregateSearchChanged,
     required this.onDiscoverDailyRecommendationChanged,
     required this.onUseSystemTitleBarChanged,
     required this.onEditMangaDownloadPath,
@@ -25,8 +23,7 @@ class OtherSettingsGeneralSection extends StatelessWidget {
   });
 
   final bool autoCheckInEnabled;
-  final bool autoSourceUpdateCheckEnabled;
-  final bool autoSoftwareUpdateCheckEnabled;
+  final bool aggregateSearchEnabled;
   final bool discoverDailyRecommendationEnabled;
   final bool showAutoCheckInSetting;
   final bool showJmExclusiveSettings;
@@ -34,8 +31,7 @@ class OtherSettingsGeneralSection extends StatelessWidget {
   final String mangaDownloadsRootPath;
   final bool showWindowsTitleBarToggle;
   final ValueChanged<bool> onAutoCheckInChanged;
-  final ValueChanged<bool> onAutoSourceUpdateChanged;
-  final ValueChanged<bool> onAutoSoftwareUpdateChanged;
+  final ValueChanged<bool> onAggregateSearchChanged;
   final ValueChanged<bool> onDiscoverDailyRecommendationChanged;
   final ValueChanged<bool> onUseSystemTitleBarChanged;
   final VoidCallback onEditMangaDownloadPath;
@@ -55,18 +51,12 @@ class OtherSettingsGeneralSection extends StatelessWidget {
             onChanged: onAutoCheckInChanged,
           ),
         SwitchListTile(
-          secondary: const Icon(Icons.system_update_alt_rounded),
-          title: Text(strings.otherAutoSourceUpdateTitle),
-          subtitle: Text(strings.otherAutoSourceUpdateSubtitle),
-          value: autoSourceUpdateCheckEnabled,
-          onChanged: onAutoSourceUpdateChanged,
-        ),
-        SwitchListTile(
-          secondary: const Icon(Icons.mobile_friendly_rounded),
-          title: Text(strings.otherAutoSoftwareUpdateTitle),
-          subtitle: Text(strings.otherAutoSoftwareUpdateSubtitle),
-          value: autoSoftwareUpdateCheckEnabled,
-          onChanged: onAutoSoftwareUpdateChanged,
+          key: const ValueKey('other-aggregate-search-switch'),
+          secondary: const Icon(Icons.travel_explore_outlined),
+          title: Text(strings.searchAggregateSearch),
+          subtitle: Text(strings.searchAggregateSearchDescription),
+          value: aggregateSearchEnabled,
+          onChanged: onAggregateSearchChanged,
         ),
         if (showJmExclusiveSettings)
           SwitchListTile(

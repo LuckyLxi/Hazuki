@@ -11,8 +11,7 @@ import 'package:hazuki/services/cloud_sync_service.dart';
 import 'package:hazuki/services/comment_filter_service.dart';
 import 'package:hazuki/services/download_groups_service.dart';
 import 'package:hazuki/services/local_favorites_service.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
-import 'package:hazuki/services/source/source_capabilities.dart';
+import 'package:hazuki/services/source/runtime/source_runtime_assembly.dart';
 import 'package:hazuki/services/read_history_service.dart';
 import 'package:hazuki/services/reading_progress_service.dart';
 import 'package:hazuki/services/search_history_service.dart';
@@ -417,12 +416,12 @@ Future<_TestDevice> _createDevice(
   final database = HazukiDatabase.memory();
   final favorites = LocalFavoritesService(database: database);
   final groups = DownloadGroupsService(database: database);
-  final source = HazukiSourceService();
+  final source = SourceRuntimeAssembly();
   final readHistory = ReadHistoryService(database: database);
   final readingProgress = ReadingProgressService(database: database);
   final searchHistory = SearchHistoryService(database: database);
   final participants = createCloudSyncParticipantSet(
-    source: HazukiSourceSyncAdapter(source),
+    source: source.gateways.sync,
     readHistory: readHistory,
     readingProgress: readingProgress,
     localFavorites: favorites,
@@ -481,7 +480,7 @@ class _TestDevice {
   final CloudSyncService service;
   final HazukiDatabase database;
   final DownloadGroupsService groups;
-  final HazukiSourceService source;
+  final SourceRuntimeAssembly source;
 
   Future<void> dispose() async {
     groups.dispose();

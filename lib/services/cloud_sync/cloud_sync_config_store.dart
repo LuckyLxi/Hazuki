@@ -17,6 +17,8 @@ class CloudSyncConfigStore {
   static const downloadsRootPathKey = 'manga_download_root_path_v1';
   static const legacyReadHistoryKey = 'hazuki_read_history';
   static const legacyReadingProgressPrefix = 'reading_progress_';
+  static const imageCacheMaxBytesKey = 'image_cache_max_bytes';
+  static const imageCacheLastAutoCleanAtKey = 'image_cache_last_auto_clean_at';
 
   static const settingsFileName = 'settings.json';
   static const readingFileName = 'reading.json';
@@ -39,6 +41,8 @@ class CloudSyncConfigStore {
     'cookie_store_v1',
     downloadStateKey,
     downloadsRootPathKey,
+    imageCacheMaxBytesKey,
+    imageCacheLastAutoCleanAtKey,
   };
 
   static bool shouldAlwaysSkipSetting(String key) {

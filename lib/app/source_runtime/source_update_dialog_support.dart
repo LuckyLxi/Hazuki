@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../l10n/l10n.dart';
-import '../../services/hazuki_source_service.dart';
+import '../../services/source/source_capabilities.dart';
 import 'source_runtime_widgets.dart';
 
 class SourceUpdateDialogSupport {
@@ -20,7 +20,7 @@ class SourceUpdateDialogSupport {
     required String skipPrefsKey,
     bool respectSkipPreference = true,
   }) async {
-    final check = await sl<HazukiSourceService>()
+    final check = await sl<SourceUpdateGateway>()
         .checkActiveSourceVersionFromCloud();
     if (!isMounted() || check == null || !check.hasUpdate) {
       return null;

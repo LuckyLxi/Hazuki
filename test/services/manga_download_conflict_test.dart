@@ -248,6 +248,180 @@ void main() {
     },
   );
 
+  test('deleting a migrated download removes its legacy directory', () async {
+    final root = await Directory.systemTemp.createTemp(
+      'hazuki-delete-legacy-download-',
+    );
+    addTearDown(() async {
+      if (await root.exists()) {
+        await root.delete(recursive: true);
+      }
+    });
+    const comicId = 'comic-id';
+    final legacyComicDir = Directory('${root.path}/$comicId');
+    final chapterDir = Directory('${legacyComicDir.path}/MangaChapter001');
+    await chapterDir.create(recursive: true);
+    final image = File('${chapterDir.path}/0001.jpg');
+    await image.writeAsString('downloaded image');
+    final downloaded = DownloadedMangaComic(
+      comicId: comicId,
+      sourceKey: 'jm',
+      title: 'Hazuki',
+      subTitle: '',
+      description: '',
+      coverUrl: '',
+      localCoverPath: null,
+      chapters: [
+        DownloadedMangaChapter(
+          epId: 'ep-1',
+          title: 'Chapter 1',
+          index: 0,
+          imagePaths: [image.path],
+        ),
+      ],
+      updatedAtMillis: 1,
+    );
+    SharedPreferences.setMockInitialValues({
+      'manga_download_root_path_v1': root.path,
+      'manga_download_service_state_v2': jsonEncode({
+        'tasks': const [],
+        'downloaded': [downloaded.toJson()],
+      }),
+    });
+    final service = MangaDownloadService();
+    addTearDown(service.dispose);
+    await service.ensureInitialized();
+
+    await service.deleteDownloadedComics([downloaded.storageKey]);
+
+    expect(await legacyComicDir.exists(), isFalse);
+    expect(service.downloadedComics, isEmpty);
+  });
+
+  test(
+    'deleting a scanned download removes its directory from image paths',
+    () async {
+      final root = await Directory.systemTemp.createTemp(
+        'hazuki-delete-scanned-download-',
+      );
+      addTearDown(() async {
+        if (await root.exists()) {
+          await root.delete(recursive: true);
+        }
+      });
+      final comicDir = Directory('${root.path}/jm__comic-id');
+      final chapterDir = Directory('${comicDir.path}/MangaChapter001');
+      await chapterDir.create(recursive: true);
+      final image = File('${chapterDir.path}/0001.jpg');
+      await image.writeAsString('downloaded image');
+      final scanned = DownloadedMangaComic(
+        // Older versions can restore an ID that no longer matches the folder
+        // name, while retaining the correct paths to the downloaded images.
+        comicId: 'old-scan-id',
+        title: 'Hazuki',
+        subTitle: '',
+        description: '',
+        coverUrl: '',
+        localCoverPath: null,
+        chapters: [
+          DownloadedMangaChapter(
+            epId: 'local_1',
+            title: 'Chapter 1',
+            index: 0,
+            imagePaths: [image.path],
+          ),
+        ],
+        updatedAtMillis: 1,
+      );
+      SharedPreferences.setMockInitialValues({
+        'manga_download_root_path_v1': root.path,
+        'manga_download_service_state_v2': jsonEncode({
+          'tasks': const [],
+          'downloaded': [scanned.toJson()],
+        }),
+      });
+      final service = MangaDownloadService();
+      addTearDown(service.dispose);
+      await service.ensureInitialized();
+
+      await service.deleteDownloadedComics([scanned.storageKey]);
+
+      expect(await comicDir.exists(), isFalse);
+      expect(service.downloadedComics, isEmpty);
+    },
+  );
+
+  test(
+    'deleting another source does not remove a legacy JM directory',
+    () async {
+      final root = await Directory.systemTemp.createTemp(
+        'hazuki-preserve-legacy-download-',
+      );
+      addTearDown(() async {
+        if (await root.exists()) {
+          await root.delete(recursive: true);
+        }
+      });
+      const comicId = 'comic-id';
+      final legacyComicDir = Directory('${root.path}/$comicId');
+      final otherSource = DownloadedMangaComic(
+        comicId: comicId,
+        sourceKey: 'copy_manga',
+        title: 'Other source',
+        subTitle: '',
+        description: '',
+        coverUrl: '',
+        localCoverPath: null,
+        chapters: const [],
+        updatedAtMillis: 2,
+      );
+      final otherSourceDir = Directory(
+        '${root.path}/${otherSource.downloadDirName}',
+      );
+      final legacyChapterDir = Directory(
+        '${legacyComicDir.path}/MangaChapter001',
+      );
+      await legacyChapterDir.create(recursive: true);
+      final legacyImage = File('${legacyChapterDir.path}/0001.jpg');
+      await legacyImage.writeAsString('downloaded image');
+      await otherSourceDir.create();
+      final migratedJm = DownloadedMangaComic(
+        comicId: comicId,
+        sourceKey: 'jm',
+        title: 'JM',
+        subTitle: '',
+        description: '',
+        coverUrl: '',
+        localCoverPath: null,
+        chapters: [
+          DownloadedMangaChapter(
+            epId: 'ep-1',
+            title: 'Chapter 1',
+            index: 0,
+            imagePaths: [legacyImage.path],
+          ),
+        ],
+        updatedAtMillis: 1,
+      );
+      SharedPreferences.setMockInitialValues({
+        'manga_download_root_path_v1': root.path,
+        'manga_download_service_state_v2': jsonEncode({
+          'tasks': const [],
+          'downloaded': [migratedJm.toJson(), otherSource.toJson()],
+        }),
+      });
+      final service = MangaDownloadService();
+      addTearDown(service.dispose);
+      await service.ensureInitialized();
+
+      await service.deleteDownloadedComics([otherSource.storageKey]);
+
+      expect(await legacyComicDir.exists(), isTrue);
+      expect(await otherSourceDir.exists(), isFalse);
+      expect(service.downloadedComics.single.storageKey, migratedJm.storageKey);
+    },
+  );
+
   test('redownload tolerates the existing task being removed', () async {
     final root = await Directory.systemTemp.createTemp(
       'hazuki-redownload-task-race-',

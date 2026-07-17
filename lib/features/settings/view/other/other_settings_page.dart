@@ -27,7 +27,8 @@ class OtherSettingsPage extends StatefulWidget {
 }
 
 class _OtherSettingsPageState extends State<OtherSettingsPage> {
-  SourceRuntimeGateway get _sourceService => widget.dependencies.sourceRuntime;
+  SourceSelectionGateway get _sourceService =>
+      widget.dependencies.sourceSelection;
   late OtherSettingsSnapshot _snapshot = OtherSettingsSnapshot.initial(
     useSystemTitleBar: widget.initialUseSystemTitleBar,
   );
@@ -70,18 +71,11 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
     await OtherSettingsActions.toggleAutoCheckIn(value);
   }
 
-  Future<void> _toggleAutoSourceUpdateCheck(bool value) async {
+  Future<void> _toggleAggregateSearch(bool value) async {
     setState(() {
-      _snapshot = _snapshot.copyWith(autoSourceUpdateCheckEnabled: value);
+      _snapshot = _snapshot.copyWith(aggregateSearchEnabled: value);
     });
-    await OtherSettingsActions.toggleAutoSourceUpdateCheck(context, value);
-  }
-
-  Future<void> _toggleAutoSoftwareUpdateCheck(bool value) async {
-    setState(() {
-      _snapshot = _snapshot.copyWith(autoSoftwareUpdateCheckEnabled: value);
-    });
-    await OtherSettingsActions.toggleAutoSoftwareUpdateCheck(context, value);
+    await OtherSettingsActions.toggleAggregateSearch(value);
   }
 
   Future<void> _toggleDiscoverDailyRecommendation(bool value) async {
@@ -149,10 +143,7 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
                 children: [
                   OtherSettingsGeneralSection(
                     autoCheckInEnabled: _snapshot.autoCheckInEnabled,
-                    autoSourceUpdateCheckEnabled:
-                        _snapshot.autoSourceUpdateCheckEnabled,
-                    autoSoftwareUpdateCheckEnabled:
-                        _snapshot.autoSoftwareUpdateCheckEnabled,
+                    aggregateSearchEnabled: _snapshot.aggregateSearchEnabled,
                     discoverDailyRecommendationEnabled:
                         _snapshot.discoverDailyRecommendationEnabled,
                     showAutoCheckInSetting:
@@ -163,8 +154,7 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
                     showWindowsTitleBarToggle:
                         Theme.of(context).platform == TargetPlatform.windows,
                     onAutoCheckInChanged: _toggleAutoCheckIn,
-                    onAutoSourceUpdateChanged: _toggleAutoSourceUpdateCheck,
-                    onAutoSoftwareUpdateChanged: _toggleAutoSoftwareUpdateCheck,
+                    onAggregateSearchChanged: _toggleAggregateSearch,
                     onDiscoverDailyRecommendationChanged:
                         _toggleDiscoverDailyRecommendation,
                     onUseSystemTitleBarChanged: _toggleUseSystemTitleBar,

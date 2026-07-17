@@ -68,6 +68,7 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
     _coordinator = HomeCoordinator(
       initialTabIndex: widget.initialTabIndex,
       sourceService: widget.services.sourceService,
+      sourceSwitchService: widget.services.sourceSwitchService,
       imageService: widget.services.imageService,
       dailyRecommendationService: widget.services.dailyRecommendationService,
     );
@@ -257,7 +258,7 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
             unawaited(() async {
               await showHomeSourceSwitchDialog(
                 context,
-                sourceService: _coordinator.sourceService,
+                sourceService: _coordinator.sourceSwitchService,
                 onSourceSwitched: () => _coordinator.syncUserProfile(context),
               );
               if (!mounted) {

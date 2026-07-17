@@ -8,6 +8,7 @@ import 'package:hazuki/features/comments/support/comments_content_support.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
+import 'package:hazuki/shared/comments/comments_interaction_state.dart';
 import 'package:hazuki/shared/search_box_outline.dart';
 import 'package:hazuki/services/comment_filter_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
@@ -36,6 +37,7 @@ class CommentsPage extends StatefulWidget {
     this.scrollController,
     this.onRequestTabFullscreen,
     this.debugOuterScrollStateBuilder,
+    this.interactionState,
   });
 
   final SourceCommentsGateway sourceService;
@@ -50,6 +52,7 @@ class CommentsPage extends StatefulWidget {
   final ScrollController? scrollController;
   final Future<void> Function()? onRequestTabFullscreen;
   final Map<String, Object?> Function()? debugOuterScrollStateBuilder;
+  final CommentsInteractionState? interactionState;
 
   @override
   State<CommentsPage> createState() => _CommentsPageState();
@@ -127,12 +130,15 @@ class _CommentsPageState extends State<CommentsPage>
     _controller = CommentsPageController(
       sourceService: widget.sourceService,
       filterService: widget.filterService,
+      state: widget.interactionState,
     );
     WidgetsBinding.instance.addObserver(this);
     _commentFocusNode.addListener(_handleCommentFocusChanged);
     _controller.addFilterListener(_onFilterChanged);
     _refreshCommentCapabilities();
-    unawaited(_loadInitial());
+    if (!_interaction.initialLoadSucceeded) {
+      unawaited(_loadInitial());
+    }
   }
 
   void _refreshCommentCapabilities() {
@@ -511,6 +517,7 @@ class _CommentsPageState extends State<CommentsPage>
       _updateCommentsState(() {
         _comments = pageResult.comments;
         _errorMessage = null;
+        _interaction.initialLoadSucceeded = true;
         _refreshCommentCapabilities();
         _currentPage = 1;
         _maxPage = pageResult.maxPage;

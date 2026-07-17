@@ -1,12 +1,25 @@
-part of '../hazuki_source_service.dart';
+import '../../models/hazuki_models.dart';
+import 'runtime/source_runtime_host.dart';
 
-extension HazukiSourceServiceExploreCapability on HazukiSourceService {
-  Future<List<ExploreSection>> loadExploreSections({
-    bool forceRefresh = false,
-  }) async {
-    final facade = this.facade;
+typedef SourceTextTranslator = String Function(String text, {String sourceKey});
+
+/// Loads and parses source explore data without depending on the service façade.
+class SourceExploreCapability {
+  SourceExploreCapability({
+    required SourceRuntimeHost runtimeHost,
+    required SourceTextTranslator translateSourceText,
+  }) : _runtimeHost = runtimeHost,
+       _translateSourceText = translateSourceText;
+
+  final SourceRuntimeHost _runtimeHost;
+  final SourceTextTranslator _translateSourceText;
+
+  Future<List<ExploreSection>> load({bool forceRefresh = false}) async {
+    final handle = _runtimeHost.activeHandle;
+    final facade = handle.facade;
     await facade.ensureInitialized();
 
+    final exploreCache = handle.exploreCache;
     if (!forceRefresh) {
       final memoryCached = exploreCache.getCachedSections();
       if (memoryCached != null) {
@@ -73,30 +86,21 @@ Promise.all(
   }
 
   List<ExploreSection> _parseMultiPartExploreSections(dynamic resolved) {
-    if (resolved is! List) {
-      return const [];
-    }
+    if (resolved is! List) return const [];
     final sections = <ExploreSection>[];
     for (final item in resolved) {
-      if (item is! Map) {
-        continue;
-      }
+      if (item is! Map) continue;
       final map = Map<String, dynamic>.from(item);
-      final title = _translateSourceText(
-        map['title']?.toString() ?? '__untitled_section__',
-      );
       final list = map['comics'];
-      if (list is! List) {
-        continue;
-      }
-      // 提取 viewMore 字段（jm.js 格式如 "category:禁漫天堂@0"）
-      final viewMore = map['viewMore']?.toString().trim();
-
+      if (list is! List) continue;
       final comics = _parseExploreComics(list);
       if (comics.isNotEmpty) {
+        final viewMore = map['viewMore']?.toString().trim();
         sections.add(
           ExploreSection(
-            title: title,
+            title: _translateSourceText(
+              map['title']?.toString() ?? '__untitled_section__',
+            ),
             comics: comics,
             viewMoreUrl: viewMore?.isNotEmpty == true ? viewMore : null,
           ),
@@ -109,21 +113,15 @@ Promise.all(
   List<ExploreSection> _parseSinglePageWithMultiPartExploreSections(
     dynamic resolved,
   ) {
-    if (resolved is! Map) {
-      return const [];
-    }
-    final map = Map<String, dynamic>.from(resolved);
+    if (resolved is! Map) return const [];
     final sections = <ExploreSection>[];
-    for (final entry in map.entries) {
-      final list = entry.value;
-      if (list is! List) {
-        continue;
-      }
-      final comics = _parseExploreComics(list);
+    for (final entry in Map<String, dynamic>.from(resolved).entries) {
+      if (entry.value is! List) continue;
+      final comics = _parseExploreComics(entry.value as List);
       if (comics.isNotEmpty) {
         sections.add(
           ExploreSection(
-            title: _translateSourceText(entry.key.toString()),
+            title: _translateSourceText(entry.key),
             comics: comics,
           ),
         );
@@ -135,23 +133,15 @@ Promise.all(
   List<ExploreSection> _parseMultiPageComicListExploreSections(
     dynamic resolved,
   ) {
-    if (resolved is! List) {
-      return const [];
-    }
+    if (resolved is! List) return const [];
     final sections = <ExploreSection>[];
     for (final item in resolved) {
-      if (item is! Map) {
-        continue;
-      }
+      if (item is! Map) continue;
       final map = Map<String, dynamic>.from(item);
       final comicsRaw = map['comics'];
-      if (comicsRaw is! List) {
-        continue;
-      }
+      if (comicsRaw is! List) continue;
       final comics = _parseExploreComics(comicsRaw);
-      if (comics.isEmpty) {
-        continue;
-      }
+      if (comics.isEmpty) continue;
       sections.add(
         ExploreSection(
           title: _translateSourceText(
@@ -166,32 +156,24 @@ Promise.all(
     return sections;
   }
 
-  int? _parseSourcePageCount(dynamic value) {
-    return switch (value) {
-      int value => value,
-      num value => value.toInt(),
-      _ => int.tryParse(value?.toString() ?? ''),
-    };
-  }
+  int? _parseSourcePageCount(dynamic value) => switch (value) {
+    int value => value,
+    num value => value.toInt(),
+    _ => int.tryParse(value?.toString() ?? ''),
+  };
 
-  List<ExploreComic> _parseExploreComics(List list, {String sourceKey = ''}) {
-    final resolvedSourceKey = sourceKey.trim().isEmpty
-        ? activeSourceKey
-        : sourceKey.trim();
+  List<ExploreComic> _parseExploreComics(List list) {
     final comics = <ExploreComic>[];
     for (final comic in list) {
-      if (comic is! Map) {
-        continue;
-      }
-      final comicMap = Map<String, dynamic>.from(comic);
+      if (comic is! Map) continue;
+      final map = Map<String, dynamic>.from(comic);
       comics.add(
         ExploreComic(
-          id: comicMap['id']?.toString() ?? '',
-          title: comicMap['title']?.toString() ?? '',
-          subTitle: (comicMap['subTitle'] ?? comicMap['subtitle'] ?? '')
-              .toString(),
-          cover: comicMap['cover']?.toString() ?? '',
-          sourceKey: resolvedSourceKey,
+          id: map['id']?.toString() ?? '',
+          title: map['title']?.toString() ?? '',
+          subTitle: (map['subTitle'] ?? map['subtitle'] ?? '').toString(),
+          cover: map['cover']?.toString() ?? '',
+          sourceKey: _runtimeHost.activeSourceKey,
         ),
       );
     }

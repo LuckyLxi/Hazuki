@@ -12,7 +12,7 @@ import 'package:hazuki/features/search/search.dart';
 import 'package:hazuki/features/search/view/search_entry_page.dart';
 import 'package:hazuki/features/search/view/search_id_extract_pill.dart';
 import 'package:hazuki/services/search_history_service.dart';
-import 'package:hazuki/services/hazuki_source_service.dart';
+import 'package:hazuki/services/source/runtime/source_runtime_assembly.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../support/test_service_locator.dart';
@@ -418,13 +418,55 @@ void main() {
     expect(requests, isNot(contains('abc123def')));
   });
 
+  testWidgets('results comic id pill dismisses the keyboard', (tester) async {
+    SharedPreferences.setMockInitialValues({
+      hazukiComicIdSearchEnhancePreferenceKey: true,
+    });
+    final requests = <String>[];
+
+    await tester.pumpWidget(
+      _buildTestApp(
+        SearchPage(
+          sourceService: sl<SourceSearchGateway>(),
+          historyService: sl<SearchHistoryService>(),
+          initialKeyword: 'hazuki',
+          comicDetailPageBuilder: _comicDetailPageBuilder,
+          comicCoverHeroTagBuilder: _testComicCoverHeroTag,
+          searchPageLoader: _recordingSearchPageLoader(requests),
+        ),
+      ),
+    );
+    await _pumpSearchSettled(tester);
+
+    final resultsSearch = find.byKey(
+      const ValueKey('search-results-app-bar-search-bar'),
+    );
+    await tester.tap(resultsSearch);
+    await tester.enterText(
+      find.descendant(of: resultsSearch, matching: find.byType(EditableText)),
+      'abc123def',
+    );
+    await tester.pumpAndSettle();
+
+    expect(_currentExtractedId(tester), '123');
+    expect(tester.testTextInput.isVisible, isTrue);
+
+    await tester.tap(find.text('Extracted: 123'));
+    await _pumpSearchSettled(tester);
+
+    expect(requests, contains('123'));
+    expect(tester.testTextInput.isVisible, isFalse);
+  });
+
   testWidgets('comic id enhancement is inactive on non-JM sources', (
     tester,
   ) async {
     SharedPreferences.setMockInitialValues({
       hazukiComicIdSearchEnhancePreferenceKey: true,
     });
-    await sl<HazukiSourceService>().activateSource('copy_manga');
+    await sl<SourceRuntimeAssembly>().runtimeRegistry.activateSource(
+      'copy_manga',
+    );
 
     await tester.pumpWidget(
       _buildTestApp(

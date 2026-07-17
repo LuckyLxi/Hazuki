@@ -28,7 +28,6 @@ import 'package:hazuki/features/home/home.dart'
 import 'package:hazuki/features/home/view/home_page.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'services/cloud_sync_service.dart';
-import 'services/hazuki_source_service.dart';
 import 'services/manga_download/manga_download_service.dart';
 import 'services/password_lock_service.dart';
 import 'services/source/source_capabilities.dart';
@@ -128,7 +127,7 @@ class _HazukiAppState extends State<HazukiApp>
       settingsStore: widget.settingsStore,
       themeController: _themeController,
       windowsTitleBarController: _windowsTitleBarController,
-      sourceRuntime: sl<SourceRuntimeGateway>(),
+      sourceSync: sl<SourceSyncGateway>(),
       reloadLocale: _reloadLocalePreference,
       refreshHome: _startupCoordinator.refreshHome,
     );
@@ -181,7 +180,7 @@ class _HazukiAppState extends State<HazukiApp>
     setState(() {
       _locale = effectiveLocale;
     });
-    sl<HazukiSourceService>().clearLocalizedSourceTextCaches();
+    sl<SourceLocalizationGateway>().clearLocalizedSourceTextCaches();
   }
 
   Future<void> _reloadLocalePreference() async {
@@ -193,7 +192,7 @@ class _HazukiAppState extends State<HazukiApp>
     setState(() {
       _locale = locale;
     });
-    sl<HazukiSourceService>().clearLocalizedSourceTextCaches();
+    sl<SourceLocalizationGateway>().clearLocalizedSourceTextCaches();
   }
 
   Brightness _resolveThemeBrightness(ThemeMode mode) {
@@ -230,7 +229,7 @@ class _HazukiAppState extends State<HazukiApp>
     String level = 'info',
     Map<String, Object?>? content,
   }) {
-    sl<HazukiSourceService>().addApplicationLog(
+    sl<SourceDebugGateway>().addApplicationLog(
       level: level,
       title: title,
       source: 'theme_switch',
@@ -369,7 +368,7 @@ class _HazukiAppState extends State<HazukiApp>
                 );
                 return SourceImageGatewayScope(
                   gateway: sl<SourceImageGateway>(),
-                  sourceListenable: sl<SourceRuntimeGateway>(),
+                  sourceListenable: sl<SourceSelectionGateway>(),
                   child: app,
                 );
               },

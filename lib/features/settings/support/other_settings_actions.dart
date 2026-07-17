@@ -14,6 +14,7 @@ class OtherSettingsSnapshot {
     required this.autoCheckInEnabled,
     required this.autoSourceUpdateCheckEnabled,
     required this.autoSoftwareUpdateCheckEnabled,
+    required this.aggregateSearchEnabled,
     required this.discoverDailyRecommendationEnabled,
     required this.useSystemTitleBar,
     required this.mangaDownloadsRootPath,
@@ -23,6 +24,7 @@ class OtherSettingsSnapshot {
   final bool autoCheckInEnabled;
   final bool autoSourceUpdateCheckEnabled;
   final bool autoSoftwareUpdateCheckEnabled;
+  final bool aggregateSearchEnabled;
   final bool discoverDailyRecommendationEnabled;
   final bool useSystemTitleBar;
   final String mangaDownloadsRootPath;
@@ -32,6 +34,7 @@ class OtherSettingsSnapshot {
     bool? autoCheckInEnabled,
     bool? autoSourceUpdateCheckEnabled,
     bool? autoSoftwareUpdateCheckEnabled,
+    bool? aggregateSearchEnabled,
     bool? discoverDailyRecommendationEnabled,
     bool? useSystemTitleBar,
     String? mangaDownloadsRootPath,
@@ -43,6 +46,8 @@ class OtherSettingsSnapshot {
           autoSourceUpdateCheckEnabled ?? this.autoSourceUpdateCheckEnabled,
       autoSoftwareUpdateCheckEnabled:
           autoSoftwareUpdateCheckEnabled ?? this.autoSoftwareUpdateCheckEnabled,
+      aggregateSearchEnabled:
+          aggregateSearchEnabled ?? this.aggregateSearchEnabled,
       discoverDailyRecommendationEnabled:
           discoverDailyRecommendationEnabled ??
           this.discoverDailyRecommendationEnabled,
@@ -58,6 +63,7 @@ class OtherSettingsSnapshot {
       autoCheckInEnabled: false,
       autoSourceUpdateCheckEnabled: true,
       autoSoftwareUpdateCheckEnabled: true,
+      aggregateSearchEnabled: false,
       discoverDailyRecommendationEnabled: false,
       useSystemTitleBar: useSystemTitleBar,
       mangaDownloadsRootPath: MangaDownloadAccess.defaultDownloadsRootPath,
@@ -69,21 +75,33 @@ class OtherSettingsSnapshot {
 class OtherSettingsActions {
   const OtherSettingsActions._();
 
+  static Future<({bool source, bool software})>
+  loadUpdateCheckSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    return (
+      source:
+          prefs.getBool(hazukiAutoSourceUpdateCheckEnabledPreferenceKey) ??
+          true,
+      software:
+          prefs.getBool(hazukiAutoSoftwareUpdateCheckEnabledPreferenceKey) ??
+          true,
+    );
+  }
+
   static Future<OtherSettingsSnapshot> loadSettings({
     required bool initialUseSystemTitleBar,
   }) async {
     final prefs = await SharedPreferences.getInstance();
+    final updateChecks = await loadUpdateCheckSettings();
     final mangaDownloadsRootPath =
         await MangaDownloadAccess.loadDownloadsRootPath(prefs: prefs);
     return OtherSettingsSnapshot(
       autoCheckInEnabled:
           prefs.getBool(hazukiAutoCheckInEnabledPreferenceKey) ?? false,
-      autoSourceUpdateCheckEnabled:
-          prefs.getBool(hazukiAutoSourceUpdateCheckEnabledPreferenceKey) ??
-          true,
-      autoSoftwareUpdateCheckEnabled:
-          prefs.getBool(hazukiAutoSoftwareUpdateCheckEnabledPreferenceKey) ??
-          true,
+      autoSourceUpdateCheckEnabled: updateChecks.source,
+      autoSoftwareUpdateCheckEnabled: updateChecks.software,
+      aggregateSearchEnabled:
+          prefs.getBool(hazukiAggregateSearchEnabledPreferenceKey) ?? false,
       discoverDailyRecommendationEnabled:
           prefs.getBool(
             hazukiDiscoverDailyRecommendationEnabledPreferenceKey,
@@ -108,6 +126,11 @@ class OtherSettingsActions {
   static Future<void> toggleAutoCheckIn(bool value) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(hazukiAutoCheckInEnabledPreferenceKey, value);
+  }
+
+  static Future<void> toggleAggregateSearch(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(hazukiAggregateSearchEnabledPreferenceKey, value);
   }
 
   static Future<void> toggleAutoSourceUpdateCheck(

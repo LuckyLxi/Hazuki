@@ -7,6 +7,7 @@ import 'package:hazuki/widgets/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'advanced_settings_content.dart';
 import '../settings_group.dart';
+import '../../support/other_settings_actions.dart';
 
 class AdvancedSettingsPage extends StatefulWidget {
   const AdvancedSettingsPage({
@@ -21,7 +22,7 @@ class AdvancedSettingsPage extends StatefulWidget {
   final WidgetBuilder logsPageBuilder;
   final WidgetBuilder comicSourceEditorPageBuilder;
   final Future<bool> Function(BuildContext context) restoreComicSource;
-  final SourceRuntimeGateway sourceService;
+  final SourceAdvancedGateway sourceService;
   final SoftwareUpdateService softwareUpdateService;
 
   @override
@@ -29,12 +30,14 @@ class AdvancedSettingsPage extends StatefulWidget {
 }
 
 class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
-  SourceRuntimeGateway get _sourceService => widget.sourceService;
+  SourceAdvancedGateway get _sourceService => widget.sourceService;
   SoftwareUpdateService get _softwareUpdateService =>
       widget.softwareUpdateService;
   bool _noImageMode = false;
   bool _softwareLogCaptureEnabled = false;
   bool _hasCustomEditedSource = false;
+  bool _autoSourceUpdateCheckEnabled = true;
+  bool _autoSoftwareUpdateCheckEnabled = true;
   SoftwareUpdateSource _softwareUpdateSource = SoftwareUpdateSource.jsDelivr;
   bool _loading = true;
 
@@ -65,6 +68,7 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
         .loadSoftwareLogCaptureEnabled();
     final softwareUpdateSource = await _softwareUpdateService
         .loadUpdateSource();
+    final updateChecks = await OtherSettingsActions.loadUpdateCheckSettings();
     if (!mounted) {
       return;
     }
@@ -72,6 +76,8 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
       _noImageMode = prefs.getBool(hazukiNoImageModePreferenceKey) ?? false;
       _softwareLogCaptureEnabled = softwareLogCaptureEnabled;
       _hasCustomEditedSource = hasCustomEditedSource;
+      _autoSourceUpdateCheckEnabled = updateChecks.source;
+      _autoSoftwareUpdateCheckEnabled = updateChecks.software;
       _softwareUpdateSource = softwareUpdateSource;
       _loading = false;
     });
@@ -90,6 +96,16 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
   Future<void> _setSoftwareUpdateSource(SoftwareUpdateSource value) async {
     setState(() => _softwareUpdateSource = value);
     await _softwareUpdateService.setUpdateSource(value);
+  }
+
+  Future<void> _toggleAutoSourceUpdateCheck(bool value) async {
+    setState(() => _autoSourceUpdateCheckEnabled = value);
+    await OtherSettingsActions.toggleAutoSourceUpdateCheck(context, value);
+  }
+
+  Future<void> _toggleAutoSoftwareUpdateCheck(bool value) async {
+    setState(() => _autoSoftwareUpdateCheckEnabled = value);
+    await OtherSettingsActions.toggleAutoSoftwareUpdateCheck(context, value);
   }
 
   Future<void> _refreshCustomEditedSourceState() async {
@@ -159,12 +175,16 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
           loading: _loading,
           noImageMode: _noImageMode,
           softwareLogCaptureEnabled: _softwareLogCaptureEnabled,
+          autoSourceUpdateCheckEnabled: _autoSourceUpdateCheckEnabled,
+          autoSoftwareUpdateCheckEnabled: _autoSoftwareUpdateCheckEnabled,
           softwareUpdateSource: _softwareUpdateSource,
           hasCustomEditedSource: _hasCustomEditedSource,
           showCopyMangaSettings: _sourceService.isActiveCopyMangaSource,
           logsPageBuilder: widget.logsPageBuilder,
           onToggleNoImageMode: _toggleNoImageMode,
           onToggleSoftwareLogCaptureEnabled: _toggleSoftwareLogCaptureEnabled,
+          onToggleAutoSourceUpdateCheck: _toggleAutoSourceUpdateCheck,
+          onToggleAutoSoftwareUpdateCheck: _toggleAutoSoftwareUpdateCheck,
           onSoftwareUpdateSourceChanged: _setSoftwareUpdateSource,
           onOpenComicSourceEditor: _openComicSourceEditor,
           onRestoreComicSource: _restoreComicSource,

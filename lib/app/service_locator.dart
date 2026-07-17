@@ -5,7 +5,7 @@ import '../services/cloud_sync/cloud_sync_participant_set.dart';
 import '../services/comment_filter_service.dart';
 import '../services/discover_daily_recommendation_service.dart';
 import '../services/download_groups_service.dart';
-import '../services/hazuki_source_service.dart';
+import '../services/source/runtime/source_runtime_assembly.dart';
 import '../services/source/source_capabilities.dart';
 import '../services/local_favorites_service.dart';
 import '../services/local_favorites/local_favorites_contracts.dart';
@@ -127,7 +127,7 @@ void registerServices() {
   }
   if (!sl.isRegistered<SourceRuntimeRegistry>()) {
     sl.registerLazySingleton<SourceRuntimeRegistry>(
-      () => sl<HazukiSourceService>().runtimeRegistry,
+      () => sl<SourceRuntimeAssembly>().runtimeRegistry,
     );
   }
   if (!sl.isRegistered<CloudSyncParticipantSet>()) {
@@ -152,82 +152,124 @@ void registerServices() {
       ),
     );
   }
-  if (!sl.isRegistered<HazukiSourceService>()) {
-    sl.registerLazySingleton<HazukiSourceService>(() => HazukiSourceService());
+  if (!sl.isRegistered<SourceRuntimeAssembly>()) {
+    sl.registerLazySingleton<SourceRuntimeAssembly>(
+      () => SourceRuntimeAssembly(),
+    );
   }
   if (!sl.isRegistered<SourceSearchGateway>()) {
     sl.registerLazySingleton<SourceSearchGateway>(
-      () => HazukiSourceSearchAdapter(sl<HazukiSourceService>()),
+      () => sl<SourceRuntimeAssembly>().gateways.search,
     );
   }
   if (!sl.isRegistered<SourceDiscoverGateway>()) {
     sl.registerLazySingleton<SourceDiscoverGateway>(
-      () => HazukiSourceDiscoverAdapter(sl<HazukiSourceService>()),
+      () => sl<SourceRuntimeAssembly>().gateways.discover,
     );
   }
   if (!sl.isRegistered<SourceFavoriteGateway>()) {
     sl.registerLazySingleton<SourceFavoriteGateway>(
-      () => HazukiSourceFavoriteAdapter(sl<HazukiSourceService>()),
+      () => sl<SourceRuntimeAssembly>().gateways.favorite,
     );
   }
   if (!sl.isRegistered<SourceReaderGateway>()) {
     sl.registerLazySingleton<SourceReaderGateway>(
-      () => HazukiSourceReaderAdapter(sl<HazukiSourceService>()),
+      () => sl<SourceRuntimeAssembly>().gateways.reader,
     );
   }
   if (!sl.isRegistered<SourceSettingsGateway>()) {
     sl.registerLazySingleton<SourceSettingsGateway>(
-      () => HazukiSourceSettingsAdapter(sl<HazukiSourceService>()),
+      () => sl<SourceRuntimeAssembly>().gateways.settingsGateway,
     );
   }
   if (!sl.isRegistered<SourceAccountGateway>()) {
     sl.registerLazySingleton<SourceAccountGateway>(
-      () => HazukiSourceAccountAdapter(sl<HazukiSourceService>()),
+      () => sl<SourceRuntimeAssembly>().gateways.accountGateway,
     );
   }
   if (!sl.isRegistered<SourceDebugGateway>()) {
     sl.registerLazySingleton<SourceDebugGateway>(
-      () => HazukiSourceDebugAdapter(sl<HazukiSourceService>()),
+      () => sl<SourceRuntimeAssembly>().gateways.debugGateway,
     );
   }
   if (!sl.isRegistered<SourceImageGateway>()) {
     sl.registerLazySingleton<SourceImageGateway>(
-      () => HazukiSourceImageAdapter(sl<HazukiSourceService>()),
+      () => sl<SourceRuntimeAssembly>().gateways.imageGateway,
     );
   }
   if (!sl.isRegistered<SourceRecommendationGateway>()) {
     sl.registerLazySingleton<SourceRecommendationGateway>(
-      () => HazukiSourceRecommendationAdapter(sl<HazukiSourceService>()),
+      () => sl<SourceRuntimeAssembly>().gateways.recommendation,
     );
   }
   if (!sl.isRegistered<SourceDailyRecommendationGateway>()) {
     sl.registerLazySingleton<SourceDailyRecommendationGateway>(
-      () => HazukiSourceDailyRecommendationAdapter(sl<HazukiSourceService>()),
+      () => sl<SourceRuntimeAssembly>().gateways.dailyRecommendation,
     );
   }
   if (!sl.isRegistered<SourceSyncGateway>()) {
     sl.registerLazySingleton<SourceSyncGateway>(
-      () => HazukiSourceSyncAdapter(sl<HazukiSourceService>()),
+      () => sl<SourceRuntimeAssembly>().gateways.sync,
     );
   }
   if (!sl.isRegistered<SourceRuntimeGateway>()) {
     sl.registerLazySingleton<SourceRuntimeGateway>(
-      () => HazukiSourceRuntimeAdapter(sl<HazukiSourceService>()),
+      () => sl<SourceRuntimeAssembly>().gateways.runtimeGateway,
+    );
+  }
+  if (!sl.isRegistered<SourceSelectionGateway>()) {
+    sl.registerLazySingleton<SourceSelectionGateway>(
+      () => sl<SourceRuntimeAssembly>().gateways.selection,
+    );
+  }
+  if (!sl.isRegistered<SourceHomeGateway>()) {
+    sl.registerLazySingleton<SourceHomeGateway>(
+      () => sl<SourceRuntimeAssembly>().gateways.home,
+    );
+  }
+  if (!sl.isRegistered<SourceSwitchGateway>()) {
+    sl.registerLazySingleton<SourceSwitchGateway>(
+      () => sl<SourceRuntimeAssembly>().gateways.switchGateway,
+    );
+  }
+  if (!sl.isRegistered<SourceAdvancedGateway>()) {
+    sl.registerLazySingleton<SourceAdvancedGateway>(
+      () => sl<SourceRuntimeAssembly>().gateways.advanced,
     );
   }
   if (!sl.isRegistered<SourceCategoryGateway>()) {
     sl.registerLazySingleton<SourceCategoryGateway>(
-      () => HazukiSourceCategoryAdapter(sl<HazukiSourceService>()),
+      () => sl<SourceRuntimeAssembly>().gateways.category,
     );
   }
   if (!sl.isRegistered<SourceCommentsGateway>()) {
     sl.registerLazySingleton<SourceCommentsGateway>(
-      () => HazukiSourceCommentsAdapter(sl<HazukiSourceService>()),
+      () => sl<SourceRuntimeAssembly>().gateways.commentsGateway,
     );
   }
   if (!sl.isRegistered<SourceComicDetailGateway>()) {
     sl.registerLazySingleton<SourceComicDetailGateway>(
-      () => HazukiSourceComicDetailAdapter(sl<HazukiSourceService>()),
+      () => sl<SourceRuntimeAssembly>().gateways.comicDetail,
+    );
+  }
+  if (!sl.isRegistered<SourceBootstrapGateway>()) {
+    sl.registerLazySingleton<SourceBootstrapGateway>(
+      () => sl<SourceRuntimeAssembly>().gateways.bootstrap,
+    );
+  }
+  if (!sl.isRegistered<SourceUpdateGateway>()) {
+    sl.registerLazySingleton<SourceUpdateGateway>(
+      () => sl<SourceRuntimeAssembly>().gateways.update,
+    );
+  }
+  if (!sl.isRegistered<SourceScriptGateway>()) {
+    sl.registerLazySingleton<SourceScriptGateway>(
+      () => sl<SourceRuntimeAssembly>().gateways.script,
+    );
+  }
+  if (!sl.isRegistered<SourceLocalizationGateway>()) {
+    sl.registerLazySingleton<SourceLocalizationGateway>(
+      () => sl<SourceRuntimeAssembly>().gateways.localizationGateway,
     );
   }
 }

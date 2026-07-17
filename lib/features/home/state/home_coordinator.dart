@@ -15,10 +15,12 @@ import 'package:hazuki/shared/favorites/favorite_page_actions.dart';
 class HomeCoordinator extends ChangeNotifier {
   HomeCoordinator({
     required int initialTabIndex,
-    required SourceRuntimeGateway sourceService,
+    required SourceHomeGateway sourceService,
+    required SourceSwitchGateway sourceSwitchService,
     required SourceImageGateway imageService,
     required DiscoverDailyRecommendationService dailyRecommendationService,
   }) : _sourceService = sourceService,
+       _sourceSwitchService = sourceSwitchService,
        _imageService = imageService,
        _dailyRecommendationService = dailyRecommendationService,
        _profileController = HomeProfileController(sourceService: sourceService),
@@ -36,7 +38,8 @@ class HomeCoordinator extends ChangeNotifier {
     'hazuki.comics/media',
   );
 
-  final SourceRuntimeGateway _sourceService;
+  final SourceHomeGateway _sourceService;
+  final SourceSwitchGateway _sourceSwitchService;
   final SourceImageGateway _imageService;
   final HomeProfileController _profileController;
   final HomeShellController _shellController;
@@ -58,7 +61,8 @@ class HomeCoordinator extends ChangeNotifier {
   bool get isCheckInAvailable => _profileController.isCheckInAvailable;
   int get authVersion => _profileController.authVersion;
   bool get isLogged => _profileController.isLogged;
-  SourceRuntimeGateway get sourceService => _sourceService;
+  SourceHomeGateway get sourceService => _sourceService;
+  SourceSwitchGateway get sourceSwitchService => _sourceSwitchService;
 
   int get currentIndex => _shellController.currentIndex;
   double get discoverSearchMorphProgress =>

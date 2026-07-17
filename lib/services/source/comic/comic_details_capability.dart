@@ -1,6 +1,35 @@
-part of '../../hazuki_source_service.dart';
+import 'dart:convert';
 
-extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
+import '../../../models/hazuki_models.dart';
+import '../../../shared/chapter_title_resolver.dart';
+import '../account/source_relogin_coordinator.dart';
+import '../common/source_json_coerce.dart';
+import '../explore_capability.dart';
+import '../runtime/source_runtime_facade.dart';
+import '../runtime/source_runtime_host.dart';
+import 'source_comic_details_cache.dart';
+
+class SourceComicDetailsCapability {
+  SourceComicDetailsCapability({
+    required SourceRuntimeHost runtimeHost,
+    required SourceComicDetailsCache cache,
+    required SourceReloginCoordinator reloginCoordinator,
+    required SourceTextTranslator translateSourceText,
+  }) : _runtimeHost = runtimeHost,
+       _cache = cache,
+       _reloginCoordinator = reloginCoordinator,
+       _translateSourceText = translateSourceText;
+
+  final SourceRuntimeHost _runtimeHost;
+  final SourceComicDetailsCache _cache;
+  final SourceReloginCoordinator _reloginCoordinator;
+  final SourceTextTranslator _translateSourceText;
+
+  String _resolveActiveSourceKey(String sourceKey) => sourceKey.trim().isEmpty
+      ? _runtimeHost.activeSourceKey
+      : _runtimeHost.normalize(sourceKey);
+
+  HazukiSourceFacade get facade => _runtimeHost.activeHandle.facade;
   Future<ComicDetailsData> loadComicDetails(
     String comicId, {
     String sourceKey = '',
@@ -15,7 +44,7 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
       comicId: normalizedComicId,
     ).storageKey;
 
-    final memoryCached = _getComicDetailsFromMemoryCache(
+    final memoryCached = _cache.get(
       scopedComicKey,
       sourceKey: resolvedSourceKey,
     );
@@ -23,7 +52,7 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
       return memoryCached;
     }
 
-    final facade = _handleFor(resolvedSourceKey).facade;
+    final facade = _runtimeHost.handleFor(resolvedSourceKey).facade;
 
     final inFlight = facade.cache.comicDetailsInFlight[scopedComicKey];
     if (inFlight != null) {
@@ -97,7 +126,7 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
       sourceKey: sourceKey,
     );
 
-    _putComicDetailsInMemoryCache(
+    _cache.put(
       SourceScopedComicId(
         sourceKey: details.sourceKey,
         comicId: normalizedComicId,
@@ -106,11 +135,7 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
       sourceKey: sourceKey,
     );
     if (details.id != normalizedComicId) {
-      _putComicDetailsInMemoryCache(
-        details.scopedId.storageKey,
-        details,
-        sourceKey: sourceKey,
-      );
+      _cache.put(details.scopedId.storageKey, details, sourceKey: sourceKey);
     }
     return details;
   }
@@ -121,7 +146,7 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
     String sourceKey = '',
   }) async {
     final resolvedSourceKey = _resolveActiveSourceKey(sourceKey);
-    final facade = _handleFor(resolvedSourceKey).facade;
+    final facade = _runtimeHost.handleFor(resolvedSourceKey).facade;
     await facade.ensureInitialized();
     final engine = facade.js.engine;
     if (engine == null) {
@@ -206,7 +231,7 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
 
   bool supportComicLikeForSource(String sourceKey) {
     final resolvedSourceKey = _resolveActiveSourceKey(sourceKey);
-    final targetFacade = _handleFor(resolvedSourceKey).facade;
+    final targetFacade = _runtimeHost.handleFor(resolvedSourceKey).facade;
     final engine = targetFacade.js.engine;
     if (engine == null) return false;
     try {
@@ -228,7 +253,7 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
       throw Exception('comic_id_empty');
     }
     final resolvedSourceKey = _resolveActiveSourceKey(sourceKey);
-    final facade = _handleFor(resolvedSourceKey).facade;
+    final facade = _runtimeHost.handleFor(resolvedSourceKey).facade;
     await facade.ensureInitialized();
 
     Future<void> runToggle() async {
@@ -249,16 +274,16 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
       await facade.js.resolve(result);
     }
 
-    await _runWithReloginRetry(runToggle, targetFacade: facade);
+    await _reloginCoordinator.runWithReloginRetry(
+      runToggle,
+      context: SourceFacadeReloginContext(facade),
+    );
 
     final scopedKey = SourceScopedComicId(
       sourceKey: resolvedSourceKey,
       comicId: normalizedComicId,
     ).storageKey;
-    final cached = _getComicDetailsFromMemoryCache(
-      scopedKey,
-      sourceKey: resolvedSourceKey,
-    );
+    final cached = _cache.get(scopedKey, sourceKey: resolvedSourceKey);
     if (cached != null) {
       _updateComicDetailsLikeStateInMemoryCache(
         cached.scopedId,
@@ -277,7 +302,7 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
     );
   }
 
-  void _updateComicDetailsFavoriteStateInMemoryCache(
+  void updateFavoriteStateInMemoryCache(
     SourceScopedComicId scopedId, {
     required bool isFavorite,
   }) {
@@ -290,24 +315,7 @@ extension HazukiSourceServiceComicDetailsCapability on HazukiSourceService {
   void _updateComicDetailsStateInMemoryCache(
     SourceScopedComicId scopedId, {
     required ComicDetailsData Function(ComicDetailsData details) update,
-  }) {
-    final canonicalKey = scopedId.storageKey;
-    final cache = _handleFor(
-      _resolveActiveSourceKey(scopedId.sourceKey),
-    ).cache.comicDetailsMemoryCache;
-    final entries = cache.entries.toList();
-    for (final entry in entries) {
-      if (entry.key != canonicalKey &&
-          entry.value.scopedId.storageKey != canonicalKey) {
-        continue;
-      }
-      _putComicDetailsInMemoryCache(
-        entry.key,
-        update(entry.value),
-        sourceKey: scopedId.sourceKey,
-      );
-    }
-  }
+  }) => _cache.update(scopedId, transform: update);
 
   Map<String, String> _extractComicDetailsChapters(
     Map<String, dynamic> map, {

@@ -90,7 +90,27 @@ void main() {
     );
   });
 
-  testWidgets('multi-select action hides as soon as downloaded tab is left', (
+  testWidgets(
+    'multi-select action stays visible before swipe reaches halfway',
+    (tester) async {
+      await tester.pumpWidget(
+        _wrapWithAppBar(initialIndex: 1, onToggleSelectionMode: () {}),
+      );
+      expect(find.byIcon(Icons.checklist_rounded), findsOneWidget);
+
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byType(TabBarView)),
+      );
+      await gesture.moveBy(const Offset(80, 0));
+      await tester.pump();
+
+      expect(find.byIcon(Icons.checklist_rounded), findsOneWidget);
+
+      await gesture.up();
+    },
+  );
+
+  testWidgets('multi-select action hides after swipe leaves halfway', (
     tester,
   ) async {
     await tester.pumpWidget(
@@ -101,7 +121,8 @@ void main() {
     final gesture = await tester.startGesture(
       tester.getCenter(find.byType(TabBarView)),
     );
-    await gesture.moveBy(const Offset(80, 0));
+    final tabViewWidth = tester.getSize(find.byType(TabBarView)).width;
+    await gesture.moveBy(Offset(tabViewWidth * 0.55, 0));
     await tester.pump();
 
     expect(find.byIcon(Icons.checklist_rounded), findsNothing);
@@ -109,25 +130,25 @@ void main() {
     await gesture.up();
   });
 
-  testWidgets(
-    'multi-select action appears as soon as downloaded tab is entered',
-    (tester) async {
-      await tester.pumpWidget(
-        _wrapWithAppBar(initialIndex: 0, onToggleSelectionMode: () {}),
-      );
-      expect(find.byIcon(Icons.checklist_rounded), findsNothing);
+  testWidgets('multi-select action appears after swipe passes halfway', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _wrapWithAppBar(initialIndex: 0, onToggleSelectionMode: () {}),
+    );
+    expect(find.byIcon(Icons.checklist_rounded), findsNothing);
 
-      final gesture = await tester.startGesture(
-        tester.getCenter(find.byType(TabBarView)),
-      );
-      await gesture.moveBy(const Offset(-80, 0));
-      await tester.pump();
+    final gesture = await tester.startGesture(
+      tester.getCenter(find.byType(TabBarView)),
+    );
+    final tabViewWidth = tester.getSize(find.byType(TabBarView)).width;
+    await gesture.moveBy(Offset(-tabViewWidth * 0.55, 0));
+    await tester.pump();
 
-      expect(find.byIcon(Icons.checklist_rounded), findsOneWidget);
+    expect(find.byIcon(Icons.checklist_rounded), findsOneWidget);
 
-      await gesture.up();
-    },
-  );
+    await gesture.up();
+  });
 
   testWidgets(
     'multi-select action appears immediately when downloaded tab is tapped',

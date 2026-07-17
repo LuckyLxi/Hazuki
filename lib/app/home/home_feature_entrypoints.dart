@@ -31,6 +31,7 @@ import 'package:hazuki/services/read_history_service.dart';
 import 'package:hazuki/services/search_history_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/software_update/software_update_service.dart';
+import 'package:hazuki/shared/comments/comments_interaction_state.dart';
 import 'package:hazuki/shared/comments/comments_widget_builder.dart';
 import 'package:hazuki/shared/reading/reader_offline_chapter_data.dart';
 import 'package:hazuki/widgets/widgets.dart';
@@ -59,7 +60,8 @@ class _MangaDownloadStatusAdapter implements HomeDownloadStatusListenable {
 
 HomeServices buildHazukiHomeServices() {
   return HomeServices(
-    sourceService: sl<SourceRuntimeGateway>(),
+    sourceService: sl<SourceHomeGateway>(),
+    sourceSwitchService: sl<SourceSwitchGateway>(),
     imageService: sl<SourceImageGateway>(),
     dailyRecommendationService: sl<DiscoverDailyRecommendationService>(),
     downloadStatus: _MangaDownloadStatusAdapter(sl<MangaDownloadService>()),
@@ -78,6 +80,7 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
     bool isTabView = false,
     bool isActiveInTabView = true,
     Map<String, Object?> Function()? debugOuterScrollStateBuilder,
+    CommentsInteractionState? interactionState,
   }) {
     return CommentsPage(
       sourceService: sl<SourceCommentsGateway>(),
@@ -92,6 +95,7 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
       scrollController: scrollController,
       onRequestTabFullscreen: onRequestTabFullscreen,
       debugOuterScrollStateBuilder: debugOuterScrollStateBuilder,
+      interactionState: interactionState,
     );
   }
 
@@ -114,6 +118,10 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
     dailyRecommendation: sl<DiscoverDailyRecommendationService>(),
     downloader: sl<MangaDownloadService>(),
     sourceRuntime: sl<SourceRuntimeGateway>(),
+    sourceSelection: sl<SourceSelectionGateway>(),
+    sourceAdvanced: sl<SourceAdvancedGateway>(),
+    sourceScript: sl<SourceScriptGateway>(),
+    sourceUpdate: sl<SourceUpdateGateway>(),
   );
   final readerDependencies = ReaderDependencies(
     sourceReader: sl<SourceReaderGateway>(),
@@ -264,7 +272,7 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
         ({required comicDetailPageBuilder, required onFavoriteRequested}) {
           return HistoryPage(
             readHistoryService: sl<ReadHistoryService>(),
-            sourceService: sl<SourceRuntimeGateway>(),
+            sourceService: sl<SourceSelectionGateway>(),
             imageGateway: sl<SourceImageGateway>(),
             comicDetailPageBuilder: comicDetailPageBuilder,
             onFavoriteRequested: onFavoriteRequested,
@@ -331,16 +339,16 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
               sourceService: settingsCoreDependencies.sourceRuntime,
             ),
             advancedSettingsPageBuilder: (_) => AdvancedSettingsPage(
-              sourceService: settingsCoreDependencies.sourceRuntime,
+              sourceService: settingsCoreDependencies.sourceAdvanced,
               softwareUpdateService: settingsCoreDependencies.softwareUpdate,
               logsPageBuilder: (_) =>
                   LogsPage(debugGateway: settingsCoreDependencies.sourceDebug),
               comicSourceEditorPageBuilder: (_) => ComicSourceEditorPage(
-                sourceService: settingsCoreDependencies.sourceRuntime,
+                sourceService: settingsCoreDependencies.sourceScript,
               ),
               restoreComicSource: (context) => showComicSourceRestoreDialog(
                 context,
-                sourceService: settingsCoreDependencies.sourceRuntime,
+                sourceService: settingsCoreDependencies.sourceUpdate,
               ),
             ),
           );

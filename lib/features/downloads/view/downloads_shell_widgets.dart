@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/widgets/widgets.dart';
@@ -52,13 +51,7 @@ class DownloadsPageAppBar extends StatelessWidget
         AnimatedBuilder(
           animation: tabController.animation!,
           builder: (context, child) {
-            final animationValue = tabController.animation!.value;
-            // 当动画属于「正在下载」 tab（index == 0）一侧时才显示
-            final ongoingTabIsActive = tabController.indexIsChanging
-                ? tabController.index == 0
-                : tabController.index == 0
-                ? animationValue <= precisionErrorTolerance
-                : animationValue < 1 - precisionErrorTolerance;
+            final ongoingTabIsActive = _isOngoingTabActive(tabController);
             return ongoingTabIsActive ? child! : const SizedBox.shrink();
           },
           child: IconButton(
@@ -71,12 +64,7 @@ class DownloadsPageAppBar extends StatelessWidget
         AnimatedBuilder(
           animation: tabController.animation!,
           builder: (context, child) {
-            final animationValue = tabController.animation!.value;
-            final ongoingTabIsActive = tabController.indexIsChanging
-                ? tabController.index == 0
-                : tabController.index == 0
-                ? animationValue <= precisionErrorTolerance
-                : animationValue < 1 - precisionErrorTolerance;
+            final ongoingTabIsActive = _isOngoingTabActive(tabController);
             return ongoingTabIsActive ? child! : const SizedBox.shrink();
           },
           child: IconButton(
@@ -89,13 +77,7 @@ class DownloadsPageAppBar extends StatelessWidget
         AnimatedBuilder(
           animation: tabController.animation!,
           builder: (context, child) {
-            final animationValue = tabController.animation!.value;
-            // 已下载 tab 激活判断
-            final downloadedTabIsActive = tabController.indexIsChanging
-                ? tabController.index == 1
-                : tabController.index == 1
-                ? animationValue >= 1 - precisionErrorTolerance
-                : animationValue > precisionErrorTolerance;
+            final downloadedTabIsActive = _isDownloadedTabActive(tabController);
             // 只有在已下载 tab 且处于多选模式时才展示全选按钒
             if (!downloadedTabIsActive) {
               return const SizedBox.shrink();
@@ -127,12 +109,7 @@ class DownloadsPageAppBar extends StatelessWidget
         AnimatedBuilder(
           animation: tabController.animation!,
           builder: (context, child) {
-            final animationValue = tabController.animation!.value;
-            final downloadedTabIsActive = tabController.indexIsChanging
-                ? tabController.index == 1
-                : tabController.index == 1
-                ? animationValue >= 1 - precisionErrorTolerance
-                : animationValue > precisionErrorTolerance;
+            final downloadedTabIsActive = _isDownloadedTabActive(tabController);
             return downloadedTabIsActive ? child! : const SizedBox.shrink();
           },
           child: IconButton(
@@ -155,6 +132,20 @@ class DownloadsPageAppBar extends StatelessWidget
       ),
     );
   }
+}
+
+bool _isOngoingTabActive(TabController tabController) {
+  if (tabController.indexIsChanging) {
+    return tabController.index == 0;
+  }
+  return tabController.animation!.value < 0.5;
+}
+
+bool _isDownloadedTabActive(TabController tabController) {
+  if (tabController.indexIsChanging) {
+    return tabController.index == 1;
+  }
+  return tabController.animation!.value >= 0.5;
 }
 
 class DownloadsScanButton extends StatelessWidget {

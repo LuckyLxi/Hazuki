@@ -13,7 +13,7 @@ export 'source_account_dialogs.dart';
 
 Future<void> showHomeSourceSwitchDialog(
   BuildContext context, {
-  required SourceRuntimeGateway sourceService,
+  required SourceSwitchGateway sourceService,
   Future<void> Function()? onSourceSwitched,
 }) async {
   final registry = sourceService;

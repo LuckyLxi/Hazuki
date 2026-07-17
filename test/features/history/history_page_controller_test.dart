@@ -30,7 +30,7 @@ void main() {
 
       final controller = HistoryPageController(
         readHistoryService: service,
-        sourceService: sl<SourceRuntimeGateway>(),
+        sourceService: sl<SourceSelectionGateway>(),
       );
       addTearDown(controller.dispose);
 
@@ -63,7 +63,7 @@ void main() {
 
       final controller = HistoryPageController(
         readHistoryService: service,
-        sourceService: sl<SourceRuntimeGateway>(),
+        sourceService: sl<SourceSelectionGateway>(),
       );
       addTearDown(controller.dispose);
 
@@ -91,7 +91,7 @@ void main() {
 
     final controller = HistoryPageController(
       readHistoryService: service,
-      sourceService: sl<SourceRuntimeGateway>(),
+      sourceService: sl<SourceSelectionGateway>(),
     );
     addTearDown(controller.dispose);
 
@@ -127,7 +127,7 @@ void main() {
 
       final controller = HistoryPageController(
         readHistoryService: service,
-        sourceService: sl<SourceRuntimeGateway>(),
+        sourceService: sl<SourceSelectionGateway>(),
       );
       addTearDown(controller.dispose);
 
@@ -151,7 +151,7 @@ void main() {
 
       final reenteredController = HistoryPageController(
         readHistoryService: service,
-        sourceService: sl<SourceRuntimeGateway>(),
+        sourceService: sl<SourceSelectionGateway>(),
       );
       addTearDown(reenteredController.dispose);
       await reenteredController.loadInitial();

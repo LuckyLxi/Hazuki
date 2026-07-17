@@ -25,17 +25,31 @@ class HazukiPullToRefresh extends StatefulWidget {
   State<HazukiPullToRefresh> createState() => _HazukiPullToRefreshState();
 }
 
-class _HazukiPullToRefreshState extends State<HazukiPullToRefresh> {
+class _HazukiPullToRefreshState extends State<HazukiPullToRefresh>
+    with SingleTickerProviderStateMixin {
   double _pullDistance = 0;
   double _lastDragDeltaY = 0;
-  bool _dragging = false;
   bool _armed = false;
   bool _refreshing = false;
   bool _didHaptic = false;
-  // Set to true just before calling position.jumpTo() so that the
-  // ScrollEndNotification dispatched synchronously inside jumpTo is
-  // ignored rather than misinterpreted as the user releasing the drag.
-  bool _pinningToTop = false;
+  late final AnimationController _settleController;
+  double _settleStartOffset = 0;
+  bool _settling = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _settleController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 240),
+    );
+  }
+
+  @override
+  void dispose() {
+    _settleController.dispose();
+    super.dispose();
+  }
 
   double get _targetContentOffset {
     if (_refreshing) {
@@ -63,8 +77,11 @@ class _HazukiPullToRefreshState extends State<HazukiPullToRefresh> {
     if (notification is ScrollStartNotification &&
         notification.dragDetails != null &&
         !_refreshing) {
-      _dragging = true;
       _lastDragDeltaY = 0;
+      if (_settling) {
+        setState(() => _settling = false);
+      }
+      _settleController.stop();
     }
 
     if (_refreshing) {
@@ -88,7 +105,7 @@ class _HazukiPullToRefreshState extends State<HazukiPullToRefresh> {
         notification.dragDetails != null) {
       if (_pullDistance > 0) {
         _lastDragDeltaY = notification.dragDetails!.delta.dy;
-        _pinScrollToTop(notification);
+        _keepScrollAtTop(notification);
         if (_lastDragDeltaY < 0) {
           _updatePullDistance(_pullDistance - _lastDragDeltaY.abs());
         }
@@ -97,13 +114,6 @@ class _HazukiPullToRefreshState extends State<HazukiPullToRefresh> {
     }
 
     if (notification is ScrollEndNotification) {
-      // Ignore the synthetic ScrollEndNotification emitted by jumpTo()
-      // inside _pinScrollToTop — it is not a real user gesture end.
-      if (_pinningToTop) {
-        _pinningToTop = false;
-        return false;
-      }
-      _dragging = false;
       final shouldRefresh = _armed && _lastDragDeltaY >= 0;
       _lastDragDeltaY = 0;
       if (shouldRefresh) {
@@ -117,25 +127,21 @@ class _HazukiPullToRefreshState extends State<HazukiPullToRefresh> {
     return false;
   }
 
-  void _pinScrollToTop(ScrollNotification notification) {
+  void _keepScrollAtTop(ScrollNotification notification) {
     final notificationContext = notification.context;
     if (notificationContext == null) {
       return;
     }
-    final scrollable = Scrollable.maybeOf(notificationContext);
-    final position = scrollable?.position;
-    if (position == null) {
+    final position = Scrollable.maybeOf(notificationContext)?.position;
+    if (position == null ||
+        (position.pixels - position.minScrollExtent).abs() < 0.1) {
       return;
     }
-    if ((position.pixels - position.minScrollExtent).abs() < 0.1) {
-      return;
-    }
-    // Mark that the upcoming ScrollEndNotification is from jumpTo, not the user.
-    _pinningToTop = true;
-    position.jumpTo(position.minScrollExtent);
-    // If jumpTo did NOT dispatch a ScrollEndNotification (e.g. position was
-    // already at min after correction), clear the flag to stay consistent.
-    _pinningToTop = false;
+
+    // Unlike jumpTo, correcting the pixels does not emit a scroll-end
+    // notification. This keeps the active drag intact while the upward motion
+    // is used to reduce the pull distance.
+    position.correctPixels(position.minScrollExtent);
   }
 
   void _updatePullDistance(double next) {
@@ -165,11 +171,15 @@ class _HazukiPullToRefreshState extends State<HazukiPullToRefresh> {
     if (!mounted) {
       return;
     }
+    final settleStartOffset = _targetContentOffset;
     setState(() {
       _pullDistance = 0;
       _armed = false;
       _didHaptic = false;
+      _settling = true;
+      _settleStartOffset = settleStartOffset;
     });
+    _runSettleAnimation();
   }
 
   Future<void> _startRefresh() async {
@@ -178,7 +188,6 @@ class _HazukiPullToRefreshState extends State<HazukiPullToRefresh> {
     }
     setState(() {
       _refreshing = true;
-      _dragging = false;
       _armed = false;
     });
 
@@ -190,21 +199,44 @@ class _HazukiPullToRefreshState extends State<HazukiPullToRefresh> {
           _refreshing = false;
           _pullDistance = 0;
           _didHaptic = false;
+          _settling = true;
+          _settleStartOffset = widget.refreshHoldOffset;
         });
+        _runSettleAnimation();
       }
     }
   }
 
+  void _runSettleAnimation() {
+    _settleController.forward(from: 0).whenComplete(() {
+      if (mounted && _settling) {
+        setState(() => _settling = false);
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween<double>(end: _targetContentOffset),
-      duration: _dragging ? Duration.zero : const Duration(milliseconds: 240),
-      curve: Curves.easeOutCubic,
-      builder: (context, animatedOffset, child) {
+    return AnimatedBuilder(
+      animation: _settleController,
+      child: widget.child,
+      builder: (context, child) {
+        final animatedOffset = _settling
+            ? _settleStartOffset *
+                  (1 - Curves.easeOutCubic.transform(_settleController.value))
+            : _targetContentOffset;
         final indicatorExtent = math
             .max(animatedOffset, _refreshing ? widget.refreshHoldOffset : 0.0)
             .toDouble();
+        final indicatorProgress = _progress > 0
+            ? _progress
+            : (widget.refreshHoldOffset > 0
+                      ? (animatedOffset / widget.refreshHoldOffset).clamp(
+                          0.0,
+                          1.0,
+                        )
+                      : 0.0)
+                  .toDouble();
 
         return NotificationListener<ScrollNotification>(
           onNotification: _handleScrollNotification,
@@ -221,7 +253,7 @@ class _HazukiPullToRefreshState extends State<HazukiPullToRefresh> {
                 height: indicatorExtent,
                 child: IgnorePointer(
                   child: _HazukiPullToRefreshIndicator(
-                    progress: _progress,
+                    progress: indicatorProgress,
                     isRefreshing: _refreshing,
                     extent: indicatorExtent,
                     topInset: widget.edgeOffset,
@@ -232,7 +264,6 @@ class _HazukiPullToRefreshState extends State<HazukiPullToRefresh> {
           ),
         );
       },
-      child: widget.child,
     );
   }
 }

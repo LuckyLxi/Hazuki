@@ -18,12 +18,14 @@ abstract class HomeDownloadStatusListenable implements Listenable {
 class HomeServices {
   const HomeServices({
     required this.sourceService,
+    required this.sourceSwitchService,
     required this.imageService,
     required this.dailyRecommendationService,
     required this.downloadStatus,
   });
 
-  final SourceRuntimeGateway sourceService;
+  final SourceHomeGateway sourceService;
+  final SourceSwitchGateway sourceSwitchService;
   final SourceImageGateway imageService;
   final DiscoverDailyRecommendationService dailyRecommendationService;
   final HomeDownloadStatusListenable downloadStatus;

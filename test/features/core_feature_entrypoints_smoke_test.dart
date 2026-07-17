@@ -30,6 +30,7 @@ import 'package:hazuki/services/search_history_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/software_update/software_update_service.dart';
 import 'package:hazuki/shared/comments/comments_widget_builder.dart';
+import 'package:hazuki/shared/comments/comments_interaction_state.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
 
 Widget _buildComments({
@@ -43,6 +44,7 @@ Widget _buildComments({
   bool isTabView = false,
   bool isActiveInTabView = true,
   Map<String, Object?> Function()? debugOuterScrollStateBuilder,
+  CommentsInteractionState? interactionState,
 }) {
   return const SizedBox.shrink();
 }
@@ -186,7 +188,7 @@ void main() {
     );
     final history = HistoryPage(
       readHistoryService: sl<ReadHistoryService>(),
-      sourceService: sl<SourceRuntimeGateway>(),
+      sourceService: sl<SourceSelectionGateway>(),
       imageGateway: sl<SourceImageGateway>(),
       comicDetailPageBuilder: buildDetail,
       onFavoriteRequested: (_, _) async {},
@@ -202,6 +204,10 @@ void main() {
         dailyRecommendation: sl<DiscoverDailyRecommendationService>(),
         downloader: sl<MangaDownloadService>(),
         sourceRuntime: sl<SourceRuntimeGateway>(),
+        sourceSelection: sl<SourceSelectionGateway>(),
+        sourceAdvanced: sl<SourceAdvancedGateway>(),
+        sourceScript: sl<SourceScriptGateway>(),
+        sourceUpdate: sl<SourceUpdateGateway>(),
       ),
       appearanceSettings: const AppearanceSettingsData(
         themeMode: ThemeMode.system,
@@ -220,12 +226,12 @@ void main() {
       labSettingsPageBuilder: (_) =>
           LabSettingsPage(sourceService: sl<SourceRuntimeGateway>()),
       advancedSettingsPageBuilder: (_) => AdvancedSettingsPage(
-        sourceService: sl<SourceRuntimeGateway>(),
+        sourceService: sl<SourceAdvancedGateway>(),
         softwareUpdateService: sl<SoftwareUpdateService>(),
         logsPageBuilder: (_) =>
             LogsPage(debugGateway: sl<SourceDebugGateway>()),
         comicSourceEditorPageBuilder: (_) =>
-            ComicSourceEditorPage(sourceService: sl<SourceRuntimeGateway>()),
+            ComicSourceEditorPage(sourceService: sl<SourceScriptGateway>()),
         restoreComicSource: (_) async => false,
       ),
     );

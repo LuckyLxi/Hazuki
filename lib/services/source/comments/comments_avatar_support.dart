@@ -1,6 +1,16 @@
-part of '../../hazuki_source_service.dart';
+import 'dart:convert';
 
-@visibleForTesting
+import '../debug/debug_log_internals.dart';
+import '../models/source_identity.dart';
+import '../runtime/source_runtime_facade.dart';
+
+typedef SourceLoginSideDataPersister =
+    Future<void> Function(
+      HazukiSourceFacade facade, {
+      required String sourceKey,
+      required dynamic result,
+    });
+
 String? normalizeSourceAvatarUrl({
   required String sourceKey,
   required Object? avatar,
@@ -72,9 +82,18 @@ String _avatarUrlForDisplay({
       .toString();
 }
 
-extension HazukiSourceServiceCommentsAvatarSupport on HazukiSourceService {
+class SourceAvatarCapability {
+  SourceAvatarCapability({
+    required HazukiSourceFacade Function() activeFacade,
+    required SourceLoginSideDataPersister persistLoginSideData,
+  }) : _activeFacade = activeFacade,
+       _persistLoginSideData = persistLoginSideData;
+
+  final HazukiSourceFacade Function() _activeFacade;
+  final SourceLoginSideDataPersister _persistLoginSideData;
+
   Future<String?> loadCurrentAvatarUrl() async {
-    final facade = this.facade;
+    final facade = _activeFacade();
     final sourceKey = facade.sourceMeta?.key ?? facade.sourceKey;
     _logAvatarEvent(
       facade,

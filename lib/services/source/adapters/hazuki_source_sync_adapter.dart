@@ -1,23 +1,29 @@
-import '../../hazuki_source_service.dart';
 import '../gateways/source_sync_gateway.dart';
-import 'hazuki_source_adapter_base.dart';
+import '../runtime/source_runtime_operations.dart';
+import '../runtime/source_runtime_view.dart';
 
-class HazukiSourceSyncAdapter extends HazukiSourceAdapterBase
-    implements SourceSyncGateway {
-  const HazukiSourceSyncAdapter(super.source);
+class HazukiSourceSyncAdapter implements SourceSyncGateway {
+  const HazukiSourceSyncAdapter({
+    required SourceRuntimeView runtime,
+    required SourceRuntimeOperations runtimeOperations,
+  }) : _runtime = runtime,
+       _runtimeOperations = runtimeOperations;
+
+  final SourceRuntimeView _runtime;
+  final SourceRuntimeOperations _runtimeOperations;
 
   @override
-  String get activeSourceKey => source.activeSourceKey;
+  String get activeSourceKey => _runtime.activeSourceKey;
   @override
   Future<bool> hasCustomEditedActiveSource() =>
-      source.hasCustomEditedActiveSource();
+      _runtimeOperations.hasCustomEditedActiveSource();
   @override
   Future<String?> readLocalActiveSourceIfExists() =>
-      source.readLocalActiveSourceIfExists();
+      _runtimeOperations.readLocalActiveSourceIfExists();
   @override
   Future<void> writeLocalActiveSource(String content) =>
-      source.writeLocalActiveSource(content);
+      _runtimeOperations.writeLocalActiveSource(content);
   @override
   Future<void> reloadFromLocalSourceFiles() =>
-      source.reloadFromLocalSourceFiles();
+      _runtimeOperations.reloadFromLocalSourceFiles();
 }

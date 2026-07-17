@@ -28,6 +28,7 @@ import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/reading_progress_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
+import 'package:hazuki/shared/comments/comments_interaction_state.dart';
 import 'package:hazuki/shared/reading/reader_settings_store.dart';
 import '../../support/test_service_locator.dart';
 
@@ -738,6 +739,7 @@ void main() {
         required String sourceKey,
         ScrollController? scrollController,
         Future<void> Function()? onRequestTabFullscreen,
+        CommentsInteractionState? interactionState,
       }) {
         return const SizedBox.shrink();
       }

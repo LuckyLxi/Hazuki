@@ -1,8 +1,22 @@
-part of '../../hazuki_source_service.dart';
+import 'dart:io';
 
-extension HazukiSourceServiceDebugReportCapability on HazukiSourceService {
+import '../debug/debug_log_internals.dart';
+import '../runtime/source_runtime_facade.dart';
+
+class SourceDebugReportCapability {
+  SourceDebugReportCapability({
+    required HazukiSourceFacade Function() activeFacade,
+    required String? Function() currentAccount,
+  }) : _activeFacade = activeFacade,
+       _currentAccount = currentAccount;
+
+  final HazukiSourceFacade Function() _activeFacade;
+  final String? Function() _currentAccount;
+
+  HazukiSourceFacade get _facade => _activeFacade();
+
   Future<Map<String, dynamic>> collectTypedDebugInfo(String type) async {
-    final facade = this.facade;
+    final facade = _facade;
     final normalizedType = _normalizeDebugReportType(type);
     final logs = _typedDebugReportLogsFor(normalizedType);
     final approxBytes = logs.fold<int>(
@@ -20,7 +34,7 @@ extension HazukiSourceServiceDebugReportCapability on HazukiSourceService {
         'version': facade.sourceMeta?.version,
       },
       'isLogged': facade.isLogged,
-      'currentAccount': currentAccount,
+      'currentAccount': _currentAccount(),
       'generatedAt': DateTime.now().toIso8601String(),
       'captureEnabled': facade.softwareLogCaptureEnabled,
       'logStats': {
@@ -39,16 +53,16 @@ extension HazukiSourceServiceDebugReportCapability on HazukiSourceService {
 
   List<Map<String, dynamic>> _typedDebugReportLogsFor(String type) {
     return switch (_normalizeDebugReportType(type)) {
-      debugLogTypeError => facade.debug.recentErrorLogs,
-      debugLogTypeAction => facade.debug.recentActionLogs,
-      debugLogTypeSystem => facade.debug.recentSystemLogs,
-      debugLogTypePerformance => facade.debug.recentPerformanceLogs,
-      _ => facade.debug.recentActionLogs,
+      debugLogTypeError => _facade.debug.recentErrorLogs,
+      debugLogTypeAction => _facade.debug.recentActionLogs,
+      debugLogTypeSystem => _facade.debug.recentSystemLogs,
+      debugLogTypePerformance => _facade.debug.recentPerformanceLogs,
+      _ => _facade.debug.recentActionLogs,
     };
   }
 
   Future<Map<String, dynamic>> collectNetworkDebugInfo() async {
-    final facade = this.facade;
+    final facade = _facade;
     final recentNetworkLogs = facade.debug.recentNetworkLogs;
     final approxBytes = recentNetworkLogs.fold<int>(
       0,
@@ -64,7 +78,7 @@ extension HazukiSourceServiceDebugReportCapability on HazukiSourceService {
         'version': facade.sourceMeta?.version,
       },
       'isLogged': facade.isLogged,
-      'currentAccount': currentAccount,
+      'currentAccount': _currentAccount(),
       'generatedAt': DateTime.now().toIso8601String(),
       'captureEnabled': facade.softwareLogCaptureEnabled,
       'networkLogStats': {
@@ -79,7 +93,7 @@ extension HazukiSourceServiceDebugReportCapability on HazukiSourceService {
   }
 
   Future<Map<String, dynamic>> collectApplicationDebugInfo() async {
-    final facade = this.facade;
+    final facade = _facade;
     final recentApplicationLogs = facade.debug.recentApplicationLogs;
     final approxBytes = recentApplicationLogs.fold<int>(
       0,
@@ -95,7 +109,7 @@ extension HazukiSourceServiceDebugReportCapability on HazukiSourceService {
         'version': facade.sourceMeta?.version,
       },
       'isLogged': facade.isLogged,
-      'currentAccount': currentAccount,
+      'currentAccount': _currentAccount(),
       'generatedAt': DateTime.now().toIso8601String(),
       'captureEnabled': facade.softwareLogCaptureEnabled,
       'applicationLogStats': {
@@ -107,7 +121,7 @@ extension HazukiSourceServiceDebugReportCapability on HazukiSourceService {
   }
 
   Future<Map<String, dynamic>> collectReaderDebugInfo() async {
-    final facade = this.facade;
+    final facade = _facade;
     final recentReaderLogs = facade.debug.recentReaderLogs;
     final approxBytes = recentReaderLogs.fold<int>(
       0,
@@ -123,7 +137,7 @@ extension HazukiSourceServiceDebugReportCapability on HazukiSourceService {
         'version': facade.sourceMeta?.version,
       },
       'isLogged': facade.isLogged,
-      'currentAccount': currentAccount,
+      'currentAccount': _currentAccount(),
       'generatedAt': DateTime.now().toIso8601String(),
       'captureEnabled': facade.softwareLogCaptureEnabled,
       'readerLogStats': {

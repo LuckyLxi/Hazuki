@@ -92,86 +92,58 @@ class HomeDrawerContent extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          ClipRect(
-            child: Stack(
-              children: [
-                Positioned.fill(child: ColoredBox(color: drawerBackground)),
-                Positioned.fill(
-                  child: ShaderMask(
-                    blendMode: BlendMode.dstIn,
-                    shaderCallback: (bounds) {
-                      return const LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.black,
-                          Colors.black,
-                          Colors.transparent,
-                        ],
-                        stops: [0.0, 0.74, 1.0],
-                      ).createShader(bounds);
-                    },
-                    child: ClipRect(
-                      child: ImageFiltered(
-                        imageFilter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
-                        child: Transform.scale(
-                          scale: 1.08,
-                          child:
-                              profile.profileLoading ||
-                                  resolvedAvatarUrl.isEmpty
-                              ? ColoredBox(
-                                  color: colorScheme.surfaceContainerHigh,
-                                )
-                              : HazukiCachedImage(
-                                  key: ValueKey('drawer-bg-$visualStateKey'),
-                                  url: resolvedAvatarUrl,
-                                  fit: BoxFit.cover,
-                                  ignoreNoImageMode: true,
-                                ),
+          RepaintBoundary(
+            child: ClipRect(
+              child: Stack(
+                children: [
+                  Positioned.fill(child: ColoredBox(color: drawerBackground)),
+                  Positioned.fill(
+                    child: ShaderMask(
+                      blendMode: BlendMode.dstIn,
+                      shaderCallback: (bounds) {
+                        return const LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.black,
+                            Colors.black,
+                            Colors.transparent,
+                          ],
+                          stops: [0.0, 0.74, 1.0],
+                        ).createShader(bounds);
+                      },
+                      child: ClipRect(
+                        child: ImageFiltered(
+                          imageFilter: ImageFilter.blur(sigmaX: 6, sigmaY: 6),
+                          child: Transform.scale(
+                            scale: 1.08,
+                            child:
+                                profile.profileLoading ||
+                                    resolvedAvatarUrl.isEmpty
+                                ? ColoredBox(
+                                    color: colorScheme.surfaceContainerHigh,
+                                  )
+                                : HazukiCachedImage(
+                                    key: ValueKey('drawer-bg-$visualStateKey'),
+                                    url: resolvedAvatarUrl,
+                                    fit: BoxFit.cover,
+                                    ignoreNoImageMode: true,
+                                  ),
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-                Positioned.fill(child: ColoredBox(color: darkModeDim)),
-                Positioned.fill(
-                  child: ClipRect(
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 3, sigmaY: 3),
-                      child: const SizedBox.expand(),
-                    ),
-                  ),
-                ),
-                Positioned.fill(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          Colors.transparent,
-                          drawerBackground.withValues(
-                            alpha: isDark ? 0.48 : 0.42,
-                          ),
-                          drawerBackground,
-                        ],
-                        stops: const [0.0, 0.56, 0.82, 1.0],
+                  Positioned.fill(child: ColoredBox(color: darkModeDim)),
+                  Positioned.fill(
+                    child: ClipRect(
+                      child: BackdropFilter(
+                        filter: ImageFilter.blur(sigmaX: 3, sigmaY: 3),
+                        child: const SizedBox.expand(),
                       ),
                     ),
                   ),
-                ),
-                Positioned.fill(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      border: Border(
-                        bottom: BorderSide(color: outlineColor, width: 1),
-                      ),
-                    ),
-                  ),
-                ),
-                Positioned.fill(
-                  child: IgnorePointer(
+                  Positioned.fill(
                     child: DecoratedBox(
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
@@ -180,122 +152,153 @@ class HomeDrawerContent extends StatelessWidget {
                           colors: [
                             Colors.transparent,
                             Colors.transparent,
-                            drawerBackground.withValues(alpha: 0.04),
-                            drawerBackground.withValues(
-                              alpha: isDark ? 0.18 : 0.14,
-                            ),
                             drawerBackground.withValues(
                               alpha: isDark ? 0.48 : 0.42,
                             ),
                             drawerBackground,
                           ],
-                          stops: const [0.0, 0.50, 0.66, 0.80, 0.91, 1.0],
+                          stops: const [0.0, 0.56, 0.82, 1.0],
                         ),
                       ),
                     ),
                   ),
-                ),
-                Padding(
-                  padding: EdgeInsets.fromLTRB(24, topPadding + 24, 24, 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      InkWell(
-                        onTap: actions.onProfileTap,
-                        borderRadius: BorderRadius.circular(40),
-                        child: HomeProfileAvatar(
-                          key: ValueKey('drawer-avatar-$visualStateKey'),
-                          avatarUrl: profile.avatarUrl,
-                          loading: profile.profileLoading,
-                          size: 72,
-                          heroEnabled: true,
+                  Positioned.fill(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        border: Border(
+                          bottom: BorderSide(color: outlineColor, width: 1),
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Flexible(
-                            child: Text(
-                              displayUsername,
-                              style: usernameStyle,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
+                    ),
+                  ),
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.transparent,
+                              drawerBackground.withValues(alpha: 0.04),
+                              drawerBackground.withValues(
+                                alpha: isDark ? 0.18 : 0.14,
+                              ),
+                              drawerBackground.withValues(
+                                alpha: isDark ? 0.48 : 0.42,
+                              ),
+                              drawerBackground,
+                            ],
+                            stops: const [0.0, 0.50, 0.66, 0.80, 0.91, 1.0],
                           ),
-                          const SizedBox(width: 3),
-                          Transform.translate(
-                            offset: const Offset(0, 2),
-                            child: HomeSourceSwitchPillButton(
-                              onPressed: actions.onSwitchSourcePressed,
+                        ),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(24, topPadding + 24, 24, 24),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        InkWell(
+                          onTap: actions.onProfileTap,
+                          borderRadius: BorderRadius.circular(40),
+                          child: HomeProfileAvatar(
+                            key: ValueKey('drawer-avatar-$visualStateKey'),
+                            avatarUrl: profile.avatarUrl,
+                            loading: profile.profileLoading,
+                            size: 72,
+                            heroEnabled: true,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Flexible(
+                              child: Text(
+                                displayUsername,
+                                style: usernameStyle,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 3),
+                            Transform.translate(
+                              offset: const Offset(0, 2),
+                              child: HomeSourceSwitchPillButton(
+                                onPressed: actions.onSwitchSourcePressed,
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (profile.showCheckInActions &&
+                            profile.isLogged &&
+                            !profile.profileLoading &&
+                            !profile.autoCheckInEnabled) ...[
+                          const SizedBox(height: 16),
+                          AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 260),
+                            switchInCurve: Curves.easeOutBack,
+                            switchOutCurve: Curves.easeInCubic,
+                            transitionBuilder: (child, animation) {
+                              return ScaleTransition(
+                                scale: Tween<double>(
+                                  begin: 0.92,
+                                  end: 1,
+                                ).animate(animation),
+                                child: FadeTransition(
+                                  opacity: animation,
+                                  child: child,
+                                ),
+                              );
+                            },
+                            child: FilledButton.tonalIcon(
+                              key: ValueKey(
+                                'checkin-${profile.checkInBusy
+                                    ? 'busy'
+                                    : profile.checkedInToday
+                                    ? 'done'
+                                    : 'idle'}',
+                              ),
+                              onPressed:
+                                  (profile.checkInBusy ||
+                                      profile.checkedInToday)
+                                  ? null
+                                  : actions.onCheckInPressed,
+                              icon: profile.checkInBusy
+                                  ? SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: colorScheme.onSecondaryContainer,
+                                      ),
+                                    )
+                                  : Icon(
+                                      profile.checkedInToday
+                                          ? Icons.check_circle_outline
+                                          : Icons.event_available_outlined,
+                                    ),
+                              label: Text(
+                                profile.checkInBusy
+                                    ? l10n(context).homeCheckInInProgress
+                                    : profile.checkedInToday
+                                    ? l10n(context).homeCheckInDone
+                                    : l10n(context).homeCheckInAction,
+                              ),
+                              style: FilledButton.styleFrom(
+                                minimumSize: const Size(double.infinity, 40),
+                              ),
                             ),
                           ),
                         ],
-                      ),
-                      if (profile.showCheckInActions &&
-                          profile.isLogged &&
-                          !profile.profileLoading &&
-                          !profile.autoCheckInEnabled) ...[
-                        const SizedBox(height: 16),
-                        AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 260),
-                          switchInCurve: Curves.easeOutBack,
-                          switchOutCurve: Curves.easeInCubic,
-                          transitionBuilder: (child, animation) {
-                            return ScaleTransition(
-                              scale: Tween<double>(
-                                begin: 0.92,
-                                end: 1,
-                              ).animate(animation),
-                              child: FadeTransition(
-                                opacity: animation,
-                                child: child,
-                              ),
-                            );
-                          },
-                          child: FilledButton.tonalIcon(
-                            key: ValueKey(
-                              'checkin-${profile.checkInBusy
-                                  ? 'busy'
-                                  : profile.checkedInToday
-                                  ? 'done'
-                                  : 'idle'}',
-                            ),
-                            onPressed:
-                                (profile.checkInBusy || profile.checkedInToday)
-                                ? null
-                                : actions.onCheckInPressed,
-                            icon: profile.checkInBusy
-                                ? SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: colorScheme.onSecondaryContainer,
-                                    ),
-                                  )
-                                : Icon(
-                                    profile.checkedInToday
-                                        ? Icons.check_circle_outline
-                                        : Icons.event_available_outlined,
-                                  ),
-                            label: Text(
-                              profile.checkInBusy
-                                  ? l10n(context).homeCheckInInProgress
-                                  : profile.checkedInToday
-                                  ? l10n(context).homeCheckInDone
-                                  : l10n(context).homeCheckInAction,
-                            ),
-                            style: FilledButton.styleFrom(
-                              minimumSize: const Size(double.infinity, 40),
-                            ),
-                          ),
-                        ),
                       ],
-                    ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 8),
