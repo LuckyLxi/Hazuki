@@ -1,12 +1,12 @@
 {
-  "version": "1.1.5",
-  "releaseUrl": "https://github.com/LuckyLxi/Hazuki/releases/tag/v1.1.5",
+  "version": "1.1.6",
+  "releaseUrl": "https://github.com/LuckyLxi/Hazuki/releases/tag/v1.1.6",
   "apkUrls": {
-    "arm64-v8a": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.1.5/app-arm64-v8a-release.apk"
+    "arm64-v8a": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.1.6/app-arm64-v8a-release.apk"
   },
   "windowsUrls": {
-    "x64_zip": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.1.5/hazuki-windows-x64-v1.1.5.zip",
-    "x64_exe": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.1.5/hazuki-windows-x64-v1.1.5-setup.exe"
+    "x64_zip": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.1.6/hazuki-windows-x64-v1.1.6.zip",
+    "x64_exe": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.1.6/hazuki-windows-x64-v1.1.6-setup.exe"
   },
-  "changelog": "Hazuki v1.1.5\n\n- 新增聚合搜索\n- 优化云同步\n- 优化发现页周榜日期导航与每日推荐合并逻辑\n- 增强下载任务冲突处理，修复下载分组成员关系异常丢失\n- 新增软件更新源选择，并支持删除已停用的本地漫画源文件\n- 优化评论过滤\n- 优化漫画源运行稳定性"
+  "changelog": "发布 v1.1.6"
 }
