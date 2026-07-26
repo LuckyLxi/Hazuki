@@ -846,7 +846,6 @@
   "cloudSyncRestoreConfirm": "Overwrite and restore",
   "cloudSyncRestoreCompleted": "Restore completed",
   "cloudSyncRestoreSkippedPlatformSettings": "Skipped incompatible settings for this platform",
-  "cloudSyncRestoreSourceRestartRequired": "Comic source changes will apply on next launch",
   "cloudSyncRestoreFailed": "Restore failed: {error}",
   "@cloudSyncRestoreFailed": {
     "placeholders": {

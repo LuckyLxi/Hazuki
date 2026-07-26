@@ -14,6 +14,7 @@ class ReadHistoryEntries extends Table {
   TextColumn get title => text()();
   TextColumn get cover => text()();
   TextColumn get subTitle => text()();
+  TextColumn get tagsJson => text().withDefault(const Constant('[]'))();
   IntColumn get timestampMs => integer()();
 
   @override
@@ -77,6 +78,7 @@ class LocalFavoriteComics extends Table {
   TextColumn get subTitle => text()();
   TextColumn get cover => text()();
   TextColumn get updateTime => text()();
+  TextColumn get tagsJson => text().withDefault(const Constant('[]'))();
 
   @override
   Set<Column<Object>> get primaryKey => {storageKey};
@@ -181,7 +183,7 @@ class HazukiDatabase extends _$HazukiDatabase {
   HazukiDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -219,6 +221,18 @@ class HazukiDatabase extends _$HazukiDatabase {
         }
         await m.createTable(searchHistoryTombstones);
         await m.createTable(searchHistoryClearStates);
+      }
+      if (from < 8) {
+        await _safeAddColumn(
+          m,
+          readHistoryEntries,
+          readHistoryEntries.tagsJson,
+        );
+        await _safeAddColumn(
+          m,
+          localFavoriteComics,
+          localFavoriteComics.tagsJson,
+        );
       }
     },
   );

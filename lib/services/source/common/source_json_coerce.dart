@@ -27,6 +27,14 @@ int? jsAsInt(dynamic value) {
   return null;
 }
 
+List<String> jsAsStringList(dynamic value) {
+  if (value is! List) return const [];
+  return value
+      .map((item) => item.toString().trim())
+      .where((item) => item.isNotEmpty)
+      .toList(growable: false);
+}
+
 Uint8List jsToBytes(dynamic value) {
   if (value is Uint8List) {
     return value;

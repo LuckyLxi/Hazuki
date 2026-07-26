@@ -18,14 +18,4 @@ class CloudSyncRestoreApplier {
   Future<void> applySearchHistoryJsonl(String content) {
     return _participants.searchHistory.restoreSnapshot(content);
   }
-
-  Future<bool> applySourceFile({
-    required String? sourceText,
-    required bool manifestHasSource,
-  }) {
-    return _participants.source.restoreSnapshot(
-      sourceText: sourceText,
-      manifestHasSource: manifestHasSource,
-    );
-  }
 }

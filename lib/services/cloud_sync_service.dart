@@ -184,13 +184,6 @@ class CloudSyncService {
       snapshot.searchHistoryJsonl,
     );
 
-    if (snapshot.jmSource != null && snapshot.jmSource!.trim().isNotEmpty) {
-      await client.putSourceFile(
-        CloudSyncConfigStore.sourceFileName,
-        snapshot.jmSource!,
-      );
-    }
-
     final manifest = {
       'version': 2,
       'updatedAtMs': uploadAtMs,
@@ -198,7 +191,6 @@ class CloudSyncService {
       'progressCount': snapshot.progressCount,
       'searchCount': snapshot.searchCount,
       'sourcePlatform': _configStore.currentPlatformName,
-      'hasSourceFile': snapshot.jmSource?.trim().isNotEmpty == true,
     };
     await client.putBackupFile(
       CloudSyncConfigStore.manifestFileName,
@@ -314,7 +306,6 @@ class CloudSyncService {
     }
 
     final client = facade.remoteClient(config);
-    final manifest = await client.loadManifest();
     final settingsText = await client.getBackupFile(
       CloudSyncConfigStore.settingsFileName,
     );
@@ -322,10 +313,6 @@ class CloudSyncService {
     final searchHistoryText = await client.getBackupFile(
       CloudSyncConfigStore.searchHistoryFileName,
     );
-    final sourceText = await client.tryGetSourceFile(
-      CloudSyncConfigStore.sourceFileName,
-    );
-
     final settingsResult = await _restoreApplier.applySettingsJson(
       settingsText,
     );
@@ -333,16 +320,10 @@ class CloudSyncService {
     await _restoreApplier.applyReadingSnapshot(readingText);
     await _restoreApplier.applySearchHistoryJsonl(searchHistoryText);
 
-    final restoredSourceFile = await _restoreApplier.applySourceFile(
-      sourceText: sourceText,
-      manifestHasSource: manifest['hasSourceFile'] == true,
-    );
-
     return CloudSyncRestoreResult(
       restoredSettings: true,
       restoredReading: true,
       restoredSearchHistory: true,
-      restoredSourceFile: restoredSourceFile,
       appliedPlatformFilteredKeys: settingsResult.appliedPlatformFilteredKeys,
       skippedKeys: settingsResult.skippedKeys,
     );

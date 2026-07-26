@@ -174,6 +174,7 @@ class SearchComicListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tags = comic.sourceKey == 'picacg' ? comic.tags : const <String>[];
     final item = Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: InkWell(
@@ -242,6 +243,10 @@ class SearchComicListItem extends StatelessWidget {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
+                    ],
+                    if (tags.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      PicacgComicTags(sourceKey: comic.sourceKey, tags: tags),
                     ],
                   ],
                 ),

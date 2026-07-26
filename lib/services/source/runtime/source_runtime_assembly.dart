@@ -10,6 +10,7 @@ import '../comic/comic_details_capability.dart';
 import '../comic/source_comic_details_cache.dart';
 import '../comments/comments_capability.dart';
 import '../comments/source_comments_operations.dart';
+import '../common/source_json_coerce.dart';
 import '../content/source_content_operations.dart';
 import '../debug/debug_favorites_capability.dart';
 import '../debug/debug_report_capability.dart';
@@ -374,6 +375,7 @@ class SourceRuntimeAssembly {
               .toString(),
           cover: comicMap['cover']?.toString() ?? '',
           sourceKey: resolvedSourceKey,
+          tags: jsAsStringList(comicMap['tags']),
         ),
       );
     }

@@ -25,6 +25,7 @@ void main() {
           'title': 'Legacy',
           'cover': 'https://example.test/cover.jpg',
           'subTitle': 'Old',
+          'tags': ['Action'],
           'sourceKey': '',
           'timestamp': 12,
         },
@@ -38,6 +39,7 @@ void main() {
       expect(jmHistory, hasLength(1));
       expect(jmHistory.single.id, 'legacy-id');
       expect(jmHistory.single.sourceKey, hazukiDefaultSourceKey);
+      expect(jmHistory.single.tags, ['Action']);
       expect(copyHistory, isEmpty);
     });
 

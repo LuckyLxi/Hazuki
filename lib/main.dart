@@ -127,7 +127,6 @@ class _HazukiAppState extends State<HazukiApp>
       settingsStore: widget.settingsStore,
       themeController: _themeController,
       windowsTitleBarController: _windowsTitleBarController,
-      sourceSync: sl<SourceSyncGateway>(),
       reloadLocale: _reloadLocalePreference,
       refreshHome: _startupCoordinator.refreshHome,
     );

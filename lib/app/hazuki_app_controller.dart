@@ -1,46 +1,30 @@
 import 'package:flutter/widgets.dart';
 
 import '../services/cloud_sync_service.dart';
-import '../services/source/source_capabilities.dart';
 import 'app_settings_store.dart';
 import 'theme/hazuki_theme_controller.dart';
 import 'windows/windows_title_bar_controller.dart';
-
-class CloudSyncRestoreApplyResult {
-  const CloudSyncRestoreApplyResult({
-    required this.sourceReloaded,
-    required this.sourceNeedsRestart,
-  });
-
-  final bool sourceReloaded;
-  final bool sourceNeedsRestart;
-}
 
 class HazukiAppController {
   HazukiAppController({
     required HazukiAppSettingsStore settingsStore,
     required HazukiThemeController themeController,
     required HazukiWindowsTitleBarController windowsTitleBarController,
-    required SourceSyncGateway sourceSync,
     required Future<void> Function() reloadLocale,
     required VoidCallback refreshHome,
   }) : _settingsStore = settingsStore,
        _themeController = themeController,
        _windowsTitleBarController = windowsTitleBarController,
-       _sourceSync = sourceSync,
        _reloadLocale = reloadLocale,
        _refreshHome = refreshHome;
 
   final HazukiAppSettingsStore _settingsStore;
   final HazukiThemeController _themeController;
   final HazukiWindowsTitleBarController _windowsTitleBarController;
-  final SourceSyncGateway _sourceSync;
   final Future<void> Function() _reloadLocale;
   final VoidCallback _refreshHome;
 
-  Future<CloudSyncRestoreApplyResult> applyCloudSyncRestore(
-    CloudSyncRestoreResult result,
-  ) async {
+  Future<void> applyCloudSyncRestore(CloudSyncRestoreResult result) async {
     if (result.restoredSettings) {
       final appearance = await _settingsStore.loadAppearance();
       await _themeController.applyRestoredSettings(appearance);
@@ -48,22 +32,7 @@ class HazukiAppController {
       await _windowsTitleBarController.reloadFromStore();
     }
 
-    var sourceReloaded = false;
-    var sourceNeedsRestart = false;
-    if (result.restoredSourceFile) {
-      try {
-        await _sourceSync.reloadFromLocalSourceFiles();
-        sourceReloaded = true;
-      } catch (_) {
-        sourceNeedsRestart = true;
-      }
-    }
-
     _refreshHome();
-    return CloudSyncRestoreApplyResult(
-      sourceReloaded: sourceReloaded,
-      sourceNeedsRestart: sourceNeedsRestart,
-    );
   }
 }
 

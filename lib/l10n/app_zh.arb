@@ -846,7 +846,6 @@
   "cloudSyncRestoreConfirm": "覆盖恢复",
   "cloudSyncRestoreCompleted": "恢复完成",
   "cloudSyncRestoreSkippedPlatformSettings": "已跳过当前平台不兼容设置",
-  "cloudSyncRestoreSourceRestartRequired": "漫画源将在下次启动时生效",
   "cloudSyncRestoreFailed": "恢复失败: {error}",
   "@cloudSyncRestoreFailed": {
     "placeholders": {

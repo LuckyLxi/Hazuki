@@ -52,8 +52,6 @@ class CloudSyncSnapshotCodec {
     final searchCount = await _participants.searchHistory.exportCount();
     final searchHistoryJsonl = await _participants.searchHistory
         .exportSnapshot();
-    final source = await _participants.source.exportSnapshot();
-
     return CloudSyncLocalSnapshot(
       settings: settings,
       reading: reading.json,
@@ -61,7 +59,6 @@ class CloudSyncSnapshotCodec {
       historyCount: reading.historyCount,
       progressCount: reading.progressCount,
       searchCount: searchCount,
-      jmSource: source,
     );
   }
 }

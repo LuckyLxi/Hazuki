@@ -1,19 +1,14 @@
 import 'dart:async';
 
 import 'package:flutter/widgets.dart';
-import 'package:hazuki/app/hazuki_app_controller.dart';
 import 'package:hazuki/services/cloud_sync_service.dart';
 
 typedef ApplyCloudSyncRestoreCallback =
-    Future<CloudSyncRestoreApplyResult> Function(CloudSyncRestoreResult result);
+    Future<void> Function(CloudSyncRestoreResult result);
 
 class CloudSyncRestoreOutcome {
-  const CloudSyncRestoreOutcome({
-    required this.skippedPlatformSettings,
-    required this.sourceNeedsRestart,
-  });
+  const CloudSyncRestoreOutcome({required this.skippedPlatformSettings});
   final bool skippedPlatformSettings;
-  final bool sourceNeedsRestart;
 }
 
 class CloudSyncController extends ChangeNotifier {
@@ -146,14 +141,13 @@ class CloudSyncController extends ChangeNotifier {
     try {
       final config = _buildConfig();
       final result = await _service.restoreLatestBackup(configOverride: config);
-      final applyResult = await applyRestore(result);
+      await applyRestore(result);
       final status = await _service.testConnection(configOverride: config);
       if (!_disposed) {
         _status = status;
       }
       return CloudSyncRestoreOutcome(
         skippedPlatformSettings: result.skippedKeys.isNotEmpty,
-        sourceNeedsRestart: applyResult.sourceNeedsRestart,
       );
     } finally {
       if (!_disposed) {

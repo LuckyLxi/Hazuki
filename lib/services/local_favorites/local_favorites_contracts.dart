@@ -28,6 +28,11 @@ abstract interface class LocalFavoritesRepository implements Listenable {
     required String folderId,
   });
   Future<bool> isComicFavorited(String comicId, {String sourceKey = ''});
+  Future<void> updateComicTags({
+    required String comicId,
+    required String sourceKey,
+    required List<String> tags,
+  });
 }
 
 abstract interface class LocalFavoritesSyncStore {

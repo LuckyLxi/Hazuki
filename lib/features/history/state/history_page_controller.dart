@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/read_history_service.dart';
+import 'package:hazuki/shared/picacg_comic_tags.dart';
 
 import 'history_page_state.dart';
 
@@ -11,8 +12,10 @@ class HistoryPageController extends ChangeNotifier {
   HistoryPageController({
     required ReadHistoryService readHistoryService,
     required SourceSelectionGateway sourceService,
+    SourceReaderGateway? readerService,
   }) : _readHistoryService = readHistoryService,
        _sourceService = sourceService,
+       _readerService = readerService,
        _activeSourceKey = _normalizeSourceKey(sourceService.activeSourceKey) {
     _readHistoryService.addListener(_handleReadHistoryChanged);
     _sourceService.addListener(_handleSourceChanged);
@@ -20,6 +23,7 @@ class HistoryPageController extends ChangeNotifier {
 
   final ReadHistoryService _readHistoryService;
   final SourceSelectionGateway _sourceService;
+  final SourceReaderGateway? _readerService;
   final HistoryPageData _state = HistoryPageData();
 
   bool _disposed = false;
@@ -184,7 +188,88 @@ class HistoryPageController extends ChangeNotifier {
       _state.applyLoaded(history, playEntryAnimation: playEntryAnimation);
     }
     notifyListeners();
+    unawaited(
+      _backfillPicacgTags(
+        history,
+        requestVersion: requestVersion,
+        sourceKey: sourceKey,
+      ),
+    );
   }
+
+  Future<void> _backfillPicacgTags(
+    List<ExploreComic> history, {
+    required int requestVersion,
+    required String sourceKey,
+  }) async {
+    if (_readerService == null) return;
+    final comics = List<ExploreComic>.of(history);
+    for (var start = 0; start < comics.length; start += 4) {
+      if (!_isCurrentHistoryRequest(
+        requestVersion: requestVersion,
+        sourceKey: sourceKey,
+      )) {
+        return;
+      }
+      final end = (start + 4).clamp(0, comics.length);
+      await Future.wait(
+        List<Future<void>>.generate(end - start, (offset) async {
+          final index = start + offset;
+          final comic = comics[index];
+          if (comic.sourceKey.trim().toLowerCase() != 'picacg' ||
+              comic.tags.isNotEmpty) {
+            return;
+          }
+          try {
+            final details = await _readerService.loadComicDetails(
+              comic.id,
+              sourceKey: comic.sourceKey,
+            );
+            if (!_isCurrentHistoryRequest(
+              requestVersion: requestVersion,
+              sourceKey: sourceKey,
+            )) {
+              return;
+            }
+            final tags = picacgComicDetailTags(details);
+            if (tags.isEmpty) return;
+            comics[index] = comic.copyWith(tags: tags);
+            unawaited(
+              _readHistoryService.updateComicTags(comic: comic, tags: tags),
+            );
+          } catch (_) {}
+        }),
+      );
+    }
+    if (!_isCurrentHistoryRequest(
+      requestVersion: requestVersion,
+      sourceKey: sourceKey,
+    )) {
+      return;
+    }
+    final tagsByComic = <String, List<String>>{
+      for (final comic in comics)
+        if (comic.tags.isNotEmpty) comic.scopedId.storageKey: comic.tags,
+    };
+    var changed = false;
+    _state.history = List<ExploreComic>.unmodifiable(
+      _state.history.map((comic) {
+        final tags = tagsByComic[comic.scopedId.storageKey];
+        if (tags == null || comic.tags.isNotEmpty) return comic;
+        changed = true;
+        return comic.copyWith(tags: tags);
+      }),
+    );
+    if (changed) notifyListeners();
+  }
+
+  bool _isCurrentHistoryRequest({
+    required int requestVersion,
+    required String sourceKey,
+  }) =>
+      !_disposed &&
+      requestVersion == _requestVersion &&
+      sourceKey == _activeSourceKey;
 
   Future<void> _replaceSourceHistory({
     required String sourceKey,

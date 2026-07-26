@@ -71,6 +71,18 @@ class $ReadHistoryEntriesTable extends ReadHistoryEntries
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _tagsJsonMeta = const VerificationMeta(
+    'tagsJson',
+  );
+  @override
+  late final GeneratedColumn<String> tagsJson = GeneratedColumn<String>(
+    'tags_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('[]'),
+  );
   static const VerificationMeta _timestampMsMeta = const VerificationMeta(
     'timestampMs',
   );
@@ -90,6 +102,7 @@ class $ReadHistoryEntriesTable extends ReadHistoryEntries
     title,
     cover,
     subTitle,
+    tagsJson,
     timestampMs,
   ];
   @override
@@ -152,6 +165,12 @@ class $ReadHistoryEntriesTable extends ReadHistoryEntries
     } else if (isInserting) {
       context.missing(_subTitleMeta);
     }
+    if (data.containsKey('tags_json')) {
+      context.handle(
+        _tagsJsonMeta,
+        tagsJson.isAcceptableOrUnknown(data['tags_json']!, _tagsJsonMeta),
+      );
+    }
     if (data.containsKey('timestamp_ms')) {
       context.handle(
         _timestampMsMeta,
@@ -196,6 +215,10 @@ class $ReadHistoryEntriesTable extends ReadHistoryEntries
         DriftSqlType.string,
         data['${effectivePrefix}sub_title'],
       )!,
+      tagsJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}tags_json'],
+      )!,
       timestampMs: attachedDatabase.typeMapping.read(
         DriftSqlType.int,
         data['${effectivePrefix}timestamp_ms'],
@@ -217,6 +240,7 @@ class ReadHistoryEntry extends DataClass
   final String title;
   final String cover;
   final String subTitle;
+  final String tagsJson;
   final int timestampMs;
   const ReadHistoryEntry({
     required this.storageKey,
@@ -225,6 +249,7 @@ class ReadHistoryEntry extends DataClass
     required this.title,
     required this.cover,
     required this.subTitle,
+    required this.tagsJson,
     required this.timestampMs,
   });
   @override
@@ -236,6 +261,7 @@ class ReadHistoryEntry extends DataClass
     map['title'] = Variable<String>(title);
     map['cover'] = Variable<String>(cover);
     map['sub_title'] = Variable<String>(subTitle);
+    map['tags_json'] = Variable<String>(tagsJson);
     map['timestamp_ms'] = Variable<int>(timestampMs);
     return map;
   }
@@ -248,6 +274,7 @@ class ReadHistoryEntry extends DataClass
       title: Value(title),
       cover: Value(cover),
       subTitle: Value(subTitle),
+      tagsJson: Value(tagsJson),
       timestampMs: Value(timestampMs),
     );
   }
@@ -264,6 +291,7 @@ class ReadHistoryEntry extends DataClass
       title: serializer.fromJson<String>(json['title']),
       cover: serializer.fromJson<String>(json['cover']),
       subTitle: serializer.fromJson<String>(json['subTitle']),
+      tagsJson: serializer.fromJson<String>(json['tagsJson']),
       timestampMs: serializer.fromJson<int>(json['timestampMs']),
     );
   }
@@ -277,6 +305,7 @@ class ReadHistoryEntry extends DataClass
       'title': serializer.toJson<String>(title),
       'cover': serializer.toJson<String>(cover),
       'subTitle': serializer.toJson<String>(subTitle),
+      'tagsJson': serializer.toJson<String>(tagsJson),
       'timestampMs': serializer.toJson<int>(timestampMs),
     };
   }
@@ -288,6 +317,7 @@ class ReadHistoryEntry extends DataClass
     String? title,
     String? cover,
     String? subTitle,
+    String? tagsJson,
     int? timestampMs,
   }) => ReadHistoryEntry(
     storageKey: storageKey ?? this.storageKey,
@@ -296,6 +326,7 @@ class ReadHistoryEntry extends DataClass
     title: title ?? this.title,
     cover: cover ?? this.cover,
     subTitle: subTitle ?? this.subTitle,
+    tagsJson: tagsJson ?? this.tagsJson,
     timestampMs: timestampMs ?? this.timestampMs,
   );
   ReadHistoryEntry copyWithCompanion(ReadHistoryEntriesCompanion data) {
@@ -308,6 +339,7 @@ class ReadHistoryEntry extends DataClass
       title: data.title.present ? data.title.value : this.title,
       cover: data.cover.present ? data.cover.value : this.cover,
       subTitle: data.subTitle.present ? data.subTitle.value : this.subTitle,
+      tagsJson: data.tagsJson.present ? data.tagsJson.value : this.tagsJson,
       timestampMs: data.timestampMs.present
           ? data.timestampMs.value
           : this.timestampMs,
@@ -323,6 +355,7 @@ class ReadHistoryEntry extends DataClass
           ..write('title: $title, ')
           ..write('cover: $cover, ')
           ..write('subTitle: $subTitle, ')
+          ..write('tagsJson: $tagsJson, ')
           ..write('timestampMs: $timestampMs')
           ..write(')'))
         .toString();
@@ -336,6 +369,7 @@ class ReadHistoryEntry extends DataClass
     title,
     cover,
     subTitle,
+    tagsJson,
     timestampMs,
   );
   @override
@@ -348,6 +382,7 @@ class ReadHistoryEntry extends DataClass
           other.title == this.title &&
           other.cover == this.cover &&
           other.subTitle == this.subTitle &&
+          other.tagsJson == this.tagsJson &&
           other.timestampMs == this.timestampMs);
 }
 
@@ -358,6 +393,7 @@ class ReadHistoryEntriesCompanion extends UpdateCompanion<ReadHistoryEntry> {
   final Value<String> title;
   final Value<String> cover;
   final Value<String> subTitle;
+  final Value<String> tagsJson;
   final Value<int> timestampMs;
   final Value<int> rowid;
   const ReadHistoryEntriesCompanion({
@@ -367,6 +403,7 @@ class ReadHistoryEntriesCompanion extends UpdateCompanion<ReadHistoryEntry> {
     this.title = const Value.absent(),
     this.cover = const Value.absent(),
     this.subTitle = const Value.absent(),
+    this.tagsJson = const Value.absent(),
     this.timestampMs = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -377,6 +414,7 @@ class ReadHistoryEntriesCompanion extends UpdateCompanion<ReadHistoryEntry> {
     required String title,
     required String cover,
     required String subTitle,
+    this.tagsJson = const Value.absent(),
     required int timestampMs,
     this.rowid = const Value.absent(),
   }) : storageKey = Value(storageKey),
@@ -393,6 +431,7 @@ class ReadHistoryEntriesCompanion extends UpdateCompanion<ReadHistoryEntry> {
     Expression<String>? title,
     Expression<String>? cover,
     Expression<String>? subTitle,
+    Expression<String>? tagsJson,
     Expression<int>? timestampMs,
     Expression<int>? rowid,
   }) {
@@ -403,6 +442,7 @@ class ReadHistoryEntriesCompanion extends UpdateCompanion<ReadHistoryEntry> {
       if (title != null) 'title': title,
       if (cover != null) 'cover': cover,
       if (subTitle != null) 'sub_title': subTitle,
+      if (tagsJson != null) 'tags_json': tagsJson,
       if (timestampMs != null) 'timestamp_ms': timestampMs,
       if (rowid != null) 'rowid': rowid,
     });
@@ -415,6 +455,7 @@ class ReadHistoryEntriesCompanion extends UpdateCompanion<ReadHistoryEntry> {
     Value<String>? title,
     Value<String>? cover,
     Value<String>? subTitle,
+    Value<String>? tagsJson,
     Value<int>? timestampMs,
     Value<int>? rowid,
   }) {
@@ -425,6 +466,7 @@ class ReadHistoryEntriesCompanion extends UpdateCompanion<ReadHistoryEntry> {
       title: title ?? this.title,
       cover: cover ?? this.cover,
       subTitle: subTitle ?? this.subTitle,
+      tagsJson: tagsJson ?? this.tagsJson,
       timestampMs: timestampMs ?? this.timestampMs,
       rowid: rowid ?? this.rowid,
     );
@@ -451,6 +493,9 @@ class ReadHistoryEntriesCompanion extends UpdateCompanion<ReadHistoryEntry> {
     if (subTitle.present) {
       map['sub_title'] = Variable<String>(subTitle.value);
     }
+    if (tagsJson.present) {
+      map['tags_json'] = Variable<String>(tagsJson.value);
+    }
     if (timestampMs.present) {
       map['timestamp_ms'] = Variable<int>(timestampMs.value);
     }
@@ -469,6 +514,7 @@ class ReadHistoryEntriesCompanion extends UpdateCompanion<ReadHistoryEntry> {
           ..write('title: $title, ')
           ..write('cover: $cover, ')
           ..write('subTitle: $subTitle, ')
+          ..write('tagsJson: $tagsJson, ')
           ..write('timestampMs: $timestampMs, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -2121,6 +2167,18 @@ class $LocalFavoriteComicsTable extends LocalFavoriteComics
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _tagsJsonMeta = const VerificationMeta(
+    'tagsJson',
+  );
+  @override
+  late final GeneratedColumn<String> tagsJson = GeneratedColumn<String>(
+    'tags_json',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('[]'),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     storageKey,
@@ -2130,6 +2188,7 @@ class $LocalFavoriteComicsTable extends LocalFavoriteComics
     subTitle,
     cover,
     updateTime,
+    tagsJson,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -2197,6 +2256,12 @@ class $LocalFavoriteComicsTable extends LocalFavoriteComics
     } else if (isInserting) {
       context.missing(_updateTimeMeta);
     }
+    if (data.containsKey('tags_json')) {
+      context.handle(
+        _tagsJsonMeta,
+        tagsJson.isAcceptableOrUnknown(data['tags_json']!, _tagsJsonMeta),
+      );
+    }
     return context;
   }
 
@@ -2234,6 +2299,10 @@ class $LocalFavoriteComicsTable extends LocalFavoriteComics
         DriftSqlType.string,
         data['${effectivePrefix}update_time'],
       )!,
+      tagsJson: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}tags_json'],
+      )!,
     );
   }
 
@@ -2252,6 +2321,7 @@ class LocalFavoriteComic extends DataClass
   final String subTitle;
   final String cover;
   final String updateTime;
+  final String tagsJson;
   const LocalFavoriteComic({
     required this.storageKey,
     required this.comicId,
@@ -2260,6 +2330,7 @@ class LocalFavoriteComic extends DataClass
     required this.subTitle,
     required this.cover,
     required this.updateTime,
+    required this.tagsJson,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2271,6 +2342,7 @@ class LocalFavoriteComic extends DataClass
     map['sub_title'] = Variable<String>(subTitle);
     map['cover'] = Variable<String>(cover);
     map['update_time'] = Variable<String>(updateTime);
+    map['tags_json'] = Variable<String>(tagsJson);
     return map;
   }
 
@@ -2283,6 +2355,7 @@ class LocalFavoriteComic extends DataClass
       subTitle: Value(subTitle),
       cover: Value(cover),
       updateTime: Value(updateTime),
+      tagsJson: Value(tagsJson),
     );
   }
 
@@ -2299,6 +2372,7 @@ class LocalFavoriteComic extends DataClass
       subTitle: serializer.fromJson<String>(json['subTitle']),
       cover: serializer.fromJson<String>(json['cover']),
       updateTime: serializer.fromJson<String>(json['updateTime']),
+      tagsJson: serializer.fromJson<String>(json['tagsJson']),
     );
   }
   @override
@@ -2312,6 +2386,7 @@ class LocalFavoriteComic extends DataClass
       'subTitle': serializer.toJson<String>(subTitle),
       'cover': serializer.toJson<String>(cover),
       'updateTime': serializer.toJson<String>(updateTime),
+      'tagsJson': serializer.toJson<String>(tagsJson),
     };
   }
 
@@ -2323,6 +2398,7 @@ class LocalFavoriteComic extends DataClass
     String? subTitle,
     String? cover,
     String? updateTime,
+    String? tagsJson,
   }) => LocalFavoriteComic(
     storageKey: storageKey ?? this.storageKey,
     comicId: comicId ?? this.comicId,
@@ -2331,6 +2407,7 @@ class LocalFavoriteComic extends DataClass
     subTitle: subTitle ?? this.subTitle,
     cover: cover ?? this.cover,
     updateTime: updateTime ?? this.updateTime,
+    tagsJson: tagsJson ?? this.tagsJson,
   );
   LocalFavoriteComic copyWithCompanion(LocalFavoriteComicsCompanion data) {
     return LocalFavoriteComic(
@@ -2345,6 +2422,7 @@ class LocalFavoriteComic extends DataClass
       updateTime: data.updateTime.present
           ? data.updateTime.value
           : this.updateTime,
+      tagsJson: data.tagsJson.present ? data.tagsJson.value : this.tagsJson,
     );
   }
 
@@ -2357,7 +2435,8 @@ class LocalFavoriteComic extends DataClass
           ..write('title: $title, ')
           ..write('subTitle: $subTitle, ')
           ..write('cover: $cover, ')
-          ..write('updateTime: $updateTime')
+          ..write('updateTime: $updateTime, ')
+          ..write('tagsJson: $tagsJson')
           ..write(')'))
         .toString();
   }
@@ -2371,6 +2450,7 @@ class LocalFavoriteComic extends DataClass
     subTitle,
     cover,
     updateTime,
+    tagsJson,
   );
   @override
   bool operator ==(Object other) =>
@@ -2382,7 +2462,8 @@ class LocalFavoriteComic extends DataClass
           other.title == this.title &&
           other.subTitle == this.subTitle &&
           other.cover == this.cover &&
-          other.updateTime == this.updateTime);
+          other.updateTime == this.updateTime &&
+          other.tagsJson == this.tagsJson);
 }
 
 class LocalFavoriteComicsCompanion extends UpdateCompanion<LocalFavoriteComic> {
@@ -2393,6 +2474,7 @@ class LocalFavoriteComicsCompanion extends UpdateCompanion<LocalFavoriteComic> {
   final Value<String> subTitle;
   final Value<String> cover;
   final Value<String> updateTime;
+  final Value<String> tagsJson;
   final Value<int> rowid;
   const LocalFavoriteComicsCompanion({
     this.storageKey = const Value.absent(),
@@ -2402,6 +2484,7 @@ class LocalFavoriteComicsCompanion extends UpdateCompanion<LocalFavoriteComic> {
     this.subTitle = const Value.absent(),
     this.cover = const Value.absent(),
     this.updateTime = const Value.absent(),
+    this.tagsJson = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   LocalFavoriteComicsCompanion.insert({
@@ -2412,6 +2495,7 @@ class LocalFavoriteComicsCompanion extends UpdateCompanion<LocalFavoriteComic> {
     required String subTitle,
     required String cover,
     required String updateTime,
+    this.tagsJson = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : storageKey = Value(storageKey),
        comicId = Value(comicId),
@@ -2427,6 +2511,7 @@ class LocalFavoriteComicsCompanion extends UpdateCompanion<LocalFavoriteComic> {
     Expression<String>? subTitle,
     Expression<String>? cover,
     Expression<String>? updateTime,
+    Expression<String>? tagsJson,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -2437,6 +2522,7 @@ class LocalFavoriteComicsCompanion extends UpdateCompanion<LocalFavoriteComic> {
       if (subTitle != null) 'sub_title': subTitle,
       if (cover != null) 'cover': cover,
       if (updateTime != null) 'update_time': updateTime,
+      if (tagsJson != null) 'tags_json': tagsJson,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2449,6 +2535,7 @@ class LocalFavoriteComicsCompanion extends UpdateCompanion<LocalFavoriteComic> {
     Value<String>? subTitle,
     Value<String>? cover,
     Value<String>? updateTime,
+    Value<String>? tagsJson,
     Value<int>? rowid,
   }) {
     return LocalFavoriteComicsCompanion(
@@ -2459,6 +2546,7 @@ class LocalFavoriteComicsCompanion extends UpdateCompanion<LocalFavoriteComic> {
       subTitle: subTitle ?? this.subTitle,
       cover: cover ?? this.cover,
       updateTime: updateTime ?? this.updateTime,
+      tagsJson: tagsJson ?? this.tagsJson,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2487,6 +2575,9 @@ class LocalFavoriteComicsCompanion extends UpdateCompanion<LocalFavoriteComic> {
     if (updateTime.present) {
       map['update_time'] = Variable<String>(updateTime.value);
     }
+    if (tagsJson.present) {
+      map['tags_json'] = Variable<String>(tagsJson.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2503,6 +2594,7 @@ class LocalFavoriteComicsCompanion extends UpdateCompanion<LocalFavoriteComic> {
           ..write('subTitle: $subTitle, ')
           ..write('cover: $cover, ')
           ..write('updateTime: $updateTime, ')
+          ..write('tagsJson: $tagsJson, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -4832,6 +4924,7 @@ typedef $$ReadHistoryEntriesTableCreateCompanionBuilder =
       required String title,
       required String cover,
       required String subTitle,
+      Value<String> tagsJson,
       required int timestampMs,
       Value<int> rowid,
     });
@@ -4843,6 +4936,7 @@ typedef $$ReadHistoryEntriesTableUpdateCompanionBuilder =
       Value<String> title,
       Value<String> cover,
       Value<String> subTitle,
+      Value<String> tagsJson,
       Value<int> timestampMs,
       Value<int> rowid,
     });
@@ -4883,6 +4977,11 @@ class $$ReadHistoryEntriesTableFilterComposer
 
   ColumnFilters<String> get subTitle => $composableBuilder(
     column: $table.subTitle,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get tagsJson => $composableBuilder(
+    column: $table.tagsJson,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4931,6 +5030,11 @@ class $$ReadHistoryEntriesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get tagsJson => $composableBuilder(
+    column: $table.tagsJson,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<int> get timestampMs => $composableBuilder(
     column: $table.timestampMs,
     builder: (column) => ColumnOrderings(column),
@@ -4965,6 +5069,9 @@ class $$ReadHistoryEntriesTableAnnotationComposer
 
   GeneratedColumn<String> get subTitle =>
       $composableBuilder(column: $table.subTitle, builder: (column) => column);
+
+  GeneratedColumn<String> get tagsJson =>
+      $composableBuilder(column: $table.tagsJson, builder: (column) => column);
 
   GeneratedColumn<int> get timestampMs => $composableBuilder(
     column: $table.timestampMs,
@@ -5018,6 +5125,7 @@ class $$ReadHistoryEntriesTableTableManager
                 Value<String> title = const Value.absent(),
                 Value<String> cover = const Value.absent(),
                 Value<String> subTitle = const Value.absent(),
+                Value<String> tagsJson = const Value.absent(),
                 Value<int> timestampMs = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ReadHistoryEntriesCompanion(
@@ -5027,6 +5135,7 @@ class $$ReadHistoryEntriesTableTableManager
                 title: title,
                 cover: cover,
                 subTitle: subTitle,
+                tagsJson: tagsJson,
                 timestampMs: timestampMs,
                 rowid: rowid,
               ),
@@ -5038,6 +5147,7 @@ class $$ReadHistoryEntriesTableTableManager
                 required String title,
                 required String cover,
                 required String subTitle,
+                Value<String> tagsJson = const Value.absent(),
                 required int timestampMs,
                 Value<int> rowid = const Value.absent(),
               }) => ReadHistoryEntriesCompanion.insert(
@@ -5047,6 +5157,7 @@ class $$ReadHistoryEntriesTableTableManager
                 title: title,
                 cover: cover,
                 subTitle: subTitle,
+                tagsJson: tagsJson,
                 timestampMs: timestampMs,
                 rowid: rowid,
               ),
@@ -6077,6 +6188,7 @@ typedef $$LocalFavoriteComicsTableCreateCompanionBuilder =
       required String subTitle,
       required String cover,
       required String updateTime,
+      Value<String> tagsJson,
       Value<int> rowid,
     });
 typedef $$LocalFavoriteComicsTableUpdateCompanionBuilder =
@@ -6088,6 +6200,7 @@ typedef $$LocalFavoriteComicsTableUpdateCompanionBuilder =
       Value<String> subTitle,
       Value<String> cover,
       Value<String> updateTime,
+      Value<String> tagsJson,
       Value<int> rowid,
     });
 
@@ -6132,6 +6245,11 @@ class $$LocalFavoriteComicsTableFilterComposer
 
   ColumnFilters<String> get updateTime => $composableBuilder(
     column: $table.updateTime,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get tagsJson => $composableBuilder(
+    column: $table.tagsJson,
     builder: (column) => ColumnFilters(column),
   );
 }
@@ -6179,6 +6297,11 @@ class $$LocalFavoriteComicsTableOrderingComposer
     column: $table.updateTime,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get tagsJson => $composableBuilder(
+    column: $table.tagsJson,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$LocalFavoriteComicsTableAnnotationComposer
@@ -6214,6 +6337,9 @@ class $$LocalFavoriteComicsTableAnnotationComposer
     column: $table.updateTime,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get tagsJson =>
+      $composableBuilder(column: $table.tagsJson, builder: (column) => column);
 }
 
 class $$LocalFavoriteComicsTableTableManager
@@ -6266,6 +6392,7 @@ class $$LocalFavoriteComicsTableTableManager
                 Value<String> subTitle = const Value.absent(),
                 Value<String> cover = const Value.absent(),
                 Value<String> updateTime = const Value.absent(),
+                Value<String> tagsJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LocalFavoriteComicsCompanion(
                 storageKey: storageKey,
@@ -6275,6 +6402,7 @@ class $$LocalFavoriteComicsTableTableManager
                 subTitle: subTitle,
                 cover: cover,
                 updateTime: updateTime,
+                tagsJson: tagsJson,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -6286,6 +6414,7 @@ class $$LocalFavoriteComicsTableTableManager
                 required String subTitle,
                 required String cover,
                 required String updateTime,
+                Value<String> tagsJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => LocalFavoriteComicsCompanion.insert(
                 storageKey: storageKey,
@@ -6295,6 +6424,7 @@ class $$LocalFavoriteComicsTableTableManager
                 subTitle: subTitle,
                 cover: cover,
                 updateTime: updateTime,
+                tagsJson: tagsJson,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

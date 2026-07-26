@@ -25,6 +25,7 @@ class FavoritePage extends StatefulWidget {
   const FavoritePage({
     super.key,
     required this.sourceService,
+    this.readerService,
     required this.localFavoritesRepository,
     required this.localFavoritesPreferences,
     required this.imageGateway,
@@ -36,6 +37,7 @@ class FavoritePage extends StatefulWidget {
   });
 
   final SourceFavoriteGateway sourceService;
+  final SourceReaderGateway? readerService;
   final LocalFavoritesRepository localFavoritesRepository;
   final LocalFavoritesPreferencesStore localFavoritesPreferences;
   final SourceImageGateway imageGateway;
@@ -70,6 +72,7 @@ class FavoritePageState extends State<FavoritePage>
     super.initState();
     _controller = FavoritePageController(
       sourceService: widget.sourceService,
+      readerService: widget.readerService,
       localFavoritesRepository: widget.localFavoritesRepository,
       localFavoritesPreferences: widget.localFavoritesPreferences,
     );

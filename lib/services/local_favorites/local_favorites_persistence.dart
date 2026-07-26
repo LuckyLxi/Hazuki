@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:drift/drift.dart';
 
 import '../../models/source_scoped_comic_id.dart';
@@ -79,6 +81,7 @@ class DriftLocalFavoritesPersistence implements LocalFavoritesPersistence {
               subTitle: comic.subTitle,
               cover: comic.cover,
               updateTime: comic.updateTime,
+              tags: _tagsFromJson(comic.tagsJson),
               folderSavedAtMs:
                   folderSavedAtByComic[comic.storageKey] ?? <String, int>{},
             ),
@@ -122,6 +125,7 @@ class DriftLocalFavoritesPersistence implements LocalFavoritesPersistence {
             subTitle: entry.subTitle,
             cover: entry.cover,
             updateTime: entry.updateTime,
+            tagsJson: Value(jsonEncode(entry.tags)),
           ),
         );
         for (final saved in entry.folderSavedAtMs.entries) {
@@ -349,5 +353,19 @@ class DriftLocalFavoritesPersistence implements LocalFavoritesPersistence {
     await (_database.delete(
       _database.localFavoriteComicFolderTombstones,
     )..where((row) => row.deletedAtMs.isSmallerThanValue(cutoff))).go();
+  }
+}
+
+List<String> _tagsFromJson(String raw) {
+  try {
+    final value = jsonDecode(raw);
+    if (value is! List) return const [];
+    return value
+        .map((tag) => tag.toString().trim())
+        .where((tag) => tag.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+  } catch (_) {
+    return const [];
   }
 }

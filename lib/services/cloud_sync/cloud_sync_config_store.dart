@@ -26,8 +26,6 @@ class CloudSyncConfigStore {
   static const searchHistoryFileName = 'search_history.jsonl';
   static const manifestFileName = 'manifest.json';
   static const syncLockFileName = '.sync_lock';
-  static const sourceDirName = 'source';
-  static const sourceFileName = 'jm.js';
 
   static const localFavoriteFoldersKey = 'local_favorite_folders_v1';
   static const localFavoriteEntriesKey = 'local_favorite_entries_v1';

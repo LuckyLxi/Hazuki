@@ -38,6 +38,7 @@ class ExploreComic {
     required this.subTitle,
     required this.cover,
     this.sourceKey = '',
+    this.tags = const [],
   });
 
   final String id;
@@ -45,6 +46,16 @@ class ExploreComic {
   final String subTitle;
   final String cover;
   final String sourceKey;
+  final List<String> tags;
+
+  ExploreComic copyWith({List<String>? tags}) => ExploreComic(
+    id: id,
+    title: title,
+    subTitle: subTitle,
+    cover: cover,
+    sourceKey: sourceKey,
+    tags: tags ?? this.tags,
+  );
 
   SourceScopedComicId get scopedId =>
       SourceScopedComicId(sourceKey: sourceKey, comicId: id);

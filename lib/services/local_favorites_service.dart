@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../models/hazuki_models.dart';
+import '../shared/picacg_comic_tags.dart';
 import 'local_favorites/local_favorites_contracts.dart';
 import 'local_favorites/local_favorites_migration.dart';
 import 'local_favorites/local_favorites_models.dart';
@@ -341,6 +342,7 @@ class LocalFavoritesService extends ChangeNotifier
                 subTitle: details.subTitle.trim(),
                 cover: details.cover.trim(),
                 updateTime: details.updateTime.trim(),
+                tags: _picacgTags(details),
                 folderSavedAtMs: <String, int>{},
               );
         record
@@ -348,6 +350,7 @@ class LocalFavoritesService extends ChangeNotifier
           ..subTitle = details.subTitle.trim()
           ..cover = details.cover.trim()
           ..updateTime = details.updateTime.trim()
+          ..tags = _picacgTags(details)
           ..folderSavedAtMs.putIfAbsent(normalizedFolderId, () => savedAtMs);
         if (existingIndex < 0) snapshot.entries.add(record);
       } else if (existingIndex >= 0) {
@@ -378,6 +381,9 @@ class LocalFavoritesService extends ChangeNotifier
     });
   }
 
+  List<String> _picacgTags(ComicDetailsData details) =>
+      picacgComicDetailTags(details);
+
   @override
   Future<bool> isComicFavorited(String comicId, {String sourceKey = ''}) async {
     final normalizedComicId = comicId.trim();
@@ -389,6 +395,34 @@ class LocalFavoritesService extends ChangeNotifier
       sourceKey: sourceKey.trim(),
     );
     return entry != null && entry.folderIds.isNotEmpty;
+  }
+
+  @override
+  Future<void> updateComicTags({
+    required String comicId,
+    required String sourceKey,
+    required List<String> tags,
+  }) {
+    final normalizedComicId = comicId.trim();
+    final normalizedSourceKey = sourceKey.trim();
+    if (normalizedComicId.isEmpty || tags.isEmpty) {
+      return Future<void>.value();
+    }
+    return _serialized(() async {
+      await _ensureMigrated();
+      final snapshot = await _persistence.load();
+      final entry = snapshot.findEntry(
+        normalizedComicId,
+        sourceKey: normalizedSourceKey,
+      );
+      if (entry == null || entry.tags.isNotEmpty) {
+        return;
+      }
+      entry.tags = List<String>.from(tags);
+      await _persistence.replace(snapshot);
+      // Metadata backfill is reflected by the caller's in-memory list. Do not
+      // notify here: a page-wide reload can race with folder selection.
+    });
   }
 
   bool _sourceMatches(String storedSourceKey, String requestedSourceKey) {

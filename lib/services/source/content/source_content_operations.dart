@@ -3,6 +3,7 @@ import 'dart:convert';
 import '../../../models/hazuki_models.dart';
 import '../category/source_category_capability.dart';
 import '../comic/comic_details_capability.dart';
+import '../common/source_json_coerce.dart';
 import '../explore_capability.dart';
 import '../models/source_identity.dart';
 import '../runtime/source_runtime_host.dart';
@@ -193,6 +194,7 @@ class SourceContentOperationService implements SourceContentOperations {
           subTitle: (map['subTitle'] ?? map['subtitle'] ?? '').toString(),
           cover: map['cover']?.toString() ?? '',
           sourceKey: sourceKey,
+          tags: jsAsStringList(map['tags']),
         );
       })
       .toList(growable: false);
