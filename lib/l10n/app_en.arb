@@ -23,7 +23,7 @@
   "displayThemeTitle": "Theme",
   "displayThemeLight": "Light",
   "displayThemeDark": "Dark",
-  "displayThemeSystem": "Follow system",
+  "displayThemeSystem": "System",
   "displayPresetMintGreen": "Mint Green",
   "displayPresetSeaSaltBlue": "Sea Salt Blue",
   "displayPresetTwilightPurple": "Twilight Purple",
@@ -250,6 +250,7 @@
   "commonDeselectAll": "Clear all",
   "commonLoading": "Loading...",
   "commonRetry": "Retry",
+  "comicDetailRecoveryTimedOut": "Recovering the comic source is taking longer than expected. Please retry.",
   "searchTitle": "Search",
   "searchHint": "Search comics",
   "searchSettingsTitle": "Search settings",
@@ -1394,7 +1395,7 @@
   "sourceRuntimeLoadingTitle": "Loading comic source",
   "sourceRuntimeLoadingMessage": "The comic source is getting ready. Please wait a moment.",
   "sourceRuntimeRetryingTitle": "Retrying comic source",
-  "sourceRuntimeRetryingMessage": "Hazuki is retrying the comic source setup. This usually only takes a moment.",
+  "sourceRuntimeRetryingMessage": "Retrying comic source setup, please wait a moment.",
   "sourceRuntimeFailedTitle": "Comic source unavailable",
   "sourceRuntimeWaitingForRestartTitle": "Source update ready",
   "sourceRuntimeWaitingForRestartMessage": "The comic source files have changed. Restart the app to fully apply the new source.",
@@ -1407,6 +1408,6 @@
   "sourceRuntimeErrorMetadataIncomplete": "The comic source loaded, but the required source metadata is incomplete.",
   "sourceRuntimeErrorModuleLoad": "The comic source initialization could not finish because one of its modules did not load correctly.",
   "sourceRuntimeErrorTimeout": "The comic source took too long to respond. Please try again.",
-  "sourceRuntimeErrorInitialization": "Hazuki could not finish initializing the comic source.",
+  "sourceRuntimeErrorInitialization": "Failed to initialize manga source",
   "sourceRuntimeErrorGeneric": "The comic source is currently unavailable. Please try again."
 }

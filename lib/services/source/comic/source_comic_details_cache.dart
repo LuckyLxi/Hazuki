@@ -1,6 +1,27 @@
 import '../../../models/hazuki_models.dart';
 import '../runtime/source_runtime_host.dart';
 
+/// Tracks the newest request for each comic so an older response cannot
+/// replace data obtained by a forced refresh.
+class SourceComicDetailsRequestTracker {
+  final Map<String, Object> _activeRequests = {};
+
+  Object begin(String scopedComicKey) {
+    final token = Object();
+    _activeRequests[scopedComicKey] = token;
+    return token;
+  }
+
+  bool isCurrent(String scopedComicKey, Object token) =>
+      identical(_activeRequests[scopedComicKey], token);
+
+  void complete(String scopedComicKey, Object token) {
+    if (isCurrent(scopedComicKey, token)) {
+      _activeRequests.remove(scopedComicKey);
+    }
+  }
+}
+
 /// Owns source-scoped in-memory comic detail cache access.
 class SourceComicDetailsCache {
   SourceComicDetailsCache({required SourceRuntimeHost runtimeHost})

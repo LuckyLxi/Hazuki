@@ -111,6 +111,7 @@ abstract interface class SourceComicDetailGateway {
   Future<ComicDetailsData> loadComicDetails(
     String comicId, {
     String sourceKey = '',
+    bool forceRefresh = false,
   });
   Future<List<CategoryTagGroup>> loadCategoryTagGroups({
     bool forceRefresh = false,

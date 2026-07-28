@@ -14,6 +14,7 @@ abstract interface class SourceContentOperations {
   Future<ComicDetailsData> loadComicDetails(
     String comicId, {
     String sourceKey = '',
+    bool forceRefresh = false,
   });
   Future<List<String>> loadChapterImages({
     required String comicId,
@@ -79,7 +80,12 @@ class SourceContentOperationService implements SourceContentOperations {
   Future<ComicDetailsData> loadComicDetails(
     String comicId, {
     String sourceKey = '',
-  }) => _comicDetails.loadComicDetails(comicId, sourceKey: sourceKey);
+    bool forceRefresh = false,
+  }) => _comicDetails.loadComicDetails(
+    comicId,
+    sourceKey: sourceKey,
+    forceRefresh: forceRefresh,
+  );
   @override
   Future<List<String>> loadChapterImages({
     required String comicId,

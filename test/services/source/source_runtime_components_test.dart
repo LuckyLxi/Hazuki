@@ -2,9 +2,12 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hazuki/services/source/debug/source_debug_log_store.dart';
 import 'package:hazuki/services/source/models/source_contract_models.dart';
 import 'package:hazuki/services/source/runtime/source_cookie_store.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_coordinator.dart';
+import 'package:hazuki/services/source/runtime/source_runtime_facade.dart';
+import 'package:hazuki/services/source/runtime/source_runtime_kernel.dart';
 import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
 import 'package:hazuki/services/source/runtime/source_session_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -74,6 +77,25 @@ void main() {
 
       expect(coordinator.activeSourceKey, 'jm');
       expect(persisted, 'jm');
+    });
+
+    test('recreates a runtime once for concurrent recovery requests', () {
+      final created = <String, _FakeRuntimeResource>{};
+      final coordinator = _createCoordinator(created: created);
+      final original = coordinator.handleFor('copy_manga');
+
+      final replacement = coordinator.recreate(
+        'copy_manga',
+        expectedHandle: original,
+      );
+      final concurrentReplacement = coordinator.recreate(
+        'copy_manga',
+        expectedHandle: original,
+      );
+
+      expect(original.disposeCount, 1);
+      expect(replacement, isNot(same(original)));
+      expect(concurrentReplacement, same(replacement));
     });
   });
 
@@ -145,6 +167,39 @@ void main() {
     });
   });
 
+  test('retains captured logs when a runtime is recreated', () {
+    final previous = SourceDebugLogStore()
+      ..softwareLogCaptureEnabled = true
+      ..recentNetworkLogs.add({'statusCode': 210})
+      ..networkLogDedupedCount = 2;
+    final replacement = SourceDebugLogStore();
+
+    replacement.copyCapturedLogsFrom(previous);
+    previous.recentNetworkLogs.single['statusCode'] = 500;
+
+    expect(replacement.softwareLogCaptureEnabled, isTrue);
+    expect(replacement.recentNetworkLogs, [
+      <String, dynamic>{'statusCode': 210},
+    ]);
+    expect(replacement.networkLogDedupedCount, 2);
+  });
+
+  test(
+    'keeps a runtime retained while resolving a JavaScript future',
+    () async {
+      final handle = _FakeRuntimeHandle();
+      final bridge = SourceJsBridge(SourceRuntimeKernel(), handle);
+      final result = Completer<String>();
+
+      final resolving = bridge.resolve(result.future);
+      expect(handle.activeOperationCount, 1);
+
+      result.complete('details');
+      expect(await resolving, 'details');
+      expect(handle.activeOperationCount, 0);
+    },
+  );
+
   test(
     'SourceCookieStore parses, persists, and selects scoped cookies',
     () async {
@@ -194,8 +249,11 @@ SourceRuntimeCoordinator<_FakeRuntimeResource> _createCoordinator({
       SourceCatalogEntry(key: 'picacg', name: 'Picacg', fileName: 'picacg.js'),
     ],
     defaultSourceKey: 'jm',
-    createHandle: (sourceKey) =>
-        created.putIfAbsent(sourceKey, () => _FakeRuntimeResource(sourceKey)),
+    createHandle: (sourceKey) {
+      final resource = _FakeRuntimeResource(sourceKey);
+      created[sourceKey] = resource;
+      return resource;
+    },
     onActiveSourceChanged: onActiveSourceChanged ?? () {},
   );
 }
@@ -209,6 +267,32 @@ class _FakeRuntimeResource implements SourceRuntimeResource {
 
   @override
   void requestDispose() => disposeCount++;
+}
+
+class _FakeRuntimeHandle implements SourceRuntimeHandleView {
+  var activeOperationCount = 0;
+
+  @override
+  final SourceCookieStore cookieStore = SourceCookieStore(
+    loadCookies: () => const [],
+    saveCookies: (_) async {},
+  );
+
+  @override
+  bool get isDisposed => false;
+
+  @override
+  String get sourceKey => 'copy_manga';
+
+  @override
+  Future<T> runOperation<T>(Future<T> Function() operation) async {
+    activeOperationCount++;
+    try {
+      return await operation();
+    } finally {
+      activeOperationCount--;
+    }
+  }
 }
 
 class _FailingSecureStorage implements SourceSecureSessionStorage {

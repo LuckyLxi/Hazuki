@@ -250,6 +250,7 @@
   "commonDeselectAll": "取消全选",
   "commonLoading": "加载中...",
   "commonRetry": "重试",
+  "comicDetailRecoveryTimedOut": "恢复漫画源耗时较长，请点击重试。",
   "searchTitle": "搜索",
   "searchHint": "搜索漫画",
   "searchSettingsTitle": "搜索设置",
@@ -1394,7 +1395,7 @@
   "sourceRuntimeLoadingTitle": "正在加载漫画源",
   "sourceRuntimeLoadingMessage": "漫画源正在准备中，请稍候。",
   "sourceRuntimeRetryingTitle": "正在重试漫画源",
-  "sourceRuntimeRetryingMessage": "Hazuki 正在重新尝试初始化漫画源，通常很快就会完成。",
+  "sourceRuntimeRetryingMessage": "正在重新尝试初始化漫画源，通常很快就会完成。",
   "sourceRuntimeFailedTitle": "漫画源暂时不可用",
   "sourceRuntimeWaitingForRestartTitle": "漫画源已更新",
   "sourceRuntimeWaitingForRestartMessage": "漫画源文件已经变更，重启软件后即可完整应用新版本。",
@@ -1407,6 +1408,6 @@
   "sourceRuntimeErrorMetadataIncomplete": "漫画源已加载，但缺少必要的元数据。",
   "sourceRuntimeErrorModuleLoad": "漫画源初始化没有完成，其中一个模块加载失败了。",
   "sourceRuntimeErrorTimeout": "漫画源响应超时，请稍后重试。",
-  "sourceRuntimeErrorInitialization": "Hazuki 暂时无法完成漫画源初始化。",
+  "sourceRuntimeErrorInitialization": "暂时无法完成漫画源初始化。",
   "sourceRuntimeErrorGeneric": "漫画源当前不可用，请稍后重试。"
 }

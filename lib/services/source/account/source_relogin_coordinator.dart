@@ -1,7 +1,9 @@
 import '../runtime/source_cookie_store.dart';
 import '../runtime/source_runtime_facade.dart';
+import '../models/source_identity.dart';
 
 abstract interface class SourceReloginContext {
+  String get sourceKey;
   Future<void> ensureInitialized();
   bool get isLogged;
   bool shouldSkipRelogin(Duration duration);
@@ -16,6 +18,9 @@ class SourceFacadeReloginContext implements SourceReloginContext {
   SourceFacadeReloginContext(this.facade);
 
   final HazukiSourceFacade facade;
+
+  @override
+  String get sourceKey => facade.sourceKey;
 
   @override
   Future<void> ensureInitialized() => facade.ensureInitialized();
@@ -77,6 +82,9 @@ class SourceReloginCoordinator {
 
   Future<bool> ensureFavoriteSessionReady(SourceReloginContext context) async {
     await context.ensureInitialized();
+    if (isHazukiCopyMangaSourceKey(context.sourceKey)) {
+      return true;
+    }
     if (!context.isLogged || context.shouldSkipRelogin(_reloginInterval)) {
       return true;
     }

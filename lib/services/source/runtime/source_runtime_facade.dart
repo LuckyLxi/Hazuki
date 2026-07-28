@@ -31,9 +31,10 @@ typedef SourceApplicationLogAppender =
     });
 
 class SourceJsBridge {
-  SourceJsBridge(this._runtime);
+  SourceJsBridge(this._runtime, this._handle);
 
   final SourceRuntimeKernel _runtime;
+  final SourceRuntimeHandleView _handle;
 
   FlutterQjs? get engine => _runtime.engine;
 
@@ -41,9 +42,8 @@ class SourceJsBridge {
     return engine?.evaluate(code, name: name);
   }
 
-  Future<dynamic> resolve(dynamic value) {
-    return awaitJsResult(value);
-  }
+  Future<dynamic> resolve(dynamic value) =>
+      _handle.runOperation(() => awaitJsResult(value));
 
   bool asBool(dynamic value) => jsAsBool(value);
 

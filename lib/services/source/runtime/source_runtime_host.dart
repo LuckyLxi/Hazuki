@@ -102,6 +102,25 @@ class SourceRuntimeHost extends ChangeNotifier {
   SourceRuntimeHandle? remove(String sourceKey) =>
       _coordinator.remove(sourceKey);
 
+  /// Rebuilds the source's network client and JavaScript runtime.
+  SourceRuntimeHandle recreateSourceRuntime(
+    String sourceKey, {
+    SourceRuntimeHandle? expectedHandle,
+  }) {
+    final current = _coordinator.handleFor(sourceKey);
+    final previous = expectedHandle ?? current;
+    final shouldCopyLogs =
+        expectedHandle == null || identical(current, expectedHandle);
+    final replacement = _coordinator.recreate(
+      sourceKey,
+      expectedHandle: expectedHandle,
+    );
+    if (shouldCopyLogs && !identical(previous, replacement)) {
+      replacement.debug.copyCapturedLogsFrom(previous.debug);
+    }
+    return replacement;
+  }
+
   /// Publishes changes initiated by an active runtime handle.
   void notifyActiveRuntimeChanged(String sourceKey) {
     if (activeSourceKey == sourceKey) {

@@ -41,4 +41,32 @@ class SourceDebugLogStore {
     lastLoginDebugInfoStorage = null;
     lastSourceVersionDebugInfoStorage = null;
   }
+
+  /// Retains captured diagnostics when a source runtime is recreated.
+  void copyCapturedLogsFrom(SourceDebugLogStore previous) {
+    favoritesDebugCache = previous.favoritesDebugCache;
+    isWarmingUpFavoritesDebug = previous.isWarmingUpFavoritesDebug;
+    softwareLogCaptureEnabled = previous.softwareLogCaptureEnabled;
+    _copyEntries(recentNetworkLogs, previous.recentNetworkLogs);
+    _copyEntries(recentApplicationLogs, previous.recentApplicationLogs);
+    _copyEntries(recentReaderLogs, previous.recentReaderLogs);
+    _copyEntries(recentErrorLogs, previous.recentErrorLogs);
+    _copyEntries(recentActionLogs, previous.recentActionLogs);
+    _copyEntries(recentSystemLogs, previous.recentSystemLogs);
+    _copyEntries(recentPerformanceLogs, previous.recentPerformanceLogs);
+    networkLogDedupedCount = previous.networkLogDedupedCount;
+    lastAgeCleanupAt = previous.lastAgeCleanupAt;
+    lastLoginDebugInfoStorage = previous.lastLoginDebugInfoStorage;
+    lastSourceVersionDebugInfoStorage =
+        previous.lastSourceVersionDebugInfoStorage;
+  }
+
+  void _copyEntries(
+    List<Map<String, dynamic>> target,
+    List<Map<String, dynamic>> source,
+  ) {
+    target
+      ..clear()
+      ..addAll(source.map(Map<String, dynamic>.from));
+  }
 }

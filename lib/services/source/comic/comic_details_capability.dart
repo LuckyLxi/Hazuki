@@ -6,6 +6,7 @@ import '../account/source_relogin_coordinator.dart';
 import '../common/source_json_coerce.dart';
 import '../explore_capability.dart';
 import '../runtime/source_runtime_facade.dart';
+import '../runtime/source_runtime_handle.dart';
 import '../runtime/source_runtime_host.dart';
 import 'source_comic_details_cache.dart';
 
@@ -24,6 +25,8 @@ class SourceComicDetailsCapability {
   final SourceComicDetailsCache _cache;
   final SourceReloginCoordinator _reloginCoordinator;
   final SourceTextTranslator _translateSourceText;
+  final SourceComicDetailsRequestTracker _requestTracker =
+      SourceComicDetailsRequestTracker();
 
   String _resolveActiveSourceKey(String sourceKey) => sourceKey.trim().isEmpty
       ? _runtimeHost.activeSourceKey
@@ -33,6 +36,7 @@ class SourceComicDetailsCapability {
   Future<ComicDetailsData> loadComicDetails(
     String comicId, {
     String sourceKey = '',
+    bool forceRefresh = false,
   }) async {
     final normalizedComicId = comicId.trim();
     if (normalizedComicId.isEmpty) {
@@ -44,38 +48,100 @@ class SourceComicDetailsCapability {
       comicId: normalizedComicId,
     ).storageKey;
 
-    final memoryCached = _cache.get(
-      scopedComicKey,
-      sourceKey: resolvedSourceKey,
-    );
-    if (memoryCached != null) {
-      return memoryCached;
+    if (!forceRefresh) {
+      final memoryCached = _cache.get(
+        scopedComicKey,
+        sourceKey: resolvedSourceKey,
+      );
+      if (memoryCached != null) {
+        return memoryCached;
+      }
     }
 
-    final facade = _runtimeHost.handleFor(resolvedSourceKey).facade;
+    final handle = _runtimeHost.handleFor(resolvedSourceKey);
+    final facade = handle.facade;
 
     final inFlight = facade.cache.comicDetailsInFlight[scopedComicKey];
-    if (inFlight != null) {
+    if (!forceRefresh && inFlight != null) {
       return inFlight;
     }
 
-    final future = _loadComicDetailsFromSource(
+    final requestToken = _requestTracker.begin(scopedComicKey);
+    final future = _loadComicDetailsWithRuntimeRecovery(
       normalizedComicId,
-      facade,
+      handle,
       sourceKey: resolvedSourceKey,
+      shouldCacheResult: () =>
+          _requestTracker.isCurrent(scopedComicKey, requestToken),
     );
     facade.cache.comicDetailsInFlight[scopedComicKey] = future;
     try {
       return await future;
     } finally {
-      facade.cache.comicDetailsInFlight.remove(scopedComicKey);
+      if (identical(
+        facade.cache.comicDetailsInFlight[scopedComicKey],
+        future,
+      )) {
+        facade.cache.comicDetailsInFlight.remove(scopedComicKey);
+      }
+      _requestTracker.complete(scopedComicKey, requestToken);
     }
+  }
+
+  Future<ComicDetailsData> _loadComicDetailsWithRuntimeRecovery(
+    String normalizedComicId,
+    SourceRuntimeHandle initialHandle, {
+    required String sourceKey,
+    required bool Function() shouldCacheResult,
+  }) async {
+    var handle = initialHandle;
+    var recoveringFromHttp210 = false;
+    for (var attempt = 0; attempt < 2; attempt++) {
+      final facade = handle.facade;
+      try {
+        final details = await _loadComicDetailsFromSource(
+          normalizedComicId,
+          facade,
+          sourceKey: sourceKey,
+          shouldCacheResult: shouldCacheResult,
+        );
+        if (!handle.recreationRequested) {
+          return details;
+        }
+      } catch (error) {
+        if (!handle.recreationRequested || attempt == 1) {
+          if (attempt == 1 && recoveringFromHttp210) {
+            throw Exception(
+              'copy_manga_runtime_recovery_failed_after_http_210:$error',
+            );
+          }
+          rethrow;
+        }
+      }
+
+      if (attempt == 1) {
+        throw Exception('copy_manga_runtime_recovery_failed_after_http_210');
+      }
+      recoveringFromHttp210 = true;
+      facade.addApplicationLog(
+        title: 'Recreating source runtime after HTTP 210',
+        level: 'warning',
+        source: 'source_runtime',
+        content: {'sourceKey': sourceKey, 'comicId': normalizedComicId},
+      );
+      handle = _runtimeHost.recreateSourceRuntime(
+        sourceKey,
+        expectedHandle: handle,
+      );
+    }
+    throw StateError('unreachable');
   }
 
   Future<ComicDetailsData> _loadComicDetailsFromSource(
     String normalizedComicId,
     HazukiSourceFacade facade, {
     required String sourceKey,
+    required bool Function() shouldCacheResult,
   }) async {
     await facade.ensureInitialized();
 
@@ -126,16 +192,18 @@ class SourceComicDetailsCapability {
       sourceKey: sourceKey,
     );
 
-    _cache.put(
-      SourceScopedComicId(
-        sourceKey: details.sourceKey,
-        comicId: normalizedComicId,
-      ).storageKey,
-      details,
-      sourceKey: sourceKey,
-    );
-    if (details.id != normalizedComicId) {
-      _cache.put(details.scopedId.storageKey, details, sourceKey: sourceKey);
+    if (shouldCacheResult()) {
+      _cache.put(
+        SourceScopedComicId(
+          sourceKey: details.sourceKey,
+          comicId: normalizedComicId,
+        ).storageKey,
+        details,
+        sourceKey: sourceKey,
+      );
+      if (details.id != normalizedComicId) {
+        _cache.put(details.scopedId.storageKey, details, sourceKey: sourceKey);
+      }
     }
     return details;
   }

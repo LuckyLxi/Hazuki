@@ -33,11 +33,17 @@ class ComicDetailSessionController extends ChangeNotifier {
 
   bool _disposed = false;
 
-  late final Future<ComicDetailsData> _future;
+  late Future<ComicDetailsData> _future;
   Timer? _detailsTimeoutTimer;
+  bool _hasDetailsTimedOut = false;
+  bool _isRetryingDetails = false;
+  bool _hasAutomaticallyRetriedDetails = false;
+  int _detailsRequestId = 0;
   Map<String, dynamic>? _lastReadProgress;
 
   Future<ComicDetailsData> get future => _future;
+  bool get hasDetailsTimedOut => _hasDetailsTimedOut;
+  bool get isRetryingDetails => _isRetryingDetails;
   Map<String, dynamic>? get lastReadProgress => _lastReadProgress;
 
   void initialize() {
@@ -46,6 +52,20 @@ class ComicDetailSessionController extends ChangeNotifier {
     unawaited(loadReadingProgress());
     unawaited(_loadFavoriteOverrideState());
     unawaited(_recordHistory());
+  }
+
+  void retry() {
+    if (_disposed) return;
+    _startDetailRetry();
+  }
+
+  void _startDetailRetry() {
+    _detailsTimeoutTimer?.cancel();
+    _detailsTimeoutTimer = null;
+    _hasDetailsTimedOut = false;
+    _isRetryingDetails = true;
+    _future = _createComicDetailsFuture(forceRefresh: true);
+    notifyListeners();
   }
 
   @override
@@ -111,40 +131,64 @@ class ComicDetailSessionController extends ChangeNotifier {
     } catch (_) {}
   }
 
-  Future<ComicDetailsData> _createComicDetailsFuture() {
-    final completer = Completer<ComicDetailsData>();
+  Future<ComicDetailsData> _createComicDetailsFuture({
+    bool forceRefresh = false,
+  }) {
+    final requestId = ++_detailsRequestId;
     final sourceFuture = _repository.loadComicDetails(
       _comic.id,
       sourceKey: _sourceKey,
+      forceRefresh: forceRefresh,
     );
 
-    _detailsTimeoutTimer = Timer(const Duration(seconds: 30), () {
-      if (!completer.isCompleted) {
-        completer.completeError(
-          TimeoutException(
-            'Timed out loading comic details for ${_comic.id}',
-            const Duration(seconds: 30),
-          ),
-        );
+    late final Timer timeoutTimer;
+    timeoutTimer = Timer(const Duration(seconds: 30), () {
+      if (_disposed || requestId != _detailsRequestId) return;
+      if (!_hasAutomaticallyRetriedDetails) {
+        _hasAutomaticallyRetriedDetails = true;
+        _startDetailRetry();
+        return;
       }
+      _hasDetailsTimedOut = true;
+      notifyListeners();
     });
+    _detailsTimeoutTimer = timeoutTimer;
 
-    sourceFuture
-        .then(
-          (details) {
-            if (!completer.isCompleted) completer.complete(details);
-          },
-          onError: (Object error, StackTrace stackTrace) {
-            if (!completer.isCompleted) {
-              completer.completeError(error, stackTrace);
-            }
-          },
-        )
-        .whenComplete(() {
-          _detailsTimeoutTimer?.cancel();
-          _detailsTimeoutTimer = null;
-        });
+    sourceFuture.then(
+      (_) => _onDetailsFutureFinished(requestId, timeoutTimer),
+      onError: (Object error, StackTrace _) {
+        if (_shouldAutomaticallyRetryAfterHttp210(error)) {
+          _hasAutomaticallyRetriedDetails = true;
+          _startDetailRetry();
+          return;
+        }
+        _onDetailsFutureFinished(requestId, timeoutTimer);
+      },
+    );
 
-    return completer.future;
+    return sourceFuture;
+  }
+
+  void _onDetailsFutureFinished(int requestId, Timer timeoutTimer) {
+    timeoutTimer.cancel();
+    if (identical(_detailsTimeoutTimer, timeoutTimer)) {
+      _detailsTimeoutTimer = null;
+    }
+    if (_disposed || requestId != _detailsRequestId) return;
+    final shouldNotify = _hasDetailsTimedOut || _isRetryingDetails;
+    _hasDetailsTimedOut = false;
+    _isRetryingDetails = false;
+    if (shouldNotify) notifyListeners();
+  }
+
+  bool _shouldAutomaticallyRetryAfterHttp210(Object error) {
+    if (_disposed ||
+        _hasAutomaticallyRetriedDetails ||
+        _sourceKey.trim() != 'copy_manga') {
+      return false;
+    }
+    return error.toString().contains(
+      'copy_manga_runtime_recovery_failed_after_http_210',
+    );
   }
 }
