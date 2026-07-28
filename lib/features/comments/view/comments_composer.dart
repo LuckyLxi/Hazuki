@@ -1,5 +1,59 @@
 part of 'comments_page.dart';
 
+class _KeyboardAwareCommentsBody extends StatelessWidget {
+  const _KeyboardAwareCommentsBody({
+    required this.useKeyboardInset,
+    required this.child,
+  });
+
+  final bool useKeyboardInset;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    // Keep the list above the IME when its parent does not resize itself.
+    // This layout-only update preserves the expensive list child's element.
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom:
+            MediaQuery.viewPaddingOf(context).bottom +
+            (useKeyboardInset ? MediaQuery.viewInsetsOf(context).bottom : 0),
+      ),
+      child: child,
+    );
+  }
+}
+
+class _KeyboardAwareCommentsComposer extends StatelessWidget {
+  const _KeyboardAwareCommentsComposer({
+    required this.isFocused,
+    required this.useKeyboardInset,
+    required this.bottomMargin,
+    required this.child,
+  });
+
+  final bool isFocused;
+  final bool useKeyboardInset;
+  final double bottomMargin;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+    final keyboardInset = useKeyboardInset ? mediaQuery.viewInsets.bottom : 0.0;
+
+    // Keep the keyboard's per-frame inset updates inside the composer subtree.
+    // Rebuilding the comments list for every IME animation frame is expensive,
+    // especially when comments include images or expanded replies.
+    return Positioned(
+      left: isFocused && useKeyboardInset ? 10.0 : 16.0,
+      right: isFocused && useKeyboardInset ? 10.0 : 16.0,
+      bottom: mediaQuery.padding.bottom + bottomMargin + keyboardInset,
+      child: child,
+    );
+  }
+}
+
 class _CommentsBottomComposer extends StatelessWidget {
   const _CommentsBottomComposer({
     required this.replyToComment,
