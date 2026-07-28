@@ -23,12 +23,20 @@ class _CommentsBottomComposer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final replyAttribution = replyToComment == null
+        ? null
+        : parseCommentUserAttribution(replyToComment!.userName);
     final hint = replyToComment == null
         ? l10n(context).commentsComposerHint
         : l10n(context).commentsReplyComposerHint(
             replyToComment!.userName.isEmpty
                 ? l10n(context).commentsAnonymousUser
-                : replyToComment!.userName,
+                : replyAttribution!.replyTo == null
+                ? replyAttribution.author
+                : l10n(context).commentsReplyAttribution(
+                    replyAttribution.author,
+                    replyAttribution.replyTo!,
+                  ),
           );
     final isFocused = commentFocusNode.hasFocus;
 
@@ -274,9 +282,14 @@ class _CommentsReplyBanner extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
+    final attribution = parseCommentUserAttribution(replyTo.userName);
     final name = replyTo.userName.isEmpty
         ? l10n(context).commentsAnonymousUser
-        : replyTo.userName;
+        : attribution.replyTo == null
+        ? attribution.author
+        : l10n(
+            context,
+          ).commentsReplyAttribution(attribution.author, attribution.replyTo!);
     final preview = commentPreviewText(replyTo.content);
 
     return Container(

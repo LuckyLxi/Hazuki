@@ -785,7 +785,7 @@ class _CommentsPageState extends State<CommentsPage>
             ? const <ComicCommentData>[]
             : (_replyComments[commentId] ?? const <ComicCommentData>[]);
         final merged = _mergeComments(existing, pageResult.comments);
-        _replyComments[commentId] = merged;
+        _replyComments[commentId] = sortRepliesChronologically(merged);
         _replyPages[commentId] = page;
         _replyMaxPages[commentId] = pageResult.maxPage;
         _replyHasMore[commentId] = _computeHasMore(

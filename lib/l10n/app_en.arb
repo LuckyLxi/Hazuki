@@ -1074,6 +1074,13 @@
       "name": {}
     }
   },
+  "commentsReplyAttribution": "{author} replied to {replyTo}",
+  "@commentsReplyAttribution": {
+    "placeholders": {
+      "author": {},
+      "replyTo": {}
+    }
+  },
   "commentsCancelReplyTooltip": "Cancel reply",
   "commentsComposerHint": "Write your comment…",
   "commentsReplyComposerHint": "Reply to {name}…",

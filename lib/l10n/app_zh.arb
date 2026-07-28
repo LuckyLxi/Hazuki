@@ -1074,6 +1074,13 @@
       "name": {}
     }
   },
+  "commentsReplyAttribution": "{author} 回复 {replyTo}",
+  "@commentsReplyAttribution": {
+    "placeholders": {
+      "author": {},
+      "replyTo": {}
+    }
+  },
   "commentsCancelReplyTooltip": "取消回复",
   "commentsComposerHint": "写下你的评论…",
   "commentsReplyComposerHint": "回复 {name}…",
