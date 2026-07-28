@@ -214,7 +214,53 @@ class SourceComicDetailsCapability {
     String sourceKey = '',
   }) async {
     final resolvedSourceKey = _resolveActiveSourceKey(sourceKey);
-    final facade = _runtimeHost.handleFor(resolvedSourceKey).facade;
+    var handle = _runtimeHost.handleFor(resolvedSourceKey);
+    for (var attempt = 0; attempt < 2; attempt++) {
+      final facade = handle.facade;
+      try {
+        final images = await _loadChapterImagesFromSource(
+          comicId: comicId,
+          epId: epId,
+          facade: facade,
+        );
+        if (!handle.recreationRequested) {
+          return images;
+        }
+      } catch (_) {
+        if (!handle.recreationRequested || attempt == 1) {
+          rethrow;
+        }
+      }
+
+      if (attempt == 1) {
+        throw Exception(
+          'copy_manga_chapter_images_recovery_failed_after_http_210',
+        );
+      }
+      facade.addApplicationLog(
+        title: 'Recreating source runtime after HTTP 210',
+        level: 'warning',
+        source: 'source_runtime',
+        content: {
+          'sourceKey': resolvedSourceKey,
+          'comicId': comicId,
+          'epId': epId,
+          'operation': 'load_chapter_images',
+        },
+      );
+      handle = _runtimeHost.recreateSourceRuntime(
+        resolvedSourceKey,
+        expectedHandle: handle,
+      );
+    }
+    throw StateError('unreachable');
+  }
+
+  Future<List<String>> _loadChapterImagesFromSource({
+    required String comicId,
+    required String epId,
+    required HazukiSourceFacade facade,
+  }) async {
     await facade.ensureInitialized();
     final engine = facade.js.engine;
     if (engine == null) {
