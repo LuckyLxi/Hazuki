@@ -65,7 +65,7 @@ class SourceScriptStorage {
   Future<String?> readIfExists(String sourceKey) async {
     try {
       final file = await sourceFileFor(sourceKey);
-      return await file.exists() ? file.readAsString() : null;
+      return await file.exists() ? await file.readAsString() : null;
     } catch (_) {
       return null;
     }

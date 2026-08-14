@@ -183,7 +183,7 @@ class MangaDownloadRecoveryScanner {
             'metadataFile': metadataFile.path,
           },
         );
-        return _fallbackDownloadedComicFromDirectory(comicDir);
+        return await _fallbackDownloadedComicFromDirectory(comicDir);
       }
       final comic = DownloadedMangaComic.fromJson(
         Map<String, dynamic>.from(decoded),

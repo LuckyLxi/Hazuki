@@ -458,7 +458,7 @@ class FavoritePageController extends ChangeNotifier {
           return null;
         }
         _state.favoriteSortOrder = normalized;
-        return _reloadLocalComicsAfterSort();
+        return await _reloadLocalComicsAfterSort();
       } else {
         await _cloudFlow.setSortOrder(normalized);
       }
