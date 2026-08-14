@@ -27,6 +27,18 @@ Future<void> handleHomePopRequest({
   }
 }
 
+@visibleForTesting
+Offset resolveHomeNavigationDrawerOffset({
+  required Size viewportSize,
+  required double progress,
+}) {
+  final scale = 1 - 0.035 * progress;
+  return Offset(
+    18 * progress + (1 - scale) * viewportSize.width / 2,
+    -(1 - scale) * viewportSize.height / 2,
+  );
+}
+
 class HomeScaffoldShell extends StatefulWidget {
   const HomeScaffoldShell({
     super.key,
@@ -320,28 +332,61 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
                       drawerEnableOpenDragGesture: false,
                       drawer: null,
                       body: body,
-                      bottomNavigationBar: Platform.isWindows
-                          ? null
-                          : HomeBottomNavigation(
-                              currentIndex: currentIndex,
-                              onDestinationSelected: onDestinationSelected,
-                              discoverLabel: l10n(context).homeTabDiscover,
-                              favoriteLabel: l10n(context).homeTabFavorite,
-                            ),
+                      bottomNavigationBar: null,
                     );
                   },
                 );
               },
             ),
           ),
-          builder: (context, child) => Transform.translate(
-            offset: Offset(18 * _profileDrawerController.value, 0),
-            child: Transform.scale(
-              scale: 1 - 0.035 * _profileDrawerController.value,
-              alignment: Alignment.centerRight,
-              child: child,
-            ),
-          ),
+          builder: (context, child) {
+            final drawerProgress = _profileDrawerController.value;
+            final transformedContent = Transform.translate(
+              offset: Offset(18 * drawerProgress, 0),
+              child: Transform.scale(
+                scale: 1 - 0.035 * drawerProgress,
+                alignment: Alignment.centerRight,
+                child: child,
+              ),
+            );
+            if (Platform.isWindows) {
+              return transformedContent;
+            }
+            return LayoutBuilder(
+              builder: (context, constraints) {
+                final navigationScale = 1 - 0.035 * drawerProgress;
+                final navigationOffset = resolveHomeNavigationDrawerOffset(
+                  viewportSize: constraints.biggest,
+                  progress: drawerProgress,
+                );
+                return Stack(
+                  fit: StackFit.expand,
+                  clipBehavior: Clip.none,
+                  children: [
+                    transformedContent,
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: -navigationOffset.dy,
+                      child: Padding(
+                        // A left inset twice the desired center displacement
+                        // reproduces the right-anchored scale and translation
+                        // using layout coordinates, keeping shaders untransformed.
+                        padding: EdgeInsets.only(left: navigationOffset.dx * 2),
+                        child: HomeBottomNavigation(
+                          currentIndex: currentIndex,
+                          onDestinationSelected: onDestinationSelected,
+                          discoverLabel: l10n(context).homeTabDiscover,
+                          favoriteLabel: l10n(context).homeTabFavorite,
+                          layoutScale: navigationScale,
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
         ),
       ),
     );
