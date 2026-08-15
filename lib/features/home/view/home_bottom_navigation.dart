@@ -16,12 +16,13 @@ class HomeBottomNavigation extends StatefulWidget {
     this.layoutScale = 1,
   }) : assert(layoutScale > 0);
 
-  static const double floatingBarHeight = 64;
-  static const double fallbackBarHeight = 56;
+  static const double floatingBarHeight = 58;
+  static const double floatingVerticalPadding = 6;
+  static const double fallbackBarHeight = 48;
   static const double bottomSpacing = 10;
   static const double promptGap = 10;
   static const double promptBottomPadding =
-      floatingBarHeight + bottomSpacing + promptGap;
+      floatingBarHeight + floatingVerticalPadding * 2 + promptGap;
   static const double fallbackPromptBottomPadding =
       fallbackBarHeight + bottomSpacing + promptGap;
 
@@ -161,7 +162,8 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
               onTabSelected: widget.onDestinationSelected,
               quality: HazukiLiquidGlass.navigationQuality,
               horizontalPadding: 12 * scale,
-              verticalPadding: 10 * scale,
+              verticalPadding:
+                  HomeBottomNavigation.floatingVerticalPadding * scale,
               barHeight: HomeBottomNavigation.floatingBarHeight * scale,
               tabWidth: 108 * scale,
               barBorderRadius: 32 * scale,
@@ -218,7 +220,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
               colorScheme: colorScheme,
               isDark: isDark,
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTapDown: (details) {
@@ -374,7 +376,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
             ),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 14),
+            padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 14),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: labelOnRight

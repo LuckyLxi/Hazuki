@@ -81,6 +81,9 @@ dev_dependencies:
   flutter_lints: ^6.0.0
 
 dependency_overrides:
+  # Keep the selected indicator anchored to its press origin on initial drag.
+  liquid_glass_widgets:
+    path: third_party/pub_overrides/liquid_glass_widgets
   device_info_plus:
     path: third_party/pub_overrides/device_info_plus
   dynamic_color:
