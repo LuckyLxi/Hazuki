@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -90,43 +91,60 @@ Widget buildReaderSettingsDrawer({
     data: readerTheme,
     child: Builder(
       builder: (drawerContext) {
+        final colorScheme = Theme.of(drawerContext).colorScheme;
+        final isDark = Theme.of(drawerContext).brightness == Brightness.dark;
+
         return Drawer(
           width: drawerWidth,
-          child: ReaderSettingsDrawerContent(
-            readerMode: runtimeState.readerMode,
-            doublePageMode: runtimeState.doublePageMode,
-            tapToTurnPage: runtimeState.tapToTurnPage,
-            volumeButtonTurnPage: runtimeState.volumeButtonTurnPage,
-            pinchToZoom: runtimeState.pinchToZoom,
-            longPressToSave: runtimeState.longPressToSave,
-            immersiveMode: runtimeState.immersiveMode,
-            keepScreenOn: runtimeState.keepScreenOn,
-            pageIndicator: runtimeState.pageIndicator,
-            customBrightness: runtimeState.customBrightness,
-            brightnessValue: runtimeState.brightnessValue,
-            filterEnabled: runtimeState.filterEnabled,
-            filterColor: runtimeState.filterColor,
-            filterStrength: runtimeState.filterStrength,
-            onReaderModeChanged: onReaderModeChanged,
-            onDoublePageModeChanged: onDoublePageModeChanged,
-            onTapToTurnPageChanged: onTapToTurnPageChanged,
-            onVolumeButtonTurnPageChanged: onVolumeButtonTurnPageChanged,
-            onPinchToZoomChanged: onPinchToZoomChanged,
-            onLongPressToSaveChanged: onLongPressToSaveChanged,
-            onImmersiveModeChanged: onImmersiveModeChanged,
-            onKeepScreenOnChanged: onKeepScreenOnChanged,
-            onPageIndicatorChanged: onPageIndicatorChanged,
-            onCustomBrightnessChanged: onCustomBrightnessChanged,
-            onBrightnessChanged: onBrightnessChanged,
-            onBrightnessChangeEnd: onBrightnessChangeEnd,
-            onFilterEnabledChanged: onFilterEnabledChanged,
-            onFilterColorChanged: onFilterColorChanged,
-            onFilterStrengthChanged: onFilterStrengthChanged,
-            onFilterStrengthChangeEnd: onFilterStrengthChangeEnd,
-            sourceImageQuality: sourceImageQuality,
-            onCopyMangaImageQualityChanged: onCopyMangaImageQualityChanged,
-            onPicacgImageQualityChanged: onPicacgImageQualityChanged,
-            onClose: () => Navigator.of(drawerContext).pop(),
+          backgroundColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
+          elevation: 0,
+          child: ClipRect(
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+              child: ColoredBox(
+                color: colorScheme.surface.withValues(
+                  alpha: isDark ? 0.68 : 0.76,
+                ),
+                child: ReaderSettingsDrawerContent(
+                  readerMode: runtimeState.readerMode,
+                  doublePageMode: runtimeState.doublePageMode,
+                  tapToTurnPage: runtimeState.tapToTurnPage,
+                  volumeButtonTurnPage: runtimeState.volumeButtonTurnPage,
+                  pinchToZoom: runtimeState.pinchToZoom,
+                  longPressToSave: runtimeState.longPressToSave,
+                  immersiveMode: runtimeState.immersiveMode,
+                  keepScreenOn: runtimeState.keepScreenOn,
+                  pageIndicator: runtimeState.pageIndicator,
+                  customBrightness: runtimeState.customBrightness,
+                  brightnessValue: runtimeState.brightnessValue,
+                  filterEnabled: runtimeState.filterEnabled,
+                  filterColor: runtimeState.filterColor,
+                  filterStrength: runtimeState.filterStrength,
+                  onReaderModeChanged: onReaderModeChanged,
+                  onDoublePageModeChanged: onDoublePageModeChanged,
+                  onTapToTurnPageChanged: onTapToTurnPageChanged,
+                  onVolumeButtonTurnPageChanged: onVolumeButtonTurnPageChanged,
+                  onPinchToZoomChanged: onPinchToZoomChanged,
+                  onLongPressToSaveChanged: onLongPressToSaveChanged,
+                  onImmersiveModeChanged: onImmersiveModeChanged,
+                  onKeepScreenOnChanged: onKeepScreenOnChanged,
+                  onPageIndicatorChanged: onPageIndicatorChanged,
+                  onCustomBrightnessChanged: onCustomBrightnessChanged,
+                  onBrightnessChanged: onBrightnessChanged,
+                  onBrightnessChangeEnd: onBrightnessChangeEnd,
+                  onFilterEnabledChanged: onFilterEnabledChanged,
+                  onFilterColorChanged: onFilterColorChanged,
+                  onFilterStrengthChanged: onFilterStrengthChanged,
+                  onFilterStrengthChangeEnd: onFilterStrengthChangeEnd,
+                  sourceImageQuality: sourceImageQuality,
+                  onCopyMangaImageQualityChanged:
+                      onCopyMangaImageQualityChanged,
+                  onPicacgImageQualityChanged: onPicacgImageQualityChanged,
+                  onClose: () => Navigator.of(drawerContext).pop(),
+                ),
+              ),
+            ),
           ),
         );
       },
