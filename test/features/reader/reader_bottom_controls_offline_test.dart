@@ -154,14 +154,25 @@ void main() {
         .opacity;
     expect(floatingOpacity + targetOpacity, closeTo(1, 0.001));
 
-    final barAnimation = tester.widget<AnimatedPositioned>(
-      find.byType(AnimatedPositioned),
+    final barAnimation = tester.widget<TweenAnimationBuilder<double>>(
+      find.byKey(
+        const ValueKey<String>('reader_bottom_control_bar_transition'),
+      ),
     );
     expect(barAnimation.duration, const Duration(milliseconds: 360));
     expect(barAnimation.curve, Curves.easeOutBack);
 
     await tester.pumpAndSettle();
-    expect(floatingFinder, findsNothing);
+    expect(floatingFinder, findsOneWidget);
+    expect(
+      tester
+          .widgetList<Opacity>(
+            find.ancestor(of: floatingFinder, matching: find.byType(Opacity)),
+          )
+          .single
+          .opacity,
+      0,
+    );
     expect(targetFinder, findsOneWidget);
   });
 
@@ -211,6 +222,15 @@ void main() {
     updateControls(() => controlsVisible = true);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 90));
+    final opacityBeforeInterrupt = tester
+        .widgetList<Opacity>(
+          find.ancestor(
+            of: find.byKey(floatingKey),
+            matching: find.byType(Opacity),
+          ),
+        )
+        .single
+        .opacity;
     updateControls(() => controlsVisible = false);
     await tester.pump();
     expect(
@@ -223,7 +243,7 @@ void main() {
           )
           .single
           .opacity,
-      1,
+      closeTo(opacityBeforeInterrupt, 0.001),
     );
     await tester.pump(const Duration(milliseconds: 40));
     updateControls(() => controlsVisible = true);
@@ -243,6 +263,25 @@ void main() {
         )
         .map((widget) => widget.opacity);
     expect(transitionOpacities.every((opacity) => opacity == 1), isTrue);
+
+    updateControls(() => controlsVisible = true);
+    await tester.pumpAndSettle();
+    expect(find.byKey(floatingKey), findsOneWidget);
+
+    updateControls(() => controlsVisible = false);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 80));
+    final restoredOpacity = tester
+        .widgetList<Opacity>(
+          find.ancestor(
+            of: find.byKey(floatingKey),
+            matching: find.byType(Opacity),
+          ),
+        )
+        .single
+        .opacity;
+    expect(restoredOpacity, greaterThan(0));
+    expect(restoredOpacity, lessThan(1));
   });
 
   testWidgets('track tap commits the latest changed slider value', (
