@@ -161,7 +161,6 @@ Widget buildReaderTopControls({
   required VoidCallback onOpenSettingsDrawer,
 }) {
   return ReaderTopControls(
-    controlsVisible: runtimeState.controlsVisible,
     readerTheme: readerTheme,
     title: title,
     settingsTooltip: l10n(context).readingSettingsTitle,
@@ -176,7 +175,6 @@ Widget buildReaderPageIndicator({
   required int chapterIndex,
 }) {
   return ReaderPageIndicatorOverlay(
-    controlsVisible: runtimeState.controlsVisible,
     readerTheme: readerTheme,
     pageIndexNotifier: runtimeState.pageIndexNotifier,
     chapterIndex: chapterIndex,

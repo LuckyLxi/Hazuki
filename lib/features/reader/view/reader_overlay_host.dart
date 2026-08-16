@@ -52,13 +52,23 @@ class ReaderOverlayHost extends StatelessWidget {
           top: 0,
           left: 0,
           right: 0,
-          child: buildReaderTopControls(
-            context: context,
-            runtimeState: runtimeState,
-            readerTheme: readerTheme,
-            title: title,
-            onBackPressed: onBackPressed,
-            onOpenSettingsDrawer: onOpenSettingsDrawer,
+          child: IgnorePointer(
+            ignoring: !runtimeState.controlsVisible,
+            child: AnimatedSlide(
+              offset: runtimeState.controlsVisible
+                  ? Offset.zero
+                  : const Offset(0, -1),
+              duration: const Duration(milliseconds: 360),
+              curve: Curves.easeOutBack,
+              child: buildReaderTopControls(
+                context: context,
+                runtimeState: runtimeState,
+                readerTheme: readerTheme,
+                title: title,
+                onBackPressed: onBackPressed,
+                onOpenSettingsDrawer: onOpenSettingsDrawer,
+              ),
+            ),
           ),
         ),
         if (runtimeState.pageIndicator)
@@ -66,10 +76,17 @@ class ReaderOverlayHost extends StatelessWidget {
             left: 0,
             right: 0,
             bottom: 0,
-            child: buildReaderPageIndicator(
-              runtimeState: runtimeState,
-              readerTheme: readerTheme,
-              chapterIndex: chapterIndex,
+            child: AnimatedSlide(
+              offset: runtimeState.controlsVisible
+                  ? const Offset(0, 1)
+                  : Offset.zero,
+              duration: const Duration(milliseconds: 360),
+              curve: Curves.easeOutBack,
+              child: buildReaderPageIndicator(
+                runtimeState: runtimeState,
+                readerTheme: readerTheme,
+                chapterIndex: chapterIndex,
+              ),
             ),
           ),
         Positioned(
