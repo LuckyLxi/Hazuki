@@ -53,6 +53,14 @@ void main() {
       expect(transform.transform.storage[0], closeTo(0.8, 0.001));
       expect(transform.transform.storage[5], closeTo(0.8, 0.001));
       expect(
+        tester.widget<Text>(find.text('Discover')).style?.decoration,
+        TextDecoration.none,
+      );
+      expect(
+        tester.widget<Text>(find.text('Favorites')).style?.decoration,
+        TextDecoration.none,
+      );
+      expect(
         hazukiPromptPlacementController.bottomPadding,
         HomeBottomNavigation.fallbackPromptBottomPadding,
       );

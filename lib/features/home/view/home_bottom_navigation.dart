@@ -347,6 +347,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
                 color: colorScheme.primary,
+                decoration: TextDecoration.none,
               ),
             ),
           ),
