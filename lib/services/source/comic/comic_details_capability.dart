@@ -1,30 +1,29 @@
 import 'dart:convert';
 
 import '../../../models/hazuki_models.dart';
-import '../../../shared/chapter_title_resolver.dart';
 import '../account/source_relogin_coordinator.dart';
 import '../common/source_json_coerce.dart';
-import '../explore_capability.dart';
 import '../runtime/source_runtime_facade.dart';
 import '../runtime/source_runtime_handle.dart';
 import '../runtime/source_runtime_host.dart';
 import 'source_comic_details_cache.dart';
+import 'source_comic_details_parser.dart';
 
 class SourceComicDetailsCapability {
   SourceComicDetailsCapability({
     required SourceRuntimeHost runtimeHost,
     required SourceComicDetailsCache cache,
     required SourceReloginCoordinator reloginCoordinator,
-    required SourceTextTranslator translateSourceText,
+    required ComicDetailsTextTranslator translateSourceText,
   }) : _runtimeHost = runtimeHost,
        _cache = cache,
        _reloginCoordinator = reloginCoordinator,
-       _translateSourceText = translateSourceText;
+       _parser = SourceComicDetailsParser(translateSourceText);
 
   final SourceRuntimeHost _runtimeHost;
   final SourceComicDetailsCache _cache;
   final SourceReloginCoordinator _reloginCoordinator;
-  final SourceTextTranslator _translateSourceText;
+  final SourceComicDetailsParser _parser;
   final SourceComicDetailsRequestTracker _requestTracker =
       SourceComicDetailsRequestTracker();
 
@@ -186,9 +185,9 @@ class SourceComicDetailsCapability {
       throw Exception('comic_details_invalid_response');
     }
 
-    final details = _buildComicDetailsFromSourceMap(
+    final details = _parser.parse(
       map: Map<String, dynamic>.from(resolved),
-      normalizedComicId: normalizedComicId,
+      fallbackComicId: normalizedComicId,
       sourceKey: sourceKey,
     );
 
@@ -285,50 +284,6 @@ class SourceComicDetailsCapability {
         .map((e) => e.toString())
         .where((e) => e.isNotEmpty)
         .toList();
-  }
-
-  ComicDetailsData _buildComicDetailsFromSourceMap({
-    required Map<String, dynamic> map,
-    required String normalizedComicId,
-    required String sourceKey,
-  }) {
-    final chapters = _extractComicDetailsChapters(
-      map,
-      fallbackComicId: normalizedComicId,
-    );
-    final recommend = _extractComicDetailsRecommendations(
-      map,
-      sourceKey: sourceKey,
-    );
-    final tags = _extractComicDetailsTags(map, sourceKey: sourceKey);
-
-    final detailsComicId = map['id']?.toString().trim() ?? '';
-    final finalComicId = detailsComicId.isEmpty
-        ? normalizedComicId
-        : detailsComicId;
-    final updateTime = _resolveComicDetailsUpdateTime(
-      map['updateTime']?.toString() ?? '',
-      tags,
-    );
-
-    return ComicDetailsData(
-      id: finalComicId,
-      title: map['title']?.toString() ?? '',
-      subTitle: (map['subTitle'] ?? map['subtitle'] ?? '').toString(),
-      cover: map['cover']?.toString() ?? '',
-      description: map['description']?.toString() ?? '',
-      updateTime: updateTime,
-      likesCount: map['likesCount']?.toString() ?? '',
-      chapters: chapters,
-      tags: _filterComicDetailsDisplayTags(tags),
-      recommend: recommend,
-      isFavorite: jsAsBool(map['isFavorite']),
-      isLiked: jsAsBool(map['isLiked']),
-      uploader: map['uploader']?.toString() ?? '',
-      pageCount: (map['pageCount'] ?? map['maxPage'] ?? '').toString(),
-      subId: map['subId']?.toString() ?? '',
-      sourceKey: sourceKey,
-    );
   }
 
   bool get supportComicLike {
@@ -430,145 +385,4 @@ class SourceComicDetailsCapability {
     SourceScopedComicId scopedId, {
     required ComicDetailsData Function(ComicDetailsData details) update,
   }) => _cache.update(scopedId, transform: update);
-
-  Map<String, String> _extractComicDetailsChapters(
-    Map<String, dynamic> map, {
-    required String fallbackComicId,
-  }) {
-    final chapters = <String, String>{};
-    final chapterEntriesRaw = map['__chapterEntries'];
-    if (chapterEntriesRaw is List) {
-      for (final item in chapterEntriesRaw) {
-        if (item is List && item.length >= 2) {
-          final id = item[0].toString().trim();
-          final title = item[1].toString().trim();
-          if (id.isNotEmpty && title.isNotEmpty) {
-            chapters[id] = title;
-          }
-        }
-      }
-    }
-
-    if (chapters.isEmpty) {
-      final chapterRaw = map['chapters'];
-      if (chapterRaw is Map) {
-        for (final entry in chapterRaw.entries) {
-          final id = entry.key.toString().trim();
-          final title = entry.value.toString().trim();
-          if (id.isNotEmpty && title.isNotEmpty) {
-            chapters[id] = title;
-          }
-        }
-      }
-    }
-
-    if (chapters.isEmpty && fallbackComicId.isNotEmpty) {
-      chapters[fallbackComicId] = hazukiDefaultChapterTitleToken;
-    }
-    return chapters;
-  }
-
-  Map<String, List<String>> _extractComicDetailsTags(
-    Map<String, dynamic> map, {
-    required String sourceKey,
-  }) {
-    final tags = <String, List<String>>{};
-    final tagsRaw = map['tags'];
-    if (tagsRaw is Map) {
-      for (final entry in tagsRaw.entries) {
-        final value = entry.value;
-        if (value is List) {
-          tags[_translateSourceText(
-            entry.key.toString(),
-            sourceKey: sourceKey,
-          )] = value
-              .map((e) => e.toString())
-              .toList();
-        }
-      }
-    }
-    return tags;
-  }
-
-  List<ExploreComic> _extractComicDetailsRecommendations(
-    Map<String, dynamic> map, {
-    required String sourceKey,
-  }) {
-    final recommend = <ExploreComic>[];
-    final recommendRaw = map['recommend'];
-    if (recommendRaw is List) {
-      for (final item in recommendRaw) {
-        if (item is! Map) {
-          continue;
-        }
-        final recommendMap = Map<String, dynamic>.from(item);
-        final id = recommendMap['id']?.toString().trim() ?? '';
-        final title = recommendMap['title']?.toString().trim() ?? '';
-        if (id.isEmpty || title.isEmpty) {
-          continue;
-        }
-        final subTitle =
-            (recommendMap['subTitle'] ?? recommendMap['subtitle'] ?? '')
-                .toString()
-                .trim();
-        final cover = recommendMap['cover']?.toString().trim() ?? '';
-        recommend.add(
-          ExploreComic(
-            id: id,
-            title: title,
-            subTitle: subTitle,
-            cover: cover,
-            sourceKey: sourceKey,
-          ),
-        );
-      }
-    }
-    return recommend;
-  }
-}
-
-String _resolveComicDetailsUpdateTime(
-  String explicitUpdateTime,
-  Map<String, List<String>> tags,
-) {
-  final trimmed = explicitUpdateTime.trim();
-  if (trimmed.isNotEmpty) {
-    return trimmed;
-  }
-  for (final entry in tags.entries) {
-    if (!_isComicDetailsUpdateTagKey(entry.key)) {
-      continue;
-    }
-    for (final value in entry.value) {
-      final text = value.trim();
-      if (text.isNotEmpty) {
-        return text;
-      }
-    }
-  }
-  return '';
-}
-
-Map<String, List<String>> _filterComicDetailsDisplayTags(
-  Map<String, List<String>> tags,
-) {
-  final filtered = <String, List<String>>{};
-  for (final entry in tags.entries) {
-    if (_isComicDetailsUpdateTagKey(entry.key)) {
-      continue;
-    }
-    filtered[entry.key] = entry.value;
-  }
-  return filtered;
-}
-
-bool _isComicDetailsUpdateTagKey(String key) {
-  final normalized = key.trim().toLowerCase();
-  return normalized == '更新' ||
-      normalized == '更新时间' ||
-      normalized == 'update' ||
-      normalized == 'updated' ||
-      normalized == 'time' ||
-      normalized == 'datetime' ||
-      normalized == 'datetime_updated';
 }

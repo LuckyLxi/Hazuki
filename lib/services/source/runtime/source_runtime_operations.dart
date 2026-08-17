@@ -2,7 +2,11 @@
 // ignore_for_file: annotate_overrides
 
 import '../models/source_contract_models.dart';
-import 'source_runtime_capability.dart';
+import 'source_runtime_diagnostics_operations.dart';
+import 'source_runtime_initialization_operations.dart';
+import 'source_runtime_recovery_operations.dart';
+import 'source_script_editing_operations.dart';
+import 'source_update_operations.dart';
 
 /// Script storage, initialization, and update operations exposed to source
 /// adapters. Keeping these forwards outside the composition root prevents the
@@ -40,57 +44,67 @@ abstract interface class SourceRuntimeOperations {
 }
 
 class SourceRuntimeOperationService implements SourceRuntimeOperations {
-  const SourceRuntimeOperationService(this._runtime);
+  const SourceRuntimeOperationService(
+    this._initialization,
+    this._diagnostics,
+    this._scripts,
+    this._updates,
+    this._recovery,
+  );
 
-  final SourceRuntimeCapability _runtime;
+  final SourceRuntimeInitializationOperations _initialization;
+  final SourceRuntimeDiagnosticsOperations _diagnostics;
+  final SourceScriptEditingOperations _scripts;
+  final SourceUpdateOperations _updates;
+  final SourceRuntimeRecoveryOperations _recovery;
 
   Future<void> init({
     void Function(int received, int total)? onSourceDownloadProgress,
     bool prewarm = false,
-  }) => _runtime.init(
+  }) => _initialization.init(
     onSourceDownloadProgress: onSourceDownloadProgress,
     prewarm: prewarm,
   );
 
   Future<void> ensureInitialized({String? sourceKey}) =>
-      _runtime.ensureInitialized(sourceKey: sourceKey);
+      _initialization.ensureInitialized(sourceKey: sourceKey);
   Future<void> ensureSourceInitialized(String sourceKey) =>
-      _runtime.ensureSourceInitialized(sourceKey);
-  Future<void> prewarmInBackground() => _runtime.prewarmInBackground();
+      _initialization.ensureSourceInitialized(sourceKey);
+  Future<void> prewarmInBackground() => _initialization.prewarmInBackground();
   void logRuntimeRetryRequested(String source) =>
-      _runtime.logRuntimeRetryRequested(source);
+      _diagnostics.logRuntimeRetryRequested(source);
   Future<bool> loadSoftwareLogCaptureEnabled() =>
-      _runtime.loadSoftwareLogCaptureEnabled();
+      _diagnostics.loadSoftwareLogCaptureEnabled();
   Future<void> setSoftwareLogCaptureEnabled(bool enabled) =>
-      _runtime.setSoftwareLogCaptureEnabled(enabled);
-  Future<bool> hasLocalJmSourceFile() => _runtime.hasLocalJmSourceFile();
+      _diagnostics.setSoftwareLogCaptureEnabled(enabled);
+  Future<bool> hasLocalJmSourceFile() => _scripts.hasLocalActiveSourceFile();
   Future<bool> hasLocalSourceFile(String sourceKey) =>
-      _runtime.hasLocalSourceFile(sourceKey);
+      _scripts.hasLocalSourceFile(sourceKey);
   Future<void> deleteLocalSourceFile(String sourceKey) =>
-      _runtime.deleteLocalSourceFile(sourceKey);
+      _scripts.deleteLocalSourceFile(sourceKey);
   Future<void> downloadSourceFile(
     String sourceKey, {
     void Function(int received, int total)? onProgress,
-  }) => _runtime.downloadSourceFile(sourceKey, onProgress: onProgress);
+  }) => _recovery.downloadSourceFile(sourceKey, onProgress: onProgress);
   Future<String?> readLocalActiveSourceIfExists() =>
-      _runtime.readLocalActiveSourceIfExists();
+      _scripts.readLocalActiveSourceIfExists();
   Future<void> writeLocalActiveSource(String content) =>
-      _runtime.writeLocalActiveSource(content);
+      _scripts.writeLocalActiveSource(content);
   Future<String> loadEditableActiveSource() =>
-      _runtime.loadEditableActiveSource();
+      _scripts.loadEditableActiveSource();
   Future<void> saveEditedActiveSource(String content) =>
-      _runtime.saveEditedActiveSource(content);
+      _scripts.saveEditedActiveSource(content);
   Future<bool> hasCustomEditedActiveSource() =>
-      _runtime.hasCustomEditedActiveSource();
+      _scripts.hasCustomEditedActiveSource();
   Future<bool> hasCustomEditedSource(String sourceKey) =>
-      _runtime.hasCustomEditedSource(sourceKey);
+      _scripts.hasCustomEditedSource(sourceKey);
   Future<void> reloadFromLocalSourceFiles() =>
-      _runtime.reloadFromLocalSourceFiles();
+      _recovery.reloadFromLocalSourceFiles();
   Future<SourceVersionCheckResult?> checkActiveSourceVersionFromCloud() =>
-      _runtime.checkActiveSourceVersionFromCloud();
+      _updates.checkActiveSourceVersion();
   Future<bool> downloadActiveSourceAndReload({
     void Function(int received, int total)? onProgress,
-  }) => _runtime.downloadActiveSourceAndReload(onProgress: onProgress);
+  }) => _updates.downloadActiveSource(onProgress: onProgress);
   Future<bool> refreshSourceOnNetworkRecovery() =>
-      _runtime.refreshSourceOnNetworkRecovery();
+      _recovery.refreshSourceOnNetworkRecovery();
 }

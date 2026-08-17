@@ -102,7 +102,7 @@ class SourceRuntimeAssembly {
       defaultSourceKey: hazukiDefaultSourceKey,
       secureSessionStorage: _secureSessionStorage,
       ensureSourceInitialized: (sourceKey) =>
-          _runtimeCapability.ensureSourceInitialized(sourceKey),
+          _runtimeCapability.initialization.ensureSourceInitialized(sourceKey),
       currentAccountForSource: (sourceKey) =>
           _accountCapability.currentAccountForSource(sourceKey),
       isLoggedForSource: (sourceKey) =>
@@ -203,7 +203,13 @@ class SourceRuntimeAssembly {
   late final SourceReloginCoordinator _reloginCoordinator;
   late final SourceRuntimeCapability _runtimeCapability;
   late final SourceRuntimeOperations _runtimeOperations =
-      SourceRuntimeOperationService(_runtimeCapability);
+      SourceRuntimeOperationService(
+        _runtimeCapability.initialization,
+        _runtimeCapability.diagnostics,
+        _runtimeCapability.scriptEditing,
+        _runtimeCapability.sourceUpdates,
+        _runtimeCapability.sourceRecovery,
+      );
   late final SourceRuntimeView _runtimeView = SourceRuntimeViewService(
     runtimeHost: _runtimeHost,
     runtimeOperations: _runtimeOperations,
