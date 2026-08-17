@@ -572,18 +572,17 @@ class _HomeAppBarProfileButtonState extends State<_HomeAppBarProfileButton> {
   void _openProfileDrawer() {
     final context = this.context;
     widget.onDrawerVisibilityChanged(true);
-    Navigator.of(context)
-        .push(
-          _HomeProfileDrawerRoute(
-            drawerWidth: resolveHomeDrawerWidth(context),
-            drawerColor:
-                DrawerTheme.of(context).backgroundColor ??
-                Theme.of(context).drawerTheme.backgroundColor ??
-                Theme.of(context).colorScheme.surface,
-            drawerContentListenable: _drawerContentNotifier,
-          ),
-        )
-        .whenComplete(() => widget.onDrawerVisibilityChanged(false));
+    Navigator.of(context).push(
+      _HomeProfileDrawerRoute(
+        drawerWidth: resolveHomeDrawerWidth(context),
+        drawerColor:
+            DrawerTheme.of(context).backgroundColor ??
+            Theme.of(context).drawerTheme.backgroundColor ??
+            Theme.of(context).colorScheme.surface,
+        drawerContentListenable: _drawerContentNotifier,
+        onClosing: () => widget.onDrawerVisibilityChanged(false),
+      ),
+    );
   }
 }
 
@@ -688,11 +687,15 @@ class _HomeProfileDrawerRoute extends PageRoute<void> {
     required this.drawerWidth,
     required this.drawerColor,
     required this.drawerContentListenable,
+    required this.onClosing,
   });
 
   final double drawerWidth;
   final Color drawerColor;
   final ValueListenable<Widget> drawerContentListenable;
+  final VoidCallback onClosing;
+  final SnapshotController _snapshotController = SnapshotController();
+  bool _closingNotified = false;
 
   @override
   bool get opaque => false;
@@ -716,6 +719,31 @@ class _HomeProfileDrawerRoute extends PageRoute<void> {
   Duration get reverseTransitionDuration => const Duration(milliseconds: 160);
 
   @override
+  void install() {
+    super.install();
+    animation?.addStatusListener(_syncSnapshotting);
+    _syncSnapshotting(animation?.status ?? AnimationStatus.dismissed);
+  }
+
+  void _syncSnapshotting(AnimationStatus status) {
+    _snapshotController.allowSnapshotting = status.isAnimating;
+  }
+
+  void _notifyClosing() {
+    if (_closingNotified) {
+      return;
+    }
+    _closingNotified = true;
+    onClosing();
+  }
+
+  @override
+  bool didPop(void result) {
+    _notifyClosing();
+    return super.didPop(result);
+  }
+
+  @override
   void didChangeNext(Route<dynamic>? nextRoute) {
     super.didChangeNext(nextRoute);
     if (nextRoute is! PageRoute<dynamic>) {
@@ -732,17 +760,31 @@ class _HomeProfileDrawerRoute extends PageRoute<void> {
     Animation<double> animation,
     Animation<double> secondaryAnimation,
   ) {
-    return Align(
-      alignment: Alignment.centerLeft,
-      child: Drawer(
-        width: drawerWidth,
-        backgroundColor: drawerColor,
-        child: ValueListenableBuilder<Widget>(
-          valueListenable: drawerContentListenable,
-          builder: (context, drawerContent, _) => drawerContent,
+    return SnapshotWidget(
+      controller: _snapshotController,
+      mode: SnapshotMode.permissive,
+      child: RepaintBoundary(
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Drawer(
+            width: drawerWidth,
+            backgroundColor: drawerColor,
+            child: ValueListenableBuilder<Widget>(
+              valueListenable: drawerContentListenable,
+              builder: (context, drawerContent, _) => drawerContent,
+            ),
+          ),
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    animation?.removeStatusListener(_syncSnapshotting);
+    _notifyClosing();
+    _snapshotController.dispose();
+    super.dispose();
   }
 
   @override
