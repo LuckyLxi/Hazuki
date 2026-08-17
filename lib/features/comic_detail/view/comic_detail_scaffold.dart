@@ -46,173 +46,187 @@ class ComicDetailBody extends StatelessWidget {
     final uiState = scope.uiState;
     final surface = Theme.of(context).colorScheme.surface;
 
-    return FutureBuilder<ComicDetailsData>(
-      future: session.future,
-      builder: (context, snapshot) {
-        final details = snapshot.data;
-        final isDark = Theme.of(context).brightness == Brightness.dark;
-        final skeletonColor = isDark
-            ? Colors.white.withValues(alpha: 0.1)
-            : Colors.black.withValues(alpha: 0.06);
+    return ListenableBuilder(
+      listenable: session,
+      builder: (context, _) {
+        return FutureBuilder<ComicDetailsData>(
+          future: session.future,
+          builder: (context, snapshot) {
+            final details = snapshot.data;
+            final isDark = Theme.of(context).brightness == Brightness.dark;
+            final skeletonColor = isDark
+                ? Colors.white.withValues(alpha: 0.1)
+                : Colors.black.withValues(alpha: 0.06);
 
-        final displayTitle = details?.title ?? comic.title;
-        final displaySubTitle = details?.subTitle ?? comic.subTitle;
-        final listCoverUrl = comic.cover.trim();
-        final displayCoverUrl = listCoverUrl.isNotEmpty
-            ? listCoverUrl
-            : (details?.cover.trim() ?? '');
-        final shouldAnimateInitialDetailReveal =
-            uiState.shouldAnimateInitialDetailReveal;
-        final shouldAnimateResolvedContent =
-            shouldAnimateInitialDetailReveal && details != null;
-        final supportsJmExclusiveActions = scope.supportsJmExclusiveActions;
+            final displayTitle = details?.title ?? comic.title;
+            final displaySubTitle = details?.subTitle ?? comic.subTitle;
+            final listCoverUrl = comic.cover.trim();
+            final displayCoverUrl = listCoverUrl.isNotEmpty
+                ? listCoverUrl
+                : (details?.cover.trim() ?? '');
+            final shouldAnimateInitialDetailReveal =
+                uiState.shouldAnimateInitialDetailReveal;
+            final shouldAnimateResolvedContent =
+                shouldAnimateInitialDetailReveal && details != null;
+            final supportsJmExclusiveActions = scope.supportsJmExclusiveActions;
 
-        uiState.updateAppBarMetadata(
-          title: displayTitle,
-          updateTime: details?.updateTime ?? '',
-        );
-        if (details != null) {
-          uiState.markComicDetailRevealHandled(details.id);
-        }
+            uiState.updateAppBarMetadata(
+              title: displayTitle,
+              updateTime: details?.updateTime ?? '',
+            );
+            if (details != null) {
+              uiState.markComicDetailRevealHandled(details.id);
+            }
 
-        return NestedScrollView(
-          controller: scrollController,
-          physics: const ClampingScrollPhysics(),
-          headerSliverBuilder: (context, _) {
-            return [
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                  child: AnimatedSize(
-                    duration: const Duration(milliseconds: 320),
-                    curve: Curves.easeOutCubic,
-                    alignment: Alignment.topCenter,
-                    clipBehavior: Clip.hardEdge,
-                    child: RepaintBoundary(
-                      child: ComicDetailHeaderSection(
-                        heroTag: heroTag,
-                        details: details,
-                        skeletonColor: skeletonColor,
-                        displayTitle: displayTitle,
-                        displaySubTitle: displaySubTitle,
-                        displayCoverUrl: displayCoverUrl,
-                        viewsText: details != null
-                            ? extractComicViewsText(details)
-                            : '',
-                        headerTitleKey: headerTitleKey,
-                        favoriteRowKey: favoriteRowKey,
-                        actionButtonsKey: actionButtonsKey,
+            return NestedScrollView(
+              controller: scrollController,
+              physics: const ClampingScrollPhysics(),
+              headerSliverBuilder: (context, _) {
+                return [
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                      child: AnimatedSize(
+                        duration: const Duration(milliseconds: 320),
+                        curve: Curves.easeOutCubic,
+                        alignment: Alignment.topCenter,
+                        clipBehavior: Clip.hardEdge,
+                        child: RepaintBoundary(
+                          child: ComicDetailHeaderSection(
+                            heroTag: heroTag,
+                            details: details,
+                            skeletonColor: skeletonColor,
+                            displayTitle: displayTitle,
+                            displaySubTitle: displaySubTitle,
+                            displayCoverUrl: displayCoverUrl,
+                            viewsText: details != null
+                                ? extractComicViewsText(details)
+                                : '',
+                            headerTitleKey: headerTitleKey,
+                            favoriteRowKey: favoriteRowKey,
+                            actionButtonsKey: actionButtonsKey,
+                            shouldAnimateInitialDetailReveal:
+                                shouldAnimateInitialDetailReveal,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  SliverOverlapAbsorber(
+                    handle: NestedScrollView.sliverOverlapAbsorberHandleFor(
+                      context,
+                    ),
+                    sliver: SliverPersistentHeader(
+                      pinned: true,
+                      delegate: HazukiTabBarDelegate(
+                        TabBar(
+                          controller: uiState.tabController,
+                          onTap: (_) =>
+                              FocusManager.instance.primaryFocus?.unfocus(),
+                          isScrollable: true,
+                          tabAlignment: TabAlignment.center,
+                          padding: EdgeInsets.zero,
+                          labelPadding: const EdgeInsets.symmetric(
+                            horizontal: 18,
+                          ),
+                          indicatorSize: TabBarIndicatorSize.label,
+                          indicatorWeight: 3,
+                          dividerColor: Colors.transparent,
+                          tabs: [
+                            Tab(
+                              height: 44,
+                              text: l10n(context).comicDetailTabInfo,
+                            ),
+                            Tab(
+                              height: 44,
+                              text: l10n(context).comicDetailTabComments,
+                            ),
+                            if (supportsJmExclusiveActions)
+                              Tab(
+                                height: 44,
+                                text: l10n(context).comicDetailTabRelated,
+                              ),
+                          ],
+                        ),
+                        surface,
+                        detailsReady: details != null,
                         shouldAnimateInitialDetailReveal:
                             shouldAnimateInitialDetailReveal,
                       ),
                     ),
                   ),
-                ),
-              ),
-              SliverOverlapAbsorber(
-                handle: NestedScrollView.sliverOverlapAbsorberHandleFor(
-                  context,
-                ),
-                sliver: SliverPersistentHeader(
-                  pinned: true,
-                  delegate: HazukiTabBarDelegate(
-                    TabBar(
-                      controller: uiState.tabController,
-                      onTap: (_) =>
-                          FocusManager.instance.primaryFocus?.unfocus(),
-                      isScrollable: true,
-                      tabAlignment: TabAlignment.center,
-                      padding: EdgeInsets.zero,
-                      labelPadding: const EdgeInsets.symmetric(horizontal: 18),
-                      indicatorSize: TabBarIndicatorSize.label,
-                      indicatorWeight: 3,
-                      dividerColor: Colors.transparent,
-                      tabs: [
-                        Tab(height: 44, text: l10n(context).comicDetailTabInfo),
-                        Tab(
-                          height: 44,
-                          text: l10n(context).comicDetailTabComments,
-                        ),
-                        if (supportsJmExclusiveActions)
-                          Tab(
-                            height: 44,
-                            text: l10n(context).comicDetailTabRelated,
+                ];
+              },
+              body: ColoredBox(
+                color: surface,
+                child: TabBarView(
+                  controller: uiState.tabController,
+                  physics: const ClampingScrollPhysics(),
+                  children: [
+                    ComicDetailTabTickerScope(
+                      tabController: uiState.tabController,
+                      tabIndex: 0,
+                      builder: (context, shouldRender, _) {
+                        return RepaintBoundary(
+                          child: ComicDetailInfoTab(
+                            details: details,
+                            error: snapshot.error,
+                            hasTimedOut: session.hasDetailsTimedOut,
+                            isRetrying: session.isRetryingDetails,
+                            onRetry: session.retry,
+                            skeletonColor: skeletonColor,
+                            isActiveInTabView: shouldRender,
+                            shouldAnimateResolvedContent:
+                                shouldAnimateResolvedContent,
                           ),
-                      ],
+                        );
+                      },
                     ),
-                    surface,
-                    detailsReady: details != null,
-                    shouldAnimateInitialDetailReveal:
-                        shouldAnimateInitialDetailReveal,
-                  ),
+                    ComicDetailTabTickerScope(
+                      tabController: uiState.tabController,
+                      tabIndex: 1,
+                      builder: (context, shouldRender, _) {
+                        return details != null
+                            ? RepaintBoundary(
+                                child: commentsWidgetBuilder(
+                                  comicId: details.id,
+                                  subId: details.subId.isEmpty
+                                      ? null
+                                      : details.subId,
+                                  sourceKey: details.sourceKey,
+                                  showAppBar: true,
+                                  isTabView: true,
+                                  isActiveInTabView: shouldRender,
+                                  onRequestTabFullscreen:
+                                      uiState.ensureCommentsTabFullscreen,
+                                  debugOuterScrollStateBuilder:
+                                      uiState.buildCommentsTabDebugState,
+                                ),
+                              )
+                            : const ComicDetailLoadingView();
+                      },
+                    ),
+                    if (supportsJmExclusiveActions)
+                      ComicDetailTabTickerScope(
+                        tabController: uiState.tabController,
+                        tabIndex: 2,
+                        builder: (context, shouldRender, _) {
+                          return RepaintBoundary(
+                            child: ComicDetailRelatedTab(
+                              details: details,
+                              isActiveInTabView: shouldRender,
+                              isDesktopPanel: isDesktopPanel,
+                              onCloseRequested: onCloseRequested,
+                              pageBuilder: buildComicDetailPage,
+                            ),
+                          );
+                        },
+                      ),
+                  ],
                 ),
               ),
-            ];
+            );
           },
-          body: ColoredBox(
-            color: surface,
-            child: TabBarView(
-              controller: uiState.tabController,
-              physics: const ClampingScrollPhysics(),
-              children: [
-                ComicDetailTabTickerScope(
-                  tabController: uiState.tabController,
-                  tabIndex: 0,
-                  builder: (context, shouldRender, _) {
-                    return RepaintBoundary(
-                      child: ComicDetailInfoTab(
-                        details: details,
-                        skeletonColor: skeletonColor,
-                        isActiveInTabView: shouldRender,
-                        shouldAnimateResolvedContent:
-                            shouldAnimateResolvedContent,
-                      ),
-                    );
-                  },
-                ),
-                ComicDetailTabTickerScope(
-                  tabController: uiState.tabController,
-                  tabIndex: 1,
-                  builder: (context, shouldRender, _) {
-                    return details != null
-                        ? RepaintBoundary(
-                            child: commentsWidgetBuilder(
-                              comicId: details.id,
-                              subId: details.subId.isEmpty
-                                  ? null
-                                  : details.subId,
-                              sourceKey: details.sourceKey,
-                              showAppBar: true,
-                              isTabView: true,
-                              isActiveInTabView: shouldRender,
-                              onRequestTabFullscreen:
-                                  uiState.ensureCommentsTabFullscreen,
-                              debugOuterScrollStateBuilder:
-                                  uiState.buildCommentsTabDebugState,
-                            ),
-                          )
-                        : const ComicDetailLoadingView();
-                  },
-                ),
-                if (supportsJmExclusiveActions)
-                  ComicDetailTabTickerScope(
-                    tabController: uiState.tabController,
-                    tabIndex: 2,
-                    builder: (context, shouldRender, _) {
-                      return RepaintBoundary(
-                        child: ComicDetailRelatedTab(
-                          details: details,
-                          isActiveInTabView: shouldRender,
-                          isDesktopPanel: isDesktopPanel,
-                          onCloseRequested: onCloseRequested,
-                          pageBuilder: buildComicDetailPage,
-                        ),
-                      );
-                    },
-                  ),
-              ],
-            ),
-          ),
         );
       },
     );

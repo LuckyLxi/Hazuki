@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:hazuki/features/reader/support/reader_diagnostics_support.dart';
+import 'package:hazuki/features/reader/support/reader_diagnostics_controller.dart';
 import 'package:hazuki/features/reader/state/reader_image_pipeline_state.dart';
 import 'package:hazuki/shared/reading/reader_filter_color.dart';
 import 'package:hazuki/shared/reading/reader_mode.dart';
@@ -1347,5 +1348,118 @@ void main() {
         expect(scrollController.position.pixels, greaterThan(beforeCorrection));
       },
     );
+  });
+
+  group('ReaderDiagnosticsController', () {
+    test('creates a snapshot from reader runtime and pipeline state', () {
+      final runtimeState = ReaderRuntimeState()
+        ..applyImages(['a', 'b', 'c'])
+        ..currentPageIndex = 1
+        ..controlsVisible = true
+        ..isZoomed = true;
+      runtimeState.setDisplayedPageIndex(1);
+      final pipelineState = ReaderImagePipelineState()
+        ..activeUnscrambleTasks = 2
+        ..prefetchAheadRunning = true;
+      final diagnosticsState = ReaderDiagnosticsState()
+        ..lastObservedListPixels = 12.345;
+      final scrollController = ScrollController();
+      final pageController = PageController();
+      final zoomController = TransformationController();
+      addTearDown(scrollController.dispose);
+      addTearDown(pageController.dispose);
+      addTearDown(zoomController.dispose);
+      addTearDown(pipelineState.dispose);
+      addTearDown(runtimeState.pageIndexNotifier.dispose);
+
+      final controller = ReaderDiagnosticsController(
+        runtimeState: runtimeState,
+        imagePipelineState: pipelineState,
+        diagnosticsState: diagnosticsState,
+        scrollController: scrollController,
+        pageController: pageController,
+        zoomController: zoomController,
+        sessionId: () => 'session-1',
+        noImageModeEnabled: () => true,
+        log: (_, {level = 'info', source = 'reader_ui', content}) {},
+        comicId: 'comic-1',
+        epId: 'ep-1',
+        chapterTitle: 'Chapter 1',
+        chapterIndex: 0,
+      );
+
+      final snapshot = controller.createSnapshot();
+
+      expect(snapshot.readerSessionId, 'session-1');
+      expect(snapshot.comicId, 'comic-1');
+      expect(snapshot.currentPageIndex, 1);
+      expect(snapshot.currentPage, 2);
+      expect(snapshot.totalPages, 3);
+      expect(snapshot.controlsVisible, isTrue);
+      expect(snapshot.noImageModeEnabled, isTrue);
+      expect(snapshot.isZoomed, isTrue);
+      expect(snapshot.activeUnscrambleTasks, 2);
+      expect(snapshot.prefetchAheadRunning, isTrue);
+      expect(snapshot.lastObservedListPixels, 12.35);
+      expect(snapshot.listSnapshot, isNull);
+      expect(snapshot.pageControllerPage, isNull);
+    });
+
+    test('normalizes and deduplicates visible page logs', () {
+      final runtimeState = ReaderRuntimeState()
+        ..applyImages(['a', 'b', 'c', 'd'])
+        ..readerMode = ReaderMode.topToBottom;
+      final pipelineState = ReaderImagePipelineState();
+      final diagnosticsState = ReaderDiagnosticsState();
+      final scrollController = ScrollController();
+      final pageController = PageController();
+      final zoomController = TransformationController();
+      final logs = <Map<String, Object?>>[];
+      addTearDown(scrollController.dispose);
+      addTearDown(pageController.dispose);
+      addTearDown(zoomController.dispose);
+      addTearDown(pipelineState.dispose);
+      addTearDown(runtimeState.pageIndexNotifier.dispose);
+
+      final controller = ReaderDiagnosticsController(
+        runtimeState: runtimeState,
+        imagePipelineState: pipelineState,
+        diagnosticsState: diagnosticsState,
+        scrollController: scrollController,
+        pageController: pageController,
+        zoomController: zoomController,
+        sessionId: () => 'session-1',
+        noImageModeEnabled: () => false,
+        log: (title, {level = 'info', source = 'reader_ui', content}) {
+          logs.add({
+            'title': title,
+            'level': level,
+            'source': source,
+            'content': content,
+          });
+        },
+        comicId: 'comic-1',
+        epId: 'ep-1',
+        chapterTitle: 'Chapter 1',
+        chapterIndex: 0,
+      );
+
+      controller.logVisiblePageChange(index: 99, trigger: 'test');
+      controller.logVisiblePageChange(index: 3, trigger: 'duplicate');
+
+      expect(logs, hasLength(1));
+      expect(logs.single['title'], 'Reader visible page changed');
+      expect(logs.single['source'], 'reader_position');
+      final content = logs.single['content']! as Map<String, dynamic>;
+      expect(content['trigger'], 'test');
+      expect(content['pageIndex'], 3);
+      expect(content['page'], 4);
+      expect(content['visibleImageIndices'], [3]);
+      expect(content['nearbyRenderedItems'], [
+        {'index': 1, 'mounted': false},
+        {'index': 2, 'mounted': false},
+        {'index': 3, 'mounted': false},
+      ]);
+    });
   });
 }

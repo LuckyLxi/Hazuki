@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../shared/preferences/hazuki_preference_keys.dart';
+import '../shared/picacg_comic_tags.dart';
 import '../models/hazuki_models.dart';
 import 'source/models/source_identity.dart';
 import 'storage/hazuki_database.dart';
@@ -67,6 +68,7 @@ class ReadHistoryService extends ChangeNotifier {
             cover: entry.cover,
             subTitle: entry.subTitle,
             sourceKey: entry.sourceKey,
+            tags: _tagsFromJson(entry.tagsJson),
           ),
         )
         .toList(growable: false);
@@ -104,6 +106,7 @@ class ReadHistoryService extends ChangeNotifier {
                   title: comic.title,
                   cover: comic.cover,
                   subTitle: comic.subTitle,
+                  tagsJson: Value(jsonEncode(comic.tags)),
                   timestampMs: now - index,
                 ),
               );
@@ -131,6 +134,24 @@ class ReadHistoryService extends ChangeNotifier {
           ))
           .go();
       notifyListeners();
+    });
+  }
+
+  Future<void> updateComicTags({
+    required ExploreComic comic,
+    required List<String> tags,
+  }) {
+    if (comic.id.trim().isEmpty || tags.isEmpty) {
+      return Future<void>.value();
+    }
+    return _serialized(() async {
+      await _ensureMigrated();
+      await (_database.update(_database.readHistoryEntries)..where(
+            (entry) => entry.storageKey.equals(comic.scopedId.storageKey),
+          ))
+          .write(
+            ReadHistoryEntriesCompanion(tagsJson: Value(jsonEncode(tags))),
+          );
     });
   }
 
@@ -170,6 +191,7 @@ class ReadHistoryService extends ChangeNotifier {
                 subTitle: details.subTitle.isNotEmpty
                     ? details.subTitle
                     : comic.subTitle,
+                tagsJson: Value(jsonEncode(_tagsForHistory(comic, details))),
                 timestampMs: DateTime.now().millisecondsSinceEpoch,
               ),
             );
@@ -194,6 +216,7 @@ class ReadHistoryService extends ChangeNotifier {
             'title': entry.title,
             'cover': entry.cover,
             'subTitle': entry.subTitle,
+            'tags': _tagsFromJson(entry.tagsJson),
             'timestamp': entry.timestampMs,
           },
         )
@@ -256,6 +279,7 @@ class ReadHistoryService extends ChangeNotifier {
               title: (entry['title'] ?? '').toString(),
               cover: (entry['cover'] ?? '').toString(),
               subTitle: (entry['subTitle'] ?? '').toString(),
+              tagsJson: Value(jsonEncode(_tagsFromValue(entry['tags']))),
               timestampMs: (entry['timestamp'] as num?)?.toInt() ?? 0,
             ),
           );
@@ -291,4 +315,25 @@ class ReadHistoryService extends ChangeNotifier {
     final normalized = sourceKey.trim();
     return normalized.isEmpty ? hazukiDefaultSourceKey : normalized;
   }
+
+  List<String> _tagsForHistory(ExploreComic comic, ComicDetailsData details) {
+    if (comic.tags.isNotEmpty) return comic.tags;
+    return picacgComicDetailTags(details);
+  }
+
+  List<String> _tagsFromJson(String raw) {
+    try {
+      return _tagsFromValue(jsonDecode(raw));
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  List<String> _tagsFromValue(Object? value) => value is List
+      ? value
+            .map((tag) => tag.toString().trim())
+            .where((tag) => tag.isNotEmpty)
+            .toSet()
+            .toList(growable: false)
+      : const [];
 }

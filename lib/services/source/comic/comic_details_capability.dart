@@ -1,29 +1,31 @@
 import 'dart:convert';
 
 import '../../../models/hazuki_models.dart';
-import '../../../shared/chapter_title_resolver.dart';
 import '../account/source_relogin_coordinator.dart';
 import '../common/source_json_coerce.dart';
-import '../explore_capability.dart';
 import '../runtime/source_runtime_facade.dart';
+import '../runtime/source_runtime_handle.dart';
 import '../runtime/source_runtime_host.dart';
 import 'source_comic_details_cache.dart';
+import 'source_comic_details_parser.dart';
 
 class SourceComicDetailsCapability {
   SourceComicDetailsCapability({
     required SourceRuntimeHost runtimeHost,
     required SourceComicDetailsCache cache,
     required SourceReloginCoordinator reloginCoordinator,
-    required SourceTextTranslator translateSourceText,
+    required ComicDetailsTextTranslator translateSourceText,
   }) : _runtimeHost = runtimeHost,
        _cache = cache,
        _reloginCoordinator = reloginCoordinator,
-       _translateSourceText = translateSourceText;
+       _parser = SourceComicDetailsParser(translateSourceText);
 
   final SourceRuntimeHost _runtimeHost;
   final SourceComicDetailsCache _cache;
   final SourceReloginCoordinator _reloginCoordinator;
-  final SourceTextTranslator _translateSourceText;
+  final SourceComicDetailsParser _parser;
+  final SourceComicDetailsRequestTracker _requestTracker =
+      SourceComicDetailsRequestTracker();
 
   String _resolveActiveSourceKey(String sourceKey) => sourceKey.trim().isEmpty
       ? _runtimeHost.activeSourceKey
@@ -33,6 +35,7 @@ class SourceComicDetailsCapability {
   Future<ComicDetailsData> loadComicDetails(
     String comicId, {
     String sourceKey = '',
+    bool forceRefresh = false,
   }) async {
     final normalizedComicId = comicId.trim();
     if (normalizedComicId.isEmpty) {
@@ -44,38 +47,100 @@ class SourceComicDetailsCapability {
       comicId: normalizedComicId,
     ).storageKey;
 
-    final memoryCached = _cache.get(
-      scopedComicKey,
-      sourceKey: resolvedSourceKey,
-    );
-    if (memoryCached != null) {
-      return memoryCached;
+    if (!forceRefresh) {
+      final memoryCached = _cache.get(
+        scopedComicKey,
+        sourceKey: resolvedSourceKey,
+      );
+      if (memoryCached != null) {
+        return memoryCached;
+      }
     }
 
-    final facade = _runtimeHost.handleFor(resolvedSourceKey).facade;
+    final handle = _runtimeHost.handleFor(resolvedSourceKey);
+    final facade = handle.facade;
 
     final inFlight = facade.cache.comicDetailsInFlight[scopedComicKey];
-    if (inFlight != null) {
+    if (!forceRefresh && inFlight != null) {
       return inFlight;
     }
 
-    final future = _loadComicDetailsFromSource(
+    final requestToken = _requestTracker.begin(scopedComicKey);
+    final future = _loadComicDetailsWithRuntimeRecovery(
       normalizedComicId,
-      facade,
+      handle,
       sourceKey: resolvedSourceKey,
+      shouldCacheResult: () =>
+          _requestTracker.isCurrent(scopedComicKey, requestToken),
     );
     facade.cache.comicDetailsInFlight[scopedComicKey] = future;
     try {
       return await future;
     } finally {
-      facade.cache.comicDetailsInFlight.remove(scopedComicKey);
+      if (identical(
+        facade.cache.comicDetailsInFlight[scopedComicKey],
+        future,
+      )) {
+        facade.cache.comicDetailsInFlight.remove(scopedComicKey);
+      }
+      _requestTracker.complete(scopedComicKey, requestToken);
     }
+  }
+
+  Future<ComicDetailsData> _loadComicDetailsWithRuntimeRecovery(
+    String normalizedComicId,
+    SourceRuntimeHandle initialHandle, {
+    required String sourceKey,
+    required bool Function() shouldCacheResult,
+  }) async {
+    var handle = initialHandle;
+    var recoveringFromHttp210 = false;
+    for (var attempt = 0; attempt < 2; attempt++) {
+      final facade = handle.facade;
+      try {
+        final details = await _loadComicDetailsFromSource(
+          normalizedComicId,
+          facade,
+          sourceKey: sourceKey,
+          shouldCacheResult: shouldCacheResult,
+        );
+        if (!handle.recreationRequested) {
+          return details;
+        }
+      } catch (error) {
+        if (!handle.recreationRequested || attempt == 1) {
+          if (attempt == 1 && recoveringFromHttp210) {
+            throw Exception(
+              'copy_manga_runtime_recovery_failed_after_http_210:$error',
+            );
+          }
+          rethrow;
+        }
+      }
+
+      if (attempt == 1) {
+        throw Exception('copy_manga_runtime_recovery_failed_after_http_210');
+      }
+      recoveringFromHttp210 = true;
+      facade.addApplicationLog(
+        title: 'Recreating source runtime after HTTP 210',
+        level: 'warning',
+        source: 'source_runtime',
+        content: {'sourceKey': sourceKey, 'comicId': normalizedComicId},
+      );
+      handle = _runtimeHost.recreateSourceRuntime(
+        sourceKey,
+        expectedHandle: handle,
+      );
+    }
+    throw StateError('unreachable');
   }
 
   Future<ComicDetailsData> _loadComicDetailsFromSource(
     String normalizedComicId,
     HazukiSourceFacade facade, {
     required String sourceKey,
+    required bool Function() shouldCacheResult,
   }) async {
     await facade.ensureInitialized();
 
@@ -120,22 +185,24 @@ class SourceComicDetailsCapability {
       throw Exception('comic_details_invalid_response');
     }
 
-    final details = _buildComicDetailsFromSourceMap(
+    final details = _parser.parse(
       map: Map<String, dynamic>.from(resolved),
-      normalizedComicId: normalizedComicId,
+      fallbackComicId: normalizedComicId,
       sourceKey: sourceKey,
     );
 
-    _cache.put(
-      SourceScopedComicId(
-        sourceKey: details.sourceKey,
-        comicId: normalizedComicId,
-      ).storageKey,
-      details,
-      sourceKey: sourceKey,
-    );
-    if (details.id != normalizedComicId) {
-      _cache.put(details.scopedId.storageKey, details, sourceKey: sourceKey);
+    if (shouldCacheResult()) {
+      _cache.put(
+        SourceScopedComicId(
+          sourceKey: details.sourceKey,
+          comicId: normalizedComicId,
+        ).storageKey,
+        details,
+        sourceKey: sourceKey,
+      );
+      if (details.id != normalizedComicId) {
+        _cache.put(details.scopedId.storageKey, details, sourceKey: sourceKey);
+      }
     }
     return details;
   }
@@ -146,7 +213,53 @@ class SourceComicDetailsCapability {
     String sourceKey = '',
   }) async {
     final resolvedSourceKey = _resolveActiveSourceKey(sourceKey);
-    final facade = _runtimeHost.handleFor(resolvedSourceKey).facade;
+    var handle = _runtimeHost.handleFor(resolvedSourceKey);
+    for (var attempt = 0; attempt < 2; attempt++) {
+      final facade = handle.facade;
+      try {
+        final images = await _loadChapterImagesFromSource(
+          comicId: comicId,
+          epId: epId,
+          facade: facade,
+        );
+        if (!handle.recreationRequested) {
+          return images;
+        }
+      } catch (_) {
+        if (!handle.recreationRequested || attempt == 1) {
+          rethrow;
+        }
+      }
+
+      if (attempt == 1) {
+        throw Exception(
+          'copy_manga_chapter_images_recovery_failed_after_http_210',
+        );
+      }
+      facade.addApplicationLog(
+        title: 'Recreating source runtime after HTTP 210',
+        level: 'warning',
+        source: 'source_runtime',
+        content: {
+          'sourceKey': resolvedSourceKey,
+          'comicId': comicId,
+          'epId': epId,
+          'operation': 'load_chapter_images',
+        },
+      );
+      handle = _runtimeHost.recreateSourceRuntime(
+        resolvedSourceKey,
+        expectedHandle: handle,
+      );
+    }
+    throw StateError('unreachable');
+  }
+
+  Future<List<String>> _loadChapterImagesFromSource({
+    required String comicId,
+    required String epId,
+    required HazukiSourceFacade facade,
+  }) async {
     await facade.ensureInitialized();
     final engine = facade.js.engine;
     if (engine == null) {
@@ -171,50 +284,6 @@ class SourceComicDetailsCapability {
         .map((e) => e.toString())
         .where((e) => e.isNotEmpty)
         .toList();
-  }
-
-  ComicDetailsData _buildComicDetailsFromSourceMap({
-    required Map<String, dynamic> map,
-    required String normalizedComicId,
-    required String sourceKey,
-  }) {
-    final chapters = _extractComicDetailsChapters(
-      map,
-      fallbackComicId: normalizedComicId,
-    );
-    final recommend = _extractComicDetailsRecommendations(
-      map,
-      sourceKey: sourceKey,
-    );
-    final tags = _extractComicDetailsTags(map, sourceKey: sourceKey);
-
-    final detailsComicId = map['id']?.toString().trim() ?? '';
-    final finalComicId = detailsComicId.isEmpty
-        ? normalizedComicId
-        : detailsComicId;
-    final updateTime = _resolveComicDetailsUpdateTime(
-      map['updateTime']?.toString() ?? '',
-      tags,
-    );
-
-    return ComicDetailsData(
-      id: finalComicId,
-      title: map['title']?.toString() ?? '',
-      subTitle: (map['subTitle'] ?? map['subtitle'] ?? '').toString(),
-      cover: map['cover']?.toString() ?? '',
-      description: map['description']?.toString() ?? '',
-      updateTime: updateTime,
-      likesCount: map['likesCount']?.toString() ?? '',
-      chapters: chapters,
-      tags: _filterComicDetailsDisplayTags(tags),
-      recommend: recommend,
-      isFavorite: jsAsBool(map['isFavorite']),
-      isLiked: jsAsBool(map['isLiked']),
-      uploader: map['uploader']?.toString() ?? '',
-      pageCount: (map['pageCount'] ?? map['maxPage'] ?? '').toString(),
-      subId: map['subId']?.toString() ?? '',
-      sourceKey: sourceKey,
-    );
   }
 
   bool get supportComicLike {
@@ -316,145 +385,4 @@ class SourceComicDetailsCapability {
     SourceScopedComicId scopedId, {
     required ComicDetailsData Function(ComicDetailsData details) update,
   }) => _cache.update(scopedId, transform: update);
-
-  Map<String, String> _extractComicDetailsChapters(
-    Map<String, dynamic> map, {
-    required String fallbackComicId,
-  }) {
-    final chapters = <String, String>{};
-    final chapterEntriesRaw = map['__chapterEntries'];
-    if (chapterEntriesRaw is List) {
-      for (final item in chapterEntriesRaw) {
-        if (item is List && item.length >= 2) {
-          final id = item[0].toString().trim();
-          final title = item[1].toString().trim();
-          if (id.isNotEmpty && title.isNotEmpty) {
-            chapters[id] = title;
-          }
-        }
-      }
-    }
-
-    if (chapters.isEmpty) {
-      final chapterRaw = map['chapters'];
-      if (chapterRaw is Map) {
-        for (final entry in chapterRaw.entries) {
-          final id = entry.key.toString().trim();
-          final title = entry.value.toString().trim();
-          if (id.isNotEmpty && title.isNotEmpty) {
-            chapters[id] = title;
-          }
-        }
-      }
-    }
-
-    if (chapters.isEmpty && fallbackComicId.isNotEmpty) {
-      chapters[fallbackComicId] = hazukiDefaultChapterTitleToken;
-    }
-    return chapters;
-  }
-
-  Map<String, List<String>> _extractComicDetailsTags(
-    Map<String, dynamic> map, {
-    required String sourceKey,
-  }) {
-    final tags = <String, List<String>>{};
-    final tagsRaw = map['tags'];
-    if (tagsRaw is Map) {
-      for (final entry in tagsRaw.entries) {
-        final value = entry.value;
-        if (value is List) {
-          tags[_translateSourceText(
-            entry.key.toString(),
-            sourceKey: sourceKey,
-          )] = value
-              .map((e) => e.toString())
-              .toList();
-        }
-      }
-    }
-    return tags;
-  }
-
-  List<ExploreComic> _extractComicDetailsRecommendations(
-    Map<String, dynamic> map, {
-    required String sourceKey,
-  }) {
-    final recommend = <ExploreComic>[];
-    final recommendRaw = map['recommend'];
-    if (recommendRaw is List) {
-      for (final item in recommendRaw) {
-        if (item is! Map) {
-          continue;
-        }
-        final recommendMap = Map<String, dynamic>.from(item);
-        final id = recommendMap['id']?.toString().trim() ?? '';
-        final title = recommendMap['title']?.toString().trim() ?? '';
-        if (id.isEmpty || title.isEmpty) {
-          continue;
-        }
-        final subTitle =
-            (recommendMap['subTitle'] ?? recommendMap['subtitle'] ?? '')
-                .toString()
-                .trim();
-        final cover = recommendMap['cover']?.toString().trim() ?? '';
-        recommend.add(
-          ExploreComic(
-            id: id,
-            title: title,
-            subTitle: subTitle,
-            cover: cover,
-            sourceKey: sourceKey,
-          ),
-        );
-      }
-    }
-    return recommend;
-  }
-}
-
-String _resolveComicDetailsUpdateTime(
-  String explicitUpdateTime,
-  Map<String, List<String>> tags,
-) {
-  final trimmed = explicitUpdateTime.trim();
-  if (trimmed.isNotEmpty) {
-    return trimmed;
-  }
-  for (final entry in tags.entries) {
-    if (!_isComicDetailsUpdateTagKey(entry.key)) {
-      continue;
-    }
-    for (final value in entry.value) {
-      final text = value.trim();
-      if (text.isNotEmpty) {
-        return text;
-      }
-    }
-  }
-  return '';
-}
-
-Map<String, List<String>> _filterComicDetailsDisplayTags(
-  Map<String, List<String>> tags,
-) {
-  final filtered = <String, List<String>>{};
-  for (final entry in tags.entries) {
-    if (_isComicDetailsUpdateTagKey(entry.key)) {
-      continue;
-    }
-    filtered[entry.key] = entry.value;
-  }
-  return filtered;
-}
-
-bool _isComicDetailsUpdateTagKey(String key) {
-  final normalized = key.trim().toLowerCase();
-  return normalized == '更新' ||
-      normalized == '更新时间' ||
-      normalized == 'update' ||
-      normalized == 'updated' ||
-      normalized == 'time' ||
-      normalized == 'datetime' ||
-      normalized == 'datetime_updated';
 }

@@ -258,6 +258,7 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
         }) {
           return FavoritePage(
             sourceService: sl<SourceFavoriteGateway>(),
+            readerService: sl<SourceReaderGateway>(),
             localFavoritesRepository: sl<LocalFavoritesRepository>(),
             localFavoritesPreferences: sl<LocalFavoritesPreferencesStore>(),
             imageGateway: sl<SourceImageGateway>(),
@@ -273,6 +274,7 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
           return HistoryPage(
             readHistoryService: sl<ReadHistoryService>(),
             sourceService: sl<SourceSelectionGateway>(),
+            readerService: sl<SourceReaderGateway>(),
             imageGateway: sl<SourceImageGateway>(),
             comicDetailPageBuilder: comicDetailPageBuilder,
             onFavoriteRequested: onFavoriteRequested,

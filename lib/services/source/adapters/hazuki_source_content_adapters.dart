@@ -280,7 +280,12 @@ class HazukiSourceComicDetailAdapter implements SourceComicDetailGateway {
   Future<ComicDetailsData> loadComicDetails(
     String comicId, {
     String sourceKey = '',
-  }) => _content.loadComicDetails(comicId, sourceKey: sourceKey);
+    bool forceRefresh = false,
+  }) => _content.loadComicDetails(
+    comicId,
+    sourceKey: sourceKey,
+    forceRefresh: forceRefresh,
+  );
   @override
   Future<List<CategoryTagGroup>> loadCategoryTagGroups({
     bool forceRefresh = false,

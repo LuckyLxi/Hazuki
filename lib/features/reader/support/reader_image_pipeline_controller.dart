@@ -729,7 +729,11 @@ class ReaderImagePipelineController {
         await _evictImageCacheEntries([url]);
         providerCache.remove(url);
         providerFutureCache.remove(url);
-        return _buildImageProvider(url, useDiskCache: false, priority: true);
+        return await _buildImageProvider(
+          url,
+          useDiskCache: false,
+          priority: true,
+        );
       }
       return MemoryImage(prepared.bytes);
     } finally {

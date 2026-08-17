@@ -1,69 +1,43 @@
-import 'dart:async';
-import 'dart:collection';
-import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:crypto/crypto.dart';
-import 'package:path_provider/path_provider.dart';
-
 import '../../../models/hazuki_models.dart';
-import '../common/source_prefs_keys.dart';
 import '../runtime/source_runtime_facade.dart';
+import 'image_cache_policy.dart';
+import 'image_disk_cache_store.dart';
+import 'image_download_scheduler.dart';
+import 'source_image_network_downloader.dart';
 
 class ImageCacheCapability {
-  ImageCacheCapability(this._facade);
+  ImageCacheCapability(HazukiSourceFacade facade)
+    : _facade = facade,
+      _diskCache = ImageDiskCacheStore(
+        getCachedDirectory: () => facade.cache.imageCacheDir,
+        setCachedDirectory: (directory) =>
+            facade.cache.imageCacheDir = directory,
+      );
 
   final HazukiSourceFacade _facade;
+  final ImageDiskCacheStore _diskCache;
+  late final ImageCachePolicy _policy = ImageCachePolicy(
+    getPreferences: () => _facade.session.prefs,
+    cleanByAge: _diskCache.cleanByAge,
+    trimToOverflow: _diskCache.trimToOverflow,
+  );
+  late final SourceImageNetworkDownloader _networkDownloader =
+      SourceImageNetworkDownloader.forFacade(_facade);
 
-  static const int _maxConcurrent = 4;
-  int _activeCount = 0;
-  final Queue<_ImageDownloadSlotWaiter> _waiters =
-      Queue<_ImageDownloadSlotWaiter>();
-  Future<void>? _enforcePolicyInFlight;
+  final ImageDownloadScheduler _downloadScheduler = ImageDownloadScheduler();
 
   // ---------- Cache size config ----------
 
-  int get maxBytes {
-    final prefs = _facade.session.prefs;
-    final value =
-        prefs?.getInt(SourcePrefsKeys.cacheMaxBytes) ??
-        SourcePrefsKeys.defaultCacheMaxBytes;
-    return value < SourcePrefsKeys.defaultCacheMaxBytes
-        ? SourcePrefsKeys.defaultCacheMaxBytes
-        : value;
-  }
+  int get maxBytes => _policy.maxBytes;
 
-  Future<void> setMaxBytes(int value) async {
-    final prefs = _facade.session.prefs;
-    if (prefs == null) {
-      return;
-    }
-    final normalized = value < SourcePrefsKeys.defaultCacheMaxBytes
-        ? SourcePrefsKeys.defaultCacheMaxBytes
-        : value;
-    await prefs.setInt(SourcePrefsKeys.cacheMaxBytes, normalized);
-    await enforcePolicy();
-  }
+  Future<void> setMaxBytes(int value) => _policy.setMaxBytes(value);
 
-  String get autoCleanMode {
-    final prefs = _facade.session.prefs;
-    final mode = prefs?.getString(SourcePrefsKeys.cacheAutoCleanMode);
-    if (mode == 'seven_days') {
-      return mode!;
-    }
-    return SourcePrefsKeys.defaultAutoCleanMode;
-  }
+  String get autoCleanMode => _policy.autoCleanMode;
 
-  Future<void> setAutoCleanMode(String mode) async {
-    final prefs = _facade.session.prefs;
-    if (prefs == null) {
-      return;
-    }
-    final normalized = mode == 'seven_days' ? 'seven_days' : 'size_overflow';
-    await prefs.setString(SourcePrefsKeys.cacheAutoCleanMode, normalized);
-    await enforcePolicy(force: true);
-  }
+  Future<void> setAutoCleanMode(String mode) => _policy.setAutoCleanMode(mode);
 
   Future<Map<String, dynamic>> getStatus() async {
     final dir = await ensureCacheDir();
@@ -189,7 +163,7 @@ class ImageCacheCapability {
     final inFlight = inFlightMap[cacheKey];
     if (inFlight != null) {
       if (priority) {
-        _promoteWaitingDownload(cacheKey);
+        _downloadScheduler.promote(cacheKey);
       }
       final bytes = await inFlight;
       if (keepInMemory) {
@@ -198,18 +172,15 @@ class ImageCacheCapability {
       return bytes;
     }
 
-    final future = () async {
-      await _acquireSlot(cacheKey, priority: priority);
-      try {
-        return await _downloadFromNetwork(
-          normalizedUrl,
-          comicId: comicId,
-          epId: epId,
-        );
-      } finally {
-        _releaseSlot();
-      }
-    }();
+    final future = _downloadScheduler.schedule(
+      cacheKey,
+      priority: priority,
+      task: () => _networkDownloader.download(
+        normalizedUrl,
+        comicId: comicId,
+        epId: epId,
+      ),
+    );
     inFlightMap[cacheKey] = future;
 
     try {
@@ -226,115 +197,10 @@ class ImageCacheCapability {
     }
   }
 
-  Future<Uint8List> _downloadFromNetwork(
-    String url, {
-    String? comicId,
-    String? epId,
-  }) async {
-    final headers = <String, dynamic>{};
-
-    try {
-      final engine = _facade.js.engine;
-      if (engine != null) {
-        final cid = jsonEncode(comicId ?? '');
-        final eid = jsonEncode(epId ?? '');
-        final dynamic configRaw = engine.evaluate(
-          'this.__hazuki_source.comic?.onImageLoad?.(${jsonEncode(url)}, $cid, $eid) ?? {}',
-          name: 'source_on_image_load.js',
-        );
-        final dynamic config = await _facade.js.resolve(configRaw);
-        if (config is Map) {
-          final cfg = Map<String, dynamic>.from(config);
-          final h = cfg['headers'];
-          if (h is Map) {
-            headers.addAll(Map<String, dynamic>.from(h));
-          }
-        }
-      }
-    } catch (_) {}
-
-    final cookie = _facade.httpGateway.buildCookieHeader(url);
-    if (cookie != null && cookie.isNotEmpty && !headers.containsKey('cookie')) {
-      headers['cookie'] = cookie;
-    }
-
-    final response = await _facade.httpGateway.getBytes(
-      url,
-      headers: headers,
-      category: 'image_download',
-    );
-
-    final data = response.data;
-    if (response.statusCode != 200 || data == null || data.isEmpty) {
-      throw Exception('image_download_failed:${response.statusCode ?? -1}');
-    }
-
-    return Uint8List.fromList(data);
-  }
-
-  Future<void> _acquireSlot(String cacheKey, {required bool priority}) async {
-    if (_activeCount < _maxConcurrent) {
-      _activeCount++;
-      return;
-    }
-    final waiter = _ImageDownloadSlotWaiter(cacheKey);
-    if (priority) {
-      _waiters.addFirst(waiter);
-    } else {
-      _waiters.addLast(waiter);
-    }
-    await waiter.completer.future;
-  }
-
-  void _releaseSlot() {
-    if (_waiters.isNotEmpty) {
-      final next = _waiters.removeFirst();
-      if (!next.completer.isCompleted) {
-        next.completer.complete();
-      }
-      return;
-    }
-    if (_activeCount > 0) {
-      _activeCount--;
-    }
-  }
-
-  void _promoteWaitingDownload(String cacheKey) {
-    _ImageDownloadSlotWaiter? pending;
-    for (final waiter in _waiters) {
-      if (waiter.cacheKey == cacheKey) {
-        pending = waiter;
-        break;
-      }
-    }
-    if (pending == null || pending.completer.isCompleted) {
-      return;
-    }
-    if (_waiters.remove(pending)) {
-      _waiters.addFirst(pending);
-    }
-  }
-
   // ---------- Disk cache ----------
 
-  Future<Uint8List?> _readFromDisk(String url, {String sourceKey = ''}) async {
-    try {
-      final file = await _cacheFileFor(url, sourceKey: sourceKey);
-      if (!await file.exists()) {
-        return null;
-      }
-      final stat = await file.stat();
-      final now = DateTime.now();
-      await file.setLastAccessed(now);
-      await file.setLastModified(now);
-      if (stat.size <= 0) {
-        return null;
-      }
-      return await file.readAsBytes();
-    } catch (_) {
-      return null;
-    }
-  }
+  Future<Uint8List?> _readFromDisk(String url, {String sourceKey = ''}) =>
+      _diskCache.read(url, sourceKey: sourceKey);
 
   Future<void> _saveToDisk(
     String url,
@@ -342,18 +208,8 @@ class ImageCacheCapability {
     String sourceKey = '',
   }) async {
     try {
-      final file = await _cacheFileFor(url, sourceKey: sourceKey);
-      if (await file.exists()) {
-        final stat = await file.stat();
-        if (stat.size == bytes.length && stat.size > 0) {
-          final now = DateTime.now();
-          await file.setLastAccessed(now);
-          await file.setLastModified(now);
-          return;
-        }
-      }
-      await file.writeAsBytes(bytes, flush: false);
-      await enforcePolicy();
+      final wrote = await _diskCache.write(url, bytes, sourceKey: sourceKey);
+      if (wrote) await _policy.enforce();
     } catch (_) {}
   }
 
@@ -361,199 +217,18 @@ class ImageCacheCapability {
 
   Future<void> init() async {
     await ensureCacheDir();
-    await enforcePolicy(force: true);
+    await _policy.enforce(force: true);
   }
 
-  Future<Directory> ensureCacheDir() async {
-    final existed = _facade.cache.imageCacheDir;
-    if (existed != null) {
-      return existed;
-    }
-    Directory dir;
-    if (Platform.isWindows) {
-      final exeDir = File(Platform.resolvedExecutable).parent.path;
-      dir = Directory('$exeDir/image_cache');
-    } else {
-      final supportDir = await getApplicationSupportDirectory();
-      dir = Directory('${supportDir.path}/image_cache');
-    }
-    if (!await dir.exists()) {
-      await dir.create(recursive: true);
-    }
-    _facade.cache.imageCacheDir = dir;
-    return dir;
-  }
+  Future<Directory> ensureCacheDir() => _diskCache.ensureDirectory();
 
-  String _cacheFileName(String url, {String sourceKey = ''}) {
-    final scopedUrl = SourceScopedComicId(
-      sourceKey: sourceKey,
-      comicId: url,
-    ).imageCacheKey;
-    final hash = md5.convert(utf8.encode(scopedUrl)).toString();
-    return '$hash.bin';
-  }
+  Future<void> enforcePolicy({bool force = false}) =>
+      _policy.enforce(force: force);
 
-  Future<File> _cacheFileFor(String url, {String sourceKey = ''}) async {
-    final dir = await ensureCacheDir();
-    return File('${dir.path}/${_cacheFileName(url, sourceKey: sourceKey)}');
-  }
-
-  Future<void> enforcePolicy({bool force = false}) {
-    if (!force) {
-      final inFlight = _enforcePolicyInFlight;
-      if (inFlight != null) {
-        return inFlight;
-      }
-    }
-    final future = _enforcePolicyInternal(force: force);
-    _enforcePolicyInFlight = future;
-    return future.whenComplete(() {
-      if (identical(_enforcePolicyInFlight, future)) {
-        _enforcePolicyInFlight = null;
-      }
-    });
-  }
-
-  Future<void> _enforcePolicyInternal({bool force = false}) async {
-    final prefs = _facade.session.prefs;
-    if (prefs == null) {
-      return;
-    }
-
-    final now = DateTime.now();
-    final mode = autoCleanMode;
-
-    if (mode == 'seven_days') {
-      final lastAtMs = prefs.getInt(SourcePrefsKeys.cacheLastAutoCleanAt) ?? 0;
-      final shouldCleanByAge =
-          force ||
-          lastAtMs <= 0 ||
-          now.difference(DateTime.fromMillisecondsSinceEpoch(lastAtMs)) >=
-              const Duration(days: 7);
-      if (shouldCleanByAge) {
-        await _cleanByAge(const Duration(days: 1));
-        await prefs.setInt(
-          SourcePrefsKeys.cacheLastAutoCleanAt,
-          now.millisecondsSinceEpoch,
-        );
-      }
-    }
-
-    final trimmedByOverflow = await _trimToOverflow();
-    if (mode != 'seven_days' && trimmedByOverflow) {
-      await prefs.setInt(
-        SourcePrefsKeys.cacheLastAutoCleanAt,
-        now.millisecondsSinceEpoch,
-      );
-    }
-  }
-
-  Future<bool> _trimToOverflow() async {
-    final dir = await ensureCacheDir();
-    final entities = await dir.list(followLinks: false).toList();
-    final files = <File>[];
-    for (final entity in entities) {
-      if (entity is File) {
-        files.add(entity);
-      }
-    }
-
-    final stats = <MapEntry<File, FileStat>>[];
-    var total = 0;
-    for (final file in files) {
-      try {
-        final stat = await file.stat();
-        if (stat.size <= 0) {
-          continue;
-        }
-        total += stat.size;
-        stats.add(MapEntry(file, stat));
-      } catch (_) {
-        continue;
-      }
-    }
-
-    final limit = maxBytes;
-    if (total <= limit) {
-      return false;
-    }
-
-    var targetBytes = (limit * SourcePrefsKeys.cacheOverflowTrimTargetRatio)
-        .round();
-    if (targetBytes < 0) {
-      targetBytes = 0;
-    }
-
-    stats.sort((a, b) => a.value.modified.compareTo(b.value.modified));
-    var removedAny = false;
-    for (final item in stats) {
-      if (total <= targetBytes) {
-        break;
-      }
-      try {
-        await item.key.delete();
-        total -= item.value.size;
-        removedAny = true;
-      } catch (_) {
-        continue;
-      }
-    }
-
-    return removedAny;
-  }
-
-  Future<void> _cleanByAge(Duration keepDuration) async {
-    final dir = await ensureCacheDir();
-    final entities = await dir.list(followLinks: false).toList();
-    final threshold = DateTime.now().subtract(keepDuration);
-    for (final entity in entities) {
-      if (entity is! File) {
-        continue;
-      }
-      try {
-        final stat = await entity.stat();
-        if (stat.modified.isBefore(threshold)) {
-          await entity.delete();
-        }
-      } catch (_) {
-        continue;
-      }
-    }
-  }
-
-  Future<int> computeSizeBytes() async {
-    final dir = await ensureCacheDir();
-    final entities = await dir.list(followLinks: false).toList();
-    var total = 0;
-    for (final entity in entities) {
-      if (entity is! File) {
-        continue;
-      }
-      try {
-        final stat = await entity.stat();
-        if (stat.size > 0) {
-          total += stat.size;
-        }
-      } catch (_) {
-        continue;
-      }
-    }
-    return total;
-  }
+  Future<int> computeSizeBytes() => _diskCache.computeSizeBytes();
 
   Future<void> clear() async {
-    final dir = await ensureCacheDir();
-    final entities = await dir.list(followLinks: false).toList();
-    for (final entity in entities) {
-      if (entity is! File) {
-        continue;
-      }
-      try {
-        await entity.delete();
-      } catch (_) {
-        continue;
-      }
-    }
+    await _diskCache.clear();
     _facade.cache.imageBytesCache.clear();
   }
 
@@ -562,29 +237,6 @@ class ImageCacheCapability {
     String sourceKey = '',
   }) async {
     final resolvedSourceKey = _resolveSourceKeyForRequest(sourceKey);
-    for (final url in urls) {
-      final normalizedUrl = url.trim();
-      if (normalizedUrl.isEmpty) {
-        continue;
-      }
-      try {
-        final file = await _cacheFileFor(
-          normalizedUrl,
-          sourceKey: resolvedSourceKey,
-        );
-        if (await file.exists()) {
-          await file.delete();
-        }
-      } catch (_) {
-        continue;
-      }
-    }
+    await _diskCache.evictEntries(urls, sourceKey: resolvedSourceKey);
   }
-}
-
-class _ImageDownloadSlotWaiter {
-  _ImageDownloadSlotWaiter(this.cacheKey);
-
-  final String cacheKey;
-  final Completer<void> completer = Completer<void>();
 }

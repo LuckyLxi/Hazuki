@@ -23,6 +23,56 @@ class ComicDetailLoadingView extends StatelessWidget {
   }
 }
 
+class ComicDetailLoadErrorView extends StatelessWidget {
+  const ComicDetailLoadErrorView({
+    super.key,
+    required this.isTimeout,
+    this.isRetrying = false,
+    this.onRetry,
+  });
+
+  final bool isTimeout;
+  final bool isRetrying;
+  final VoidCallback? onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = l10n(context);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 48),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              isRetrying
+                  ? strings.sourceRuntimeRetryingMessage
+                  : isTimeout
+                  ? strings.comicDetailRecoveryTimedOut
+                  : strings.sourceRuntimeErrorGeneric,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: isRetrying ? null : onRetry,
+              icon: isRetrying
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.refresh),
+              label: Text(
+                isRetrying ? strings.comicDetailLoading : strings.commonRetry,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class ComicDetailAppBarTitle extends StatelessWidget {
   const ComicDetailAppBarTitle({
     super.key,

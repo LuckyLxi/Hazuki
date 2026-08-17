@@ -117,16 +117,42 @@ void main() {
       expect(stored.lastReloginAt, isNotNull);
     },
   );
+
+  test(
+    'uses the persisted CopyManga session before attempting relogin',
+    () async {
+      var loginCount = 0;
+      final coordinator = SourceReloginCoordinator(
+        loginWithStoredAccount:
+            (_, {required account, required password}) async {
+              loginCount++;
+            },
+      );
+
+      final ready = await coordinator.ensureFavoriteSessionReady(
+        _FakeReloginContext(
+          sourceKey: 'copy_manga',
+          accountData: const ['user', 'password'],
+        ),
+      );
+
+      expect(ready, isTrue);
+      expect(loginCount, 0);
+    },
+  );
 }
 
 class _FakeReloginContext implements SourceReloginContext {
   _FakeReloginContext({
+    this.sourceKey = 'jm',
     this.isLogged = true,
     this.shouldSkip = false,
     this.accountData,
     List<SourceCookie>? cookies,
   }) : cookies = List.of(cookies ?? const []);
 
+  @override
+  final String sourceKey;
   @override
   final bool isLogged;
   final bool shouldSkip;

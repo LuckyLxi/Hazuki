@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import 'package:hazuki/features/reader/view/reader_control_surface.dart';
 import 'package:hazuki/features/reader/view/reader_overlay_layout.dart';
 
 class ReaderBottomControls extends StatelessWidget {
@@ -61,6 +62,11 @@ class ReaderBottomControls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hiddenControlsOffset =
+        ReaderOverlayLayout.bottomControlsHeight +
+        MediaQuery.paddingOf(context).bottom +
+        ReaderOverlayLayout.bottomControlsBottomPadding;
+
     return SafeArea(
       top: false,
       child: Padding(
@@ -70,111 +76,381 @@ class ReaderBottomControls extends StatelessWidget {
           ReaderOverlayLayout.edgePadding,
           ReaderOverlayLayout.bottomControlsBottomPadding,
         ),
-        child: Stack(
-          alignment: Alignment.bottomCenter,
-          clipBehavior: Clip.none,
-          children: [
-            IgnorePointer(
-              ignoring: controlsVisible || !isZoomed,
-              child: AnimatedAlign(
-                alignment: controlsVisible
-                    ? Alignment.bottomLeft
-                    : Alignment.bottomCenter,
-                duration: const Duration(milliseconds: 280),
-                curve: Curves.easeOutCubic,
-                child: AnimatedPadding(
-                  padding: EdgeInsets.only(
-                    bottom: controlsVisible
-                        ? ReaderOverlayLayout.bottomControlsHeight -
-                              ReaderOverlayLayout.bottomControlsButtonSize -
-                              8
-                        : ReaderOverlayLayout.hiddenResetZoomLift,
-                  ),
-                  duration: const Duration(milliseconds: 280),
-                  curve: Curves.easeOutCubic,
-                  child: AnimatedOpacity(
-                    opacity: !controlsVisible && isZoomed ? 1.0 : 0.0,
-                    duration: const Duration(milliseconds: 220),
-                    curve: Curves.easeOutCubic,
-                    child: _ReaderResetZoomButton(
-                      label: resetZoomLabel,
-                      onPressed: onResetZoom,
-                      embedded: false,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            IgnorePointer(
-              ignoring: !controlsVisible,
-              child: AnimatedSlide(
-                offset: controlsVisible ? Offset.zero : const Offset(0, 0.36),
-                duration: const Duration(milliseconds: 260),
-                curve: Curves.easeOutBack,
-                child: AnimatedScale(
-                  scale: controlsVisible ? 1.0 : 0.96,
-                  duration: const Duration(milliseconds: 260),
-                  curve: Curves.easeOutBack,
-                  child: AnimatedOpacity(
-                    opacity: controlsVisible ? 1.0 : 0.0,
-                    duration: const Duration(milliseconds: 200),
-                    curve: Curves.easeOutCubic,
-                    child: ValueListenableBuilder<int>(
-                      valueListenable: pageIndexNotifier,
-                      builder: (context, pageIndex, _) {
-                        final maxIndex = math.max(imageCount - 1, 0);
-                        final rawSliderValue = sliderDragging
-                            ? sliderDragValue
-                            : pageIndex.toDouble();
-                        final sliderValue = math.min(
-                          math.max(rawSliderValue, 0.0),
-                          maxIndex.toDouble(),
-                        );
-                        final displayIndex = math.max(
-                          0,
-                          math.min(
-                            sliderDragging ? sliderValue.round() : pageIndex,
-                            maxIndex,
+        child: _ReaderResetZoomTransitionLayout(
+          controlsVisible: controlsVisible,
+          isZoomed: isZoomed,
+          label: resetZoomLabel,
+          onPressed: onResetZoom,
+          controlBarBuilder:
+              (controlBarKey, resetZoomTargetKey, resetZoomTransitionProgress) {
+                return Stack(
+                  alignment: Alignment.bottomCenter,
+                  clipBehavior: Clip.none,
+                  children: [
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      child: TweenAnimationBuilder<double>(
+                        key: const ValueKey<String>(
+                          'reader_bottom_control_bar_transition',
+                        ),
+                        tween: Tween<double>(
+                          begin: controlsVisible ? 0 : hiddenControlsOffset,
+                          end: controlsVisible ? 0 : hiddenControlsOffset,
+                        ),
+                        duration: const Duration(milliseconds: 360),
+                        curve: Curves.easeOutBack,
+                        builder: (context, offsetY, child) =>
+                            Transform.translate(
+                              offset: Offset(0, offsetY),
+                              child: child,
+                            ),
+                        child: IgnorePointer(
+                          ignoring: !controlsVisible,
+                          child: ValueListenableBuilder<int>(
+                            valueListenable: pageIndexNotifier,
+                            builder: (context, pageIndex, _) {
+                              final maxIndex = math.max(imageCount - 1, 0);
+                              final rawSliderValue = sliderDragging
+                                  ? sliderDragValue
+                                  : pageIndex.toDouble();
+                              final sliderValue = math.min(
+                                math.max(rawSliderValue, 0.0),
+                                maxIndex.toDouble(),
+                              );
+                              final displayIndex = math.max(
+                                0,
+                                math.min(
+                                  sliderDragging
+                                      ? sliderValue.round()
+                                      : pageIndex,
+                                  maxIndex,
+                                ),
+                              );
+                              final canDrag = imageCount > 1;
+                              return LayoutBuilder(
+                                builder: (context, constraints) {
+                                  return _ReaderUnifiedControlBar(
+                                    key: controlBarKey,
+                                    readerTheme: readerTheme,
+                                    displayIndex: displayIndex,
+                                    imageCount: imageCount,
+                                    maxIndex: maxIndex,
+                                    sliderValue: sliderValue,
+                                    canDrag: canDrag,
+                                    isZoomed: isZoomed,
+                                    chapterPanelLoading: chapterPanelLoading,
+                                    previousTooltip: previousTooltip,
+                                    chaptersTooltip: chaptersTooltip,
+                                    favoriteTooltip: favoriteTooltip,
+                                    commentsTooltip: commentsTooltip,
+                                    nextTooltip: nextTooltip,
+                                    resetZoomLabel: resetZoomLabel,
+                                    onSliderChangeStart: onSliderChangeStart,
+                                    onSliderPointerDown: onSliderPointerDown,
+                                    onSliderChanged: onSliderChanged,
+                                    onSliderChangeEnd: onSliderChangeEnd,
+                                    onPreviousChapter: onPreviousChapter,
+                                    onOpenChaptersPanel: onOpenChaptersPanel,
+                                    onFavorite: onFavorite,
+                                    onComments: onComments,
+                                    onNextChapter: onNextChapter,
+                                    onResetZoom: onResetZoom,
+                                    resetZoomTargetKey: resetZoomTargetKey,
+                                    resetZoomTransitionProgress:
+                                        resetZoomTransitionProgress,
+                                  );
+                                },
+                              );
+                            },
                           ),
-                        );
-                        final canDrag = imageCount > 1;
-                        return LayoutBuilder(
-                          builder: (context, constraints) {
-                            return _ReaderUnifiedControlBar(
-                              readerTheme: readerTheme,
-                              displayIndex: displayIndex,
-                              imageCount: imageCount,
-                              maxIndex: maxIndex,
-                              sliderValue: sliderValue,
-                              canDrag: canDrag,
-                              isZoomed: isZoomed,
-                              chapterPanelLoading: chapterPanelLoading,
-                              previousTooltip: previousTooltip,
-                              chaptersTooltip: chaptersTooltip,
-                              favoriteTooltip: favoriteTooltip,
-                              commentsTooltip: commentsTooltip,
-                              nextTooltip: nextTooltip,
-                              resetZoomLabel: resetZoomLabel,
-                              onSliderChangeStart: onSliderChangeStart,
-                              onSliderPointerDown: onSliderPointerDown,
-                              onSliderChanged: onSliderChanged,
-                              onSliderChangeEnd: onSliderChangeEnd,
-                              onPreviousChapter: onPreviousChapter,
-                              onOpenChaptersPanel: onOpenChaptersPanel,
-                              onFavorite: onFavorite,
-                              onComments: onComments,
-                              onNextChapter: onNextChapter,
-                              onResetZoom: onResetZoom,
-                            );
-                          },
-                        );
-                      },
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+        ),
+      ),
+    );
+  }
+}
+
+typedef _ReaderControlBarBuilder =
+    Widget Function(
+      GlobalKey controlBarKey,
+      GlobalKey resetZoomTargetKey,
+      ValueListenable<double> resetZoomTransitionProgress,
+    );
+
+class _ReaderResetZoomTransitionLayout extends StatefulWidget {
+  const _ReaderResetZoomTransitionLayout({
+    required this.controlsVisible,
+    required this.isZoomed,
+    required this.label,
+    required this.onPressed,
+    required this.controlBarBuilder,
+  });
+
+  final bool controlsVisible;
+  final bool isZoomed;
+  final String label;
+  final VoidCallback onPressed;
+  final _ReaderControlBarBuilder controlBarBuilder;
+
+  @override
+  State<_ReaderResetZoomTransitionLayout> createState() =>
+      _ReaderResetZoomTransitionLayoutState();
+}
+
+class _ReaderResetZoomTransitionLayoutState
+    extends State<_ReaderResetZoomTransitionLayout> {
+  final GlobalKey _stackKey = GlobalKey();
+  final GlobalKey _controlBarKey = GlobalKey();
+  final GlobalKey _resetZoomTargetKey = GlobalKey();
+  late final ValueNotifier<double> _transitionProgress = ValueNotifier<double>(
+    widget.controlsVisible ? 1 : 0,
+  );
+
+  @override
+  void dispose() {
+    _transitionProgress.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      height:
+          ReaderOverlayLayout.hiddenResetZoomLift +
+          ReaderOverlayLayout.bottomControlsButtonSize,
+      child: Stack(
+        key: _stackKey,
+        alignment: Alignment.bottomCenter,
+        clipBehavior: Clip.none,
+        children: [
+          _ReaderFloatingResetZoomButton(
+            controlsVisible: widget.controlsVisible,
+            isZoomed: widget.isZoomed,
+            label: widget.label,
+            onPressed: widget.onPressed,
+            stackKey: _stackKey,
+            controlBarKey: _controlBarKey,
+            resetZoomTargetKey: _resetZoomTargetKey,
+            transitionProgress: _transitionProgress,
+          ),
+          widget.controlBarBuilder(
+            _controlBarKey,
+            _resetZoomTargetKey,
+            _transitionProgress,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReaderFloatingResetZoomButton extends StatefulWidget {
+  const _ReaderFloatingResetZoomButton({
+    required this.controlsVisible,
+    required this.isZoomed,
+    required this.label,
+    required this.onPressed,
+    required this.stackKey,
+    required this.controlBarKey,
+    required this.resetZoomTargetKey,
+    required this.transitionProgress,
+  });
+
+  final bool controlsVisible;
+  final bool isZoomed;
+  final String label;
+  final VoidCallback onPressed;
+  final GlobalKey stackKey;
+  final GlobalKey controlBarKey;
+  final GlobalKey resetZoomTargetKey;
+  final ValueNotifier<double> transitionProgress;
+
+  @override
+  State<_ReaderFloatingResetZoomButton> createState() =>
+      _ReaderFloatingResetZoomButtonState();
+}
+
+class _ReaderFloatingResetZoomButtonState
+    extends State<_ReaderFloatingResetZoomButton>
+    with TickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 360),
+    value: widget.controlsVisible ? 1 : 0,
+  );
+  late final AnimationController _blendController = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 100),
+    reverseDuration: const Duration(milliseconds: 180),
+    value: widget.controlsVisible ? 1 : 0,
+  );
+  late bool _showButton = widget.isZoomed;
+  final GlobalKey _floatingButtonKey = GlobalKey();
+  Offset _targetDelta = Offset.zero;
+
+  @override
+  void initState() {
+    super.initState();
+    _blendController.addListener(_syncTransitionProgress);
+    _syncTransitionProgress();
+  }
+
+  void _syncTransitionProgress() {
+    widget.transitionProgress.value = _blendController.value;
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _blendController
+      ..removeListener(_syncTransitionProgress)
+      ..dispose();
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ReaderFloatingResetZoomButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!widget.isZoomed) {
+      return;
+    }
+    if (!oldWidget.isZoomed) {
+      _controller.value = widget.controlsVisible ? 1 : 0;
+      _blendController.value = widget.controlsVisible ? 1 : 0;
+      if (!widget.controlsVisible) {
+        setState(() => _showButton = true);
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _captureTargetPosition();
+        }
+      });
+      return;
+    }
+    if (widget.controlsVisible == oldWidget.controlsVisible) {
+      return;
+    }
+    if (!widget.controlsVisible) {
+      setState(() => _showButton = true);
+    }
+    _captureTargetPosition(notify: false);
+    if (widget.controlsVisible) {
+      _controller.forward();
+      _blendController.forward();
+    } else {
+      _controller.reverse();
+      _blendController.reverse();
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      _captureTargetPosition();
+    });
+  }
+
+  void _captureTargetPosition({bool notify = true}) {
+    final stackBox =
+        widget.stackKey.currentContext?.findRenderObject() as RenderBox?;
+    final controlBarBox =
+        widget.controlBarKey.currentContext?.findRenderObject() as RenderBox?;
+    final targetBox =
+        widget.resetZoomTargetKey.currentContext?.findRenderObject()
+            as RenderBox?;
+    final floatingBox =
+        _floatingButtonKey.currentContext?.findRenderObject() as RenderBox?;
+    if (stackBox == null ||
+        controlBarBox == null ||
+        targetBox == null ||
+        floatingBox == null) {
+      return;
+    }
+
+    final targetInControlBar = targetBox.localToGlobal(
+      Offset.zero,
+      ancestor: controlBarBox,
+    );
+    final targetTopLeft = Offset(
+      targetInControlBar.dx,
+      stackBox.size.height - controlBarBox.size.height + targetInControlBar.dy,
+    );
+    final sourceTopLeft = Offset(
+      (stackBox.size.width - floatingBox.size.width) / 2,
+      stackBox.size.height -
+          ReaderOverlayLayout.hiddenResetZoomLift -
+          floatingBox.size.height,
+    );
+    final nextDelta = targetTopLeft - sourceTopLeft;
+    if (nextDelta == _targetDelta) {
+      return;
+    }
+    if (notify) {
+      setState(() => _targetDelta = nextDelta);
+    } else {
+      _targetDelta = nextDelta;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_showButton) {
+      return const SizedBox.shrink();
+    }
+
+    return Positioned(
+      left: 0,
+      right: 0,
+      bottom: ReaderOverlayLayout.hiddenResetZoomLift,
+      child: IgnorePointer(
+        ignoring: widget.controlsVisible || !widget.isZoomed,
+        child: AnimatedOpacity(
+          opacity: widget.isZoomed ? 1 : 0,
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          onEnd: () {
+            if (!widget.isZoomed && mounted) {
+              setState(() => _showButton = false);
+            }
+          },
+          child: Center(
+            child: AnimatedBuilder(
+              animation: Listenable.merge([_controller, _blendController]),
+              builder: (context, child) {
+                final reversing = _controller.status == AnimationStatus.reverse;
+                final movementProgress =
+                    (reversing ? Curves.easeInBack : Curves.easeOutBack)
+                        .transform(_controller.value);
+                return Opacity(
+                  opacity: 1 - _blendController.value,
+                  child: Transform.translate(
+                    offset: _targetDelta * movementProgress,
+                    child: KeyedSubtree(
+                      key: _floatingButtonKey,
+                      child: KeyedSubtree(
+                        key: const ValueKey<String>(
+                          'reader_floating_reset_zoom_button',
+                        ),
+                        child: child!,
+                      ),
                     ),
                   ),
-                ),
+                );
+              },
+              child: _ReaderResetZoomButton(
+                label: widget.label,
+                onPressed: widget.onPressed,
+                embedded: false,
               ),
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -183,6 +459,7 @@ class ReaderBottomControls extends StatelessWidget {
 
 class _ReaderUnifiedControlBar extends StatelessWidget {
   const _ReaderUnifiedControlBar({
+    super.key,
     required this.readerTheme,
     required this.displayIndex,
     required this.imageCount,
@@ -207,6 +484,8 @@ class _ReaderUnifiedControlBar extends StatelessWidget {
     required this.onComments,
     required this.onNextChapter,
     required this.onResetZoom,
+    required this.resetZoomTargetKey,
+    required this.resetZoomTransitionProgress,
   });
 
   final ThemeData readerTheme;
@@ -233,21 +512,20 @@ class _ReaderUnifiedControlBar extends StatelessWidget {
   final VoidCallback? onComments;
   final VoidCallback? onNextChapter;
   final VoidCallback onResetZoom;
+  final GlobalKey resetZoomTargetKey;
+  final ValueListenable<double> resetZoomTransitionProgress;
 
   @override
   Widget build(BuildContext context) {
     final hasTopActions =
         onOpenChaptersPanel != null || onFavorite != null || onComments != null;
-    return Container(
+    return ReaderControlSurface(
+      borderRadius: 30,
+      fallbackColor: Colors.black.withValues(alpha: 0.68),
       height: hasTopActions
           ? ReaderOverlayLayout.bottomControlsHeight
           : ReaderOverlayLayout.bottomControlsButtonSize + 24,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.68),
-        borderRadius: BorderRadius.circular(30),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -261,10 +539,27 @@ class _ReaderUnifiedControlBar extends StatelessWidget {
                   child: isZoomed
                       ? Padding(
                           padding: const EdgeInsets.only(right: 4),
-                          child: _ReaderResetZoomButton(
-                            label: resetZoomLabel,
-                            onPressed: onResetZoom,
-                            embedded: true,
+                          child: KeyedSubtree(
+                            key: resetZoomTargetKey,
+                            child: AnimatedBuilder(
+                              animation: resetZoomTransitionProgress,
+                              builder: (context, child) {
+                                return Opacity(
+                                  opacity: resetZoomTransitionProgress.value,
+                                  child: child,
+                                );
+                              },
+                              child: KeyedSubtree(
+                                key: const ValueKey<String>(
+                                  'reader_embedded_reset_zoom_button',
+                                ),
+                                child: _ReaderResetZoomButton(
+                                  label: resetZoomLabel,
+                                  onPressed: onResetZoom,
+                                  embedded: true,
+                                ),
+                              ),
+                            ),
                           ),
                         )
                       : const SizedBox.shrink(),
@@ -457,11 +752,12 @@ class _ReaderResetZoomButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: !embedded
-          ? Colors.black.withValues(alpha: 0.72)
-          : Colors.white.withValues(alpha: 0.10),
+    final button = Material(
+      color: embedded
+          ? Colors.white.withValues(alpha: 0.10)
+          : Colors.transparent,
       borderRadius: BorderRadius.circular(24),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         borderRadius: BorderRadius.circular(24),
         onTap: onPressed,
@@ -491,6 +787,14 @@ class _ReaderResetZoomButton extends StatelessWidget {
           ),
         ),
       ),
+    );
+    if (embedded) {
+      return button;
+    }
+    return ReaderControlSurface(
+      borderRadius: 24,
+      fallbackColor: Colors.black.withValues(alpha: 0.72),
+      child: button,
     );
   }
 }

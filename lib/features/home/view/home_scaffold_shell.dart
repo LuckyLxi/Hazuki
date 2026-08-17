@@ -27,6 +27,18 @@ Future<void> handleHomePopRequest({
   }
 }
 
+@visibleForTesting
+Offset resolveHomeNavigationDrawerOffset({
+  required Size viewportSize,
+  required double progress,
+}) {
+  final scale = 1 - 0.035 * progress;
+  return Offset(
+    18 * progress + (1 - scale) * viewportSize.width / 2,
+    -(1 - scale) * viewportSize.height / 2,
+  );
+}
+
 class HomeScaffoldShell extends StatefulWidget {
   const HomeScaffoldShell({
     super.key,
@@ -320,28 +332,61 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
                       drawerEnableOpenDragGesture: false,
                       drawer: null,
                       body: body,
-                      bottomNavigationBar: Platform.isWindows
-                          ? null
-                          : HomeBottomNavigation(
-                              currentIndex: currentIndex,
-                              onDestinationSelected: onDestinationSelected,
-                              discoverLabel: l10n(context).homeTabDiscover,
-                              favoriteLabel: l10n(context).homeTabFavorite,
-                            ),
+                      bottomNavigationBar: null,
                     );
                   },
                 );
               },
             ),
           ),
-          builder: (context, child) => Transform.translate(
-            offset: Offset(18 * _profileDrawerController.value, 0),
-            child: Transform.scale(
-              scale: 1 - 0.035 * _profileDrawerController.value,
-              alignment: Alignment.centerRight,
-              child: child,
-            ),
-          ),
+          builder: (context, child) {
+            final drawerProgress = _profileDrawerController.value;
+            final transformedContent = Transform.translate(
+              offset: Offset(18 * drawerProgress, 0),
+              child: Transform.scale(
+                scale: 1 - 0.035 * drawerProgress,
+                alignment: Alignment.centerRight,
+                child: child,
+              ),
+            );
+            if (Platform.isWindows) {
+              return transformedContent;
+            }
+            return LayoutBuilder(
+              builder: (context, constraints) {
+                final navigationScale = 1 - 0.035 * drawerProgress;
+                final navigationOffset = resolveHomeNavigationDrawerOffset(
+                  viewportSize: constraints.biggest,
+                  progress: drawerProgress,
+                );
+                return Stack(
+                  fit: StackFit.expand,
+                  clipBehavior: Clip.none,
+                  children: [
+                    transformedContent,
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: -navigationOffset.dy,
+                      child: Padding(
+                        // A left inset twice the desired center displacement
+                        // reproduces the right-anchored scale and translation
+                        // using layout coordinates, keeping shaders untransformed.
+                        padding: EdgeInsets.only(left: navigationOffset.dx * 2),
+                        child: HomeBottomNavigation(
+                          currentIndex: currentIndex,
+                          onDestinationSelected: onDestinationSelected,
+                          discoverLabel: l10n(context).homeTabDiscover,
+                          favoriteLabel: l10n(context).homeTabFavorite,
+                          layoutScale: navigationScale,
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
         ),
       ),
     );
@@ -527,18 +572,17 @@ class _HomeAppBarProfileButtonState extends State<_HomeAppBarProfileButton> {
   void _openProfileDrawer() {
     final context = this.context;
     widget.onDrawerVisibilityChanged(true);
-    Navigator.of(context)
-        .push(
-          _HomeProfileDrawerRoute(
-            drawerWidth: resolveHomeDrawerWidth(context),
-            drawerColor:
-                DrawerTheme.of(context).backgroundColor ??
-                Theme.of(context).drawerTheme.backgroundColor ??
-                Theme.of(context).colorScheme.surface,
-            drawerContentListenable: _drawerContentNotifier,
-          ),
-        )
-        .whenComplete(() => widget.onDrawerVisibilityChanged(false));
+    Navigator.of(context).push(
+      _HomeProfileDrawerRoute(
+        drawerWidth: resolveHomeDrawerWidth(context),
+        drawerColor:
+            DrawerTheme.of(context).backgroundColor ??
+            Theme.of(context).drawerTheme.backgroundColor ??
+            Theme.of(context).colorScheme.surface,
+        drawerContentListenable: _drawerContentNotifier,
+        onClosing: () => widget.onDrawerVisibilityChanged(false),
+      ),
+    );
   }
 }
 
@@ -643,11 +687,14 @@ class _HomeProfileDrawerRoute extends PageRoute<void> {
     required this.drawerWidth,
     required this.drawerColor,
     required this.drawerContentListenable,
+    required this.onClosing,
   });
 
   final double drawerWidth;
   final Color drawerColor;
   final ValueListenable<Widget> drawerContentListenable;
+  final VoidCallback onClosing;
+  bool _closingNotified = false;
 
   @override
   bool get opaque => false;
@@ -670,6 +717,20 @@ class _HomeProfileDrawerRoute extends PageRoute<void> {
   @override
   Duration get reverseTransitionDuration => const Duration(milliseconds: 160);
 
+  void _notifyClosing() {
+    if (_closingNotified) {
+      return;
+    }
+    _closingNotified = true;
+    onClosing();
+  }
+
+  @override
+  bool didPop(void result) {
+    _notifyClosing();
+    return super.didPop(result);
+  }
+
   @override
   void didChangeNext(Route<dynamic>? nextRoute) {
     super.didChangeNext(nextRoute);
@@ -689,15 +750,23 @@ class _HomeProfileDrawerRoute extends PageRoute<void> {
   ) {
     return Align(
       alignment: Alignment.centerLeft,
-      child: Drawer(
-        width: drawerWidth,
-        backgroundColor: drawerColor,
-        child: ValueListenableBuilder<Widget>(
-          valueListenable: drawerContentListenable,
-          builder: (context, drawerContent, _) => drawerContent,
+      child: RepaintBoundary(
+        child: Drawer(
+          width: drawerWidth,
+          backgroundColor: drawerColor,
+          child: ValueListenableBuilder<Widget>(
+            valueListenable: drawerContentListenable,
+            builder: (context, drawerContent, _) => drawerContent,
+          ),
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _notifyClosing();
+    super.dispose();
   }
 
   @override

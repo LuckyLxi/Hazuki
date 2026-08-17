@@ -3,7 +3,6 @@ import 'cloud_sync_favorites_participant.dart';
 import 'cloud_sync_comment_filter_participant.dart';
 import 'cloud_sync_reading_participant.dart';
 import 'cloud_sync_settings_participant.dart';
-import 'cloud_sync_source_participant.dart';
 import '../download_groups_service.dart';
 import '../source/source_capabilities.dart';
 import '../local_favorites/local_favorites_contracts.dart';
@@ -16,7 +15,6 @@ class CloudSyncParticipantSet {
     required this.reading,
     required this.settings,
     required this.searchHistory,
-    required this.source,
     required this.commentFilter,
     required this.favorites,
     required this.downloadGroups,
@@ -25,7 +23,6 @@ class CloudSyncParticipantSet {
   final CloudSyncReadingParticipant reading;
   final CloudSyncSettingsParticipant settings;
   final SearchHistorySyncParticipant searchHistory;
-  final CloudSyncSourceParticipant source;
   final CommentFilterSyncParticipant commentFilter;
   final LocalFavoritesSyncParticipant favorites;
   final DownloadGroupsSyncParticipant downloadGroups;
@@ -56,7 +53,6 @@ CloudSyncParticipantSet createCloudSyncParticipantSet({
       commentFilter: commentFilterParticipant,
     ),
     searchHistory: SearchHistorySyncParticipant(searchHistory),
-    source: CloudSyncSourceParticipant(source),
     commentFilter: commentFilterParticipant,
     favorites: favoritesParticipant,
     downloadGroups: downloadGroupsParticipant,

@@ -133,9 +133,14 @@ class _CommentsCommentTileContent extends StatelessWidget {
     final hasReply = (comment.replyCount ?? 0) > 0;
     final bodyStyle = theme.textTheme.bodyMedium;
     final metaStyle = theme.textTheme.bodySmall;
+    final attribution = parseCommentUserAttribution(comment.userName);
     final displayName = comment.userName.isEmpty
         ? l10n(context).commentsAnonymousUser
-        : comment.userName;
+        : attribution.replyTo == null
+        ? attribution.author
+        : l10n(
+            context,
+          ).commentsReplyAttribution(attribution.author, attribution.replyTo!);
     final animationKey =
         comment.id ?? '${comment.userName}|${comment.time}|${comment.content}';
     final shouldAnimate = animatedCommentKeys.add(animationKey);
@@ -177,7 +182,7 @@ class _CommentsCommentTileContent extends StatelessWidget {
                     crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
                       if (comment.time.isNotEmpty)
-                        Text(comment.time, style: metaStyle),
+                        Text(formatCommentTime(comment.time), style: metaStyle),
                       if (hasReply)
                         Text(
                           l10n(
@@ -476,9 +481,14 @@ class _CommentReplyTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final attribution = parseCommentUserAttribution(comment.userName);
     final name = comment.userName.isEmpty
         ? l10n(context).commentsAnonymousUser
-        : comment.userName;
+        : attribution.replyTo == null
+        ? attribution.author
+        : l10n(
+            context,
+          ).commentsReplyAttribution(attribution.author, attribution.replyTo!);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -497,7 +507,10 @@ class _CommentReplyTile extends StatelessWidget {
                 children: [
                   Text(name, style: theme.textTheme.labelLarge),
                   if (comment.time.isNotEmpty)
-                    Text(comment.time, style: theme.textTheme.bodySmall),
+                    Text(
+                      formatCommentTime(comment.time),
+                      style: theme.textTheme.bodySmall,
+                    ),
                   const SizedBox(height: 4),
                   CommentsSelectableContent(
                     content: comment.content,

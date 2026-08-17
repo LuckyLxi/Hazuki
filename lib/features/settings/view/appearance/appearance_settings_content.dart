@@ -326,6 +326,19 @@ class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
                 );
               },
             ),
+            const Divider(height: 1, indent: 16, endIndent: 16),
+            SwitchListTile(
+              value: widget.settings.liquidGlassEnabled,
+              title: Text(strings.displayLiquidGlassTitle),
+              subtitle: Text(strings.displayLiquidGlassSubtitle),
+              onChanged: (value) {
+                unawaited(
+                  widget.onApply(
+                    widget.settings.copyWith(liquidGlassEnabled: value),
+                  ),
+                );
+              },
+            ),
           ],
         ),
         SettingsGroup(

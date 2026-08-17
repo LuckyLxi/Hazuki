@@ -10,12 +10,15 @@ class SourceHttpGateway {
     required String sourceKey,
     required SourceCookieStore cookieStore,
     required SourceNetworkLogSink networkLogSink,
+    void Function(int statusCode)? onResponseStatus,
   }) : _cookieStore = cookieStore,
        _networkLogSink = networkLogSink,
+       _onResponseStatus = onResponseStatus,
        _client = HazukiNetworkClient(dio: dio, sourceKey: sourceKey);
 
   final SourceCookieStore _cookieStore;
   final SourceNetworkLogSink _networkLogSink;
+  final void Function(int statusCode)? _onResponseStatus;
   final HazukiNetworkClient _client;
   bool _cookieBridgeConfigured = false;
 
@@ -101,6 +104,10 @@ class SourceHttpGateway {
       }
       error = e.toString();
     } finally {
+      final statusCode = response?.statusCode;
+      if (statusCode != null) {
+        _onResponseStatus?.call(statusCode);
+      }
       _networkLogSink.append(
         method: method,
         url: requestUrl,

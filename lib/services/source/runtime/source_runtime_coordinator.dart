@@ -95,6 +95,24 @@ class SourceRuntimeCoordinator<T extends SourceRuntimeResource> {
     return removed;
   }
 
+  /// Disposes a source's current resources and creates a replacement handle.
+  ///
+  /// When [expectedHandle] is supplied, a handle replaced by another caller is
+  /// retained. This makes concurrent recovery requests converge on one runtime.
+  T recreate(String sourceKey, {T? expectedHandle}) {
+    final normalized = normalize(sourceKey);
+    final current = _handles[normalized];
+    if (expectedHandle != null && !identical(current, expectedHandle)) {
+      return handleFor(normalized);
+    }
+    _handles.remove(normalized)?.requestDispose();
+    final replacement = handleFor(normalized);
+    if (normalized == _activeSourceKey) {
+      _onActiveSourceChanged();
+    }
+    return replacement;
+  }
+
   Future<void> _serialize(Future<void> Function() operation) {
     final next = _activationTail.then<void>(
       (_) => operation(),

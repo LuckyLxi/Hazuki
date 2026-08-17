@@ -15,12 +15,20 @@ class ComicDetailInfoTab extends StatelessWidget {
   const ComicDetailInfoTab({
     super.key,
     required this.details,
+    this.error,
+    this.hasTimedOut = false,
+    this.isRetrying = false,
+    this.onRetry,
     required this.skeletonColor,
     required this.isActiveInTabView,
     required this.shouldAnimateResolvedContent,
   });
 
   final ComicDetailsData? details;
+  final Object? error;
+  final bool hasTimedOut;
+  final bool isRetrying;
+  final VoidCallback? onRetry;
   final Color skeletonColor;
   final bool isActiveInTabView;
   final bool shouldAnimateResolvedContent;
@@ -45,6 +53,7 @@ class ComicDetailInfoTab extends StatelessWidget {
       context,
     );
     if (details == null) {
+      final error = this.error;
       return CustomScrollView(
         key: const PageStorageKey<String>('comic-detail-info-tab-loading'),
         physics: const ClampingScrollPhysics(),
@@ -53,7 +62,13 @@ class ComicDetailInfoTab extends StatelessWidget {
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
             sliver: SliverToBoxAdapter(
-              child: _ComicDetailInfoSkeleton(skeletonColor: skeletonColor),
+              child: error == null && !hasTimedOut
+                  ? _ComicDetailInfoSkeleton(skeletonColor: skeletonColor)
+                  : ComicDetailLoadErrorView(
+                      isTimeout: hasTimedOut || error is TimeoutException,
+                      isRetrying: isRetrying,
+                      onRetry: onRetry,
+                    ),
             ),
           ),
         ],

@@ -17,6 +17,16 @@ class _FakeDownloadStatus extends ChangeNotifier
 }
 
 void main() {
+  test('navigation drawer offset matches the foreground transform', () {
+    final offset = resolveHomeNavigationDrawerOffset(
+      viewportSize: const Size(360, 800),
+      progress: 1,
+    );
+
+    expect(offset.dx, closeTo(24.3, 0.001));
+    expect(offset.dy, closeTo(-14, 0.001));
+  });
+
   test('home pop request exits after confirmation', () async {
     var exitRequested = false;
 

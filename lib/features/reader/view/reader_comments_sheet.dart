@@ -30,6 +30,7 @@ class _ReaderCommentsSheetState extends State<ReaderCommentsSheet> {
   final DraggableScrollableController _sheetController =
       DraggableScrollableController();
   bool _sheetAtFullHeight = false;
+  bool _expandingToFullscreen = false;
 
   @override
   void dispose() {
@@ -38,14 +39,21 @@ class _ReaderCommentsSheetState extends State<ReaderCommentsSheet> {
   }
 
   Future<void> _expandToFullscreen() async {
-    if (!_sheetController.isAttached) {
+    if (!_sheetController.isAttached ||
+        _sheetAtFullHeight ||
+        _expandingToFullscreen) {
       return;
     }
-    await _sheetController.animateTo(
-      1,
-      duration: const Duration(milliseconds: 260),
-      curve: Curves.easeOutCubic,
-    );
+    _expandingToFullscreen = true;
+    try {
+      await _sheetController.animateTo(
+        1,
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutCubic,
+      );
+    } finally {
+      _expandingToFullscreen = false;
+    }
   }
 
   @override

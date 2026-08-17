@@ -5,8 +5,20 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../common/source_prefs_keys.dart';
 
+/// Persistence port used by runtime and source-script editing operations.
+abstract interface class SourceScriptStore {
+  Future<File> sourceFileFor(String sourceKey, {bool ensureDirectory = false});
+  Future<File> ensureLocalSourceFile(String sourceKey);
+  Future<String?> readIfExists(String sourceKey);
+  Future<void> write(String sourceKey, String content);
+  Future<bool> exists(String sourceKey);
+  Future<void> delete(String sourceKey);
+  Future<bool> isCustomEdited(String sourceKey);
+  Future<void> setCustomEdited(String sourceKey, bool value);
+}
+
 /// Persists source scripts and their edit state without owning a runtime.
-class SourceScriptStorage {
+class SourceScriptStorage implements SourceScriptStore {
   SourceScriptStorage({
     required String defaultSourceKey,
     required String Function(String sourceKey) normalizeSourceKey,
@@ -41,6 +53,7 @@ class SourceScriptStorage {
     return Directory('${documents.path}/comic_source/$normalized');
   }
 
+  @override
   Future<File> sourceFileFor(
     String sourceKey, {
     bool ensureDirectory = false,
@@ -52,6 +65,7 @@ class SourceScriptStorage {
     return File('${directory.path}/source.js');
   }
 
+  @override
   Future<File> ensureLocalSourceFile(String sourceKey) async {
     final normalized = _normalizeSourceKey(sourceKey);
     final file = await sourceFileFor(normalized, ensureDirectory: true);
@@ -62,20 +76,23 @@ class SourceScriptStorage {
     return file;
   }
 
+  @override
   Future<String?> readIfExists(String sourceKey) async {
     try {
       final file = await sourceFileFor(sourceKey);
-      return await file.exists() ? file.readAsString() : null;
+      return await file.exists() ? await file.readAsString() : null;
     } catch (_) {
       return null;
     }
   }
 
+  @override
   Future<void> write(String sourceKey, String content) async {
     final file = await sourceFileFor(sourceKey, ensureDirectory: true);
     await file.writeAsString(content, flush: true);
   }
 
+  @override
   Future<bool> exists(String sourceKey) async {
     final normalized = _normalizeSourceKey(sourceKey);
     final file = await sourceFileFor(normalized);
@@ -84,11 +101,13 @@ class SourceScriptStorage {
         await File('${file.parent.parent.path}/jm.js').exists();
   }
 
+  @override
   Future<void> delete(String sourceKey) async {
     final file = await sourceFileFor(sourceKey);
     if (await file.exists()) await file.delete();
   }
 
+  @override
   Future<bool> isCustomEdited(String sourceKey) async {
     final normalized = _normalizeSourceKey(sourceKey);
     final prefs = await _ensurePreferences(normalized);
@@ -98,6 +117,7 @@ class SourceScriptStorage {
         (prefs.getBool(SourcePrefsKeys.customEditedJmSource) ?? false);
   }
 
+  @override
   Future<void> setCustomEdited(String sourceKey, bool value) async {
     final normalized = _normalizeSourceKey(sourceKey);
     final prefs = await _ensurePreferences(normalized);

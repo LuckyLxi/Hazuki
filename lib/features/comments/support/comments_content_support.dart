@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/shared/ui_flags.dart';
 import 'package:hazuki/widgets/widgets.dart';
+import 'package:intl/intl.dart';
 
 final RegExp _commentInlineImagePattern = RegExp(
   r'<img\b[^>]*>',
@@ -115,6 +117,53 @@ String commentPreviewText(String content) {
 }
 
 String commentFilterText(String content) => commentPreviewText(content);
+
+/// Formats machine-readable source timestamps for display while leaving
+/// source-specific, non-parseable timestamps untouched.
+String formatCommentTime(String rawTime) {
+  final timestamp = DateTime.tryParse(rawTime);
+  if (timestamp == null) {
+    return rawTime;
+  }
+  return DateFormat('yyyy-MM-dd HH:mm').format(timestamp.toLocal());
+}
+
+final RegExp _commentReplyAttributionPattern = RegExp(
+  r'^\s*(.*?)\s*👉\s*(.*?)\s*$',
+);
+
+/// Separates the legacy reply attribution emitted by some sources.
+({String author, String? replyTo}) parseCommentUserAttribution(
+  String rawUserName,
+) {
+  final match = _commentReplyAttributionPattern.firstMatch(rawUserName);
+  final author = match?.group(1)?.trim();
+  final replyTo = match?.group(2)?.trim();
+  if (author == null || author.isEmpty || replyTo == null || replyTo.isEmpty) {
+    return (author: rawUserName, replyTo: null);
+  }
+  return (author: author, replyTo: replyTo);
+}
+
+/// Orders replies from oldest to newest. Replies without a parseable timestamp
+/// are retained after dated replies in their source order.
+List<ComicCommentData> sortRepliesChronologically(
+  List<ComicCommentData> replies,
+) {
+  final indexed = replies.indexed.toList()
+    ..sort((left, right) {
+      final leftTime = DateTime.tryParse(left.$2.time);
+      final rightTime = DateTime.tryParse(right.$2.time);
+      if (leftTime == null || rightTime == null) {
+        if (leftTime != null) return -1;
+        if (rightTime != null) return 1;
+        return left.$1.compareTo(right.$1);
+      }
+      final comparison = leftTime.compareTo(rightTime);
+      return comparison != 0 ? comparison : left.$1.compareTo(right.$1);
+    });
+  return indexed.map((entry) => entry.$2).toList();
+}
 
 String normalizeCommentText(String rawText) {
   if (rawText.isEmpty) {

@@ -58,9 +58,11 @@ class ComicDetailFeatureFacade implements FavoriteFoldersRepository {
   Future<ComicDetailsData> loadComicDetails(
     String id, {
     String sourceKey = '',
+    bool forceRefresh = false,
   }) => _source.loadComicDetails(
     id,
     sourceKey: sourceKey.trim().isEmpty ? _sourceKey : sourceKey,
+    forceRefresh: forceRefresh,
   );
 
   Future<List<CategoryTagGroup>> loadCategoryTagGroups() {

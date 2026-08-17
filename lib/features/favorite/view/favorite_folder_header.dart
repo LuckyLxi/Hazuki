@@ -35,34 +35,44 @@ class FavoriteFolderHeader extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Text(
-                strings.favoriteFolderHeader,
-                style: Theme.of(context).textTheme.titleSmall,
-              ),
-              const Spacer(),
-              if (showDeleteActionSlot)
-                SizedBox(
-                  width: 48,
-                  height: 48,
-                  child: AnimatedOpacity(
-                    opacity: enableDeleteAction ? 1 : 0,
-                    duration: const Duration(milliseconds: 180),
-                    curve: Curves.easeOutCubic,
-                    child: IgnorePointer(
-                      ignoring: !enableDeleteAction,
-                      child: IconButton(
-                        tooltip: strings.favoriteDeleteCurrentFolderTooltip,
-                        onPressed: enableDeleteAction
-                            ? onDeleteCurrentFolder
-                            : null,
-                        icon: const Icon(Icons.delete_outline),
+          SizedBox(
+            height: 40,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Text(
+                  strings.favoriteFolderHeader,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const Spacer(),
+                if (showDeleteActionSlot)
+                  SizedBox(
+                    width: 40,
+                    height: 40,
+                    child: AnimatedOpacity(
+                      opacity: enableDeleteAction ? 1 : 0,
+                      duration: const Duration(milliseconds: 180),
+                      curve: Curves.easeOutCubic,
+                      child: IgnorePointer(
+                        ignoring: !enableDeleteAction,
+                        child: IconButton(
+                          tooltip: strings.favoriteDeleteCurrentFolderTooltip,
+                          onPressed: enableDeleteAction
+                              ? onDeleteCurrentFolder
+                              : null,
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints.tightFor(
+                            width: 40,
+                            height: 40,
+                          ),
+                          visualDensity: VisualDensity.compact,
+                          icon: const Icon(Icons.delete_outline),
+                        ),
                       ),
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
           if (loadingFolders)
             const Padding(

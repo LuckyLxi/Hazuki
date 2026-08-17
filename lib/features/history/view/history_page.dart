@@ -20,6 +20,7 @@ class HistoryPage extends StatefulWidget {
     super.key,
     required this.readHistoryService,
     required this.sourceService,
+    this.readerService,
     required this.imageGateway,
     required this.comicDetailPageBuilder,
     required this.onFavoriteRequested,
@@ -28,6 +29,7 @@ class HistoryPage extends StatefulWidget {
 
   final ReadHistoryService readHistoryService;
   final SourceSelectionGateway sourceService;
+  final SourceReaderGateway? readerService;
   final SourceImageGateway imageGateway;
   final ComicDetailPageBuilder comicDetailPageBuilder;
   final HistoryFavoriteRequested onFavoriteRequested;
@@ -50,6 +52,7 @@ class _HistoryPageState extends State<HistoryPage> {
     _controller = HistoryPageController(
       readHistoryService: widget.readHistoryService,
       sourceService: widget.sourceService,
+      readerService: widget.readerService,
     );
     _scrollCoordinator = HistoryPageScrollCoordinator();
     _coverPrefetcher = ComicCoverPrefetcher(imageGateway: widget.imageGateway);

@@ -30,6 +30,7 @@ import 'package:hazuki/models/hazuki_models.dart';
 import 'services/cloud_sync_service.dart';
 import 'services/manga_download/manga_download_service.dart';
 import 'services/password_lock_service.dart';
+import 'shared/liquid_glass_support.dart';
 import 'services/source/source_capabilities.dart';
 import 'widgets/hazuki_prompt.dart';
 import 'widgets/source_image_gateway_scope.dart';
@@ -37,12 +38,17 @@ import 'features/password_lock/view/password_lock_widgets.dart';
 
 Future<void> main() async {
   final bootstrap = await bootstrapApp();
+  await HazukiLiquidGlass.initialize(
+    enabled: bootstrap.initialAppearance.liquidGlassEnabled,
+  );
   runApp(
-    HazukiApp(
-      settingsStore: bootstrap.settingsStore,
-      initialAppearance: bootstrap.initialAppearance,
-      initialLocale: bootstrap.initialLocale,
-      initialUseSystemTitleBar: bootstrap.initialUseSystemTitleBar,
+    HazukiLiquidGlass.wrap(
+      child: HazukiApp(
+        settingsStore: bootstrap.settingsStore,
+        initialAppearance: bootstrap.initialAppearance,
+        initialLocale: bootstrap.initialLocale,
+        initialUseSystemTitleBar: bootstrap.initialUseSystemTitleBar,
+      ),
     ),
   );
 }
@@ -127,11 +133,16 @@ class _HazukiAppState extends State<HazukiApp>
       settingsStore: widget.settingsStore,
       themeController: _themeController,
       windowsTitleBarController: _windowsTitleBarController,
-      sourceSync: sl<SourceSyncGateway>(),
+      applyAppearanceRuntime: (appearance) =>
+          HazukiLiquidGlass.setEnabled(appearance.liquidGlassEnabled),
       reloadLocale: _reloadLocalePreference,
       refreshHome: _startupCoordinator.refreshHome,
     );
-    _appListenable = Listenable.merge([_themeController, _startupCoordinator]);
+    _appListenable = Listenable.merge([
+      _themeController,
+      _startupCoordinator,
+      HazukiLiquidGlass.changes,
+    ]);
     _locale = widget.initialLocale;
     _startupCoordinator.initialize();
     _launchShortcutCoordinator.initialize();
@@ -168,6 +179,7 @@ class _HazukiAppState extends State<HazukiApp>
       resolveThemeBrightness: _resolveThemeBrightness,
       revealOrigin: revealOrigin,
     );
+    await HazukiLiquidGlass.setEnabled(next.liquidGlassEnabled);
   }
 
   Future<void> _updateLocalePreference(Locale? locale) async {

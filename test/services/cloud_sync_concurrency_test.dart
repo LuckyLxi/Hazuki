@@ -112,9 +112,6 @@ class _FakeLockedRemoteClient extends CloudSyncRemoteClient {
     }
   }
 
-  @override
-  Future<void> putSourceFile(String fileName, String content) async {}
-
   String? _lockId(String? token) {
     if (token == null) return null;
     final decoded = jsonDecode(token);

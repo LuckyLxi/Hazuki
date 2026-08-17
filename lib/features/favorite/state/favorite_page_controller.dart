@@ -5,6 +5,7 @@ import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/local_favorites/local_favorites_contracts.dart';
 import 'package:hazuki/services/local_favorites/local_favorites_preferences_store.dart';
+import 'package:hazuki/shared/picacg_comic_tags.dart';
 
 import 'favorite_app_bar_actions_state.dart';
 import 'favorite_page_state.dart';
@@ -14,9 +15,11 @@ import '../support/favorite_local_flow.dart';
 class FavoritePageController extends ChangeNotifier {
   FavoritePageController({
     required SourceFavoriteGateway sourceService,
+    SourceReaderGateway? readerService,
     required LocalFavoritesRepository localFavoritesRepository,
     required LocalFavoritesPreferencesStore localFavoritesPreferences,
   }) : _sourceService = sourceService,
+       _readerService = readerService,
        _localFavoritesRepository = localFavoritesRepository,
        _cloudFlow = FavoriteCloudFlow(sourceService),
        _localFlow = FavoriteLocalFlow(
@@ -35,6 +38,7 @@ class FavoritePageController extends ChangeNotifier {
   static const favoriteLoadTimeout = Duration(seconds: 90);
 
   final SourceFavoriteGateway _sourceService;
+  final SourceReaderGateway? _readerService;
   final FavoriteCloudFlow _cloudFlow;
   final FavoriteLocalFlow _localFlow;
   final LocalFavoritesRepository _localFavoritesRepository;
@@ -454,7 +458,7 @@ class FavoritePageController extends ChangeNotifier {
           return null;
         }
         _state.favoriteSortOrder = normalized;
-        return _reloadLocalComicsAfterSort();
+        return await _reloadLocalComicsAfterSort();
       } else {
         await _cloudFlow.setSortOrder(normalized);
       }
@@ -634,22 +638,73 @@ class FavoritePageController extends ChangeNotifier {
     required int page,
     required String folderId,
     required String timeoutMessage,
-  }) {
-    if (_state.mode == FavoritePageMode.local) {
-      return _localFlow.loadPage(
-        page: page,
-        folderId: folderId,
-        sortOrder: _state.favoriteSortOrder,
-        sourceKey: _activeSourceKey,
+  }) async {
+    final result = _state.mode == FavoritePageMode.local
+        ? await _localFlow.loadPage(
+            page: page,
+            folderId: folderId,
+            sortOrder: _state.favoriteSortOrder,
+            sourceKey: _activeSourceKey,
+          )
+        : await _cloudFlow.loadPage(
+            page: page,
+            folderId: folderId,
+            timeoutMessage: timeoutMessage,
+            timeout: favoriteLoadTimeout,
+          );
+    unawaited(_backfillPicacgTags(result));
+    return result;
+  }
+
+  Future<void> _backfillPicacgTags(FavoriteComicsResult result) async {
+    if (_readerService == null || result.errorMessage != null) return;
+    final comics = List<ExploreComic>.of(result.comics);
+    for (var start = 0; start < comics.length; start += 4) {
+      final end = (start + 4).clamp(0, comics.length);
+      await Future.wait(
+        List<Future<void>>.generate(end - start, (offset) async {
+          final index = start + offset;
+          final comic = comics[index];
+          if (comic.sourceKey.trim().toLowerCase() != 'picacg' ||
+              comic.tags.isNotEmpty) {
+            return;
+          }
+          try {
+            final details = await _readerService.loadComicDetails(
+              comic.id,
+              sourceKey: comic.sourceKey,
+            );
+            final tags = picacgComicDetailTags(details);
+            if (tags.isEmpty) return;
+            comics[index] = comic.copyWith(tags: tags);
+            if (_state.mode == FavoritePageMode.local) {
+              unawaited(
+                _localFavoritesRepository.updateComicTags(
+                  comicId: comic.id,
+                  sourceKey: comic.sourceKey,
+                  tags: tags,
+                ),
+              );
+            }
+          } catch (_) {}
+        }),
       );
     }
-
-    return _cloudFlow.loadPage(
-      page: page,
-      folderId: folderId,
-      timeoutMessage: timeoutMessage,
-      timeout: favoriteLoadTimeout,
-    );
+    if (_disposed) return;
+    final tagsByComic = <String, List<String>>{
+      for (final comic in comics)
+        if (comic.tags.isNotEmpty) comic.scopedId.storageKey: comic.tags,
+    };
+    var changed = false;
+    _state.comics = _state.comics
+        .map((comic) {
+          final tags = tagsByComic[comic.scopedId.storageKey];
+          if (tags == null || comic.tags.isNotEmpty) return comic;
+          changed = true;
+          return comic.copyWith(tags: tags);
+        })
+        .toList(growable: false);
+    if (changed) _notify();
   }
 
   Future<void> _loadInitialLocal({bool notifyIntermediate = true}) async {
@@ -671,11 +726,10 @@ class FavoritePageController extends ChangeNotifier {
       _notify();
       return;
     }
-    final result = await _localFlow.loadPage(
+    final result = await _loadPage(
       page: 1,
       folderId: _state.selectedLocalFolderId,
-      sortOrder: _state.favoriteSortOrder,
-      sourceKey: _activeSourceKey,
+      timeoutMessage: '',
     );
     if (_disposed || requestVersion != _state.listRequestVersion) {
       return;

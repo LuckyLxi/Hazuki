@@ -34,6 +34,7 @@ void main() {
             subTitle: 'Subtitle',
             cover: 'cover',
             updateTime: '2026-01-01',
+            tags: ['Action'],
             folderSavedAtMs: {'folder-1': 200},
           ),
         ],
@@ -43,6 +44,7 @@ void main() {
     final restored = await persistence.load();
     expect(restored.folders.single.name, 'Reading');
     expect(restored.entries.single.sourceKey, 'copy_manga');
+    expect(restored.entries.single.tags, ['Action']);
     expect(restored.entries.single.folderSavedAtMs, {'folder-1': 200});
   });
 

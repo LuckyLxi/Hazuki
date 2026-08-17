@@ -10,6 +10,7 @@ import '../comic/comic_details_capability.dart';
 import '../comic/source_comic_details_cache.dart';
 import '../comments/comments_capability.dart';
 import '../comments/source_comments_operations.dart';
+import '../common/source_json_coerce.dart';
 import '../content/source_content_operations.dart';
 import '../debug/debug_favorites_capability.dart';
 import '../debug/debug_report_capability.dart';
@@ -101,7 +102,7 @@ class SourceRuntimeAssembly {
       defaultSourceKey: hazukiDefaultSourceKey,
       secureSessionStorage: _secureSessionStorage,
       ensureSourceInitialized: (sourceKey) =>
-          _runtimeCapability.ensureSourceInitialized(sourceKey),
+          _runtimeCapability.initialization.ensureSourceInitialized(sourceKey),
       currentAccountForSource: (sourceKey) =>
           _accountCapability.currentAccountForSource(sourceKey),
       isLoggedForSource: (sourceKey) =>
@@ -202,7 +203,13 @@ class SourceRuntimeAssembly {
   late final SourceReloginCoordinator _reloginCoordinator;
   late final SourceRuntimeCapability _runtimeCapability;
   late final SourceRuntimeOperations _runtimeOperations =
-      SourceRuntimeOperationService(_runtimeCapability);
+      SourceRuntimeOperationService(
+        _runtimeCapability.initialization,
+        _runtimeCapability.diagnostics,
+        _runtimeCapability.scriptEditing,
+        _runtimeCapability.sourceUpdates,
+        _runtimeCapability.sourceRecovery,
+      );
   late final SourceRuntimeView _runtimeView = SourceRuntimeViewService(
     runtimeHost: _runtimeHost,
     runtimeOperations: _runtimeOperations,
@@ -374,6 +381,7 @@ class SourceRuntimeAssembly {
               .toString(),
           cover: comicMap['cover']?.toString() ?? '',
           sourceKey: resolvedSourceKey,
+          tags: jsAsStringList(comicMap['tags']),
         ),
       );
     }

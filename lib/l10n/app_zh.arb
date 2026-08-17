@@ -50,6 +50,8 @@
   "displaySystemFontSubtitle": "关闭后使用内置 Noto Sans SC 字体",
   "displayPureBlackTitle": "纯黑模式",
   "displayPureBlackSubtitle": "深色模式下使用纯黑背景",
+  "displayLiquidGlassTitle": "液态玻璃效果",
+  "displayLiquidGlassSubtitle": "关闭后全局使用旧版界面样式",
   "displayDynamicColorTitle": "动态取色",
   "displayDynamicColorSubtitle": "根据系统壁纸自动提取主题色（Android 12+）",
   "displayComicDynamicColorTitle": "漫画详情页动态取色",
@@ -250,6 +252,7 @@
   "commonDeselectAll": "取消全选",
   "commonLoading": "加载中...",
   "commonRetry": "重试",
+  "comicDetailRecoveryTimedOut": "恢复漫画源耗时较长，请点击重试。",
   "searchTitle": "搜索",
   "searchHint": "搜索漫画",
   "searchSettingsTitle": "搜索设置",
@@ -846,7 +849,6 @@
   "cloudSyncRestoreConfirm": "覆盖恢复",
   "cloudSyncRestoreCompleted": "恢复完成",
   "cloudSyncRestoreSkippedPlatformSettings": "已跳过当前平台不兼容设置",
-  "cloudSyncRestoreSourceRestartRequired": "漫画源将在下次启动时生效",
   "cloudSyncRestoreFailed": "恢复失败: {error}",
   "@cloudSyncRestoreFailed": {
     "placeholders": {
@@ -1072,6 +1074,13 @@
   "@commentsReplyToUser": {
     "placeholders": {
       "name": {}
+    }
+  },
+  "commentsReplyAttribution": "{author} 回复 {replyTo}",
+  "@commentsReplyAttribution": {
+    "placeholders": {
+      "author": {},
+      "replyTo": {}
     }
   },
   "commentsCancelReplyTooltip": "取消回复",
@@ -1395,7 +1404,7 @@
   "sourceRuntimeLoadingTitle": "正在加载漫画源",
   "sourceRuntimeLoadingMessage": "漫画源正在准备中，请稍候。",
   "sourceRuntimeRetryingTitle": "正在重试漫画源",
-  "sourceRuntimeRetryingMessage": "Hazuki 正在重新尝试初始化漫画源，通常很快就会完成。",
+  "sourceRuntimeRetryingMessage": "正在重新尝试初始化漫画源，通常很快就会完成。",
   "sourceRuntimeFailedTitle": "漫画源暂时不可用",
   "sourceRuntimeWaitingForRestartTitle": "漫画源已更新",
   "sourceRuntimeWaitingForRestartMessage": "漫画源文件已经变更，重启软件后即可完整应用新版本。",
@@ -1408,6 +1417,6 @@
   "sourceRuntimeErrorMetadataIncomplete": "漫画源已加载，但缺少必要的元数据。",
   "sourceRuntimeErrorModuleLoad": "漫画源初始化没有完成，其中一个模块加载失败了。",
   "sourceRuntimeErrorTimeout": "漫画源响应超时，请稍后重试。",
-  "sourceRuntimeErrorInitialization": "Hazuki 暂时无法完成漫画源初始化。",
+  "sourceRuntimeErrorInitialization": "暂时无法完成漫画源初始化。",
   "sourceRuntimeErrorGeneric": "漫画源当前不可用，请稍后重试。"
 }

@@ -30,14 +30,10 @@ class CloudSyncRemoteClient {
   final String rootUrl;
 
   String get backupDirUrl => '$rootUrl/backup';
-  String get sourceDirUrl =>
-      '$backupDirUrl/${CloudSyncConfigStore.sourceDirName}';
-
   Future<void> ensureRootDir() => _ensureDir(rootUrl);
 
   Future<void> ensureBackupDirs() async {
     await _ensureDir(backupDirUrl);
-    await _ensureDir(sourceDirUrl);
   }
 
   Future<CloudSyncConnectionStatus> testConnection() async {
@@ -65,10 +61,6 @@ class CloudSyncRemoteClient {
 
   Future<void> putBackupFile(String fileName, String content) {
     return _putString('$backupDirUrl/$fileName', content);
-  }
-
-  Future<void> putSourceFile(String fileName, String content) {
-    return _putString('$sourceDirUrl/$fileName', content);
   }
 
   Future<bool> tryAcquireSyncLock(String token) async {
@@ -213,10 +205,6 @@ class CloudSyncRemoteClient {
 
   Future<String?> tryGetBackupFile(String fileName) {
     return _tryGetString('$backupDirUrl/$fileName');
-  }
-
-  Future<String?> tryGetSourceFile(String fileName) {
-    return _tryGetString('$sourceDirUrl/$fileName');
   }
 
   Future<Map<String, dynamic>> loadManifest() async {

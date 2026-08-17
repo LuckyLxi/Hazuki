@@ -1,7 +1,9 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
+import 'package:hazuki/shared/liquid_glass_support.dart';
 import 'package:hazuki/widgets/hazuki_prompt.dart';
 
 class HomeBottomNavigation extends StatefulWidget {
@@ -11,18 +13,24 @@ class HomeBottomNavigation extends StatefulWidget {
     required this.onDestinationSelected,
     required this.discoverLabel,
     required this.favoriteLabel,
-  });
+    this.layoutScale = 1,
+  }) : assert(layoutScale > 0);
 
-  static const double floatingBarHeight = 56;
+  static const double floatingBarHeight = 58;
+  static const double floatingVerticalPadding = 6;
+  static const double fallbackBarHeight = 48;
   static const double bottomSpacing = 10;
   static const double promptGap = 10;
   static const double promptBottomPadding =
-      floatingBarHeight + bottomSpacing + promptGap;
+      floatingBarHeight + floatingVerticalPadding * 2 + promptGap;
+  static const double fallbackPromptBottomPadding =
+      fallbackBarHeight + bottomSpacing + promptGap;
 
   final int currentIndex;
   final ValueChanged<int> onDestinationSelected;
   final String discoverLabel;
   final String favoriteLabel;
+  final double layoutScale;
 
   @override
   State<HomeBottomNavigation> createState() => _HomeBottomNavigationState();
@@ -124,37 +132,95 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final bottomPadding = MediaQuery.of(context).padding.bottom;
+    final scale = widget.layoutScale;
+    final bottomPadding = MediaQuery.of(context).padding.bottom * scale;
+
+    if (HazukiLiquidGlass.isAvailable) {
+      return Padding(
+        padding: EdgeInsets.only(bottom: bottomPadding),
+        child: Center(
+          heightFactor: 1,
+          child: SizedBox(
+            width: 240 * scale,
+            child: GlassTabBar.bottom(
+              key: const ValueKey('home-bottom-navigation-premium'),
+              tabs: [
+                GlassTab(
+                  icon: const Icon(Icons.explore_outlined),
+                  activeIcon: const Icon(Icons.explore),
+                  label: widget.discoverLabel,
+                  semanticLabel: widget.discoverLabel,
+                ),
+                GlassTab(
+                  icon: const Icon(Icons.favorite_border),
+                  activeIcon: const Icon(Icons.favorite),
+                  label: widget.favoriteLabel,
+                  semanticLabel: widget.favoriteLabel,
+                ),
+              ],
+              selectedIndex: widget.currentIndex,
+              onTabSelected: widget.onDestinationSelected,
+              quality: HazukiLiquidGlass.navigationQuality,
+              horizontalPadding: 12 * scale,
+              verticalPadding:
+                  HomeBottomNavigation.floatingVerticalPadding * scale,
+              barHeight: HomeBottomNavigation.floatingBarHeight * scale,
+              tabWidth: 108 * scale,
+              barBorderRadius: 32 * scale,
+              tabPadding: EdgeInsets.symmetric(horizontal: 4 * scale),
+              iconLabelSpacing: 4 * scale,
+              iconSize: 24 * scale,
+              labelFontSize: 11 * scale,
+              indicatorBorderRadius: 40 * scale,
+              indicatorExpansion: EdgeInsets.symmetric(
+                horizontal: 12 * scale,
+                vertical: 8 * scale,
+              ),
+              selectedIconColor: colorScheme.primary,
+              selectedLabelColor: colorScheme.primary,
+              unselectedIconColor: colorScheme.onSurfaceVariant,
+              unselectedLabelColor: colorScheme.onSurfaceVariant,
+              selectedLabelStyle: const TextStyle(
+                decoration: TextDecoration.none,
+              ),
+              unselectedLabelStyle: const TextStyle(
+                decoration: TextDecoration.none,
+              ),
+              interactionBehavior: GlassInteractionBehavior.scaleOnly,
+              settings: LiquidGlassSettings(
+                thickness: 30,
+                blur: 3,
+                chromaticAberration: 0.3,
+                lightIntensity: 0.6,
+                refractiveIndex: 1.59,
+                saturation: 0.7,
+                ambientStrength: 1,
+                glassColor: isDark
+                    ? Colors.white.withValues(alpha: 0.08)
+                    : const Color(0x3DFFFFFF),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
 
     return Padding(
-      padding: EdgeInsets.only(bottom: 10 + bottomPadding),
+      padding: EdgeInsets.only(
+        bottom: HomeBottomNavigation.bottomSpacing * scale + bottomPadding,
+      ),
       child: Center(
         heightFactor: 1.0,
-        child: UnconstrainedBox(
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(36),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: isDark
-                      ? colorScheme.surface.withValues(alpha: 0.75)
-                      : colorScheme.surface.withValues(alpha: 0.85),
-                  borderRadius: BorderRadius.circular(36),
-                  border: Border.all(
-                    color: colorScheme.outlineVariant.withValues(alpha: 0.22),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(
-                        alpha: isDark ? 0.20 : 0.08,
-                      ),
-                      blurRadius: 20,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+        child: Transform.scale(
+          key: const ValueKey('home-bottom-navigation-fallback-scale'),
+          scale: scale,
+          alignment: Alignment.bottomCenter,
+          child: UnconstrainedBox(
+            child: _buildNavigationSurface(
+              colorScheme: colorScheme,
+              isDark: isDark,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
                 child: GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onTapDown: (details) {
@@ -198,6 +264,38 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
     );
   }
 
+  Widget _buildNavigationSurface({
+    required ColorScheme colorScheme,
+    required bool isDark,
+    required Widget child,
+  }) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(36),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          decoration: BoxDecoration(
+            color: isDark
+                ? colorScheme.surface.withValues(alpha: 0.75)
+                : colorScheme.surface.withValues(alpha: 0.85),
+            borderRadius: BorderRadius.circular(36),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.22),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: isDark ? 0.20 : 0.08),
+                blurRadius: 20,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: child,
+        ),
+      ),
+    );
+  }
+
   void _schedulePromptAnchorSync() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
@@ -205,7 +303,9 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
       }
       hazukiPromptPlacementController.updateHomeAnchor(
         tabIndex: widget.currentIndex,
-        elevatedBottomPadding: HomeBottomNavigation.promptBottomPadding,
+        elevatedBottomPadding: HazukiLiquidGlass.isAvailable
+            ? HomeBottomNavigation.promptBottomPadding
+            : HomeBottomNavigation.fallbackPromptBottomPadding,
       );
     });
   }
@@ -247,6 +347,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
                 color: colorScheme.primary,
+                decoration: TextDecoration.none,
               ),
             ),
           ),
@@ -276,7 +377,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
             ),
           ),
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 14),
+            padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 14),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: labelOnRight

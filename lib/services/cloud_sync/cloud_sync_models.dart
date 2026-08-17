@@ -48,7 +48,6 @@ class CloudSyncRestoreResult {
     required this.restoredSettings,
     required this.restoredReading,
     required this.restoredSearchHistory,
-    required this.restoredSourceFile,
     required this.appliedPlatformFilteredKeys,
     required this.skippedKeys,
   });
@@ -56,7 +55,6 @@ class CloudSyncRestoreResult {
   final bool restoredSettings;
   final bool restoredReading;
   final bool restoredSearchHistory;
-  final bool restoredSourceFile;
   final List<String> appliedPlatformFilteredKeys;
   final List<String> skippedKeys;
 }
@@ -69,7 +67,6 @@ class CloudSyncLocalSnapshot {
     required this.historyCount,
     required this.progressCount,
     required this.searchCount,
-    required this.jmSource,
   });
 
   final String settings;
@@ -78,7 +75,6 @@ class CloudSyncLocalSnapshot {
   final int historyCount;
   final int progressCount;
   final int searchCount;
-  final String? jmSource;
 }
 
 class CloudSyncApplySettingsResult {

@@ -61,8 +61,10 @@ class LocalFavoriteComicRecord {
     required this.subTitle,
     required this.cover,
     required this.updateTime,
+    List<String> tags = const [],
     required Map<String, int> folderSavedAtMs,
-  }) : folderSavedAtMs = Map<String, int>.from(folderSavedAtMs);
+  }) : tags = List<String>.from(tags),
+       folderSavedAtMs = Map<String, int>.from(folderSavedAtMs);
 
   factory LocalFavoriteComicRecord.fromJson(Map<String, dynamic> json) {
     final folderSavedAtMs = <String, int>{};
@@ -101,6 +103,7 @@ class LocalFavoriteComicRecord {
       subTitle: (json['subTitle'] ?? '').toString(),
       cover: (json['cover'] ?? '').toString(),
       updateTime: (json['updateTime'] ?? '').toString(),
+      tags: _tagsFromJson(json['tags']),
       folderSavedAtMs: folderSavedAtMs,
     );
   }
@@ -111,6 +114,7 @@ class LocalFavoriteComicRecord {
   String subTitle;
   String cover;
   String updateTime;
+  List<String> tags;
   final Map<String, int> folderSavedAtMs;
 
   int get savedAtMs {
@@ -135,6 +139,7 @@ class LocalFavoriteComicRecord {
       subTitle: subTitle,
       cover: cover,
       sourceKey: resolvedSourceKey,
+      tags: tags,
     );
   }
 
@@ -145,11 +150,20 @@ class LocalFavoriteComicRecord {
     'subTitle': subTitle,
     'cover': cover,
     'updateTime': updateTime,
+    'tags': tags,
     'savedAtMs': savedAtMs,
     'folderIds': folderIds.toList(growable: false),
     'folderSavedAtMs': folderSavedAtMs,
   };
 }
+
+List<String> _tagsFromJson(Object? value) => value is List
+    ? value
+          .map((tag) => tag.toString().trim())
+          .where((tag) => tag.isNotEmpty)
+          .toSet()
+          .toList(growable: false)
+    : const [];
 
 class LocalFavoriteFolderTombstone {
   const LocalFavoriteFolderTombstone(this.folderId, this.deletedAtMs);

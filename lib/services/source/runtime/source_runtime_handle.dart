@@ -48,6 +48,7 @@ class SourceRuntimeHandle
   final SourceRuntimeKernel runtime = SourceRuntimeKernel();
   bool _disposed = false;
   bool _disposeRequested = false;
+  bool _recreationRequested = false;
   int _activeOperationCount = 0;
   late final SourceSessionStore session = SourceSessionStore(
     sourceKey: sourceKey,
@@ -56,7 +57,7 @@ class SourceRuntimeHandle
   final SourceCacheStore cache = SourceCacheStore();
   final SourceDebugLogStore debug = SourceDebugLogStore();
 
-  late final SourceJsBridge js = SourceJsBridge(runtime);
+  late final SourceJsBridge js = SourceJsBridge(runtime, this);
   @override
   late final SourceCookieStore cookieStore = SourceCookieStore(
     loadCookies: session.loadCookieStore,
@@ -94,6 +95,7 @@ class SourceRuntimeHandle
     sourceKey: sourceKey,
     cookieStore: cookieStore,
     networkLogSink: networkLogSink,
+    onResponseStatus: _onResponseStatus,
   );
   late final HazukiSourceFacade facade = HazukiSourceFacade(
     handle: this,
@@ -134,6 +136,14 @@ class SourceRuntimeHandle
 
   @override
   bool get isDisposed => _disposed;
+
+  bool get recreationRequested => _recreationRequested;
+
+  void _onResponseStatus(int statusCode) {
+    if (sourceKey == 'copy_manga' && statusCode == 210) {
+      _recreationRequested = true;
+    }
+  }
 
   @override
   Future<T> runOperation<T>(Future<T> Function() operation) async {
@@ -183,6 +193,5 @@ class SourceRuntimeHandle
     } catch (_) {}
     session.clearMemory();
     cache.clearMemory();
-    debug.clearCapturedLogs();
   }
 }

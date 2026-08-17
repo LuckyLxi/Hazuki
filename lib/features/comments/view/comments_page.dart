@@ -59,7 +59,7 @@ class CommentsPage extends StatefulWidget {
 }
 
 class _CommentsPageState extends State<CommentsPage>
-    with AutomaticKeepAliveClientMixin, WidgetsBindingObserver {
+    with AutomaticKeepAliveClientMixin {
   static const _commentsLoadTimeout = Duration(seconds: 20);
   static const _pageSize = 16;
 
@@ -73,7 +73,6 @@ class _CommentsPageState extends State<CommentsPage>
   bool? _tabScrollAtTop;
   int _fullscreenRequestEpoch = 0;
   final List<Timer> _fullscreenSyncTimers = [];
-  double _keyboardHeight = 0;
   double? _lastInnerScrollPixels;
   double? _lastInnerScrollMin;
   double? _lastInnerScrollMax;
@@ -132,7 +131,6 @@ class _CommentsPageState extends State<CommentsPage>
       filterService: widget.filterService,
       state: widget.interactionState,
     );
-    WidgetsBinding.instance.addObserver(this);
     _commentFocusNode.addListener(_handleCommentFocusChanged);
     _controller.addFilterListener(_onFilterChanged);
     _refreshCommentCapabilities();
@@ -154,7 +152,6 @@ class _CommentsPageState extends State<CommentsPage>
       t.cancel();
     }
     _fullscreenSyncTimers.clear();
-    WidgetsBinding.instance.removeObserver(this);
     if (_ownsScrollController) {
       _scrollController.dispose();
     }
@@ -170,28 +167,6 @@ class _CommentsPageState extends State<CommentsPage>
     if (mounted) {
       setState(() {});
       _maybeLoadMoreForHiddenFilter();
-    }
-  }
-
-  @override
-  void didChangeMetrics() {
-    if (!mounted) {
-      return;
-    }
-    final view = WidgetsBinding.instance.platformDispatcher.views.first;
-    final rawBottom = view.viewInsets.bottom;
-    final newKeyboardHeight = rawBottom / view.devicePixelRatio;
-    if (newKeyboardHeight != _keyboardHeight) {
-      setState(() {
-        _keyboardHeight = newKeyboardHeight;
-      });
-      _logCommentsStateSnapshot(
-        'Comments metrics changed',
-        extra: {
-          'rawBottomInset': rawBottom.round(),
-          'newKeyboardHeight': newKeyboardHeight.round(),
-        },
-      );
     }
   }
 
@@ -273,7 +248,7 @@ class _CommentsPageState extends State<CommentsPage>
       content: {
         'hasFocus': _commentFocusNode.hasFocus,
         'tabScrollAtTop': _tabScrollAtTop,
-        'keyboardHeight': _keyboardHeight.round(),
+        'keyboardHeight': mediaQuery?.viewInsets.bottom.round(),
         'liveViewInsetBottom': mediaQuery?.viewInsets.bottom.round(),
         'safeBottom': mediaQuery?.padding.bottom.round(),
         'innerPixels': _lastInnerScrollPixels?.round(),
@@ -295,26 +270,20 @@ class _CommentsPageState extends State<CommentsPage>
 
     if (widget.isTabView) {
       final isFocused = _commentFocusNode.hasFocus;
-      final liveBottomInset = MediaQuery.viewInsetsOf(context).bottom;
-      final bottomInset = math.max(liveBottomInset, _keyboardHeight);
-      final safeBottom = MediaQuery.paddingOf(context).bottom;
-      final pillHoriz = isFocused ? 10.0 : 16.0;
       final pillMarginBottom = isFocused ? 2.0 : 4.0;
       final pillApproxHeight = _replyToComment == null ? 72.0 : 126.0;
-      final listExtraBottom =
-          pillApproxHeight + pillMarginBottom + safeBottom + bottomInset;
-      final composerPositionDuration = bottomInset > 0
-          ? Duration.zero
-          : const Duration(milliseconds: 220);
       return Stack(
         children: [
-          _buildCommentsBodyList(extraBottomPadding: listExtraBottom),
-          AnimatedPositioned(
-            duration: composerPositionDuration,
-            curve: Curves.easeOutCubic,
-            left: pillHoriz,
-            right: pillHoriz,
-            bottom: safeBottom + pillMarginBottom + bottomInset,
+          _KeyboardAwareCommentsBody(
+            useKeyboardInset: true,
+            child: _buildCommentsBodyList(
+              extraBottomPadding: pillApproxHeight + pillMarginBottom,
+            ),
+          ),
+          _KeyboardAwareCommentsComposer(
+            isFocused: isFocused,
+            useKeyboardInset: true,
+            bottomMargin: pillMarginBottom,
             child: _buildBottomComposer(),
           ),
         ],
@@ -322,29 +291,21 @@ class _CommentsPageState extends State<CommentsPage>
     }
 
     final isFocused = _commentFocusNode.hasFocus;
-    final liveBottomInset = MediaQuery.viewInsetsOf(context).bottom;
-    final bottomInset = !widget.showAppBar
-        ? math.max(liveBottomInset, _keyboardHeight)
-        : 0.0;
-    final safeBottom = MediaQuery.paddingOf(context).bottom;
-    final pillHoriz = !widget.showAppBar && isFocused ? 10.0 : 16.0;
     final pillMarginBottom = !widget.showAppBar && isFocused ? 2.0 : 6.0;
     final pillApproxHeight = _replyToComment == null ? 72.0 : 126.0;
     final listExtraBottom = !widget.showAppBar
-        ? pillApproxHeight + pillMarginBottom + safeBottom + bottomInset
+        ? pillApproxHeight + pillMarginBottom
         : 80.0;
-    final composerPositionDuration = bottomInset > 0
-        ? Duration.zero
-        : const Duration(milliseconds: 220);
     final body = Stack(
       children: [
-        _buildCommentsBodyList(extraBottomPadding: listExtraBottom),
-        AnimatedPositioned(
-          duration: composerPositionDuration,
-          curve: Curves.easeOutCubic,
-          left: pillHoriz,
-          right: pillHoriz,
-          bottom: safeBottom + pillMarginBottom + bottomInset,
+        _KeyboardAwareCommentsBody(
+          useKeyboardInset: false,
+          child: _buildCommentsBodyList(extraBottomPadding: listExtraBottom),
+        ),
+        _KeyboardAwareCommentsComposer(
+          isFocused: isFocused,
+          useKeyboardInset: !widget.showAppBar,
+          bottomMargin: pillMarginBottom,
           child: _buildBottomComposer(),
         ),
       ],
@@ -785,7 +746,7 @@ class _CommentsPageState extends State<CommentsPage>
             ? const <ComicCommentData>[]
             : (_replyComments[commentId] ?? const <ComicCommentData>[]);
         final merged = _mergeComments(existing, pageResult.comments);
-        _replyComments[commentId] = merged;
+        _replyComments[commentId] = sortRepliesChronologically(merged);
         _replyPages[commentId] = page;
         _replyMaxPages[commentId] = pageResult.maxPage;
         _replyHasMore[commentId] = _computeHasMore(

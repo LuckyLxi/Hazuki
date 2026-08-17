@@ -1,4 +1,5 @@
 import '../../models/hazuki_models.dart';
+import 'common/source_json_coerce.dart';
 import 'runtime/source_runtime_host.dart';
 
 typedef SourceTextTranslator = String Function(String text, {String sourceKey});
@@ -174,6 +175,7 @@ Promise.all(
           subTitle: (map['subTitle'] ?? map['subtitle'] ?? '').toString(),
           cover: map['cover']?.toString() ?? '',
           sourceKey: _runtimeHost.activeSourceKey,
+          tags: jsAsStringList(map['tags']),
         ),
       );
     }

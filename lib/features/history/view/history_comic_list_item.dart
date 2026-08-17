@@ -211,6 +211,14 @@ class _HistoryComicListItemState extends State<HistoryComicListItem> {
             overflow: TextOverflow.ellipsis,
           ),
         ],
+        if (widget.comic.sourceKey == 'picacg' &&
+            widget.comic.tags.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          PicacgComicTags(
+            sourceKey: widget.comic.sourceKey,
+            tags: widget.comic.tags,
+          ),
+        ],
       ],
     );
   }

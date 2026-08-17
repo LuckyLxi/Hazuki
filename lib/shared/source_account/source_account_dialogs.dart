@@ -3,8 +3,10 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import 'package:hazuki/l10n/l10n.dart';
+import 'package:hazuki/shared/liquid_glass_support.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
 Future<T?> showHomeAnimatedDialog<T>(
@@ -413,34 +415,93 @@ Future<void> showHomeAvatarCard(
 }) {
   return showHomeAnimatedDialog<void>(
     context,
-    child: ClipRRect(
-      borderRadius: BorderRadius.circular(28),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-        child: IntrinsicWidth(
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            decoration: BoxDecoration(
-              color: Theme.of(
-                context,
-              ).colorScheme.surface.withValues(alpha: 0.72),
-              borderRadius: BorderRadius.circular(28),
-              border: Border.all(
-                color: Theme.of(
-                  context,
-                ).colorScheme.outlineVariant.withValues(alpha: 0.4),
-              ),
-            ),
-            child: HomeProfileCardContent(
-              avatarUrl: avatarUrl,
-              username: username,
-              firstUseText: firstUseText,
-              onLogoutTap: onLogoutTap,
-              onRequestSaveAvatar: onRequestSaveAvatar,
-            ),
-          ),
-        ),
-      ),
+    child: _HomeProfileGlassCard(
+      avatarUrl: avatarUrl,
+      username: username,
+      firstUseText: firstUseText,
+      onLogoutTap: onLogoutTap,
+      onRequestSaveAvatar: onRequestSaveAvatar,
     ),
   );
+}
+
+class _HomeProfileGlassCard extends StatelessWidget {
+  const _HomeProfileGlassCard({
+    required this.avatarUrl,
+    required this.username,
+    required this.firstUseText,
+    required this.onLogoutTap,
+    required this.onRequestSaveAvatar,
+  });
+
+  static const _borderRadius = 28.0;
+  static const _width = 252.0;
+  static const _padding = EdgeInsets.fromLTRB(16, 16, 16, 8);
+
+  final String avatarUrl;
+  final String username;
+  final String firstUseText;
+  final VoidCallback onLogoutTap;
+  final Future<void> Function() onRequestSaveAvatar;
+
+  @override
+  Widget build(BuildContext context) {
+    final content = HomeProfileCardContent(
+      avatarUrl: avatarUrl,
+      username: username,
+      firstUseText: firstUseText,
+      onLogoutTap: onLogoutTap,
+      onRequestSaveAvatar: onRequestSaveAvatar,
+    );
+
+    if (HazukiLiquidGlass.isAvailable) {
+      final isDark = Theme.of(context).brightness == Brightness.dark;
+      return GlassContainer(
+        key: const ValueKey('home-profile-liquid-glass-card'),
+        width: _width,
+        padding: _padding,
+        useOwnLayer: true,
+        quality: HazukiLiquidGlass.navigationQuality,
+        shape: const LiquidRoundedSuperellipse(borderRadius: _borderRadius),
+        settings: LiquidGlassSettings(
+          thickness: 34,
+          blur: 4,
+          chromaticAberration: 0.16,
+          lightIntensity: 0.72,
+          refractiveIndex: 1.56,
+          saturation: 1.06,
+          ambientStrength: 0.3,
+          glowIntensity: 0.5,
+          shadowElevation: 0,
+          glassColor: Colors.white.withValues(alpha: isDark ? 0.1 : 0.18),
+          backerColor: isDark
+              ? Colors.black.withValues(alpha: 0.18)
+              : Colors.white.withValues(alpha: 0.06),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: content,
+      );
+    }
+
+    final colorScheme = Theme.of(context).colorScheme;
+    return ClipRRect(
+      key: const ValueKey('home-profile-frosted-glass-card'),
+      borderRadius: BorderRadius.circular(_borderRadius),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+        child: Container(
+          width: _width,
+          padding: _padding,
+          decoration: BoxDecoration(
+            color: colorScheme.surface.withValues(alpha: 0.72),
+            borderRadius: BorderRadius.circular(_borderRadius),
+            border: Border.all(
+              color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+            ),
+          ),
+          child: content,
+        ),
+      ),
+    );
+  }
 }

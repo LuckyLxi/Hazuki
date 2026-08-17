@@ -146,9 +146,6 @@ class _CloudSyncPageState extends State<CloudSyncPage> {
       if (outcome.skippedPlatformSettings) {
         message.write('\n${strings.cloudSyncRestoreSkippedPlatformSettings}');
       }
-      if (outcome.sourceNeedsRestart) {
-        message.write('\n${strings.cloudSyncRestoreSourceRestartRequired}');
-      }
       unawaited(showHazukiPrompt(context, message.toString()));
     } catch (e) {
       if (!mounted) return;

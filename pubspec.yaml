@@ -45,6 +45,7 @@ dependencies:
   crypto: ^3.0.6
   pointycastle: ^4.0.0
   dynamic_color: ^1.7.0
+  liquid_glass_widgets: ^0.29.5
   flutter_qjs:
     path: third_party/flutter_qjs
   flutter_displaymode: ^0.7.0
@@ -80,6 +81,9 @@ dev_dependencies:
   flutter_lints: ^6.0.0
 
 dependency_overrides:
+  # Keep the selected indicator anchored to its press origin on initial drag.
+  liquid_glass_widgets:
+    path: third_party/pub_overrides/liquid_glass_widgets
   device_info_plus:
     path: third_party/pub_overrides/device_info_plus
   dynamic_color:
