@@ -694,7 +694,6 @@ class _HomeProfileDrawerRoute extends PageRoute<void> {
   final Color drawerColor;
   final ValueListenable<Widget> drawerContentListenable;
   final VoidCallback onClosing;
-  final SnapshotController _snapshotController = SnapshotController();
   bool _closingNotified = false;
 
   @override
@@ -717,17 +716,6 @@ class _HomeProfileDrawerRoute extends PageRoute<void> {
 
   @override
   Duration get reverseTransitionDuration => const Duration(milliseconds: 160);
-
-  @override
-  void install() {
-    super.install();
-    animation?.addStatusListener(_syncSnapshotting);
-    _syncSnapshotting(animation?.status ?? AnimationStatus.dismissed);
-  }
-
-  void _syncSnapshotting(AnimationStatus status) {
-    _snapshotController.allowSnapshotting = status.isAnimating;
-  }
 
   void _notifyClosing() {
     if (_closingNotified) {
@@ -760,19 +748,15 @@ class _HomeProfileDrawerRoute extends PageRoute<void> {
     Animation<double> animation,
     Animation<double> secondaryAnimation,
   ) {
-    return SnapshotWidget(
-      controller: _snapshotController,
-      mode: SnapshotMode.permissive,
+    return Align(
+      alignment: Alignment.centerLeft,
       child: RepaintBoundary(
-        child: Align(
-          alignment: Alignment.centerLeft,
-          child: Drawer(
-            width: drawerWidth,
-            backgroundColor: drawerColor,
-            child: ValueListenableBuilder<Widget>(
-              valueListenable: drawerContentListenable,
-              builder: (context, drawerContent, _) => drawerContent,
-            ),
+        child: Drawer(
+          width: drawerWidth,
+          backgroundColor: drawerColor,
+          child: ValueListenableBuilder<Widget>(
+            valueListenable: drawerContentListenable,
+            builder: (context, drawerContent, _) => drawerContent,
           ),
         ),
       ),
@@ -781,9 +765,7 @@ class _HomeProfileDrawerRoute extends PageRoute<void> {
 
   @override
   void dispose() {
-    animation?.removeStatusListener(_syncSnapshotting);
     _notifyClosing();
-    _snapshotController.dispose();
     super.dispose();
   }
 

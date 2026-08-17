@@ -117,5 +117,14 @@ void main() {
     expect(switcher.switchInCurve, Curves.easeOutBack);
     expect(switcher.switchOutCurve, Curves.easeInCubic);
     expect(find.byIcon(Icons.event_available_outlined), findsOneWidget);
+    final snapshot = tester.widget<SnapshotWidget>(find.byType(SnapshotWidget));
+    expect(snapshot.autoresize, isTrue);
+    expect(
+      find.ancestor(
+        of: find.byType(Hero),
+        matching: find.byType(SnapshotWidget),
+      ),
+      findsNothing,
+    );
   });
 }
