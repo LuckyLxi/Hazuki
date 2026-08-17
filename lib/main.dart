@@ -38,7 +38,9 @@ import 'features/password_lock/view/password_lock_widgets.dart';
 
 Future<void> main() async {
   final bootstrap = await bootstrapApp();
-  await HazukiLiquidGlass.initialize();
+  await HazukiLiquidGlass.initialize(
+    enabled: bootstrap.initialAppearance.liquidGlassEnabled,
+  );
   runApp(
     HazukiLiquidGlass.wrap(
       child: HazukiApp(
@@ -131,10 +133,16 @@ class _HazukiAppState extends State<HazukiApp>
       settingsStore: widget.settingsStore,
       themeController: _themeController,
       windowsTitleBarController: _windowsTitleBarController,
+      applyAppearanceRuntime: (appearance) =>
+          HazukiLiquidGlass.setEnabled(appearance.liquidGlassEnabled),
       reloadLocale: _reloadLocalePreference,
       refreshHome: _startupCoordinator.refreshHome,
     );
-    _appListenable = Listenable.merge([_themeController, _startupCoordinator]);
+    _appListenable = Listenable.merge([
+      _themeController,
+      _startupCoordinator,
+      HazukiLiquidGlass.changes,
+    ]);
     _locale = widget.initialLocale;
     _startupCoordinator.initialize();
     _launchShortcutCoordinator.initialize();
@@ -171,6 +179,7 @@ class _HazukiAppState extends State<HazukiApp>
       resolveThemeBrightness: _resolveThemeBrightness,
       revealOrigin: revealOrigin,
     );
+    await HazukiLiquidGlass.setEnabled(next.liquidGlassEnabled);
   }
 
   Future<void> _updateLocalePreference(Locale? locale) async {

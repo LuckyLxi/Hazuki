@@ -17,6 +17,7 @@ class AppearanceSettingsData {
     required this.displayModeRaw,
     required this.comicDetailDynamicColor,
     required this.useSystemFont,
+    this.liquidGlassEnabled = true,
   });
 
   final ThemeMode themeMode;
@@ -26,6 +27,7 @@ class AppearanceSettingsData {
   final String displayModeRaw;
   final bool comicDetailDynamicColor;
   final bool useSystemFont;
+  final bool liquidGlassEnabled;
 
   static ThemeMode decodeThemeMode(String? raw) {
     return switch (raw) {
@@ -51,6 +53,7 @@ class AppearanceSettingsData {
     String? displayModeRaw,
     bool? comicDetailDynamicColor,
     bool? useSystemFont,
+    bool? liquidGlassEnabled,
   }) {
     return AppearanceSettingsData(
       themeMode: themeMode ?? this.themeMode,
@@ -61,6 +64,7 @@ class AppearanceSettingsData {
       comicDetailDynamicColor:
           comicDetailDynamicColor ?? this.comicDetailDynamicColor,
       useSystemFont: useSystemFont ?? this.useSystemFont,
+      liquidGlassEnabled: liquidGlassEnabled ?? this.liquidGlassEnabled,
     );
   }
 
@@ -76,7 +80,8 @@ class AppearanceSettingsData {
         other.presetIndex == presetIndex &&
         other.displayModeRaw == displayModeRaw &&
         other.comicDetailDynamicColor == comicDetailDynamicColor &&
-        other.useSystemFont == useSystemFont;
+        other.useSystemFont == useSystemFont &&
+        other.liquidGlassEnabled == liquidGlassEnabled;
   }
 
   @override
@@ -88,6 +93,7 @@ class AppearanceSettingsData {
     displayModeRaw,
     comicDetailDynamicColor,
     useSystemFont,
+    liquidGlassEnabled,
   );
 }
 

@@ -50,6 +50,8 @@
   "displaySystemFontSubtitle": "When off, uses the built-in Noto Sans SC font",
   "displayPureBlackTitle": "Pure black mode",
   "displayPureBlackSubtitle": "Use a pure black background in dark mode",
+  "displayLiquidGlassTitle": "Liquid glass effects",
+  "displayLiquidGlassSubtitle": "When off, use the classic interface style throughout the app",
   "displayDynamicColorTitle": "Dynamic color",
   "displayDynamicColorSubtitle": "Use wallpaper colors automatically (Android 12+)",
   "displayComicDynamicColorTitle": "Comic detail dynamic color",

@@ -16,6 +16,7 @@ class HazukiAppSettingsStore {
   static const String _comicDetailDynamicColorKey =
       'appearance_comic_detail_dynamic_color';
   static const String _useSystemFontKey = 'appearance_use_system_font';
+  static const String _liquidGlassEnabledKey = 'appearance_liquid_glass';
 
   Future<AppearanceSettingsData> loadAppearance() async {
     final prefs = await SharedPreferences.getInstance();
@@ -40,6 +41,7 @@ class HazukiAppSettingsStore {
       comicDetailDynamicColor:
           prefs.getBool(_comicDetailDynamicColorKey) ?? false,
       useSystemFont: prefs.getBool(_useSystemFontKey) ?? true,
+      liquidGlassEnabled: prefs.getBool(_liquidGlassEnabledKey) ?? true,
     );
   }
 
@@ -56,6 +58,7 @@ class HazukiAppSettingsStore {
       next.comicDetailDynamicColor,
     );
     await prefs.setBool(_useSystemFontKey, next.useSystemFont);
+    await prefs.setBool(_liquidGlassEnabledKey, next.liquidGlassEnabled);
   }
 
   Future<Locale?> loadLocalePreference() async {
