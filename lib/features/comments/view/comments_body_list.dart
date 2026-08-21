@@ -11,6 +11,7 @@ class _CommentsBodyList extends StatelessWidget {
     required this.isTabView,
     required this.scrollController,
     required this.extraBottomPadding,
+    required this.reserveKeyboardInset,
     required this.onRetry,
     required this.onScrollNotification,
     required this.commentBuilder,
@@ -25,6 +26,7 @@ class _CommentsBodyList extends StatelessWidget {
   final bool isTabView;
   final ScrollController scrollController;
   final double extraBottomPadding;
+  final bool reserveKeyboardInset;
   final VoidCallback onRetry;
   final void Function(ScrollNotification notification) onScrollNotification;
   final Widget Function(ComicCommentData comment, int index) commentBuilder;
@@ -88,6 +90,8 @@ class _CommentsBodyList extends StatelessWidget {
               ),
               SliverToBoxAdapter(child: loadMoreFooter),
             ],
+            if (reserveKeyboardInset)
+              const SliverToBoxAdapter(child: _CommentsKeyboardInsetSpacer()),
           ],
         ),
       );
@@ -158,6 +162,22 @@ class _CommentsBodyList extends StatelessWidget {
       return const ValueKey('empty');
     }
     return const ValueKey('list');
+  }
+}
+
+class _CommentsKeyboardInsetSpacer extends StatelessWidget {
+  const _CommentsKeyboardInsetSpacer();
+
+  @override
+  Widget build(BuildContext context) {
+    // Let only this trailing sliver react to per-frame IME metrics. Keeping the
+    // viewport constraints stable avoids laying out every visible comment as
+    // the keyboard opens or closes while preserving the same scroll reserve.
+    return SizedBox(
+      height:
+          MediaQuery.viewPaddingOf(context).bottom +
+          MediaQuery.viewInsetsOf(context).bottom,
+    );
   }
 }
 

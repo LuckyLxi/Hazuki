@@ -274,11 +274,9 @@ class _CommentsPageState extends State<CommentsPage>
       final pillApproxHeight = _replyToComment == null ? 72.0 : 126.0;
       return Stack(
         children: [
-          _KeyboardAwareCommentsBody(
-            useKeyboardInset: true,
-            child: _buildCommentsBodyList(
-              extraBottomPadding: pillApproxHeight + pillMarginBottom,
-            ),
+          _buildCommentsBodyList(
+            extraBottomPadding: pillApproxHeight + pillMarginBottom,
+            reserveKeyboardInset: true,
           ),
           _KeyboardAwareCommentsComposer(
             isFocused: isFocused,
@@ -906,7 +904,10 @@ class _CommentsPageState extends State<CommentsPage>
     }
   }
 
-  Widget _buildCommentsBodyList({double extraBottomPadding = 0}) {
+  Widget _buildCommentsBodyList({
+    double extraBottomPadding = 0,
+    bool reserveKeyboardInset = false,
+  }) {
     final hideFilteredComments = _controller.filterModeIsHide;
     final visibleComments = hideFilteredComments
         ? _controller.visibleComments(_comments)
@@ -925,6 +926,7 @@ class _CommentsPageState extends State<CommentsPage>
       isTabView: widget.isTabView,
       scrollController: _scrollController,
       extraBottomPadding: extraBottomPadding,
+      reserveKeyboardInset: reserveKeyboardInset,
       onRetry: () => unawaited(_loadInitial()),
       onScrollNotification: _onScrollNotification,
       commentBuilder: _buildCommentTile,

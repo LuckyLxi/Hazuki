@@ -39,8 +39,10 @@ class _KeyboardAwareCommentsComposer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final mediaQuery = MediaQuery.of(context);
-    final keyboardInset = useKeyboardInset ? mediaQuery.viewInsets.bottom : 0.0;
+    final keyboardInset = useKeyboardInset
+        ? MediaQuery.viewInsetsOf(context).bottom
+        : 0.0;
+    final safeBottom = MediaQuery.paddingOf(context).bottom;
 
     // Keep the keyboard's per-frame inset updates inside the composer subtree.
     // Rebuilding the comments list for every IME animation frame is expensive,
@@ -48,7 +50,7 @@ class _KeyboardAwareCommentsComposer extends StatelessWidget {
     return Positioned(
       left: isFocused && useKeyboardInset ? 10.0 : 16.0,
       right: isFocused && useKeyboardInset ? 10.0 : 16.0,
-      bottom: mediaQuery.padding.bottom + bottomMargin + keyboardInset,
+      bottom: safeBottom + bottomMargin + keyboardInset,
       child: child,
     );
   }
