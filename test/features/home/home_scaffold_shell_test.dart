@@ -114,4 +114,38 @@ void main() {
     expect(find.text('discover child'), findsOneWidget);
     expect(find.text('favorite child'), findsOneWidget);
   });
+
+  testWidgets('drawer scale stays fixed until the destination returns', (
+    tester,
+  ) async {
+    final drawerController = AnimationController(vsync: tester, value: 1);
+    final routeController = AnimationController(
+      vsync: tester,
+      duration: const Duration(milliseconds: 300),
+    );
+    addTearDown(drawerController.dispose);
+    addTearDown(routeController.dispose);
+
+    holdHomeDrawerScaleUntilRouteReturns(
+      routeAnimation: routeController,
+      onRouteReturning: () => resetHomeDrawerScale(drawerController),
+    );
+
+    routeController.forward();
+
+    expect(routeController.status, AnimationStatus.forward);
+    expect(drawerController.value, 1);
+
+    routeController.value = 1;
+
+    expect(routeController.status, AnimationStatus.completed);
+    expect(drawerController.value, 1);
+
+    routeController.reverse();
+
+    expect(routeController.status, AnimationStatus.reverse);
+    expect(drawerController.value, 0);
+    expect(drawerController.isAnimating, isFalse);
+    routeController.stop();
+  });
 }

@@ -39,6 +39,39 @@ Offset resolveHomeNavigationDrawerOffset({
   );
 }
 
+@visibleForTesting
+void resetHomeDrawerScale(AnimationController controller) {
+  controller.value = 0;
+}
+
+@visibleForTesting
+VoidCallback holdHomeDrawerScaleUntilRouteReturns({
+  required Animation<double> routeAnimation,
+  required VoidCallback onRouteReturning,
+}) {
+  var listening = true;
+  late final AnimationStatusListener listener;
+
+  void stopListening() {
+    if (!listening) {
+      return;
+    }
+    listening = false;
+    routeAnimation.removeStatusListener(listener);
+  }
+
+  listener = (status) {
+    if (status != AnimationStatus.reverse &&
+        status != AnimationStatus.dismissed) {
+      return;
+    }
+    stopListening();
+    onRouteReturning();
+  };
+  routeAnimation.addStatusListener(listener);
+  return stopListening;
+}
+
 class HomeScaffoldShell extends StatefulWidget {
   const HomeScaffoldShell({
     super.key,
@@ -183,6 +216,13 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
     }
   }
 
+  void _resetProfileDrawer() {
+    if (!mounted) {
+      return;
+    }
+    resetHomeDrawerScale(_profileDrawerController);
+  }
+
   @override
   Widget build(BuildContext context) {
     final drawerVisualKey =
@@ -300,6 +340,7 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
                                 onOpenDownloads: onOpenDownloadTasks,
                                 onDrawerVisibilityChanged:
                                     _setProfileDrawerOpen,
+                                onDrawerCovered: _resetProfileDrawer,
                               ),
                         leadingWidth: Platform.isWindows ? null : leadingWidth,
                         automaticallyImplyLeading: false,
@@ -403,6 +444,7 @@ class _HomeAppBarProfileButton extends StatefulWidget {
     required this.drawerContent,
     required this.onOpenDownloads,
     required this.onDrawerVisibilityChanged,
+    required this.onDrawerCovered,
   });
 
   final HomeDownloadStatusListenable downloadStatus;
@@ -413,6 +455,7 @@ class _HomeAppBarProfileButton extends StatefulWidget {
   final Widget drawerContent;
   final VoidCallback onOpenDownloads;
   final ValueChanged<bool> onDrawerVisibilityChanged;
+  final VoidCallback onDrawerCovered;
 
   @override
   State<_HomeAppBarProfileButton> createState() =>
@@ -581,6 +624,7 @@ class _HomeAppBarProfileButtonState extends State<_HomeAppBarProfileButton> {
             Theme.of(context).colorScheme.surface,
         drawerContentListenable: _drawerContentNotifier,
         onClosing: () => widget.onDrawerVisibilityChanged(false),
+        onDestinationReturning: widget.onDrawerCovered,
       ),
     );
   }
@@ -688,13 +732,16 @@ class _HomeProfileDrawerRoute extends PageRoute<void> {
     required this.drawerColor,
     required this.drawerContentListenable,
     required this.onClosing,
+    required this.onDestinationReturning,
   });
 
   final double drawerWidth;
   final Color drawerColor;
   final ValueListenable<Widget> drawerContentListenable;
   final VoidCallback onClosing;
+  final VoidCallback onDestinationReturning;
   bool _closingNotified = false;
+  bool _scaleResetHandedOff = false;
 
   @override
   bool get opaque => false;
@@ -734,9 +781,19 @@ class _HomeProfileDrawerRoute extends PageRoute<void> {
   @override
   void didChangeNext(Route<dynamic>? nextRoute) {
     super.didChangeNext(nextRoute);
-    if (nextRoute is! PageRoute<dynamic>) {
+    if (_scaleResetHandedOff || nextRoute is! PageRoute<dynamic>) {
       return;
     }
+    final destinationAnimation = nextRoute.animation;
+    if (destinationAnimation == null) {
+      return;
+    }
+    _scaleResetHandedOff = true;
+    _closingNotified = true;
+    holdHomeDrawerScaleUntilRouteReturns(
+      routeAnimation: destinationAnimation,
+      onRouteReturning: onDestinationReturning,
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       navigator?.removeRoute(this);
     });
