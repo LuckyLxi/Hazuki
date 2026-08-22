@@ -1,5 +1,18 @@
 part of 'comments_page.dart';
 
+double resolveCommentsSafeBottomInset({
+  required double observedSafeBottom,
+  required double? lastCurrentRouteSafeBottom,
+  required bool routeIsCurrent,
+  required bool preserveAfterRouteCover,
+}) {
+  if ((routeIsCurrent && !preserveAfterRouteCover) ||
+      lastCurrentRouteSafeBottom == null) {
+    return observedSafeBottom;
+  }
+  return lastCurrentRouteSafeBottom;
+}
+
 class _KeyboardAwareCommentsBody extends StatelessWidget {
   const _KeyboardAwareCommentsBody({
     required this.useKeyboardInset,
@@ -24,7 +37,7 @@ class _KeyboardAwareCommentsBody extends StatelessWidget {
   }
 }
 
-class _KeyboardAwareCommentsComposer extends StatelessWidget {
+class _KeyboardAwareCommentsComposer extends StatefulWidget {
   const _KeyboardAwareCommentsComposer({
     required this.isFocused,
     required this.useKeyboardInset,
@@ -38,20 +51,45 @@ class _KeyboardAwareCommentsComposer extends StatelessWidget {
   final Widget child;
 
   @override
-  Widget build(BuildContext context) {
-    final keyboardInset = useKeyboardInset
-        ? MediaQuery.viewInsetsOf(context).bottom
-        : 0.0;
-    final safeBottom = MediaQuery.paddingOf(context).bottom;
+  State<_KeyboardAwareCommentsComposer> createState() =>
+      _KeyboardAwareCommentsComposerState();
+}
 
+class _KeyboardAwareCommentsComposerState
+    extends State<_KeyboardAwareCommentsComposer> {
+  double? _lastCurrentRouteSafeBottom;
+  bool _preserveSafeBottomAfterRouteCover = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final observedSafeBottom = MediaQuery.paddingOf(context).bottom;
+    final rawKeyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+    final routeIsCurrent = ModalRoute.of(context)?.isCurrent ?? true;
+    if (!routeIsCurrent) {
+      _preserveSafeBottomAfterRouteCover = true;
+    } else if (rawKeyboardInset > 0 ||
+        observedSafeBottom >= (_lastCurrentRouteSafeBottom ?? 0)) {
+      _preserveSafeBottomAfterRouteCover = false;
+    }
+    final safeBottom = resolveCommentsSafeBottomInset(
+      observedSafeBottom: observedSafeBottom,
+      lastCurrentRouteSafeBottom: _lastCurrentRouteSafeBottom,
+      routeIsCurrent: routeIsCurrent,
+      preserveAfterRouteCover: _preserveSafeBottomAfterRouteCover,
+    );
+    if ((routeIsCurrent && !_preserveSafeBottomAfterRouteCover) ||
+        _lastCurrentRouteSafeBottom == null) {
+      _lastCurrentRouteSafeBottom = observedSafeBottom;
+    }
+    final keyboardInset = widget.useKeyboardInset ? rawKeyboardInset : 0.0;
     // Keep the keyboard's per-frame inset updates inside the composer subtree.
     // Rebuilding the comments list for every IME animation frame is expensive,
     // especially when comments include images or expanded replies.
     return Positioned(
-      left: isFocused && useKeyboardInset ? 10.0 : 16.0,
-      right: isFocused && useKeyboardInset ? 10.0 : 16.0,
-      bottom: safeBottom + bottomMargin + keyboardInset,
-      child: child,
+      left: widget.isFocused && widget.useKeyboardInset ? 10.0 : 16.0,
+      right: widget.isFocused && widget.useKeyboardInset ? 10.0 : 16.0,
+      bottom: safeBottom + widget.bottomMargin + keyboardInset,
+      child: widget.child,
     );
   }
 }
