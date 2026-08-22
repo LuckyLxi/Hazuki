@@ -54,7 +54,7 @@ class ComicDetailHeaderSection extends StatelessWidget {
         .round()
         .clamp(190, 900)
         .toInt();
-    final favoriteButtonWidth = MediaQuery.of(context).size.width / 2.2;
+    final favoriteButtonWidth = MediaQuery.sizeOf(context).width / 2.2;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

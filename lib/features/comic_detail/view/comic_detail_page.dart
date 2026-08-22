@@ -221,7 +221,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
   @override
   Widget build(BuildContext context) {
     final theme = _themeController.buildDetailTheme(Theme.of(context));
-    final topInset = MediaQuery.of(context).padding.top + kToolbarHeight;
+    final topInset = MediaQuery.viewPaddingOf(context).top + kToolbarHeight;
     final surface = theme.colorScheme.surface;
 
     return ComicDetailScope(

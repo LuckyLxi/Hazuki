@@ -379,6 +379,10 @@ class _TabBarBottomLayoutState extends State<TabBarBottomLayout>
       placement: config.placement,
       position: config.position,
       collapseOnSearchFocus: config.collapseOnSearchFocus,
+      transformOffset: config.transformOffset,
+      transformScale: config.transformScale,
+      ignorePointer: config.ignorePointer,
+      glowOpacity: config.glowOpacity,
     );
   }
 

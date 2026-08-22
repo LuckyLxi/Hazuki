@@ -70,16 +70,17 @@ class _ComicDetailRelatedTabState extends State<ComicDetailRelatedTab>
     const crossAxisCount = 3;
     const gridPadding = 16.0;
     const crossSpacing = 10.0;
-    final mediaQuery = MediaQuery.of(context);
+    final mediaSize = MediaQuery.sizeOf(context);
     final tileWidth =
-        (mediaQuery.size.width -
+        (mediaSize.width -
             (gridPadding * 2) -
             (crossSpacing * (crossAxisCount - 1))) /
         crossAxisCount;
-    final thumbnailCacheWidth = (tileWidth * mediaQuery.devicePixelRatio)
-        .round()
-        .clamp(120, 480)
-        .toInt();
+    final thumbnailCacheWidth =
+        (tileWidth * MediaQuery.devicePixelRatioOf(context))
+            .round()
+            .clamp(120, 480)
+            .toInt();
 
     return CustomScrollView(
       key: const PageStorageKey<String>('comic-detail-related-tab'),

@@ -10,6 +10,7 @@ import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/local_favorites/local_favorites_contracts.dart';
 import 'package:hazuki/services/local_favorites/local_favorites_preferences_store.dart';
 import 'package:hazuki/shared/comic_cover_prefetcher.dart';
+import 'package:hazuki/shared/liquid_glass_support.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:hazuki/widgets/windows_comic_detail_host.dart';
 import 'favorite_page_content.dart';
@@ -66,6 +67,9 @@ class FavoritePageState extends State<FavoritePage>
       <String, FavoriteEntryAnimationStyle>{};
   bool _pendingFreshListEntryAnimation = true;
   int _entryAnimationBatchId = 0;
+
+  @override
+  bool get backToTopVisible => _showBackToTop;
 
   @override
   void initState() {
@@ -229,6 +233,10 @@ class FavoritePageState extends State<FavoritePage>
       setState(() {
         _showBackToTop = nextShowBackToTop;
       });
+      widget.actionsBinding?.updateBackToTopVisibility(
+        this,
+        visible: nextShowBackToTop,
+      );
     }
     if (position.pixels >= position.maxScrollExtent - 240) {
       unawaited(_handleLoadMore());
@@ -422,7 +430,8 @@ class FavoritePageState extends State<FavoritePage>
     );
   }
 
-  Future<void> _scrollToTop() async {
+  @override
+  Future<void> scrollToTop() async {
     if (!_scrollController.hasClients) {
       return;
     }
@@ -503,14 +512,15 @@ class FavoritePageState extends State<FavoritePage>
                   ),
                 ],
               ),
-              Positioned(
-                right: 16,
-                bottom: 16,
-                child: FavoriteBackToTopButton(
-                  visible: _showBackToTop,
-                  onPressed: _scrollToTop,
+              if (!HazukiLiquidGlass.isAvailable)
+                Positioned(
+                  right: 16,
+                  bottom: 16,
+                  child: FavoriteBackToTopButton(
+                    visible: _showBackToTop,
+                    onPressed: scrollToTop,
+                  ),
                 ),
-              ),
             ],
           ),
         );

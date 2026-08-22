@@ -13,10 +13,14 @@ class HomeBottomNavigation extends StatefulWidget {
     required this.onDestinationSelected,
     required this.discoverLabel,
     required this.favoriteLabel,
+    this.showBackToTop = false,
+    this.onBackToTopPressed,
+    this.backToTopLabel = '',
     this.layoutScale = 1,
   }) : assert(layoutScale > 0);
 
-  static const double floatingBarHeight = 58;
+  static const double floatingBarHeight =
+      HazukiLiquidGlass.navigationControlHeight;
   static const double floatingVerticalPadding = 6;
   static const double fallbackBarHeight = 48;
   static const double bottomSpacing = 10;
@@ -30,6 +34,9 @@ class HomeBottomNavigation extends StatefulWidget {
   final ValueChanged<int> onDestinationSelected;
   final String discoverLabel;
   final String favoriteLabel;
+  final bool showBackToTop;
+  final VoidCallback? onBackToTopPressed;
+  final String backToTopLabel;
   final double layoutScale;
 
   @override
@@ -41,6 +48,8 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
   static const int _itemCount = 2;
   final _barKey = GlobalKey();
 
+  late final GlassMorphController _backToTopMorph;
+
   late final List<AnimationController> _controllers;
   late final List<Animation<double>> _scaleAnims;
   late final List<Animation<double>> _labelAnims;
@@ -49,6 +58,10 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
   @override
   void initState() {
     super.initState();
+    _backToTopMorph = GlassMorphController(vsync: this, speed: MorphSpeed.slow);
+    if (widget.showBackToTop) {
+      _backToTopMorph.open();
+    }
     _controllers = List.generate(
       _itemCount,
       (i) => AnimationController(
@@ -111,17 +124,28 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
       // Animate in the new item with spring
       _controllers[widget.currentIndex].forward();
     }
+    if (oldWidget.showBackToTop != widget.showBackToTop) {
+      if (widget.showBackToTop) {
+        _backToTopMorph.open();
+      } else {
+        _backToTopMorph.close();
+      }
+    }
     _schedulePromptAnchorSync();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    _backToTopMorph.setDisableAnimations(
+      MediaQuery.disableAnimationsOf(context),
+    );
     _schedulePromptAnchorSync();
   }
 
   @override
   void dispose() {
+    _backToTopMorph.dispose();
     for (final c in _controllers) {
       c.dispose();
     }
@@ -136,72 +160,141 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
     final bottomPadding = MediaQuery.of(context).padding.bottom * scale;
 
     if (HazukiLiquidGlass.isAvailable) {
-      return Padding(
-        padding: EdgeInsets.only(bottom: bottomPadding),
-        child: Center(
-          heightFactor: 1,
-          child: SizedBox(
-            width: 240 * scale,
-            child: GlassTabBar.bottom(
-              key: const ValueKey('home-bottom-navigation-premium'),
-              tabs: [
-                GlassTab(
-                  icon: const Icon(Icons.explore_outlined),
-                  activeIcon: const Icon(Icons.explore),
-                  label: widget.discoverLabel,
-                  semanticLabel: widget.discoverLabel,
-                ),
-                GlassTab(
-                  icon: const Icon(Icons.favorite_border),
-                  activeIcon: const Icon(Icons.favorite),
-                  label: widget.favoriteLabel,
-                  semanticLabel: widget.favoriteLabel,
-                ),
-              ],
-              selectedIndex: widget.currentIndex,
-              onTabSelected: widget.onDestinationSelected,
-              quality: HazukiLiquidGlass.navigationQuality,
-              horizontalPadding: 12 * scale,
-              verticalPadding:
-                  HomeBottomNavigation.floatingVerticalPadding * scale,
-              barHeight: HomeBottomNavigation.floatingBarHeight * scale,
-              tabWidth: 108 * scale,
-              barBorderRadius: 32 * scale,
-              tabPadding: EdgeInsets.symmetric(horizontal: 4 * scale),
-              iconLabelSpacing: 4 * scale,
-              iconSize: 24 * scale,
-              labelFontSize: 11 * scale,
-              indicatorBorderRadius: 40 * scale,
-              indicatorExpansion: EdgeInsets.symmetric(
-                horizontal: 12 * scale,
-                vertical: 8 * scale,
-              ),
-              selectedIconColor: colorScheme.primary,
-              selectedLabelColor: colorScheme.primary,
-              unselectedIconColor: colorScheme.onSurfaceVariant,
-              unselectedLabelColor: colorScheme.onSurfaceVariant,
-              selectedLabelStyle: const TextStyle(
-                decoration: TextDecoration.none,
-              ),
-              unselectedLabelStyle: const TextStyle(
-                decoration: TextDecoration.none,
-              ),
-              interactionBehavior: GlassInteractionBehavior.scaleOnly,
-              settings: LiquidGlassSettings(
-                thickness: 30,
-                blur: 3,
-                chromaticAberration: 0.3,
-                lightIntensity: 0.6,
-                refractiveIndex: 1.59,
-                saturation: 0.7,
-                ambientStrength: 1,
-                glassColor: isDark
-                    ? Colors.white.withValues(alpha: 0.08)
-                    : const Color(0x3DFFFFFF),
+      return AnimatedBuilder(
+        animation: _backToTopMorph,
+        builder: (context, _) {
+          final morphState = _backToTopMorph.computeState(
+            finalDx: 91 * scale,
+            finalDy: 0,
+          );
+          final buttonScale = morphState.sizeT.clamp(0.0, 1.0).toDouble();
+          final combinedWidth =
+              (240 + 8 + HazukiLiquidGlass.navigationControlHeight) * scale;
+
+          return Padding(
+            padding: EdgeInsets.only(bottom: bottomPadding),
+            child: SizedBox(
+              height:
+                  (HomeBottomNavigation.floatingBarHeight +
+                      HomeBottomNavigation.floatingVerticalPadding * 2) *
+                  scale,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final navigationWidth = 240 * scale;
+                  final navigationLeft =
+                      (constraints.maxWidth - navigationWidth) / 2;
+
+                  return Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Positioned(
+                        key: const ValueKey(
+                          'home-bottom-navigation-glass-anchor',
+                        ),
+                        left: navigationLeft,
+                        width: navigationWidth,
+                        top: 0,
+                        bottom: 0,
+                        child: const SizedBox.shrink(),
+                      ),
+                      Positioned(
+                        left: navigationLeft,
+                        width: combinedWidth,
+                        top: 0,
+                        child: GlassTabBar.bottom(
+                          key: const ValueKey('home-bottom-navigation-premium'),
+                          tabs: [
+                            GlassTab(
+                              icon: const Icon(Icons.explore_outlined),
+                              activeIcon: const Icon(Icons.explore),
+                              label: widget.discoverLabel,
+                              semanticLabel: widget.discoverLabel,
+                            ),
+                            GlassTab(
+                              icon: const Icon(Icons.favorite_border),
+                              activeIcon: const Icon(Icons.favorite),
+                              label: widget.favoriteLabel,
+                              semanticLabel: widget.favoriteLabel,
+                            ),
+                          ],
+                          selectedIndex: widget.currentIndex,
+                          onTabSelected: widget.onDestinationSelected,
+                          extraButton: GlassTabBarExtraButton(
+                            icon: Opacity(
+                              opacity: buttonScale,
+                              child: const Icon(
+                                Icons.vertical_align_top_rounded,
+                              ),
+                            ),
+                            onTap: widget.onBackToTopPressed ?? () {},
+                            label: widget.backToTopLabel,
+                            size:
+                                HazukiLiquidGlass.navigationControlHeight *
+                                scale,
+                            transformOffset: Offset(
+                              morphState.currentDx - 91 * scale,
+                              0,
+                            ),
+                            transformScale: buttonScale,
+                            ignorePointer:
+                                !widget.showBackToTop || buttonScale < 0.8,
+                            glowOpacity: 0,
+                          ),
+                          spacing: 8 * scale,
+                          blendAmount: 10 + morphState.blend,
+                          quality: HazukiLiquidGlass.navigationQuality,
+                          horizontalPadding: 12 * scale,
+                          verticalPadding:
+                              HomeBottomNavigation.floatingVerticalPadding *
+                              scale,
+                          barHeight:
+                              HomeBottomNavigation.floatingBarHeight * scale,
+                          tabWidth: 108 * scale,
+                          barBorderRadius: 32 * scale,
+                          tabPadding: EdgeInsets.symmetric(
+                            horizontal: 4 * scale,
+                          ),
+                          iconLabelSpacing: 4 * scale,
+                          iconSize: 24 * scale,
+                          labelFontSize: 11 * scale,
+                          indicatorBorderRadius: 40 * scale,
+                          indicatorExpansion: EdgeInsets.symmetric(
+                            horizontal: 12 * scale,
+                            vertical: 8 * scale,
+                          ),
+                          selectedIconColor: colorScheme.primary,
+                          selectedLabelColor: colorScheme.primary,
+                          unselectedIconColor: colorScheme.onSurfaceVariant,
+                          unselectedLabelColor: colorScheme.onSurfaceVariant,
+                          selectedLabelStyle: const TextStyle(
+                            decoration: TextDecoration.none,
+                          ),
+                          unselectedLabelStyle: const TextStyle(
+                            decoration: TextDecoration.none,
+                          ),
+                          interactionBehavior:
+                              GlassInteractionBehavior.scaleOnly,
+                          settings: LiquidGlassSettings(
+                            thickness: 30,
+                            blur: 3,
+                            chromaticAberration: 0.3,
+                            lightIntensity: 0.6,
+                            refractiveIndex: 1.59,
+                            saturation: 0.7,
+                            ambientStrength: 1,
+                            glassColor: isDark
+                                ? Colors.white.withValues(alpha: 0.08)
+                                : const Color(0x3DFFFFFF),
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
             ),
-          ),
-        ),
+          );
+        },
       );
     }
 

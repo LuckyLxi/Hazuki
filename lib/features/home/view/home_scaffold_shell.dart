@@ -39,6 +39,39 @@ Offset resolveHomeNavigationDrawerOffset({
   );
 }
 
+@visibleForTesting
+void resetHomeDrawerScale(AnimationController controller) {
+  controller.value = 0;
+}
+
+@visibleForTesting
+VoidCallback holdHomeDrawerScaleUntilRouteReturns({
+  required Animation<double> routeAnimation,
+  required VoidCallback onRouteReturning,
+}) {
+  var listening = true;
+  late final AnimationStatusListener listener;
+
+  void stopListening() {
+    if (!listening) {
+      return;
+    }
+    listening = false;
+    routeAnimation.removeStatusListener(listener);
+  }
+
+  listener = (status) {
+    if (status != AnimationStatus.reverse &&
+        status != AnimationStatus.dismissed) {
+      return;
+    }
+    stopListening();
+    onRouteReturning();
+  };
+  routeAnimation.addStatusListener(listener);
+  return stopListening;
+}
+
 class HomeScaffoldShell extends StatefulWidget {
   const HomeScaffoldShell({
     super.key,
@@ -52,6 +85,7 @@ class HomeScaffoldShell extends StatefulWidget {
     required this.discoverChild,
     required this.favoriteChild,
     required this.favoriteAppBarActions,
+    required this.showFavoriteBackToTop,
     required this.isLogged,
     required this.profileLoading,
     required this.avatarUrl,
@@ -66,6 +100,7 @@ class HomeScaffoldShell extends StatefulWidget {
     required this.onFavoriteSortSelected,
     required this.onFavoriteCreateFolderPressed,
     required this.onFavoriteModeTogglePressed,
+    required this.onFavoriteBackToTopPressed,
     required this.onProfileTap,
     required this.onCheckInPressed,
     required this.onSwitchSourcePressed,
@@ -90,6 +125,7 @@ class HomeScaffoldShell extends StatefulWidget {
   final Widget discoverChild;
   final Widget favoriteChild;
   final FavoriteAppBarActionsState favoriteAppBarActions;
+  final bool showFavoriteBackToTop;
   final bool isLogged;
   final bool profileLoading;
   final String? avatarUrl;
@@ -104,6 +140,7 @@ class HomeScaffoldShell extends StatefulWidget {
   final ValueChanged<String> onFavoriteSortSelected;
   final VoidCallback onFavoriteCreateFolderPressed;
   final VoidCallback onFavoriteModeTogglePressed;
+  final VoidCallback onFavoriteBackToTopPressed;
   final VoidCallback? onProfileTap;
   final VoidCallback? onCheckInPressed;
   final VoidCallback? onSwitchSourcePressed;
@@ -181,6 +218,13 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
     } else {
       _profileDrawerController.reverse();
     }
+  }
+
+  void _resetProfileDrawer() {
+    if (!mounted) {
+      return;
+    }
+    resetHomeDrawerScale(_profileDrawerController);
   }
 
   @override
@@ -300,6 +344,7 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
                                 onOpenDownloads: onOpenDownloadTasks,
                                 onDrawerVisibilityChanged:
                                     _setProfileDrawerOpen,
+                                onDrawerCovered: _resetProfileDrawer,
                               ),
                         leadingWidth: Platform.isWindows ? null : leadingWidth,
                         automaticallyImplyLeading: false,
@@ -378,7 +423,11 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
                           onDestinationSelected: onDestinationSelected,
                           discoverLabel: l10n(context).homeTabDiscover,
                           favoriteLabel: l10n(context).homeTabFavorite,
+                          backToTopLabel: l10n(context).favoriteBackToTop,
                           layoutScale: navigationScale,
+                          showBackToTop:
+                              currentIndex == 1 && widget.showFavoriteBackToTop,
+                          onBackToTopPressed: widget.onFavoriteBackToTopPressed,
                         ),
                       ),
                     ),
@@ -403,6 +452,7 @@ class _HomeAppBarProfileButton extends StatefulWidget {
     required this.drawerContent,
     required this.onOpenDownloads,
     required this.onDrawerVisibilityChanged,
+    required this.onDrawerCovered,
   });
 
   final HomeDownloadStatusListenable downloadStatus;
@@ -413,6 +463,7 @@ class _HomeAppBarProfileButton extends StatefulWidget {
   final Widget drawerContent;
   final VoidCallback onOpenDownloads;
   final ValueChanged<bool> onDrawerVisibilityChanged;
+  final VoidCallback onDrawerCovered;
 
   @override
   State<_HomeAppBarProfileButton> createState() =>
@@ -581,6 +632,7 @@ class _HomeAppBarProfileButtonState extends State<_HomeAppBarProfileButton> {
             Theme.of(context).colorScheme.surface,
         drawerContentListenable: _drawerContentNotifier,
         onClosing: () => widget.onDrawerVisibilityChanged(false),
+        onDestinationReturning: widget.onDrawerCovered,
       ),
     );
   }
@@ -688,13 +740,16 @@ class _HomeProfileDrawerRoute extends PageRoute<void> {
     required this.drawerColor,
     required this.drawerContentListenable,
     required this.onClosing,
+    required this.onDestinationReturning,
   });
 
   final double drawerWidth;
   final Color drawerColor;
   final ValueListenable<Widget> drawerContentListenable;
   final VoidCallback onClosing;
+  final VoidCallback onDestinationReturning;
   bool _closingNotified = false;
+  bool _scaleResetHandedOff = false;
 
   @override
   bool get opaque => false;
@@ -734,9 +789,19 @@ class _HomeProfileDrawerRoute extends PageRoute<void> {
   @override
   void didChangeNext(Route<dynamic>? nextRoute) {
     super.didChangeNext(nextRoute);
-    if (nextRoute is! PageRoute<dynamic>) {
+    if (_scaleResetHandedOff || nextRoute is! PageRoute<dynamic>) {
       return;
     }
+    final destinationAnimation = nextRoute.animation;
+    if (destinationAnimation == null) {
+      return;
+    }
+    _scaleResetHandedOff = true;
+    _closingNotified = true;
+    holdHomeDrawerScaleUntilRouteReturns(
+      routeAnimation: destinationAnimation,
+      onRouteReturning: onDestinationReturning,
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       navigator?.removeRoute(this);
     });

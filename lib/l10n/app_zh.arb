@@ -1002,6 +1002,7 @@
   "favoriteDeleteCurrentFolderTooltip": "删除当前收藏夹",
   "favoriteLoginRequired": "请登录",
   "favoriteEmpty": "暂无收藏",
+  "favoriteBackToTop": "回到顶部",
   "favoriteCreateFolderTitle": "新建收藏夹",
   "favoriteCreateFolderHint": "请输入收藏夹名称",
   "favoriteCreateFolderNameRequired": "收藏夹名称不能为空",

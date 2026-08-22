@@ -1002,6 +1002,7 @@
   "favoriteDeleteCurrentFolderTooltip": "Delete current favorite folder",
   "favoriteLoginRequired": "Please sign in",
   "favoriteEmpty": "No favorites yet",
+  "favoriteBackToTop": "Back to top",
   "favoriteCreateFolderTitle": "New favorite folder",
   "favoriteCreateFolderHint": "Enter a folder name",
   "favoriteCreateFolderNameRequired": "Folder name cannot be empty",
