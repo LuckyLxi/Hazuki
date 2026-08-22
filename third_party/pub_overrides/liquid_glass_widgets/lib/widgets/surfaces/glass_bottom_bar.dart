@@ -915,6 +915,10 @@ class GlassTabBarExtraButton {
     this.placement = GlassExtraButtonPlacement.right,
     this.position = GlassExtraButtonPosition.beforeSearch,
     this.collapseOnSearchFocus = true,
+    this.transformOffset = Offset.zero,
+    this.transformScale = 1,
+    this.ignorePointer = false,
+    this.glowOpacity,
   });
 
   /// Icon widget displayed in the button.
@@ -972,6 +976,18 @@ class GlassTabBarExtraButton {
   ///
   /// Has no effect in [GlassBottomBar].
   final bool collapseOnSearchFocus;
+
+  /// Paint offset applied to the complete glass surface after layout.
+  final Offset transformOffset;
+
+  /// Paint scale applied to the complete glass surface after layout.
+  final double transformScale;
+
+  /// Whether this button should ignore pointer events while still rendering.
+  final bool ignorePointer;
+
+  /// Opacity of the interaction glow. Set to zero to disable it.
+  final double? glowOpacity;
 }
 
 /// Deprecated alias for [GlassTabBarExtraButton].

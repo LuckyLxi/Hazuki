@@ -31,6 +31,7 @@ class HomeCoordinator extends ChangeNotifier {
     _profileController.addListener(_relayChange);
     _shellController.addListener(_relayChange);
     _dailyRecommendationService.addListener(_relayChange);
+    favoriteActionsBinding.addListener(_relayChange);
     _sourceService.addListener(_handleSourceChanged);
   }
 
@@ -69,6 +70,7 @@ class HomeCoordinator extends ChangeNotifier {
       _shellController.discoverSearchMorphProgress;
   FavoriteAppBarActionsState get favoriteAppBarActions =>
       _shellController.favoriteAppBarActions;
+  bool get favoriteBackToTopVisible => favoriteActionsBinding.backToTopVisible;
   DiscoverDailyRecommendationState get dailyRecommendationState =>
       _dailyRecommendationService.state;
 
@@ -154,6 +156,10 @@ class HomeCoordinator extends ChangeNotifier {
     return favoriteActionsBinding.toggleMode();
   }
 
+  Future<void> scrollFavoriteToTop() {
+    return favoriteActionsBinding.scrollToTop();
+  }
+
   void handleDiscoverSearchMorphProgressChanged(double progress) {
     _shellController.handleDiscoverSearchMorphProgressChanged(progress);
   }
@@ -231,6 +237,7 @@ class HomeCoordinator extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _dailyRecommendationService.removeListener(_relayChange);
+    favoriteActionsBinding.removeListener(_relayChange);
     _sourceService.removeListener(_handleSourceChanged);
     _profileController
       ..removeListener(_relayChange)

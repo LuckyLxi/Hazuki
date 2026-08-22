@@ -11,6 +11,8 @@ class _HazukiLiquidGlassEnabledNotifier extends ValueNotifier<bool> {
 
 /// Keeps the experimental liquid-glass integration optional and recoverable.
 abstract final class HazukiLiquidGlass {
+  static const double navigationControlHeight = 58;
+
   static bool _rendererReady = false;
   static final _enabled = _HazukiLiquidGlassEnabledNotifier(true);
 

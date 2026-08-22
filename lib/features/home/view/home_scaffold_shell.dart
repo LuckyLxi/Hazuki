@@ -85,6 +85,7 @@ class HomeScaffoldShell extends StatefulWidget {
     required this.discoverChild,
     required this.favoriteChild,
     required this.favoriteAppBarActions,
+    required this.showFavoriteBackToTop,
     required this.isLogged,
     required this.profileLoading,
     required this.avatarUrl,
@@ -99,6 +100,7 @@ class HomeScaffoldShell extends StatefulWidget {
     required this.onFavoriteSortSelected,
     required this.onFavoriteCreateFolderPressed,
     required this.onFavoriteModeTogglePressed,
+    required this.onFavoriteBackToTopPressed,
     required this.onProfileTap,
     required this.onCheckInPressed,
     required this.onSwitchSourcePressed,
@@ -123,6 +125,7 @@ class HomeScaffoldShell extends StatefulWidget {
   final Widget discoverChild;
   final Widget favoriteChild;
   final FavoriteAppBarActionsState favoriteAppBarActions;
+  final bool showFavoriteBackToTop;
   final bool isLogged;
   final bool profileLoading;
   final String? avatarUrl;
@@ -137,6 +140,7 @@ class HomeScaffoldShell extends StatefulWidget {
   final ValueChanged<String> onFavoriteSortSelected;
   final VoidCallback onFavoriteCreateFolderPressed;
   final VoidCallback onFavoriteModeTogglePressed;
+  final VoidCallback onFavoriteBackToTopPressed;
   final VoidCallback? onProfileTap;
   final VoidCallback? onCheckInPressed;
   final VoidCallback? onSwitchSourcePressed;
@@ -419,7 +423,11 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
                           onDestinationSelected: onDestinationSelected,
                           discoverLabel: l10n(context).homeTabDiscover,
                           favoriteLabel: l10n(context).homeTabFavorite,
+                          backToTopLabel: l10n(context).favoriteBackToTop,
                           layoutScale: navigationScale,
+                          showBackToTop:
+                              currentIndex == 1 && widget.showFavoriteBackToTop,
+                          onBackToTopPressed: widget.onFavoriteBackToTopPressed,
                         ),
                       ),
                     ),

@@ -387,13 +387,26 @@ class BottomBarExtraBtn extends StatelessWidget {
       height: config.size,
       quality: quality,
       iconColor: iconColor,
+      glowOpacity: config.glowOpacity,
       useOwnLayer: !enableBlend, // When blending, share the parent's layer
       shape: effectiveShape,
       platformViewBackdrop: platformViewBackdrop,
       stretch: platformViewBackdrop ? 0.0 : 0.5,
     );
 
-    return button;
+    return ExcludeFocus(
+      excluding: config.ignorePointer,
+      child: ExcludeSemantics(
+        excluding: config.ignorePointer,
+        child: IgnorePointer(
+          ignoring: config.ignorePointer,
+          child: Transform.translate(
+            offset: config.transformOffset,
+            child: Transform.scale(scale: config.transformScale, child: button),
+          ),
+        ),
+      ),
+    );
   }
 }
 

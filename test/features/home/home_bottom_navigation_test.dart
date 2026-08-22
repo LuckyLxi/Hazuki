@@ -115,8 +115,105 @@ void main() {
     expect(tabBar.settings?.glassColor.a, closeTo(0.08, 0.01));
     expect(tabBar.indicatorSettings, isNull);
 
+    final scaffoldRect = tester.getRect(find.byType(Scaffold));
+    final anchorRect = tester.getRect(
+      find.byKey(const ValueKey('home-bottom-navigation-glass-anchor')),
+    );
+    final glassRect = tester.getRect(
+      find.byKey(const ValueKey('home-bottom-navigation-premium')),
+    );
+    expect(anchorRect.center.dx, closeTo(scaffoldRect.center.dx, 0.01));
+    expect(anchorRect.bottom, closeTo(scaffoldRect.bottom, 0.01));
+    expect(glassRect.left, closeTo(anchorRect.left, 0.01));
+    expect(glassRect.top, closeTo(anchorRect.top, 0.01));
+
     tabBar.onTabSelected(1);
     expect(selectedIndex, 1);
+  });
+
+  testWidgets('back-to-top glass splits from the favorite destination', (
+    tester,
+  ) async {
+    await tester.runAsync(HazukiLiquidGlass.initialize);
+    var backToTopPressed = false;
+    var showBackToTop = true;
+    late StateSetter setNavigationState;
+
+    await tester.pumpWidget(
+      HazukiLiquidGlass.wrap(
+        child: MaterialApp(
+          home: Scaffold(
+            bottomNavigationBar: StatefulBuilder(
+              builder: (context, setState) {
+                setNavigationState = setState;
+                return HomeBottomNavigation(
+                  currentIndex: 1,
+                  onDestinationSelected: _ignoreDestination,
+                  discoverLabel: 'Discover',
+                  favoriteLabel: 'Favorites',
+                  backToTopLabel: 'Back to top',
+                  showBackToTop: showBackToTop,
+                  onBackToTopPressed: () => backToTopPressed = true,
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+
+    var tabBar = tester.widget<GlassTabBar>(find.byType(GlassTabBar));
+    var button = tabBar.extraButton!;
+    final glassButton = find.byWidgetPredicate(
+      (widget) => widget is GlassButton && widget.label == 'Back to top',
+    );
+    ExcludeFocus focusGuard() => tester.widget<ExcludeFocus>(
+      find.ancestor(of: glassButton, matching: find.byType(ExcludeFocus)).first,
+    );
+    ExcludeSemantics semanticsGuard() => tester.widget<ExcludeSemantics>(
+      find
+          .ancestor(of: glassButton, matching: find.byType(ExcludeSemantics))
+          .first,
+    );
+    expect(button.transformScale, lessThan(1));
+    expect(button.transformOffset.dx, lessThan(0));
+    expect(button.ignorePointer, isTrue);
+    expect(focusGuard().excluding, isTrue);
+    expect(semanticsGuard().excluding, isTrue);
+
+    await tester.pumpAndSettle();
+
+    tabBar = tester.widget<GlassTabBar>(find.byType(GlassTabBar));
+    button = tabBar.extraButton!;
+    expect(button.size, HomeBottomNavigation.floatingBarHeight);
+    expect(button.transformScale, closeTo(1, 0.01));
+    expect(button.transformOffset.dx, closeTo(0, 0.1));
+    expect(button.ignorePointer, isFalse);
+    expect(button.glowOpacity, 0);
+    expect(focusGuard().excluding, isFalse);
+    expect(semanticsGuard().excluding, isFalse);
+    expect(
+      tester
+          .getSize(
+            find.byKey(const ValueKey('home-bottom-navigation-glass-anchor')),
+          )
+          .width,
+      240,
+    );
+
+    button.onTap();
+    expect(backToTopPressed, isTrue);
+
+    setNavigationState(() => showBackToTop = false);
+    await tester.pumpAndSettle();
+
+    tabBar = tester.widget<GlassTabBar>(find.byType(GlassTabBar));
+    button = tabBar.extraButton!;
+    expect(button.transformScale, closeTo(0, 0.01));
+    expect(button.transformOffset.dx, closeTo(-91, 0.1));
+    expect(button.ignorePointer, isTrue);
+    expect(focusGuard().excluding, isTrue);
+    expect(semanticsGuard().excluding, isTrue);
   });
 
   testWidgets('liquid glass indicator preserves its off-center press offset', (
@@ -139,7 +236,9 @@ void main() {
       ),
     );
 
-    final barRect = tester.getRect(find.byType(GlassTabBar));
+    final barRect = tester.getRect(
+      find.byKey(const ValueKey('home-bottom-navigation-glass-anchor')),
+    );
     final selectedCenter = Offset(
       barRect.left + barRect.width / 4,
       barRect.center.dy,
@@ -194,7 +293,9 @@ void main() {
       ),
     );
 
-    final barRect = tester.getRect(find.byType(GlassTabBar));
+    final barRect = tester.getRect(
+      find.byKey(const ValueKey('home-bottom-navigation-glass-anchor')),
+    );
     final selectedCenter = Offset(
       barRect.left + barRect.width * 3 / 4,
       barRect.center.dy,

@@ -214,6 +214,7 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
           discoverChild: discoverChild,
           favoriteChild: favoriteChild,
           favoriteAppBarActions: _coordinator.favoriteAppBarActions,
+          showFavoriteBackToTop: _coordinator.favoriteBackToTopVisible,
           isLogged: isLogged,
           profileLoading: profileLoading,
           avatarUrl: _coordinator.avatarUrl,
@@ -235,6 +236,9 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
           },
           onFavoriteModeTogglePressed: () {
             unawaited(_coordinator.toggleFavoriteMode());
+          },
+          onFavoriteBackToTopPressed: () {
+            unawaited(_coordinator.scrollFavoriteToTop());
           },
           onProfileTap: () {
             if (profileLoading) {

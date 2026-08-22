@@ -35,6 +35,7 @@ class FavoriteBackToTopButton extends StatelessWidget {
           child: IgnorePointer(
             ignoring: !visible,
             child: FloatingActionButton(
+              key: const ValueKey('favorite-back-to-top-fallback'),
               heroTag: 'favorite_back_to_top',
               onPressed: onPressed,
               child: const Icon(Icons.vertical_align_top_rounded),
