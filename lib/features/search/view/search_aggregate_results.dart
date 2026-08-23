@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
@@ -6,6 +8,8 @@ import 'package:hazuki/widgets/windows_comic_detail_host.dart';
 import 'package:loading_indicator_m3e/loading_indicator_m3e.dart';
 
 import '../state/aggregate_search_results_controller.dart';
+import '../support/search_shared.dart';
+import 'search_results_page_widgets.dart';
 
 class SearchAggregateResultsBody extends StatelessWidget {
   const SearchAggregateResultsBody({
@@ -286,17 +290,31 @@ class _SearchAggregateSectionPageState
 
   @override
   Widget build(BuildContext context) {
+    final section = widget.section;
     return WindowsComicDetailHost(
-      child: Scaffold(
-        appBar: hazukiFrostedAppBar(
-          context: context,
-          title: Text(widget.section.source.name),
-          enableBlur: false,
-        ),
-        body: ListenableBuilder(
-          listenable: widget.controller,
-          builder: (context, _) => _buildBody(context),
-        ),
+      child: ListenableBuilder(
+        listenable: widget.controller,
+        builder: (context, _) {
+          final orderLabels = searchOrderLabels(
+            context,
+            sourceKey: section.source.normalizedKey,
+          );
+          return Scaffold(
+            appBar: SearchResultsAppBar(
+              title: Text(section.source.name),
+              orderLabels: orderLabels,
+              currentOrderLabel: orderLabels[section.order] ?? section.order,
+              searchOrder: section.order,
+              onOrderMenuOpened: () {},
+              onOrderSelected: (order) {
+                unawaited(
+                  widget.controller.changeOrder(context, section, order),
+                );
+              },
+            ),
+            body: _buildBody(context),
+          );
+        },
       ),
     );
   }
@@ -304,6 +322,35 @@ class _SearchAggregateSectionPageState
   Widget _buildBody(BuildContext context) {
     final section = widget.section;
     final colorScheme = Theme.of(context).colorScheme;
+    if (section.loading && section.comics.isEmpty) {
+      return const Center(
+        child: SizedBox.square(dimension: 52, child: LoadingIndicatorM3E()),
+      );
+    }
+    if (section.errorMessage != null && section.comics.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: _AggregateSectionMessage(
+            icon: Icons.error_outline_rounded,
+            message: section.errorMessage!,
+            actionLabel: AppLocalizations.of(context)!.commonRetry,
+            onAction: () => widget.controller.retry(context, section),
+          ),
+        ),
+      );
+    }
+    if (section.comics.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: _AggregateSectionMessage(
+            icon: Icons.search_off_rounded,
+            message: AppLocalizations.of(context)!.searchEmpty,
+          ),
+        ),
+      );
+    }
     return Stack(
       children: [
         GridView.builder(
