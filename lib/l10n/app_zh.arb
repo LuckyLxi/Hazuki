@@ -1032,6 +1032,7 @@
     }
   },
   "discoverSectionEmpty": "暂无漫画",
+  "discoverSectionHomePreview": "首页展示",
   "discoverSectionChooseDate": "选择日期",
   "discoverSectionPreviousIssue": "上一期",
   "discoverSectionNextIssue": "下一期",

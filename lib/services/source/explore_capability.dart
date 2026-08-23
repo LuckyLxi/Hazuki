@@ -1,5 +1,8 @@
+import 'package:flutter/foundation.dart';
+
 import '../../models/hazuki_models.dart';
 import 'common/source_json_coerce.dart';
+import 'models/source_identity.dart';
 import 'runtime/source_runtime_host.dart';
 
 typedef SourceTextTranslator = String Function(String text, {String sourceKey});
@@ -96,19 +99,21 @@ Promise.all(
       if (list is! List) continue;
       final comics = _parseExploreComics(list);
       if (comics.isNotEmpty) {
+        final rawTitle = map['title']?.toString() ?? '__untitled_section__';
         final viewMore = map['viewMore']?.toString().trim();
         sections.add(
           ExploreSection(
-            title: _translateSourceText(
-              map['title']?.toString() ?? '__untitled_section__',
-            ),
+            title: _translateSourceText(rawTitle),
             comics: comics,
             viewMoreUrl: viewMore?.isNotEmpty == true ? viewMore : null,
+            offersInitialComicsFilter:
+                isHazukiJmSourceKey(_runtimeHost.activeSourceKey) &&
+                isJmPromotionWithUnreliableViewMore(rawTitle),
           ),
         );
       }
     }
-    return sections;
+    return markSectionsWithSharedCategoryViewMoreParameter(sections);
   }
 
   List<ExploreSection> _parseSinglePageWithMultiPartExploreSections(
@@ -129,6 +134,57 @@ Promise.all(
       }
     }
     return sections;
+  }
+
+  @visibleForTesting
+  static List<ExploreSection> markSectionsWithSharedCategoryViewMoreParameter(
+    List<ExploreSection> sections,
+  ) {
+    final parameterCounts = <String, int>{};
+    for (final section in sections) {
+      final parameter = _categoryViewMoreParameter(section.viewMoreUrl);
+      if (parameter != null) {
+        parameterCounts.update(
+          parameter,
+          (count) => count + 1,
+          ifAbsent: () => 1,
+        );
+      }
+    }
+    if (parameterCounts.values.every((count) => count < 2)) return sections;
+
+    return sections
+        .map((section) {
+          final parameter = _categoryViewMoreParameter(section.viewMoreUrl);
+          return parameter != null && parameterCounts[parameter]! > 1
+              ? section.copyWith(offersInitialComicsFilter: true)
+              : section;
+        })
+        .toList(growable: false);
+  }
+
+  static String? _categoryViewMoreParameter(String? viewMoreUrl) {
+    final raw = viewMoreUrl?.trim() ?? '';
+    if (!raw.startsWith('category:')) return null;
+    final separator = raw.indexOf('@');
+    if (separator < 0 || separator == raw.length - 1) return null;
+    final parameter = raw.substring(separator + 1).trim();
+    return parameter.isEmpty ? null : parameter;
+  }
+
+  @visibleForTesting
+  static bool isJmPromotionWithUnreliableViewMore(String title) {
+    final normalized = title.replaceAll(RegExp(r'\s+'), '');
+    return RegExp(
+          r'^C\d+.*(?:推薦本本|推荐本本)$',
+          caseSensitive: false,
+        ).hasMatch(normalized) ||
+        normalized.contains('連載更新') ||
+        normalized.contains('连载更新') ||
+        (normalized.contains('禁漫去碼') && normalized.contains('全彩化')) ||
+        (normalized.contains('禁漫去码') && normalized.contains('全彩化')) ||
+        normalized.contains('禁漫漢化組') ||
+        normalized.contains('禁漫汉化组');
   }
 
   List<ExploreSection> _parseMultiPageComicListExploreSections(
