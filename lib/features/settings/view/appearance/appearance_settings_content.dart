@@ -31,7 +31,15 @@ class AppearanceSettingsContent extends StatefulWidget {
 }
 
 class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
+  static const _themeSliderDuration = Duration(milliseconds: 220);
+
   final GlobalKey _themeIconKey = GlobalKey();
+  final GlobalKey _themeSliderKey = GlobalKey();
+  ThemeMode? _pendingThemeMode;
+  int _themeSelectionGeneration = 0;
+
+  ThemeMode get _selectedThemeMode =>
+      _pendingThemeMode ?? widget.settings.themeMode;
 
   void _logThemeUiEvent(
     String title, {
@@ -108,8 +116,22 @@ class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
     return origin;
   }
 
+  Rect? _themeSliderRect() {
+    final sliderContext = _themeSliderKey.currentContext;
+    final renderObject = sliderContext?.findRenderObject();
+    if (renderObject is! RenderBox) {
+      _logThemeUiEvent(
+        'Theme slider bounds unavailable',
+        level: 'warning',
+        content: {'reason': 'slider_render_box_not_found'},
+      );
+      return null;
+    }
+    return renderObject.localToGlobal(Offset.zero) & renderObject.size;
+  }
+
   Future<void> _applyThemeMode(ThemeMode mode) async {
-    if (widget.settings.themeMode == mode) {
+    if (_selectedThemeMode == mode) {
       _logThemeUiEvent(
         'Theme mode apply skipped',
         content: {'requestedThemeMode': mode.name, 'reason': 'same_mode'},
@@ -120,14 +142,37 @@ class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
       'Theme mode apply requested',
       content: {'requestedThemeMode': mode.name},
     );
-    await widget.onApply(
-      widget.settings.copyWith(themeMode: mode),
-      revealOrigin: _themeToggleOrigin(),
-    );
+
+    final generation = ++_themeSelectionGeneration;
+    final currentMode = _selectedThemeMode;
+    final targetBrightness = switch (mode) {
+      ThemeMode.light => Brightness.light,
+      ThemeMode.dark => Brightness.dark,
+      ThemeMode.system => MediaQuery.platformBrightnessOf(context),
+    };
+    final waitsForThemeReveal =
+        Theme.of(context).brightness != targetBrightness;
+    setState(() {
+      _pendingThemeMode = waitsForThemeReveal ? currentMode : mode;
+    });
+
+    try {
+      await widget.onApply(
+        widget.settings.copyWith(themeMode: mode),
+        revealOrigin: _themeToggleOrigin(),
+        revealSyncRegion: waitsForThemeReveal ? _themeSliderRect() : null,
+      );
+    } finally {
+      if (mounted && generation == _themeSelectionGeneration) {
+        setState(() {
+          _pendingThemeMode = null;
+        });
+      }
+    }
   }
 
   Alignment get _themeSliderAlignment {
-    return switch (widget.settings.themeMode) {
+    return switch (_selectedThemeMode) {
       ThemeMode.light => Alignment.centerLeft,
       ThemeMode.dark => Alignment.center,
       ThemeMode.system => Alignment.centerRight,
@@ -147,7 +192,7 @@ class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
     required String label,
     required ColorScheme colorScheme,
   }) {
-    final selected = widget.settings.themeMode == mode;
+    final selected = _selectedThemeMode == mode;
     return Expanded(
       child: InkWell(
         borderRadius: BorderRadius.circular(8),
@@ -192,6 +237,7 @@ class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
     required ColorScheme colorScheme,
   }) {
     return Container(
+      key: _themeSliderKey,
       height: 52,
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
@@ -205,7 +251,7 @@ class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
         children: [
           AnimatedAlign(
             alignment: _themeSliderAlignment,
-            duration: const Duration(milliseconds: 220),
+            duration: _themeSliderDuration,
             curve: Curves.easeOutCubic,
             child: FractionallySizedBox(
               widthFactor: 1 / 3,

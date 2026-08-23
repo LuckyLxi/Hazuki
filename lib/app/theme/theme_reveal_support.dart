@@ -12,6 +12,26 @@ import '../windows/windows_title_bar_controller.dart';
 typedef ThemeRevealLogCallback =
     void Function(String title, {String level, Map<String, Object?>? content});
 
+const Curve _themeRevealRadiusCurve = Cubic(0.22, 0.0, 0.12, 1.0);
+const double _themeRevealRadiusStartDelay = 0.025;
+
+double _resolveThemeRevealRadius(Size size, Offset center, double progress) {
+  final delayedProgress =
+      ((progress - _themeRevealRadiusStartDelay) /
+              (1 - _themeRevealRadiusStartDelay))
+          .clamp(0.0, 1.0);
+  final radiusProgress = _themeRevealRadiusCurve.transform(delayedProgress);
+  final distances = <double>[
+    (center - Offset.zero).distance,
+    (center - Offset(size.width, 0)).distance,
+    (center - Offset(0, size.height)).distance,
+    (center - Offset(size.width, size.height)).distance,
+  ];
+  final maxDistance = distances.reduce(math.max);
+  final overscan = math.max(size.longestSide * 0.08, 18.0);
+  return (maxDistance + overscan) * radiusProgress;
+}
+
 class HazukiThemeRevealSupport {
   HazukiThemeRevealSupport({
     required TickerProvider vsync,
@@ -51,6 +71,7 @@ class HazukiThemeRevealSupport {
     required Future<void> Function(AppearanceSettingsData next) applyTheme,
     required Brightness Function(ThemeMode mode) resolveThemeBrightness,
     Offset? revealOrigin,
+    Rect? revealSyncRegion,
   }) async {
     final shouldAnimate =
         revealOrigin != null &&
@@ -65,6 +86,7 @@ class HazukiThemeRevealSupport {
         'fromBrightness': resolveThemeBrightness(current.themeMode).name,
         'toBrightness': resolveThemeBrightness(next.themeMode).name,
         'hasRevealOrigin': revealOrigin != null,
+        'hasRevealSyncRegion': revealSyncRegion != null,
         'shouldAnimateReveal': shouldAnimate,
         if (revealOrigin != null) ...{
           'originX': revealOrigin.dx.round(),
@@ -87,7 +109,10 @@ class HazukiThemeRevealSupport {
     }
 
     clearOverlay();
-    final snapshot = await _captureSnapshot(revealOrigin);
+    final snapshot = await _captureSnapshot(
+      revealOrigin,
+      revealSyncRegion: revealSyncRegion,
+    );
     if (snapshot != null && _isMounted()) {
       revealImage = snapshot.image;
       revealCenter = snapshot.center;
@@ -127,6 +152,7 @@ class HazukiThemeRevealSupport {
       return;
     }
 
+    final syncRegionRevealed = Completer<void>();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_isMounted() || revealImage == null) {
         _logEvent(
@@ -137,6 +163,7 @@ class HazukiThemeRevealSupport {
             'hasRevealImage': revealImage != null,
           },
         );
+        syncRegionRevealed.complete();
         return;
       }
       _logEvent(
@@ -146,8 +173,10 @@ class HazukiThemeRevealSupport {
           'centerY': revealCenter?.dy.round(),
         },
       );
+      _completeWhenSyncRegionIsRevealed(snapshot, syncRegionRevealed);
       controller.forward();
     });
+    await syncRegionRevealed.future;
   }
 
   void dispose() {
@@ -185,7 +214,45 @@ class HazukiThemeRevealSupport {
     }
   }
 
-  Future<ThemeRevealSnapshot?> _captureSnapshot(Offset revealOrigin) async {
+  void _completeWhenSyncRegionIsRevealed(
+    ThemeRevealSnapshot snapshot,
+    Completer<void> completer,
+  ) {
+    final region = snapshot.syncRegion;
+    if (region == null) {
+      completer.complete();
+      return;
+    }
+
+    final requiredRadius = <Offset>[
+      region.topLeft,
+      region.topRight,
+      region.bottomLeft,
+      region.bottomRight,
+    ].map((corner) => (corner - snapshot.center).distance).reduce(math.max);
+
+    void checkProgress() {
+      final radius = _resolveThemeRevealRadius(
+        snapshot.size,
+        snapshot.center,
+        controller.value,
+      );
+      if (!_isMounted() || radius >= requiredRadius) {
+        controller.removeListener(checkProgress);
+        if (!completer.isCompleted) {
+          completer.complete();
+        }
+      }
+    }
+
+    controller.addListener(checkProgress);
+    checkProgress();
+  }
+
+  Future<ThemeRevealSnapshot?> _captureSnapshot(
+    Offset revealOrigin, {
+    Rect? revealSyncRegion,
+  }) async {
     final boundary = await _findRepaintBoundary();
     if (boundary == null) {
       _logEvent(
@@ -220,7 +287,18 @@ class HazukiThemeRevealSupport {
           .toImage(pixelRatio: pixelRatio)
           .timeout(_themeRevealSnapshotTimeout);
       final localCenter = boundary.globalToLocal(revealOrigin);
-      return ThemeRevealSnapshot(image: image, center: localCenter);
+      final localSyncRegion = revealSyncRegion == null
+          ? null
+          : Rect.fromPoints(
+              boundary.globalToLocal(revealSyncRegion.topLeft),
+              boundary.globalToLocal(revealSyncRegion.bottomRight),
+            );
+      return ThemeRevealSnapshot(
+        image: image,
+        center: localCenter,
+        size: boundary.size,
+        syncRegion: localSyncRegion,
+      );
     } on TimeoutException {
       _logEvent(
         'Theme reveal snapshot capture timed out',
@@ -310,10 +388,17 @@ class HazukiWindowFrame extends StatelessWidget {
 }
 
 class ThemeRevealSnapshot {
-  const ThemeRevealSnapshot({required this.image, required this.center});
+  const ThemeRevealSnapshot({
+    required this.image,
+    required this.center,
+    required this.size,
+    this.syncRegion,
+  });
 
   final ui.Image image;
   final Offset center;
+  final Size size;
+  final Rect? syncRegion;
 }
 
 class ThemeRevealOverlay extends StatelessWidget {
@@ -324,9 +409,7 @@ class ThemeRevealOverlay extends StatelessWidget {
     required this.progress,
   });
 
-  static const Curve _radiusCurve = Cubic(0.22, 0.0, 0.12, 1.0);
   static const Curve _overlayFadeCurve = Cubic(0.3, 0.0, 0.18, 1.0);
-  static const double _radiusStartDelay = 0.025;
 
   final ui.Image image;
   final Offset center;
@@ -337,18 +420,12 @@ class ThemeRevealOverlay extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final size = Size(constraints.maxWidth, constraints.maxHeight);
-        final delayedProgress =
-            ((progress - _radiusStartDelay) / (1 - _radiusStartDelay)).clamp(
-              0.0,
-              1.0,
-            );
-        final radiusProgress = _radiusCurve.transform(delayedProgress);
         final overlayOpacity =
             1 -
             _overlayFadeCurve.transform(
               const Interval(0.68, 1.0).transform(progress),
             );
-        final radius = _resolveRevealRadius(size, center, radiusProgress);
+        final radius = _resolveThemeRevealRadius(size, center, progress);
         return Opacity(
           opacity: overlayOpacity.clamp(0.0, 1.0),
           child: CustomPaint(
@@ -362,18 +439,6 @@ class ThemeRevealOverlay extends StatelessWidget {
         );
       },
     );
-  }
-
-  double _resolveRevealRadius(Size size, Offset center, double progress) {
-    final distances = <double>[
-      (center - Offset.zero).distance,
-      (center - Offset(size.width, 0)).distance,
-      (center - Offset(0, size.height)).distance,
-      (center - Offset(size.width, size.height)).distance,
-    ];
-    final maxDistance = distances.reduce(math.max);
-    final overscan = math.max(size.longestSide * 0.08, 18.0);
-    return (maxDistance + overscan) * progress;
   }
 }
 
@@ -400,13 +465,10 @@ class _ThemeRevealPainter extends CustomPainter {
 
     canvas.saveLayer(destination, Paint());
     canvas.drawImageRect(image, source, destination, Paint());
-    canvas.drawCircle(
-      center,
-      radius,
-      Paint()
-        ..blendMode = BlendMode.clear
-        ..isAntiAlias = true,
-    );
+    final clearPaint = Paint()
+      ..blendMode = BlendMode.clear
+      ..isAntiAlias = true;
+    canvas.drawCircle(center, radius, clearPaint);
     canvas.restore();
   }
 

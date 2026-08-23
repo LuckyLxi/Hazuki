@@ -171,6 +171,7 @@ class _HazukiAppState extends State<HazukiApp>
   Future<void> _updateAppearance(
     AppearanceSettingsData next, {
     Offset? revealOrigin,
+    Rect? revealSyncRegion,
   }) async {
     await _themeRevealSupport.updateAppearance(
       current: _themeController.settings,
@@ -178,6 +179,7 @@ class _HazukiAppState extends State<HazukiApp>
       applyTheme: _themeController.update,
       resolveThemeBrightness: _resolveThemeBrightness,
       revealOrigin: revealOrigin,
+      revealSyncRegion: revealSyncRegion,
     );
     await HazukiLiquidGlass.setEnabled(next.liquidGlassEnabled);
   }
