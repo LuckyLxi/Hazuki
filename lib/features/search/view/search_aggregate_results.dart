@@ -127,35 +127,40 @@ class _AggregateSourceSectionState extends State<_AggregateSourceSection> {
     final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  widget.section.source.name,
-                  style: theme.textTheme.titleMedium,
-                ),
-              ),
-              if (widget.section.comics.isNotEmpty)
-                TextButton(
-                  key: ValueKey(
-                    'aggregate-search-more-${widget.section.source.key}',
+      child: AnimatedSize(
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+        alignment: Alignment.topCenter,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    widget.section.source.name,
+                    style: theme.textTheme.titleMedium,
                   ),
-                  onPressed: widget.onViewMore,
-                  child: Text(AppLocalizations.of(context)!.discoverMore),
                 ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 220),
-            switchInCurve: Curves.easeOutCubic,
-            switchOutCurve: Curves.easeInCubic,
-            child: _buildContent(context),
-          ),
-        ],
+                if (widget.section.comics.isNotEmpty)
+                  TextButton(
+                    key: ValueKey(
+                      'aggregate-search-more-${widget.section.source.key}',
+                    ),
+                    onPressed: widget.onViewMore,
+                    child: Text(AppLocalizations.of(context)!.discoverMore),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 220),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              child: _buildContent(context),
+            ),
+          ],
+        ),
       ),
     );
   }
