@@ -45,6 +45,17 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
     return '${gb.toStringAsFixed(2)} GB';
   }
 
+  String _formatAnimatedBytes(double bytes, int targetBytes) {
+    if (targetBytes >= 1024 * 1024 * 1024) {
+      return (bytes / 1024 / 1024 / 1024).toStringAsFixed(2);
+    }
+    return (bytes / 1024 / 1024).toStringAsFixed(0);
+  }
+
+  String _animatedBytesUnit(int targetBytes) {
+    return targetBytes >= 1024 * 1024 * 1024 ? 'GB' : 'MB';
+  }
+
   Future<void> _chooseCacheMaxSize() async {
     final strings = AppLocalizations.of(context)!;
     final presets = <(String label, int mb)>[
@@ -313,10 +324,6 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
         child: ListenableBuilder(
           listenable: _controller,
           builder: (context, _) {
-            if (_controller.loading) {
-              return const Center(child: LoadingIndicatorM3E());
-            }
-
             final maxBytes = _controller.maxBytes;
             final usedBytes = _controller.usedBytes;
             final autoCleanMode = _controller.autoCleanMode;
@@ -368,56 +375,122 @@ class _CacheSettingsPageState extends State<CacheSettingsPage> {
                           ],
                         ),
                         const SizedBox(height: 24),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              _formatBytes(usedBytes).split(' ').first,
-                              style: TextStyle(
-                                fontSize: 36,
-                                fontWeight: FontWeight.w700,
-                                color: colorScheme.onSurface,
-                                height: 1.0,
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 4.0),
-                              child: Text(
-                                _formatBytes(usedBytes).split(' ').last,
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: colorScheme.onSurfaceVariant,
+                        AnimatedSize(
+                          alignment: Alignment.topCenter,
+                          duration: const Duration(milliseconds: 240),
+                          curve: Curves.easeOutCubic,
+                          child: _controller.loading
+                              ? SizedBox(
+                                  height: 64,
+                                  child: Row(
+                                    children: [
+                                      const SizedBox(
+                                        width: 36,
+                                        height: 36,
+                                        child: LoadingIndicatorM3E(),
+                                      ),
+                                      const Spacer(),
+                                      Padding(
+                                        padding: const EdgeInsets.only(
+                                          bottom: 4.0,
+                                        ),
+                                        child: Text(
+                                          '/ ${_formatBytes(maxBytes)}',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w500,
+                                            color: colorScheme.onSurfaceVariant,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              : TweenAnimationBuilder<double>(
+                                  tween: Tween<double>(
+                                    begin: 0,
+                                    end: usedBytes.toDouble(),
+                                  ),
+                                  duration: const Duration(milliseconds: 700),
+                                  curve: Curves.easeOutCubic,
+                                  builder: (context, animatedUsedBytes, _) {
+                                    final animatedUsageRatio = maxBytes > 0
+                                        ? (animatedUsedBytes / maxBytes).clamp(
+                                            0.0,
+                                            1.0,
+                                          )
+                                        : 0.0;
+
+                                    return Column(
+                                      children: [
+                                        Row(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.end,
+                                          children: [
+                                            Text(
+                                              _formatAnimatedBytes(
+                                                animatedUsedBytes,
+                                                usedBytes,
+                                              ),
+                                              style: TextStyle(
+                                                fontSize: 36,
+                                                fontWeight: FontWeight.w700,
+                                                color: colorScheme.onSurface,
+                                                height: 1.0,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Padding(
+                                              padding: const EdgeInsets.only(
+                                                bottom: 4.0,
+                                              ),
+                                              child: Text(
+                                                _animatedBytesUnit(usedBytes),
+                                                style: TextStyle(
+                                                  fontSize: 16,
+                                                  fontWeight: FontWeight.w600,
+                                                  color: colorScheme
+                                                      .onSurfaceVariant,
+                                                ),
+                                              ),
+                                            ),
+                                            const Spacer(),
+                                            Padding(
+                                              padding: const EdgeInsets.only(
+                                                bottom: 4.0,
+                                              ),
+                                              child: Text(
+                                                '/ ${_formatBytes(maxBytes)}',
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  fontWeight: FontWeight.w500,
+                                                  color: colorScheme
+                                                      .onSurfaceVariant,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 16),
+                                        ClipRRect(
+                                          borderRadius: BorderRadius.circular(
+                                            8.0,
+                                          ),
+                                          child: LinearProgressIndicator(
+                                            value: animatedUsageRatio,
+                                            minHeight: 8,
+                                            backgroundColor: colorScheme
+                                                .surfaceContainerHighest,
+                                            valueColor:
+                                                AlwaysStoppedAnimation<Color>(
+                                                  usageColor,
+                                                ),
+                                          ),
+                                        ),
+                                      ],
+                                    );
+                                  },
                                 ),
-                              ),
-                            ),
-                            const Spacer(),
-                            Padding(
-                              padding: const EdgeInsets.only(bottom: 4.0),
-                              child: Text(
-                                '/ ${_formatBytes(maxBytes)}',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                  color: colorScheme.onSurfaceVariant,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8.0),
-                          child: LinearProgressIndicator(
-                            value: usageRatio,
-                            minHeight: 8,
-                            backgroundColor:
-                                colorScheme.surfaceContainerHighest,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              usageColor,
-                            ),
-                          ),
                         ),
                       ],
                     ),
