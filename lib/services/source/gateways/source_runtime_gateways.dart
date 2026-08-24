@@ -149,6 +149,7 @@ abstract interface class SourceRuntimeGateway
 abstract interface class SourceSettingsGateway {
   String get activeSourceKey;
   bool get isActiveCopyMangaSource;
+  int get imageCacheMaxBytes;
 
   Object? loadSourceSetting(String sourceKey, String key);
   Future<void> updateSourceSetting(String sourceKey, String key, dynamic value);

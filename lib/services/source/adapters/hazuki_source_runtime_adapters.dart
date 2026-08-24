@@ -400,6 +400,8 @@ class HazukiSourceSettingsAdapter implements SourceSettingsGateway {
   @override
   bool get isActiveCopyMangaSource => _runtime.isActiveCopyMangaSource;
   @override
+  int get imageCacheMaxBytes => _image.imageCacheMaxBytes;
+  @override
   Object? loadSourceSetting(String sourceKey, String key) =>
       _settings.loadSourceSetting(sourceKey, key);
   @override

@@ -6,12 +6,13 @@ const String _defaultAutoCleanMode = 'size_overflow';
 
 class CacheSettingsController extends ChangeNotifier {
   CacheSettingsController({required SourceSettingsGateway sourceService})
-    : _sourceService = sourceService;
+    : _sourceService = sourceService,
+      _maxBytes = sourceService.imageCacheMaxBytes;
 
   final SourceSettingsGateway _sourceService;
 
   bool _loading = true;
-  int _maxBytes = _defaultCacheMaxBytes;
+  int _maxBytes;
   int _usedBytes = 0;
   String _autoCleanMode = _defaultAutoCleanMode;
   bool _disposed = false;
