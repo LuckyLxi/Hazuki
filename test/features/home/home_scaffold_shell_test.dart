@@ -115,6 +115,24 @@ void main() {
 
     expect(find.text('discover child'), findsOneWidget);
     expect(find.text('favorite child'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('home-app-bar-repaint-boundary')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('home-discover-repaint-boundary')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey('home-favorite-repaint-boundary')),
+      findsOneWidget,
+    );
+    expect(
+      tester.widget(
+        find.byKey(const ValueKey('home-app-bar-repaint-boundary')),
+      ),
+      isA<RepaintBoundary>(),
+    );
   });
 
   testWidgets('drawer scale stays fixed until the destination returns', (

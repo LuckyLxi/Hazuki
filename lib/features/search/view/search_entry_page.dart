@@ -62,6 +62,7 @@ class _SearchEntryPageState extends State<SearchEntryPage>
   bool _historyExpanded = false;
   bool _initialDataLoadScheduled = false;
   bool _aggregateSearchEnabled = false;
+  bool _keyboardDismissPopInProgress = false;
 
   @override
   void initState() {
@@ -69,6 +70,7 @@ class _SearchEntryPageState extends State<SearchEntryPage>
     WidgetsBinding.instance.addObserver(this);
     _focusCoordinator.primaryFocusNode.addListener(_handleSearchFocusChanged);
     _historyService.addListener(_handleHistoryChanged);
+    unawaited(_loadHistory());
   }
 
   @override
@@ -113,6 +115,15 @@ class _SearchEntryPageState extends State<SearchEntryPage>
     }
   }
 
+  void _dismissKeyboardAndPop() {
+    if (_keyboardDismissPopInProgress || !mounted) {
+      return;
+    }
+    _keyboardDismissPopInProgress = true;
+    unawaited(_focusCoordinator.dismissKeyboard(context, parkOnPage: true));
+    Navigator.of(context).pop();
+  }
+
   void _scheduleInitialDataLoadAfterRouteAnimation() {
     if (_initialDataLoadScheduled || !mounted) {
       return;
@@ -145,7 +156,7 @@ class _SearchEntryPageState extends State<SearchEntryPage>
 
   Future<void> _loadInitialData() async {
     final aggregateSearchFuture = isAggregateSearchEnabled();
-    await Future.wait([_loadHistory(), _idExtractController.load()]);
+    await _idExtractController.load();
     final aggregateSearchEnabled = await aggregateSearchFuture;
     if (!mounted) return;
     setState(() {
@@ -402,12 +413,12 @@ class _SearchEntryPageState extends State<SearchEntryPage>
       child: ListenableBuilder(
         listenable: Listenable.merge([_focusCoordinator, _idExtractController]),
         builder: (context, _) => PopScope(
-          canPop: true,
+          canPop: !_focusCoordinator.keyboardVisible && !_searchInputFocused,
           onPopInvokedWithResult: (didPop, result) {
-            if (!didPop) {
+            if (didPop) {
               return;
             }
-            unawaited(_focusCoordinator.dismissKeyboard(context));
+            _dismissKeyboardAndPop();
           },
           child: Focus(
             focusNode: _focusCoordinator.pageFocusNode,
@@ -446,30 +457,32 @@ class _SearchEntryPageState extends State<SearchEntryPage>
                   ),
                 ],
               ),
-              body: SearchEntryBody(
-                scrollController: _scrollController,
-                historyList: _historyList,
-                historyEditMode: _historyEditMode,
-                historyExpanded: _historyExpanded,
-                extractedComicId: _idExtractController.extractedId,
-                onKeywordPressed: (keyword) {
-                  unawaited(
-                    _openResults(
-                      keyword,
-                      intent: SearchEntryIntent.historySelection,
-                    ),
-                  );
-                },
-                onKeywordLongPressed: (keyword) =>
-                    unawaited(_copyHistoryKeyword(keyword)),
-                onKeywordDeleted: (keyword) =>
-                    unawaited(_removeHistory(keyword)),
-                onHistoryExpandedChanged: (expanded) {
-                  setState(() {
-                    _historyExpanded = expanded;
-                  });
-                },
-                onApplyExtractedComicId: _applyExtractedComicId,
+              body: RepaintBoundary(
+                child: SearchEntryBody(
+                  scrollController: _scrollController,
+                  historyList: _historyList,
+                  historyEditMode: _historyEditMode,
+                  historyExpanded: _historyExpanded,
+                  extractedComicId: _idExtractController.extractedId,
+                  onKeywordPressed: (keyword) {
+                    unawaited(
+                      _openResults(
+                        keyword,
+                        intent: SearchEntryIntent.historySelection,
+                      ),
+                    );
+                  },
+                  onKeywordLongPressed: (keyword) =>
+                      unawaited(_copyHistoryKeyword(keyword)),
+                  onKeywordDeleted: (keyword) =>
+                      unawaited(_removeHistory(keyword)),
+                  onHistoryExpandedChanged: (expanded) {
+                    setState(() {
+                      _historyExpanded = expanded;
+                    });
+                  },
+                  onApplyExtractedComicId: _applyExtractedComicId,
+                ),
               ),
             ),
           ),

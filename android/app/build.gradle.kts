@@ -51,6 +51,12 @@ android {
             manifestPlaceholders["appLabel"] = "Hazuki Debug"
         }
 
+        getByName("profile") {
+            applicationIdSuffix = ".profile"
+            versionNameSuffix = "-profile"
+            manifestPlaceholders["appLabel"] = "Hazuki Profile"
+        }
+
         release {
             signingConfig =
                     if (hasReleaseKey) {

@@ -10,6 +10,7 @@ import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/features/search/search.dart';
 import 'package:hazuki/features/search/view/search_entry_page.dart';
+import 'package:hazuki/features/search/view/search_entry_widgets.dart';
 import 'package:hazuki/features/search/view/search_id_extract_pill.dart';
 import 'package:hazuki/services/search_history_service.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_assembly.dart';
@@ -58,6 +59,35 @@ void main() {
     expect(find.byType(FloatingActionButton), findsOneWidget);
     expect(editableText.focusNode.hasFocus, isFalse);
     expect(tester.testTextInput.isVisible, isFalse);
+
+    expect(
+      find.ancestor(
+        of: find.byType(SearchEntryBody),
+        matching: find.byType(SnapshotWidget),
+      ),
+      findsNothing,
+    );
+    expect(
+      find.ancestor(
+        of: find.byType(SearchEntryBody),
+        matching: find.byType(RepaintBoundary),
+      ),
+      findsWidgets,
+    );
+    expect(
+      find.ancestor(
+        of: find.byKey(const ValueKey('search-entry-app-bar-search-bar')),
+        matching: find.byType(SnapshotWidget),
+      ),
+      findsNothing,
+    );
+    expect(
+      find.ancestor(
+        of: find.byType(FloatingActionButton),
+        matching: find.byType(SnapshotWidget),
+      ),
+      findsNothing,
+    );
   });
 
   testWidgets('history FAB keeps its safe-area margin as keyboard closes', (
@@ -100,6 +130,103 @@ void main() {
       fabRect.bottom,
       lessThanOrEqualTo(scaffoldRect.bottom - 24 - kFloatingActionButtonMargin),
     );
+  });
+
+  testWidgets('back starts popping immediately while dismissing the keyboard', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues(const {});
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Builder(
+          builder: (context) {
+            return Scaffold(
+              body: TextButton(
+                onPressed: () {
+                  Navigator.of(context).push<void>(
+                    buildSearchEntryPageRoute<void>(
+                      builder: (_) => SearchEntryPage(
+                        sourceService: sl<SourceSearchGateway>(),
+                        historyService: sl<SearchHistoryService>(),
+                        comicDetailPageBuilder: _comicDetailPageBuilder,
+                        comicCoverHeroTagBuilder: _testComicCoverHeroTag,
+                        searchPageLoader: _fakeSearchPageLoader,
+                      ),
+                    ),
+                  );
+                },
+                child: const Text('Open search'),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open search'));
+    await _pumpSearchSettled(tester);
+    await tester.tap(
+      find.byKey(const ValueKey('search-entry-app-bar-search-bar')),
+    );
+    await _pumpSearchSettled(tester);
+
+    expect(tester.testTextInput.isVisible, isTrue);
+    expect(find.byType(SearchEntryPage), findsOneWidget);
+    final route = ModalRoute.of(tester.element(find.byType(SearchEntryPage)))!;
+
+    await tester.tap(find.byType(BackButton));
+    await tester.pump();
+
+    expect(tester.testTextInput.isVisible, isFalse);
+    expect(route.animation!.status, AnimationStatus.reverse);
+
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SearchEntryPage), findsNothing);
+    expect(find.text('Open search'), findsOneWidget);
+  });
+
+  testWidgets('history loads before the search entry transition completes', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues(const {});
+    await sl<SearchHistoryService>().replace(const ['early-history']);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Builder(
+          builder: (context) => TextButton(
+            onPressed: () {
+              Navigator.of(context).push<void>(
+                buildSearchEntryPageRoute<void>(
+                  builder: (_) => SearchEntryPage(
+                    sourceService: sl<SourceSearchGateway>(),
+                    historyService: sl<SearchHistoryService>(),
+                    comicDetailPageBuilder: _comicDetailPageBuilder,
+                    comicCoverHeroTagBuilder: _testComicCoverHeroTag,
+                    searchPageLoader: _fakeSearchPageLoader,
+                  ),
+                ),
+              );
+            },
+            child: const Text('Open search'),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open search'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    final route = ModalRoute.of(tester.element(find.byType(SearchEntryPage)))!;
+    expect(route.animation!.status, AnimationStatus.forward);
+    expect(find.text('early-history'), findsOneWidget);
   });
 
   testWidgets('search settings toggles and persists aggregate search', (
