@@ -25,7 +25,6 @@ class AppLogStore extends ChangeNotifier {
   static const Duration duplicateWindow = Duration(minutes: 5);
   static const int maxPersistentBytes = 10 * 1024 * 1024;
   static const int maxPersistentEvents = 2000;
-  static const int maxDisabledEvents = 200;
   static const String _encryptionKeyName = 'hazuki_log_encryption_key_v2';
 
   final AppLogSecretStorage? _secureStorage;
@@ -44,8 +43,10 @@ class AppLogStore extends ChangeNotifier {
 
   Future<void> initialize({required bool captureEnabled}) async {
     _captureEnabled = captureEnabled;
+    if (!captureEnabled) {
+      await _disableCapture();
+    }
     if (_initialized) {
-      if (!captureEnabled) await _deletePersistedLogs();
       notifyListeners();
       return;
     }
@@ -65,16 +66,7 @@ class AppLogStore extends ChangeNotifier {
     _captureEnabled = enabled;
     _initialized = true;
     if (!enabled) {
-      _persistenceGeneration++;
-      _events.removeWhere(
-        (event) =>
-            event.level != AppLogLevel.warning &&
-            event.level != AppLogLevel.error,
-      );
-      if (_events.length > maxDisabledEvents) {
-        _events.removeRange(0, _events.length - maxDisabledEvents);
-      }
-      await _deletePersistedLogs();
+      await _disableCapture();
     } else {
       _schedulePersistence();
     }
@@ -91,12 +83,8 @@ class AppLogStore extends ChangeNotifier {
     List<String> tags = const <String>[],
     DateTime? time,
   }) {
+    if (!_captureEnabled) return;
     final normalizedLevel = AppLogLevel.parse(level);
-    if (!_captureEnabled &&
-        normalizedLevel != AppLogLevel.warning &&
-        normalizedLevel != AppLogLevel.error) {
-      return;
-    }
     final now = time ?? DateTime.now();
     final entry = AppLogEvent(
       id: '${now.microsecondsSinceEpoch}-${_sequence++}',
@@ -140,10 +128,22 @@ class AppLogStore extends ChangeNotifier {
   void _prune() {
     final cutoff = DateTime.now().subtract(retention);
     _events.removeWhere((event) => event.lastSeenAt.isBefore(cutoff));
-    final limit = _captureEnabled ? maxPersistentEvents : maxDisabledEvents;
-    if (_events.length > limit) {
-      _events.removeRange(0, _events.length - limit);
+    if (_events.length > maxPersistentEvents) {
+      _events.removeRange(0, _events.length - maxPersistentEvents);
     }
+  }
+
+  Future<void> _disableCapture() async {
+    _captureEnabled = false;
+    _persistTimer?.cancel();
+    _persistTimer = null;
+    _persistPending = false;
+    _persistenceGeneration++;
+    _events.clear();
+    await _deletePersistedLogs();
+    final running = _persistFuture;
+    if (running != null) await running;
+    if (!_captureEnabled) await _deletePersistedLogs();
   }
 
   void _schedulePersistence() {

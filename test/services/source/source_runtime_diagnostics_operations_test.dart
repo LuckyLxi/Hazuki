@@ -52,7 +52,7 @@ void main() {
       await diagnostics.setSoftwareLogCaptureEnabled(false);
 
       expect(facade.softwareLogCaptureEnabled, isFalse);
-      expect(host.logStore.events, hasLength(1));
+      expect(host.logStore.events, isEmpty);
       expect(facade.debug.lastLoginDebugInfoStorage, isNull);
       expect(facade.debug.lastSourceVersionDebugInfoStorage, isNull);
       final prefs = await SharedPreferences.getInstance();

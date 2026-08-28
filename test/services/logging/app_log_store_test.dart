@@ -97,6 +97,125 @@ void main() {
     store.dispose();
   });
 
+  test('disabled capture clears and rejects logs at every level', () async {
+    final directory = await Directory.systemTemp.createTemp('hazuki-log-test-');
+    addTearDown(() async {
+      if (await directory.exists()) {
+        await directory.delete(recursive: true);
+      }
+    });
+    final store = AppLogStore(
+      secureStorage: MemorySourceSecureSessionStorage(),
+      supportDirectory: () async => directory,
+    );
+    await store.initialize(captureEnabled: true);
+    for (final level in const ['info', 'warning', 'error']) {
+      store.add(
+        level: level,
+        area: AppLogArea.application,
+        source: 'test',
+        event: level,
+        title: level,
+      );
+    }
+
+    await store.setCaptureEnabled(false);
+    for (final level in const ['info', 'warning', 'error']) {
+      store.add(
+        level: level,
+        area: AppLogArea.application,
+        source: 'test',
+        event: 'disabled_$level',
+        title: level,
+      );
+    }
+
+    expect(store.events, isEmpty);
+    store.dispose();
+  });
+
+  test('disabling capture waits for an in-flight write to stop', () async {
+    final directory = await Directory.systemTemp.createTemp('hazuki-log-test-');
+    final secureStorage = _DelayedSecretStorage();
+    addTearDown(() async {
+      if (await directory.exists()) {
+        await directory.delete(recursive: true);
+      }
+    });
+    final store = AppLogStore(
+      secureStorage: secureStorage,
+      supportDirectory: () async => directory,
+    );
+    await store.initialize(captureEnabled: true);
+    store.add(
+      level: 'error',
+      area: AppLogArea.application,
+      source: 'test',
+      event: 'error',
+      title: 'Error',
+    );
+
+    final flushing = store.flush();
+    await Future<void>.delayed(Duration.zero);
+    final disabling = store.setCaptureEnabled(false);
+    secureStorage.allowReads.complete();
+    await Future.wait([flushing, disabling]);
+
+    final file = File(
+      '${directory.path}${Platform.pathSeparator}logs'
+      '${Platform.pathSeparator}events_v2.enc',
+    );
+    expect(await file.exists(), isFalse);
+    expect(store.events, isEmpty);
+    store.dispose();
+  });
+
+  test('reenabling capture preserves logs written while disabling', () async {
+    final directory = await Directory.systemTemp.createTemp('hazuki-log-test-');
+    final secureStorage = _DelayedSecretStorage();
+    addTearDown(() async {
+      if (await directory.exists()) {
+        await directory.delete(recursive: true);
+      }
+    });
+    final store = AppLogStore(
+      secureStorage: secureStorage,
+      supportDirectory: () async => directory,
+    );
+    await store.initialize(captureEnabled: true);
+    store.add(
+      level: 'error',
+      area: AppLogArea.application,
+      source: 'test',
+      event: 'old_error',
+      title: 'Old error',
+    );
+
+    final oldFlush = store.flush();
+    await Future<void>.delayed(Duration.zero);
+    final disabling = store.setCaptureEnabled(false);
+    await store.setCaptureEnabled(true);
+    store.add(
+      level: 'error',
+      area: AppLogArea.application,
+      source: 'test',
+      event: 'new_error',
+      title: 'New error',
+    );
+    final newFlush = store.flush();
+    secureStorage.allowReads.complete();
+    await Future.wait([oldFlush, disabling, newFlush]);
+
+    final restored = AppLogStore(
+      secureStorage: secureStorage,
+      supportDirectory: () async => directory,
+    );
+    await restored.initialize(captureEnabled: true);
+    expect(restored.events.map((event) => event.event), ['new_error']);
+    store.dispose();
+    restored.dispose();
+  });
+
   test('an in-flight background write cannot recreate cleared logs', () async {
     final directory = await Directory.systemTemp.createTemp('hazuki-log-test-');
     final secureStorage = _DelayedSecretStorage();
