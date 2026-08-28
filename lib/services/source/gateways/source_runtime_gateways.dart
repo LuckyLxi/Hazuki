@@ -97,6 +97,7 @@ abstract interface class SourceAdvancedGateway implements Listenable {
 
 abstract interface class SourceDebugGateway {
   bool get softwareLogCaptureEnabled;
+  Listenable get logChanges;
   Future<bool> loadSoftwareLogCaptureEnabled();
   Future<void> setSoftwareLogCaptureEnabled(bool enabled);
   void addApplicationLog({
@@ -112,7 +113,8 @@ abstract interface class SourceDebugGateway {
     String source = 'reader',
   });
   Future<Map<String, dynamic>> collectTypedDebugInfo(String type);
-  void clearCapturedLogs();
+  Future<Map<String, dynamic>> collectAllDebugInfo();
+  Future<void> clearCapturedLogs();
 }
 
 abstract interface class SourceRuntimeGateway

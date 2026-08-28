@@ -565,7 +565,7 @@ void main() {
     expect(operations.contains('.parseProfileResult('), isTrue);
   });
 
-  test('debug log storage delegates value compaction', () {
+  test('debug recorders write to the unified application log store', () {
     final structured = File(
       'lib/services/source/debug/debug_structured_log_recorder.dart',
     ).readAsStringSync();
@@ -573,15 +573,12 @@ void main() {
       'lib/services/source/debug/debug_network_log_recorder.dart',
     ).readAsStringSync();
 
-    expect(structured.contains('dynamic _compactNetworkHeaders'), isFalse);
-    expect(structured.contains('dynamic _compactReaderLogContent'), isFalse);
-    expect(structured.contains('dynamic _compactGenericLogValue'), isFalse);
-    expect(
-      networkRecorder.contains('_compactor.compactNetworkHeaders('),
-      isTrue,
-    );
-    expect(structured.contains('_compactor.compactReaderLogContent('), isTrue);
-    expect(structured.contains('_compactor.compactGenericLogValue('), isTrue);
+    expect(structured.contains('final AppLogStore store;'), isTrue);
+    expect(networkRecorder.contains('final AppLogStore store;'), isTrue);
+    expect(structured.contains('recentApplicationLogs'), isFalse);
+    expect(networkRecorder.contains('recentNetworkLogs'), isFalse);
+    expect(structured.contains('store.add('), isTrue);
+    expect(networkRecorder.contains('store.add('), isTrue);
   });
 
   test('debug log capability delegates network retention policy', () {

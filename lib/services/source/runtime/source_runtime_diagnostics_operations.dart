@@ -25,27 +25,21 @@ class SourceRuntimeDiagnosticsOperations {
   Future<bool> loadSoftwareLogCaptureEnabled() async {
     final facade = _facade;
     final prefs = await facade.ensurePrefs();
-    facade.debug.softwareLogCaptureEnabled =
+    final enabled =
         prefs.getBool(SourcePrefsKeys.softwareLogCaptureEnabled) ?? false;
-    if (!facade.softwareLogCaptureEnabled) {
-      _clearCapturedLogs(facade);
-    }
-    return facade.softwareLogCaptureEnabled;
+    facade.debug.softwareLogCaptureEnabled = enabled;
+    await _runtimeHost.logStore.initialize(captureEnabled: enabled);
+    return enabled;
   }
 
   Future<void> setSoftwareLogCaptureEnabled(bool enabled) async {
     final facade = _facade;
     facade.debug.softwareLogCaptureEnabled = enabled;
+    await _runtimeHost.logStore.setCaptureEnabled(enabled);
     if (!enabled) {
-      _clearCapturedLogs(facade);
+      facade.clearCapturedLogs();
     }
     final prefs = await facade.ensurePrefs();
     await prefs.setBool(SourcePrefsKeys.softwareLogCaptureEnabled, enabled);
-  }
-
-  void _clearCapturedLogs(HazukiSourceFacade facade) {
-    facade.clearCapturedLogs();
-    facade.lastLoginDebugInfo = null;
-    facade.lastSourceVersionDebugInfo = null;
   }
 }

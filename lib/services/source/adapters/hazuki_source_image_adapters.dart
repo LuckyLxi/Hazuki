@@ -88,6 +88,8 @@ class HazukiSourceRecommendationAdapter implements SourceRecommendationGateway {
   @override
   bool get softwareLogCaptureEnabled => _debug.softwareLogCaptureEnabled;
   @override
+  Listenable get logChanges => _debug.logStore;
+  @override
   Future<bool> loadSoftwareLogCaptureEnabled() =>
       _runtimeOperations.loadSoftwareLogCaptureEnabled();
   @override
@@ -121,7 +123,10 @@ class HazukiSourceRecommendationAdapter implements SourceRecommendationGateway {
   Future<Map<String, dynamic>> collectTypedDebugInfo(String type) =>
       _debug.collectTypedDebugInfo(type);
   @override
-  void clearCapturedLogs() => _debug.clearCapturedLogs();
+  Future<Map<String, dynamic>> collectAllDebugInfo() =>
+      _debug.collectAllDebugInfo();
+  @override
+  Future<void> clearCapturedLogs() => _debug.clearCapturedLogs();
 }
 
 class HazukiSourceDailyRecommendationAdapter

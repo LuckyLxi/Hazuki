@@ -1,19 +1,16 @@
-import '../runtime/source_runtime_facade.dart';
+import '../../logging/app_log_store.dart';
 import 'debug_network_log_recorder.dart';
 import 'debug_structured_log_recorder.dart';
 
 /// Public facade for structured and network debug-log recorders.
 class DebugLogCapability {
-  DebugLogCapability(this.facade);
+  DebugLogCapability(this.store);
 
-  final HazukiSourceFacade facade;
+  final AppLogStore store;
 
   late final DebugStructuredLogRecorder _structured =
-      DebugStructuredLogRecorder(facade);
-  late final DebugNetworkLogRecorder _network = DebugNetworkLogRecorder(
-    facade: facade,
-    appendTypedLog: _structured.appendTyped,
-  );
+      DebugStructuredLogRecorder(store);
+  late final DebugNetworkLogRecorder _network = DebugNetworkLogRecorder(store);
 
   void addDebugLog({
     required String type,

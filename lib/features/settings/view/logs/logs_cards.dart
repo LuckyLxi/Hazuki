@@ -1,290 +1,195 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:hazuki/l10n/l10n.dart';
 
-class DebugLogEntryCard extends StatelessWidget {
-  const DebugLogEntryCard({super.key, required this.log});
+class UnifiedLogEntryCard extends StatelessWidget {
+  const UnifiedLogEntryCard({
+    super.key,
+    required this.log,
+    required this.onOpen,
+  });
 
   final Map<String, dynamic> log;
+  final VoidCallback onOpen;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final level = _normalizeLevel(log['level']);
-    final levelColor = _levelColor(colorScheme, level);
-    final mergedCount = log['mergedCount'] is num
-        ? (log['mergedCount'] as num).toInt()
-        : 1;
-    final content = _contentText(log);
-
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.36),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.52),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    final colors = theme.colorScheme;
+    final level = (log['level'] ?? 'info').toString();
+    final color = switch (level) {
+      'error' => colors.error,
+      'warning' || 'warn' => Colors.amber.shade700,
+      _ => colors.primary,
+    };
+    final preview = _dataText(log['data']);
+    final occurrences = (log['occurrences'] as num?)?.toInt() ?? 1;
+    return Card(
+      margin: EdgeInsets.zero,
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onOpen,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: levelColor.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: levelColor.withValues(alpha: 0.28)),
-                ),
-                child: Text(
-                  level,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: levelColor,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      (log['title'] ?? 'Log').toString(),
-                      style: theme.textTheme.titleSmall?.copyWith(
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      _levelLabel(context, level),
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: color,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
-                    const SizedBox(height: 3),
-                    Text(
-                      _metaText(log, mergedCount),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    _areaAndTagsLabel(context, log),
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: colors.onSurfaceVariant,
                     ),
-                  ],
+                  ),
+                  const Spacer(),
+                  Text(
+                    _formatTime(log['time']?.toString()),
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 9),
+              Text(
+                '${log['title'] ?? 'Log'}${occurrences > 1 ? ' × $occurrences' : ''}',
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-            ],
-          ),
-          if (content.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            SelectableText(
-              content,
-              style: const TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 12,
-                height: 1.35,
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  static String _normalizeLevel(Object? value) {
-    final level = (value ?? 'info').toString().toLowerCase();
-    return switch (level) {
-      'error' => 'error',
-      'warn' || 'warning' => 'warn',
-      _ => 'info',
-    };
-  }
-
-  static Color _levelColor(ColorScheme colorScheme, String level) {
-    return switch (level) {
-      'error' => colorScheme.error,
-      'warn' => Colors.amber.shade700,
-      _ => Colors.blue.shade600,
-    };
-  }
-
-  static String _metaText(Map<String, dynamic> log, int mergedCount) {
-    final source = (log['source'] ?? '').toString();
-    final time = (log['time'] ?? '').toString();
-    final parts = <String>[
-      if (time.isNotEmpty) time,
-      if (source.isNotEmpty) source,
-      if (mergedCount > 1) 'x$mergedCount',
-    ];
-    return parts.join(' · ');
-  }
-
-  static String _contentText(Map<String, dynamic> log) {
-    final content = log['content'];
-    if (content == null) {
-      return '';
-    }
-    if (content is String) {
-      return content;
-    }
-    return content.toString();
-  }
-}
-
-class LogsTextCard extends StatelessWidget {
-  const LogsTextCard({
-    super.key,
-    required this.icon,
-    required this.title,
-    required this.text,
-  });
-
-  final IconData icon;
-  final String title;
-  final String text;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.42),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.56),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(icon, size: 18, color: colorScheme.primary),
-              const SizedBox(width: 10),
-              Expanded(
+              if (preview.isNotEmpty) ...[
+                const SizedBox(height: 7),
+                Text(
+                  preview,
+                  maxLines: 8,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colors.onSurfaceVariant,
+                    fontFamily: 'monospace',
+                    height: 1.35,
+                  ),
+                ),
+              ],
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerRight,
                 child: Text(
-                  title,
-                  style: theme.textTheme.titleMedium?.copyWith(
+                  l10n(context).logsViewDetails,
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: colors.primary,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          SelectableText(
-            text.isEmpty ? '{}' : text,
-            style: const TextStyle(
-              fontFamily: 'monospace',
-              fontSize: 12,
-              height: 1.4,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
+
+  static String _dataText(Object? data) {
+    if (data == null) return '';
+    if (data is String) return data;
+    return const JsonEncoder.withIndent('  ').convert(data);
+  }
+
+  static String _formatTime(String? value) {
+    final time = DateTime.tryParse(value ?? '')?.toLocal();
+    if (time == null) return value ?? '';
+    String two(int number) => number.toString().padLeft(2, '0');
+    return '${two(time.hour)}:${two(time.minute)}:${two(time.second)}';
+  }
+}
+
+String _areaAndTagsLabel(BuildContext context, Map<String, dynamic> log) {
+  final area = _areaLabel(context, (log['area'] ?? '').toString());
+  final tags = log['tags'];
+  if (tags is List && tags.contains('performance')) {
+    return '$area · ${l10n(context).logsAreaPerformance}';
+  }
+  return area;
+}
+
+String logLevelLabel(BuildContext context, String level) =>
+    _levelLabel(context, level);
+
+String logAreaLabel(BuildContext context, String area) =>
+    _areaLabel(context, area);
+
+String _levelLabel(BuildContext context, String level) {
+  final strings = l10n(context);
+  return switch (level) {
+    'error' => strings.logsLevelErrorOnly,
+    'warning' || 'warn' => strings.logsLevelWarning,
+    _ => strings.logsLevelInfo,
+  };
+}
+
+String _areaLabel(BuildContext context, String area) {
+  final strings = l10n(context);
+  return switch (area) {
+    'source' => strings.logsAreaSource,
+    'network' => strings.logsAreaNetwork,
+    'reader' => strings.logsAreaReader,
+    'download' => strings.logsAreaDownload,
+    'update' => strings.logsAreaUpdate,
+    _ => strings.logsAreaApplication,
+  };
 }
 
 class LogsErrorCard extends StatelessWidget {
   const LogsErrorCard({
     super.key,
-    required this.icon,
-    required this.title,
     required this.message,
     required this.onRetry,
   });
 
-  final IconData icon;
-  final String title;
   final String message;
   final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: colorScheme.errorContainer.withValues(alpha: 0.52),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: colorScheme.error.withValues(alpha: 0.18)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: colorScheme.error),
-          const SizedBox(height: 12),
-          Text(
-            title,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w800,
-              color: colorScheme.onErrorContainer,
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.error_outline,
+              color: Theme.of(context).colorScheme.error,
             ),
-          ),
-          const SizedBox(height: 8),
-          SelectableText(
-            message,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: colorScheme.onErrorContainer,
-              height: 1.45,
+            const SizedBox(height: 12),
+            SelectableText(message, textAlign: TextAlign.center),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh),
+              label: Text(l10n(context).commonRetry),
             ),
-          ),
-          const SizedBox(height: 16),
-          FilledButton.icon(
-            onPressed: onRetry,
-            icon: const Icon(Icons.refresh_rounded),
-            label: Text(l10n(context).commonRetry),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class LogsEmptyCard extends StatelessWidget {
-  const LogsEmptyCard({
-    super.key,
-    required this.icon,
-    required this.title,
-    required this.message,
-  });
-
-  final IconData icon;
-  final String title;
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.42),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: colorScheme.outlineVariant.withValues(alpha: 0.56),
+          ],
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: colorScheme.primary),
-          const SizedBox(height: 12),
-          Text(
-            title,
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            message,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-              height: 1.45,
-            ),
-          ),
-        ],
       ),
     );
   }

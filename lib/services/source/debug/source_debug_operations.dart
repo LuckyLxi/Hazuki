@@ -1,5 +1,6 @@
 import 'debug_log_capability.dart';
 import 'debug_report_capability.dart';
+import '../../logging/app_log_store.dart';
 import '../runtime/source_runtime_facade.dart';
 
 /// Log capture and diagnostic-report operations for the active source runtime.
@@ -8,18 +9,22 @@ class SourceDebugOperations {
     required DebugLogCapability Function() activeDebugLog,
     required HazukiSourceFacade Function() activeFacade,
     required SourceDebugReportCapability debugReport,
+    required AppLogStore logStore,
   }) : _activeDebugLog = activeDebugLog,
        _activeFacade = activeFacade,
-       _debugReport = debugReport;
+       _debugReport = debugReport,
+       _logStore = logStore;
 
   final DebugLogCapability Function() _activeDebugLog;
   final HazukiSourceFacade Function() _activeFacade;
   final SourceDebugReportCapability _debugReport;
+  final AppLogStore _logStore;
 
   DebugLogCapability get _debugLog => _activeDebugLog();
 
-  bool get softwareLogCaptureEnabled =>
-      _activeFacade().softwareLogCaptureEnabled;
+  bool get softwareLogCaptureEnabled => _logStore.captureEnabled;
+
+  AppLogStore get logStore => _logStore;
 
   void addDebugLog({
     required String type,
@@ -88,6 +93,9 @@ class SourceDebugOperations {
   Future<Map<String, dynamic>> collectTypedDebugInfo(String type) =>
       _debugReport.collectTypedDebugInfo(type);
 
+  Future<Map<String, dynamic>> collectAllDebugInfo() =>
+      _debugReport.collectAllDebugInfo();
+
   Future<Map<String, dynamic>> collectNetworkDebugInfo() =>
       _debugReport.collectNetworkDebugInfo();
 
@@ -97,5 +105,8 @@ class SourceDebugOperations {
   Future<Map<String, dynamic>> collectReaderDebugInfo() =>
       _debugReport.collectReaderDebugInfo();
 
-  void clearCapturedLogs() => _activeFacade().clearCapturedLogs();
+  Future<void> clearCapturedLogs() async {
+    await _logStore.clear();
+    _activeFacade().clearCapturedLogs();
+  }
 }

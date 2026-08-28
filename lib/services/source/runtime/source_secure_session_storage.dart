@@ -1,8 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../../logging/app_log_store.dart';
 
-abstract class SourceSecureSessionStorage {
+abstract class SourceSecureSessionStorage implements AppLogSecretStorage {
+  @override
   Future<String?> read(String key);
+  @override
   Future<void> write(String key, String value);
   Future<void> delete(String key);
 }

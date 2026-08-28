@@ -2,298 +2,172 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:hazuki/l10n/l10n.dart';
+import 'package:hazuki/services/logging/app_log_sanitizer.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
-import 'package:hazuki/services/source/debug/debug_log_internals.dart';
+import 'package:hazuki/widgets/widgets.dart';
+
 import 'logs_cards.dart';
+import 'logs_export_button.dart';
 
-class LogsTabSpec {
-  const LogsTabSpec({
-    required this.type,
-    required this.icon,
-    required this.titleBuilder,
-  });
+class UnifiedLogsView extends StatefulWidget {
+  const UnifiedLogsView({super.key, required this.debugGateway});
 
-  final String type;
-  final IconData icon;
-  final String Function(BuildContext context) titleBuilder;
-}
-
-const logsTabSpecs = <LogsTabSpec>[
-  LogsTabSpec(
-    type: debugLogTypeError,
-    icon: Icons.error_outline_rounded,
-    titleBuilder: _errorLogsTitle,
-  ),
-  LogsTabSpec(
-    type: debugLogTypeAction,
-    icon: Icons.touch_app_outlined,
-    titleBuilder: _actionLogsTitle,
-  ),
-  LogsTabSpec(
-    type: debugLogTypeSystem,
-    icon: Icons.settings_suggest_outlined,
-    titleBuilder: _systemLogsTitle,
-  ),
-  LogsTabSpec(
-    type: debugLogTypePerformance,
-    icon: Icons.speed_rounded,
-    titleBuilder: _performanceLogsTitle,
-  ),
-];
-
-String _errorLogsTitle(BuildContext context) => l10n(context).logsErrorTitle;
-String _actionLogsTitle(BuildContext context) => l10n(context).logsActionTitle;
-String _systemLogsTitle(BuildContext context) => l10n(context).logsSystemTitle;
-String _performanceLogsTitle(BuildContext context) =>
-    l10n(context).logsPerformanceTitle;
-
-Future<Map<String, dynamic>> collectVisibleLogsForIndex(
-  SourceDebugGateway debugGateway,
-  int index,
-) {
-  final clampedIndex = index.clamp(0, logsTabSpecs.length - 1).toInt();
-  final spec = logsTabSpecs[clampedIndex];
-  return debugGateway.collectTypedDebugInfo(spec.type);
-}
-
-Map<String, dynamic>? debugInfoForVisibleIndex(
-  Map<String, Map<String, dynamic>>? logsByType,
-  int index,
-) {
-  if (logsByType == null) {
-    return null;
-  }
-  final clampedIndex = index.clamp(0, logsTabSpecs.length - 1).toInt();
-  final spec = logsTabSpecs[clampedIndex];
-  return logsByType[spec.type];
-}
-
-String formatVisibleLogs(Map<String, dynamic> debugInfo) {
-  return const JsonEncoder.withIndent('  ').convert(debugInfo);
-}
-
-class DebugLogsTab extends StatefulWidget {
-  const DebugLogsTab({
-    super.key,
-    required this.spec,
-    required this.debugGateway,
-    this.debugInfoOverride,
-  });
-
-  final LogsTabSpec spec;
   final SourceDebugGateway debugGateway;
-  final Map<String, dynamic>? debugInfoOverride;
 
   @override
-  State<DebugLogsTab> createState() => _DebugLogsTabState();
+  State<UnifiedLogsView> createState() => _UnifiedLogsViewState();
 }
 
-class _DebugLogsTabState extends State<DebugLogsTab>
-    with AutomaticKeepAliveClientMixin<DebugLogsTab> {
-  Map<String, dynamic>? _debugInfo;
-  String? _errorText;
+class _UnifiedLogsViewState extends State<UnifiedLogsView> {
+  Map<String, dynamic>? _report;
+  Object? _error;
   bool _loading = true;
-  String _searchQuery = '';
-  String? _selectedSource;
-  String _selectedMinLevel = 'warn';
-
-  @override
-  bool get wantKeepAlive => true;
+  String _query = '';
+  String _level = 'all';
+  String? _area;
+  Timer? _reloadTimer;
 
   @override
   void initState() {
     super.initState();
-    final override = widget.debugInfoOverride;
-    if (override != null) {
-      _debugInfo = override;
-      _loading = false;
-    } else {
-      unawaited(_loadLogs());
+    widget.debugGateway.logChanges.addListener(_scheduleReload);
+    unawaited(_load());
+  }
+
+  @override
+  void didUpdateWidget(UnifiedLogsView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.debugGateway != widget.debugGateway) {
+      oldWidget.debugGateway.logChanges.removeListener(_scheduleReload);
+      widget.debugGateway.logChanges.addListener(_scheduleReload);
+      unawaited(_load());
     }
   }
 
   @override
-  void didUpdateWidget(DebugLogsTab oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.debugInfoOverride != widget.debugInfoOverride) {
-      final override = widget.debugInfoOverride;
-      setState(() {
-        _debugInfo = override;
-        _errorText = null;
-        _loading = override == null;
-      });
-      if (override == null) {
-        unawaited(_loadLogs());
-      }
-      return;
-    }
-    if (widget.debugInfoOverride == null &&
-        oldWidget.spec.type != widget.spec.type) {
-      unawaited(_loadLogs());
-    }
+  void dispose() {
+    _reloadTimer?.cancel();
+    widget.debugGateway.logChanges.removeListener(_scheduleReload);
+    super.dispose();
   }
 
-  Future<void> _loadLogs() async {
-    setState(() {
-      _loading = true;
-      _errorText = null;
+  void _scheduleReload() {
+    _reloadTimer?.cancel();
+    _reloadTimer = Timer(const Duration(milliseconds: 120), () {
+      if (mounted) unawaited(_load(showProgress: false));
     });
+  }
+
+  Future<void> _load({bool showProgress = true}) async {
+    if (showProgress && mounted) setState(() => _loading = true);
     try {
-      final debugInfo = await widget.debugGateway
-          .collectTypedDebugInfo(widget.spec.type)
-          .timeout(const Duration(seconds: 10));
-      if (!mounted) {
-        return;
-      }
+      final report = await widget.debugGateway.collectAllDebugInfo();
+      if (!mounted) return;
       setState(() {
-        _debugInfo = debugInfo;
+        _report = report;
+        _error = null;
       });
-    } catch (e) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _errorText = e.toString();
-      });
+    } catch (error) {
+      if (mounted) setState(() => _error = error);
     } finally {
-      if (mounted) {
-        setState(() {
-          _loading = false;
-        });
-      }
+      if (mounted && showProgress) setState(() => _loading = false);
     }
   }
 
-  List<Map<String, dynamic>> _rawLogs() {
-    final logs = _debugInfo?['logs'];
-    if (logs is! List) {
-      return const <Map<String, dynamic>>[];
-    }
-    return logs
+  List<Map<String, dynamic>> get _logs {
+    final raw = _report?['logs'];
+    if (raw is! List) return const <Map<String, dynamic>>[];
+    return raw
         .whereType<Map>()
-        .map((entry) => Map<String, dynamic>.from(entry))
+        .map((log) => Map<String, dynamic>.from(log))
+        .toList(growable: false)
+      ..sort(
+        (a, b) => (b['time'] ?? '').toString().compareTo(
+          (a['time'] ?? '').toString(),
+        ),
+      );
+  }
+
+  List<Map<String, dynamic>> get _filteredLogs {
+    final normalizedQuery = _query.trim().toLowerCase();
+    return _logs
+        .where((log) {
+          if (_level != 'all' && log['level'] != _level) return false;
+          if (_area != null && log['area'] != _area) return false;
+          if (normalizedQuery.isEmpty) return true;
+          return jsonEncode(log).toLowerCase().contains(normalizedQuery);
+        })
         .toList(growable: false);
   }
 
-  static int _levelRank(String level) => switch (level) {
-    'error' => 2,
-    'warn' || 'warning' => 1,
-    _ => 0,
-  };
+  Set<String> get _areas => _logs
+      .map((log) => log['area']?.toString() ?? '')
+      .where((area) => area.isNotEmpty)
+      .toSet();
 
-  List<Map<String, dynamic>> _filteredLogs() {
-    final raw = _rawLogs();
-    return raw.where((log) {
-      if (_selectedMinLevel != 'all') {
-        final minRank = _levelRank(_selectedMinLevel);
-        final logLevel = (log['level'] as String? ?? 'info').toLowerCase();
-        if (_levelRank(logLevel) < minRank) return false;
-      }
-      if (_selectedSource != null && log['source'] != _selectedSource) {
-        return false;
-      }
-      if (_searchQuery.isNotEmpty) {
-        final q = _searchQuery.toLowerCase();
-        final title = (log['title'] as String? ?? '').toLowerCase();
-        final preview = (log['contentPreview'] as String? ?? '').toLowerCase();
-        if (!title.contains(q) && !preview.contains(q)) return false;
-      }
-      return true;
-    }).toList();
-  }
-
-  Set<String> _allSources() {
-    return _rawLogs()
-        .map((l) => l['source'] as String? ?? '')
-        .where((s) => s.isNotEmpty)
-        .toSet();
+  void _openLog(Map<String, dynamic> log) {
+    FocusManager.instance.primaryFocus?.unfocus();
+    unawaited(
+      Navigator.of(
+        context,
+      ).push(MaterialPageRoute<void>(builder: (_) => LogDetailPage(log: log))),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    super.build(context);
-    final title = widget.spec.titleBuilder(context);
-    if (_loading) {
+    if (_loading && _report == null) {
       return const Center(child: CircularProgressIndicator());
     }
-    if (_errorText != null) {
-      return ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          LogsErrorCard(
-            icon: widget.spec.icon,
-            title: title,
-            message: l10n(context).logsLoadFailed(_errorText!),
-            onRetry: _loadLogs,
-          ),
-        ],
+    if (_error != null && _report == null) {
+      return LogsErrorCard(
+        message: l10n(context).logsLoadFailed(_error!),
+        onRetry: _load,
       );
     }
-
-    final rawLogs = _rawLogs();
-    if (rawLogs.isEmpty) {
-      return ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          LogsEmptyCard(
-            icon: widget.spec.icon,
-            title: title,
-            message: l10n(context).logsEmpty,
-          ),
-        ],
-      );
-    }
-
-    final sources = _allSources();
-    final logs = _filteredLogs();
-
+    final logs = _filteredLogs;
     return Column(
       children: [
-        _LogsSearchBar(
-          query: _searchQuery,
-          onChanged: (v) => setState(() {
-            _searchQuery = v;
-          }),
-          onClear: () => setState(() {
-            _searchQuery = '';
-          }),
+        _LogFilters(
+          query: _query,
+          level: _level,
+          area: _area,
+          areas: _areas,
+          onQueryChanged: (value) => setState(() => _query = value),
+          onLevelChanged: (value) => setState(() => _level = value),
+          onAreaChanged: (value) => setState(() => _area = value),
         ),
-        _LevelFilterChips(
-          selected: _selectedMinLevel,
-          onSelected: (v) => setState(() {
-            _selectedMinLevel = v;
-          }),
-        ),
-        if (sources.length > 1)
-          _SourceFilterChips(
-            sources: sources,
-            selected: _selectedSource,
-            onSelected: (s) => setState(() {
-              _selectedSource = s;
-            }),
-          ),
         Expanded(
           child: logs.isEmpty
-              ? ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    LogsEmptyCard(
-                      icon: Icons.search_off_rounded,
-                      title: title,
-                      message: l10n(context).logsFilterNoResults,
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Text(
+                      _logs.isEmpty
+                          ? l10n(context).logsEmpty
+                          : l10n(context).logsFilterNoResults,
+                      style: Theme.of(context).textTheme.bodyLarge,
                     ),
-                  ],
+                  ),
                 )
-              : ListView.separated(
-                  physics: const ClampingScrollPhysics(),
-                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
-                  itemBuilder: (context, index) {
-                    return DebugLogEntryCard(log: logs[index]);
-                  },
-                  separatorBuilder: (context, index) =>
-                      const SizedBox(height: 12),
-                  itemCount: logs.length,
+              : RefreshIndicator(
+                  onRefresh: _load,
+                  child: ListView.separated(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+                    itemCount: logs.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 10),
+                    itemBuilder: (context, index) {
+                      final log = logs[index];
+                      return UnifiedLogEntryCard(
+                        key: ValueKey(log['id']),
+                        log: log,
+                        onOpen: () => _openLog(log),
+                      );
+                    },
+                  ),
                 ),
         ),
       ],
@@ -301,191 +175,233 @@ class _DebugLogsTabState extends State<DebugLogsTab>
   }
 }
 
-class _LevelFilterChips extends StatelessWidget {
-  const _LevelFilterChips({required this.selected, required this.onSelected});
+class _LogFilters extends StatelessWidget {
+  const _LogFilters({
+    required this.query,
+    required this.level,
+    required this.area,
+    required this.areas,
+    required this.onQueryChanged,
+    required this.onLevelChanged,
+    required this.onAreaChanged,
+  });
 
-  final String selected;
-  final ValueChanged<String> onSelected;
-
-  static const _levels = [
-    ('warn', 'Warn+'),
-    ('error', 'Error'),
-    ('all', 'All'),
-  ];
+  final String query;
+  final String level;
+  final String? area;
+  final Set<String> areas;
+  final ValueChanged<String> onQueryChanged;
+  final ValueChanged<String> onLevelChanged;
+  final ValueChanged<String?> onAreaChanged;
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return SizedBox(
-      height: 40,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-        itemCount: _levels.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 6),
-        itemBuilder: (context, index) {
-          final (key, label) = _levels[index];
-          final isSelected = selected == key;
-          return FilterChip(
-            label: Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                color: isSelected
-                    ? colorScheme.onSecondaryContainer
-                    : colorScheme.onSurfaceVariant,
+    final strings = l10n(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      child: Column(
+        children: [
+          TextFormField(
+            initialValue: query,
+            onChanged: onQueryChanged,
+            decoration: InputDecoration(
+              hintText: strings.logsSearchHint,
+              prefixIcon: const Icon(Icons.search_rounded),
+              isDense: true,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _LevelChip(
+                        value: 'all',
+                        label: strings.logsLevelAll,
+                        selected: level,
+                        onChanged: onLevelChanged,
+                      ),
+                      const SizedBox(width: 6),
+                      _LevelChip(
+                        value: 'warning',
+                        label: strings.logsLevelWarning,
+                        selected: level,
+                        onChanged: onLevelChanged,
+                      ),
+                      const SizedBox(width: 6),
+                      _LevelChip(
+                        value: 'error',
+                        label: strings.logsLevelErrorOnly,
+                        selected: level,
+                        onChanged: onLevelChanged,
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ),
-            selected: isSelected,
-            onSelected: (_) => onSelected(key),
-            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            visualDensity: VisualDensity.compact,
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            showCheckmark: false,
-            selectedColor: colorScheme.secondaryContainer,
-            backgroundColor: colorScheme.surfaceContainerHighest.withValues(
-              alpha: 0.4,
-            ),
-            side: BorderSide.none,
-          );
-        },
+              const SizedBox(width: 8),
+              DropdownButtonHideUnderline(
+                child: DropdownButton<String?>(
+                  value: area,
+                  hint: Text(strings.logsAreaAll),
+                  items: [
+                    DropdownMenuItem<String?>(
+                      value: null,
+                      child: Text(strings.logsAreaAll),
+                    ),
+                    for (final value in areas.toList()..sort())
+                      DropdownMenuItem<String?>(
+                        value: value,
+                        child: Text(logAreaLabel(context, value)),
+                      ),
+                  ],
+                  onChanged: onAreaChanged,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 }
 
-class _LogsSearchBar extends StatefulWidget {
-  const _LogsSearchBar({
-    required this.query,
+class _LevelChip extends StatelessWidget {
+  const _LevelChip({
+    required this.value,
+    required this.label,
+    required this.selected,
     required this.onChanged,
-    required this.onClear,
   });
 
-  final String query;
+  final String value;
+  final String label;
+  final String selected;
   final ValueChanged<String> onChanged;
-  final VoidCallback onClear;
 
   @override
-  State<_LogsSearchBar> createState() => _LogsSearchBarState();
+  Widget build(BuildContext context) {
+    return ChoiceChip(
+      label: Text(label),
+      selected: selected == value,
+      onSelected: (_) => onChanged(value),
+      showCheckmark: false,
+      visualDensity: VisualDensity.compact,
+    );
+  }
 }
 
-class _LogsSearchBarState extends State<_LogsSearchBar> {
-  late final TextEditingController _controller;
+class LogDetailPage extends StatelessWidget {
+  const LogDetailPage({super.key, required this.log});
 
-  @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController(text: widget.query);
-  }
+  final Map<String, dynamic> log;
 
-  @override
-  void didUpdateWidget(_LogsSearchBar oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.query != _controller.text) {
-      _controller.text = widget.query;
+  Future<void> _copy(BuildContext context) async {
+    final mode = await resolveLogSanitization(context, log);
+    if (mode == null || !context.mounted) return;
+    final sanitized = const AppLogSanitizer().sanitize(log, mode);
+    final text = const JsonEncoder.withIndent('  ').convert(sanitized);
+    await Clipboard.setData(ClipboardData(text: text));
+    if (context.mounted) {
+      unawaited(showHazukiPrompt(context, l10n(context).logsCopied));
     }
   }
 
   @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-      child: TextField(
-        controller: _controller,
-        onChanged: widget.onChanged,
-        style: const TextStyle(fontSize: 14),
-        decoration: InputDecoration(
-          hintText: l10n(context).logsSearchHint,
-          hintStyle: TextStyle(
-            fontSize: 14,
-            color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+    final data = log['data'];
+    final content = data == null
+        ? ''
+        : data is String
+        ? data
+        : const JsonEncoder.withIndent('  ').convert(data);
+    return Scaffold(
+      appBar: hazukiFrostedAppBar(
+        context: context,
+        title: Text(l10n(context).logsDetailTitle),
+        actions: [
+          IconButton(
+            tooltip: l10n(context).logsCopyField,
+            onPressed: () => unawaited(_copy(context)),
+            icon: const Icon(Icons.copy_outlined),
           ),
-          prefixIcon: Icon(
-            Icons.search_rounded,
-            size: 20,
-            color: colorScheme.onSurfaceVariant,
-          ),
-          suffixIcon: widget.query.isNotEmpty
-              ? IconButton(
-                  iconSize: 18,
-                  icon: const Icon(Icons.close_rounded),
-                  onPressed: () {
-                    _controller.clear();
-                    widget.onClear();
-                  },
-                )
-              : null,
-          isDense: true,
-          contentPadding: const EdgeInsets.symmetric(vertical: 10),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(24),
-            borderSide: BorderSide.none,
-          ),
-          filled: true,
-          fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        ],
+      ),
+      body: SelectionArea(
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            Text(
+              (log['title'] ?? 'Log').toString(),
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 12),
+            _DetailRow(label: 'Time', value: '${log['time'] ?? '-'}'),
+            _DetailRow(
+              label: 'Level',
+              value: logLevelLabel(context, '${log['level'] ?? 'info'}'),
+            ),
+            _DetailRow(
+              label: 'Area',
+              value: logAreaLabel(context, '${log['area'] ?? ''}'),
+            ),
+            _DetailRow(label: 'Source', value: '${log['source'] ?? '-'}'),
+            _DetailRow(label: 'Event', value: '${log['event'] ?? '-'}'),
+            if (log['tags'] case final List tags when tags.isNotEmpty)
+              _DetailRow(label: 'Tags', value: tags.join(', ')),
+            if ((log['occurrences'] as num?)?.toInt() case final count?
+                when count > 1) ...[
+              _DetailRow(label: 'Occurrences', value: '$count'),
+              _DetailRow(
+                label: 'Last seen',
+                value: '${log['lastSeenAt'] ?? '-'}',
+              ),
+            ],
+            if (content.isNotEmpty) ...[
+              const Divider(height: 32),
+              Text(
+                content,
+                style: const TextStyle(
+                  fontFamily: 'monospace',
+                  fontSize: 13,
+                  height: 1.45,
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );
   }
 }
 
-class _SourceFilterChips extends StatelessWidget {
-  const _SourceFilterChips({
-    required this.sources,
-    required this.selected,
-    required this.onSelected,
-  });
+class _DetailRow extends StatelessWidget {
+  const _DetailRow({required this.label, required this.value});
 
-  final Set<String> sources;
-  final String? selected;
-  final ValueChanged<String?> onSelected;
+  final String label;
+  final String value;
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final allSources = ['', ...sources.toList()..sort()];
-    return SizedBox(
-      height: 40,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-        itemCount: allSources.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 6),
-        itemBuilder: (context, index) {
-          final source = allSources[index];
-          final isAll = source.isEmpty;
-          final isSelected = isAll ? selected == null : selected == source;
-          final label = isAll ? l10n(context).logsSourceAll : source;
-          return FilterChip(
-            label: Text(
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 96,
+            child: Text(
               label,
               style: TextStyle(
-                fontSize: 12,
-                color: isSelected
-                    ? colorScheme.onSecondaryContainer
-                    : colorScheme.onSurfaceVariant,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
-            selected: isSelected,
-            onSelected: (_) => onSelected(isAll ? null : source),
-            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            visualDensity: VisualDensity.compact,
-            padding: const EdgeInsets.symmetric(horizontal: 4),
-            showCheckmark: false,
-            selectedColor: colorScheme.secondaryContainer,
-            backgroundColor: colorScheme.surfaceContainerHighest.withValues(
-              alpha: 0.4,
-            ),
-            side: BorderSide.none,
-          );
-        },
+          ),
+          Expanded(child: Text(value)),
+        ],
       ),
     );
   }

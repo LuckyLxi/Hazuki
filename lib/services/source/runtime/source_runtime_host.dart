@@ -7,6 +7,7 @@ import 'source_runtime_coordinator.dart';
 import 'source_runtime_handle.dart';
 import 'source_runtime_registry.dart';
 import 'source_secure_session_storage.dart';
+import '../../logging/app_log_store.dart';
 
 /// Owns source selection and the lifetime of per-source runtime handles.
 ///
@@ -21,7 +22,9 @@ class SourceRuntimeHost extends ChangeNotifier {
     required Future<void> Function(String sourceKey) ensureSourceInitialized,
     required String? Function(String sourceKey) currentAccountForSource,
     required bool Function(String sourceKey) isLoggedForSource,
+    AppLogStore? logStore,
   }) : _catalog = List.unmodifiable(catalog),
+       logStore = logStore ?? AppLogStore(),
        _secureSessionStorage = secureSessionStorage,
        _ensureSourceInitialized = ensureSourceInitialized,
        _currentAccountForSource = currentAccountForSource,
@@ -50,6 +53,7 @@ class SourceRuntimeHost extends ChangeNotifier {
   final Future<void> Function(String sourceKey) _ensureSourceInitialized;
   final String? Function(String sourceKey) _currentAccountForSource;
   final bool Function(String sourceKey) _isLoggedForSource;
+  final AppLogStore logStore;
 
   late final SourceRuntimeCoordinator<SourceRuntimeHandle> _coordinator;
   late final SourceRuntimeRegistry runtimeRegistry;
@@ -107,17 +111,10 @@ class SourceRuntimeHost extends ChangeNotifier {
     String sourceKey, {
     SourceRuntimeHandle? expectedHandle,
   }) {
-    final current = _coordinator.handleFor(sourceKey);
-    final previous = expectedHandle ?? current;
-    final shouldCopyLogs =
-        expectedHandle == null || identical(current, expectedHandle);
     final replacement = _coordinator.recreate(
       sourceKey,
       expectedHandle: expectedHandle,
     );
-    if (shouldCopyLogs && !identical(previous, replacement)) {
-      replacement.debug.copyCapturedLogsFrom(previous.debug);
-    }
     return replacement;
   }
 
@@ -135,6 +132,7 @@ class SourceRuntimeHost extends ChangeNotifier {
     secureStorage: _secureSessionStorage,
     ensureInitialized: _ensureSourceInitialized,
     notifyRuntimeStateChanged: notifyActiveRuntimeChanged,
+    appLogStore: logStore,
   );
 
   void _notifyChanged() {

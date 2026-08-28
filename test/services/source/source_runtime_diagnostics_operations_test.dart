@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hazuki/services/logging/app_log_event.dart';
 import 'package:hazuki/services/source/common/source_prefs_keys.dart';
 import 'package:hazuki/services/source/models/source_contract_models.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_diagnostics_operations.dart';
@@ -40,12 +41,18 @@ void main() {
       facade.debug.softwareLogCaptureEnabled = true;
       facade.lastLoginDebugInfo = {'account': 'test'};
       facade.lastSourceVersionDebugInfo = {'version': '1.0.0'};
-      facade.debug.recentApplicationLogs.add({'title': 'captured'});
+      host.logStore.add(
+        level: 'error',
+        area: AppLogArea.application,
+        source: 'test',
+        event: 'captured',
+        title: 'captured',
+      );
 
       await diagnostics.setSoftwareLogCaptureEnabled(false);
 
       expect(facade.softwareLogCaptureEnabled, isFalse);
-      expect(facade.debug.recentApplicationLogs, isEmpty);
+      expect(host.logStore.events, hasLength(1));
       expect(facade.debug.lastLoginDebugInfoStorage, isNull);
       expect(facade.debug.lastSourceVersionDebugInfoStorage, isNull);
       final prefs = await SharedPreferences.getInstance();
@@ -61,10 +68,7 @@ void main() {
     expect(await diagnostics.loadSoftwareLogCaptureEnabled(), isTrue);
     diagnostics.logRuntimeRetryRequested('test_retry');
 
-    expect(host.activeHandle.debug.recentApplicationLogs, hasLength(1));
-    expect(
-      host.activeHandle.debug.recentApplicationLogs.single['title'],
-      'Source retry requested',
-    );
+    expect(host.logStore.events, hasLength(1));
+    expect(host.logStore.events.single.title, 'Source retry requested');
   });
 }
