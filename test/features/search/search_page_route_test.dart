@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/search/search.dart';
@@ -32,21 +33,31 @@ void main() {
     await tester.pump(const Duration(milliseconds: 1));
 
     final route = ModalRoute.of(tester.element(find.text('Search')))!;
-    expect(route, isA<PageRoute<void>>());
+    expect(route, isA<CupertinoPageRoute<void>>());
     expect((route as PageRoute<void>).allowSnapshotting, isFalse);
-    expect(route.transitionDuration, const Duration(milliseconds: 280));
-    expect(route.reverseTransitionDuration, const Duration(milliseconds: 240));
+    expect(route.transitionDuration, const Duration(milliseconds: 500));
+    expect(route.reverseTransitionDuration, const Duration(milliseconds: 500));
     expect(_hasSnapshotAncestor(find.text('Home')), isFalse);
     expect(_hasSnapshotAncestor(find.text('Search')), isFalse);
-    final slide = tester.widget<SlideTransition>(
+    final searchSlides = tester.widgetList<SlideTransition>(
       find.ancestor(
         of: find.text('Search'),
         matching: find.byType(SlideTransition),
       ),
     );
-    expect(slide.position.value.dx, closeTo(1, 0.02));
+    expect(searchSlides.any((slide) => slide.position.value.dx > 0.9), isTrue);
 
-    await tester.pump(const Duration(milliseconds: 280));
+    await tester.pump(const Duration(milliseconds: 250));
+
+    final homeSlides = tester.widgetList<SlideTransition>(
+      find.ancestor(
+        of: find.text('Home'),
+        matching: find.byType(SlideTransition),
+      ),
+    );
+    expect(homeSlides.any((slide) => slide.position.value.dx < 0), isTrue);
+
+    await tester.pump(const Duration(milliseconds: 250));
 
     expect(_hasSnapshotAncestor(find.text('Search')), isFalse);
 
