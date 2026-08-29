@@ -129,6 +129,7 @@ class HomeFeatureEntrypoints {
     required this.buildReaderPage,
     required this.buildSearchPage,
     required this.buildSearchRoute,
+    this.prepareSearchPage,
     required this.buildDiscoverTab,
     required this.buildFavoriteTab,
     required this.buildHistoryPage,
@@ -144,6 +145,7 @@ class HomeFeatureEntrypoints {
   final HomeReaderPageBuilder buildReaderPage;
   final HomeSearchPageBuilder buildSearchPage;
   final HomeSearchRouteBuilder buildSearchRoute;
+  final Future<void> Function()? prepareSearchPage;
   final HomeDiscoverTabBuilder buildDiscoverTab;
   final HomeFavoriteTabBuilder buildFavoriteTab;
   final HomeHistoryPageBuilder buildHistoryPage;

@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hazuki/services/logging/app_log_event.dart';
 import 'package:hazuki/services/source/models/source_contract_models.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_host.dart';
 import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
@@ -8,7 +9,7 @@ void main() {
 
   late SourceRuntimeHost host;
 
-  setUp(() {
+  setUp(() async {
     host = SourceRuntimeHost(
       catalog: const [
         SourceCatalogEntry(
@@ -24,11 +25,11 @@ void main() {
       currentAccountForSource: (_) => null,
       isLoggedForSource: (_) => false,
     );
-    host.activeHandle.facade.debug.softwareLogCaptureEnabled = true;
+    await host.logStore.setCaptureEnabled(true);
     addTearDown(host.dispose);
   });
 
-  test('application logs retain their stream and classify system events', () {
+  test('stores and merges one application event instead of typed copies', () {
     for (var index = 0; index < 2; index++) {
       host.activeHandle.debugLog.addApplicationLog(
         level: 'info',
@@ -38,56 +39,54 @@ void main() {
       );
     }
 
-    expect(host.activeHandle.debug.recentApplicationLogs, hasLength(1));
-    expect(
-      host.activeHandle.debug.recentApplicationLogs.single['mergedCount'],
-      2,
-    );
-    expect(host.activeHandle.debug.recentSystemLogs, hasLength(1));
-    expect(host.activeHandle.debug.recentSystemLogs.single['mergedCount'], 2);
+    expect(host.logStore.events, hasLength(1));
+    expect(host.logStore.events.single.occurrences, 2);
+    expect(host.logStore.events.single.area, AppLogArea.source);
   });
 
-  test('reader logs classify performance events and retain full content', () {
+  test('reader logs retain complete content', () {
     final longContent = {'durationMs': 4200, 'detail': 'x' * 500};
 
     host.activeHandle.debugLog.addReaderLog(
       level: 'warning',
       title: 'Frame duration',
       content: longContent,
+      source: 'reader_position',
     );
 
-    final reader = host.activeHandle.debug.recentReaderLogs.single;
-    expect(reader['contentFull'], longContent);
-    expect(host.activeHandle.debug.recentPerformanceLogs, hasLength(1));
+    final event = host.logStore.events.single;
+    expect(event.data, longContent);
+    expect(event.area, AppLogArea.reader);
+    expect(event.tags, contains('performance'));
+    expect(event.level, AppLogLevel.warning);
   });
 
-  test('explicit logs normalize unknown types and warning levels', () {
+  test('explicit error logs use a real level instead of keyword guessing', () {
     host.activeHandle.debugLog.addDebugLog(
-      type: 'unknown',
-      level: 'warning',
-      title: 'Action',
-      content: const {'trigger': 'tap'},
-    );
-
-    final entry = host.activeHandle.debug.recentActionLogs.single;
-    expect(entry['type'], 'action');
-    expect(entry['level'], 'warn');
-  });
-
-  test('new logs prune entries older than the retention window', () {
-    host.activeHandle.debug.recentApplicationLogs.add({
-      'time': DateTime.now()
-          .subtract(const Duration(days: 8))
-          .toIso8601String(),
-    });
-    host.activeHandle.debug.lastAgeCleanupAt = null;
-
-    host.activeHandle.debugLog.addDebugLog(
-      type: 'system',
+      type: 'error',
       level: 'info',
-      title: 'Fresh',
+      title: 'Request failed',
+      content: const {'reason': 'test'},
     );
 
-    expect(host.activeHandle.debug.recentApplicationLogs, isEmpty);
+    expect(host.logStore.events.single.level, AppLogLevel.error);
+  });
+
+  test('runtime recreation keeps using the same application log store', () {
+    host.activeHandle.debugLog.addApplicationLog(
+      level: 'info',
+      title: 'Before recreation',
+    );
+
+    final replacement = host.recreateSourceRuntime('jm');
+    replacement.debugLog.addApplicationLog(
+      level: 'info',
+      title: 'After recreation',
+    );
+
+    expect(host.logStore.events.map((event) => event.title), [
+      'Before recreation',
+      'After recreation',
+    ]);
   });
 }

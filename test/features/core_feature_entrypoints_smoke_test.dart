@@ -88,7 +88,7 @@ void main() {
         comicDetailDynamicColor: false,
         useSystemFont: true,
       ),
-      onAppearanceChanged: (_, {revealOrigin}) async {},
+      onAppearanceChanged: (_, {revealOrigin, revealSyncRegion}) async {},
       locale: const Locale('en'),
       onLocaleChanged: (_) async {},
       featureEntrypoints: homeFeatureEntrypoints,
@@ -218,7 +218,7 @@ void main() {
         comicDetailDynamicColor: false,
         useSystemFont: true,
       ),
-      onAppearanceChanged: (_, {revealOrigin}) async {},
+      onAppearanceChanged: (_, {revealOrigin, revealSyncRegion}) async {},
       locale: const Locale('en'),
       onLocaleChanged: (_) async {},
       cloudSyncPageBuilder: (_) =>

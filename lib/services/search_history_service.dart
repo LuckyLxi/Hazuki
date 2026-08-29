@@ -13,12 +13,15 @@ class SearchHistoryService extends ChangeNotifier {
     : _database = database;
 
   final HazukiDatabase _database;
+  List<String> _cachedHistory = const <String>[];
   Future<void> _migration = Future.value();
   Future<void> _opQueue = Future.value();
 
   static const _key = 'search_history';
   static const _migrationDoneKey = 'search_history_drift_migrated_v1';
   static const _clearStateId = 'global';
+
+  List<String> get cachedHistory => _cachedHistory;
 
   Future<T> _serialized<T>(Future<T> Function() fn) {
     final completer = Completer<T>();
@@ -47,7 +50,9 @@ class SearchHistoryService extends ChangeNotifier {
 
   Future<List<String>> load() async {
     await _ensureMigrated();
-    return _loadFromDatabase();
+    final history = await _loadFromDatabase();
+    _cachedHistory = List<String>.unmodifiable(history);
+    return _cachedHistory;
   }
 
   Future<void> add(String keyword) async {

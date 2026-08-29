@@ -8,45 +8,59 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Run on device/emulator
 flutter run
 
-# Build Android APK
+# Build Android APK (release, arm64)
 flutter build apk --split-per-abi --target-platform android-arm64
 
-# Analyze
+# Analyze / test
 flutter analyze
-
-# Run tests
 flutter test
+flutter test test/path/to/test_file.dart            # single test file
 
-# Run a single test file
-flutter test test/path/to/test_file.dart
+# Regenerate localization code after editing lib/l10n/*.arb
+flutter gen-l10n
+
+# Regenerate Drift code after changing the database schema
+dart run build_runner build --delete-conflicting-outputs
+
+# Verify formatting (CI uses this exact form)
+dart format --output=none --set-exit-if-changed lib test
 ```
+
+`third_party/flutter_qjs` and each package under `third_party/pub_overrides/` are **separate packages** — run their `flutter pub get` / `dart format` / `flutter analyze` / `flutter test` from that directory, not the repo root. Do not overwrite the local `dependency_overrides` in `pubspec.yaml` (they patch upstream bugs).
 
 ## Architecture
 
-Hazuki is a Flutter manga reader app targeting Android. It fetches and renders manga from a third-party JavaScript source script (JMComic via [venera-configs](https://github.com/venera-app/venera-configs/blob/main/jm.js)).
+Hazuki is a Flutter manga reader targeting Android. It fetches and renders manga from third-party JavaScript source scripts (JMComic / CopyManga / Picacg via [venera-configs](https://github.com/venera-app/venera-configs)). No Provider/GetX/Riverpod — state is `ChangeNotifier` controllers consumed via `ListenableBuilder`/`AnimatedBuilder`.
 
-### Core concept: JS source runtime
+### JS source runtime
 
-All manga data (browse, search, favorites, chapters, images) flows through a JavaScript runtime powered by `flutter_qjs` (QuickJS embedded in Flutter, at `third_party/flutter_qjs`). The JS source file is downloaded at first launch and stored locally.
+All manga data (browse, search, favorites, chapters, images) flows through a JavaScript runtime powered by `flutter_qjs` (QuickJS, at `third_party/flutter_qjs`). The JS source script is downloaded at first launch and stored locally. `assets/init.js` is the bridge library injected into the runtime before the source script (provides `sendMessage`, `Convert`, `Network`, etc.).
 
-- **`HazukiSourceService`** (`lib/services/hazuki_source_service.dart`) — the central singleton. It owns the JS engine and orchestrates a mix of `part` capabilities (favorites, comments, comic details, JS engine bootstrap, etc.) and standalone capability classes registered as instance fields. The standalone classes (`ImageCacheCapability`, `ExploreCacheCapability`, `DebugLogCapability`, `LineSettingsCapability`, `SourceHttpGateway`, `SourceNetworkLogSink`) live under `lib/services/source/<domain>/` and take `HazukiSourceService` or `HazukiSourceFacade` through their constructors. Shared infrastructure: `HazukiSourceFacade` (the contract the capabilities depend on), `SourceRuntimeKernel` / `SourceSessionStore` / `SourceCacheStore` / `SourceDebugLogStore` (state stores), `SourceJsBridge` (QuickJS wrapper), `SourcePrefsKeys` and `DebugLogConstants` (centralized constants), top-level helpers in `source/common/source_json_coerce.dart` and `source/debug/debug_log_internals.dart`. The JS engine core (bootstrap / loader / version update / cookie storage / file management) intentionally stays as `part` files because it is tightly coupled to the QuickJS lifecycle.
-- **`SourceRuntimeCoordinator`** (`lib/app/source_runtime_coordinator.dart`) — orchestrates bootstrap (downloading/loading the JS file), connectivity recovery, and source update checks.
-- **`assets/init.js`** — the JS bridge library injected into the QuickJS runtime before the source script. Provides `sendMessage`, `Convert`, `Network`, etc. to the JS source.
+The source service is a decomposed subsystem under `lib/services/source/`, layered as:
 
-### State & settings
+- **`SourceRuntimeAssembly`** ([source_runtime_assembly.dart](lib/services/source/runtime/source_runtime_assembly.dart)) — internal composition root. Wires the state stores, per-domain capabilities, and the gateway set together. Application code never depends on it directly.
+- **`SourceRuntimeHost`** ([source_runtime_host.dart](lib/services/source/runtime/source_runtime_host.dart)) — owns source selection and the lifetime of per-source `SourceRuntimeHandle`s. Each handle bundles the `HazukiSourceFacade`, JS kernel, cache/cookie/session stores, and image cache for one source. A generic `SourceRuntimeCoordinator<T>` ([source_runtime_coordinator.dart](lib/services/source/runtime/source_runtime_coordinator.dart)) manages the handle map + active-source selection.
+- **`SourceGatewaySet`** ([source_gateway_set.dart](lib/services/source/gateways/source_gateway_set.dart)) — produces the **focused gateway contracts** that features actually consume (`SourceSearchGateway`, `SourceReaderGateway`, `SourceDiscoverGateway`, `SourceFavoriteGateway`, `SourceSyncGateway`, …). Each gateway is an *Adapter* over the operations/capabilities.
+- **`HazukiSourceFacade`** ([source_runtime_facade.dart](lib/services/source/runtime/source_runtime_facade.dart)) — the per-source contract capabilities depend on (JS bridge, session, cache, debug log, http gateway).
+- **Capabilities** live under domain subdirs (`account/`, `comic/`, `comments/`, `favorites/`, `image/`, `debug/`, `content/`, `category/`, `runtime/`); state stores and shared helpers live in `runtime/` and `common/`.
 
-No external state management library (no Provider, GetX, Riverpod). Pattern:
+The app-level **`SourceRuntimeCoordinator`** ([lib/app/source_runtime/source_runtime_coordinator.dart](lib/app/source_runtime/source_runtime_coordinator.dart)) is a separate UI orchestrator: bootstrap overlay, connectivity recovery, and source-update checks. Do not confuse it with the generic handle-lifecycle coordinator above.
 
-- Feature controllers extend `ChangeNotifier`, hold a private `_state` snapshot, and call `notifyListeners()`.
-- Controllers accept **callbacks** injected at construction (e.g. `ReaderStateUpdate`, `ReaderLogEvent`), which keeps them testable without widget dependencies.
-- Consumed via `ListenableBuilder` or `AnimatedBuilder` in views.
-- **`HazukiThemeController`** — `ChangeNotifier` holding current `AppearanceSettingsData`; consumed via `HazukiThemeControllerScope` (InheritedWidget).
-- **`HazukiAppSettingsStore`** — serializes/deserializes appearance and locale to `SharedPreferences`.
-- App-level preference keys live in `lib/app/app_preferences.dart`.
+### Dependency injection
+
+Pure `get_it`. `lib/app/service_locator.dart` exposes `final GetIt sl` and `registerServices()`, which delegates to `registerSourceServices` + `registerApplicationServices` in [lib/app/di/](lib/app/di/). Resolve **everything** via `sl<T>()` (e.g. `sl<SourceReaderGateway>()`, `sl<MangaDownloadService>()`). There are no `.instance` static singletons. Registrars accept an optional `GetIt` so tests can build an isolated graph.
+
+### Startup
+
+`main()` → `bootstrapApp()` ([app_bootstrap.dart](lib/app/startup/app_bootstrap.dart)) → `runApp`. Bootstrap calls `registerServices()`, loads active-source preference and UI flags, then initializes `MangaDownloadService`, `PasswordLockService`, `CommentFilterService`, etc. `HazukiAppStartupCoordinator` ([app_startup_coordinator.dart](lib/app/app_startup_coordinator.dart)) orchestrates source bootstrap and the source/software update dialogs post-run.
+
+### State pattern
+
+Feature controllers are `ChangeNotifier`s that hold a private `_state` snapshot and call `notifyListeners()`. They accept **callbacks** injected at construction (e.g. reader update/log callbacks) to stay testable without widget dependencies. Views resolve gateways via `sl<T>()` and pass them into controllers, which take them as constructor parameters.
 
 ### Feature modules
 
-The app uses a bottom-nav shell (`HazukiHomePage` → `HomeCoordinator`). Features live under `lib/features/`, each with `view/`, `state/`, and `support/` subdirectories and a public barrel export (e.g. `home.dart`):
+The bottom-nav shell (`HazukiHomePage` → `HomeCoordinator`) hosts features under `lib/features/`, each with `view/`, `state/`, and `support/` subdirs plus a public barrel export (e.g. `home.dart`):
 
 | Feature | Purpose |
 | --- | --- |
@@ -61,47 +75,27 @@ The app uses a bottom-nav shell (`HazukiHomePage` → `HomeCoordinator`). Featur
 | `history/` | Read history |
 | `comments/` | Chapter comments |
 
-Each feature's `support/` subdirectory contains controllers, async action flows, and utilities factored out of views. E.g. the `reader` feature has 7 support controllers (session, navigation, zoom, image pipeline, display bridge, diagnostics).
+`support/` holds controllers, async action flows, and utilities factored out of views (the reader feature alone has ~7 support controllers). Cross-feature helpers live in `lib/shared/` (e.g. `navigation_tags.dart`, `reading/`, `favorites/`, `source_account/`, `preferences/`); shared UI widgets live in `lib/widgets/`; shared models in `lib/models/`.
 
-**State pattern**: feature controllers are `ChangeNotifier`s consumed via `ListenableBuilder` or `AnimatedBuilder`. `HomeCoordinator` owns `HomeShellController` (tab/app bar) and `HomeProfileController` (login/profile). Access services via static singletons: `HazukiSourceService.instance`, `MangaDownloadService.instance`, etc.
+### Storage
 
-### Shared code
+`lib/services/storage/hazuki_database.dart` is the Drift database (tables for read history, reading progress, search history, download groups), with generated code in `hazuki_database.g.dart` (never hand-edit). Tests use `HazukiDatabase.memory()`. App-level preference keys live in `lib/app/app_preferences.dart` and `lib/shared/preferences/hazuki_preference_keys.dart`.
 
-- `lib/models/` — shared data models used across features.
-- `lib/widgets/` — shared UI widgets (not feature-specific).
-- `lib/app/service_locator.dart` — `get_it` based DI container (`sl`); call `registerServices()` once during startup.
+### Navigation & theme
 
-### Navigation
-
-Navigation uses hero animations for comic cover transitions. Key helpers in `lib/app/navigation_tags.dart`:
-
-- `comicCoverHeroTag()` — generates the hero tag for a comic cover.
-- `buildComicCoverHeroFlightShuttle()` — custom flight shuttle widget.
-- `comicCoverHeroBorderRadius()` — animates border radius during flight.
-
-Platform adaptation: Android uses a bottom drawer; Windows gets a sidebar navigation layout.
-
-### Services
-
-- **`MangaDownloadService`** — download queue, storage layout, recovery on restart.
-- **`CloudSyncService`** — syncs favorites/history with the source account.
-- **`PasswordLockService`** — app-level PIN lock (blocks the whole UI via an overlay).
-- **`SoftwareUpdateService`** / **`SoftwareUpdateDownloadService`** — self-update from `update.json`.
-- **`LocalFavoritesService`** — local (on-device) favorites storage separate from cloud sync.
-- **`DiscoverDailyRecommendationService`** — caches daily recommendation results.
-- **`CommentFilterService`** — filters/blocks comments by user-defined rules.
-
-### Theme switching
-
-Light/dark switching uses a circular reveal animation (`_ThemeRevealOverlay` in `main.dart`): the old theme is rasterized into a `ui.Image` via `RepaintBoundary.toImage()`, then a `CustomPainter` clips a growing circle away to reveal the new theme underneath.
+Navigation uses hero animations for comic-cover transitions; helpers live in [lib/shared/navigation_tags.dart](lib/shared/navigation_tags.dart) (`comicCoverHeroTag()`, `buildComicCoverHeroFlightShuttle()`, `comicCoverHeroBorderRadius()`). Android uses a bottom drawer; Windows gets a sidebar layout. Light/dark switching uses a circular reveal animation (`_ThemeRevealOverlay` in `main.dart`).
 
 ### Localization
 
-ARB files live in `lib/l10n/`. Helper: `l10n(context)` from `lib/l10n/l10n.dart` returns `AppLocalizations.of(context)!`.
+ARB files in `lib/l10n/`. Use `l10n(context)` from `lib/l10n/l10n.dart` to get `AppLocalizations`.
 
 ### Tests
 
-Tests live under `test/`, mirroring the `lib/` structure. Two main patterns:
+Tests mirror the `lib/` structure under `test/`. Two patterns: **smoke tests** (instantiate controllers/pages to verify construction) and **controller unit tests** (drive state transitions directly on the `ChangeNotifier`). Use `mocktail` for fakes and `HazukiDatabase.memory()` for isolated storage.
 
-- **Smoke tests** — instantiate controllers/pages to verify no crash at construction.
-- **Controller unit tests** — test state transitions directly on the `ChangeNotifier` controller without Flutter widgets.
+## Conventions
+
+- **Code comments must be written in Simplified Chinese** — docstrings and inline comments explaining *why/how*, kept concise and professional.
+- **Strict scope**: touch only the lines/functions required for the task; do not refactor unrelated code or delete existing behavior without asking first.
+- **Commits**: Conventional Commits, imperative and scoped (e.g. `feat(settings): …`, `fix(storage): …`). No casual/playful language.
+- **Release notes / `update.json` `log` field / git tag descriptions**: list items start with `- ` (never numeric ordering), separated by `\n`. Release tags must be annotated (`git tag -a`).

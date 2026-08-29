@@ -456,30 +456,34 @@ class _HomeProfileGlassCard extends StatelessWidget {
 
     if (HazukiLiquidGlass.isAvailable) {
       final isDark = Theme.of(context).brightness == Brightness.dark;
-      return GlassContainer(
-        key: const ValueKey('home-profile-liquid-glass-card'),
-        width: _width,
-        padding: _padding,
-        useOwnLayer: true,
-        quality: HazukiLiquidGlass.navigationQuality,
-        shape: const LiquidRoundedSuperellipse(borderRadius: _borderRadius),
-        settings: LiquidGlassSettings(
-          thickness: 34,
-          blur: 4,
-          chromaticAberration: 0.16,
-          lightIntensity: 0.72,
-          refractiveIndex: 1.56,
-          saturation: 1.06,
-          ambientStrength: 0.3,
-          glowIntensity: 0.5,
-          shadowElevation: 0,
-          glassColor: Colors.white.withValues(alpha: isDark ? 0.1 : 0.18),
-          backerColor: isDark
-              ? Colors.black.withValues(alpha: 0.18)
-              : Colors.white.withValues(alpha: 0.06),
-        ),
+      return ClipRSuperellipse(
+        borderRadius: BorderRadius.circular(_borderRadius),
         clipBehavior: Clip.antiAlias,
-        child: content,
+        child: GlassContainer(
+          key: const ValueKey('home-profile-liquid-glass-card'),
+          width: _width,
+          padding: _padding,
+          useOwnLayer: true,
+          quality: HazukiLiquidGlass.navigationQuality,
+          shape: const LiquidRoundedSuperellipse(borderRadius: _borderRadius),
+          settings: LiquidGlassSettings(
+            thickness: 34,
+            blur: 4,
+            chromaticAberration: 0.16,
+            lightIntensity: 0.72,
+            refractiveIndex: 1.56,
+            saturation: 1.06,
+            ambientStrength: 0.3,
+            glowIntensity: 0.5,
+            shadowElevation: 0,
+            glassColor: Colors.white.withValues(alpha: isDark ? 0.1 : 0.18),
+            backerColor: isDark
+                ? Colors.black.withValues(alpha: 0.18)
+                : Colors.white.withValues(alpha: 0.06),
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: content,
+        ),
       );
     }
 

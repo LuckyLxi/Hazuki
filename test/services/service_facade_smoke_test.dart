@@ -571,8 +571,7 @@ void main() {
     final logs = (debugInfo['logs'] as List).cast<Map>();
     final log = logs.last.cast<String, dynamic>();
 
-    expect(log['content'].toString(), contains('[omitted'));
-    expect(log['contentFull'], {'message': longMessage});
+    expect((log['data'] as Map)['message'], longMessage);
   });
 
   test('application debug export data keeps full log content', () async {
@@ -587,12 +586,11 @@ void main() {
       content: {'body': longMessage},
     );
 
-    final debugInfo = await service.testing.debug.collectApplicationDebugInfo();
-    final logs = (debugInfo['recentApplicationLogs'] as List).cast<Map>();
+    final debugInfo = await service.testing.debug.collectAllDebugInfo();
+    final logs = (debugInfo['logs'] as List).cast<Map>();
     final log = logs.last.cast<String, dynamic>();
 
-    expect(log['content'].toString(), contains('[omitted'));
-    expect(log['contentFull'], {'body': longMessage});
+    expect((log['data'] as Map)['body'], longMessage);
   });
 
   test('network debug export data keeps full response body', () async {
@@ -614,7 +612,6 @@ void main() {
     final logs = (debugInfo['recentNetworkLogs'] as List).cast<Map>();
     final log = logs.last.cast<String, dynamic>();
 
-    expect(log['responseBodyPreview'].toString(), contains('[omitted'));
-    expect(log['responseBodyFull'], longBody);
+    expect((log['data'] as Map)['responseBody'], longBody);
   });
 }

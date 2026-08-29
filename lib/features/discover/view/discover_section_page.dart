@@ -43,12 +43,22 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
     _controller = DiscoverSectionPageController(
       sourceService: widget.sourceService,
       viewMoreUrl: widget.section.viewMoreUrl,
-      initialComics: widget.section.viewMoreUrl == null
-          ? widget.section.comics
-          : null,
+      initialComics: widget.section.comics,
+      initiallyOffersInitialComicsFilter:
+          widget.section.offersInitialComicsFilter,
     );
     _scrollController.addListener(_onScroll);
     _scheduleInitialBootstrap();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _controller.setInitialComicsFilterLabel(
+      widget.section.viewMoreUrl != null && widget.section.comics.isNotEmpty
+          ? AppLocalizations.of(context)!.discoverSectionHomePreview
+          : null,
+    );
   }
 
   @override

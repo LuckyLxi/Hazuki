@@ -60,11 +60,16 @@ class _SettingsPageState extends State<SettingsPage> {
   Future<void> _handleAppearanceChanged(
     AppearanceSettingsData next, {
     Offset? revealOrigin,
+    Rect? revealSyncRegion,
   }) async {
     setState(() {
       _appearanceSettings = next;
     });
-    await widget.onAppearanceChanged(next, revealOrigin: revealOrigin);
+    await widget.onAppearanceChanged(
+      next,
+      revealOrigin: revealOrigin,
+      revealSyncRegion: revealSyncRegion,
+    );
   }
 
   Future<void> _handleLocaleChanged(Locale? locale) async {

@@ -60,6 +60,11 @@ class HomeNavigationActions {
   }
 
   Future<void> openSearch() async {
+    final sourceRoute = ModalRoute.of(context);
+    await featureEntrypoints.prepareSearchPage?.call();
+    if (!context.mounted || sourceRoute == null || !sourceRoute.isCurrent) {
+      return;
+    }
     await Navigator.of(context).push(
       featureEntrypoints.buildSearchRoute<void>(
         builder: (_) => buildSearchPage(),

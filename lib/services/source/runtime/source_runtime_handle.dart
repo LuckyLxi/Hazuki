@@ -15,6 +15,7 @@ import 'source_runtime_facade.dart';
 import 'source_runtime_kernel.dart';
 import 'source_secure_session_storage.dart';
 import 'source_session_store.dart';
+import '../../logging/app_log_store.dart';
 
 Dio _createSourceDio() {
   return createHazukiDio(
@@ -35,9 +36,11 @@ class SourceRuntimeHandle
     required SourceSecureSessionStorage secureStorage,
     required Future<void> Function(String sourceKey) ensureInitialized,
     required void Function(String sourceKey) notifyRuntimeStateChanged,
+    AppLogStore? appLogStore,
   }) : _ensureInitialized = ensureInitialized,
        _notifyRuntimeStateChanged = notifyRuntimeStateChanged,
-       _secureStorage = secureStorage;
+       _secureStorage = secureStorage,
+       appLogStore = appLogStore ?? AppLogStore();
 
   @override
   final String sourceKey;
@@ -45,6 +48,7 @@ class SourceRuntimeHandle
   final Future<void> Function(String sourceKey) _ensureInitialized;
   final void Function(String sourceKey) _notifyRuntimeStateChanged;
   final Dio dio = _createSourceDio();
+  final AppLogStore appLogStore;
   final SourceRuntimeKernel runtime = SourceRuntimeKernel();
   bool _disposed = false;
   bool _disposeRequested = false;
@@ -103,6 +107,7 @@ class SourceRuntimeHandle
     session: session,
     cache: cache,
     debug: debug,
+    appLogStore: appLogStore,
     js: js,
     networkLogSink: networkLogSink,
     httpGateway: httpGateway,
@@ -132,7 +137,7 @@ class SourceRuntimeHandle
   late final ExploreCacheCapability exploreCache = ExploreCacheCapability(
     facade,
   );
-  late final DebugLogCapability debugLog = DebugLogCapability(facade);
+  late final DebugLogCapability debugLog = DebugLogCapability(appLogStore);
 
   @override
   bool get isDisposed => _disposed;

@@ -31,7 +31,10 @@ class HomeContentStack extends StatelessWidget {
                   duration: const Duration(milliseconds: 220),
                   curve: Curves.easeOut,
                   opacity: currentIndex == 0 ? 1 : 0,
-                  child: discoverChild,
+                  child: RepaintBoundary(
+                    key: const ValueKey('home-discover-repaint-boundary'),
+                    child: discoverChild,
+                  ),
                 ),
               ),
             ),
@@ -50,7 +53,10 @@ class HomeContentStack extends StatelessWidget {
                   duration: const Duration(milliseconds: 220),
                   curve: Curves.easeOut,
                   opacity: currentIndex == 1 ? 1 : 0,
-                  child: favoriteChild,
+                  child: RepaintBoundary(
+                    key: const ValueKey('home-favorite-repaint-boundary'),
+                    child: favoriteChild,
+                  ),
                 ),
               ),
             ),

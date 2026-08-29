@@ -16,9 +16,13 @@ typedef AggregateSearchPageLoader =
     });
 
 class AggregateSearchSectionState {
-  AggregateSearchSectionState({required this.source});
+  AggregateSearchSectionState({required this.source})
+    : order = AggregateSearchResultsController.defaultOrderForSource(
+        source.normalizedKey,
+      );
 
   final SourceCatalogEntry source;
+  String order;
   List<ExploreComic> comics = const [];
   String? errorMessage;
   bool loading = false;
@@ -112,6 +116,31 @@ class AggregateSearchResultsController extends ChangeNotifier {
     return _loadSectionPage(context, section, page: 1, append: false);
   }
 
+  Future<void> changeOrder(
+    BuildContext context,
+    AggregateSearchSectionState section,
+    String order,
+  ) {
+    if (_keyword.isEmpty || section.loading || section.loadingMore) {
+      return Future.value();
+    }
+    final normalized = _normalizeOrder(order, section.source.normalizedKey);
+    if (section.order == normalized) return Future.value();
+
+    section
+      ..requestToken = section.requestToken + 1
+      ..order = normalized
+      ..comics = const []
+      ..errorMessage = null
+      ..loading = true
+      ..loadingMore = false
+      ..hasMore = true
+      ..page = 0
+      ..maxPage = null;
+    _notify();
+    return _loadSectionPage(context, section, page: 1, append: false);
+  }
+
   Future<void> loadMore(
     BuildContext context,
     AggregateSearchSectionState section,
@@ -144,7 +173,7 @@ class AggregateSearchResultsController extends ChangeNotifier {
     final strings = AppLocalizations.of(context)!;
     try {
       final sourceKey = section.source.normalizedKey;
-      final order = _defaultOrder(sourceKey);
+      final order = section.order;
       final loader = _loader;
       final request = loader != null
           ? loader(
@@ -203,10 +232,21 @@ class AggregateSearchResultsController extends ChangeNotifier {
     return !_disposed && token == section.requestToken;
   }
 
-  String _defaultOrder(String sourceKey) {
+  static String defaultOrderForSource(String sourceKey) {
     if (sourceKey == copyMangaSourceKey) return '-';
     if (sourceKey == picacgSourceKey) return 'dd';
     return 'mr';
+  }
+
+  static String _normalizeOrder(String order, String sourceKey) {
+    final normalized = order.trim();
+    if (sourceKey == copyMangaSourceKey) {
+      return copyMangaSearchModeKeys.contains(normalized) ? normalized : '-';
+    }
+    if (sourceKey == picacgSourceKey) {
+      return picacgSearchOrderKeys.contains(normalized) ? normalized : 'dd';
+    }
+    return searchOrderKeys.contains(normalized) ? normalized : 'mr';
   }
 
   void _notify() {

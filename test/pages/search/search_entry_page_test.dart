@@ -10,10 +10,12 @@ import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/features/search/search.dart';
 import 'package:hazuki/features/search/view/search_entry_page.dart';
+import 'package:hazuki/features/search/view/search_entry_widgets.dart';
 import 'package:hazuki/features/search/view/search_id_extract_pill.dart';
 import 'package:hazuki/services/search_history_service.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_assembly.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
+import 'package:hazuki/shared/search_box_outline.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../support/test_service_locator.dart';
 
@@ -58,6 +60,35 @@ void main() {
     expect(find.byType(FloatingActionButton), findsOneWidget);
     expect(editableText.focusNode.hasFocus, isFalse);
     expect(tester.testTextInput.isVisible, isFalse);
+
+    expect(
+      find.ancestor(
+        of: find.byType(SearchEntryBody),
+        matching: find.byType(SnapshotWidget),
+      ),
+      findsNothing,
+    );
+    expect(
+      find.ancestor(
+        of: find.byType(SearchEntryBody),
+        matching: find.byType(RepaintBoundary),
+      ),
+      findsWidgets,
+    );
+    expect(
+      find.ancestor(
+        of: find.byKey(const ValueKey('search-entry-app-bar-search-bar')),
+        matching: find.byType(SnapshotWidget),
+      ),
+      findsNothing,
+    );
+    expect(
+      find.ancestor(
+        of: find.byType(FloatingActionButton),
+        matching: find.byType(SnapshotWidget),
+      ),
+      findsNothing,
+    );
   });
 
   testWidgets('history FAB keeps its safe-area margin as keyboard closes', (
@@ -101,6 +132,219 @@ void main() {
       lessThanOrEqualTo(scaffoldRect.bottom - 24 - kFloatingActionButtonMargin),
     );
   });
+
+  testWidgets(
+    'app and system back start popping as soon as the keyboard is hidden',
+    (tester) async {
+      SharedPreferences.setMockInitialValues(const {});
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Builder(
+            builder: (context) {
+              return Scaffold(
+                body: TextButton(
+                  onPressed: () {
+                    Navigator.of(context).push<void>(
+                      buildSearchEntryPageRoute<void>(
+                        builder: (_) => SearchEntryPage(
+                          sourceService: sl<SourceSearchGateway>(),
+                          historyService: sl<SearchHistoryService>(),
+                          comicDetailPageBuilder: _comicDetailPageBuilder,
+                          comicCoverHeroTagBuilder: _testComicCoverHeroTag,
+                          searchPageLoader: _fakeSearchPageLoader,
+                        ),
+                      ),
+                    );
+                  },
+                  child: const Text('Open search'),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open search'));
+      await _pumpSearchSettled(tester);
+      await tester.tap(
+        find.byKey(const ValueKey('search-entry-app-bar-search-bar')),
+      );
+      await _pumpSearchSettled(tester);
+
+      expect(tester.testTextInput.isVisible, isTrue);
+      expect(find.byType(SearchEntryPage), findsOneWidget);
+      final route = ModalRoute.of(
+        tester.element(find.byType(SearchEntryPage)),
+      )!;
+      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+      addTearDown(tester.view.resetViewInsets);
+      await tester.pump();
+
+      await tester.tap(find.byType(BackButton));
+      await tester.pump();
+
+      expect(tester.testTextInput.isVisible, isFalse);
+      expect(route.animation!.status, AnimationStatus.completed);
+      expect(find.byType(SearchEntryPage), findsOneWidget);
+
+      tester.view.viewInsets = FakeViewPadding.zero;
+      await tester.pump();
+
+      expect(route.animation!.status, AnimationStatus.reverse);
+      expect(find.byType(SearchEntryPage), findsOneWidget);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SearchEntryPage), findsNothing);
+      expect(find.text('Open search'), findsOneWidget);
+
+      await tester.tap(find.text('Open search'));
+      await _pumpSearchSettled(tester);
+      await tester.tap(
+        find.byKey(const ValueKey('search-entry-app-bar-search-bar')),
+      );
+      await _pumpSearchSettled(tester);
+
+      final systemBackRoute = ModalRoute.of(
+        tester.element(find.byType(SearchEntryPage)),
+      )!;
+      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+      await tester.pump();
+
+      await tester.binding.handlePopRoute();
+      await tester.pump();
+
+      expect(tester.testTextInput.isVisible, isFalse);
+      expect(systemBackRoute.animation!.status, AnimationStatus.completed);
+      expect(find.byType(SearchEntryPage), findsOneWidget);
+
+      tester.view.viewInsets = FakeViewPadding.zero;
+      await tester.pump();
+
+      expect(systemBackRoute.animation!.status, AnimationStatus.reverse);
+      expect(find.byType(SearchEntryPage), findsOneWidget);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SearchEntryPage), findsNothing);
+      expect(find.text('Open search'), findsOneWidget);
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets('history loads before the search entry transition completes', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues(const {});
+    await sl<SearchHistoryService>().replace(const ['early-history']);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Builder(
+          builder: (context) => TextButton(
+            onPressed: () {
+              Navigator.of(context).push<void>(
+                buildSearchEntryPageRoute<void>(
+                  builder: (_) => SearchEntryPage(
+                    sourceService: sl<SourceSearchGateway>(),
+                    historyService: sl<SearchHistoryService>(),
+                    comicDetailPageBuilder: _comicDetailPageBuilder,
+                    comicCoverHeroTagBuilder: _testComicCoverHeroTag,
+                    searchPageLoader: _fakeSearchPageLoader,
+                  ),
+                ),
+              );
+            },
+            child: const Text('Open search'),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Open search'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    final route = ModalRoute.of(tester.element(find.byType(SearchEntryPage)))!;
+    expect(route.animation!.status, AnimationStatus.forward);
+    expect(find.text('early-history'), findsOneWidget);
+  });
+
+  testWidgets(
+    'prepared autofocus entry shows the keyboard when the transition completes',
+    (tester) async {
+      SharedPreferences.setMockInitialValues(const {});
+      final historyService = sl<SearchHistoryService>();
+      await historyService.replace(const ['prepared-history']);
+      await historyService.load();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Builder(
+            builder: (context) => TextButton(
+              onPressed: () {
+                Navigator.of(context).push<void>(
+                  buildSearchEntryPageRoute<void>(
+                    builder: (_) => SearchEntryPage(
+                      sourceService: sl<SourceSearchGateway>(),
+                      historyService: historyService,
+                      autoFocusOnOpen: true,
+                      comicDetailPageBuilder: _comicDetailPageBuilder,
+                      comicCoverHeroTagBuilder: _testComicCoverHeroTag,
+                      searchPageLoader: _fakeSearchPageLoader,
+                    ),
+                  ),
+                );
+              },
+              child: const Text('Open prepared search'),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open prepared search'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 1));
+
+      final searchBarFinder = find.byKey(
+        const ValueKey('search-entry-app-bar-search-bar'),
+      );
+      final searchBar = tester.widget<SearchBar>(
+        find.descendant(of: searchBarFinder, matching: find.byType(SearchBar)),
+      );
+      final searchBarContext = tester.element(searchBarFinder);
+      final route = ModalRoute.of(
+        tester.element(find.byType(SearchEntryPage)),
+      )!;
+
+      expect(route.animation!.status, AnimationStatus.forward);
+      expect(find.text('prepared-history'), findsOneWidget);
+      expect(find.byType(FloatingActionButton), findsOneWidget);
+      expect(tester.testTextInput.isVisible, isFalse);
+      expect(
+        searchBar.backgroundColor!.resolve(const <WidgetState>{}),
+        hazukiSearchBoxBackgroundColor(searchBarContext, focusProgress: 1),
+      );
+
+      await tester.pump(const Duration(milliseconds: 350));
+      expect(route.animation!.status, AnimationStatus.forward);
+      expect(tester.testTextInput.isVisible, isFalse);
+
+      await tester.pump(const Duration(milliseconds: 30));
+      expect(route.animation!.status, AnimationStatus.forward);
+      expect(tester.testTextInput.isVisible, isFalse);
+
+      await tester.pump(const Duration(milliseconds: 120));
+      expect(route.animation!.status, AnimationStatus.completed);
+      expect(tester.testTextInput.isVisible, isTrue);
+    },
+  );
 
   testWidgets('search settings toggles and persists aggregate search', (
     tester,

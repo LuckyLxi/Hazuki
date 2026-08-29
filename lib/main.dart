@@ -38,6 +38,7 @@ import 'features/password_lock/view/password_lock_widgets.dart';
 
 Future<void> main() async {
   final bootstrap = await bootstrapApp();
+  _installErrorLogging(sl<SourceDebugGateway>());
   await HazukiLiquidGlass.initialize(
     enabled: bootstrap.initialAppearance.liquidGlassEnabled,
   );
@@ -51,6 +52,39 @@ Future<void> main() async {
       ),
     ),
   );
+}
+
+void _installErrorLogging(SourceDebugGateway logger) {
+  final previousFlutterErrorHandler = FlutterError.onError;
+  FlutterError.onError = (details) {
+    logger.addApplicationLog(
+      level: 'error',
+      title: 'Flutter framework error',
+      source: 'flutter_error',
+      content: <String, Object?>{
+        'exception': details.exceptionAsString(),
+        'stackTrace': details.stack?.toString(),
+        'library': details.library,
+        'context': details.context?.toDescription(),
+      },
+    );
+    previousFlutterErrorHandler?.call(details);
+  };
+
+  final dispatcher = WidgetsBinding.instance.platformDispatcher;
+  final previousPlatformErrorHandler = dispatcher.onError;
+  dispatcher.onError = (error, stackTrace) {
+    logger.addApplicationLog(
+      level: 'error',
+      title: 'Unhandled asynchronous error',
+      source: 'platform_error',
+      content: <String, Object?>{
+        'error': error.toString(),
+        'stackTrace': stackTrace.toString(),
+      },
+    );
+    return previousPlatformErrorHandler?.call(error, stackTrace) ?? false;
+  };
 }
 
 class HazukiApp extends StatefulWidget {
@@ -171,6 +205,7 @@ class _HazukiAppState extends State<HazukiApp>
   Future<void> _updateAppearance(
     AppearanceSettingsData next, {
     Offset? revealOrigin,
+    Rect? revealSyncRegion,
   }) async {
     await _themeRevealSupport.updateAppearance(
       current: _themeController.settings,
@@ -178,6 +213,7 @@ class _HazukiAppState extends State<HazukiApp>
       applyTheme: _themeController.update,
       resolveThemeBrightness: _resolveThemeBrightness,
       revealOrigin: revealOrigin,
+      revealSyncRegion: revealSyncRegion,
     );
     await HazukiLiquidGlass.setEnabled(next.liquidGlassEnabled);
   }

@@ -1,150 +1,116 @@
 import 'dart:io';
 
-import '../debug/debug_log_internals.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+
+import '../../logging/app_log_event.dart';
+import '../../logging/app_log_store.dart';
 import '../runtime/source_runtime_facade.dart';
 
 class SourceDebugReportCapability {
   SourceDebugReportCapability({
     required HazukiSourceFacade Function() activeFacade,
     required String? Function() currentAccount,
+    required AppLogStore logStore,
   }) : _activeFacade = activeFacade,
-       _currentAccount = currentAccount;
+       _currentAccount = currentAccount,
+       _logStore = logStore;
 
   final HazukiSourceFacade Function() _activeFacade;
   final String? Function() _currentAccount;
+  final AppLogStore _logStore;
+  late final Future<String> _appVersion = _loadAppVersion();
 
-  HazukiSourceFacade get _facade => _activeFacade();
+  Future<Map<String, dynamic>> collectAllDebugInfo() =>
+      _buildReport(_logStore.events, reportType: 'all');
 
-  Future<Map<String, dynamic>> collectTypedDebugInfo(String type) async {
-    final facade = _facade;
-    final normalizedType = _normalizeDebugReportType(type);
-    final logs = _typedDebugReportLogsFor(normalizedType);
-    final approxBytes = logs.fold<int>(
-      0,
-      (sum, item) => sum + estimatePayloadBytes(item),
-    );
-    return <String, dynamic>{
-      'type': normalizedType,
-      'statusText': facade.statusText,
-      'sourceRuntimeState': facade.runtimeState.toDebugMap(),
-      'platform': Platform.operatingSystem,
-      'sourceMeta': {
-        'name': facade.sourceMeta?.name,
-        'key': facade.sourceMeta?.key,
-        'version': facade.sourceMeta?.version,
-      },
-      'isLogged': facade.isLogged,
-      'currentAccount': _currentAccount(),
-      'generatedAt': DateTime.now().toIso8601String(),
-      'captureEnabled': facade.softwareLogCaptureEnabled,
-      'logStats': {
-        'type': normalizedType,
-        'keptCount': logs.length,
-        'approxBytes': approxBytes,
-      },
-      'logs': copyLogsWithoutDedupKey(logs),
-    };
-  }
-
-  String _normalizeDebugReportType(String type) {
+  Future<Map<String, dynamic>> collectTypedDebugInfo(String type) {
     final normalized = type.trim().toLowerCase();
-    return debugLogTypes.contains(normalized) ? normalized : debugLogTypeAction;
-  }
-
-  List<Map<String, dynamic>> _typedDebugReportLogsFor(String type) {
-    return switch (_normalizeDebugReportType(type)) {
-      debugLogTypeError => _facade.debug.recentErrorLogs,
-      debugLogTypeAction => _facade.debug.recentActionLogs,
-      debugLogTypeSystem => _facade.debug.recentSystemLogs,
-      debugLogTypePerformance => _facade.debug.recentPerformanceLogs,
-      _ => _facade.debug.recentActionLogs,
-    };
+    final logs = _logStore.events.where((event) {
+      return switch (normalized) {
+        'error' => event.level == AppLogLevel.error,
+        'performance' => event.tags.contains('performance'),
+        'system' =>
+          event.area == AppLogArea.source ||
+              event.area == AppLogArea.network ||
+              event.area == AppLogArea.update,
+        'action' =>
+          event.area == AppLogArea.application ||
+              event.area == AppLogArea.reader ||
+              event.area == AppLogArea.download,
+        _ => true,
+      };
+    });
+    return _buildReport(logs, reportType: normalized);
   }
 
   Future<Map<String, dynamic>> collectNetworkDebugInfo() async {
-    final facade = _facade;
-    final recentNetworkLogs = facade.debug.recentNetworkLogs;
-    final approxBytes = recentNetworkLogs.fold<int>(
-      0,
-      (sum, item) => sum + estimatePayloadBytes(item),
+    final report = await _buildReport(
+      _logStore.events.where((event) => event.area == AppLogArea.network),
+      reportType: 'network',
     );
-    return <String, dynamic>{
-      'statusText': facade.statusText,
-      'sourceRuntimeState': facade.runtimeState.toDebugMap(),
-      'platform': Platform.operatingSystem,
-      'sourceMeta': {
-        'name': facade.sourceMeta?.name,
-        'key': facade.sourceMeta?.key,
-        'version': facade.sourceMeta?.version,
-      },
-      'isLogged': facade.isLogged,
-      'currentAccount': _currentAccount(),
-      'generatedAt': DateTime.now().toIso8601String(),
-      'captureEnabled': facade.softwareLogCaptureEnabled,
-      'networkLogStats': {
-        'keptCount': recentNetworkLogs.length,
-        'dedupedCount': facade.debug.networkLogDedupedCount,
-        'approxBytes': approxBytes,
-      },
-      'lastLoginDebugInfo': facade.lastLoginDebugInfo,
-      'lastSourceVersionDebugInfo': facade.lastSourceVersionDebugInfo,
-      'recentNetworkLogs': copyLogsWithoutDedupKey(recentNetworkLogs),
-    };
+    return <String, dynamic>{...report, 'recentNetworkLogs': report['logs']};
   }
 
   Future<Map<String, dynamic>> collectApplicationDebugInfo() async {
-    final facade = _facade;
-    final recentApplicationLogs = facade.debug.recentApplicationLogs;
-    final approxBytes = recentApplicationLogs.fold<int>(
-      0,
-      (sum, item) => sum + estimatePayloadBytes(item),
+    final report = await _buildReport(
+      _logStore.events.where((event) => event.area == AppLogArea.application),
+      reportType: 'application',
     );
     return <String, dynamic>{
-      'statusText': facade.statusText,
-      'sourceRuntimeState': facade.runtimeState.toDebugMap(),
-      'platform': Platform.operatingSystem,
-      'sourceMeta': {
-        'name': facade.sourceMeta?.name,
-        'key': facade.sourceMeta?.key,
-        'version': facade.sourceMeta?.version,
-      },
-      'isLogged': facade.isLogged,
-      'currentAccount': _currentAccount(),
-      'generatedAt': DateTime.now().toIso8601String(),
-      'captureEnabled': facade.softwareLogCaptureEnabled,
-      'applicationLogStats': {
-        'keptCount': recentApplicationLogs.length,
-        'approxBytes': approxBytes,
-      },
-      'recentApplicationLogs': copyLogsWithoutDedupKey(recentApplicationLogs),
+      ...report,
+      'recentApplicationLogs': report['logs'],
     };
   }
 
   Future<Map<String, dynamic>> collectReaderDebugInfo() async {
-    final facade = _facade;
-    final recentReaderLogs = facade.debug.recentReaderLogs;
-    final approxBytes = recentReaderLogs.fold<int>(
-      0,
-      (sum, item) => sum + estimatePayloadBytes(item),
+    final report = await _buildReport(
+      _logStore.events.where((event) => event.area == AppLogArea.reader),
+      reportType: 'reader',
     );
+    return <String, dynamic>{...report, 'recentReaderLogs': report['logs']};
+  }
+
+  Future<Map<String, dynamic>> _buildReport(
+    Iterable<AppLogEvent> events, {
+    required String reportType,
+  }) async {
+    final facade = _activeFacade();
+    final logs = events.map((event) => event.toJson()).toList(growable: false);
+    final appVersion = await _appVersion;
     return <String, dynamic>{
+      'formatVersion': 2,
+      'type': reportType,
+      'generatedAt': DateTime.now().toIso8601String(),
+      'captureEnabled': _logStore.captureEnabled,
+      'platform': Platform.operatingSystem,
+      'appVersion': appVersion,
       'statusText': facade.statusText,
       'sourceRuntimeState': facade.runtimeState.toDebugMap(),
-      'platform': Platform.operatingSystem,
-      'sourceMeta': {
+      'sourceMeta': <String, dynamic>{
         'name': facade.sourceMeta?.name,
         'key': facade.sourceMeta?.key,
         'version': facade.sourceMeta?.version,
       },
-      'isLogged': facade.isLogged,
       'currentAccount': _currentAccount(),
-      'generatedAt': DateTime.now().toIso8601String(),
-      'captureEnabled': facade.softwareLogCaptureEnabled,
-      'readerLogStats': {
-        'keptCount': recentReaderLogs.length,
-        'approxBytes': approxBytes,
+      'logStats': <String, dynamic>{
+        'keptCount': logs.length,
+        'errorCount': logs
+            .where((log) => log['level'] == AppLogLevel.error.wireName)
+            .length,
+        'warningCount': logs
+            .where((log) => log['level'] == AppLogLevel.warning.wireName)
+            .length,
       },
-      'recentReaderLogs': copyLogsWithoutDedupKey(recentReaderLogs),
+      'logs': logs,
     };
+  }
+
+  Future<String> _loadAppVersion() async {
+    try {
+      return (await PackageInfo.fromPlatform()).version;
+    } catch (_) {
+      // Package metadata is unavailable in some isolated test environments.
+      return '-';
+    }
   }
 }

@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hazuki/services/source/debug/source_debug_log_store.dart';
 import 'package:hazuki/services/source/models/source_contract_models.dart';
 import 'package:hazuki/services/source/runtime/source_cookie_store.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_coordinator.dart';
@@ -165,23 +164,6 @@ void main() {
         isNot(true),
       );
     });
-  });
-
-  test('retains captured logs when a runtime is recreated', () {
-    final previous = SourceDebugLogStore()
-      ..softwareLogCaptureEnabled = true
-      ..recentNetworkLogs.add({'statusCode': 210})
-      ..networkLogDedupedCount = 2;
-    final replacement = SourceDebugLogStore();
-
-    replacement.copyCapturedLogsFrom(previous);
-    previous.recentNetworkLogs.single['statusCode'] = 500;
-
-    expect(replacement.softwareLogCaptureEnabled, isTrue);
-    expect(replacement.recentNetworkLogs, [
-      <String, dynamic>{'statusCode': 210},
-    ]);
-    expect(replacement.networkLogDedupedCount, 2);
   });
 
   test(

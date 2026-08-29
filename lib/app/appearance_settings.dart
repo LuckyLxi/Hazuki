@@ -6,7 +6,11 @@ const int hazukiDefaultAppearancePresetIndex = 0;
 const bool hazukiDefaultDynamicColorEnabled = false;
 
 typedef AppearanceSettingsApplyCallback =
-    Future<void> Function(AppearanceSettingsData next, {Offset? revealOrigin});
+    Future<void> Function(
+      AppearanceSettingsData next, {
+      Offset? revealOrigin,
+      Rect? revealSyncRegion,
+    });
 
 class AppearanceSettingsData {
   const AppearanceSettingsData({

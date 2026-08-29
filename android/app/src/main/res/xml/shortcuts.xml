@@ -8,7 +8,7 @@
         android:shortcutLongLabel="@string/shortcut_search_long_label">
         <intent
             android:action="android.intent.action.VIEW"
-            android:targetPackage="com.lxi.hazuki"
+            android:targetPackage="@string/shortcut_target_package"
             android:targetClass="com.lxi.hazuki.MainActivity"
             android:data="hazuki://shortcut/search" />
     </shortcut>

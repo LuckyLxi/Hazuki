@@ -46,10 +46,10 @@ class MainActivityChannels(
     private var launchShortcutEventSink: EventChannel.EventSink? = null
     private var pendingLaunchShortcutAction: String? = null
 
-    private val createJsonDocumentLauncher =
+    private val createLogDocumentLauncher =
             activity.registerForActivityResult(
-                    ActivityResultContracts.CreateDocument("application/json"),
-            ) { uri -> handleCreateJsonDocumentResult(uri) }
+                    ActivityResultContracts.CreateDocument("application/octet-stream"),
+            ) { uri -> handleCreateLogDocumentResult(uri) }
     private val manageStorageAccessLauncher =
             activity.registerForActivityResult(
                     ActivityResultContracts.StartActivityForResult(),
@@ -226,7 +226,7 @@ class MainActivityChannels(
                                     call.argument<String>("suggestedFileName")?.takeIf {
                                         it.isNotBlank()
                                     }
-                                            ?: "hazuki_application_logs.json"
+                                            ?: "hazuki-application.log"
                             val content = call.argument<String>("content")
                             if (content == null) {
                                 result.error("missing_content", "Missing text content", null)
@@ -236,7 +236,7 @@ class MainActivityChannels(
                             pendingSaveTextResult = result
                             pendingSaveTextContent = content
                             try {
-                                createJsonDocumentLauncher.launch(suggestedFileName)
+                                createLogDocumentLauncher.launch(suggestedFileName)
                             } catch (e: Exception) {
                                 pendingSaveTextResult = null
                                 pendingSaveTextContent = null
@@ -527,7 +527,7 @@ class MainActivityChannels(
         return volumeButtonPagingSessionId != null
     }
 
-    private fun handleCreateJsonDocumentResult(uri: Uri?) {
+    private fun handleCreateLogDocumentResult(uri: Uri?) {
         val result = pendingSaveTextResult ?: return
         val content = pendingSaveTextContent
         pendingSaveTextResult = null

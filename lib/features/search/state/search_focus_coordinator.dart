@@ -131,34 +131,36 @@ class SearchFocusCoordinator extends ChangeNotifier {
     _routeAutoFocusAttached = true;
     _routeAutoFocusCancelled = false;
     _routeAutoFocusContext = context;
-    final animation = ModalRoute.of(context)?.animation;
-    if (animation == null || animation.isCompleted) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!_canRunScheduledAction()) {
-          return;
-        }
-        unawaited(
-          requestPrimarySearchFocus(
-            context,
-            showKeyboard: showKeyboard,
-            cancelPendingRouteAutoFocus: false,
-            forceShowKeyboard: forceShowKeyboard,
-          ),
-        );
-      });
-      return;
-    }
-    _routeAnimation = animation;
-    animation.addStatusListener(_handleRouteAnimationStatus);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_canRunScheduledAction()) {
+        return;
+      }
+      final animation = ModalRoute.of(context)?.animation;
+      if (animation != null && !animation.isCompleted) {
+        _routeAnimation = animation;
+        animation.addStatusListener(_handleRouteAnimationStatus);
+        return;
+      }
+      unawaited(
+        requestPrimarySearchFocus(
+          context,
+          showKeyboard: showKeyboard,
+          cancelPendingRouteAutoFocus: false,
+          forceShowKeyboard: forceShowKeyboard,
+        ),
+      );
+    });
   }
 
   void _handleRouteAnimationStatus(AnimationStatus status) {
     if (status != AnimationStatus.completed) {
       return;
     }
-    final animation = _routeAnimation;
-    animation?.removeStatusListener(_handleRouteAnimationStatus);
-    _routeAnimation = null;
+    _runPendingRouteAutoFocus();
+  }
+
+  void _runPendingRouteAutoFocus() {
+    _detachRouteAnimation();
     final context = _routeAutoFocusContext;
     if (context != null && _canRunScheduledAction()) {
       unawaited(
@@ -166,9 +168,16 @@ class SearchFocusCoordinator extends ChangeNotifier {
           context,
           cancelPendingRouteAutoFocus: false,
           forceShowKeyboard: true,
+          keyboardShowDelay: Duration.zero,
         ),
       );
     }
+  }
+
+  void _detachRouteAnimation() {
+    final animation = _routeAnimation;
+    animation?.removeStatusListener(_handleRouteAnimationStatus);
+    _routeAnimation = null;
   }
 
   bool _canRunScheduledAction() {
@@ -180,6 +189,7 @@ class SearchFocusCoordinator extends ChangeNotifier {
     bool showKeyboard = true,
     bool cancelPendingRouteAutoFocus = true,
     bool forceShowKeyboard = false,
+    Duration keyboardShowDelay = const Duration(milliseconds: 16),
   }) async {
     if (cancelPendingRouteAutoFocus) {
       cancelPendingAutoFocus();
@@ -191,7 +201,9 @@ class SearchFocusCoordinator extends ChangeNotifier {
     if (!showKeyboard) {
       return;
     }
-    await Future<void>.delayed(const Duration(milliseconds: 16));
+    if (keyboardShowDelay > Duration.zero) {
+      await Future<void>.delayed(keyboardShowDelay);
+    }
     if (!forceShowKeyboard || !_isMounted() || !primaryFocusNode.hasFocus) {
       return;
     }
@@ -200,11 +212,7 @@ class SearchFocusCoordinator extends ChangeNotifier {
 
   void cancelPendingAutoFocus() {
     _routeAutoFocusCancelled = true;
-    final animation = _routeAnimation;
-    if (animation != null) {
-      animation.removeStatusListener(_handleRouteAnimationStatus);
-      _routeAnimation = null;
-    }
+    _detachRouteAnimation();
     _routeAutoFocusContext = null;
   }
 

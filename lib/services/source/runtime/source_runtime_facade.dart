@@ -14,6 +14,7 @@ import 'source_cache_store.dart';
 import 'source_cookie_store.dart';
 import 'source_runtime_kernel.dart';
 import 'source_session_store.dart';
+import '../../logging/app_log_store.dart';
 
 abstract interface class SourceRuntimeHandleView {
   String get sourceKey;
@@ -61,6 +62,7 @@ class HazukiSourceFacade {
     required this.session,
     required this.cache,
     required this.debug,
+    required this.appLogStore,
     required this.js,
     required this.networkLogSink,
     required this.httpGateway,
@@ -88,6 +90,7 @@ class HazukiSourceFacade {
   final SourceSessionStore session;
   final SourceCacheStore cache;
   final SourceDebugLogStore debug;
+  final AppLogStore appLogStore;
   final SourceJsBridge js;
   final SourceNetworkLogSink networkLogSink;
   final SourceHttpGateway httpGateway;
@@ -104,7 +107,7 @@ class HazukiSourceFacade {
 
   SourceMeta? get sourceMeta => runtime.sourceMeta;
 
-  bool get softwareLogCaptureEnabled => debug.softwareLogCaptureEnabled;
+  bool get softwareLogCaptureEnabled => appLogStore.captureEnabled;
 
   DateTime? get lastReloginAt => runtime.lastReloginAt;
   set lastReloginAt(DateTime? value) => runtime.lastReloginAt = value;

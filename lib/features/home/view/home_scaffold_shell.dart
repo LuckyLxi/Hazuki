@@ -327,52 +327,57 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
                   duration: const Duration(milliseconds: 260),
                   curve: Curves.easeOutCubic,
                   builder: (context, leadingWidth, _) {
+                    final appBar = hazukiFrostedAppBar(
+                      context: context,
+                      leading: Platform.isWindows
+                          ? null
+                          : _HomeAppBarProfileButton(
+                              downloadStatus: downloadStatus,
+                              activeSourceKey: activeSourceKey,
+                              avatarUrl: avatarUrl,
+                              profileLoading: profileLoading,
+                              username: username,
+                              drawerContent: mobileDrawerContent,
+                              onOpenDownloads: onOpenDownloadTasks,
+                              onDrawerVisibilityChanged: _setProfileDrawerOpen,
+                              onDrawerCovered: _resetProfileDrawer,
+                            ),
+                      leadingWidth: Platform.isWindows ? null : leadingWidth,
+                      automaticallyImplyLeading: false,
+                      title: currentIndex == 1
+                          ? null
+                          : _HomeAppBarSearchBox(
+                              onOpenSearch: onOpenSearch,
+                              maxWidth: Platform.isWindows ? 320 : null,
+                            ),
+                      titleSpacing: Platform.isWindows ? null : 4,
+                      centerTitle: Platform.isWindows,
+                      enableBlur: currentIndex != 0 && currentIndex != 1,
+                      actions: [
+                        HomeAppBarActions(
+                          currentIndex: currentIndex,
+                          discoverSearchMorphProgress:
+                              discoverSearchMorphProgress,
+                          forceDiscoverSearchInAppBar: usePinnedDiscoverSearch,
+                          favoriteAppBarActions: favoriteAppBarActions,
+                          onOpenSearch: onOpenSearch,
+                          onFavoriteSortSelected: onFavoriteSortSelected,
+                          onFavoriteCreateFolderPressed:
+                              onFavoriteCreateFolderPressed,
+                          onFavoriteModeTogglePressed:
+                              onFavoriteModeTogglePressed,
+                        ),
+                      ],
+                    );
                     return Scaffold(
                       key: scaffoldKey,
                       extendBody: true,
-                      appBar: hazukiFrostedAppBar(
-                        context: context,
-                        leading: Platform.isWindows
-                            ? null
-                            : _HomeAppBarProfileButton(
-                                downloadStatus: downloadStatus,
-                                activeSourceKey: activeSourceKey,
-                                avatarUrl: avatarUrl,
-                                profileLoading: profileLoading,
-                                username: username,
-                                drawerContent: mobileDrawerContent,
-                                onOpenDownloads: onOpenDownloadTasks,
-                                onDrawerVisibilityChanged:
-                                    _setProfileDrawerOpen,
-                                onDrawerCovered: _resetProfileDrawer,
-                              ),
-                        leadingWidth: Platform.isWindows ? null : leadingWidth,
-                        automaticallyImplyLeading: false,
-                        title: currentIndex == 1
-                            ? null
-                            : _HomeAppBarSearchBox(
-                                onOpenSearch: onOpenSearch,
-                                maxWidth: Platform.isWindows ? 320 : null,
-                              ),
-                        titleSpacing: Platform.isWindows ? null : 4,
-                        centerTitle: Platform.isWindows,
-                        enableBlur: currentIndex != 0 && currentIndex != 1,
-                        actions: [
-                          HomeAppBarActions(
-                            currentIndex: currentIndex,
-                            discoverSearchMorphProgress:
-                                discoverSearchMorphProgress,
-                            forceDiscoverSearchInAppBar:
-                                usePinnedDiscoverSearch,
-                            favoriteAppBarActions: favoriteAppBarActions,
-                            onOpenSearch: onOpenSearch,
-                            onFavoriteSortSelected: onFavoriteSortSelected,
-                            onFavoriteCreateFolderPressed:
-                                onFavoriteCreateFolderPressed,
-                            onFavoriteModeTogglePressed:
-                                onFavoriteModeTogglePressed,
-                          ),
-                        ],
+                      appBar: PreferredSize(
+                        preferredSize: appBar.preferredSize,
+                        child: RepaintBoundary(
+                          key: const ValueKey('home-app-bar-repaint-boundary'),
+                          child: appBar,
+                        ),
                       ),
                       drawerEnableOpenDragGesture: false,
                       drawer: null,
@@ -418,16 +423,23 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
                         // reproduces the right-anchored scale and translation
                         // using layout coordinates, keeping shaders untransformed.
                         padding: EdgeInsets.only(left: navigationOffset.dx * 2),
-                        child: HomeBottomNavigation(
-                          currentIndex: currentIndex,
-                          onDestinationSelected: onDestinationSelected,
-                          discoverLabel: l10n(context).homeTabDiscover,
-                          favoriteLabel: l10n(context).homeTabFavorite,
-                          backToTopLabel: l10n(context).favoriteBackToTop,
-                          layoutScale: navigationScale,
-                          showBackToTop:
-                              currentIndex == 1 && widget.showFavoriteBackToTop,
-                          onBackToTopPressed: widget.onFavoriteBackToTopPressed,
+                        child: RepaintBoundary(
+                          key: const ValueKey(
+                            'home-bottom-navigation-repaint-boundary',
+                          ),
+                          child: HomeBottomNavigation(
+                            currentIndex: currentIndex,
+                            onDestinationSelected: onDestinationSelected,
+                            discoverLabel: l10n(context).homeTabDiscover,
+                            favoriteLabel: l10n(context).homeTabFavorite,
+                            backToTopLabel: l10n(context).favoriteBackToTop,
+                            layoutScale: navigationScale,
+                            showBackToTop:
+                                currentIndex == 1 &&
+                                widget.showFavoriteBackToTop,
+                            onBackToTopPressed:
+                                widget.onFavoriteBackToTopPressed,
+                          ),
                         ),
                       ),
                     ),

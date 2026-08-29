@@ -36,6 +36,7 @@ import 'source_runtime_registry.dart';
 import 'source_runtime_state_controller.dart';
 import 'source_script_storage.dart';
 import 'source_secure_session_storage.dart';
+import '../../logging/app_log_store.dart';
 import 'source_settings_operations.dart';
 
 export '../comments/comments_avatar_support.dart' show normalizeSourceAvatarUrl;
@@ -97,6 +98,7 @@ class SourceRuntimeAssembly {
   SourceRuntimeAssembly({SourceSecureSessionStorage? secureSessionStorage})
     : _secureSessionStorage =
           secureSessionStorage ?? FlutterSourceSecureSessionStorage() {
+    _logStore = AppLogStore(secureStorage: _secureSessionStorage);
     _runtimeHost = SourceRuntimeHost(
       catalog: hazukiAllowedSourceCatalog,
       defaultSourceKey: hazukiDefaultSourceKey,
@@ -107,6 +109,7 @@ class SourceRuntimeAssembly {
           _accountCapability.currentAccountForSource(sourceKey),
       isLoggedForSource: (sourceKey) =>
           _accountCapability.isLoggedForSource(sourceKey),
+      logStore: _logStore,
     );
     _accountCapability = SourceAccountSessionCapability(
       runtimeHost: _runtimeHost,
@@ -194,10 +197,12 @@ class SourceRuntimeAssembly {
     _debugReportCapability = SourceDebugReportCapability(
       activeFacade: () => _facade,
       currentAccount: () => _accountOperations.currentAccount,
+      logStore: _logStore,
     );
   }
 
   final SourceSecureSessionStorage _secureSessionStorage;
+  late final AppLogStore _logStore;
   late final SourceRuntimeHost _runtimeHost;
   late final SourceAccountSessionCapability _accountCapability;
   late final SourceReloginCoordinator _reloginCoordinator;
@@ -235,6 +240,7 @@ class SourceRuntimeAssembly {
     activeDebugLog: () => _activeHandle.debugLog,
     activeFacade: () => _facade,
     debugReport: _debugReportCapability,
+    logStore: _logStore,
   );
   late final SourceFavoritesDebugCapability _favoritesDebugCapability;
   late final SourceDebugReportCapability _debugReportCapability;

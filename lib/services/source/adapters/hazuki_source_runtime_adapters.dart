@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import '../../../models/hazuki_models.dart';
 import '../account/source_account_operations.dart';
 import '../debug/source_debug_operations.dart';
@@ -228,6 +230,8 @@ class HazukiSourceDebugAdapter implements SourceDebugGateway {
   @override
   bool get softwareLogCaptureEnabled => _debug.softwareLogCaptureEnabled;
   @override
+  Listenable get logChanges => _debug.logStore;
+  @override
   Future<bool> loadSoftwareLogCaptureEnabled() =>
       _runtimeOperations.loadSoftwareLogCaptureEnabled();
   @override
@@ -261,7 +265,10 @@ class HazukiSourceDebugAdapter implements SourceDebugGateway {
   Future<Map<String, dynamic>> collectTypedDebugInfo(String type) =>
       _debug.collectTypedDebugInfo(type);
   @override
-  void clearCapturedLogs() => _debug.clearCapturedLogs();
+  Future<Map<String, dynamic>> collectAllDebugInfo() =>
+      _debug.collectAllDebugInfo();
+  @override
+  Future<void> clearCapturedLogs() => _debug.clearCapturedLogs();
 }
 
 class HazukiSourceRuntimeAdapter extends HazukiSourceListenableAdapter
@@ -399,6 +406,8 @@ class HazukiSourceSettingsAdapter implements SourceSettingsGateway {
   String get activeSourceKey => _runtime.activeSourceKey;
   @override
   bool get isActiveCopyMangaSource => _runtime.isActiveCopyMangaSource;
+  @override
+  int get imageCacheMaxBytes => _image.imageCacheMaxBytes;
   @override
   Object? loadSourceSetting(String sourceKey, String key) =>
       _settings.loadSourceSetting(sourceKey, key);
