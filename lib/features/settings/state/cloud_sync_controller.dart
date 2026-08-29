@@ -140,6 +140,7 @@ class CloudSyncController extends ChangeNotifier {
     _notify();
     try {
       final config = _buildConfig();
+      await _service.saveConfig(config);
       final result = await _service.restoreLatestBackup(configOverride: config);
       await applyRestore(result);
       final status = await _service.testConnection(configOverride: config);
