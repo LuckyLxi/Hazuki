@@ -1,12 +1,12 @@
 {
-  "version": "1.1.6",
-  "releaseUrl": "https://github.com/LuckyLxi/Hazuki/releases/tag/v1.1.6",
+  "version": "1.1.7",
+  "releaseUrl": "https://github.com/LuckyLxi/Hazuki/releases/tag/v1.1.7",
   "apkUrls": {
-    "arm64-v8a": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.1.6/app-arm64-v8a-release.apk"
+    "arm64-v8a": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.1.7/app-arm64-v8a-release.apk"
   },
   "windowsUrls": {
-    "x64_zip": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.1.6/hazuki-windows-x64-v1.1.6.zip",
-    "x64_exe": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.1.6/hazuki-windows-x64-v1.1.6-setup.exe"
+    "x64_zip": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.1.7/hazuki-windows-x64-v1.1.7.zip",
+    "x64_exe": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.1.7/hazuki-windows-x64-v1.1.7-setup.exe"
   },
-  "changelog": "Hazuki v1.1.6\n\n- 长按搜索历史可复制关键词\n- 优化阅读体验\n- 优化下载管理\n- 优化封面预加载\n- 调整部分文本"
+  "changelog": "Hazuki v1.1.7\n\n- 新增液态玻璃\n- 优化性能"
 }
