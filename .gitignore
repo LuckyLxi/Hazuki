@@ -31,6 +31,7 @@ doc/api/
 .idea/
 .vscode/
 .claude/
+.mimosa/
 .metadata
 *.iml
 
