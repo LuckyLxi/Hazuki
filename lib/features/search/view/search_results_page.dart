@@ -72,6 +72,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
 
   bool _showBackToTop = false;
   late bool _aggregateSearchEnabled;
+  bool _keyboardDismissPopInProgress = false;
 
   String get _searchKeyword => _aggregateSearchEnabled
       ? _aggregateResultsController.keyword
@@ -119,7 +120,10 @@ class _SearchResultsPageState extends State<SearchResultsPage>
           _idExtractController,
         ]),
         builder: (context, _) => PopScope(
-          canPop: true,
+          canPop:
+              !_keyboardDismissPopInProgress &&
+              !_focusCoordinator.keyboardVisible &&
+              !_searchInputFocused,
           onPopInvokedWithResult: _handlePopInvoked,
           child: Scaffold(
             backgroundColor: Theme.of(context).colorScheme.surface,
@@ -214,6 +218,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
     if (wasKeyboardVisible && !_focusCoordinator.keyboardVisible) {
       _idExtractController.scheduleHideIfUnfocused();
     }
+    _closePageWhenKeyboardIsDismissed();
   }
 
   Future<void> _dismissSearchInputIfFocused() async {
@@ -325,9 +330,32 @@ class _SearchResultsPageState extends State<SearchResultsPage>
 
   void _handlePopInvoked(bool didPop, Object? result) {
     if (didPop) {
-      unawaited(_focusCoordinator.dismissKeyboard(context));
       return;
     }
+    _dismissKeyboardAndPop();
+  }
+
+  void _dismissKeyboardAndPop() {
+    if (_keyboardDismissPopInProgress || !mounted) {
+      return;
+    }
+    setState(() {
+      _keyboardDismissPopInProgress = true;
+    });
+    unawaited(() async {
+      await _focusCoordinator.dismissKeyboard(context, parkOnPage: true);
+      _closePageWhenKeyboardIsDismissed();
+    }());
+  }
+
+  void _closePageWhenKeyboardIsDismissed() {
+    if (!_keyboardDismissPopInProgress ||
+        !mounted ||
+        _focusCoordinator.keyboardVisible) {
+      return;
+    }
+    _keyboardDismissPopInProgress = false;
+    Navigator.of(context).pop();
   }
 
   String? _normalizeComicIdKeyword(String keyword) {

@@ -133,62 +133,106 @@ void main() {
     );
   });
 
-  testWidgets('back starts popping while locking the keyboard layout', (
-    tester,
-  ) async {
-    SharedPreferences.setMockInitialValues(const {});
+  testWidgets(
+    'app and system back start popping as soon as the keyboard is hidden',
+    (tester) async {
+      SharedPreferences.setMockInitialValues(const {});
 
-    await tester.pumpWidget(
-      MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: Builder(
-          builder: (context) {
-            return Scaffold(
-              body: TextButton(
-                onPressed: () {
-                  Navigator.of(context).push<void>(
-                    buildSearchEntryPageRoute<void>(
-                      builder: (_) => SearchEntryPage(
-                        sourceService: sl<SourceSearchGateway>(),
-                        historyService: sl<SearchHistoryService>(),
-                        comicDetailPageBuilder: _comicDetailPageBuilder,
-                        comicCoverHeroTagBuilder: _testComicCoverHeroTag,
-                        searchPageLoader: _fakeSearchPageLoader,
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Builder(
+            builder: (context) {
+              return Scaffold(
+                body: TextButton(
+                  onPressed: () {
+                    Navigator.of(context).push<void>(
+                      buildSearchEntryPageRoute<void>(
+                        builder: (_) => SearchEntryPage(
+                          sourceService: sl<SourceSearchGateway>(),
+                          historyService: sl<SearchHistoryService>(),
+                          comicDetailPageBuilder: _comicDetailPageBuilder,
+                          comicCoverHeroTagBuilder: _testComicCoverHeroTag,
+                          searchPageLoader: _fakeSearchPageLoader,
+                        ),
                       ),
-                    ),
-                  );
-                },
-                child: const Text('Open search'),
-              ),
-            );
-          },
+                    );
+                  },
+                  child: const Text('Open search'),
+                ),
+              );
+            },
+          ),
         ),
-      ),
-    );
+      );
 
-    await tester.tap(find.text('Open search'));
-    await _pumpSearchSettled(tester);
-    await tester.tap(
-      find.byKey(const ValueKey('search-entry-app-bar-search-bar')),
-    );
-    await _pumpSearchSettled(tester);
+      await tester.tap(find.text('Open search'));
+      await _pumpSearchSettled(tester);
+      await tester.tap(
+        find.byKey(const ValueKey('search-entry-app-bar-search-bar')),
+      );
+      await _pumpSearchSettled(tester);
 
-    expect(tester.testTextInput.isVisible, isTrue);
-    expect(find.byType(SearchEntryPage), findsOneWidget);
-    final route = ModalRoute.of(tester.element(find.byType(SearchEntryPage)))!;
+      expect(tester.testTextInput.isVisible, isTrue);
+      expect(find.byType(SearchEntryPage), findsOneWidget);
+      final route = ModalRoute.of(
+        tester.element(find.byType(SearchEntryPage)),
+      )!;
+      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+      addTearDown(tester.view.resetViewInsets);
+      await tester.pump();
 
-    await tester.tap(find.byType(BackButton));
-    await tester.pump();
+      await tester.tap(find.byType(BackButton));
+      await tester.pump();
 
-    expect(tester.testTextInput.isVisible, isFalse);
-    expect(route.animation!.status, AnimationStatus.reverse);
+      expect(tester.testTextInput.isVisible, isFalse);
+      expect(route.animation!.status, AnimationStatus.completed);
+      expect(find.byType(SearchEntryPage), findsOneWidget);
 
-    await tester.pumpAndSettle();
+      tester.view.viewInsets = FakeViewPadding.zero;
+      await tester.pump();
 
-    expect(find.byType(SearchEntryPage), findsNothing);
-    expect(find.text('Open search'), findsOneWidget);
-  });
+      expect(route.animation!.status, AnimationStatus.reverse);
+      expect(find.byType(SearchEntryPage), findsOneWidget);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SearchEntryPage), findsNothing);
+      expect(find.text('Open search'), findsOneWidget);
+
+      await tester.tap(find.text('Open search'));
+      await _pumpSearchSettled(tester);
+      await tester.tap(
+        find.byKey(const ValueKey('search-entry-app-bar-search-bar')),
+      );
+      await _pumpSearchSettled(tester);
+
+      final systemBackRoute = ModalRoute.of(
+        tester.element(find.byType(SearchEntryPage)),
+      )!;
+      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+      await tester.pump();
+
+      await tester.binding.handlePopRoute();
+      await tester.pump();
+
+      expect(tester.testTextInput.isVisible, isFalse);
+      expect(systemBackRoute.animation!.status, AnimationStatus.completed);
+      expect(find.byType(SearchEntryPage), findsOneWidget);
+
+      tester.view.viewInsets = FakeViewPadding.zero;
+      await tester.pump();
+
+      expect(systemBackRoute.animation!.status, AnimationStatus.reverse);
+      expect(find.byType(SearchEntryPage), findsOneWidget);
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SearchEntryPage), findsNothing);
+      expect(find.text('Open search'), findsOneWidget);
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
+    },
+  );
 
   testWidgets('history loads before the search entry transition completes', (
     tester,

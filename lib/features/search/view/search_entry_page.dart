@@ -58,7 +58,6 @@ class _SearchEntryPageState extends State<SearchEntryPage>
 
   List<String> _historyList = <String>[];
   Animation<double>? _initialDataLoadRouteAnimation;
-  EdgeInsets? _lockedPopViewInsets;
   bool _historyEditMode = false;
   bool _historyExpanded = false;
   bool _initialDataLoadScheduled = false;
@@ -117,6 +116,7 @@ class _SearchEntryPageState extends State<SearchEntryPage>
     if (wasKeyboardVisible && !_focusCoordinator.keyboardVisible) {
       _idExtractController.scheduleHideIfUnfocused();
     }
+    _closePageWhenKeyboardIsDismissed();
   }
 
   void _dismissKeyboardAndPop() {
@@ -125,8 +125,20 @@ class _SearchEntryPageState extends State<SearchEntryPage>
     }
     setState(() {
       _keyboardDismissPopInProgress = true;
-      _lockedPopViewInsets = MediaQuery.viewInsetsOf(context);
     });
+    unawaited(() async {
+      await _focusCoordinator.dismissKeyboard(context, parkOnPage: true);
+      _closePageWhenKeyboardIsDismissed();
+    }());
+  }
+
+  void _closePageWhenKeyboardIsDismissed() {
+    if (!_keyboardDismissPopInProgress ||
+        !mounted ||
+        _focusCoordinator.keyboardVisible) {
+      return;
+    }
+    _keyboardDismissPopInProgress = false;
     Navigator.of(context).pop();
   }
 
@@ -427,8 +439,11 @@ class _SearchEntryPageState extends State<SearchEntryPage>
       child: ListenableBuilder(
         listenable: Listenable.merge([_focusCoordinator, _idExtractController]),
         builder: (context, _) {
-          final page = PopScope(
-            canPop: !_focusCoordinator.keyboardVisible && !_searchInputFocused,
+          return PopScope(
+            canPop:
+                !_keyboardDismissPopInProgress &&
+                !_focusCoordinator.keyboardVisible &&
+                !_searchInputFocused,
             onPopInvokedWithResult: (didPop, result) {
               if (didPop) {
                 return;
@@ -504,14 +519,6 @@ class _SearchEntryPageState extends State<SearchEntryPage>
                 ),
               ),
             ),
-          );
-          final lockedViewInsets = _lockedPopViewInsets;
-          if (lockedViewInsets == null) {
-            return page;
-          }
-          return MediaQuery(
-            data: MediaQuery.of(context).copyWith(viewInsets: lockedViewInsets),
-            child: page,
           );
         },
       ),
