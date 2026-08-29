@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 
+import 'source_config_url_resolver.dart';
 import 'source_runtime_facade.dart';
 
 abstract interface class SourceTextDownloadClient {
@@ -29,7 +30,8 @@ class SourceTextDownloader implements SourceTextDownloadClient {
     required HazukiSourceFacade facade,
     String source = 'source_fetch',
   }) async {
-    if (urls.isEmpty) return null;
+    final selectedUrls = await resolveSelectedSourceConfigUrls(urls);
+    if (selectedUrls.isEmpty) return null;
 
     Future<String?> requestOnce(String url) async {
       final startedAt = DateTime.now();
@@ -83,7 +85,7 @@ class SourceTextDownloader implements SourceTextDownloadClient {
 
     Future<void> runAll() async {
       await Future.wait(
-        urls.map((url) async => tryComplete(await requestOnce(url))),
+        selectedUrls.map((url) async => tryComplete(await requestOnce(url))),
       );
       if (!finished) completer.complete(null);
     }
@@ -99,7 +101,8 @@ class SourceTextDownloader implements SourceTextDownloadClient {
     void Function(int received, int total)? onProgress,
     String source = 'source_download',
   }) async {
-    for (final url in urls) {
+    final selectedUrls = await resolveSelectedSourceConfigUrls(urls);
+    for (final url in selectedUrls) {
       final startedAt = DateTime.now();
       final requestUrl = facade.httpGateway.normalizeUrl(url);
       try {

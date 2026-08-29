@@ -117,6 +117,10 @@ class AdvancedSettingsContent extends StatelessWidget {
                     value: SoftwareUpdateSource.github,
                     child: Text('GitHub'),
                   ),
+                  DropdownMenuItem(
+                    value: SoftwareUpdateSource.ghproxy,
+                    child: Text('ghproxy'),
+                  ),
                 ],
               ),
             ),

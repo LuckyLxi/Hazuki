@@ -11,9 +11,20 @@ import '../../shared/preferences/hazuki_preference_keys.dart';
 import '../network/hazuki_network.dart';
 import 'software_update_version_utils.dart';
 
+const _ghproxyBaseUrl = 'https://ghproxy.net/';
+const _jsDelivrUpdateManifestUrl =
+    'https://cdn.jsdelivr.net/gh/LuckyLxi/Hazuki@main/update.json';
+const _githubRawUpdateManifestUrl =
+    'https://raw.githubusercontent.com/LuckyLxi/Hazuki/main/update.json';
+const _ghproxyUpdateManifestUrl =
+    '$_ghproxyBaseUrl$_githubRawUpdateManifestUrl';
+const _githubLatestReleaseUrl =
+    'https://api.github.com/repos/LuckyLxi/Hazuki/releases/latest';
+
 enum SoftwareUpdateSource {
   jsDelivr('jsdelivr'),
-  github('github');
+  github('github'),
+  ghproxy('ghproxy');
 
   const SoftwareUpdateSource(this.preferenceValue);
 
@@ -27,16 +38,45 @@ enum SoftwareUpdateSource {
   }
 }
 
+Future<SoftwareUpdateSource> loadSoftwareUpdateSourcePreference() async {
+  final prefs = await SharedPreferences.getInstance();
+  return SoftwareUpdateSource.fromPreference(
+    prefs.getString(hazukiSoftwareUpdateSourcePreferenceKey),
+  );
+}
+
+String resolveSoftwareUpdateCheckUrl(SoftwareUpdateSource source) {
+  return switch (source) {
+    SoftwareUpdateSource.jsDelivr => _jsDelivrUpdateManifestUrl,
+    SoftwareUpdateSource.github => _githubLatestReleaseUrl,
+    SoftwareUpdateSource.ghproxy => _ghproxyUpdateManifestUrl,
+  };
+}
+
+String? resolveSoftwareUpdateDownloadUrl(
+  String? url,
+  SoftwareUpdateSource source,
+) {
+  final normalized = url?.trim();
+  if (normalized == null || normalized.isEmpty) {
+    return null;
+  }
+  if (source != SoftwareUpdateSource.ghproxy ||
+      normalized.startsWith(_ghproxyBaseUrl)) {
+    return normalized;
+  }
+
+  final host = Uri.tryParse(normalized)?.host.toLowerCase();
+  final isGitHubUrl =
+      host == 'github.com' ||
+      host?.endsWith('.github.com') == true ||
+      host == 'githubusercontent.com' ||
+      host?.endsWith('.githubusercontent.com') == true;
+  return isGitHubUrl ? '$_ghproxyBaseUrl$normalized' : normalized;
+}
+
 class SoftwareUpdateService {
   SoftwareUpdateService();
-
-  static const _jsDelivrUpdateManifestUrl =
-      'https://cdn.jsdelivr.net/gh/LuckyLxi/Hazuki@main/update.json';
-  static const _githubUpdateManifestUrl =
-      'https://raw.githubusercontent.com/LuckyLxi/Hazuki/main/update.json';
-
-  static const _latestReleaseUrl =
-      'https://api.github.com/repos/LuckyLxi/Hazuki/releases/latest';
 
   final HazukiNetworkClient _client = HazukiNetworkClient(
     dio: createHazukiDio(
@@ -59,53 +99,31 @@ class SoftwareUpdateService {
     final packageInfo = await PackageInfo.fromPlatform();
     final currentVersion = packageInfo.version.trim();
     final supportedAbis = await _resolveSupportedAbis();
-
-    final manifestData = await _loadUpdateManifest();
-    if (manifestData != null) {
-      final manifestResult = _buildResultFromManifest(
-        manifestData,
-        currentVersion: currentVersion,
-        supportedAbis: supportedAbis,
-      );
-      if (manifestResult != null) {
-        if (manifestResult.hasUpdate && manifestResult.changelog == null) {
-          final releaseData = await _loadLatestReleaseFromGitHubApi();
-          if (releaseData != null) {
-            final releaseResult = _buildResultFromRelease(
-              releaseData,
-              currentVersion: currentVersion,
-              supportedAbis: supportedAbis,
-            );
-            if (releaseResult != null &&
-                releaseResult.latestVersion == manifestResult.latestVersion &&
-                releaseResult.changelog != null) {
-              return manifestResult.copyWith(
-                changelog: releaseResult.changelog,
-              );
-            }
-          }
-        }
-        return manifestResult;
-      }
-    }
-
-    final releaseData = await _loadLatestReleaseFromGitHubApi();
-    if (releaseData == null) {
+    final source = await loadUpdateSource();
+    final updateData = await _getJsonMap(resolveSoftwareUpdateCheckUrl(source));
+    if (updateData == null) {
       return null;
     }
 
-    return _buildResultFromRelease(
-      releaseData,
+    if (source == SoftwareUpdateSource.github) {
+      return _buildResultFromRelease(
+        updateData,
+        currentVersion: currentVersion,
+        supportedAbis: supportedAbis,
+        source: source,
+      );
+    }
+
+    return _buildResultFromManifest(
+      updateData,
       currentVersion: currentVersion,
       supportedAbis: supportedAbis,
+      source: source,
     );
   }
 
   Future<SoftwareUpdateSource> loadUpdateSource() async {
-    final prefs = await SharedPreferences.getInstance();
-    return SoftwareUpdateSource.fromPreference(
-      prefs.getString(hazukiSoftwareUpdateSourcePreferenceKey),
-    );
+    return loadSoftwareUpdateSourcePreference();
   }
 
   Future<void> setUpdateSource(SoftwareUpdateSource source) async {
@@ -114,19 +132,6 @@ class SoftwareUpdateService {
       hazukiSoftwareUpdateSourcePreferenceKey,
       source.preferenceValue,
     );
-  }
-
-  Future<Map<String, dynamic>?> _loadUpdateManifest() async {
-    final source = await loadUpdateSource();
-    final url = switch (source) {
-      SoftwareUpdateSource.jsDelivr => _jsDelivrUpdateManifestUrl,
-      SoftwareUpdateSource.github => _githubUpdateManifestUrl,
-    };
-    return _getJsonMap(url);
-  }
-
-  Future<Map<String, dynamic>?> _loadLatestReleaseFromGitHubApi() async {
-    return _getJsonMap(_latestReleaseUrl);
   }
 
   Future<Map<String, dynamic>?> _getJsonMap(String url) async {
@@ -152,15 +157,22 @@ class SoftwareUpdateService {
     Map<String, dynamic> manifest, {
     required String currentVersion,
     required List<String> supportedAbis,
+    required SoftwareUpdateSource source,
   }) {
     final latestVersionRaw = manifest['version']?.toString().trim();
     final releaseUrl = manifest['releaseUrl']?.toString().trim();
-    final apkUrl = _resolveManifestApkUrl(
-      manifest,
-      supportedAbis: supportedAbis,
+    final apkUrl = resolveSoftwareUpdateDownloadUrl(
+      _resolveManifestApkUrl(manifest, supportedAbis: supportedAbis),
+      source,
     );
-    final windowsExeUrl = _resolveManifestWindowsExeUrl(manifest);
-    final windowsZipUrl = _resolveManifestWindowsZipUrl(manifest);
+    final windowsExeUrl = resolveSoftwareUpdateDownloadUrl(
+      _resolveManifestWindowsExeUrl(manifest),
+      source,
+    );
+    final windowsZipUrl = resolveSoftwareUpdateDownloadUrl(
+      _resolveManifestWindowsZipUrl(manifest),
+      source,
+    );
     final changelog = _normalizeChangelog(manifest['changelog']?.toString());
 
     if (latestVersionRaw == null ||
@@ -188,6 +200,7 @@ class SoftwareUpdateService {
     Map<String, dynamic> release, {
     required String currentVersion,
     required List<String> supportedAbis,
+    required SoftwareUpdateSource source,
   }) {
     final latestVersionRaw =
         release['tag_name']?.toString().trim().isNotEmpty == true
@@ -208,6 +221,9 @@ class SoftwareUpdateService {
       windowsExeUrl = _selectWindowsExeUrlFromAssets(assets);
       windowsZipUrl = _selectWindowsZipUrlFromAssets(assets);
     }
+    apkUrl = resolveSoftwareUpdateDownloadUrl(apkUrl, source);
+    windowsExeUrl = resolveSoftwareUpdateDownloadUrl(windowsExeUrl, source);
+    windowsZipUrl = resolveSoftwareUpdateDownloadUrl(windowsZipUrl, source);
 
     if (latestVersionRaw == null ||
         latestVersionRaw.isEmpty ||
