@@ -176,7 +176,20 @@ mixin TabDragGestureMixin<T extends StatefulWidget> on State<T> {
   /// Call from [didUpdateWidget] when tabIndex or tabCount may have changed.
   void updateTabAlignIfNeeded(int oldTabIndex, int oldTabCount) {
     if (oldTabIndex != tabIndex || oldTabCount != tabCount) {
-      if (mounted) setState(() => tabXAlign = computeTabAlignment(tabIndex));
+      if (mounted) {
+        setState(() {
+          final updatedAlignment = computeTabAlignment(tabIndex);
+          tabXAlign = updatedAlignment;
+
+          // A tap selects on down, while the raw pointer listener has already
+          // captured the previously selected tab as the drag origin. Keep the
+          // origin in sync during the gesture-slop window so a slight move
+          // continues from the newly selected tab instead of jumping back.
+          if (tabIsTrackingPointer && !tabIsDragging) {
+            _dragStartAlignment = updatedAlignment;
+          }
+        });
+      }
     }
   }
 

@@ -270,6 +270,59 @@ void main() {
     await gesture.cancel();
   });
 
+  testWidgets(
+    'liquid glass indicator stays on a newly selected held destination',
+    (tester) async {
+      await tester.runAsync(HazukiLiquidGlass.initialize);
+      var selectedIndex = 0;
+      late StateSetter setNavigationState;
+
+      await tester.pumpWidget(
+        HazukiLiquidGlass.wrap(
+          child: MaterialApp(
+            home: Scaffold(
+              bottomNavigationBar: StatefulBuilder(
+                builder: (context, setState) {
+                  setNavigationState = setState;
+                  return HomeBottomNavigation(
+                    currentIndex: selectedIndex,
+                    onDestinationSelected: (index) {
+                      setNavigationState(() => selectedIndex = index);
+                    },
+                    discoverLabel: 'Discover',
+                    favoriteLabel: 'Favorites',
+                  );
+                },
+              ),
+            ),
+          ),
+        ),
+      );
+
+      final barRect = tester.getRect(
+        find.byKey(const ValueKey('home-bottom-navigation-glass-anchor')),
+      );
+      final favoriteCenter = Offset(
+        barRect.left + barRect.width * 3 / 4,
+        barRect.center.dy,
+      );
+      final gesture = await tester.startGesture(favoriteCenter);
+      await tester.pump(const Duration(milliseconds: 150));
+      expect(selectedIndex, 1);
+
+      await gesture.moveBy(const Offset(1, 0));
+      await tester.pump(const Duration(milliseconds: 100));
+
+      final indicator = tester.widget<AnimatedGlassIndicator>(
+        find.byType(AnimatedGlassIndicator).first,
+      );
+      final alignment = indicator.alignment.resolve(TextDirection.ltr);
+      expect(alignment.x, greaterThan(0.5));
+
+      await gesture.cancel();
+    },
+  );
+
   testWidgets('liquid glass indicator follows physical drag direction in RTL', (
     tester,
   ) async {
