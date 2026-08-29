@@ -58,15 +58,19 @@ class _SearchEntryPageState extends State<SearchEntryPage>
 
   List<String> _historyList = <String>[];
   Animation<double>? _initialDataLoadRouteAnimation;
+  EdgeInsets? _lockedPopViewInsets;
   bool _historyEditMode = false;
   bool _historyExpanded = false;
   bool _initialDataLoadScheduled = false;
   bool _aggregateSearchEnabled = false;
   bool _keyboardDismissPopInProgress = false;
+  bool _forceInitialFocusedAppearance = false;
 
   @override
   void initState() {
     super.initState();
+    _historyList = List<String>.of(_historyService.cachedHistory);
+    _forceInitialFocusedAppearance = widget.autoFocusOnOpen;
     WidgetsBinding.instance.addObserver(this);
     _focusCoordinator.primaryFocusNode.addListener(_handleSearchFocusChanged);
     _historyService.addListener(_handleHistoryChanged);
@@ -119,8 +123,10 @@ class _SearchEntryPageState extends State<SearchEntryPage>
     if (_keyboardDismissPopInProgress || !mounted) {
       return;
     }
-    _keyboardDismissPopInProgress = true;
-    unawaited(_focusCoordinator.dismissKeyboard(context, parkOnPage: true));
+    setState(() {
+      _keyboardDismissPopInProgress = true;
+      _lockedPopViewInsets = MediaQuery.viewInsetsOf(context);
+    });
     Navigator.of(context).pop();
   }
 
@@ -165,6 +171,12 @@ class _SearchEntryPageState extends State<SearchEntryPage>
   }
 
   void _handleSearchFocusChanged() {
+    if (_forceInitialFocusedAppearance &&
+        _focusCoordinator.primaryFocusNode.hasFocus) {
+      setState(() {
+        _forceInitialFocusedAppearance = false;
+      });
+    }
     if (_searchInputFocused) {
       _idExtractController.syncWithFocus(_focusCoordinator.text);
     } else {
@@ -336,6 +348,7 @@ class _SearchEntryPageState extends State<SearchEntryPage>
     FocusNode? focusNode,
     bool compact = false,
     bool autofocus = false,
+    bool forceFocusedAppearance = false,
   }) {
     return SearchBarShell(
       key: key,
@@ -345,6 +358,7 @@ class _SearchEntryPageState extends State<SearchEntryPage>
       submitKey: submitKey,
       compact: compact,
       autofocus: autofocus,
+      forceFocusedAppearance: forceFocusedAppearance,
       onTap: _handleSearchBarTap,
       onClear: () {
         _focusCoordinator.clearText();
@@ -412,81 +426,94 @@ class _SearchEntryPageState extends State<SearchEntryPage>
     return WindowsComicDetailHost(
       child: ListenableBuilder(
         listenable: Listenable.merge([_focusCoordinator, _idExtractController]),
-        builder: (context, _) => PopScope(
-          canPop: !_focusCoordinator.keyboardVisible && !_searchInputFocused,
-          onPopInvokedWithResult: (didPop, result) {
-            if (didPop) {
-              return;
-            }
-            _dismissKeyboardAndPop();
-          },
-          child: Focus(
-            focusNode: _focusCoordinator.pageFocusNode,
-            skipTraversal: true,
-            child: Scaffold(
-              backgroundColor: Theme.of(context).colorScheme.surface,
-              resizeToAvoidBottomInset: true,
-              floatingActionButtonLocation: _KeyboardSafeEndFloatFabLocation(
-                MediaQuery.viewPaddingOf(context).bottom,
-              ),
-              floatingActionButton: _historyList.isNotEmpty
-                  ? SearchEntryHistoryEditFab(
-                      editMode: _historyEditMode,
-                      onPressed: _toggleHistoryEditMode,
-                      onLongPress: _confirmClearHistory,
-                    )
-                  : null,
-              appBar: hazukiFrostedAppBar(
-                context: context,
-                title: Hero(
-                  tag: discoverSearchHeroTag,
-                  child: _buildSearchBar(
-                    key: const ValueKey('search-entry-app-bar-search-bar'),
-                    clearKey: 'entry-clear',
-                    submitKey: 'entry-submit',
-                    compact: true,
-                  ),
+        builder: (context, _) {
+          final page = PopScope(
+            canPop: !_focusCoordinator.keyboardVisible && !_searchInputFocused,
+            onPopInvokedWithResult: (didPop, result) {
+              if (didPop) {
+                return;
+              }
+              _dismissKeyboardAndPop();
+            },
+            child: Focus(
+              focusNode: _focusCoordinator.pageFocusNode,
+              skipTraversal: true,
+              child: Scaffold(
+                backgroundColor: Theme.of(context).colorScheme.surface,
+                resizeToAvoidBottomInset: true,
+                floatingActionButtonLocation: _KeyboardSafeEndFloatFabLocation(
+                  MediaQuery.viewPaddingOf(context).bottom,
                 ),
-                enableBlur: false,
-                actions: [
-                  IconButton(
-                    key: const ValueKey('search-settings-button'),
-                    tooltip: AppLocalizations.of(context)!.searchSettingsTitle,
-                    onPressed: () => unawaited(_openSearchSettings()),
-                    icon: const Icon(Icons.tune_rounded),
+                floatingActionButton: _historyList.isNotEmpty
+                    ? SearchEntryHistoryEditFab(
+                        editMode: _historyEditMode,
+                        onPressed: _toggleHistoryEditMode,
+                        onLongPress: _confirmClearHistory,
+                      )
+                    : null,
+                appBar: hazukiFrostedAppBar(
+                  context: context,
+                  title: Hero(
+                    tag: discoverSearchHeroTag,
+                    child: _buildSearchBar(
+                      key: const ValueKey('search-entry-app-bar-search-bar'),
+                      clearKey: 'entry-clear',
+                      submitKey: 'entry-submit',
+                      compact: true,
+                      forceFocusedAppearance: _forceInitialFocusedAppearance,
+                    ),
                   ),
-                ],
-              ),
-              body: RepaintBoundary(
-                child: SearchEntryBody(
-                  scrollController: _scrollController,
-                  historyList: _historyList,
-                  historyEditMode: _historyEditMode,
-                  historyExpanded: _historyExpanded,
-                  extractedComicId: _idExtractController.extractedId,
-                  onKeywordPressed: (keyword) {
-                    unawaited(
-                      _openResults(
-                        keyword,
-                        intent: SearchEntryIntent.historySelection,
-                      ),
-                    );
-                  },
-                  onKeywordLongPressed: (keyword) =>
-                      unawaited(_copyHistoryKeyword(keyword)),
-                  onKeywordDeleted: (keyword) =>
-                      unawaited(_removeHistory(keyword)),
-                  onHistoryExpandedChanged: (expanded) {
-                    setState(() {
-                      _historyExpanded = expanded;
-                    });
-                  },
-                  onApplyExtractedComicId: _applyExtractedComicId,
+                  enableBlur: false,
+                  actions: [
+                    IconButton(
+                      key: const ValueKey('search-settings-button'),
+                      tooltip: AppLocalizations.of(
+                        context,
+                      )!.searchSettingsTitle,
+                      onPressed: () => unawaited(_openSearchSettings()),
+                      icon: const Icon(Icons.tune_rounded),
+                    ),
+                  ],
+                ),
+                body: RepaintBoundary(
+                  child: SearchEntryBody(
+                    scrollController: _scrollController,
+                    historyList: _historyList,
+                    historyEditMode: _historyEditMode,
+                    historyExpanded: _historyExpanded,
+                    extractedComicId: _idExtractController.extractedId,
+                    onKeywordPressed: (keyword) {
+                      unawaited(
+                        _openResults(
+                          keyword,
+                          intent: SearchEntryIntent.historySelection,
+                        ),
+                      );
+                    },
+                    onKeywordLongPressed: (keyword) =>
+                        unawaited(_copyHistoryKeyword(keyword)),
+                    onKeywordDeleted: (keyword) =>
+                        unawaited(_removeHistory(keyword)),
+                    onHistoryExpandedChanged: (expanded) {
+                      setState(() {
+                        _historyExpanded = expanded;
+                      });
+                    },
+                    onApplyExtractedComicId: _applyExtractedComicId,
+                  ),
                 ),
               ),
             ),
-          ),
-        ),
+          );
+          final lockedViewInsets = _lockedPopViewInsets;
+          if (lockedViewInsets == null) {
+            return page;
+          }
+          return MediaQuery(
+            data: MediaQuery.of(context).copyWith(viewInsets: lockedViewInsets),
+            child: page,
+          );
+        },
       ),
     );
   }

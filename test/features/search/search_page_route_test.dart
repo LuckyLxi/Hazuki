@@ -4,9 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/search/search.dart';
 
 void main() {
-  testWidgets('search route keeps both pages live during transitions', (
-    tester,
-  ) async {
+  testWidgets('search route snapshots only the entering page', (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         home: Builder(
@@ -34,11 +32,11 @@ void main() {
 
     final route = ModalRoute.of(tester.element(find.text('Search')))!;
     expect(route, isA<CupertinoPageRoute<void>>());
-    expect((route as PageRoute<void>).allowSnapshotting, isFalse);
+    expect((route as PageRoute<void>).allowSnapshotting, isTrue);
     expect(route.transitionDuration, const Duration(milliseconds: 500));
     expect(route.reverseTransitionDuration, const Duration(milliseconds: 500));
-    expect(_hasSnapshotAncestor(find.text('Home')), isFalse);
-    expect(_hasSnapshotAncestor(find.text('Search')), isFalse);
+    expect(_isSnapshotting(find.text('Home')), isFalse);
+    expect(_isSnapshotting(find.text('Search')), isTrue);
     final searchSlides = tester.widgetList<SlideTransition>(
       find.ancestor(
         of: find.text('Search'),
@@ -59,23 +57,24 @@ void main() {
 
     await tester.pump(const Duration(milliseconds: 250));
 
-    expect(_hasSnapshotAncestor(find.text('Search')), isFalse);
+    expect(_isSnapshotting(find.text('Search')), isFalse);
 
     Navigator.of(tester.element(find.text('Search'))).pop();
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 1));
 
-    expect(_hasSnapshotAncestor(find.text('Home')), isFalse);
-    expect(_hasSnapshotAncestor(find.text('Search')), isFalse);
+    expect(_isSnapshotting(find.text('Home')), isFalse);
+    expect(_isSnapshotting(find.text('Search')), isTrue);
 
     await tester.pumpAndSettle();
     expect(find.text('Home'), findsOneWidget);
   });
 }
 
-bool _hasSnapshotAncestor(Finder finder) {
+bool _isSnapshotting(Finder finder) {
   return find
       .ancestor(of: finder, matching: find.byType(SnapshotWidget))
       .evaluate()
-      .isNotEmpty;
+      .map((element) => element.widget as SnapshotWidget)
+      .any((widget) => widget.controller.allowSnapshotting);
 }

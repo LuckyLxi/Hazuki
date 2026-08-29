@@ -17,6 +17,7 @@ class SearchBarShell extends StatelessWidget {
     this.onTap,
     this.compact = false,
     this.autofocus = false,
+    this.forceFocusedAppearance = false,
   });
 
   final TextEditingController controller;
@@ -30,14 +31,17 @@ class SearchBarShell extends StatelessWidget {
   final VoidCallback? onTap;
   final bool compact;
   final bool autofocus;
+  final bool forceFocusedAppearance;
 
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
       listenable: focusNode,
       builder: (context, _) {
+        final showFocusedAppearance =
+            forceFocusedAppearance || focusNode.hasFocus;
         return TweenAnimationBuilder<double>(
-          tween: Tween<double>(end: focusNode.hasFocus ? 1 : 0),
+          tween: Tween<double>(end: showFocusedAppearance ? 1 : 0),
           duration: const Duration(milliseconds: 180),
           curve: Curves.easeOutCubic,
           builder: (context, focusProgress, _) {

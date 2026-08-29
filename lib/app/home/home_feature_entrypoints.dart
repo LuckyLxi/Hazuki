@@ -223,6 +223,9 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
           );
         },
     buildSearchRoute: buildSearchEntryPageRoute,
+    prepareSearchPage: () async {
+      await sl<SearchHistoryService>().load();
+    },
     buildDiscoverTab:
         ({
           required comicDetailPageBuilder,

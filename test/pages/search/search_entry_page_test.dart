@@ -15,6 +15,7 @@ import 'package:hazuki/features/search/view/search_id_extract_pill.dart';
 import 'package:hazuki/services/search_history_service.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_assembly.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
+import 'package:hazuki/shared/search_box_outline.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../support/test_service_locator.dart';
 
@@ -132,7 +133,7 @@ void main() {
     );
   });
 
-  testWidgets('back starts popping immediately while dismissing the keyboard', (
+  testWidgets('back starts popping while locking the keyboard layout', (
     tester,
   ) async {
     SharedPreferences.setMockInitialValues(const {});
@@ -228,6 +229,78 @@ void main() {
     expect(route.animation!.status, AnimationStatus.forward);
     expect(find.text('early-history'), findsOneWidget);
   });
+
+  testWidgets(
+    'prepared autofocus entry shows the keyboard when the transition completes',
+    (tester) async {
+      SharedPreferences.setMockInitialValues(const {});
+      final historyService = sl<SearchHistoryService>();
+      await historyService.replace(const ['prepared-history']);
+      await historyService.load();
+
+      await tester.pumpWidget(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Builder(
+            builder: (context) => TextButton(
+              onPressed: () {
+                Navigator.of(context).push<void>(
+                  buildSearchEntryPageRoute<void>(
+                    builder: (_) => SearchEntryPage(
+                      sourceService: sl<SourceSearchGateway>(),
+                      historyService: historyService,
+                      autoFocusOnOpen: true,
+                      comicDetailPageBuilder: _comicDetailPageBuilder,
+                      comicCoverHeroTagBuilder: _testComicCoverHeroTag,
+                      searchPageLoader: _fakeSearchPageLoader,
+                    ),
+                  ),
+                );
+              },
+              child: const Text('Open prepared search'),
+            ),
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('Open prepared search'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 1));
+
+      final searchBarFinder = find.byKey(
+        const ValueKey('search-entry-app-bar-search-bar'),
+      );
+      final searchBar = tester.widget<SearchBar>(
+        find.descendant(of: searchBarFinder, matching: find.byType(SearchBar)),
+      );
+      final searchBarContext = tester.element(searchBarFinder);
+      final route = ModalRoute.of(
+        tester.element(find.byType(SearchEntryPage)),
+      )!;
+
+      expect(route.animation!.status, AnimationStatus.forward);
+      expect(find.text('prepared-history'), findsOneWidget);
+      expect(find.byType(FloatingActionButton), findsOneWidget);
+      expect(tester.testTextInput.isVisible, isFalse);
+      expect(
+        searchBar.backgroundColor!.resolve(const <WidgetState>{}),
+        hazukiSearchBoxBackgroundColor(searchBarContext, focusProgress: 1),
+      );
+
+      await tester.pump(const Duration(milliseconds: 350));
+      expect(route.animation!.status, AnimationStatus.forward);
+      expect(tester.testTextInput.isVisible, isFalse);
+
+      await tester.pump(const Duration(milliseconds: 30));
+      expect(route.animation!.status, AnimationStatus.forward);
+      expect(tester.testTextInput.isVisible, isFalse);
+
+      await tester.pump(const Duration(milliseconds: 120));
+      expect(route.animation!.status, AnimationStatus.completed);
+      expect(tester.testTextInput.isVisible, isTrue);
+    },
+  );
 
   testWidgets('search settings toggles and persists aggregate search', (
     tester,
