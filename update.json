@@ -1,12 +1,12 @@
 {
-  "version": "1.1.7",
-  "releaseUrl": "https://github.com/LuckyLxi/Hazuki/releases/tag/v1.1.7",
+  "version": "1.1.8",
+  "releaseUrl": "https://github.com/LuckyLxi/Hazuki/releases/tag/v1.1.8",
   "apkUrls": {
-    "arm64-v8a": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.1.7/app-arm64-v8a-release.apk"
+    "arm64-v8a": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.1.8/app-arm64-v8a-release.apk"
   },
   "windowsUrls": {
-    "x64_zip": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.1.7/hazuki-windows-x64-v1.1.7.zip",
-    "x64_exe": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.1.7/hazuki-windows-x64-v1.1.7-setup.exe"
+    "x64_zip": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.1.8/hazuki-windows-x64-v1.1.8.zip",
+    "x64_exe": "https://github.com/LuckyLxi/Hazuki/releases/download/v1.1.8/hazuki-windows-x64-v1.1.8-setup.exe"
   },
-  "changelog": "Hazuki v1.1.7\n\n- 新增液态玻璃\n- 优化性能"
+  "changelog": "Hazuki v1.1.8\n\n- 新增探索分区首页内容筛选\n- 聚合搜索支持调整漫画源排序\n- 重构日志页面\n- 优化搜索、主题切换及部分界面动画\n- 修复导航指示器、搜索页面进入/退出卡顿及缓存设置等问题"
 }
