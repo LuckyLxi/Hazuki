@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "announcements": [
+    {
+      "id": "notice-20260830-01",
+      "level": "normal",
+      "title": "新增每日推荐功能",
+      "publishedAt": "2026-08-30T20:00:00+08:00",
+      "expiresAt": "2026-09-30T00:00:00+08:00",
+      "content": [
+        {
+          "type": "text",
+          "text": "发现页新增了每日推荐功能。"
+        },
+        {
+          "type": "image",
+          "url": "https://example.com/image.webp",
+          "width": 1600,
+          "height": 900,
+          "caption": "功能示意图"
+        },
+        {
+          "type": "link",
+          "label": "查看完整说明",
+          "url": "https://example.com/help"
+        }
+      ]
+    }
+  ]
+}
