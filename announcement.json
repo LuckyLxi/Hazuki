@@ -18,31 +18,26 @@
           "width": 1600,
           "height": 900,
           "caption": "功能示意图"
+        }
+      ]
+    },
+    {
+      "id": "important-20260830-01",
+      "level": "important",
+      "title": "重要通知",
+      "publishedAt": "2026-08-30T22:00:00+08:00",
+      "expiresAt": "2026-09-30T00:00:00+08:00",
+      "content": [
+        {
+          "type": "text",
+          "text": "Hazuki 公告功能现已上线。重要通知会在软件内弹窗显示，关闭后仍可前往通知页面查看完整内容。"
         },
         {
           "type": "link",
-          "label": "查看完整说明",
-          "url": "https://youtu.be/dQw4w9WgXcQ?si=aJnFFSP99Hn2njbJ"
+          "label": "查看项目主页",
+          "url": "https://github.com/LuckyLxi/Hazuki"
         }
       ]
-    }
-  ]
-}
-{
-  "id": "important-20260830-01",
-  "level": "important",
-  "title": "重要通知",
-  "publishedAt": "2026-08-30T22:00:00+08:00",
-  "expiresAt": "2026-09-30T00:00:00+08:00",
-  "content": [
-    {
-      "type": "text",
-      "text": "Hazuki 公告功能现已上线。重要通知会在软件内弹窗显示，关闭后仍可前往通知页面查看完整内容。"
-    },
-    {
-      "type": "link",
-      "label": "查看项目主页",
-      "url": "https://github.com/LuckyLxi/Hazuki"
     }
   ]
 }
