@@ -21,5 +21,11 @@ const hazukiCommentFilterKeywordsUpdatedAtKey =
     'comment_filter_keywords_updated_at_ms';
 const hazukiCommentFilterModeKey = 'comment_filter_mode';
 const hazukiFirstUseDatePreferenceKey = 'app_first_use_date';
+const hazukiAnnouncementCachePreferenceKey = 'announcement_cache';
+const hazukiAnnouncementReadIdsPreferenceKey = 'announcement_read_ids';
+const hazukiAnnouncementPresentedIdsPreferenceKey =
+    'announcement_presented_important_ids';
+const hazukiAnnouncementHiddenCardIdsPreferenceKey =
+    'announcement_hidden_normal_ids';
 const hazukiReadHistoryMaxCount = 300;
 const hazukiSearchHistoryMaxCount = 50;

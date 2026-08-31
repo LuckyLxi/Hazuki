@@ -3,11 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/services/announcement_service.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
 
 import '../state/discover_page_controller.dart';
+import 'discover_announcement_card.dart';
 import 'discover_daily_recommendation_carousel.dart';
 import 'discover_page_body.dart';
 import 'discover_page_sections.dart';
@@ -18,6 +20,8 @@ class DiscoverPage extends StatefulWidget {
     required this.sourceService,
     required this.recommendationSource,
     required this.recommendationService,
+    this.announcementService,
+    this.onAnnouncementTap,
     required this.comicDetailPageBuilder,
     this.usePinnedSearchInAppBar = false,
     this.dailyRecommendationState =
@@ -34,6 +38,13 @@ class DiscoverPage extends StatefulWidget {
   final SourceDiscoverGateway sourceService;
   final SourceRecommendationGateway recommendationSource;
   final DiscoverDailyRecommendationService recommendationService;
+  final AnnouncementService? announcementService;
+  final Future<void> Function(
+    BuildContext context,
+    Announcement announcement,
+    VoidCallback onMorphLanding,
+  )?
+  onAnnouncementTap;
   final ComicDetailPageBuilder comicDetailPageBuilder;
   final bool usePinnedSearchInAppBar;
   final DiscoverDailyRecommendationState dailyRecommendationState;
@@ -59,6 +70,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
   @override
   void initState() {
     super.initState();
+    widget.announcementService?.addListener(_handleAnnouncementChanged);
     _controller = DiscoverPageController(
       sourceService: widget.sourceService,
       // 源切换时后台触发刷新，重新加载当前源的发现页数据
@@ -81,6 +93,10 @@ class _DiscoverPageState extends State<DiscoverPage> {
   @override
   void didUpdateWidget(covariant DiscoverPage oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.announcementService != widget.announcementService) {
+      oldWidget.announcementService?.removeListener(_handleAnnouncementChanged);
+      widget.announcementService?.addListener(_handleAnnouncementChanged);
+    }
     if (oldWidget.onSearchMorphProgressChanged !=
         widget.onSearchMorphProgressChanged) {
       widget.onSearchMorphProgressChanged?.call(_effectiveSearchMorphProgress);
@@ -97,11 +113,18 @@ class _DiscoverPageState extends State<DiscoverPage> {
 
   @override
   void dispose() {
+    widget.announcementService?.removeListener(_handleAnnouncementChanged);
     _scrollController
       ..removeListener(_handleScroll)
       ..dispose();
     _controller.dispose();
     super.dispose();
+  }
+
+  void _handleAnnouncementChanged() {
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   Future<void> _triggerLoadInitial() async {
@@ -170,11 +193,16 @@ class _DiscoverPageState extends State<DiscoverPage> {
 
   int get _headerItemCount =>
       (widget.usePinnedSearchInAppBar ? 0 : 1) +
-      (_showRecommendationCarousel ? 1 : 0);
+      (_showRecommendationCarousel ? 1 : 0) +
+      (widget.announcementService == null ? 0 : 1);
 
   Widget _buildDailyRecommendationCarousel() {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 20),
+    return AnimatedPadding(
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeOutCubic,
+      padding: EdgeInsets.only(
+        bottom: widget.announcementService?.latestDiscoverCard == null ? 20 : 8,
+      ),
       child: DiscoverDailyRecommendationCarousel(
         displayedRecommendations:
             widget.dailyRecommendationState.displayedRecommendations,
@@ -202,6 +230,24 @@ class _DiscoverPageState extends State<DiscoverPage> {
     }
     if (_showRecommendationCarousel && currentIndex == 0) {
       return _buildDailyRecommendationCarousel();
+    }
+    if (_showRecommendationCarousel) {
+      currentIndex -= 1;
+    }
+    final service = widget.announcementService;
+    if (service != null && currentIndex == 0) {
+      return DiscoverAnnouncementAnimatedSlot(
+        announcements: service.discoverCardAnnouncements,
+        service: service,
+        onTap: widget.onAnnouncementTap == null
+            ? null
+            : (anchorContext, announcement, onMorphLanding) =>
+                  widget.onAnnouncementTap!(
+                    anchorContext,
+                    announcement,
+                    onMorphLanding,
+                  ),
+      );
     }
     return const SizedBox.shrink();
   }

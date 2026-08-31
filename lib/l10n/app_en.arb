@@ -1441,5 +1441,12 @@
   "sourceRuntimeErrorModuleLoad": "Comic source initialization failed because a module did not load.",
   "sourceRuntimeErrorTimeout": "The comic source took too long to respond. Please try again.",
   "sourceRuntimeErrorInitialization": "Failed to initialize manga source",
-  "sourceRuntimeErrorGeneric": "The comic source is currently unavailable. Please try again."
+  "sourceRuntimeErrorGeneric": "The comic source is currently unavailable. Please try again.",
+  "announcementTitle": "Notifications",
+  "announcementEmpty": "No notifications",
+  "announcementExpired": "Expired",
+  "announcementAcknowledge": "Got it",
+  "announcementImageLoadFailed": "Failed to load image",
+  "announcementHideCurrent": "Hide this notification",
+  "announcementHideAll": "Hide all notifications"
 }

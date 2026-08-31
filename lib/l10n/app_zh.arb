@@ -1441,5 +1441,12 @@
   "sourceRuntimeErrorModuleLoad": "漫画源初始化没有完成，其中一个模块加载失败了。",
   "sourceRuntimeErrorTimeout": "漫画源响应超时，请稍后重试。",
   "sourceRuntimeErrorInitialization": "暂时无法完成漫画源初始化。",
-  "sourceRuntimeErrorGeneric": "漫画源当前不可用，请稍后重试。"
+  "sourceRuntimeErrorGeneric": "漫画源当前不可用，请稍后重试。",
+  "announcementTitle": "通知",
+  "announcementEmpty": "暂无通知",
+  "announcementExpired": "已过期",
+  "announcementAcknowledge": "知道了",
+  "announcementImageLoadFailed": "图片加载失败",
+  "announcementHideCurrent": "隐藏此通知",
+  "announcementHideAll": "隐藏所有通知"
 }

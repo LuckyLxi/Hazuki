@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:hazuki/app/app.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
+import 'package:hazuki/services/announcement_service.dart';
 import 'package:hazuki/services/manga_download/manga_download_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/shared/favorites/favorite_app_bar_actions_state.dart';
@@ -21,14 +22,19 @@ class HomeServices {
     required this.sourceSwitchService,
     required this.imageService,
     required this.dailyRecommendationService,
+    required this.announcementService,
     required this.downloadStatus,
+    required this.showAnnouncement,
   });
 
   final SourceHomeGateway sourceService;
   final SourceSwitchGateway sourceSwitchService;
   final SourceImageGateway imageService;
   final DiscoverDailyRecommendationService dailyRecommendationService;
+  final AnnouncementService announcementService;
   final HomeDownloadStatusListenable downloadStatus;
+  final Future<void> Function(BuildContext context, Announcement announcement)
+  showAnnouncement;
 }
 
 typedef HomeComicDetailPageBuilder =
@@ -138,6 +144,7 @@ class HomeFeatureEntrypoints {
     required this.buildDownloadsPage,
     required this.buildSettingsPage,
     required this.buildLinesPage,
+    required this.buildAnnouncementsPage,
     required this.onHistoryFavoriteRequested,
   });
 
@@ -154,6 +161,7 @@ class HomeFeatureEntrypoints {
   final HomeDownloadsPageBuilder buildDownloadsPage;
   final HomeSettingsPageBuilder buildSettingsPage;
   final WidgetBuilder buildLinesPage;
+  final WidgetBuilder buildAnnouncementsPage;
   final Future<void> Function(BuildContext context, ExploreComic comic)
   onHistoryFavoriteRequested;
 }

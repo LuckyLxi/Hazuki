@@ -1,6 +1,7 @@
 import 'package:get_it/get_it.dart';
 
 import '../../services/cloud_sync/cloud_sync_participant_set.dart';
+import '../../services/announcement_service.dart';
 import '../../services/cloud_sync_service.dart';
 import '../../services/comment_filter_service.dart';
 import '../../services/discover_daily_recommendation_service.dart';
@@ -23,6 +24,12 @@ import '../../services/storage/hazuki_database.dart';
 
 /// Registers application services against their contract-level dependencies.
 void registerApplicationServices(GetIt services) {
+  if (!services.isRegistered<AnnouncementService>()) {
+    services.registerLazySingleton<AnnouncementService>(
+      AnnouncementService.new,
+      dispose: (service) => service.dispose(),
+    );
+  }
   if (!services.isRegistered<HazukiDatabase>()) {
     services.registerLazySingleton<HazukiDatabase>(
       HazukiDatabase.new,

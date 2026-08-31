@@ -6,6 +6,7 @@ import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_page.dart';
 import 'package:hazuki/features/comic_detail/support/comic_detail_dependencies.dart';
 import 'package:hazuki/features/comments/comments.dart';
+import 'package:hazuki/features/announcements/announcements.dart';
 import 'package:hazuki/features/discover/discover.dart';
 import 'package:hazuki/features/downloads/downloads.dart';
 import 'package:hazuki/features/favorite/favorite.dart';
@@ -19,6 +20,7 @@ import 'package:hazuki/features/settings/support/settings_core_dependencies.dart
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
+import 'package:hazuki/services/announcement_service.dart';
 import 'package:hazuki/services/download_groups_service.dart';
 import 'package:hazuki/services/comment_filter_service.dart';
 import 'package:hazuki/services/cloud_sync_service.dart';
@@ -64,7 +66,9 @@ HomeServices buildHazukiHomeServices() {
     sourceSwitchService: sl<SourceSwitchGateway>(),
     imageService: sl<SourceImageGateway>(),
     dailyRecommendationService: sl<DiscoverDailyRecommendationService>(),
+    announcementService: sl<AnnouncementService>(),
     downloadStatus: _MangaDownloadStatusAdapter(sl<MangaDownloadService>()),
+    showAnnouncement: showAnnouncementDialog,
   );
 }
 
@@ -240,6 +244,16 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
             sourceService: sl<SourceDiscoverGateway>(),
             recommendationSource: sl<SourceRecommendationGateway>(),
             recommendationService: sl<DiscoverDailyRecommendationService>(),
+            announcementService: sl<AnnouncementService>(),
+            onAnnouncementTap: (context, announcement, onMorphLanding) async {
+              await showAnnouncementDialog(
+                context,
+                announcement,
+                morphFromSource: true,
+                onMorphLanding: onMorphLanding,
+              );
+              await sl<AnnouncementService>().markRead(announcement);
+            },
             comicDetailPageBuilder: comicDetailPageBuilder,
             usePinnedSearchInAppBar: true,
             dailyRecommendationState: dailyRecommendationState,
@@ -361,6 +375,8 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
     buildLinesPage: (_) => LineSettingsPage(
       sourceService: settingsCoreDependencies.sourceSettings,
     ),
+    buildAnnouncementsPage: (_) =>
+        AnnouncementPage(service: sl<AnnouncementService>()),
     onHistoryFavoriteRequested: _toggleFavoriteFromHomeHistory,
   );
   return entrypoints;

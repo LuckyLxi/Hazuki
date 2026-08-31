@@ -7,6 +7,7 @@ enum HomeDrawerDestination {
   categories,
   ranking,
   downloads,
+  announcements,
   lines,
   settings,
 }
@@ -44,6 +45,7 @@ class HomeSidebarActions {
     this.onOpenCategories,
     this.onOpenRanking,
     this.onOpenDownloads,
+    this.onOpenAnnouncements,
     this.onOpenSettings,
     this.onOpenLines,
   });
@@ -57,6 +59,7 @@ class HomeSidebarActions {
   final VoidCallback? onOpenCategories;
   final VoidCallback? onOpenRanking;
   final VoidCallback? onOpenDownloads;
+  final VoidCallback? onOpenAnnouncements;
   final VoidCallback? onOpenSettings;
   final VoidCallback? onOpenLines;
 
@@ -66,6 +69,7 @@ class HomeSidebarActions {
       HomeDrawerDestination.categories => onOpenCategories,
       HomeDrawerDestination.ranking => onOpenRanking,
       HomeDrawerDestination.downloads => onOpenDownloads,
+      HomeDrawerDestination.announcements => onOpenAnnouncements,
       HomeDrawerDestination.lines => onOpenLines,
       HomeDrawerDestination.settings => onOpenSettings,
     };
@@ -84,6 +88,7 @@ class HomeSidebarItem {
       HomeDrawerDestination.categories => l10n(context).homeMenuCategories,
       HomeDrawerDestination.ranking => l10n(context).homeMenuRanking,
       HomeDrawerDestination.downloads => l10n(context).homeMenuDownloads,
+      HomeDrawerDestination.announcements => l10n(context).announcementTitle,
       HomeDrawerDestination.lines => l10n(context).homeMenuLines,
       HomeDrawerDestination.settings => l10n(context).settingsTitle,
     };
@@ -118,6 +123,10 @@ const homeSidebarPrimaryItems = <HomeSidebarItem>[
 ];
 
 const homeSidebarSecondaryItems = <HomeSidebarItem>[
+  HomeSidebarItem(
+    destination: HomeDrawerDestination.announcements,
+    icon: Icons.notifications_none_rounded,
+  ),
   HomeSidebarItem(
     destination: HomeDrawerDestination.lines,
     icon: Icons.alt_route_outlined,

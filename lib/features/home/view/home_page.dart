@@ -45,6 +45,7 @@ class HazukiHomePage extends StatefulWidget {
 class _HazukiHomePageState extends State<HazukiHomePage> {
   late final HomeCoordinator _coordinator;
   HomeDrawerDestination? _selectedDrawerDestination;
+  bool _showingPopupAnnouncement = false;
 
   Widget _buildComicDetailPage(
     ExploreComic comic,
@@ -71,6 +72,10 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
       sourceSwitchService: widget.services.sourceSwitchService,
       imageService: widget.services.imageService,
       dailyRecommendationService: widget.services.dailyRecommendationService,
+      announcementService: widget.services.announcementService,
+    );
+    _coordinator.announcementService.addListener(
+      _handleAnnouncementStateChanged,
     );
     _coordinator.start(context);
     WindowsComicDetailController.instance.panelBuilder =
@@ -86,11 +91,49 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
           shouldAnimateInitialRevealOverride: shouldAnimatePanelReveal,
           onCloseRequested: onCloseRequested,
         );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_loadAnnouncementsAndShowPopup());
+    });
+  }
+
+  Future<void> _loadAnnouncementsAndShowPopup() async {
+    await _coordinator.announcementService.refresh();
+    await _showNextPopupAnnouncement();
+  }
+
+  void _handleAnnouncementStateChanged() {
+    unawaited(_showNextPopupAnnouncement());
+  }
+
+  Future<void> _showNextPopupAnnouncement() async {
+    if (!mounted || _showingPopupAnnouncement) {
+      return;
+    }
+    _showingPopupAnnouncement = true;
+    try {
+      while (mounted) {
+        final announcement =
+            _coordinator.announcementService.nextPopupToPresent;
+        if (announcement == null) {
+          break;
+        }
+        if (!mounted) {
+          break;
+        }
+        await widget.services.showAnnouncement(context, announcement);
+        await _coordinator.announcementService.markPopupPresented(announcement);
+      }
+    } finally {
+      _showingPopupAnnouncement = false;
+    }
   }
 
   @override
   void dispose() {
     WindowsComicDetailController.instance.panelBuilder = null;
+    _coordinator.announcementService.removeListener(
+      _handleAnnouncementStateChanged,
+    );
     _coordinator.dispose();
     super.dispose();
   }
@@ -137,12 +180,16 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
                   actions: const HomeSidebarActions(),
                   currentIndex: _coordinator.currentIndex,
                   selectedDestination: _selectedDrawerDestination,
+                  unreadAnnouncementCount:
+                      _coordinator.announcementService.unreadCount,
                 )
               : HomeDrawerContent(
                   profile: sidebarProfile,
                   actions: const HomeSidebarActions(),
                   activeSourceKey: _coordinator.sourceService.activeSourceKey,
                   selectedDestination: _selectedDrawerDestination,
+                  unreadAnnouncementCount:
+                      _coordinator.announcementService.unreadCount,
                 ),
           appearanceSettings: widget.appearanceSettings,
           onAppearanceChanged: widget.onAppearanceChanged,
@@ -310,6 +357,12 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
               await _coordinator.loadOtherSettings(context);
             }());
           },
+          onOpenAnnouncements: () {
+            setState(() {
+              _selectedDrawerDestination = HomeDrawerDestination.announcements;
+            });
+            unawaited(navigation.openAnnouncements());
+          },
           onOpenLines: () {
             setState(() {
               _selectedDrawerDestination = HomeDrawerDestination.lines;
@@ -317,6 +370,7 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
             unawaited(navigation.openLines());
           },
           selectedDrawerDestination: _selectedDrawerDestination,
+          unreadAnnouncementCount: _coordinator.announcementService.unreadCount,
           onDestinationSelected: (index) {
             setState(() {
               _selectedDrawerDestination = null;
