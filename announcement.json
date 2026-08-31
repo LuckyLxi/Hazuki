@@ -3,11 +3,10 @@
   "version": 1,
   "announcements": [
     {
-      "id": "release-v1-1-8-2026-08-31",
+      "id": "release-v1-1-8-2026-08-30",
       "level": "normal",
       "presentation": [
-        "card",
-        "popup"
+        "card"
       ],
       "title": "🎉 Hazuki v1.1.8 正式发布",
       "publishedAt": "2026-08-31T22:30:00+08:00",
