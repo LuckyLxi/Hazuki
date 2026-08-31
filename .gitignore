@@ -73,6 +73,9 @@ coverage/
 # Local commit-message scratch files
 .commit-msg.tmp
 
+# Local announcement documentation
+ANNOUNCEMENT_GUIDE.md
+
 # Flutter ephemeral files
 **/ephemeral/
 **/Generated.xcconfig
