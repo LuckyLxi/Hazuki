@@ -1,1 +1,31 @@
 
+{
+  "version": 1,
+  "announcements": [
+    {
+      "id": "release-v1-1-8-2026-08-31",
+      "level": "normal",
+      "presentation": [
+        "card",
+        "popup"
+      ],
+      "title": "🎉 Hazuki v1.1.8 正式发布",
+      "publishedAt": "2026-08-31T22:30:00+08:00",
+      "content": [
+        {
+          "type": "text",
+          "text": "欢迎使用 Hazuki v1.1.8！本次更新带来了全新公告中心与多项体验优化："
+        },
+        {
+          "type": "text",
+          "text": "• 新增应用内公告中心与发现页动态卡片\n• 探索分区首页支持内容筛选\n• 聚合搜索支持调整漫画源排序\n• 重构日志页面，优化动画与流畅度\n• 修复导航指示器与部分界面交互问题"
+        },
+        {
+          "type": "link",
+          "label": "查看 Releases 详情与下载",
+          "url": "https://github.com/LuckyLxi/Hazuki/releases/tag/v1.1.8"
+        }
+      ]
+    }
+  ]
+}
