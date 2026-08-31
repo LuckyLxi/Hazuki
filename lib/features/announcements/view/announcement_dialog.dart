@@ -20,16 +20,10 @@ Future<void> showAnnouncementDialog(
       onMorphLanding: onMorphLanding,
     );
   }
-  if (announcement.level == AnnouncementLevel.important) {
-    return _showImportantAnnouncementDialog(context, announcement);
-  }
-  return showDialog<void>(
-    context: context,
-    builder: (context) => _AnnouncementDialog(announcement: announcement),
-  );
+  return _showPopupAnnouncementDialog(context, announcement);
 }
 
-Future<void> _showImportantAnnouncementDialog(
+Future<void> _showPopupAnnouncementDialog(
   BuildContext context,
   Announcement announcement,
 ) {
@@ -39,8 +33,9 @@ Future<void> _showImportantAnnouncementDialog(
     barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
     barrierColor: Colors.black.withValues(alpha: 0.42),
     transitionDuration: const Duration(milliseconds: 320),
-    pageBuilder: (context, animation, secondaryAnimation) =>
-        _AnnouncementDialog(announcement: announcement),
+    pageBuilder: (context, animation, secondaryAnimation) => SafeArea(
+      child: _AnnouncementDialog(announcement: announcement),
+    ),
     transitionBuilder: (context, animation, secondaryAnimation, child) {
       final fadeAnimation = CurvedAnimation(
         parent: animation,
@@ -58,7 +53,7 @@ Future<void> _showImportantAnnouncementDialog(
         reverseCurve: Curves.easeInCubic,
       );
       return FadeTransition(
-        key: const ValueKey<String>('important_announcement_fade_transition'),
+        key: const ValueKey<String>('popup_announcement_fade_transition'),
         opacity: fadeAnimation,
         child: SlideTransition(
           position: Tween<Offset>(
@@ -66,9 +61,7 @@ Future<void> _showImportantAnnouncementDialog(
             end: Offset.zero,
           ).animate(movementAnimation),
           child: ScaleTransition(
-            key: const ValueKey<String>(
-              'important_announcement_scale_transition',
-            ),
+            key: const ValueKey<String>('popup_announcement_scale_transition'),
             scale: Tween<double>(begin: 0.9, end: 1).animate(scaleAnimation),
             child: child,
           ),
@@ -294,8 +287,12 @@ class _AnnouncementMorphDialogState extends State<_AnnouncementMorphDialog> {
             ).transform(progress);
             final launcherOpacity =
                 1 - const Interval(0.12, 0.42).transform(progress);
+            final launcherColor =
+                announcement.level == AnnouncementLevel.important
+                ? colorScheme.errorContainer
+                : colorScheme.primaryContainer;
             final shellColor = Color.lerp(
-              colorScheme.primaryContainer,
+              launcherColor,
               colorScheme.surfaceContainerHigh,
               expandProgress,
             )!;

@@ -191,7 +191,16 @@ void main() {
 
     await tester.pumpWidget(
       app(
-        DiscoverAnnouncementCard(announcement: announcement, service: service),
+        DiscoverAnnouncementCard(
+          announcement: announcement,
+          service: service,
+          onTap: (anchorContext, onMorphLanding) => showAnnouncementDialog(
+            anchorContext,
+            announcement,
+            morphFromSource: true,
+            onMorphLanding: onMorphLanding,
+          ),
+        ),
       ),
     );
 
@@ -206,6 +215,18 @@ void main() {
       tester.widget<Icon>(find.byIcon(Icons.notifications_none_rounded)).color,
       Theme.of(context).colorScheme.error,
     );
+
+    await tester.tap(find.byType(DiscoverAnnouncementCard));
+    await tester.pump();
+
+    final morphMaterial = tester.widget<Material>(
+      find.byKey(const ValueKey<String>('announcement_morph_dialog')),
+    );
+    expect(morphMaterial.color, Theme.of(context).colorScheme.errorContainer);
+
+    await tester.pumpAndSettle();
+    await tester.tap(find.byType(FilledButton));
+    await tester.pumpAndSettle();
   });
 
   testWidgets(
@@ -593,37 +614,36 @@ void main() {
     },
   );
 
-  testWidgets('important announcement animates on open and close', (
+  testWidgets('normal popup announcement animates on open and close', (
     tester,
   ) async {
-    final importantAnnouncement = Announcement(
-      id: 'important-animation',
-      level: AnnouncementLevel.important,
+    final popupAnnouncement = Announcement(
+      id: 'normal-animation',
+      level: AnnouncementLevel.normal,
       presentation: const {AnnouncementPresentation.popup},
-      title: '重要通知',
+      title: '普通通知',
       publishedAt: DateTime.parse('2026-08-30T08:00:00+08:00'),
-      content: const [AnnouncementTextBlock('需要立即查看的内容')],
+      content: const [AnnouncementTextBlock('普通公告内容')],
     );
     await tester.pumpWidget(
       app(
         Builder(
           builder: (context) => FilledButton(
-            onPressed: () =>
-                showAnnouncementDialog(context, importantAnnouncement),
-            child: const Text('打开重要通知'),
+            onPressed: () => showAnnouncementDialog(context, popupAnnouncement),
+            child: const Text('打开普通通知'),
           ),
         ),
       ),
     );
 
-    await tester.tap(find.text('打开重要通知'));
+    await tester.tap(find.text('打开普通通知'));
     await tester.pump();
 
     final scaleTransition = find.byKey(
-      const ValueKey<String>('important_announcement_scale_transition'),
+      const ValueKey<String>('popup_announcement_scale_transition'),
     );
     final fadeTransition = find.byKey(
-      const ValueKey<String>('important_announcement_fade_transition'),
+      const ValueKey<String>('popup_announcement_fade_transition'),
     );
     expect(scaleTransition, findsOneWidget);
     expect(fadeTransition, findsOneWidget);
