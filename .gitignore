@@ -45,6 +45,7 @@ android/gradle_error.txt
 
 # Android-specific
 **/*.cxx/
+**/.kotlin/
 **/build/
 android/local.properties
 third_party/flutter_qjs/android/local.properties
