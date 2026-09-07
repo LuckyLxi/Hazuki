@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/app/app.dart';
 import 'package:hazuki/services/announcement_service.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
@@ -26,6 +27,7 @@ class DiscoverPage extends StatefulWidget {
     this.usePinnedSearchInAppBar = false,
     this.dailyRecommendationState =
         const DiscoverDailyRecommendationState.disabled(),
+    this.discoverSectionLayout = DiscoverSectionLayout.horizontal,
     this.onSearchMorphProgressChanged,
     this.onSearchTap,
     this.searchPageBuilder,
@@ -48,6 +50,7 @@ class DiscoverPage extends StatefulWidget {
   final ComicDetailPageBuilder comicDetailPageBuilder;
   final bool usePinnedSearchInAppBar;
   final DiscoverDailyRecommendationState dailyRecommendationState;
+  final DiscoverSectionLayout discoverSectionLayout;
   final ValueChanged<double>? onSearchMorphProgressChanged;
   final VoidCallback? onSearchTap;
   final WidgetBuilder? searchPageBuilder;
@@ -268,6 +271,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
       allowInitialLoad: widget.allowInitialLoad,
       hideLoadingUntilInitialLoadAllowed:
           widget.hideLoadingUntilInitialLoadAllowed,
+      sectionLayout: widget.discoverSectionLayout,
       comicDetailPageBuilder: widget.comicDetailPageBuilder,
       comicCoverHeroTagBuilder: widget.comicCoverHeroTagBuilder,
       sourceService: widget.sourceService,

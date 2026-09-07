@@ -79,6 +79,7 @@ typedef HomeDiscoverTabBuilder =
     Widget Function({
       required ComicDetailPageBuilder comicDetailPageBuilder,
       required DiscoverDailyRecommendationState dailyRecommendationState,
+      required DiscoverSectionLayout discoverSectionLayout,
       required bool allowInitialLoad,
       required bool hideLoadingUntilInitialLoadAllowed,
       required ValueChanged<double> onSearchMorphProgressChanged,

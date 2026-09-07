@@ -229,6 +229,8 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
         final discoverChild = widget.featureEntrypoints.buildDiscoverTab(
           comicDetailPageBuilder: navigation.buildComicDetailPage,
           dailyRecommendationState: _coordinator.dailyRecommendationState,
+          discoverSectionLayout:
+              widget.appearanceSettings.discoverSectionLayout,
           allowInitialLoad: widget.allowDiscoverInitialLoad,
           hideLoadingUntilInitialLoadAllowed:
               widget.hideDiscoverLoadingUntilAllowed,

@@ -234,6 +234,7 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
         ({
           required comicDetailPageBuilder,
           required dailyRecommendationState,
+          required discoverSectionLayout,
           required allowInitialLoad,
           required hideLoadingUntilInitialLoadAllowed,
           required onSearchMorphProgressChanged,
@@ -257,6 +258,7 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
             comicDetailPageBuilder: comicDetailPageBuilder,
             usePinnedSearchInAppBar: true,
             dailyRecommendationState: dailyRecommendationState,
+            discoverSectionLayout: discoverSectionLayout,
             allowInitialLoad: allowInitialLoad,
             hideLoadingUntilInitialLoadAllowed:
                 hideLoadingUntilInitialLoadAllowed,

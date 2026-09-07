@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import 'package:hazuki/app/app.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/widgets/widgets.dart';
@@ -20,6 +21,7 @@ class DiscoverPageBody extends StatelessWidget {
     this.onLoginPressed,
     required this.allowInitialLoad,
     required this.hideLoadingUntilInitialLoadAllowed,
+    required this.sectionLayout,
     required this.comicDetailPageBuilder,
     required this.comicCoverHeroTagBuilder,
     required this.sourceService,
@@ -33,6 +35,7 @@ class DiscoverPageBody extends StatelessWidget {
   final VoidCallback? onLoginPressed;
   final bool allowInitialLoad;
   final bool hideLoadingUntilInitialLoadAllowed;
+  final DiscoverSectionLayout sectionLayout;
   final ComicDetailPageBuilder comicDetailPageBuilder;
   final ComicHeroTagBuilder comicCoverHeroTagBuilder;
   final SourceDiscoverGateway sourceService;
@@ -83,6 +86,7 @@ class DiscoverPageBody extends StatelessWidget {
               return DiscoverSectionBlock(
                 section: controller.sections[sectionIndex],
                 sectionIndex: sectionIndex,
+                layout: sectionLayout,
                 loadingMore: controller.isSectionLoadingMore(sectionIndex),
                 hasMore: controller.sectionHasMore(sectionIndex),
                 onLoadMore: () => controller.loadMoreSection(sectionIndex),

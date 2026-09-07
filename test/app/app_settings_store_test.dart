@@ -37,4 +37,19 @@ void main() {
 
     expect(enabled.copyWith(liquidGlassEnabled: false), isNot(enabled));
   });
+
+  test('discover section layout defaults to horizontal and persists', () async {
+    SharedPreferences.setMockInitialValues(<String, Object>{});
+    const store = HazukiAppSettingsStore();
+
+    final initial = await store.loadAppearance();
+    expect(initial.discoverSectionLayout, DiscoverSectionLayout.horizontal);
+
+    await store.saveAppearance(
+      initial.copyWith(discoverSectionLayout: DiscoverSectionLayout.grid3),
+    );
+
+    final persisted = await store.loadAppearance();
+    expect(persisted.discoverSectionLayout, DiscoverSectionLayout.grid3);
+  });
 }
