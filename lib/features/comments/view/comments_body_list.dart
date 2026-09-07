@@ -232,9 +232,12 @@ class _CommentsContent extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const HazukiSandyLoadingIndicator(size: 144),
-            const SizedBox(height: 10),
-            Text(l10n(context).commonLoading),
+            SizedBox.square(
+              dimension: 64,
+              child: LoadingIndicatorM3E(
+                semanticLabel: l10n(context).commonLoading,
+              ),
+            ),
           ],
         ),
       );

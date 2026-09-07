@@ -12,6 +12,7 @@ import 'package:hazuki/services/source/runtime/source_runtime_registry.dart';
 import 'package:hazuki/services/manga_download/manga_download_service.dart';
 import 'package:hazuki/services/manga_download/manga_download_storage_support.dart';
 import 'package:hazuki/services/password_lock_service.dart';
+import 'package:hazuki/shared/liquid_glass_support.dart';
 import 'package:hazuki/shared/ui_flags.dart';
 
 class AppBootstrapResult {
@@ -31,22 +32,40 @@ class AppBootstrapResult {
 Future<AppBootstrapResult> bootstrapApp() async {
   WidgetsFlutterBinding.ensureInitialized();
   registerServices();
-  await loadHazukiUiFlags();
-  await sl<SourceRuntimeRegistry>().loadActiveSourcePreference();
-  await sl<SourceDebugGateway>().loadSoftwareLogCaptureEnabled();
-  await _ensureAndroidNoMediaMarker();
-  await sl<MangaDownloadService>().ensureInitialized();
-  await sl<PasswordLockService>().ensureInitialized();
-  await sl<CommentFilterService>().load();
 
   const settingsStore = HazukiAppSettingsStore();
-  final initialAppearance = await settingsStore.loadAppearance();
-  final initialLocale = await settingsStore.loadLocalePreference();
-  final initialUseSystemTitleBar = await settingsStore.loadUseSystemTitleBar();
+  final appearanceFuture = settingsStore.loadAppearance();
+  final localeFuture = settingsStore.loadLocalePreference();
+  final useSystemTitleBarFuture = settingsStore.loadUseSystemTitleBar();
+  final sourcePreferenceFuture = sl<SourceRuntimeRegistry>()
+      .loadActiveSourcePreference();
 
-  if (Platform.isWindows) {
-    await _initWindowsWindow(useSystemTitleBar: initialUseSystemTitleBar);
-  }
+  // These startup reads are independent. Running them together keeps the
+  // native launch screen visible for the slowest task instead of their sum.
+  await Future.wait<void>([
+    loadHazukiUiFlags(),
+    sourcePreferenceFuture,
+    sourcePreferenceFuture
+        .then((_) => sl<SourceDebugGateway>().loadSoftwareLogCaptureEnabled())
+        .then((_) {}),
+    _ensureAndroidNoMediaMarker(),
+    sl<MangaDownloadService>().ensureInitialized(),
+    sl<PasswordLockService>().ensureInitialized(),
+    sl<CommentFilterService>().load(),
+    appearanceFuture.then(
+      (appearance) =>
+          HazukiLiquidGlass.initialize(enabled: appearance.liquidGlassEnabled),
+    ),
+    if (Platform.isWindows)
+      useSystemTitleBarFuture.then(
+        (useSystemTitleBar) =>
+            _initWindowsWindow(useSystemTitleBar: useSystemTitleBar),
+      ),
+  ]);
+
+  final initialAppearance = await appearanceFuture;
+  final initialLocale = await localeFuture;
+  final initialUseSystemTitleBar = await useSystemTitleBarFuture;
 
   return AppBootstrapResult(
     settingsStore: settingsStore,

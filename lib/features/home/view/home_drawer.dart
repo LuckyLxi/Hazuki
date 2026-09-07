@@ -41,7 +41,9 @@ class HomeDrawer extends StatelessWidget {
     required this.onOpenRanking,
     required this.onOpenDownloads,
     required this.onOpenSettings,
+    this.onOpenAnnouncements,
     required this.onOpenLines,
+    this.unreadAnnouncementCount = 0,
     this.activeSourceKey = '',
     this.selectedDestination,
   });
@@ -62,7 +64,9 @@ class HomeDrawer extends StatelessWidget {
   final VoidCallback onOpenRanking;
   final VoidCallback onOpenDownloads;
   final VoidCallback onOpenSettings;
+  final VoidCallback? onOpenAnnouncements;
   final VoidCallback onOpenLines;
+  final int unreadAnnouncementCount;
   final String activeSourceKey;
   final HomeDrawerDestination? selectedDestination;
 
@@ -90,10 +94,12 @@ class HomeDrawer extends StatelessWidget {
           onOpenRanking: onOpenRanking,
           onOpenDownloads: onOpenDownloads,
           onOpenSettings: onOpenSettings,
+          onOpenAnnouncements: onOpenAnnouncements,
           onOpenLines: onOpenLines,
         ),
         activeSourceKey: activeSourceKey,
         selectedDestination: selectedDestination,
+        unreadAnnouncementCount: unreadAnnouncementCount,
       ),
     );
   }

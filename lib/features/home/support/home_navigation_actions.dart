@@ -141,6 +141,13 @@ class HomeNavigationActions {
     );
   }
 
+  Future<void> openAnnouncements() async {
+    await _openDrawerDestination(
+      hideComicDetailPanel: true,
+      featureEntrypoints.buildAnnouncementsPage,
+    );
+  }
+
   Future<void> _openDrawerDestination(
     WidgetBuilder builder, {
     bool hideComicDetailPanel = false,

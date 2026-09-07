@@ -39,9 +39,6 @@ import 'features/password_lock/view/password_lock_widgets.dart';
 Future<void> main() async {
   final bootstrap = await bootstrapApp();
   _installErrorLogging(sl<SourceDebugGateway>());
-  await HazukiLiquidGlass.initialize(
-    enabled: bootstrap.initialAppearance.liquidGlassEnabled,
-  );
   runApp(
     HazukiLiquidGlass.wrap(
       child: HazukiApp(

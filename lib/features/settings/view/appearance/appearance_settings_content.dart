@@ -79,6 +79,75 @@ class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
     return raw;
   }
 
+  String _discoverSectionLayoutLabel(
+    AppLocalizations strings,
+    DiscoverSectionLayout layout,
+  ) {
+    return switch (layout) {
+      DiscoverSectionLayout.horizontal =>
+        strings.displayDiscoverLayoutHorizontal,
+      DiscoverSectionLayout.list => strings.displayDiscoverLayoutList,
+      DiscoverSectionLayout.grid2 => strings.displayDiscoverLayoutGrid2,
+      DiscoverSectionLayout.grid3 => strings.displayDiscoverLayoutGrid3,
+    };
+  }
+
+  Future<void> _handleDiscoverSectionLayoutTap(BuildContext context) async {
+    final strings = AppLocalizations.of(context)!;
+    final selected = await showModalBottomSheet<DiscoverSectionLayout>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (sheetContext) {
+        final colorScheme = Theme.of(sheetContext).colorScheme;
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(4, 4, 4, 16),
+                  child: Text(
+                    strings.displayDiscoverLayoutTitle,
+                    style: Theme.of(sheetContext).textTheme.titleLarge,
+                  ),
+                ),
+                GridView.count(
+                  key: const ValueKey('discover-layout-picker-grid'),
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  crossAxisCount: 2,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  childAspectRatio: 2.15,
+                  children: [
+                    for (final layout in DiscoverSectionLayout.values)
+                      _DiscoverLayoutOption(
+                        layout: layout,
+                        label: _discoverSectionLayoutLabel(strings, layout),
+                        selected:
+                            widget.settings.discoverSectionLayout == layout,
+                        colorScheme: colorScheme,
+                        onTap: () => Navigator.of(sheetContext).pop(layout),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (selected == null || selected == widget.settings.discoverSectionLayout) {
+      return;
+    }
+    await widget.onApply(
+      widget.settings.copyWith(discoverSectionLayout: selected),
+    );
+  }
+
   Future<void> _handleLocaleTap(BuildContext context) async {
     final next = await showAppearanceLocaleDialog(
       context,
@@ -390,6 +459,27 @@ class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
         SettingsGroup(
           children: [
             ListTile(
+              leading: const Icon(Icons.view_quilt_outlined),
+              title: Text(strings.displayDiscoverLayoutTitle),
+              subtitle: Text(
+                theme.platform == TargetPlatform.windows
+                    ? strings.displayDiscoverLayoutAdaptiveWall
+                    : _discoverSectionLayoutLabel(
+                        strings,
+                        widget.settings.discoverSectionLayout,
+                      ),
+              ),
+              trailing: theme.platform == TargetPlatform.windows
+                  ? null
+                  : const Icon(Icons.chevron_right_rounded),
+              onTap: theme.platform == TargetPlatform.windows
+                  ? null
+                  : () {
+                      unawaited(_handleDiscoverSectionLayoutTap(context));
+                    },
+            ),
+            const Divider(height: 1, indent: 56),
+            ListTile(
               leading: const Icon(Icons.language_rounded),
               title: Text(strings.displayLanguageTitle),
               subtitle: Text(_localeLabel(strings)),
@@ -559,6 +649,84 @@ class _AppearanceSettingsContentState extends State<AppearanceSettingsContent> {
         ),
         const SizedBox(height: 24),
       ],
+    );
+  }
+}
+
+class _DiscoverLayoutOption extends StatelessWidget {
+  const _DiscoverLayoutOption({
+    required this.layout,
+    required this.label,
+    required this.selected,
+    required this.colorScheme,
+    required this.onTap,
+  });
+
+  final DiscoverSectionLayout layout;
+  final String label;
+  final bool selected;
+  final ColorScheme colorScheme;
+  final VoidCallback onTap;
+
+  IconData get _icon => switch (layout) {
+    DiscoverSectionLayout.horizontal => Icons.view_carousel_outlined,
+    DiscoverSectionLayout.list => Icons.view_agenda_outlined,
+    DiscoverSectionLayout.grid2 => Icons.grid_view_rounded,
+    DiscoverSectionLayout.grid3 => Icons.apps_rounded,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected
+          ? colorScheme.primaryContainer
+          : colorScheme.surfaceContainerHigh,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: selected ? colorScheme.primary : colorScheme.outlineVariant,
+          width: selected ? 1.5 : 1,
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(
+            children: [
+              Icon(
+                _icon,
+                color: selected
+                    ? colorScheme.onPrimaryContainer
+                    : colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                    color: selected
+                        ? colorScheme.onPrimaryContainer
+                        : colorScheme.onSurface,
+                  ),
+                ),
+              ),
+              if (selected) ...[
+                const SizedBox(width: 4),
+                Icon(
+                  Icons.check_circle_rounded,
+                  size: 20,
+                  color: colorScheme.primary,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

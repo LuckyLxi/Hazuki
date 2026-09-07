@@ -678,13 +678,13 @@ class _KeywordChipsSection extends StatelessWidget {
             ],
           ),
           if (keywords.length > _collapseThreshold) ...[
-            const SizedBox(height: 6),
-            GestureDetector(
+            const SizedBox(height: 2),
+            InkWell(
               onTap: onToggleExpand,
-              child: Padding(
-                padding: const EdgeInsets.only(top: 2),
+              borderRadius: BorderRadius.circular(8),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(minHeight: 44),
                 child: Row(
-                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
                       showAll ? Icons.expand_less : Icons.expand_more,
@@ -758,7 +758,6 @@ class _KeywordChip extends StatelessWidget {
                 color: colorScheme.onSecondaryContainer.withValues(alpha: 0.7),
               ),
             ),
-            const SizedBox(width: 4),
           ],
         ),
       ),

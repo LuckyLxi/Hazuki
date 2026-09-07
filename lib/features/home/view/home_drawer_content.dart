@@ -10,12 +10,14 @@ class HomeDrawerContent extends StatelessWidget {
     required this.actions,
     required this.activeSourceKey,
     this.selectedDestination,
+    this.unreadAnnouncementCount = 0,
   });
 
   final HomeSidebarProfileState profile;
   final HomeSidebarActions actions;
   final String activeSourceKey;
   final HomeDrawerDestination? selectedDestination;
+  final int unreadAnnouncementCount;
 
   @override
   Widget build(BuildContext context) {
@@ -43,6 +45,7 @@ class HomeDrawerContent extends StatelessWidget {
               actions: actions,
               selectedDestination: selectedDestination,
               bottomPadding: bottomPadding,
+              unreadAnnouncementCount: unreadAnnouncementCount,
             ),
           ),
         ],
@@ -56,11 +59,13 @@ class _HomeDrawerMenu extends StatelessWidget {
     required this.actions,
     required this.selectedDestination,
     required this.bottomPadding,
+    required this.unreadAnnouncementCount,
   });
 
   final HomeSidebarActions actions;
   final HomeDrawerDestination? selectedDestination;
   final double bottomPadding;
+  final int unreadAnnouncementCount;
 
   @override
   Widget build(BuildContext context) {
@@ -88,6 +93,9 @@ class _HomeDrawerMenu extends StatelessWidget {
             item: item,
             actions: actions,
             selectedDestination: selectedDestination,
+            unreadCount: item.destination == HomeDrawerDestination.announcements
+                ? unreadAnnouncementCount
+                : 0,
           ),
       ],
     );
@@ -99,11 +107,13 @@ class _HomeDrawerMenuItem extends StatelessWidget {
     required this.item,
     required this.actions,
     required this.selectedDestination,
+    this.unreadCount = 0,
   });
 
   final HomeSidebarItem item;
   final HomeSidebarActions actions;
   final HomeDrawerDestination? selectedDestination;
+  final int unreadCount;
 
   @override
   Widget build(BuildContext context) {
@@ -121,6 +131,9 @@ class _HomeDrawerMenuItem extends StatelessWidget {
             item.icon,
             color: selected ? selectedForeground : colorScheme.onSurfaceVariant,
           ),
+          trailing: unreadCount > 0
+              ? Badge(label: Text(unreadCount > 99 ? '99+' : '$unreadCount'))
+              : null,
           title: Text(
             item.title(context),
             style: TextStyle(

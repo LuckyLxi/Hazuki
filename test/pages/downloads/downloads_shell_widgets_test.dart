@@ -56,7 +56,11 @@ void main() {
       ),
     );
 
-    expect(find.byIcon(Icons.checklist_rounded), findsNothing);
+    expect(_transitionOpacity(tester, _downloadedActionsKey), 0);
+    expect(_transitionExcludesFocus(tester, _downloadedActionsKey), isTrue);
+    expect(_transitionExcludesSemantics(tester, _downloadedActionsKey), isTrue);
+    expect(_transitionExcludesFocus(tester, _ongoingActionsKey), isFalse);
+    expect(_transitionExcludesSemantics(tester, _ongoingActionsKey), isFalse);
 
     await tester.pumpWidget(
       _wrapWithAppBar(
@@ -64,6 +68,14 @@ void main() {
         onToggleSelectionMode: () => toggleCount++,
       ),
     );
+    expect(_transitionOpacity(tester, _downloadedActionsKey), 1);
+    expect(_transitionExcludesFocus(tester, _downloadedActionsKey), isFalse);
+    expect(
+      _transitionExcludesSemantics(tester, _downloadedActionsKey),
+      isFalse,
+    );
+    expect(_transitionExcludesFocus(tester, _ongoingActionsKey), isTrue);
+    expect(_transitionExcludesSemantics(tester, _ongoingActionsKey), isTrue);
     await tester.tap(find.byIcon(Icons.checklist_rounded));
 
     expect(toggleCount, 1);
@@ -76,10 +88,7 @@ void main() {
       _wrapWithAppBar(initialIndex: 0, onToggleSelectionMode: () {}),
     );
 
-    expect(
-      find.byKey(const ValueKey<String>('downloads_select_all_button')),
-      findsNothing,
-    );
+    expect(tester.getSize(find.byKey(_downloadedActionsKey)).width, 0);
     final pauseButton = find.ancestor(
       of: find.byIcon(Icons.pause_rounded),
       matching: find.byType(IconButton),
@@ -96,7 +105,7 @@ void main() {
       await tester.pumpWidget(
         _wrapWithAppBar(initialIndex: 1, onToggleSelectionMode: () {}),
       );
-      expect(find.byIcon(Icons.checklist_rounded), findsOneWidget);
+      expect(_transitionOpacity(tester, _downloadedActionsKey), 1);
 
       final gesture = await tester.startGesture(
         tester.getCenter(find.byType(TabBarView)),
@@ -104,7 +113,11 @@ void main() {
       await gesture.moveBy(const Offset(80, 0));
       await tester.pump();
 
-      expect(find.byIcon(Icons.checklist_rounded), findsOneWidget);
+      expect(
+        _transitionOpacity(tester, _downloadedActionsKey),
+        greaterThan(0.5),
+      );
+      expect(_transitionExcludesFocus(tester, _downloadedActionsKey), isFalse);
 
       await gesture.up();
     },
@@ -116,7 +129,7 @@ void main() {
     await tester.pumpWidget(
       _wrapWithAppBar(initialIndex: 1, onToggleSelectionMode: () {}),
     );
-    expect(find.byIcon(Icons.checklist_rounded), findsOneWidget);
+    expect(_transitionOpacity(tester, _downloadedActionsKey), 1);
 
     final gesture = await tester.startGesture(
       tester.getCenter(find.byType(TabBarView)),
@@ -125,7 +138,9 @@ void main() {
     await gesture.moveBy(Offset(tabViewWidth * 0.55, 0));
     await tester.pump();
 
-    expect(find.byIcon(Icons.checklist_rounded), findsNothing);
+    expect(_transitionOpacity(tester, _downloadedActionsKey), lessThan(0.5));
+    expect(_transitionExcludesFocus(tester, _downloadedActionsKey), isTrue);
+    expect(_transitionExcludesSemantics(tester, _downloadedActionsKey), isTrue);
 
     await gesture.up();
   });
@@ -136,7 +151,7 @@ void main() {
     await tester.pumpWidget(
       _wrapWithAppBar(initialIndex: 0, onToggleSelectionMode: () {}),
     );
-    expect(find.byIcon(Icons.checklist_rounded), findsNothing);
+    expect(_transitionOpacity(tester, _downloadedActionsKey), 0);
 
     final gesture = await tester.startGesture(
       tester.getCenter(find.byType(TabBarView)),
@@ -145,24 +160,32 @@ void main() {
     await gesture.moveBy(Offset(-tabViewWidth * 0.55, 0));
     await tester.pump();
 
-    expect(find.byIcon(Icons.checklist_rounded), findsOneWidget);
+    expect(_transitionOpacity(tester, _downloadedActionsKey), greaterThan(0.5));
+    expect(_transitionExcludesFocus(tester, _downloadedActionsKey), isFalse);
 
     await gesture.up();
   });
 
-  testWidgets(
-    'multi-select action appears immediately when downloaded tab is tapped',
-    (tester) async {
-      await tester.pumpWidget(
-        _wrapWithAppBar(initialIndex: 0, onToggleSelectionMode: () {}),
-      );
+  testWidgets('downloaded actions animate in when its tab is tapped', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _wrapWithAppBar(initialIndex: 0, onToggleSelectionMode: () {}),
+    );
 
-      await tester.tap(find.byType(Tab).at(1));
-      await tester.pump();
+    await tester.tap(find.byType(Tab).at(1));
+    await tester.pump();
+    expect(_transitionOpacity(tester, _downloadedActionsKey), 0);
 
-      expect(find.byIcon(Icons.checklist_rounded), findsOneWidget);
-    },
-  );
+    await tester.pump(const Duration(milliseconds: 150));
+    expect(
+      _transitionOpacity(tester, _downloadedActionsKey),
+      inExclusiveRange(0, 1),
+    );
+
+    await tester.pumpAndSettle();
+    expect(_transitionOpacity(tester, _downloadedActionsKey), 1);
+  });
 
   testWidgets('downloaded action button switches from scan to delete', (
     tester,
@@ -302,6 +325,25 @@ void main() {
         find.ancestor(of: button, matching: find.byType(AnimatedOpacity)),
       );
       expect(opacity.opacity, 0.0);
+      expect(
+        tester
+            .widgetList<ExcludeFocus>(
+              find.ancestor(of: button, matching: find.byType(ExcludeFocus)),
+            )
+            .any((guard) => guard.excluding),
+        isTrue,
+      );
+      expect(
+        tester
+            .widgetList<ExcludeSemantics>(
+              find.ancestor(
+                of: button,
+                matching: find.byType(ExcludeSemantics),
+              ),
+            )
+            .any((guard) => guard.excluding),
+        isTrue,
+      );
     },
   );
 
@@ -326,10 +368,63 @@ void main() {
         find.ancestor(of: button, matching: find.byType(AnimatedOpacity)),
       );
       expect(opacity.opacity, 1.0);
+      expect(
+        tester
+            .widgetList<ExcludeFocus>(
+              find.ancestor(of: button, matching: find.byType(ExcludeFocus)),
+            )
+            .every((guard) => !guard.excluding),
+        isTrue,
+      );
+      expect(
+        tester
+            .widgetList<ExcludeSemantics>(
+              find.ancestor(
+                of: button,
+                matching: find.byType(ExcludeSemantics),
+              ),
+            )
+            .every((guard) => !guard.excluding),
+        isTrue,
+      );
       await tester.tap(button);
       expect(selectAllCount, 1);
     },
   );
+}
+
+const _downloadedActionsKey = ValueKey<String>(
+  'downloads_downloaded_actions_transition',
+);
+const _ongoingActionsKey = ValueKey<String>(
+  'downloads_ongoing_actions_transition',
+);
+
+double _transitionOpacity(WidgetTester tester, Key key) {
+  final transition = find.byKey(key);
+  final opacity = find.descendant(
+    of: transition,
+    matching: find.byType(Opacity),
+  );
+  return tester.widget<Opacity>(opacity).opacity;
+}
+
+bool _transitionExcludesFocus(WidgetTester tester, Key key) {
+  final transition = find.byKey(key);
+  final focusGuard = find.descendant(
+    of: transition,
+    matching: find.byType(ExcludeFocus),
+  );
+  return tester.widgetList<ExcludeFocus>(focusGuard).first.excluding;
+}
+
+bool _transitionExcludesSemantics(WidgetTester tester, Key key) {
+  final transition = find.byKey(key);
+  final semanticsGuard = find.descendant(
+    of: transition,
+    matching: find.byType(ExcludeSemantics),
+  );
+  return tester.widgetList<ExcludeSemantics>(semanticsGuard).first.excluding;
 }
 
 Widget _wrapWithAppBar({

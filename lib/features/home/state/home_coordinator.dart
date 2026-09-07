@@ -5,6 +5,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
+import 'package:hazuki/services/announcement_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/features/home/state/home_profile_controller.dart';
 import 'package:hazuki/features/home/support/home_profile_flow.dart';
@@ -19,10 +20,12 @@ class HomeCoordinator extends ChangeNotifier {
     required SourceSwitchGateway sourceSwitchService,
     required SourceImageGateway imageService,
     required DiscoverDailyRecommendationService dailyRecommendationService,
+    required AnnouncementService announcementService,
   }) : _sourceService = sourceService,
        _sourceSwitchService = sourceSwitchService,
        _imageService = imageService,
        _dailyRecommendationService = dailyRecommendationService,
+       _announcementService = announcementService,
        _profileController = HomeProfileController(sourceService: sourceService),
        _shellController = HomeShellController(initialTabIndex: initialTabIndex),
        scaffoldKey = GlobalKey<ScaffoldState>(),
@@ -31,6 +34,7 @@ class HomeCoordinator extends ChangeNotifier {
     _profileController.addListener(_relayChange);
     _shellController.addListener(_relayChange);
     _dailyRecommendationService.addListener(_relayChange);
+    _announcementService.addListener(_relayChange);
     favoriteActionsBinding.addListener(_relayChange);
     _sourceService.addListener(_handleSourceChanged);
   }
@@ -45,6 +49,7 @@ class HomeCoordinator extends ChangeNotifier {
   final HomeProfileController _profileController;
   final HomeShellController _shellController;
   final DiscoverDailyRecommendationService _dailyRecommendationService;
+  final AnnouncementService _announcementService;
   final GlobalKey<ScaffoldState> scaffoldKey;
   final FavoritePageActionsBinding favoriteActionsBinding;
   bool _disposed = false;
@@ -73,6 +78,7 @@ class HomeCoordinator extends ChangeNotifier {
   bool get favoriteBackToTopVisible => favoriteActionsBinding.backToTopVisible;
   DiscoverDailyRecommendationState get dailyRecommendationState =>
       _dailyRecommendationService.state;
+  AnnouncementService get announcementService => _announcementService;
 
   void start(BuildContext context) {
     _context = context;
@@ -237,6 +243,7 @@ class HomeCoordinator extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _dailyRecommendationService.removeListener(_relayChange);
+    _announcementService.removeListener(_relayChange);
     favoriteActionsBinding.removeListener(_relayChange);
     _sourceService.removeListener(_handleSourceChanged);
     _profileController

@@ -20,17 +20,21 @@ void main() {
       await service.load();
     });
 
-    test('matches built-in phrases', () {
-      expect(service.isFiltered('快看免费发个传送门'), isTrue);
-      expect(service.isFiltered('已去广告 链接见头像'), isTrue);
+    test('does not filter without user keywords', () {
+      expect(service.isFiltered('快看免费发个传送门'), isFalse);
+      expect(service.isFiltered('已去广告 链接见头像'), isFalse);
     });
 
     test('does not match unrelated content', () {
       expect(service.isFiltered('这本漫画真好看'), isFalse);
     });
 
-    test('ignores invisible characters injected between characters', () {
-      // U+200B zero-width space inserted between every char of a builtin phrase.
+    test('ignores invisible characters injected between characters', () async {
+      await service.save(
+        userKeywords: ['免费发个'],
+        mode: CommentFilterMode.collapse,
+      );
+      // U+200B zero-width space inserted between every character.
       const obfuscated = '免​费​发​个';
       expect(service.isFiltered(obfuscated), isTrue);
     });

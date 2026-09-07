@@ -11,12 +11,14 @@ class HomeWindowsSidebar extends StatelessWidget {
     required this.actions,
     required this.currentIndex,
     required this.selectedDestination,
+    this.unreadAnnouncementCount = 0,
   });
 
   final HomeSidebarProfileState profile;
   final HomeSidebarActions actions;
   final int currentIndex;
   final HomeDrawerDestination? selectedDestination;
+  final int unreadAnnouncementCount;
 
   Widget _buildAvatar(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -85,12 +87,23 @@ class HomeWindowsSidebar extends StatelessWidget {
   }
 
   Widget _buildDestinationButton(BuildContext context, HomeSidebarItem item) {
-    return _buildButton(
+    final button = _buildButton(
       context,
       icon: item.icon,
       tooltip: item.title(context),
       selected: item.isSelected(selectedDestination),
       onTap: item.resolveTap(actions),
+    );
+    if (item.destination != HomeDrawerDestination.announcements ||
+        unreadAnnouncementCount <= 0) {
+      return button;
+    }
+    return Badge(
+      alignment: const AlignmentDirectional(0.58, -0.52),
+      label: Text(
+        unreadAnnouncementCount > 99 ? '99+' : '$unreadAnnouncementCount',
+      ),
+      child: button,
     );
   }
 

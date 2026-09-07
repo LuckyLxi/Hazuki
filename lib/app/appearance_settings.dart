@@ -5,6 +5,20 @@ import '../l10n/app_localizations.dart';
 const int hazukiDefaultAppearancePresetIndex = 0;
 const bool hazukiDefaultDynamicColorEnabled = false;
 
+enum DiscoverSectionLayout {
+  horizontal,
+  list,
+  grid2,
+  grid3;
+
+  static DiscoverSectionLayout decode(String? raw) {
+    return DiscoverSectionLayout.values.firstWhere(
+      (layout) => layout.name == raw,
+      orElse: () => DiscoverSectionLayout.horizontal,
+    );
+  }
+}
+
 typedef AppearanceSettingsApplyCallback =
     Future<void> Function(
       AppearanceSettingsData next, {
@@ -22,6 +36,7 @@ class AppearanceSettingsData {
     required this.comicDetailDynamicColor,
     required this.useSystemFont,
     this.liquidGlassEnabled = true,
+    this.discoverSectionLayout = DiscoverSectionLayout.horizontal,
   });
 
   final ThemeMode themeMode;
@@ -32,6 +47,7 @@ class AppearanceSettingsData {
   final bool comicDetailDynamicColor;
   final bool useSystemFont;
   final bool liquidGlassEnabled;
+  final DiscoverSectionLayout discoverSectionLayout;
 
   static ThemeMode decodeThemeMode(String? raw) {
     return switch (raw) {
@@ -58,6 +74,7 @@ class AppearanceSettingsData {
     bool? comicDetailDynamicColor,
     bool? useSystemFont,
     bool? liquidGlassEnabled,
+    DiscoverSectionLayout? discoverSectionLayout,
   }) {
     return AppearanceSettingsData(
       themeMode: themeMode ?? this.themeMode,
@@ -69,6 +86,8 @@ class AppearanceSettingsData {
           comicDetailDynamicColor ?? this.comicDetailDynamicColor,
       useSystemFont: useSystemFont ?? this.useSystemFont,
       liquidGlassEnabled: liquidGlassEnabled ?? this.liquidGlassEnabled,
+      discoverSectionLayout:
+          discoverSectionLayout ?? this.discoverSectionLayout,
     );
   }
 
@@ -85,7 +104,8 @@ class AppearanceSettingsData {
         other.displayModeRaw == displayModeRaw &&
         other.comicDetailDynamicColor == comicDetailDynamicColor &&
         other.useSystemFont == useSystemFont &&
-        other.liquidGlassEnabled == liquidGlassEnabled;
+        other.liquidGlassEnabled == liquidGlassEnabled &&
+        other.discoverSectionLayout == discoverSectionLayout;
   }
 
   @override
@@ -98,6 +118,7 @@ class AppearanceSettingsData {
     comicDetailDynamicColor,
     useSystemFont,
     liquidGlassEnabled,
+    discoverSectionLayout,
   );
 }
 

@@ -64,4 +64,49 @@ void main() {
       Alignment.center,
     );
   });
+
+  testWidgets('changes the discover section layout from appearance settings', (
+    tester,
+  ) async {
+    var settings = _initialSettings;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData(platform: TargetPlatform.android),
+        locale: const Locale('en'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: StatefulBuilder(
+            builder: (context, setState) {
+              return AppearanceSettingsContent(
+                settings: settings,
+                locale: const Locale('en'),
+                onApply: (next, {revealOrigin, revealSyncRegion}) async {
+                  setState(() {
+                    settings = next;
+                  });
+                },
+                onApplyLocale: (_) async {},
+                debugGateway: _MockSourceDebugGateway(),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Discover section layout'));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('discover-layout-picker-grid')),
+      findsOneWidget,
+    );
+    expect(find.byType(BottomSheet), findsOneWidget);
+    await tester.tap(find.text('2-column grid'));
+    await tester.pumpAndSettle();
+
+    expect(settings.discoverSectionLayout, DiscoverSectionLayout.grid2);
+    expect(find.text('2-column grid'), findsOneWidget);
+  });
 }

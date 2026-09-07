@@ -110,8 +110,10 @@ class HomeScaffoldShell extends StatefulWidget {
     required this.onOpenDownloads,
     required this.onOpenDownloadTasks,
     required this.onOpenSettings,
+    this.onOpenAnnouncements,
     required this.onOpenLines,
     this.selectedDrawerDestination,
+    this.unreadAnnouncementCount = 0,
     required this.onDestinationSelected,
   });
 
@@ -150,8 +152,10 @@ class HomeScaffoldShell extends StatefulWidget {
   final VoidCallback onOpenDownloads;
   final VoidCallback onOpenDownloadTasks;
   final VoidCallback onOpenSettings;
+  final VoidCallback? onOpenAnnouncements;
   final VoidCallback onOpenLines;
   final HomeDrawerDestination? selectedDrawerDestination;
+  final int unreadAnnouncementCount;
   final ValueChanged<int> onDestinationSelected;
 
   @override
@@ -198,6 +202,7 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
   VoidCallback get onOpenDownloads => widget.onOpenDownloads;
   VoidCallback get onOpenDownloadTasks => widget.onOpenDownloadTasks;
   VoidCallback get onOpenSettings => widget.onOpenSettings;
+  VoidCallback? get onOpenAnnouncements => widget.onOpenAnnouncements;
   VoidCallback get onOpenLines => widget.onOpenLines;
   HomeDrawerDestination? get selectedDrawerDestination =>
       widget.selectedDrawerDestination;
@@ -257,6 +262,7 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
       onOpenRanking: onOpenRanking,
       onOpenDownloads: onOpenDownloads,
       onOpenSettings: onOpenSettings,
+      onOpenAnnouncements: onOpenAnnouncements,
       onOpenLines: onOpenLines,
     );
     final mobileDrawerContent = HomeDrawerContent(
@@ -265,6 +271,7 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
       actions: sidebarActions,
       activeSourceKey: activeSourceKey,
       selectedDestination: selectedDrawerDestination,
+      unreadAnnouncementCount: widget.unreadAnnouncementCount,
     );
     final body = Platform.isWindows
         ? Row(
@@ -278,6 +285,7 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
                   actions: sidebarActions,
                   currentIndex: currentIndex,
                   selectedDestination: selectedDrawerDestination,
+                  unreadAnnouncementCount: widget.unreadAnnouncementCount,
                 ),
               ),
               Expanded(

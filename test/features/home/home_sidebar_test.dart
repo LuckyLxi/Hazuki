@@ -90,6 +90,38 @@ void main() {
     }
   });
 
+  testWidgets('drawer menu shows the announcement unread badge', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: const Scaffold(
+          body: Drawer(
+            child: HomeDrawerContent(
+              profile: _profile,
+              actions: HomeSidebarActions(),
+              activeSourceKey: 'test',
+              unreadAnnouncementCount: 3,
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final announcementTile = find.ancestor(
+      of: find.byIcon(Icons.notifications_none_rounded),
+      matching: find.byType(ListTile),
+    );
+
+    expect(announcementTile, findsOneWidget);
+    expect(
+      find.descendant(of: announcementTile, matching: find.text('3')),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('profile header preserves check-in transition settings', (
     tester,
   ) async {
