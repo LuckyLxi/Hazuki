@@ -251,13 +251,29 @@ class _AboutPageState extends State<AboutPage> {
               title: Text(strings.aboutThirdPartyLicensesTitle),
               subtitle: Text(strings.aboutThirdPartyLicensesSubtitle),
               onTap: () {
-                showLicensePage(
-                  context: context,
-                  applicationName: 'Hazuki',
-                  applicationVersion: _currentVersion ?? '1.0.0',
-                  applicationIcon: const Padding(
-                    padding: EdgeInsets.all(12),
-                    child: FlutterLogo(size: 48),
+                final theme = Theme.of(context);
+                unawaited(
+                  Navigator.of(context).push<void>(
+                    MaterialPageRoute<void>(
+                      builder: (_) => Theme(
+                        data: theme.copyWith(
+                          appBarTheme: theme.appBarTheme.copyWith(
+                            backgroundColor: colorScheme.surface,
+                            surfaceTintColor: Colors.transparent,
+                            elevation: 0,
+                            scrolledUnderElevation: 0,
+                          ),
+                        ),
+                        child: LicensePage(
+                          applicationName: 'Hazuki',
+                          applicationVersion: _currentVersion ?? '1.0.0',
+                          applicationIcon: const Padding(
+                            padding: EdgeInsets.all(12),
+                            child: FlutterLogo(size: 48),
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
                 );
               },

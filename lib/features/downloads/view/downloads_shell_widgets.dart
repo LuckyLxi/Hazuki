@@ -47,80 +47,14 @@ class DownloadsPageAppBar extends StatelessWidget
         tabIndex: tabController.index,
       ),
       actions: [
-        // 正在下载 tab 下显示的全部开始按钒
-        AnimatedBuilder(
-          animation: tabController.animation!,
-          builder: (context, child) {
-            final ongoingTabIsActive = _isOngoingTabActive(tabController);
-            return ongoingTabIsActive ? child! : const SizedBox.shrink();
-          },
-          child: IconButton(
-            tooltip: l10n(context).downloadsActionResumeAll,
-            icon: const Icon(Icons.play_arrow_rounded),
-            onPressed: onResumeAll,
-          ),
-        ),
-        // 正在下载 tab 下显示的全部暂停按钒
-        AnimatedBuilder(
-          animation: tabController.animation!,
-          builder: (context, child) {
-            final ongoingTabIsActive = _isOngoingTabActive(tabController);
-            return ongoingTabIsActive ? child! : const SizedBox.shrink();
-          },
-          child: IconButton(
-            tooltip: l10n(context).downloadsActionPauseAll,
-            icon: const Icon(Icons.pause_rounded),
-            onPressed: onPauseAll,
-          ),
-        ),
-        // 已下载 tab + 多选模式下显示的全选按钒，带出现/消失动画
-        AnimatedBuilder(
-          animation: tabController.animation!,
-          builder: (context, child) {
-            final downloadedTabIsActive = _isDownloadedTabActive(tabController);
-            // 只有在已下载 tab 且处于多选模式时才展示全选按钒
-            if (!downloadedTabIsActive) {
-              return const SizedBox.shrink();
-            }
-            final visible = selectionMode;
-            return AnimatedScale(
-              scale: visible ? 1.0 : 0.7,
-              duration: const Duration(milliseconds: 200),
-              curve: Curves.easeOutCubic,
-              child: AnimatedOpacity(
-                opacity: visible ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 180),
-                curve: Curves.easeOutCubic,
-                child: IgnorePointer(ignoring: !visible, child: child!),
-              ),
-            );
-          },
-          child: IconButton(
-            key: const ValueKey<String>('downloads_select_all_button'),
-            tooltip: l10n(context).commonSelectAll,
-            icon: Icon(
-              // 已全选时换成 done_all 图标提供视觉反馈，未全选时显示 select_all
-              allSelected ? Icons.done_all : Icons.select_all,
-            ),
-            onPressed: onSelectAll,
-          ),
-        ),
-        // 已下载 tab 下显示的选择按钒
-        AnimatedBuilder(
-          animation: tabController.animation!,
-          builder: (context, child) {
-            final downloadedTabIsActive = _isDownloadedTabActive(tabController);
-            return downloadedTabIsActive ? child! : const SizedBox.shrink();
-          },
-          child: IconButton(
-            tooltip: selectionMode
-                ? l10n(context).commonClose
-                : l10n(context).downloadsActionSelect,
-            icon: Icon(
-              selectionMode ? Icons.close_rounded : Icons.checklist_rounded,
-            ),
-            onPressed: onToggleSelectionMode,
-          ),
+        _DownloadsAnimatedAppBarActions(
+          tabController: tabController,
+          selectionMode: selectionMode,
+          allSelected: allSelected,
+          onToggleSelectionMode: onToggleSelectionMode,
+          onSelectAll: onSelectAll,
+          onPauseAll: onPauseAll,
+          onResumeAll: onResumeAll,
         ),
       ],
       bottom: TabBar(
@@ -134,18 +68,152 @@ class DownloadsPageAppBar extends StatelessWidget
   }
 }
 
-bool _isOngoingTabActive(TabController tabController) {
-  if (tabController.indexIsChanging) {
-    return tabController.index == 0;
+class _DownloadsAnimatedAppBarActions extends StatelessWidget {
+  const _DownloadsAnimatedAppBarActions({
+    required this.tabController,
+    required this.selectionMode,
+    required this.allSelected,
+    required this.onToggleSelectionMode,
+    required this.onSelectAll,
+    required this.onPauseAll,
+    required this.onResumeAll,
+  });
+
+  final TabController tabController;
+  final bool selectionMode;
+  final bool allSelected;
+  final VoidCallback onToggleSelectionMode;
+  final VoidCallback onSelectAll;
+  final VoidCallback onPauseAll;
+  final VoidCallback onResumeAll;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: tabController.animation!,
+      builder: (context, child) {
+        final downloadedVisibility = tabController.animation!.value.clamp(
+          0.0,
+          1.0,
+        );
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _DownloadsTabActionTransition(
+              key: const ValueKey<String>(
+                'downloads_ongoing_actions_transition',
+              ),
+              visibility: 1 - downloadedVisibility,
+              interactive: downloadedVisibility < 0.5,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    tooltip: l10n(context).downloadsActionResumeAll,
+                    icon: const Icon(Icons.play_arrow_rounded),
+                    onPressed: onResumeAll,
+                  ),
+                  IconButton(
+                    tooltip: l10n(context).downloadsActionPauseAll,
+                    icon: const Icon(Icons.pause_rounded),
+                    onPressed: onPauseAll,
+                  ),
+                ],
+              ),
+            ),
+            _DownloadsTabActionTransition(
+              key: const ValueKey<String>(
+                'downloads_downloaded_actions_transition',
+              ),
+              visibility: downloadedVisibility,
+              interactive: downloadedVisibility >= 0.5,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  AnimatedScale(
+                    scale: selectionMode ? 1.0 : 0.7,
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeOutCubic,
+                    child: AnimatedOpacity(
+                      opacity: selectionMode ? 1.0 : 0.0,
+                      duration: const Duration(milliseconds: 180),
+                      curve: Curves.easeOutCubic,
+                      child: ExcludeSemantics(
+                        excluding: !selectionMode,
+                        child: ExcludeFocus(
+                          excluding: !selectionMode,
+                          child: IgnorePointer(
+                            ignoring: !selectionMode,
+                            child: IconButton(
+                              key: const ValueKey<String>(
+                                'downloads_select_all_button',
+                              ),
+                              tooltip: l10n(context).commonSelectAll,
+                              icon: Icon(
+                                allSelected ? Icons.done_all : Icons.select_all,
+                              ),
+                              onPressed: onSelectAll,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: selectionMode
+                        ? l10n(context).commonClose
+                        : l10n(context).downloadsActionSelect,
+                    icon: Icon(
+                      selectionMode
+                          ? Icons.close_rounded
+                          : Icons.checklist_rounded,
+                    ),
+                    onPressed: onToggleSelectionMode,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
-  return tabController.animation!.value < 0.5;
 }
 
-bool _isDownloadedTabActive(TabController tabController) {
-  if (tabController.indexIsChanging) {
-    return tabController.index == 1;
+class _DownloadsTabActionTransition extends StatelessWidget {
+  const _DownloadsTabActionTransition({
+    super.key,
+    required this.visibility,
+    required this.interactive,
+    required this.child,
+  });
+
+  final double visibility;
+  final bool interactive;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRect(
+      child: Align(
+        alignment: Alignment.centerRight,
+        widthFactor: visibility,
+        child: Opacity(
+          opacity: visibility,
+          child: Transform.translate(
+            offset: Offset(8 * (1 - visibility), 0),
+            child: ExcludeSemantics(
+              excluding: !interactive,
+              child: ExcludeFocus(
+                excluding: !interactive,
+                child: IgnorePointer(ignoring: !interactive, child: child),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
-  return tabController.animation!.value >= 0.5;
 }
 
 class DownloadsScanButton extends StatelessWidget {

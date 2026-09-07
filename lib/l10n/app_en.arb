@@ -143,7 +143,7 @@
     }
   },
   "otherCommentFilterTitle": "Comment Filter",
-  "otherCommentFilterSubtitle": "Filter spam and inappropriate comments",
+  "otherCommentFilterSubtitle": "Filter content you don't want to see",
   "otherCopyMangaImageQualityTitle": "CopyManga image quality",
   "otherCopyMangaImageQualitySubtitle": "Used for subsequent chapter image URLs",
   "otherCopyMangaImageQualityLow": "Low (800)",
@@ -1228,7 +1228,7 @@
   "advancedCopyMangaClearDeviceSubtitle": "Clear device IDs. They regenerate on the next request.",
   "advancedCopyMangaDeviceCleared": "CopyManga device info cleared",
   "advancedEditSourceTitle": "Edit comic source",
-  "advancedEditSourceSubtitle": "Open a lightweight editor to edit and save the comic source",
+  "advancedEditSourceSubtitle": "Modify or view the comic source",
   "advancedRestoreSourceLabel": "Restore comic source",
   "advancedRestoreSourceSuccess": "Comic source restored",
   "sourceEditorLoading": "Loading comic source…",

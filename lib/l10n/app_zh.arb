@@ -143,7 +143,7 @@
     }
   },
   "otherCommentFilterTitle": "评论过滤",
-  "otherCommentFilterSubtitle": "过滤垃圾评论和违规内容",
+  "otherCommentFilterSubtitle": "过滤你不想看到的内容",
   "otherCopyMangaImageQualityTitle": "拷贝漫画图片质量",
   "otherCopyMangaImageQualitySubtitle": "用于后续章节图片地址",
   "otherCopyMangaImageQualityLow": "低（800）",
@@ -1228,7 +1228,7 @@
   "advancedCopyMangaClearDeviceSubtitle": "清除伪装客户端的设备标识，下次请求会重新生成",
   "advancedCopyMangaDeviceCleared": "拷贝漫画设备信息已清除",
   "advancedEditSourceTitle": "编辑漫画源",
-  "advancedEditSourceSubtitle": "打开轻量编辑器，修改并保存漫画源",
+  "advancedEditSourceSubtitle": "修改或查看漫画源",
   "advancedRestoreSourceLabel": "还原漫画源",
   "advancedRestoreSourceSuccess": "漫画源已还原",
   "sourceEditorLoading": "正在读取漫画源…",

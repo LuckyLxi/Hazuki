@@ -53,8 +53,15 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(title: Text(l10n(context).announcementTitle)),
+      appBar: AppBar(
+        title: Text(l10n(context).announcementTitle),
+        backgroundColor: colorScheme.surface,
+        surfaceTintColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+      ),
       body: ListenableBuilder(
         listenable: widget.service,
         builder: (context, _) {

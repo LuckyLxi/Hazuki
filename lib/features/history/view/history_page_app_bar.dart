@@ -29,6 +29,7 @@ class HistoryPageAppBar extends StatelessWidget implements PreferredSizeWidget {
 
     return hazukiFrostedAppBar(
       context: context,
+      enableBlur: false,
       title: Text(strings.historyTitle),
       actions: [
         if (hasHistory)

@@ -8,17 +8,6 @@ enum CommentFilterMode { collapse, hide }
 class CommentFilterService with ChangeNotifier {
   CommentFilterService();
 
-  static const builtinPhrases = [
-    '萝莉视频',
-    '幼和禁区',
-    '禁区视频',
-    '把我头像的链接',
-    '输入浏览器',
-    '已去广告',
-    '免费发个',
-    '拿走不用谢',
-  ];
-
   List<String> _userKeywords = [];
   CommentFilterMode _mode = CommentFilterMode.collapse;
 
@@ -103,9 +92,6 @@ class CommentFilterService with ChangeNotifier {
 
   bool isFiltered(String content) {
     final cleaned = _clean(content);
-    for (final phrase in builtinPhrases) {
-      if (cleaned.contains(phrase)) return true;
-    }
     for (final keyword in _userKeywords) {
       if (_matchesKeyword(cleaned, keyword)) return true;
     }
