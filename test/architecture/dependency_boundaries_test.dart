@@ -35,6 +35,28 @@ void main() {
     expect(violations, isEmpty, reason: violations.join('\n'));
   });
 
+  test('announcement feature consumers depend on contracts', () {
+    final violations = <String>[];
+    for (final directory in const ['lib/features', 'lib/app/home']) {
+      for (final file in _dartFilesUnder(directory)) {
+        for (final line in file.readAsLinesSync()) {
+          if (!line.trimLeft().startsWith('import ')) continue;
+          if (line.contains('services/announcement_service.dart') ||
+              line.contains('announcements/announcement_service.dart') ||
+              line.contains('announcements/announcement_remote_source.dart') ||
+              line.contains('announcements/announcement_store.dart')) {
+            violations.add('${file.path}: $line');
+          }
+        }
+      }
+    }
+    expect(
+      violations,
+      isEmpty,
+      reason: 'Announcement consumers must use contracts: $violations',
+    );
+  });
+
   test('source gateways do not import runtime implementations', () {
     final violations = <String>[];
     for (final file in _dartFilesUnder('lib/services/source/gateways')) {

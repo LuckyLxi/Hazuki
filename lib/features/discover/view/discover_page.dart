@@ -4,7 +4,8 @@ import 'package:flutter/material.dart';
 
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/app/app.dart';
-import 'package:hazuki/services/announcement_service.dart';
+import 'package:hazuki/services/announcements/announcement.dart';
+import 'package:hazuki/services/announcements/announcement_controller.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
@@ -40,7 +41,7 @@ class DiscoverPage extends StatefulWidget {
   final SourceDiscoverGateway sourceService;
   final SourceRecommendationGateway recommendationSource;
   final DiscoverDailyRecommendationService recommendationService;
-  final AnnouncementService? announcementService;
+  final AnnouncementController? announcementService;
   final Future<void> Function(
     BuildContext context,
     Announcement announcement,
@@ -241,7 +242,9 @@ class _DiscoverPageState extends State<DiscoverPage> {
     if (service != null && currentIndex == 0) {
       return DiscoverAnnouncementAnimatedSlot(
         announcements: service.discoverCardAnnouncements,
-        service: service,
+        isRead: service.isRead,
+        onHideCurrent: service.hideCardFromDiscover,
+        onHideAll: service.hideAllCardsFromDiscover,
         onTap: widget.onAnnouncementTap == null
             ? null
             : (anchorContext, announcement, onMorphLanding) =>

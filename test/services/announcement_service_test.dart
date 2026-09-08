@@ -1,8 +1,10 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:hazuki/services/announcement_service.dart';
 import 'package:hazuki/services/software_update/software_update_service.dart';
+import 'package:hazuki/shared/preferences/hazuki_preference_keys.dart';
 
 const _manifest = '''
 {
@@ -67,6 +69,28 @@ void main() {
       'LuckyLxi/Hazuki/main/announcement.json',
     );
   });
+
+  test(
+    'legacy remote loader keeps cached announcements on network error',
+    () async {
+      SharedPreferences.setMockInitialValues({
+        hazukiAnnouncementCachePreferenceKey: _manifest,
+      });
+      final service = AnnouncementService(
+        loadRemote: () async => throw DioException(
+          requestOptions: RequestOptions(path: 'announcement.json'),
+        ),
+        now: () => DateTime.parse('2026-08-31T12:00:00+08:00'),
+      );
+
+      await service.refresh();
+
+      expect(service.announcements, hasLength(2));
+      expect(service.latestDiscoverCard?.id, 'normal-1');
+      expect(service.isReadyForPopupPresentation, isTrue);
+      service.dispose();
+    },
+  );
 
   test('parses, sorts, and validates announcement content blocks', () {
     final announcements = parseAnnouncementManifest(_manifest)!;

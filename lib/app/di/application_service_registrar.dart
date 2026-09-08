@@ -1,7 +1,10 @@
 import 'package:get_it/get_it.dart';
 
+import '../../services/announcements/announcement_controller.dart';
+import '../../services/announcements/announcement_remote_source.dart';
+import '../../services/announcements/announcement_service.dart';
+import '../../services/announcements/announcement_store.dart';
 import '../../services/cloud_sync/cloud_sync_participant_set.dart';
-import '../../services/announcement_service.dart';
 import '../../services/cloud_sync_service.dart';
 import '../../services/comment_filter_service.dart';
 import '../../services/discover_daily_recommendation_service.dart';
@@ -26,8 +29,16 @@ import '../../services/storage/hazuki_database.dart';
 void registerApplicationServices(GetIt services) {
   if (!services.isRegistered<AnnouncementService>()) {
     services.registerLazySingleton<AnnouncementService>(
-      AnnouncementService.new,
+      () => AnnouncementService(
+        remoteSource: HttpAnnouncementRemoteSource(),
+        store: SharedPreferencesAnnouncementStore(),
+      ),
       dispose: (service) => service.dispose(),
+    );
+  }
+  if (!services.isRegistered<AnnouncementController>()) {
+    services.registerLazySingleton<AnnouncementController>(
+      () => services<AnnouncementService>(),
     );
   }
   if (!services.isRegistered<HazukiDatabase>()) {

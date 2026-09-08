@@ -55,7 +55,7 @@ void main() {
       app(
         DiscoverAnnouncementCard(
           announcement: service.latestDiscoverCard!,
-          service: service,
+          isRead: service.isRead(service.latestDiscoverCard!),
           onTap: (anchorContext, onMorphLanding) async {
             await showAnnouncementDialog(
               anchorContext,
@@ -193,7 +193,7 @@ void main() {
       app(
         DiscoverAnnouncementCard(
           announcement: announcement,
-          service: service,
+          isRead: service.isRead(announcement),
           onTap: (anchorContext, onMorphLanding) => showAnnouncementDialog(
             anchorContext,
             announcement,
@@ -242,7 +242,9 @@ void main() {
               updateSlot = setState;
               return DiscoverAnnouncementAnimatedSlot(
                 announcements: visibleAnnouncements,
-                service: service,
+                isRead: service.isRead,
+                onHideCurrent: service.hideCardFromDiscover,
+                onHideAll: service.hideAllCardsFromDiscover,
               );
             },
           ),
@@ -311,7 +313,9 @@ void main() {
           listenable: stackService,
           builder: (context, child) => DiscoverAnnouncementAnimatedSlot(
             announcements: stackService.discoverCardAnnouncements,
-            service: stackService,
+            isRead: stackService.isRead,
+            onHideCurrent: stackService.hideCardFromDiscover,
+            onHideAll: stackService.hideAllCardsFromDiscover,
           ),
         ),
       ),
@@ -443,7 +447,9 @@ void main() {
       app(
         DiscoverAnnouncementAnimatedSlot(
           announcements: deckService.discoverCardAnnouncements,
-          service: deckService,
+          isRead: deckService.isRead,
+          onHideCurrent: deckService.hideCardFromDiscover,
+          onHideAll: deckService.hideAllCardsFromDiscover,
         ),
       ),
     );
@@ -498,7 +504,7 @@ void main() {
       app(
         DiscoverAnnouncementCard(
           announcement: announcement,
-          service: service,
+          isRead: service.isRead(announcement),
           onTap: (anchorContext, onMorphLanding) => showAnnouncementDialog(
             anchorContext,
             announcement,
@@ -570,7 +576,7 @@ void main() {
         app(
           DiscoverAnnouncementCard(
             announcement: announcement,
-            service: service,
+            isRead: service.isRead(announcement),
             onTap: (anchorContext, onMorphLanding) => showAnnouncementDialog(
               anchorContext,
               announcement,

@@ -20,7 +20,6 @@ import 'package:hazuki/features/settings/support/settings_core_dependencies.dart
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
-import 'package:hazuki/services/announcement_service.dart';
 import 'package:hazuki/services/download_groups_service.dart';
 import 'package:hazuki/services/comment_filter_service.dart';
 import 'package:hazuki/services/cloud_sync_service.dart';
@@ -66,7 +65,7 @@ HomeServices buildHazukiHomeServices() {
     sourceSwitchService: sl<SourceSwitchGateway>(),
     imageService: sl<SourceImageGateway>(),
     dailyRecommendationService: sl<DiscoverDailyRecommendationService>(),
-    announcementService: sl<AnnouncementService>(),
+    announcementService: sl<AnnouncementController>(),
     downloadStatus: _MangaDownloadStatusAdapter(sl<MangaDownloadService>()),
     showAnnouncement: showAnnouncementDialog,
   );
@@ -245,7 +244,7 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
             sourceService: sl<SourceDiscoverGateway>(),
             recommendationSource: sl<SourceRecommendationGateway>(),
             recommendationService: sl<DiscoverDailyRecommendationService>(),
-            announcementService: sl<AnnouncementService>(),
+            announcementService: sl<AnnouncementController>(),
             onAnnouncementTap: (context, announcement, onMorphLanding) async {
               await showAnnouncementDialog(
                 context,
@@ -253,7 +252,7 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
                 morphFromSource: true,
                 onMorphLanding: onMorphLanding,
               );
-              await sl<AnnouncementService>().markRead(announcement);
+              await sl<AnnouncementController>().markRead(announcement);
             },
             comicDetailPageBuilder: comicDetailPageBuilder,
             usePinnedSearchInAppBar: true,
@@ -378,7 +377,7 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
       sourceService: settingsCoreDependencies.sourceSettings,
     ),
     buildAnnouncementsPage: (_) =>
-        AnnouncementPage(service: sl<AnnouncementService>()),
+        AnnouncementPage(service: sl<AnnouncementController>()),
     onHistoryFavoriteRequested: _toggleFavoriteFromHomeHistory,
   );
   return entrypoints;

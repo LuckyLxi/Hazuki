@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:hazuki/l10n/l10n.dart';
-import 'package:hazuki/services/announcement_service.dart';
+import 'package:hazuki/services/announcements/announcement.dart';
 
 import '../support/announcement_image_session_cache.dart';
 

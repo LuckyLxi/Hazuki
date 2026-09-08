@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get_it/get_it.dart';
 import 'package:hazuki/app/service_locator.dart';
+import 'package:hazuki/services/announcements/announcement_controller.dart';
+import 'package:hazuki/services/announcements/announcement_service.dart';
 import 'package:hazuki/services/cloud_sync_service.dart';
 import 'package:hazuki/services/local_favorites/local_favorites_contracts.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_assembly.dart';
@@ -17,6 +19,11 @@ void main() {
     expect(services.isRegistered<SourceSearchGateway>(), isTrue);
     expect(services.isRegistered<LocalFavoritesRepository>(), isTrue);
     expect(services.isRegistered<CloudSyncService>(), isTrue);
+    expect(services.isRegistered<AnnouncementController>(), isTrue);
+    expect(
+      services<AnnouncementController>(),
+      same(services<AnnouncementService>()),
+    );
     expect(sl.isRegistered<SourceRuntimeAssembly>(), isFalse);
   });
 

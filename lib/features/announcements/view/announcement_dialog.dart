@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/l10n/l10n.dart';
-import 'package:hazuki/services/announcement_service.dart';
+import 'package:hazuki/services/announcements/announcement.dart';
 
 import 'announcement_content.dart';
 
@@ -33,9 +33,8 @@ Future<void> _showPopupAnnouncementDialog(
     barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
     barrierColor: Colors.black.withValues(alpha: 0.42),
     transitionDuration: const Duration(milliseconds: 320),
-    pageBuilder: (context, animation, secondaryAnimation) => SafeArea(
-      child: _AnnouncementDialog(announcement: announcement),
-    ),
+    pageBuilder: (context, animation, secondaryAnimation) =>
+        SafeArea(child: _AnnouncementDialog(announcement: announcement)),
     transitionBuilder: (context, animation, secondaryAnimation, child) {
       final fadeAnimation = CurvedAnimation(
         parent: animation,

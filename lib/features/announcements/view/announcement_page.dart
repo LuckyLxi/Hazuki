@@ -3,14 +3,15 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/l10n/l10n.dart';
-import 'package:hazuki/services/announcement_service.dart';
+import 'package:hazuki/services/announcements/announcement.dart';
+import 'package:hazuki/services/announcements/announcement_controller.dart';
 
 import 'announcement_content.dart';
 
 class AnnouncementPage extends StatefulWidget {
   const AnnouncementPage({super.key, required this.service});
 
-  final AnnouncementService service;
+  final AnnouncementController service;
 
   @override
   State<AnnouncementPage> createState() => _AnnouncementPageState();
