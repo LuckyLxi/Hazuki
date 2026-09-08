@@ -1,3 +1,6 @@
+import 'package:hazuki/features/reader/support/reader_display_session.dart';
+import 'package:hazuki/shared/ui_flags.dart';
+import 'package:hazuki/features/reader/support/reader_view_bindings.dart';
 import 'dart:async';
 import 'package:hazuki/app/service_locator.dart';
 import 'dart:ui';
@@ -310,45 +313,22 @@ void main() {
           logPayload: ([extra]) => extra ?? <String, dynamic>{},
           logVisiblePageChange: ({required index, required trigger}) {},
           resetZoomImmediately: zoomController.resetZoomImmediately,
-          prefetchAround: (_) {},
-          requestPrefetchAhead: (_) {},
-          noImageModeEnabled: () => false,
+          onPageTargetChanged: (_) {},
           toggleControlsVisibility: () {},
         );
-        final sessionController = ReaderSessionController(
-          runtimeState: runtimeState,
-          displayBridge: ReaderDisplayBridge(
-            onVolumeButtonPressed: (_) async {},
-          ),
-          settingsStore: settingsStore,
-          scrollController: scrollController,
-          pageController: pageController,
-          readerKeyFocusNode: focusNode,
-          zoomController: transformationController,
-          applyInitialImages: (_, {required trigger}) {},
-          loadChapterImages: ({trigger = 'manual'}) async {},
-          onNoImageModeChanged: () {},
-          isMounted: () => true,
-          updateState: (update) => update(),
-          logEvent: (title, {level = 'info', source = 'reader_ui', content}) {
-            logEvents.add(title);
-          },
-          logPayload: ([extra]) => extra ?? <String, dynamic>{},
-          onScrollPositionChanged: () {},
-          onZoomChanged: () {},
-          comicId: 'comic',
-          epId: 'ep',
-          chapterTitle: 'Chapter 1',
-          chapterIndex: 0,
-          widgetImages: const [],
-          sourceService: sl<SourceReaderGateway>(),
-          readingProgressService: sl<ReadingProgressService>(),
+        final displayBridge = ReaderDisplayBridge(
+          onVolumeButtonPressed: (_) async {},
+        );
+        final displaySession = ReaderDisplaySession(
+          controller: ReaderDisplayBridge.controller,
+          sessionId: displayBridge.sessionId,
+          readSettings: () => runtimeState.settings,
         );
         final controller = ReaderSettingsController(
           runtimeState: runtimeState,
           settingsStore: settingsStore,
           navigationController: navigationController,
-          sessionController: sessionController,
+          displaySession: displaySession,
           zoomController: zoomController,
           updateState: (update) => update(),
           logEvent: (title, {level = 'info', source = 'reader_ui', content}) {
@@ -412,14 +392,29 @@ void main() {
       final transformationController = TransformationController();
       var appliedInitialImages = false;
       var loadChapterImagesCount = 0;
+      final displayBridge = ReaderDisplayBridge(
+        onVolumeButtonPressed: (_) async {},
+      );
+      final displaySession = ReaderDisplaySession(
+        controller: ReaderDisplayBridge.controller,
+        sessionId: displayBridge.sessionId,
+        readSettings: () => runtimeState.settings,
+      );
       final sessionController = ReaderSessionController(
+        viewBindings: ReaderViewBindings(
+          scrollController: scrollController,
+          pageController: pageController,
+          focusNode: focusNode,
+          zoomController: transformationController,
+          onNoImageModeChanged: () {},
+          onScrollPositionChanged: () {},
+          onZoomChanged: () {},
+          noImageMode: hazukiNoImageModeNotifier,
+        ),
         runtimeState: runtimeState,
-        displayBridge: ReaderDisplayBridge(onVolumeButtonPressed: (_) async {}),
+        displayBridge: displayBridge,
+        displaySession: displaySession,
         settingsStore: const ReaderSettingsStore(),
-        scrollController: scrollController,
-        pageController: pageController,
-        readerKeyFocusNode: focusNode,
-        zoomController: transformationController,
         applyInitialImages: (images, {required trigger}) {
           appliedInitialImages = true;
           expect(images, isEmpty);
@@ -428,19 +423,15 @@ void main() {
         loadChapterImages: ({trigger = 'manual'}) async {
           loadChapterImagesCount++;
         },
-        onNoImageModeChanged: () {},
         isMounted: () => false,
         updateState: (update) => update(),
         logEvent: (_, {level = 'info', source = 'reader_ui', content}) {},
         logPayload: ([extra]) => extra ?? <String, dynamic>{},
-        onScrollPositionChanged: () {},
-        onZoomChanged: () {},
         comicId: 'comic',
         epId: 'ep',
         chapterTitle: 'Chapter 1',
         chapterIndex: 0,
         widgetImages: const [],
-        sourceService: sl<SourceReaderGateway>(),
         readingProgressService: sl<ReadingProgressService>(),
         offlineMode: true,
       );
@@ -509,29 +500,40 @@ void main() {
       final pageController = PageController();
       final focusNode = FocusNode();
       final transformationController = TransformationController();
+      final displayBridge = ReaderDisplayBridge(
+        onVolumeButtonPressed: (_) async {},
+      );
+      final displaySession = ReaderDisplaySession(
+        controller: ReaderDisplayBridge.controller,
+        sessionId: displayBridge.sessionId,
+        readSettings: () => runtimeState.settings,
+      );
       final sessionController = ReaderSessionController(
+        viewBindings: ReaderViewBindings(
+          scrollController: scrollController,
+          pageController: pageController,
+          focusNode: focusNode,
+          zoomController: transformationController,
+          onNoImageModeChanged: () {},
+          onScrollPositionChanged: () {},
+          onZoomChanged: () {},
+          noImageMode: hazukiNoImageModeNotifier,
+        ),
         runtimeState: runtimeState,
-        displayBridge: ReaderDisplayBridge(onVolumeButtonPressed: (_) async {}),
+        displayBridge: displayBridge,
+        displaySession: displaySession,
         settingsStore: const ReaderSettingsStore(),
-        scrollController: scrollController,
-        pageController: pageController,
-        readerKeyFocusNode: focusNode,
-        zoomController: transformationController,
         applyInitialImages: (_, {required trigger}) {},
         loadChapterImages: ({trigger = 'manual'}) async {},
-        onNoImageModeChanged: () {},
         isMounted: () => true,
         updateState: (update) => update(),
         logEvent: (_, {level = 'info', source = 'reader_ui', content}) {},
         logPayload: ([extra]) => extra ?? <String, dynamic>{},
-        onScrollPositionChanged: () {},
-        onZoomChanged: () {},
         comicId: 'comic',
         epId: 'ep',
         chapterTitle: 'Chapter 1',
         chapterIndex: 0,
         widgetImages: const [],
-        sourceService: sl<SourceReaderGateway>(),
         readingProgressService: sl<ReadingProgressService>(),
       );
 
@@ -1081,9 +1083,7 @@ void main() {
           logPayload: ([extra]) => extra ?? <String, dynamic>{},
           logVisiblePageChange: ({required index, required trigger}) {},
           resetZoomImmediately: ({reason = 'unspecified'}) {},
-          prefetchAround: (_) {},
-          requestPrefetchAhead: (_) {},
-          noImageModeEnabled: () => false,
+          onPageTargetChanged: (_) {},
           toggleControlsVisibility: () {
             toggled++;
           },
@@ -1141,9 +1141,10 @@ void main() {
         logPayload: ([extra]) => extra ?? <String, dynamic>{},
         logVisiblePageChange: ({required index, required trigger}) {},
         resetZoomImmediately: ({reason = 'unspecified'}) {},
-        prefetchAround: prefetched.add,
-        requestPrefetchAhead: prefetchedAhead.add,
-        noImageModeEnabled: () => false,
+        onPageTargetChanged: (index) {
+          prefetched.add(index);
+          prefetchedAhead.add(index);
+        },
         toggleControlsVisibility: () {},
       );
 
@@ -1198,9 +1199,7 @@ void main() {
         logPayload: ([extra]) => extra ?? <String, dynamic>{},
         logVisiblePageChange: ({required index, required trigger}) {},
         resetZoomImmediately: ({reason = 'unspecified'}) {},
-        prefetchAround: (_) {},
-        requestPrefetchAhead: (_) {},
-        noImageModeEnabled: () => false,
+        onPageTargetChanged: (_) {},
         toggleControlsVisibility: () {},
       );
 
@@ -1265,9 +1264,7 @@ void main() {
           logPayload: ([extra]) => extra ?? <String, dynamic>{},
           logVisiblePageChange: ({required index, required trigger}) {},
           resetZoomImmediately: ({reason = 'unspecified'}) {},
-          prefetchAround: (_) {},
-          requestPrefetchAhead: (_) {},
-          noImageModeEnabled: () => false,
+          onPageTargetChanged: (_) {},
           toggleControlsVisibility: () {},
         );
 
@@ -1324,9 +1321,7 @@ void main() {
           logPayload: ([extra]) => extra ?? <String, dynamic>{},
           logVisiblePageChange: ({required index, required trigger}) {},
           resetZoomImmediately: ({reason = 'unspecified'}) {},
-          prefetchAround: (_) {},
-          requestPrefetchAhead: (_) {},
-          noImageModeEnabled: () => false,
+          onPageTargetChanged: (_) {},
           toggleControlsVisibility: () {},
         );
 

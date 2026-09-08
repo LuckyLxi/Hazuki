@@ -5,7 +5,8 @@ import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/local_favorites/local_favorites_contracts.dart';
 import 'package:hazuki/services/local_favorites/local_favorites_preferences_store.dart';
-import 'package:hazuki/shared/picacg_comic_tags.dart';
+import '../support/favorite_comic_tag_loader.dart';
+import '../support/favorite_source_policy.dart';
 
 import 'favorite_app_bar_actions_state.dart';
 import 'favorite_page_state.dart';
@@ -19,7 +20,7 @@ class FavoritePageController extends ChangeNotifier {
     required LocalFavoritesRepository localFavoritesRepository,
     required LocalFavoritesPreferencesStore localFavoritesPreferences,
   }) : _sourceService = sourceService,
-       _readerService = readerService,
+       _tagLoader = FavoriteComicTagLoader(readerService),
        _localFavoritesRepository = localFavoritesRepository,
        _cloudFlow = FavoriteCloudFlow(sourceService),
        _localFlow = FavoriteLocalFlow(
@@ -38,7 +39,8 @@ class FavoritePageController extends ChangeNotifier {
   static const favoriteLoadTimeout = Duration(seconds: 90);
 
   final SourceFavoriteGateway _sourceService;
-  final SourceReaderGateway? _readerService;
+  final FavoriteComicTagLoader _tagLoader;
+  final FavoriteSourcePolicy _sourcePolicy = const FavoriteSourcePolicy();
   final FavoriteCloudFlow _cloudFlow;
   final FavoriteLocalFlow _localFlow;
   final LocalFavoritesRepository _localFavoritesRepository;
@@ -443,7 +445,7 @@ class FavoritePageController extends ChangeNotifier {
     final allowedOrders = _state.mode == FavoritePageMode.local
         ? _favoriteSortOrders
         : _cloudFlow.sortOrders;
-    final normalized = _normalizeFavoriteSortOrder(
+    final normalized = _sourcePolicy.normalizeSortOrder(
       order,
       allowedOrders: allowedOrders,
     );
@@ -570,7 +572,7 @@ class FavoritePageController extends ChangeNotifier {
       return;
     }
     _lastActiveSourceKey = activeSourceKey;
-    _state.favoriteSortOrder = _normalizeFavoriteSortOrder(
+    _state.favoriteSortOrder = _sourcePolicy.normalizeSortOrder(
       _state.favoriteSortOrder,
       allowedOrders: _favoriteSortOrders,
     );
@@ -629,7 +631,7 @@ class FavoritePageController extends ChangeNotifier {
     if (_disposed || _state.mode != FavoritePageMode.cloud) {
       return;
     }
-    if (isHazukiCopyMangaSourceKey(_activeSourceKey)) {
+    if (_sourcePolicy.refreshOnCloudFavoritesChanged(_activeSourceKey)) {
       unawaited(_syncCloudFavoritesAfterExternalChange());
     }
   }
@@ -652,49 +654,26 @@ class FavoritePageController extends ChangeNotifier {
             timeoutMessage: timeoutMessage,
             timeout: favoriteLoadTimeout,
           );
-    unawaited(_backfillPicacgTags(result));
+    unawaited(_backfillComicTags(result));
     return result;
   }
 
-  Future<void> _backfillPicacgTags(FavoriteComicsResult result) async {
-    if (_readerService == null || result.errorMessage != null) return;
-    final comics = List<ExploreComic>.of(result.comics);
-    for (var start = 0; start < comics.length; start += 4) {
-      final end = (start + 4).clamp(0, comics.length);
-      await Future.wait(
-        List<Future<void>>.generate(end - start, (offset) async {
-          final index = start + offset;
-          final comic = comics[index];
-          if (comic.sourceKey.trim().toLowerCase() != 'picacg' ||
-              comic.tags.isNotEmpty) {
-            return;
-          }
-          try {
-            final details = await _readerService.loadComicDetails(
-              comic.id,
+  Future<void> _backfillComicTags(FavoriteComicsResult result) async {
+    final tagsByComic = await _tagLoader.load(
+      result,
+      onTagsLoaded: (comic, tags) {
+        if (_state.mode == FavoritePageMode.local) {
+          unawaited(
+            _localFavoritesRepository.updateComicTags(
+              comicId: comic.id,
               sourceKey: comic.sourceKey,
-            );
-            final tags = picacgComicDetailTags(details);
-            if (tags.isEmpty) return;
-            comics[index] = comic.copyWith(tags: tags);
-            if (_state.mode == FavoritePageMode.local) {
-              unawaited(
-                _localFavoritesRepository.updateComicTags(
-                  comicId: comic.id,
-                  sourceKey: comic.sourceKey,
-                  tags: tags,
-                ),
-              );
-            }
-          } catch (_) {}
-        }),
-      );
-    }
-    if (_disposed) return;
-    final tagsByComic = <String, List<String>>{
-      for (final comic in comics)
-        if (comic.tags.isNotEmpty) comic.scopedId.storageKey: comic.tags,
-    };
+              tags: tags,
+            ),
+          );
+        }
+      },
+    );
+    if (_disposed || tagsByComic.isEmpty) return;
     var changed = false;
     _state.comics = _state.comics
         .map((comic) {
@@ -709,7 +688,7 @@ class FavoritePageController extends ChangeNotifier {
 
   Future<void> _loadInitialLocal({bool notifyIntermediate = true}) async {
     final requestVersion = ++_state.listRequestVersion;
-    _state.favoriteSortOrder = _normalizeFavoriteSortOrder(
+    _state.favoriteSortOrder = _sourcePolicy.normalizeSortOrder(
       await _localFlow.loadSortOrder(),
       allowedOrders: _favoriteSortOrders,
     );
@@ -867,29 +846,6 @@ class FavoritePageController extends ChangeNotifier {
     if (!_disposed) {
       notifyListeners();
     }
-  }
-
-  String _normalizeFavoriteSortOrder(
-    String order, {
-    required List<String> allowedOrders,
-  }) {
-    final normalized = order.trim();
-    if (allowedOrders.contains(normalized)) {
-      return normalized;
-    }
-    if (allowedOrders.contains('-datetime_updated') && normalized == 'mp') {
-      return '-datetime_updated';
-    }
-    if (allowedOrders.contains('-datetime_modifier') && normalized == 'mr') {
-      return '-datetime_modifier';
-    }
-    if (allowedOrders.contains('mp') && normalized == '-datetime_updated') {
-      return 'mp';
-    }
-    if (allowedOrders.contains('mr')) {
-      return 'mr';
-    }
-    return allowedOrders.firstOrNull ?? 'mr';
   }
 
   Future<void> _saveSelectedFolderId(

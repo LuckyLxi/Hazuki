@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/hazuki_models.dart';
 import '../source/source_capabilities.dart';
 import 'manga_download_models.dart';
+import 'manga_download_lifecycle_coordinator.dart';
 import 'manga_download_state.dart';
 import 'manga_download_files.dart';
 import 'manga_download_queue_support.dart';
@@ -26,14 +27,22 @@ class MangaDownloadService extends ChangeNotifier {
       chapterDirForTarget: _files.chapterDirForTarget,
       writeMetadataFile: _files.writeMetadataFile,
     );
+    _lifecycle = MangaDownloadLifecycleCoordinator(
+      isAndroid: Platform.isAndroid,
+      hasActiveDownloads: _hasActiveDownloads,
+      startForegroundService: _access.startDownloadForegroundService,
+      stopForegroundService: _access.stopDownloadForegroundService,
+      processQueue: () => _queueExecutor.processQueue(),
+    );
     _queueExecutor = MangaDownloadQueueExecutor(
       logDownload: _logScan,
       state: _state,
       files: _files,
       access: _access,
       flushState: _flushState,
-      shouldSuspendDownloads: _shouldSuspendDownloads,
-      shouldRecoverTransientNetworkError: _shouldRecoverTransientDownloadError,
+      shouldSuspendDownloads: () => _lifecycle.shouldSuspendDownloads,
+      shouldRecoverTransientNetworkError: () =>
+          _lifecycle.shouldRecoverTransientNetworkError,
       sourceReader: sourceReader,
     );
   }
@@ -48,9 +57,7 @@ class MangaDownloadService extends ChangeNotifier {
   late final MangaDownloadAccess _access;
   late final MangaDownloadRecoveryScanner _recoveryScanner;
   late final MangaDownloadQueueExecutor _queueExecutor;
-  bool _downloadsSuspended = false;
-  DateTime? _downloadResumeGraceDeadline;
-  Timer? _downloadResumeTimer;
+  late final MangaDownloadLifecycleCoordinator _lifecycle;
 
   List<MangaDownloadTask> get tasks => _state.tasks;
   List<DownloadedMangaComic> get downloadedComics => _state.downloadedComics;
@@ -60,36 +67,13 @@ class MangaDownloadService extends ChangeNotifier {
   void _logScan(String title, {Object? content, String level = 'info'}) {}
 
   void handleAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      _downloadsSuspended = false;
-      _downloadResumeTimer?.cancel();
-      _downloadResumeTimer = null;
-      unawaited(_access.stopDownloadForegroundService());
-      _downloadResumeGraceDeadline = DateTime.now().add(
-        const Duration(seconds: 4),
-      );
-      _downloadResumeTimer = Timer(const Duration(milliseconds: 1200), () {
-        if (_downloadsSuspended) return;
-        unawaited(_queueExecutor.processQueue());
-      });
-      return;
-    }
+    _lifecycle.handleAppLifecycleState(state);
+  }
 
-    if (Platform.isAndroid) {
-      // Android: only suspend when the engine is fully detached (process dying).
-      // inactive/paused/hidden are all transient background states — keep downloads
-      // running and hold the process alive with a foreground service.
-      if (state == AppLifecycleState.paused && _hasActiveDownloads()) {
-        unawaited(_access.startDownloadForegroundService());
-      }
-      if (state != AppLifecycleState.detached) return;
-    }
-
-    if (_downloadsSuspended) return;
-    _downloadsSuspended = true;
-    _downloadResumeTimer?.cancel();
-    _downloadResumeTimer = null;
-    _downloadResumeGraceDeadline = null;
+  @override
+  void dispose() {
+    _lifecycle.dispose();
+    super.dispose();
   }
 
   bool _hasActiveDownloads() => _tasks.any(
@@ -531,19 +515,6 @@ class MangaDownloadService extends ChangeNotifier {
       unawaited(_access.stopDownloadForegroundService());
     }
     notifyListeners();
-  }
-
-  bool _shouldSuspendDownloads() => _downloadsSuspended;
-
-  bool _shouldRecoverTransientDownloadError() {
-    if (_downloadsSuspended) {
-      return true;
-    }
-    final deadline = _downloadResumeGraceDeadline;
-    if (deadline == null) {
-      return false;
-    }
-    return DateTime.now().isBefore(deadline);
   }
 
   void _sanitizeRestoredDownloadedState(Iterable<DownloadedMangaComic> comics) {

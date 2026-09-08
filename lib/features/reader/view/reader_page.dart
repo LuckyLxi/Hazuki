@@ -1,3 +1,6 @@
+import 'package:hazuki/features/reader/support/reader_navigation_prefetch.dart';
+import 'package:hazuki/features/reader/support/reader_display_session.dart';
+import 'package:hazuki/features/reader/support/reader_view_bindings.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -105,6 +108,11 @@ class _ReaderPageState extends State<ReaderPage>
   late final ReaderDisplayBridge _displayBridge = ReaderDisplayBridge(
     onVolumeButtonPressed: _handlePlatformVolumeButtonPressed,
   );
+  late final ReaderDisplaySession _displaySession = ReaderDisplaySession(
+    controller: ReaderDisplayBridge.controller,
+    sessionId: _displayBridge.sessionId,
+    readSettings: () => _runtimeState.settings,
+  );
   late final ReaderImagePipelineController _imagePipelineController =
       ReaderImagePipelineController(
         runtimeState: _runtimeState,
@@ -146,8 +154,8 @@ class _ReaderPageState extends State<ReaderPage>
         sessionId: () => _displayBridge.sessionId,
         noImageModeEnabled: () => _noImageModeEnabled,
         log: (title, {level = 'info', source = 'reader_ui', content}) =>
-            _sessionController.log(
-              title,
+            widget.dependencies.sourceReader.addReaderLog(
+              title: title,
               level: level,
               source: source,
               content: content,
@@ -156,6 +164,12 @@ class _ReaderPageState extends State<ReaderPage>
         epId: widget.epId,
         chapterTitle: widget.chapterTitle,
         chapterIndex: widget.chapterIndex,
+      );
+  late final ReaderNavigationPrefetch _navigationPrefetch =
+      ReaderNavigationPrefetch(
+        noImageModeEnabled: () => _noImageModeEnabled,
+        prefetchAround: _imagePipelineController.prefetchAround,
+        requestPrefetchAhead: _imagePipelineController.requestPrefetchAhead,
       );
   late final ReaderNavigationController _navigationController =
       ReaderNavigationController(
@@ -169,37 +183,39 @@ class _ReaderPageState extends State<ReaderPage>
         logPayload: _readerLogPayload,
         logVisiblePageChange: _logVisiblePageChange,
         resetZoomImmediately: _readerZoomController.resetZoomImmediately,
-        prefetchAround: _imagePipelineController.prefetchAround,
-        requestPrefetchAhead: _imagePipelineController.requestPrefetchAhead,
-        noImageModeEnabled: () => _noImageModeEnabled,
+        onPageTargetChanged: _navigationPrefetch.onPageTargetChanged,
         toggleControlsVisibility: _toggleControlsVisibility,
       );
   late final ReaderSessionController _sessionController =
       ReaderSessionController(
+        viewBindings: ReaderViewBindings(
+          scrollController: _scrollController,
+          pageController: _pageController,
+          focusNode: _readerKeyFocusNode,
+          zoomController: _zoomController,
+          onNoImageModeChanged:
+              _imagePipelineController.handleNoImageModeChanged,
+          onScrollPositionChanged:
+              _navigationController.handleScrollPositionChanged,
+          onZoomChanged: _readerZoomController.onZoomChanged,
+          noImageMode: hazukiNoImageModeNotifier,
+        ),
         runtimeState: _runtimeState,
         displayBridge: _displayBridge,
+        displaySession: _displaySession,
         settingsStore: _readerSettingsStore,
-        scrollController: _scrollController,
-        pageController: _pageController,
-        readerKeyFocusNode: _readerKeyFocusNode,
-        zoomController: _zoomController,
         applyInitialImages: _imagePipelineController.applyInitialImages,
         loadChapterImages: _imagePipelineController.loadChapterImages,
-        onNoImageModeChanged: _imagePipelineController.handleNoImageModeChanged,
         isMounted: () => mounted,
         updateState: _updateReaderState,
         logEvent: _logReaderEvent,
         logPayload: _readerLogPayload,
-        onScrollPositionChanged:
-            _navigationController.handleScrollPositionChanged,
-        onZoomChanged: _readerZoomController.onZoomChanged,
         comicId: widget.comicId,
         epId: widget.epId,
         sourceKey: widget.sourceKey,
         chapterTitle: widget.chapterTitle,
         chapterIndex: widget.chapterIndex,
         widgetImages: widget.images,
-        sourceService: widget.dependencies.sourceReader,
         readingProgressService: widget.dependencies.readingProgressService,
         offlineMode: widget.offlineMode,
       );
@@ -208,7 +224,7 @@ class _ReaderPageState extends State<ReaderPage>
         runtimeState: _runtimeState,
         settingsStore: _readerSettingsStore,
         navigationController: _navigationController,
-        sessionController: _sessionController,
+        displaySession: _displaySession,
         zoomController: _readerZoomController,
         updateState: _updateReaderState,
         logEvent: _logReaderEvent,
@@ -221,7 +237,7 @@ class _ReaderPageState extends State<ReaderPage>
         updateState: _updateReaderState,
         logEvent: _logReaderEvent,
         logPayload: _readerLogPayload,
-        sessionController: _sessionController,
+        sourceReader: widget.dependencies.sourceReader,
         pageContext: _pageContext,
         buildReplacementPage: _buildReaderPageFromContext,
         downloader: widget.dependencies.downloader,
@@ -230,7 +246,7 @@ class _ReaderPageState extends State<ReaderPage>
       ReaderSaveImageController(
         context: () => context,
         resolveReaderTheme: _resolveReaderTheme,
-        sessionController: _sessionController,
+        sourceReader: widget.dependencies.sourceReader,
         isMounted: () => mounted,
         logEvent: _logReaderEvent,
         logPayload: _readerLogPayload,

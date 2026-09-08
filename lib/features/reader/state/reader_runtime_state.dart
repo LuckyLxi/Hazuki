@@ -1,3 +1,4 @@
+import 'reader_navigation_state.dart';
 import 'dart:collection';
 import 'dart:math' as math;
 
@@ -9,8 +10,9 @@ import 'package:hazuki/shared/reading/reader_mode.dart';
 import 'package:hazuki/shared/reading/reader_settings_store.dart';
 
 /// Owns reader state transitions. Controllers retain Flutter effects and timing.
-class ReaderRuntimeState {
+class ReaderRuntimeState implements ReaderNavigationState {
   int _currentPageIndex = 0;
+  @override
   int get currentPageIndex => _currentPageIndex;
 
   bool _controlsVisible = false;
@@ -30,6 +32,8 @@ class ReaderRuntimeState {
 
   List<String> _images = const <String>[];
   List<String> get images => _images;
+  @override
+  int get imageCount => _images.length;
 
   bool _loadingImages = true;
   bool get loadingImages => _loadingImages;
@@ -38,12 +42,14 @@ class ReaderRuntimeState {
   String? get loadImagesError => _loadImagesError;
 
   bool _isZoomed = false;
+  @override
   bool get isZoomed => _isZoomed;
 
   bool _zoomInteracting = false;
   bool get zoomInteracting => _zoomInteracting;
 
   int _activePointerCount = 0;
+  @override
   int get activePointerCount => _activePointerCount;
 
   ReaderSettingsSnapshot _settings = const ReaderSettingsSnapshot(
@@ -63,9 +69,12 @@ class ReaderRuntimeState {
     longPressToSave: ReaderSettingsStore.defaultLongPressToSave,
   );
   ReaderSettingsSnapshot get settings => _settings;
+  @override
   ReaderMode get readerMode => _settings.readerMode;
   bool get doublePageMode => _settings.doublePageMode;
+  @override
   bool get tapToTurnPage => _settings.tapToTurnPage;
+  @override
   bool get volumeButtonTurnPage => _settings.volumeButtonTurnPage;
   bool get immersiveMode => _settings.immersiveMode;
   bool get keepScreenOn => _settings.keepScreenOn;
@@ -84,6 +93,7 @@ class ReaderRuntimeState {
   late final List<GlobalKey> _readOnlyItemKeys = UnmodifiableListView(
     _itemKeys,
   );
+  @override
   List<GlobalKey> get itemKeys => _readOnlyItemKeys;
 
   void applySettingsSnapshot(ReaderSettingsSnapshot settings) {
@@ -129,6 +139,7 @@ class ReaderRuntimeState {
   }
 
   /// Keep the navigation index and the displayed index consistent.
+  @override
   void setCurrentPageIndex(int index) {
     _currentPageIndex = normalizeSpreadIndex(index);
     _publishPageIndex(_currentPageIndex);
@@ -200,11 +211,14 @@ class ReaderRuntimeState {
   bool get zoomGestureActive =>
       pinchToZoom && (_isZoomed || _zoomInteracting || _activePointerCount > 1);
 
+  @override
   bool get pageNavigationLocked =>
       pinchToZoom && (_zoomInteracting || _isZoomed || _activePointerCount > 1);
 
+  @override
   int get readerSpreadSize => doublePageMode ? 2 : 1;
 
+  @override
   int get readerSpreadCount {
     if (_images.isEmpty) {
       return 0;
@@ -212,6 +226,7 @@ class ReaderRuntimeState {
     return (_images.length + readerSpreadSize - 1) ~/ readerSpreadSize;
   }
 
+  @override
   int normalizeSpreadIndex(int index) {
     if (readerSpreadCount <= 0) {
       return 0;
@@ -219,6 +234,7 @@ class ReaderRuntimeState {
     return math.max(0, math.min(index, readerSpreadCount - 1));
   }
 
+  @override
   int spreadStartIndex(int spreadIndex) {
     if (_images.isEmpty) {
       return 0;

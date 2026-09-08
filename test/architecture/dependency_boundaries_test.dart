@@ -156,17 +156,22 @@ void main() {
     expect(violations, isEmpty, reason: violations.join('\n'));
   });
 
-  test('feature package imports do not form cycles', () {
+  test('relative and package feature dependencies do not form cycles', () {
     final root = Directory('lib/features');
     final graph = <String, Set<String>>{};
-    final importPattern = RegExp(r'package:hazuki/features/([^/]+)/');
+    final featureRoot = root.absolute.uri.toString();
 
     for (final file in _dartFilesUnder(root.path)) {
       final relative = file.path.substring(root.path.length + 1);
       final from = relative.split(Platform.pathSeparator).first;
       final targets = graph.putIfAbsent(from, () => <String>{});
-      for (final match in importPattern.allMatches(file.readAsStringSync())) {
-        final to = match.group(1)!;
+      for (final uri in _dependencyUris(
+        file.readAsStringSync(),
+        file.absolute.uri,
+      )) {
+        final target = uri.toString();
+        if (!target.startsWith(featureRoot)) continue;
+        final to = target.substring(featureRoot.length).split('/').first;
         if (to != from) targets.add(to);
       }
     }
@@ -413,19 +418,15 @@ void main() {
     );
   });
 
-  test('service locator obtains source gateways from the gateway set', () {
-    final content = File(
-      'lib/app/di/source_service_registrar.dart',
-    ).readAsStringSync();
-    expect(content.contains('HazukiSource'), isFalse);
-    expect(content.contains('.gateways.'), isTrue);
-  });
-
-  test('service locator delegates registration without service knowledge', () {
-    final content = File('lib/app/service_locator.dart').readAsStringSync();
-    expect(content.contains('services/'), isFalse);
-    expect(content.contains('registerSourceServices(services)'), isTrue);
-    expect(content.contains('registerApplicationServices(services)'), isTrue);
+  test('service locator depends on registrars instead of services', () {
+    final file = File('lib/app/service_locator.dart');
+    expect(
+      _dependencyUris(
+        file.readAsStringSync(),
+        file.absolute.uri,
+      ).where((uri) => uri.path.contains('/services/')),
+      isEmpty,
+    );
   });
 
   test('migrated source capabilities use explicit runtime dependencies', () {
@@ -474,316 +475,73 @@ void main() {
     );
   });
 
-  test('runtime initialization delegates source-script editing operations', () {
-    final runtime = File(
-      'lib/services/source/runtime/source_runtime_capability.dart',
-    ).readAsStringSync();
-    final operations = File(
-      'lib/services/source/runtime/source_runtime_operations.dart',
-    ).readAsStringSync();
+  // Runtime, account, favorites, logging and cache behavior is covered by
+  // test/services/source/*_test.dart and test/app/service_registration_test.dart.
+  // Architecture tests constrain dependencies, not collaborator variable names.
+  for (final rule in <String, List<String>>{
+    'runtime/source_runtime_capability.dart': [
+      'package:dio/',
+      'package:flutter_qjs/',
+      'package:flutter/services.dart',
+    ],
+    'account/account_session_capability.dart': ['dart:convert'],
+    'account/source_login_operations.dart': ['dart:convert'],
+    'account/picacg_login_profile_operations.dart': ['dart:convert'],
+    'favorites/source_favorites_capability.dart': ['dart:convert'],
+    'image/image_cache_capability.dart': [
+      'dart:async',
+      'dart:collection',
+      'dart:convert',
+      'package:crypto/',
+      'package:path_provider/',
+    ],
+  }.entries) {
+    test('${rule.key} keeps infrastructure behind collaborators', () {
+      final file = File('lib/services/source/${rule.key}');
+      final violations = _dependencyUris(
+        file.readAsStringSync(),
+        file.absolute.uri,
+      ).where((uri) => rule.value.any(uri.toString().startsWith));
+      expect(violations, isEmpty);
+    });
+  }
 
-    for (final method in const [
-      'writeLocalActiveSource',
-      'saveEditedActiveSource',
-      'deleteLocalSourceFile',
-      'hasCustomEditedSource',
-    ]) {
-      expect(
-        RegExp('Future<[^>]+> $method\\(').hasMatch(runtime),
-        isFalse,
-        reason: '$method should belong to source-script operations',
+  test(
+    'navigation depends on its state contract instead of implementations',
+    () {
+      final file = File(
+        'lib/features/reader/support/reader_navigation_controller.dart',
       );
-    }
-    expect(operations.contains('_scripts.writeLocalActiveSource'), isTrue);
-    expect(operations.contains('_scripts.saveEditedActiveSource'), isTrue);
-  });
+      final dependencies = _dependencyUris(
+        file.readAsStringSync(),
+        file.absolute.uri,
+      );
+      expect(
+        dependencies.where(
+          (uri) =>
+              uri.path.endsWith('/reader_runtime_state.dart') ||
+              uri.path.endsWith('/reader_image_pipeline_controller.dart') ||
+              uri.path.contains('/services/'),
+        ),
+        isEmpty,
+      );
+    },
+  );
 
-  test('runtime initialization delegates source update operations', () {
-    final runtime = File(
-      'lib/services/source/runtime/source_runtime_capability.dart',
-    ).readAsStringSync();
-    final operations = File(
-      'lib/services/source/runtime/source_runtime_operations.dart',
-    ).readAsStringSync();
-
-    expect(runtime.contains('package:dio/dio.dart'), isFalse);
-    expect(runtime.contains('checkActiveSourceVersionFromCloud()'), isFalse);
-    expect(runtime.contains('downloadActiveSourceAndReload({'), isFalse);
-    expect(operations.contains('_updates.checkActiveSourceVersion'), isTrue);
-    expect(operations.contains('_updates.downloadActiveSource'), isTrue);
-  });
-
-  test('runtime composition delegates initialization workflows', () {
-    final runtime = File(
-      'lib/services/source/runtime/source_runtime_capability.dart',
-    ).readAsStringSync();
-    final operations = File(
-      'lib/services/source/runtime/source_runtime_operations.dart',
-    ).readAsStringSync();
-
-    expect(runtime.contains('package:flutter_qjs/flutter_qjs.dart'), isFalse);
-    expect(runtime.contains('rootBundle.loadString'), isFalse);
-    expect(runtime.contains('Future<void> _initInternal'), isFalse);
-    expect(runtime.contains('SourceRuntimeStep.loadingCache'), isFalse);
-    expect(operations.contains('_initialization.init'), isTrue);
-    expect(operations.contains('_initialization.ensureInitialized'), isTrue);
-    expect(operations.contains('_initialization.prewarmInBackground'), isTrue);
-    expect(
-      operations.contains('_diagnostics.logRuntimeRetryRequested'),
-      isTrue,
-    );
-  });
-
-  test('runtime initialization delegates recovery workflows', () {
-    final runtime = File(
-      'lib/services/source/runtime/source_runtime_capability.dart',
-    ).readAsStringSync();
-    final operations = File(
-      'lib/services/source/runtime/source_runtime_operations.dart',
-    ).readAsStringSync();
-
-    expect(runtime.contains('reloadFromLocalSourceFiles()'), isFalse);
-    expect(runtime.contains('refreshSourceOnNetworkRecovery()'), isFalse);
-    expect(operations.contains('_recovery.downloadSourceFile'), isTrue);
-    expect(operations.contains('_recovery.reloadFromLocalSourceFiles'), isTrue);
-    expect(
-      operations.contains('_recovery.refreshSourceOnNetworkRecovery'),
-      isTrue,
-    );
-  });
-
-  test('account sessions delegate source-specific login workflows', () {
-    final session = File(
-      'lib/services/source/account/account_session_capability.dart',
-    ).readAsStringSync();
-
-    expect(session.contains("import 'dart:convert';"), isFalse);
-    expect(session.contains('source_login.js'), isFalse);
-    expect(session.contains('picacg_profile_avatar.js'), isFalse);
-    expect(session.contains('_loginOperations.login('), isTrue);
-    expect(session.contains('_loginOperations.loginWithFacade('), isTrue);
-    expect(session.contains('_loginOperations.loadCurrentAvatarUrl()'), isTrue);
-  });
-
-  test('login orchestration delegates scripts and side data', () {
-    final login = File(
-      'lib/services/source/account/source_login_operations.dart',
-    ).readAsStringSync();
-
-    expect(login.contains("import 'dart:convert';"), isFalse);
-    expect(login.contains('Network.post = async function'), isFalse);
-    expect(login.contains('picacg_profile_avatar.js'), isFalse);
-    expect(login.contains('_scriptFactory.build('), isTrue);
-    expect(login.contains('_sideData.persistLoginSideData('), isTrue);
-    expect(login.contains('_sideData.logPicacgLoginResponseTrace('), isTrue);
-  });
-
-  test('login side data delegates Picacg profile adaptation', () {
-    final sideData = File(
-      'lib/services/source/account/source_login_side_data_operations.dart',
-    ).readAsStringSync();
-
-    expect(sideData.contains('/users/profile'), isFalse);
-    expect(sideData.contains('_decodeJwtPayload'), isFalse);
-    expect(sideData.contains('_extractPicacgLoginToken'), isFalse);
-    expect(sideData.contains('_picacg.persist('), isTrue);
-    expect(sideData.contains('_picacg.logResponseTrace('), isTrue);
-  });
-
-  test('Picacg profile operations delegate scripts and parsing', () {
-    final operations = File(
-      'lib/services/source/account/picacg_login_profile_operations.dart',
-    ).readAsStringSync();
-
-    expect(operations.contains("import 'dart:convert';"), isFalse);
-    expect(operations.contains('/users/profile'), isFalse);
-    expect(operations.contains('normalizeSourceAvatarUrl'), isFalse);
-    expect(operations.contains('._scriptFactory.build(token)'), isTrue);
-    expect(operations.contains('.extractLoginToken(result)'), isTrue);
-    expect(operations.contains('.parseProfileResult('), isTrue);
-  });
-
-  test('debug recorders write to the unified application log store', () {
-    final structured = File(
-      'lib/services/source/debug/debug_structured_log_recorder.dart',
-    ).readAsStringSync();
-    final networkRecorder = File(
-      'lib/services/source/debug/debug_network_log_recorder.dart',
-    ).readAsStringSync();
-
-    expect(structured.contains('final AppLogStore store;'), isTrue);
-    expect(networkRecorder.contains('final AppLogStore store;'), isTrue);
-    expect(structured.contains('recentApplicationLogs'), isFalse);
-    expect(networkRecorder.contains('recentNetworkLogs'), isFalse);
-    expect(structured.contains('store.add('), isTrue);
-    expect(networkRecorder.contains('store.add('), isTrue);
-  });
-
-  test('debug log capability delegates network retention policy', () {
-    final capability = File(
-      'lib/services/source/debug/debug_log_capability.dart',
-    ).readAsStringSync();
-
-    expect(capability.contains('_shouldSkipNetworkLogStorage'), isFalse);
-    expect(capability.contains('_isImportantNetworkLogForStorage'), isFalse);
-    expect(capability.contains('_shouldKeepDetailedNetworkResponse'), isFalse);
-    expect(capability.contains('networkLogDedupedCount++'), isFalse);
-    expect(capability.contains('_network.append('), isTrue);
-  });
-
-  test('debug log capability is a recorder facade', () {
-    final capability = File(
-      'lib/services/source/debug/debug_log_capability.dart',
-    ).readAsStringSync();
-
-    expect(capability.contains('void _pruneByAgeIfNeeded'), isFalse);
-    expect(capability.contains('void _appendApplicationLog'), isFalse);
-    expect(capability.contains('void _appendReaderLog'), isFalse);
-    expect(capability.contains('_structured.addTyped('), isTrue);
-    expect(capability.contains('_structured.addApplication('), isTrue);
-    expect(capability.contains('_structured.addReader('), isTrue);
-  });
-
-  test('favorites capability delegates support and sort policy', () {
-    final capability = File(
-      'lib/services/source/favorites/source_favorites_capability.dart',
-    ).readAsStringSync();
-
-    expect(capability.contains('favorites_ordering'), isFalse);
-    expect(capability.contains("'favoriteSort'"), isFalse);
-    expect(capability.contains('singleFolderForSingleComic == true'), isFalse);
-    expect(capability.contains('_policy.favoriteSortOrder'), isTrue);
-    expect(capability.contains('_policy.setFavoriteSortOrder('), isTrue);
-    expect(capability.contains('_policy.supportFavoriteToggle'), isTrue);
-  });
-
-  test('favorites capability delegates source response parsing', () {
-    final capability = File(
-      'lib/services/source/favorites/source_favorites_capability.dart',
-    ).readAsStringSync();
-    final comicsLoader = File(
-      'lib/services/source/favorites/source_favorite_comics_loader.dart',
-    ).readAsStringSync();
-
-    expect(capability.contains('Map<String, dynamic>.from(resolved)'), isFalse);
-    expect(capability.contains('final maxPageRaw ='), isFalse);
-    expect(capability.contains('final folders = <FavoriteFolder>[]'), isFalse);
-    expect(capability.contains('_parseExploreComics('), isFalse);
-    expect(capability.contains('_responseParser.parseComicsPage('), isTrue);
-    expect(capability.contains('_responseParser.parseFolders('), isTrue);
-    expect(capability.contains('_responseParser.extractFolderIds('), isFalse);
-    expect(comicsLoader.contains('_responseParser.parseComicsPage('), isTrue);
-    expect(comicsLoader.contains('_responseParser.extractFolderIds('), isTrue);
-  });
-
-  test('favorites capability delegates folder membership probing', () {
-    final capability = File(
-      'lib/services/source/favorites/source_favorites_capability.dart',
-    ).readAsStringSync();
-
-    expect(capability.contains('const maxProbePages = 120'), isFalse);
-    expect(capability.contains('while (page <= maxProbePages)'), isFalse);
-    expect(capability.contains('_favoriteFolderContainsComic('), isFalse);
-    expect(capability.contains('_membershipProbe.infer('), isTrue);
-  });
-
-  test('favorites capability delegates source script generation', () {
-    final capability = File(
-      'lib/services/source/favorites/source_favorites_capability.dart',
-    ).readAsStringSync();
-
-    expect(capability.contains("import 'dart:convert';"), isFalse);
-    expect(capability.contains('favorites.loadComics('), isFalse);
-    expect(capability.contains('favorites.loadNext('), isFalse);
-    expect(capability.contains('favorites.loadFolders('), isFalse);
-    expect(capability.contains('favorites.addOrDelFavorite('), isFalse);
-    expect(capability.contains('_scriptFactory.loadComics('), isTrue);
-    expect(capability.contains('_scriptFactory.loadFolders('), isTrue);
-    expect(capability.contains('_scriptFactory.toggleFavorite('), isTrue);
-  });
-
-  test('favorites capability delegates comic page loading', () {
-    final capability = File(
-      'lib/services/source/favorites/source_favorites_capability.dart',
-    ).readAsStringSync();
-
-    expect(capability.contains('source_favorite_comics_all_null.js'), isFalse);
-    expect(capability.contains('source_favorite_comics_all_0.js'), isFalse);
-    expect(capability.contains('source_favorite_next.js'), isFalse);
-    expect(capability.contains('_comicsLoader.load('), isTrue);
-  });
-
-  test('comic details capability delegates payload parsing', () {
-    final capability = File(
-      'lib/services/source/comic/comic_details_capability.dart',
-    ).readAsStringSync();
-
-    expect(capability.contains('_extractComicDetailsChapters'), isFalse);
-    expect(capability.contains('_extractComicDetailsTags'), isFalse);
-    expect(capability.contains('_extractComicDetailsRecommendations'), isFalse);
-    expect(capability.contains('hazukiDefaultChapterTitleToken'), isFalse);
-    expect(capability.contains('_parser.parse('), isTrue);
-  });
-
-  test('image cache delegates download concurrency scheduling', () {
-    final capability = File(
-      'lib/services/source/image/image_cache_capability.dart',
-    ).readAsStringSync();
-
-    expect(capability.contains("import 'dart:async';"), isFalse);
-    expect(capability.contains("import 'dart:collection';"), isFalse);
-    expect(capability.contains('_acquireSlot('), isFalse);
-    expect(capability.contains('_releaseSlot('), isFalse);
-    expect(capability.contains('_promoteWaitingDownload('), isFalse);
-    expect(capability.contains('_downloadScheduler.schedule('), isTrue);
-    expect(capability.contains('_downloadScheduler.promote('), isTrue);
-  });
-
-  test('image cache delegates disk storage and maintenance', () {
-    final capability = File(
-      'lib/services/source/image/image_cache_capability.dart',
-    ).readAsStringSync();
-
-    expect(capability.contains('package:crypto/crypto.dart'), isFalse);
-    expect(
-      capability.contains('package:path_provider/path_provider.dart'),
-      isFalse,
-    );
-    expect(capability.contains('File('), isFalse);
-    expect(capability.contains('_cacheFileFor('), isFalse);
-    expect(capability.contains('_trimToOverflow('), isFalse);
-    expect(capability.contains('_cleanByAge('), isFalse);
-    expect(capability.contains('_diskCache.read('), isTrue);
-    expect(capability.contains('_diskCache.write('), isTrue);
-    expect(capability.contains('_diskCache.computeSizeBytes('), isTrue);
-    expect(capability.contains('_diskCache.clear('), isTrue);
-  });
-
-  test('image cache delegates configuration and cleanup policy', () {
-    final capability = File(
-      'lib/services/source/image/image_cache_capability.dart',
-    ).readAsStringSync();
-
-    expect(capability.contains('SourcePrefsKeys.cacheMaxBytes'), isFalse);
-    expect(capability.contains('cacheLastAutoCleanAt'), isFalse);
-    expect(capability.contains('_enforcePolicyInternal('), isFalse);
-    expect(capability.contains('_enforcePolicyInFlight'), isFalse);
-    expect(capability.contains('_policy.setMaxBytes('), isTrue);
-    expect(capability.contains('_policy.setAutoCleanMode('), isTrue);
-    expect(capability.contains('_policy.enforce('), isTrue);
-  });
-
-  test('image cache delegates source-aware network downloads', () {
-    final capability = File(
-      'lib/services/source/image/image_cache_capability.dart',
-    ).readAsStringSync();
-
-    expect(capability.contains("import 'dart:convert';"), isFalse);
-    expect(capability.contains('source_on_image_load.js'), isFalse);
-    expect(capability.contains('buildCookieHeader('), isFalse);
-    expect(capability.contains("category: 'image_download'"), isFalse);
-    expect(capability.contains('_downloadFromNetwork('), isFalse);
-    expect(capability.contains('_networkDownloader.download('), isTrue);
+  test('dependency resolution includes relative and package directives', () {
+    final file = File('lib/features/reader/view/example.dart');
+    final dependencies = _dependencyUris(
+      "import '../../search/search.dart';\n"
+      "export 'package:hazuki/features/search/search.dart';\n"
+      "// import '../../ignored/ignored.dart';\n"
+      "import 'dart:async';",
+      file.absolute.uri,
+    ).toList();
+    expect(dependencies, [
+      File('lib/features/search/search.dart').absolute.uri,
+      File('lib/features/search/search.dart').absolute.uri,
+      Uri.parse('dart:async'),
+    ]);
   });
 }
 
@@ -791,5 +549,22 @@ Iterable<File> _dartFilesUnder(String path) sync* {
   final directory = Directory(path);
   for (final entity in directory.listSync(recursive: true)) {
     if (entity is File && entity.path.endsWith('.dart')) yield entity;
+  }
+}
+
+Iterable<Uri> _dependencyUris(String source, Uri fileUri) sync* {
+  final directives = RegExp(
+    r"""^\s*(?:import|export)\s+['"]([^'"]+)['"]""",
+    multiLine: true,
+  );
+  for (final match in directives.allMatches(source)) {
+    final value = match.group(1)!;
+    if (value.startsWith('package:hazuki/')) {
+      yield Directory(
+        'lib',
+      ).absolute.uri.resolve(value.substring('package:hazuki/'.length));
+    } else {
+      yield fileUri.resolve(value);
+    }
   }
 }

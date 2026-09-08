@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:hazuki/features/reader/support/reader_controller_support.dart';
-import 'package:hazuki/features/reader/support/reader_session_controller.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
@@ -13,7 +13,7 @@ class ReaderSaveImageController {
   ReaderSaveImageController({
     required ReaderContextGetter context,
     required ThemeData Function(BuildContext context) resolveReaderTheme,
-    required ReaderSessionController sessionController,
+    required SourceReaderGateway sourceReader,
     required ReaderIsMounted isMounted,
     required ReaderLogEvent logEvent,
     required ReaderLogPayloadBuilder logPayload,
@@ -21,7 +21,7 @@ class ReaderSaveImageController {
     required String epId,
   }) : _context = context,
        _resolveReaderTheme = resolveReaderTheme,
-       _sessionController = sessionController,
+       _sourceReader = sourceReader,
        _isMounted = isMounted,
        _logEvent = logEvent,
        _logPayload = logPayload,
@@ -30,7 +30,7 @@ class ReaderSaveImageController {
 
   final ReaderContextGetter _context;
   final ThemeData Function(BuildContext context) _resolveReaderTheme;
-  final ReaderSessionController _sessionController;
+  final SourceReaderGateway _sourceReader;
   final ReaderIsMounted _isMounted;
   final ReaderLogEvent _logEvent;
   final ReaderLogPayloadBuilder _logPayload;
@@ -136,8 +136,8 @@ class ReaderSaveImageController {
   }
 
   Future<_ReaderPreparedSaveImage> _prepareImageForSave(String imageUrl) async {
-    if (_sessionController.isLocalImagePath(imageUrl)) {
-      final file = File(_sessionController.normalizeLocalImagePath(imageUrl));
+    if (_sourceReader.isLocalImagePath(imageUrl)) {
+      final file = File(_sourceReader.normalizeLocalImagePath(imageUrl));
       final bytes = await file.readAsBytes();
       final localExtMatch = RegExp(
         r'\.([a-zA-Z0-9]+)$',
@@ -150,7 +150,7 @@ class ReaderSaveImageController {
       return _ReaderPreparedSaveImage(bytes: bytes, extension: extension);
     }
 
-    final prepared = await _sessionController.prepareImageForSave(
+    final prepared = await _sourceReader.prepareChapterImageData(
       imageUrl,
       comicId: _comicId,
       epId: _epId,
