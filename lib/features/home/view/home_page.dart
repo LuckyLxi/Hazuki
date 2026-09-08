@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'package:hazuki/app/app.dart';
+import 'package:hazuki/shared/appearance/appearance_settings.dart';
 import 'package:hazuki/features/home/home.dart';
 import 'package:hazuki/services/announcements/announcement_popup_coordinator.dart';
 import 'package:hazuki/shared/source_account/source_account_actions.dart';

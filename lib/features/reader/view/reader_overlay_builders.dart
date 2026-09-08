@@ -51,8 +51,7 @@ void maybeTriggerReaderSliderHaptic({
       return;
     }
   }
-  runtimeState.lastSliderHapticPageIndex = targetIndex;
-  runtimeState.lastSliderHapticAt = timestamp;
+  runtimeState.recordSliderHaptic(targetIndex, timestamp);
   final callback = triggerHaptic;
   if (callback != null) {
     callback();
@@ -208,16 +207,14 @@ Widget buildReaderBottomControls({
     chapterPanelLoading: chapterPanelLoading,
     onSliderChangeStart: runtimeState.readerSpreadCount > 1
         ? (value) {
-            runtimeState.lastSliderHapticPageIndex = null;
-            runtimeState.lastSliderHapticAt = null;
+            runtimeState.resetSliderHaptic();
           }
         : null,
     onSliderPointerDown: runtimeState.readerSpreadCount > 1
         ? (value) {
             maybeTriggerSliderHaptic(value);
             updateState(() {
-              runtimeState.sliderDragging = true;
-              runtimeState.sliderDragValue = value;
+              runtimeState.updateSliderDrag(value);
             });
           }
         : null,
@@ -225,8 +222,7 @@ Widget buildReaderBottomControls({
         ? (value) {
             maybeTriggerSliderHaptic(value);
             updateState(() {
-              runtimeState.sliderDragging = true;
-              runtimeState.sliderDragValue = value;
+              runtimeState.updateSliderDrag(value);
             });
           }
         : null,
@@ -236,12 +232,10 @@ Widget buildReaderBottomControls({
                 ? runtimeState.sliderDragValue
                 : value;
             final target = math.max(0, math.min(latestValue.round(), maxIndex));
-            runtimeState.lastSliderHapticPageIndex = null;
-            runtimeState.lastSliderHapticAt = null;
+            runtimeState.resetSliderHaptic();
             maybeTriggerSliderHaptic(target.toDouble(), force: true);
             updateState(() {
-              runtimeState.sliderDragging = false;
-              runtimeState.sliderDragValue = target.toDouble();
+              runtimeState.finishSliderDrag(target);
             });
             unawaited(goToPage(target));
           }

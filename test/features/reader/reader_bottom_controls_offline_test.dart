@@ -289,9 +289,9 @@ void main() {
   ) async {
     final runtimeState = ReaderRuntimeState()
       ..applyImages(List<String>.generate(12, (index) => 'img$index'))
-      ..controlsVisible = true
-      ..currentPageIndex = 2;
-    runtimeState.setDisplayedPageIndex(2);
+      ..setControlsVisible(true)
+      ..setCurrentPageIndex(2);
+    runtimeState.setCurrentPageIndex(2);
     final requestedPages = <int>[];
 
     await tester.pumpWidget(

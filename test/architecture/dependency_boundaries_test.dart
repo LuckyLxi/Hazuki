@@ -3,6 +3,22 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('features use shared contracts instead of app controllers', () {
+    final violations = <String>[];
+    for (final file in _dartFilesUnder('lib/features')) {
+      for (final line in file.readAsLinesSync()) {
+        final directive = line.trimLeft();
+        if (!directive.startsWith('import ') &&
+            !directive.startsWith('export ')) {
+          continue;
+        }
+        if (!line.replaceAll('\\', '/').contains('/app/')) continue;
+        violations.add('${file.path}: $line');
+      }
+    }
+    expect(violations, isEmpty, reason: violations.join('\n'));
+  });
+
   test('services do not depend on feature implementations', () {
     final violations = <String>[];
     for (final file in _dartFilesUnder('lib/services')) {

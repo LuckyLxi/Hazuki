@@ -1,3 +1,5 @@
+import 'package:hazuki/shared/software_update/software_update_dialog_presenter.dart';
+import 'package:hazuki/services/software_update/software_update_download_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/app/app.dart';
@@ -199,6 +201,9 @@ void main() {
         sourceDebug: sl<SourceDebugGateway>(),
         passwordLock: sl<PasswordLockService>(),
         softwareUpdate: sl<SoftwareUpdateService>(),
+        softwareUpdateDialog: SoftwareUpdateDialogPresenter(
+          downloadService: sl<SoftwareUpdateDownloadService>(),
+        ),
         cloudSync: sl<CloudSyncService>(),
         commentFilter: sl<CommentFilterService>(),
         dailyRecommendation: sl<DiscoverDailyRecommendationService>(),

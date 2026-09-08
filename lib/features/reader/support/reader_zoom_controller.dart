@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/features/reader/support/reader_controller_support.dart';
@@ -35,17 +33,17 @@ class ReaderZoomController {
     final scale = _transformationController.value.getMaxScaleOnAxis();
     final zoomed = scale > 1.05;
     if (_runtimeState.zoomInteracting) {
-      _runtimeState.isZoomed = zoomed;
+      _runtimeState.setZoomed(zoomed);
       return;
     }
     if (zoomed != _runtimeState.isZoomed && _isMounted()) {
-      _updateState(() => _runtimeState.isZoomed = zoomed);
+      _updateState(() => _runtimeState.setZoomed(zoomed));
     }
   }
 
   void handlePointerDown(PointerDownEvent _) {
     final previousCount = _runtimeState.activePointerCount;
-    _runtimeState.activePointerCount = previousCount + 1;
+    _runtimeState.pointerDown();
     if (!_runtimeState.pinchToZoom ||
         previousCount > 1 ||
         _runtimeState.activePointerCount <= 1 ||
@@ -53,13 +51,13 @@ class ReaderZoomController {
       return;
     }
     _updateState(() {
-      _runtimeState.zoomInteracting = true;
+      _runtimeState.beginZoomInteraction();
     });
   }
 
   void handlePointerEnd(PointerEvent _) {
     final previousCount = _runtimeState.activePointerCount;
-    _runtimeState.activePointerCount = math.max(0, previousCount - 1);
+    _runtimeState.pointerUp();
     if (!_runtimeState.pinchToZoom ||
         previousCount <= 1 ||
         _runtimeState.activePointerCount > 1) {
@@ -67,16 +65,14 @@ class ReaderZoomController {
     }
     final zoomed = _transformationController.value.getMaxScaleOnAxis() > 1.05;
     if (!_isMounted()) {
-      _runtimeState.zoomInteracting = false;
-      _runtimeState.isZoomed = zoomed;
+      _runtimeState.finishZoomInteraction(zoomed: zoomed);
       if (!zoomed) {
         _transformationController.value = Matrix4.identity();
       }
       return;
     }
     _updateState(() {
-      _runtimeState.zoomInteracting = false;
-      _runtimeState.isZoomed = zoomed;
+      _runtimeState.finishZoomInteraction(zoomed: zoomed);
     });
     if (!zoomed) {
       _transformationController.value = Matrix4.identity();
@@ -85,23 +81,23 @@ class ReaderZoomController {
 
   void handleInteractionStart(ScaleStartDetails _) {
     if (!_isMounted()) {
-      _runtimeState.zoomInteracting = true;
+      _runtimeState.beginZoomInteraction();
       return;
     }
     _updateState(() {
-      _runtimeState.zoomInteracting = true;
+      _runtimeState.beginZoomInteraction();
     });
   }
 
   void handleInteractionUpdate(ScaleUpdateDetails _) {
     final zoomed = _transformationController.value.getMaxScaleOnAxis() > 1.05;
     if (!_isMounted()) {
-      _runtimeState.isZoomed = zoomed;
+      _runtimeState.setZoomed(zoomed);
       return;
     }
     if (zoomed != _runtimeState.isZoomed) {
       _updateState(() {
-        _runtimeState.isZoomed = zoomed;
+        _runtimeState.setZoomed(zoomed);
       });
     }
   }
@@ -109,16 +105,14 @@ class ReaderZoomController {
   void handleInteractionEnd(ScaleEndDetails _) {
     final zoomed = _transformationController.value.getMaxScaleOnAxis() > 1.05;
     if (!_isMounted()) {
-      _runtimeState.zoomInteracting = _runtimeState.activePointerCount > 1;
-      _runtimeState.isZoomed = zoomed;
+      _runtimeState.finishZoomInteraction(zoomed: zoomed);
       if (!zoomed) {
         _transformationController.value = Matrix4.identity();
       }
       return;
     }
     _updateState(() {
-      _runtimeState.zoomInteracting = _runtimeState.activePointerCount > 1;
-      _runtimeState.isZoomed = zoomed;
+      _runtimeState.finishZoomInteraction(zoomed: zoomed);
     });
     if (!zoomed) {
       _transformationController.value = Matrix4.identity();
@@ -159,13 +153,11 @@ class ReaderZoomController {
       anim.removeListener(listener);
       controller.value = Matrix4.identity();
       if (!_isMounted()) {
-        _runtimeState.isZoomed = false;
-        _runtimeState.zoomInteracting = false;
+        _runtimeState.resetZoom(resetPointers: false);
         return;
       }
       _updateState(() {
-        _runtimeState.isZoomed = false;
-        _runtimeState.zoomInteracting = false;
+        _runtimeState.resetZoom(resetPointers: false);
       });
     });
   }
@@ -179,9 +171,7 @@ class ReaderZoomController {
         previousScale > 1.001;
     _resetAnimController.stop();
     _transformationController.value = Matrix4.identity();
-    _runtimeState.zoomInteracting = false;
-    _runtimeState.activePointerCount = 0;
-    _runtimeState.isZoomed = false;
+    _runtimeState.resetZoom();
     if (hadZoomState) {
       _logEvent(
         'Reader zoom reset immediately',

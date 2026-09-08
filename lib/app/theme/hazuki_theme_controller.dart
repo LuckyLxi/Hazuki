@@ -1,30 +1,13 @@
 import 'package:flutter/material.dart';
 
+import '../../shared/appearance/appearance_settings_scope.dart';
+export '../../shared/appearance/appearance_settings_scope.dart';
+
 import '../app_settings_store.dart';
 import '../appearance_settings.dart';
 
-class HazukiThemeControllerScope
-    extends InheritedNotifier<HazukiThemeController> {
-  const HazukiThemeControllerScope({
-    super.key,
-    required HazukiThemeController controller,
-    required super.child,
-  }) : super(notifier: controller);
-
-  static HazukiThemeController? maybeOf(BuildContext context) {
-    return context
-        .dependOnInheritedWidgetOfExactType<HazukiThemeControllerScope>()
-        ?.notifier;
-  }
-
-  static HazukiThemeController of(BuildContext context) {
-    final controller = maybeOf(context);
-    assert(controller != null, 'HazukiThemeControllerScope not found');
-    return controller!;
-  }
-}
-
-class HazukiThemeController extends ChangeNotifier {
+class HazukiThemeController extends ChangeNotifier
+    implements AppearanceSettingsSource {
   HazukiThemeController({
     required HazukiAppSettingsStore settingsStore,
     required AppearanceSettingsData initialSettings,
@@ -34,6 +17,7 @@ class HazukiThemeController extends ChangeNotifier {
   final HazukiAppSettingsStore _settingsStore;
   AppearanceSettingsData _settings;
 
+  @override
   AppearanceSettingsData get settings => _settings;
   ThemeMode get themeMode => _settings.themeMode;
 

@@ -149,6 +149,7 @@ void main() {
         mode: CommentFilterMode.collapse,
       );
       final controller = CommentsPageController(
+        comicId: 'comic',
         sourceService: (() {
           final source = SourceRuntimeAssembly();
           return HazukiSourceCommentsAdapter(
@@ -158,6 +159,7 @@ void main() {
         })(),
         filterService: service,
       );
+      addTearDown(controller.dispose);
       const comments = [
         ComicCommentData(
           avatar: '',
@@ -186,6 +188,7 @@ void main() {
         mode: CommentFilterMode.hide,
       );
       final controller = CommentsPageController(
+        comicId: 'comic',
         sourceService: (() {
           final source = SourceRuntimeAssembly();
           return HazukiSourceCommentsAdapter(
@@ -195,6 +198,7 @@ void main() {
         })(),
         filterService: service,
       );
+      addTearDown(controller.dispose);
       const comments = [
         ComicCommentData(
           avatar: '',

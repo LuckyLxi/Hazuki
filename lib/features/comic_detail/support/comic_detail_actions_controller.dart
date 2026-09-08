@@ -8,7 +8,7 @@ import 'package:flutter/services.dart';
 
 import 'package:hazuki/shared/chapter_title_resolver.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
-import 'package:hazuki/app/windows/windows_title_bar_controller.dart';
+import 'package:hazuki/shared/window/window_title_bar_control.dart';
 import 'package:hazuki/shared/category_tag_navigation.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';

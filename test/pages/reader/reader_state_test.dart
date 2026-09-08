@@ -154,17 +154,17 @@ void main() {
 
     test('applyImages resets transient session state', () {
       final state = ReaderRuntimeState()
-        ..currentPageIndex = 2
-        ..controlsVisible = true
-        ..sliderDragging = true
-        ..sliderDragValue = 2
-        ..lastSliderHapticPageIndex = 2
-        ..lastSliderHapticAt = DateTime(2026)
-        ..loadingImages = true
-        ..loadImagesError = 'boom'
-        ..isZoomed = true
-        ..zoomInteracting = true
-        ..activePointerCount = 3;
+        ..applyImages(['old-a', 'old-b', 'old-c'])
+        ..setCurrentPageIndex(2)
+        ..setControlsVisible(true)
+        ..updateSliderDrag(2)
+        ..recordSliderHaptic(2, DateTime(2026))
+        ..markLoadImagesFailed('boom')
+        ..setZoomed(true)
+        ..beginZoomInteraction()
+        ..pointerDown()
+        ..pointerDown()
+        ..pointerDown();
 
       state.applyImages(['a', 'b', 'c']);
 
@@ -266,8 +266,8 @@ void main() {
         await tester.pumpWidget(const SizedBox.shrink());
         final runtimeState = ReaderRuntimeState()
           ..applyImages(['a', 'b', 'c', 'd'])
-          ..currentPageIndex = 1;
-        runtimeState.setDisplayedPageIndex(1);
+          ..setCurrentPageIndex(1);
+        runtimeState.setCurrentPageIndex(1);
         final diagnosticsState = ReaderDiagnosticsState();
         final scrollController = ScrollController();
         final pageController = PageController();
@@ -284,7 +284,7 @@ void main() {
         addTearDown(focusNode.dispose);
         addTearDown(transformationController.dispose);
         addTearDown(resetAnimController.dispose);
-        addTearDown(runtimeState.pageIndexNotifier.dispose);
+        addTearDown(runtimeState.dispose);
 
         final zoomController = ReaderZoomController(
           transformationController: transformationController,
@@ -965,7 +965,7 @@ void main() {
       final requestedUrls = <String>[];
       late ReaderImagePipelineController controller;
       addTearDown(zoomController.dispose);
-      addTearDown(runtimeState.pageIndexNotifier.dispose);
+      addTearDown(runtimeState.dispose);
 
       await tester.pumpWidget(
         MaterialApp(
@@ -1018,7 +1018,7 @@ void main() {
       final zoomController = TransformationController();
       late ReaderImagePipelineController controller;
       addTearDown(zoomController.dispose);
-      addTearDown(runtimeState.pageIndexNotifier.dispose);
+      addTearDown(runtimeState.dispose);
 
       await tester.pumpWidget(
         MaterialApp(
@@ -1064,10 +1064,10 @@ void main() {
       () async {
         final state = ReaderRuntimeState()
           ..applyImages(['a', 'b', 'c'])
-          ..readerMode = ReaderMode.rightToLeft
-          ..tapToTurnPage = true
-          ..currentPageIndex = 1;
-        state.setDisplayedPageIndex(1);
+          ..updateSettings(readerMode: ReaderMode.rightToLeft)
+          ..updateSettings(tapToTurnPage: true)
+          ..setCurrentPageIndex(1);
+        state.setCurrentPageIndex(1);
 
         var toggled = 0;
         final controller = ReaderNavigationController(
@@ -1108,8 +1108,8 @@ void main() {
         );
         expect(state.pageIndexNotifier.value, 0);
 
-        state.currentPageIndex = 0;
-        state.setDisplayedPageIndex(0);
+        state.setCurrentPageIndex(0);
+        state.setCurrentPageIndex(0);
         await controller.handleTapUp(
           TapUpDetails(
             localPosition: Offset(90, 0),
@@ -1129,7 +1129,7 @@ void main() {
       final prefetchedAhead = <int>[];
       addTearDown(scrollController.dispose);
       addTearDown(pageController.dispose);
-      addTearDown(state.pageIndexNotifier.dispose);
+      addTearDown(state.dispose);
       final controller = ReaderNavigationController(
         runtimeState: state,
         diagnosticsState: ReaderDiagnosticsState(),
@@ -1160,13 +1160,13 @@ void main() {
     ) async {
       final state = ReaderRuntimeState()
         ..applyImages(List<String>.generate(30, (index) => 'img$index'))
-        ..readerMode = ReaderMode.topToBottom;
+        ..updateSettings(readerMode: ReaderMode.topToBottom);
       final diagnosticsState = ReaderDiagnosticsState();
       final scrollController = ScrollController();
       final pageController = PageController();
       addTearDown(scrollController.dispose);
       addTearDown(pageController.dispose);
-      addTearDown(state.pageIndexNotifier.dispose);
+      addTearDown(state.dispose);
 
       await tester.pumpWidget(
         MaterialApp(
@@ -1227,13 +1227,13 @@ void main() {
       (tester) async {
         final state = ReaderRuntimeState()
           ..applyImages(List<String>.generate(30, (index) => 'img$index'))
-          ..readerMode = ReaderMode.topToBottom;
+          ..updateSettings(readerMode: ReaderMode.topToBottom);
         final diagnosticsState = ReaderDiagnosticsState();
         final scrollController = ScrollController();
         final pageController = PageController();
         addTearDown(scrollController.dispose);
         addTearDown(pageController.dispose);
-        addTearDown(state.pageIndexNotifier.dispose);
+        addTearDown(state.dispose);
 
         await tester.pumpWidget(
           MaterialApp(
@@ -1285,13 +1285,13 @@ void main() {
       (tester) async {
         final state = ReaderRuntimeState()
           ..applyImages(List<String>.generate(30, (index) => 'img$index'))
-          ..readerMode = ReaderMode.topToBottom;
+          ..updateSettings(readerMode: ReaderMode.topToBottom);
         final diagnosticsState = ReaderDiagnosticsState();
         final scrollController = ScrollController();
         final pageController = PageController();
         addTearDown(scrollController.dispose);
         addTearDown(pageController.dispose);
-        addTearDown(state.pageIndexNotifier.dispose);
+        addTearDown(state.dispose);
 
         await tester.pumpWidget(
           MaterialApp(
@@ -1354,10 +1354,10 @@ void main() {
     test('creates a snapshot from reader runtime and pipeline state', () {
       final runtimeState = ReaderRuntimeState()
         ..applyImages(['a', 'b', 'c'])
-        ..currentPageIndex = 1
-        ..controlsVisible = true
-        ..isZoomed = true;
-      runtimeState.setDisplayedPageIndex(1);
+        ..setCurrentPageIndex(1)
+        ..setControlsVisible(true)
+        ..setZoomed(true);
+      runtimeState.setCurrentPageIndex(1);
       final pipelineState = ReaderImagePipelineState()
         ..activeUnscrambleTasks = 2
         ..prefetchAheadRunning = true;
@@ -1370,7 +1370,7 @@ void main() {
       addTearDown(pageController.dispose);
       addTearDown(zoomController.dispose);
       addTearDown(pipelineState.dispose);
-      addTearDown(runtimeState.pageIndexNotifier.dispose);
+      addTearDown(runtimeState.dispose);
 
       final controller = ReaderDiagnosticsController(
         runtimeState: runtimeState,
@@ -1408,7 +1408,7 @@ void main() {
     test('normalizes and deduplicates visible page logs', () {
       final runtimeState = ReaderRuntimeState()
         ..applyImages(['a', 'b', 'c', 'd'])
-        ..readerMode = ReaderMode.topToBottom;
+        ..updateSettings(readerMode: ReaderMode.topToBottom);
       final pipelineState = ReaderImagePipelineState();
       final diagnosticsState = ReaderDiagnosticsState();
       final scrollController = ScrollController();
@@ -1419,7 +1419,7 @@ void main() {
       addTearDown(pageController.dispose);
       addTearDown(zoomController.dispose);
       addTearDown(pipelineState.dispose);
-      addTearDown(runtimeState.pageIndexNotifier.dispose);
+      addTearDown(runtimeState.dispose);
 
       final controller = ReaderDiagnosticsController(
         runtimeState: runtimeState,

@@ -179,7 +179,7 @@ class ReaderSessionController {
     _readerKeyFocusNode.dispose();
     _zoomController.removeListener(_onZoomChanged);
     _zoomController.dispose();
-    _runtimeState.pageIndexNotifier.dispose();
+    _runtimeState.dispose();
     _logEvent(
       'Reader session closed',
       source: 'reader_lifecycle',

@@ -3,9 +3,13 @@ import 'dart:io';
 import 'package:flutter/widgets.dart';
 import 'package:window_manager/window_manager.dart';
 
+import '../../shared/window/window_title_bar_control.dart';
+export '../../shared/window/window_title_bar_control.dart';
+
 import '../app_settings_store.dart';
 
-class HazukiWindowsTitleBarController extends ChangeNotifier {
+class HazukiWindowsTitleBarController extends ChangeNotifier
+    implements WindowTitleBarControl {
   HazukiWindowsTitleBarController({
     required HazukiAppSettingsStore settingsStore,
     required bool initialUseSystemTitleBar,
@@ -17,12 +21,15 @@ class HazukiWindowsTitleBarController extends ChangeNotifier {
 
   bool _useSystemTitleBar;
 
+  @override
   bool get useSystemTitleBar => _useSystemTitleBar;
+  @override
   bool get shouldShowCustomTitleBar =>
       Platform.isWindows &&
       !_useSystemTitleBar &&
       _customTitleBarSuppressors.isEmpty;
 
+  @override
   void suppressCustomTitleBar(Object owner) {
     final wasShowing = shouldShowCustomTitleBar;
     _customTitleBarSuppressors.add(owner);
@@ -31,6 +38,7 @@ class HazukiWindowsTitleBarController extends ChangeNotifier {
     }
   }
 
+  @override
   void releaseCustomTitleBarSuppression(Object owner) {
     final wasShowing = shouldShowCustomTitleBar;
     _customTitleBarSuppressors.remove(owner);
@@ -39,6 +47,7 @@ class HazukiWindowsTitleBarController extends ChangeNotifier {
     }
   }
 
+  @override
   Future<void> updateUseSystemTitleBar(bool value) async {
     await _applyUseSystemTitleBar(value, persist: true);
   }
@@ -67,21 +76,5 @@ class HazukiWindowsTitleBarController extends ChangeNotifier {
       value ? TitleBarStyle.normal : TitleBarStyle.hidden,
       windowButtonVisibility: value,
     );
-  }
-}
-
-class HazukiWindowsTitleBarScope
-    extends InheritedNotifier<HazukiWindowsTitleBarController> {
-  const HazukiWindowsTitleBarScope({
-    super.key,
-    required HazukiWindowsTitleBarController controller,
-    required super.child,
-  }) : super(notifier: controller);
-
-  static HazukiWindowsTitleBarController of(BuildContext context) {
-    final scope = context
-        .dependOnInheritedWidgetOfExactType<HazukiWindowsTitleBarScope>();
-    assert(scope != null, 'HazukiWindowsTitleBarScope is missing.');
-    return scope!.notifier!;
   }
 }

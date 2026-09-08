@@ -162,8 +162,7 @@ class ReaderNavigationController {
       final target = _runtimeState.normalizeSpreadIndex(
         activeProgrammaticTarget,
       );
-      _runtimeState.currentPageIndex = target;
-      _runtimeState.setDisplayedPageIndex(target);
+      _runtimeState.setCurrentPageIndex(target);
       _diagnosticsState.lastObservedListPixels = currentPixels;
       return;
     }
@@ -172,16 +171,15 @@ class ReaderNavigationController {
       final target = _runtimeState.normalizeSpreadIndex(
         _diagnosticsState.stabilizingProgrammaticListTargetIndex!,
       );
-      _runtimeState.currentPageIndex = target;
-      _runtimeState.setDisplayedPageIndex(target);
+      _runtimeState.setCurrentPageIndex(target);
       _diagnosticsState.lastObservedListPixels = currentPixels;
       return;
     }
-    if (_runtimeState.currentPageIndex != normalizedIndex) {
-      _runtimeState.currentPageIndex = normalizedIndex;
+    final pageChanged = _runtimeState.currentPageIndex != normalizedIndex;
+    _runtimeState.setCurrentPageIndex(normalizedIndex);
+    if (pageChanged) {
       _logVisiblePageChange(index: normalizedIndex, trigger: 'scroll');
     }
-    _runtimeState.setDisplayedPageIndex(normalizedIndex);
 
     if (previousPixels != null) {
       final hasRecentExpectedTopJump =
@@ -243,10 +241,11 @@ class ReaderNavigationController {
     _resetZoomImmediately(reason: 'page_swipe');
     if (pageChanged || zoomWasActive) {
       _updateState(() {
-        _runtimeState.currentPageIndex = index;
+        _runtimeState.setCurrentPageIndex(index);
       });
+    } else {
+      _runtimeState.setCurrentPageIndex(index);
     }
-    _runtimeState.setDisplayedPageIndex(index);
     _logVisiblePageChange(index: index, trigger: 'page_swipe');
     if (!_noImageModeEnabled()) {
       _prefetchAround(index);
@@ -302,8 +301,7 @@ class ReaderNavigationController {
       }),
     );
     final previousIndex = _runtimeState.currentPageIndex;
-    _runtimeState.currentPageIndex = target;
-    _runtimeState.setDisplayedPageIndex(target);
+    _runtimeState.setCurrentPageIndex(target);
     if (!_noImageModeEnabled()) {
       _prefetchAround(target);
       _requestPrefetchAhead(target);
@@ -367,8 +365,7 @@ class ReaderNavigationController {
         _diagnosticsState.activeProgrammaticListTargetIndex = null;
         return;
       }
-      _runtimeState.currentPageIndex = target;
-      _runtimeState.setDisplayedPageIndex(target);
+      _runtimeState.setCurrentPageIndex(target);
       _logEvent(
         'Reader position synced after layout change',
         source: 'reader_navigation',
@@ -496,8 +493,7 @@ class ReaderNavigationController {
       final target = _runtimeState.normalizeSpreadIndex(
         safeImageIndex ~/ _runtimeState.readerSpreadSize,
       );
-      _runtimeState.currentPageIndex = target;
-      _runtimeState.setDisplayedPageIndex(target);
+      _runtimeState.setCurrentPageIndex(target);
 
       if (_runtimeState.readerMode == ReaderMode.rightToLeft) {
         if (!_pageController.hasClients) {

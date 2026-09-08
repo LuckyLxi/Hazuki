@@ -3,7 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
-import 'package:hazuki/app/windows/windows_title_bar_controller.dart';
+import 'package:hazuki/shared/window/window_title_bar_control.dart';
 import 'package:hazuki/features/reader/reader.dart';
 import 'package:hazuki/features/reader/state/reader_image_pipeline_state.dart';
 import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
@@ -238,7 +238,7 @@ class _ReaderPageState extends State<ReaderPage>
         epId: widget.epId,
       );
 
-  HazukiWindowsTitleBarController? _windowsTitleBarController;
+  WindowTitleBarControl? _windowsTitleBarController;
 
   bool get _noImageModeEnabled => hazukiNoImageModeNotifier.value;
 
@@ -536,7 +536,7 @@ class _ReaderPageState extends State<ReaderPage>
   void _toggleControlsVisibility() {
     final nextVisible = !_runtimeState.controlsVisible;
     _updateReaderState(() {
-      _runtimeState.controlsVisible = nextVisible;
+      _runtimeState.setControlsVisible(nextVisible);
     });
     _logReaderEvent(
       'Reader controls toggled',

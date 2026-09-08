@@ -4,16 +4,21 @@ import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import 'package:hazuki/app/software_update/software_update_dialog_support.dart';
+import 'package:hazuki/shared/software_update/software_update_dialog_presenter.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../services/software_update/software_update_service.dart';
 import 'settings_group.dart';
 import '../../../widgets/widgets.dart';
 
 class AboutPage extends StatefulWidget {
-  const AboutPage({super.key, required this.softwareUpdateService});
+  const AboutPage({
+    super.key,
+    required this.softwareUpdateService,
+    required this.softwareUpdateDialog,
+  });
 
   final SoftwareUpdateService softwareUpdateService;
+  final SoftwareUpdateDialogPresenter softwareUpdateDialog;
 
   @override
   State<AboutPage> createState() => _AboutPageState();
@@ -21,9 +26,6 @@ class AboutPage extends StatefulWidget {
 
 class _AboutPageState extends State<AboutPage> {
   static const _softwareUpdateSkipDateKey = 'software_update_skip_date';
-
-  final SoftwareUpdateDialogSupport _softwareUpdateDialogSupport =
-      const SoftwareUpdateDialogSupport();
 
   bool _checkingUpdate = false;
   String? _currentVersion;
@@ -118,7 +120,7 @@ class _AboutPageState extends State<AboutPage> {
         return;
       }
 
-      await _softwareUpdateDialogSupport.showForCheck(
+      await widget.softwareUpdateDialog.showForCheck(
         dialogContext: context,
         isMounted: () => mounted,
         skipPrefsKey: _softwareUpdateSkipDateKey,
