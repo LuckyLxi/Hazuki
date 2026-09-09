@@ -6,7 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../models/hazuki_models.dart';
 import '../source/source_capabilities.dart';
-import 'manga_download_models.dart';
+import 'manga_download_commands.dart';
 import 'manga_download_lifecycle_coordinator.dart';
 import 'manga_download_state.dart';
 import 'manga_download_files.dart';
@@ -16,7 +16,8 @@ import 'manga_download_storage_support.dart';
 
 export 'manga_download_models.dart';
 
-class MangaDownloadService extends ChangeNotifier {
+class MangaDownloadService extends ChangeNotifier
+    implements MangaDownloadCommands {
   MangaDownloadService({SourceReaderGateway? sourceReader}) {
     _stateStore = MangaDownloadStateStore(logScan: _logScan);
     _access = MangaDownloadAccess(logScan: _logScan);
@@ -148,6 +149,7 @@ class MangaDownloadService extends ChangeNotifier {
   MangaDownloadTask? taskByComicId(String comicId) =>
       _state.taskByComicId(comicId);
 
+  @override
   Future<MangaDownloadConflict> checkDownloadTaskConflict({
     required ComicDetailsData details,
     required List<MangaChapterDownloadTarget> chapters,
@@ -167,6 +169,7 @@ class MangaDownloadService extends ChangeNotifier {
     );
   }
 
+  @override
   Future<MangaDownloadConflict> checkDownloadConflict({
     required ComicDetailsData details,
     required List<MangaChapterDownloadTarget> chapters,
@@ -193,6 +196,7 @@ class MangaDownloadService extends ChangeNotifier {
     );
   }
 
+  @override
   Future<MangaDownloadEnqueueResult> enqueueDownload({
     required ComicDetailsData details,
     required String coverUrl,

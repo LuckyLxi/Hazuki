@@ -1,7 +1,7 @@
 import 'package:dio/dio.dart';
 
 import '../network/hazuki_network.dart';
-import '../software_update/software_update_service.dart';
+import '../../shared/preferences/software_update_source.dart';
 
 const _githubAnnouncementManifestUrl =
     'https://raw.githubusercontent.com/LuckyLxi/Hazuki/main/announcement.json';

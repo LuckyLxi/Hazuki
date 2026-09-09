@@ -1,5 +1,5 @@
 import 'package:hazuki/services/local_favorites/local_favorites_contracts.dart';
-import 'package:hazuki/services/manga_download/manga_download_service.dart';
+import 'package:hazuki/services/manga_download/manga_download_commands.dart';
 import 'package:hazuki/services/read_history_service.dart';
 import 'package:hazuki/services/reading_progress_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
@@ -18,7 +18,7 @@ class ComicDetailDependencies {
 
   final SourceComicDetailGateway source;
   final LocalFavoritesRepository localFavorites;
-  final MangaDownloadService downloader;
+  final MangaDownloadCommands downloader;
   final ReadingProgressService readingProgress;
   final ReadHistoryService readHistory;
   final SourceImageGateway imageGateway;

@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:hazuki/services/announcement_service.dart';
-import 'package:hazuki/services/software_update/software_update_service.dart';
+import 'package:hazuki/shared/preferences/software_update_source.dart';
 import 'package:hazuki/shared/preferences/hazuki_preference_keys.dart';
 
 const _manifest = '''

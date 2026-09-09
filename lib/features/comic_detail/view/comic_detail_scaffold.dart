@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
+import 'package:hazuki/shared/comments/comments_loading_view.dart';
 import 'package:hazuki/shared/comments/comments_widget_builder.dart';
 
 import '../support/comic_detail_scope.dart';
@@ -203,7 +204,7 @@ class ComicDetailBody extends StatelessWidget {
                                       uiState.buildCommentsTabDebugState,
                                 ),
                               )
-                            : const ComicDetailLoadingView();
+                            : const CommentsInitialLoadingView();
                       },
                     ),
                     if (supportsJmExclusiveActions)

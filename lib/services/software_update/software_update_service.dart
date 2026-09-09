@@ -8,8 +8,11 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../shared/preferences/hazuki_preference_keys.dart';
+import '../../shared/preferences/software_update_source.dart';
 import '../network/hazuki_network.dart';
 import 'software_update_version_utils.dart';
+
+export '../../shared/preferences/software_update_source.dart';
 
 const _ghproxyBaseUrl = 'https://ghproxy.net/';
 const _jsDelivrUpdateManifestUrl =
@@ -20,30 +23,6 @@ const _ghproxyUpdateManifestUrl =
     '$_ghproxyBaseUrl$_githubRawUpdateManifestUrl';
 const _githubLatestReleaseUrl =
     'https://api.github.com/repos/LuckyLxi/Hazuki/releases/latest';
-
-enum SoftwareUpdateSource {
-  jsDelivr('jsdelivr'),
-  github('github'),
-  ghproxy('ghproxy');
-
-  const SoftwareUpdateSource(this.preferenceValue);
-
-  final String preferenceValue;
-
-  static SoftwareUpdateSource fromPreference(String? value) {
-    return SoftwareUpdateSource.values.firstWhere(
-      (source) => source.preferenceValue == value,
-      orElse: () => SoftwareUpdateSource.jsDelivr,
-    );
-  }
-}
-
-Future<SoftwareUpdateSource> loadSoftwareUpdateSourcePreference() async {
-  final prefs = await SharedPreferences.getInstance();
-  return SoftwareUpdateSource.fromPreference(
-    prefs.getString(hazukiSoftwareUpdateSourcePreferenceKey),
-  );
-}
 
 String resolveSoftwareUpdateCheckUrl(SoftwareUpdateSource source) {
   return switch (source) {

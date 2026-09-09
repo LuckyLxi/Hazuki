@@ -12,7 +12,7 @@ import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/features/reader/view/reader_comments_sheet.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/services/manga_download/manga_download_service.dart';
+import 'package:hazuki/services/manga_download/manga_download_commands.dart';
 import 'package:hazuki/shared/chapter_title_resolver.dart';
 import 'package:hazuki/shared/comments/comments_interaction_state.dart';
 import 'package:hazuki/shared/downloads/download_conflict_dialog.dart';
@@ -31,7 +31,7 @@ class ReaderActionsController {
     required SourceReaderGateway sourceReader,
     required ReaderPageContext pageContext,
     required ReaderReplacementPageBuilder buildReplacementPage,
-    required MangaDownloadService downloader,
+    required MangaDownloadCommands downloader,
   }) : _context = context,
        _isMounted = isMounted,
        _updateState = updateState,
@@ -50,7 +50,7 @@ class ReaderActionsController {
   final SourceReaderGateway _sourceReader;
   final ReaderPageContext _pageContext;
   final ReaderReplacementPageBuilder _buildReplacementPage;
-  final MangaDownloadService _downloader;
+  final MangaDownloadCommands _downloader;
 
   ComicDetailsData? _chapterDetailsCache;
   bool _chapterPanelLoading = false;

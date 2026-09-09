@@ -4,12 +4,12 @@ import 'package:mocktail/mocktail.dart';
 import 'package:hazuki/features/reader/support/reader_actions_controller.dart';
 import 'package:hazuki/features/reader/support/reader_page_context.dart';
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/services/manga_download/manga_download_service.dart';
+import 'package:hazuki/services/manga_download/manga_download_commands.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 
 class _Source extends Mock implements SourceReaderGateway {}
 
-class _Downloader extends Mock implements MangaDownloadService {}
+class _Downloader extends Mock implements MangaDownloadCommands {}
 
 class _Details extends Mock implements ComicDetailsData {}
 

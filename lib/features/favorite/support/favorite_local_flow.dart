@@ -19,36 +19,6 @@ class FavoriteLocalFlow {
     return preferences.saveSortOrder(order);
   }
 
-  Future<FavoritePageMode> loadFavoritePageMode({String sourceKey = ''}) {
-    return preferences.loadFavoritePageMode(sourceKey: sourceKey);
-  }
-
-  Future<void> saveFavoritePageMode(
-    FavoritePageMode mode, {
-    String sourceKey = '',
-  }) {
-    return preferences.saveFavoritePageMode(mode, sourceKey: sourceKey);
-  }
-
-  Future<String> loadSelectedFolderId(
-    FavoritePageMode mode, {
-    String sourceKey = '',
-  }) {
-    return preferences.loadSelectedFavoriteFolderId(mode, sourceKey: sourceKey);
-  }
-
-  Future<void> saveSelectedFolderId(
-    FavoritePageMode mode,
-    String folderId, {
-    String sourceKey = '',
-  }) {
-    return preferences.saveSelectedFavoriteFolderId(
-      mode,
-      folderId,
-      sourceKey: sourceKey,
-    );
-  }
-
   Future<FavoriteFoldersResult> loadFolders() {
     return repository.loadFavoriteFolders();
   }

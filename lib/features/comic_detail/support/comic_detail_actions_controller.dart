@@ -12,7 +12,7 @@ import 'package:hazuki/shared/window/window_title_bar_control.dart';
 import 'package:hazuki/shared/category_tag_navigation.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/services/manga_download/manga_download_service.dart';
+import 'package:hazuki/services/manga_download/manga_download_models.dart';
 import 'package:hazuki/widgets/hazuki_prompt.dart';
 
 import '../repository/comic_detail_repository.dart';

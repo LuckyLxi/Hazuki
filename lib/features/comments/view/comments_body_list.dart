@@ -225,22 +225,7 @@ class _CommentsContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (initialLoading) {
-      return Container(
-        key: const ValueKey('loading'),
-        padding: const EdgeInsets.only(top: 100),
-        alignment: Alignment.topCenter,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            SizedBox.square(
-              dimension: 64,
-              child: LoadingIndicatorM3E(
-                semanticLabel: l10n(context).commonLoading,
-              ),
-            ),
-          ],
-        ),
-      );
+      return const CommentsInitialLoadingView();
     }
 
     if (errorMessage != null && comments.isEmpty) {

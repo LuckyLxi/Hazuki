@@ -73,6 +73,21 @@ void main() {
     );
   });
 
+  test('announcements do not depend on software update implementations', () {
+    final violations = <String>[];
+    for (final file in _dartFilesUnder('lib/services/announcements')) {
+      for (final line in file.readAsLinesSync()) {
+        final directive = line.trimLeft();
+        if ((directive.startsWith('import ') ||
+                directive.startsWith('export ')) &&
+            line.contains('software_update/')) {
+          violations.add('${file.path}: $line');
+        }
+      }
+    }
+    expect(violations, isEmpty, reason: violations.join('\n'));
+  });
+
   test('source gateways do not import runtime implementations', () {
     final violations = <String>[];
     for (final file in _dartFilesUnder('lib/services/source/gateways')) {

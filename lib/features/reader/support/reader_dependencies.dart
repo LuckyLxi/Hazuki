@@ -1,4 +1,4 @@
-import 'package:hazuki/services/manga_download/manga_download_service.dart';
+import 'package:hazuki/services/manga_download/manga_download_commands.dart';
 import 'package:hazuki/services/reading_progress_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 
@@ -13,5 +13,5 @@ class ReaderDependencies {
   final SourceReaderGateway sourceReader;
   final SourceSettingsGateway sourceSettings;
   final ReadingProgressService readingProgressService;
-  final MangaDownloadService downloader;
+  final MangaDownloadCommands downloader;
 }
