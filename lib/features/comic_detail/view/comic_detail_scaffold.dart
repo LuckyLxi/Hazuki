@@ -167,7 +167,7 @@ class ComicDetailBody extends StatelessWidget {
                     ComicDetailTabTickerScope(
                       tabController: uiState.tabController,
                       tabIndex: 0,
-                      builder: (context, shouldRender, _) {
+                      builder: (context, shouldRender) {
                         return RepaintBoundary(
                           child: ComicDetailInfoTab(
                             details: details,
@@ -186,7 +186,7 @@ class ComicDetailBody extends StatelessWidget {
                     ComicDetailTabTickerScope(
                       tabController: uiState.tabController,
                       tabIndex: 1,
-                      builder: (context, shouldRender, _) {
+                      builder: (context, shouldRender) {
                         return details != null
                             ? RepaintBoundary(
                                 child: commentsWidgetBuilder(
@@ -211,7 +211,7 @@ class ComicDetailBody extends StatelessWidget {
                       ComicDetailTabTickerScope(
                         tabController: uiState.tabController,
                         tabIndex: 2,
-                        builder: (context, shouldRender, _) {
+                        builder: (context, shouldRender) {
                           return RepaintBoundary(
                             child: ComicDetailRelatedTab(
                               details: details,

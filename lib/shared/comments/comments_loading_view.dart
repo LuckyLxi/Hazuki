@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:loading_indicator_m3e/loading_indicator_m3e.dart';
 
 import 'package:hazuki/l10n/l10n.dart';
+import 'package:hazuki/widgets/hazuki_m3e_loading_indicator.dart';
 
 class CommentsInitialLoadingView extends StatelessWidget {
   const CommentsInitialLoadingView({super.key});
@@ -14,7 +14,9 @@ class CommentsInitialLoadingView extends StatelessWidget {
       alignment: Alignment.topCenter,
       child: SizedBox.square(
         dimension: 64,
-        child: LoadingIndicatorM3E(semanticLabel: l10n(context).commonLoading),
+        child: HazukiM3ELoadingIndicator(
+          semanticLabel: l10n(context).commonLoading,
+        ),
       ),
     );
   }

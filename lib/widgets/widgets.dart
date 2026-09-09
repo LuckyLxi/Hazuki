@@ -4,6 +4,7 @@ export 'comic_cover_tile.dart';
 export 'picacg_comic_tags.dart';
 export 'hazuki_desktop_page_container.dart';
 export 'hazuki_frosted_app_bar.dart';
+export 'hazuki_m3e_loading_indicator.dart';
 export 'hazuki_pull_to_refresh.dart';
 export 'hazuki_prompt.dart';
 export 'reader_settings_content.dart';

@@ -141,12 +141,7 @@ class ComicDetailTabTickerScope extends StatefulWidget {
 
   final TabController tabController;
   final int tabIndex;
-  final Widget Function(
-    BuildContext context,
-    bool shouldRender,
-    bool isSettledActive,
-  )
-  builder;
+  final Widget Function(BuildContext context, bool shouldRender) builder;
 
   @override
   State<ComicDetailTabTickerScope> createState() =>
@@ -154,8 +149,7 @@ class ComicDetailTabTickerScope extends StatefulWidget {
 }
 
 class _ComicDetailTabTickerScopeState extends State<ComicDetailTabTickerScope> {
-  bool _shouldRender = false;
-  bool _isSettledActive = false;
+  bool _tickerEnabled = false;
 
   @override
   void initState() {
@@ -198,26 +192,22 @@ class _ComicDetailTabTickerScopeState extends State<ComicDetailTabTickerScope> {
         tc.indexIsChanging ||
         (tc.animation != null &&
             (tc.animation!.value - tc.index).abs() >= 0.01);
-    final newShouldRender =
+    final newTickerEnabled =
         tc.index == widget.tabIndex || (isTransitioning && distance <= 1.0);
-    final isSettled =
-        distance < 0.01 && tc.index == widget.tabIndex && !tc.indexIsChanging;
-    final newIsSettledActive = isSettled && tc.index == widget.tabIndex;
-
-    if (newShouldRender != _shouldRender ||
-        newIsSettledActive != _isSettledActive) {
+    if (newTickerEnabled != _tickerEnabled) {
       setState(() {
-        _shouldRender = newShouldRender;
-        _isSettledActive = newIsSettledActive;
+        _tickerEnabled = newTickerEnabled;
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // Hidden tabs must remove their scrollables from NestedScrollView's shared
+    // controller. TickerMode alone only pauses their animations.
     return TickerMode(
-      enabled: _shouldRender,
-      child: widget.builder(context, _shouldRender, _isSettledActive),
+      enabled: _tickerEnabled,
+      child: widget.builder(context, _tickerEnabled),
     );
   }
 }
