@@ -1,3 +1,6 @@
+import 'dart:math' as math;
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/l10n/app_localizations.dart';
@@ -48,35 +51,20 @@ class DiscoverSectionSortBar extends StatelessWidget {
                 padding: EdgeInsets.only(
                   bottom: groupIndex == groups.length - 1 ? 0 : 8,
                 ),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        for (final option in groups[groupIndex])
-                          Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: ChoiceChip(
-                              label: Text(option.label),
-                              selected:
-                                  (selectedSortValues.length > groupIndex
-                                      ? selectedSortValues[groupIndex]
-                                      : selectedSortValue) ==
-                                  option.value,
-                              onSelected: (_) {
-                                final handler = onSelectSortOptionInGroup;
-                                if (handler != null) {
-                                  handler(groupIndex, option.value);
-                                  return;
-                                }
-                                onSelectSortOption(option.value);
-                              },
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
+                child: _DiscoverSectionCapsuleGroup(
+                  groupIndex: groupIndex,
+                  options: groups[groupIndex],
+                  selectedValue: selectedSortValues.length > groupIndex
+                      ? selectedSortValues[groupIndex]
+                      : selectedSortValue,
+                  onSelected: (value) {
+                    final handler = onSelectSortOptionInGroup;
+                    if (handler != null) {
+                      handler(groupIndex, value);
+                      return;
+                    }
+                    onSelectSortOption(value);
+                  },
                 ),
               ),
           if (dateGroupIndex >= 0)
@@ -100,6 +88,152 @@ class DiscoverSectionSortBar extends StatelessWidget {
   }
 }
 
+class _DiscoverSectionCapsuleGroup extends StatelessWidget {
+  const _DiscoverSectionCapsuleGroup({
+    required this.groupIndex,
+    required this.options,
+    required this.selectedValue,
+    required this.onSelected,
+  });
+
+  static const double _minimumItemWidth = 84;
+  static const double _height = 48;
+  static const double _inset = 4;
+
+  final int groupIndex;
+  final List<CategoryRankingOption> options;
+  final String? selectedValue;
+  final ValueChanged<String> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final selectedIndex = math.max(
+      0,
+      options.indexWhere((option) => option.value == selectedValue),
+    );
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(999),
+      child: BackdropFilter(
+        filter: ui.ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+        child: Material(
+          key: ValueKey<String>('discover_section_sort_group_$groupIndex'),
+          color: colorScheme.surfaceContainer.withValues(alpha: 0.72),
+          borderRadius: BorderRadius.circular(999),
+          clipBehavior: Clip.antiAlias,
+          child: SizedBox(
+            height: _height,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final viewportWidth = constraints.maxWidth - _inset * 2;
+                final itemWidth = math.max(
+                  _minimumItemWidth,
+                  viewportWidth / options.length,
+                );
+                final contentWidth = math.max(
+                  viewportWidth,
+                  itemWidth * options.length,
+                );
+
+                return SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.all(_inset),
+                  child: SizedBox(
+                    width: contentWidth,
+                    height: _height - _inset * 2,
+                    child: Stack(
+                      children: [
+                        AnimatedPositioned(
+                          key: const ValueKey<String>(
+                            'discover_section_sort_indicator',
+                          ),
+                          left: selectedIndex * itemWidth,
+                          top: 0,
+                          bottom: 0,
+                          width: itemWidth,
+                          duration: const Duration(milliseconds: 260),
+                          curve: Curves.easeOutCubic,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: colorScheme.primaryContainer,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                          ),
+                        ),
+                        Row(
+                          children: [
+                            for (final option in options)
+                              SizedBox(
+                                width: itemWidth,
+                                height: double.infinity,
+                                child: _DiscoverSectionCapsuleOption(
+                                  key: ValueKey<String>(
+                                    'discover_section_sort_option_${groupIndex}_${option.value}',
+                                  ),
+                                  label: option.label,
+                                  selected: option.value == selectedValue,
+                                  onTap: () => onSelected(option.value),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DiscoverSectionCapsuleOption extends StatelessWidget {
+  const _DiscoverSectionCapsuleOption({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(999),
+        onTap: onTap,
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: AnimatedDefaultTextStyle(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOutCubic,
+              style: (theme.textTheme.labelLarge ?? const TextStyle()).copyWith(
+                color: selected
+                    ? colorScheme.onPrimaryContainer
+                    : colorScheme.onSurfaceVariant,
+                fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              ),
+              child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class DiscoverSectionContent extends StatelessWidget {
   const DiscoverSectionContent({
     super.key,
@@ -108,6 +242,7 @@ class DiscoverSectionContent extends StatelessWidget {
     required this.section,
     required this.comicDetailPageBuilder,
     required this.comicCoverHeroTagBuilder,
+    this.topPadding = 16,
   });
 
   static const int _gridCrossAxisCount = 3;
@@ -118,72 +253,70 @@ class DiscoverSectionContent extends StatelessWidget {
   final ExploreSection section;
   final ComicDetailPageBuilder comicDetailPageBuilder;
   final ComicHeroTagBuilder comicCoverHeroTagBuilder;
+  final double topPadding;
 
   @override
   Widget build(BuildContext context) {
     final strings = AppLocalizations.of(context)!;
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Expanded(
-      child: controller.comics.isEmpty
-          ? (controller.loadingMore || controller.sortLoading)
-                ? Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const HazukiSandyLoadingIndicator(size: 168),
-                        const SizedBox(height: 10),
-                        Text(strings.commonLoading),
-                      ],
-                    ),
-                  )
-                : Center(child: Text(strings.discoverSectionEmpty))
-          : LayoutBuilder(
-              builder: (context, constraints) {
-                final contentWidth = constraints.maxWidth - 32;
-                final coverWidth =
-                    (contentWidth - (_gridCrossAxisCount - 1) * _gridSpacing) /
-                    _gridCrossAxisCount;
-                final coverCacheWidth =
-                    (coverWidth * MediaQuery.devicePixelRatioOf(context))
-                        .round();
-
-                return GridView.builder(
-                  controller: scrollController,
-                  addAutomaticKeepAlives: false,
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
-                  itemCount: controller.comics.length,
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: _gridCrossAxisCount,
-                    mainAxisSpacing: _gridSpacing,
-                    crossAxisSpacing: _gridSpacing,
-                    childAspectRatio: 0.57,
+    return controller.comics.isEmpty
+        ? (controller.loadingMore || controller.sortLoading)
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const HazukiSandyLoadingIndicator(size: 168),
+                      const SizedBox(height: 10),
+                      Text(strings.commonLoading),
+                    ],
                   ),
-                  itemBuilder: (context, index) {
-                    final comic = controller.comics[index];
-                    final heroTag = comicCoverHeroTagBuilder(
-                      comic,
-                      salt: 'discover-more-${section.title}-$index',
-                    );
-                    final entryKey = _comicEntryKey(comic, index);
-                    return ComicCoverTile(
-                      key: ValueKey<String>('tile-$entryKey'),
+                )
+              : Center(child: Text(strings.discoverSectionEmpty))
+        : LayoutBuilder(
+            builder: (context, constraints) {
+              final contentWidth = constraints.maxWidth - 32;
+              final coverWidth =
+                  (contentWidth - (_gridCrossAxisCount - 1) * _gridSpacing) /
+                  _gridCrossAxisCount;
+              final coverCacheWidth =
+                  (coverWidth * MediaQuery.devicePixelRatioOf(context)).round();
+
+              return GridView.builder(
+                controller: scrollController,
+                addAutomaticKeepAlives: false,
+                padding: EdgeInsets.fromLTRB(16, topPadding, 16, 12),
+                itemCount: controller.comics.length,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: _gridCrossAxisCount,
+                  mainAxisSpacing: _gridSpacing,
+                  crossAxisSpacing: _gridSpacing,
+                  childAspectRatio: 0.57,
+                ),
+                itemBuilder: (context, index) {
+                  final comic = controller.comics[index];
+                  final heroTag = comicCoverHeroTagBuilder(
+                    comic,
+                    salt: 'discover-more-${section.title}-$index',
+                  );
+                  final entryKey = _comicEntryKey(comic, index);
+                  return ComicCoverTile(
+                    key: ValueKey<String>('tile-$entryKey'),
+                    comic: comic,
+                    heroTag: heroTag,
+                    coverCacheWidth: coverCacheWidth,
+                    placeholderColor: colorScheme.surfaceContainerHighest,
+                    onTap: () => openComicDetail(
+                      context,
                       comic: comic,
                       heroTag: heroTag,
-                      coverCacheWidth: coverCacheWidth,
-                      placeholderColor: colorScheme.surfaceContainerHighest,
-                      onTap: () => openComicDetail(
-                        context,
-                        comic: comic,
-                        heroTag: heroTag,
-                        pageBuilder: comicDetailPageBuilder,
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
-    );
+                      pageBuilder: comicDetailPageBuilder,
+                    ),
+                  );
+                },
+              );
+            },
+          );
   }
 }
 
