@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
+import 'package:hazuki/shared/comments/comments_loading_view.dart';
 import 'package:hazuki/shared/comments/comments_widget_builder.dart';
 
 import '../support/comic_detail_scope.dart';
@@ -166,7 +167,7 @@ class ComicDetailBody extends StatelessWidget {
                     ComicDetailTabTickerScope(
                       tabController: uiState.tabController,
                       tabIndex: 0,
-                      builder: (context, shouldRender, _) {
+                      builder: (context, shouldRender) {
                         return RepaintBoundary(
                           child: ComicDetailInfoTab(
                             details: details,
@@ -185,7 +186,7 @@ class ComicDetailBody extends StatelessWidget {
                     ComicDetailTabTickerScope(
                       tabController: uiState.tabController,
                       tabIndex: 1,
-                      builder: (context, shouldRender, _) {
+                      builder: (context, shouldRender) {
                         return details != null
                             ? RepaintBoundary(
                                 child: commentsWidgetBuilder(
@@ -203,14 +204,14 @@ class ComicDetailBody extends StatelessWidget {
                                       uiState.buildCommentsTabDebugState,
                                 ),
                               )
-                            : const ComicDetailLoadingView();
+                            : const CommentsInitialLoadingView();
                       },
                     ),
                     if (supportsJmExclusiveActions)
                       ComicDetailTabTickerScope(
                         tabController: uiState.tabController,
                         tabIndex: 2,
-                        builder: (context, shouldRender, _) {
+                        builder: (context, shouldRender) {
                           return RepaintBoundary(
                             child: ComicDetailRelatedTab(
                               details: details,

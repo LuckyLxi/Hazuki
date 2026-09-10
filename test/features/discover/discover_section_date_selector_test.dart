@@ -127,24 +127,66 @@ void main() {
     );
   });
 
-  testWidgets('regular sort bar keeps using choice chips', (tester) async {
+  testWidgets('regular sort bar uses a horizontally scrollable capsule', (
+    tester,
+  ) async {
+    var selectedValue = dates.first.value;
     await tester.pumpWidget(
       MaterialApp(
-        home: Scaffold(
-          body: DiscoverSectionSortBar(
-            sortOptions: dates,
-            selectedSortValue: dates.first.value,
-            onSelectSortOption: (_) {},
+        home: StatefulBuilder(
+          builder: (context, setState) => Scaffold(
+            body: DiscoverSectionSortBar(
+              sortOptions: dates,
+              selectedSortValue: selectedValue,
+              onSelectSortOption: (value) {
+                setState(() => selectedValue = value);
+              },
+            ),
           ),
         ),
       ),
     );
 
-    expect(find.byType(ChoiceChip), findsNWidgets(dates.length));
+    expect(find.byType(ChoiceChip), findsNothing);
+    final capsule = find.byKey(
+      const ValueKey<String>('discover_section_sort_group_0'),
+    );
+    expect(capsule, findsOneWidget);
+    expect(
+      find.descendant(
+        of: capsule,
+        matching: find.byType(SingleChildScrollView),
+      ),
+      findsOneWidget,
+    );
+    final material = tester.widget<Material>(capsule);
+    expect(material.borderRadius, BorderRadius.circular(999));
+    expect(
+      find.ancestor(of: capsule, matching: find.byType(BackdropFilter)),
+      findsOneWidget,
+    );
+    expect(material.color!.a, closeTo(0.72, 0.01));
+    final indicator = find.byKey(
+      const ValueKey<String>('discover_section_sort_indicator'),
+    );
+    final animatedIndicator = tester.widget<AnimatedPositioned>(indicator);
+    expect(animatedIndicator.duration, const Duration(milliseconds: 260));
     expect(
       find.byKey(const ValueKey<String>('weekly_date_launcher')),
       findsNothing,
     );
+
+    final initialX = tester.getTopLeft(indicator).dx;
+    await tester.tap(find.text(dates.last.label));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    final movingX = tester.getTopLeft(indicator).dx;
+    await tester.pumpAndSettle();
+    final settledX = tester.getTopLeft(indicator).dx;
+
+    expect(selectedValue, dates.last.value);
+    expect(movingX, greaterThan(initialX));
+    expect(movingX, lessThan(settledX));
   });
 
   testWidgets('weekly page morphs the time group and keeps type chips', (
@@ -179,7 +221,13 @@ void main() {
       ),
     );
 
-    expect(find.byType(ChoiceChip), findsNWidgets(types.length));
+    expect(find.byType(ChoiceChip), findsNothing);
+    expect(
+      find.byKey(
+        const ValueKey<String>('discover_section_sort_option_1_another'),
+      ),
+      findsOneWidget,
+    );
     expect(find.text(dates.first.label), findsOneWidget);
 
     await tester.tap(find.text(types.last.label));

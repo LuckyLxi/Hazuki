@@ -1,8 +1,8 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:hazuki/app/app.dart';
-import 'package:hazuki/app/windows/windows_title_bar_controller.dart';
+import 'package:hazuki/shared/appearance/appearance_settings.dart';
+import 'package:hazuki/shared/window/window_title_bar_control.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:hazuki/widgets/windows_comic_detail_host.dart';
@@ -220,6 +220,8 @@ class _SettingsPageState extends State<SettingsPage> {
                   Navigator.of(context).push(
                     MaterialPageRoute<void>(
                       builder: (_) => AboutPage(
+                        softwareUpdateDialog:
+                            widget.coreDependencies.softwareUpdateDialog,
                         softwareUpdateService:
                             widget.coreDependencies.softwareUpdate,
                       ),

@@ -3,8 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/l10n/l10n.dart';
-import 'package:hazuki/services/announcement_service.dart';
+import 'package:hazuki/services/announcements/announcement.dart';
 
+import 'announcement_card_content.dart';
 import 'announcement_content.dart';
 
 Future<void> showAnnouncementDialog(
@@ -33,9 +34,8 @@ Future<void> _showPopupAnnouncementDialog(
     barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
     barrierColor: Colors.black.withValues(alpha: 0.42),
     transitionDuration: const Duration(milliseconds: 320),
-    pageBuilder: (context, animation, secondaryAnimation) => SafeArea(
-      child: _AnnouncementDialog(announcement: announcement),
-    ),
+    pageBuilder: (context, animation, secondaryAnimation) =>
+        SafeArea(child: _AnnouncementDialog(announcement: announcement)),
     transitionBuilder: (context, animation, secondaryAnimation, child) {
       final fadeAnimation = CurvedAnimation(
         parent: animation,
@@ -246,7 +246,7 @@ class _AnnouncementMorphDialogState extends State<_AnnouncementMorphDialog> {
             Rect.fromCenter(
               center: endRect.center,
               width: dialogWidth,
-              height: 48,
+              height: announcementCardHeight,
             );
         return AnimatedBuilder(
           animation: animation,
@@ -306,7 +306,7 @@ class _AnnouncementMorphDialogState extends State<_AnnouncementMorphDialog> {
                     color: shellColor,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(
-                        16 + (12 * expandProgress),
+                        announcementCardBorderRadius + (12 * expandProgress),
                       ),
                     ),
                     clipBehavior: Clip.antiAlias,
@@ -439,41 +439,16 @@ class _AnnouncementMorphLauncherContents extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final date = MaterialLocalizations.of(
-      context,
-    ).formatShortDate(announcement.publishedAt.toLocal());
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: Row(
-        children: [
-          Icon(
-            announcement.level == AnnouncementLevel.important
-                ? Icons.priority_high_rounded
-                : Icons.notifications_none_rounded,
-            size: 22,
-            color: announcement.level == AnnouncementLevel.important
-                ? colorScheme.error
-                : colorScheme.primary,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              announcement.title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(
-                context,
-              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            date,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
+    return AnnouncementCardContent(
+      announcement: announcement,
+      leading: Icon(
+        announcement.level == AnnouncementLevel.important
+            ? Icons.priority_high_rounded
+            : Icons.notifications_none_rounded,
+        size: announcementCardIconSize,
+        color: announcement.level == AnnouncementLevel.important
+            ? colorScheme.error
+            : colorScheme.primary,
       ),
     );
   }

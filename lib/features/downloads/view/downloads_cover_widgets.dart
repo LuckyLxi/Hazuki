@@ -2,7 +2,7 @@ import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
-import 'package:hazuki/services/manga_download/manga_download_service.dart';
+import 'package:hazuki/services/manga_download/manga_download_models.dart';
 
 const downloadedCoverPlaceholderAsset =
     'assets/images/downloaded_cover_placeholder.png';

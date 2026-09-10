@@ -1,3 +1,4 @@
+import 'package:hazuki/shared/appearance/appearance_settings_scope.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -99,7 +100,11 @@ class _ComicDetailPageState extends State<ComicDetailPage>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _themeController.syncComicDynamicColorSettingFromScope();
+    _themeController.syncComicDynamicColorSetting(
+      HazukiThemeControllerScope.maybeOf(
+        context,
+      )?.settings.comicDetailDynamicColor,
+    );
   }
 
   @override
@@ -127,7 +132,6 @@ class _ComicDetailPageState extends State<ComicDetailPage>
     _themeController = ComicDetailThemeController(
       repository: _repository,
       comicCoverUrl: widget.comic.cover,
-      contextGetter: () => context,
       detailsFutureGetter: () => _sessionController.future,
     );
     _actionsController = ComicDetailActionsController(

@@ -24,7 +24,6 @@ class FavoritePageData {
   bool hasMore = true;
   bool loadingFolders = false;
   int currentPage = 1;
-  int listRequestVersion = 0;
   String favoriteSortOrder = 'mr';
 
   String get selectedFolderId => mode == FavoritePageMode.local

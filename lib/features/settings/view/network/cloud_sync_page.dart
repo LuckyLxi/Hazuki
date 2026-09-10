@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:hazuki/app/app.dart';
+import 'package:hazuki/shared/cloud_sync/cloud_sync_restore_handler.dart';
 import 'package:hazuki/features/settings/state/cloud_sync_controller.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/cloud_sync_service.dart';

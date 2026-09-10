@@ -9,6 +9,7 @@ import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/features/home/support/home_feature_contracts.dart';
 import 'package:hazuki/shared/favorites/favorite_app_bar_actions_state.dart';
 import 'package:hazuki/shared/search_box_outline.dart';
+import 'package:hazuki/shared/discover_back_to_top_notification.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:hazuki/widgets/windows_comic_detail_host.dart';
 
@@ -164,6 +165,8 @@ class HomeScaffoldShell extends StatefulWidget {
 
 class _HomeScaffoldShellState extends State<HomeScaffoldShell>
     with SingleTickerProviderStateMixin {
+  bool _showDiscoverBackToTop = false;
+  VoidCallback? _onDiscoverBackToTopPressed;
   static const _profileDrawerDuration = Duration(milliseconds: 210);
   static const _profileDrawerReverseDuration = Duration(milliseconds: 160);
   late final AnimationController _profileDrawerController = AnimationController(
@@ -238,7 +241,16 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
         '$activeSourceKey|${avatarUrl ?? ''}|$profileLoading|${widget.isLogged}|$username';
     final homeContent = HomeContentStack(
       currentIndex: currentIndex,
-      discoverChild: widget.discoverChild,
+      discoverChild: NotificationListener<DiscoverBackToTopNotification>(
+        onNotification: (notification) {
+          setState(() {
+            _showDiscoverBackToTop = notification.visible;
+            _onDiscoverBackToTopPressed = notification.onPressed;
+          });
+          return true;
+        },
+        child: widget.discoverChild,
+      ),
       favoriteChild: widget.favoriteChild,
     );
     final sidebarProfile = HomeSidebarProfileState(
@@ -442,11 +454,13 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
                             favoriteLabel: l10n(context).homeTabFavorite,
                             backToTopLabel: l10n(context).favoriteBackToTop,
                             layoutScale: navigationScale,
-                            showBackToTop:
-                                currentIndex == 1 &&
-                                widget.showFavoriteBackToTop,
-                            onBackToTopPressed:
-                                widget.onFavoriteBackToTopPressed,
+                            showBackToTop: currentIndex == 0
+                                ? _showDiscoverBackToTop
+                                : currentIndex == 1 &&
+                                      widget.showFavoriteBackToTop,
+                            onBackToTopPressed: currentIndex == 0
+                                ? _onDiscoverBackToTopPressed
+                                : widget.onFavoriteBackToTopPressed,
                           ),
                         ),
                       ),

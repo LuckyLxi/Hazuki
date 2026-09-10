@@ -1,147 +1,82 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
-
 import 'package:hazuki/features/reader/support/reader_controller_support.dart';
 import 'package:hazuki/features/reader/support/reader_display_bridge.dart';
+import 'package:hazuki/features/reader/support/reader_display_session.dart';
 import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
 import 'package:hazuki/shared/reading/reader_settings_store.dart';
-import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/reading_progress_service.dart';
-import 'package:hazuki/services/source/source_capabilities.dart';
-import 'package:hazuki/shared/ui_flags.dart';
+import 'package:hazuki/features/reader/support/reader_view_bindings.dart';
 
 class ReaderSessionController {
   ReaderSessionController({
     required ReaderRuntimeState runtimeState,
     required ReaderDisplayBridge displayBridge,
+    required ReaderDisplaySession displaySession,
     required ReaderSettingsStore settingsStore,
-    required ScrollController scrollController,
-    required PageController pageController,
-    required FocusNode readerKeyFocusNode,
-    required TransformationController zoomController,
+    required ReaderViewBindings viewBindings,
     required void Function(List<String> images, {required String trigger})
     applyInitialImages,
     required Future<void> Function({String trigger}) loadChapterImages,
-    required VoidCallback onNoImageModeChanged,
     required ReaderIsMounted isMounted,
     required ReaderStateUpdate updateState,
     required ReaderLogEvent logEvent,
     required ReaderLogPayloadBuilder logPayload,
-    required void Function() onScrollPositionChanged,
-    required void Function() onZoomChanged,
     required String comicId,
     required String epId,
     String sourceKey = '',
     required String chapterTitle,
     required int chapterIndex,
     required List<String> widgetImages,
-    required SourceReaderGateway sourceService,
     required ReadingProgressService readingProgressService,
     bool offlineMode = false,
   }) : _runtimeState = runtimeState,
        _displayBridge = displayBridge,
+       _displaySession = displaySession,
        _settingsStore = settingsStore,
-       _scrollController = scrollController,
-       _pageController = pageController,
-       _readerKeyFocusNode = readerKeyFocusNode,
-       _zoomController = zoomController,
+       _viewBindings = viewBindings,
        _applyInitialImages = applyInitialImages,
        _loadChapterImages = loadChapterImages,
-       _onNoImageModeChanged = onNoImageModeChanged,
        _isMounted = isMounted,
        _updateState = updateState,
        _logEvent = logEvent,
        _logPayload = logPayload,
-       _onScrollPositionChanged = onScrollPositionChanged,
-       _onZoomChanged = onZoomChanged,
        _comicId = comicId,
        _epId = epId,
        _sourceKey = sourceKey,
        _chapterTitle = chapterTitle,
        _chapterIndex = chapterIndex,
        _widgetImages = widgetImages,
-       _sourceService = sourceService,
        _readingProgressService = readingProgressService,
        _offlineMode = offlineMode;
 
   final ReaderRuntimeState _runtimeState;
   final ReaderDisplayBridge _displayBridge;
   final ReaderSettingsStore _settingsStore;
-  final ScrollController _scrollController;
-  final PageController _pageController;
-  final FocusNode _readerKeyFocusNode;
-  final TransformationController _zoomController;
+  final ReaderViewBindings _viewBindings;
   final void Function(List<String> images, {required String trigger})
   _applyInitialImages;
   final Future<void> Function({String trigger}) _loadChapterImages;
-  final VoidCallback _onNoImageModeChanged;
   final ReaderIsMounted _isMounted;
   final ReaderStateUpdate _updateState;
   final ReaderLogEvent _logEvent;
   final ReaderLogPayloadBuilder _logPayload;
-  final void Function() _onScrollPositionChanged;
-  final void Function() _onZoomChanged;
   final String _comicId;
   final String _epId;
   final String _sourceKey;
   final String _chapterTitle;
   final int _chapterIndex;
   final List<String> _widgetImages;
-  final SourceReaderGateway _sourceService;
   final ReadingProgressService _readingProgressService;
   final bool _offlineMode;
-  Future<void> _displayOperation = Future<void>.value();
+  final ReaderDisplaySession _displaySession;
   bool _closed = false;
-
-  Future<ComicDetailsData> loadComicDetails(
-    String comicId, {
-    String sourceKey = '',
-  }) => _sourceService.loadComicDetails(
-    comicId,
-    sourceKey: sourceKey.isNotEmpty ? sourceKey : _sourceKey,
-  );
-
-  Future<PreparedChapterImageData> prepareImageForSave(
-    String imageUrl, {
-    required String comicId,
-    required String epId,
-  }) => _sourceService.prepareChapterImageData(
-    imageUrl,
-    comicId: comicId,
-    epId: epId,
-  );
-
-  bool isLocalImagePath(String value) => _sourceService.isLocalImagePath(value);
-
-  String normalizeLocalImagePath(String value) =>
-      _sourceService.normalizeLocalImagePath(value);
-
-  void log(
-    String title, {
-    String level = 'info',
-    String source = 'reader_ui',
-    Object? content,
-  }) {
-    _sourceService.addReaderLog(
-      level: level,
-      title: title,
-      source: source,
-      content: content,
-    );
-  }
 
   void initialize() {
     _displayBridge.attach();
-    hazukiNoImageModeNotifier.addListener(_onNoImageModeChanged);
-    _scrollController.addListener(_onScrollPositionChanged);
-    _zoomController.addListener(_onZoomChanged);
+    _viewBindings.attach();
     unawaited(loadReadingSettings());
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_isMounted()) {
-        _readerKeyFocusNode.requestFocus();
-      }
-    });
+    _viewBindings.requestFocusAfterFrame(isMounted: _isMounted);
 
     final initialImages = _widgetImages
         .where((entry) => entry.trim().isNotEmpty)
@@ -170,16 +105,11 @@ class ReaderSessionController {
 
   void dispose() {
     _closed = true;
+    _displaySession.close();
     final lastVisiblePageIndex = _runtimeState.pageIndexNotifier.value;
     _displayBridge.detach();
-    hazukiNoImageModeNotifier.removeListener(_onNoImageModeChanged);
-    _scrollController.removeListener(_onScrollPositionChanged);
-    _scrollController.dispose();
-    _pageController.dispose();
-    _readerKeyFocusNode.dispose();
-    _zoomController.removeListener(_onZoomChanged);
-    _zoomController.dispose();
-    _runtimeState.pageIndexNotifier.dispose();
+    _viewBindings.dispose();
+    _runtimeState.dispose();
     _logEvent(
       'Reader session closed',
       source: 'reader_lifecycle',
@@ -214,53 +144,12 @@ class ReaderSessionController {
     await syncVolumeButtonPagingPlatformState();
   }
 
-  Future<void> applyReaderDisplaySettings() {
-    return _queueDisplayOperation(
-      () => ReaderDisplayBridge.controller.apply(
-        immersiveMode: _runtimeState.immersiveMode,
-        keepScreenOn: _runtimeState.keepScreenOn,
-        customBrightness: _runtimeState.customBrightness,
-        brightnessValue: _runtimeState.brightnessValue,
-      ),
-    );
-  }
+  Future<void> applyReaderDisplaySettings() => _displaySession.apply();
 
-  Future<void> syncVolumeButtonPagingPlatformState({bool? enabled}) {
-    if (_closed) {
-      return Future<void>.value();
-    }
-    return ReaderDisplayBridge.controller.syncVolumeButtonPaging(
-      enabled: enabled ?? _runtimeState.volumeButtonTurnPage,
-      sessionId: _displayBridge.sessionId,
-    );
-  }
+  Future<void> syncVolumeButtonPagingPlatformState({bool? enabled}) =>
+      _displaySession.syncVolumeButtonPaging(enabled: enabled);
 
-  Future<void> restoreReaderDisplay() {
-    return _queueDisplayOperation(
-      () => ReaderDisplayBridge.controller.restore(
-        sessionId: _displayBridge.sessionId,
-      ),
-      allowAfterClosed: true,
-    );
-  }
-
-  Future<void> _queueDisplayOperation(
-    Future<void> Function() operation, {
-    bool allowAfterClosed = false,
-  }) {
-    final previous = _displayOperation;
-    final next = () async {
-      try {
-        await previous;
-      } catch (_) {}
-      if (_closed && !allowAfterClosed) {
-        return;
-      }
-      await operation();
-    }();
-    _displayOperation = next;
-    return next;
-  }
+  Future<void> restoreReaderDisplay() => _displaySession.restore();
 
   Future<void> _recordReadingProgress({int lastPageIndex = 0}) async {
     try {

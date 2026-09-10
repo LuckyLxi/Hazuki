@@ -3,95 +3,37 @@ import 'dart:io';
 import '../network/hazuki_network.dart';
 import '../source/source_capabilities.dart';
 import 'manga_download_models.dart';
+import 'manga_download_state.dart';
+import 'manga_download_files.dart';
 import 'manga_download_storage_support.dart';
-
-typedef MangaDownloadReplaceTask =
-    bool Function(String comicId, MangaDownloadTask next);
-typedef MangaDownloadRemoveTask = bool Function(String comicId);
-typedef MangaDownloadLatestTask = MangaDownloadTask? Function(String comicId);
-typedef MangaDownloadAbortCheck = Future<bool> Function(String comicId);
-typedef MangaDownloadFindDownloadedComic =
-    DownloadedMangaComic? Function(String storageKey);
-typedef MangaDownloadUpsertComic = void Function(DownloadedMangaComic comic);
-typedef MangaDownloadStateFlush = Future<void> Function();
-typedef MangaDownloadEnsureAccess = Future<bool> Function();
-typedef MangaDownloadEnsureRootDir = Future<Directory> Function();
-typedef MangaDownloadRootPathProvider = Future<String> Function();
-typedef MangaDownloadFindExistingImagePath =
-    Future<String?> Function(Directory chapterDir, int imageIndex);
-typedef MangaDownloadCoverDownload =
-    Future<String?> Function({
-      required MangaDownloadTask task,
-      required Directory comicDir,
-    });
-typedef MangaDownloadWriteMetadata =
-    Future<void> Function(Directory comicDir, DownloadedMangaComic comic);
-typedef MangaDownloadChapterDirBuilder =
-    Directory Function(Directory comicDir, MangaChapterDownloadTarget target);
-typedef MangaDownloadSuspendCheck = bool Function();
-typedef MangaDownloadTransientRecoveryCheck = bool Function();
 
 class MangaDownloadQueueExecutor {
   MangaDownloadQueueExecutor({
     required MangaDownloadLogCallback logDownload,
-    required List<MangaDownloadTask> tasks,
-    required MangaDownloadReplaceTask replaceTask,
-    required MangaDownloadRemoveTask removeTaskByComicId,
-    required MangaDownloadLatestTask latestTask,
-    required MangaDownloadAbortCheck shouldAbortTask,
-    required MangaDownloadFindDownloadedComic downloadedComicById,
-    required MangaDownloadUpsertComic upsertDownloadedComic,
-    required MangaDownloadStateFlush flushState,
-    required MangaDownloadEnsureAccess ensureAndroidDownloadsAccess,
-    required MangaDownloadEnsureRootDir ensureRootDir,
-    required MangaDownloadRootPathProvider loadDownloadsRootPath,
-    required MangaDownloadFindExistingImagePath findExistingImagePath,
-    required MangaDownloadCoverDownload downloadCoverIfNeeded,
-    required MangaDownloadWriteMetadata writeMetadataFile,
-    required MangaDownloadChapterDirBuilder chapterDirForTarget,
-    required MangaDownloadSuspendCheck shouldSuspendDownloads,
-    required MangaDownloadTransientRecoveryCheck
-    shouldRecoverTransientNetworkError,
+    required MangaDownloadState state,
+    required MangaDownloadFiles files,
+    required MangaDownloadAccess access,
+    required Future<void> Function() flushState,
+    required bool Function() shouldSuspendDownloads,
+    required bool Function() shouldRecoverTransientNetworkError,
     required SourceReaderGateway? sourceReader,
-  }) : _tasks = tasks,
+  }) : _state = state,
+       _files = files,
+       _access = access,
        _logDownload = logDownload,
-       _replaceTask = replaceTask,
-       _removeTaskByComicId = removeTaskByComicId,
-       _latestTask = latestTask,
-       _shouldAbortTask = shouldAbortTask,
-       _downloadedComicById = downloadedComicById,
-       _upsertDownloadedComic = upsertDownloadedComic,
        _flushState = flushState,
-       _ensureAndroidDownloadsAccess = ensureAndroidDownloadsAccess,
-       _ensureRootDir = ensureRootDir,
-       _loadDownloadsRootPath = loadDownloadsRootPath,
-       _findExistingImagePath = findExistingImagePath,
-       _downloadCoverIfNeeded = downloadCoverIfNeeded,
-       _writeMetadataFile = writeMetadataFile,
-       _chapterDirForTarget = chapterDirForTarget,
        _shouldSuspendDownloads = shouldSuspendDownloads,
        _shouldRecoverTransientNetworkError = shouldRecoverTransientNetworkError,
        _sourceReader = sourceReader;
 
-  final List<MangaDownloadTask> _tasks;
+  final MangaDownloadState _state;
+  final MangaDownloadFiles _files;
+  final MangaDownloadAccess _access;
   final SourceReaderGateway? _sourceReader;
   final MangaDownloadLogCallback _logDownload;
-  final MangaDownloadReplaceTask _replaceTask;
-  final MangaDownloadRemoveTask _removeTaskByComicId;
-  final MangaDownloadLatestTask _latestTask;
-  final MangaDownloadAbortCheck _shouldAbortTask;
-  final MangaDownloadFindDownloadedComic _downloadedComicById;
-  final MangaDownloadUpsertComic _upsertDownloadedComic;
-  final MangaDownloadStateFlush _flushState;
-  final MangaDownloadEnsureAccess _ensureAndroidDownloadsAccess;
-  final MangaDownloadEnsureRootDir _ensureRootDir;
-  final MangaDownloadRootPathProvider _loadDownloadsRootPath;
-  final MangaDownloadFindExistingImagePath _findExistingImagePath;
-  final MangaDownloadCoverDownload _downloadCoverIfNeeded;
-  final MangaDownloadWriteMetadata _writeMetadataFile;
-  final MangaDownloadChapterDirBuilder _chapterDirForTarget;
-  final MangaDownloadSuspendCheck _shouldSuspendDownloads;
-  final MangaDownloadTransientRecoveryCheck _shouldRecoverTransientNetworkError;
+  final Future<void> Function() _flushState;
+  final bool Function() _shouldSuspendDownloads;
+  final bool Function() _shouldRecoverTransientNetworkError;
 
   static const int _maxTransientRetries = 5;
 
@@ -107,28 +49,21 @@ class MangaDownloadQueueExecutor {
         if (_shouldSuspendDownloads()) {
           break;
         }
-        final taskIndex = _tasks.indexWhere(
-          (task) => task.status == MangaDownloadTaskStatus.queued,
-        );
-        if (taskIndex < 0) {
-          break;
-        }
-        await runTask(taskIndex);
+        final task = _state.nextQueuedTask;
+        if (task == null) break;
+        await _runTask(task);
       }
     } finally {
       _processing = false;
     }
   }
 
-  Future<void> runTask(int taskIndex) async {
-    if (taskIndex < 0 || taskIndex >= _tasks.length) {
-      return;
-    }
-    var task = _tasks[taskIndex].copyWith(
+  Future<void> _runTask(MangaDownloadTask selected) async {
+    var task = selected.copyWith(
       status: MangaDownloadTaskStatus.downloading,
       clearErrorMessage: true,
     );
-    if (!_replaceTask(task.storageKey, task)) {
+    if (!_state.updateTask(task.storageKey, task)) {
       return;
     }
     await _flushState();
@@ -142,21 +77,18 @@ class MangaDownloadQueueExecutor {
     }
 
     try {
-      if (!await _ensureAndroidDownloadsAccess()) {
-        final rootPath = await _loadDownloadsRootPath();
+      if (!await _access.ensureAndroidDownloadsAccess()) {
+        final rootPath = await MangaDownloadAccess.loadDownloadsRootPath();
         throw FileSystemException(
           'Android downloads access not granted',
           rootPath,
         );
       }
-      final rootDir = await _ensureRootDir();
-      final comicDir = Directory('${rootDir.path}/${task.downloadDirName}');
-      if (!await comicDir.exists()) {
-        await comicDir.create(recursive: true);
-      }
+      final rootDir = await _access.ensureRootDir();
+      final comicDir = await _files.ensureComicDirectory(rootDir, task);
 
       var downloadedComic =
-          _downloadedComicById(task.storageKey) ??
+          _state.downloadedComicByStorageKey(task.storageKey) ??
           DownloadedMangaComic(
             comicId: task.comicId,
             sourceKey: task.sourceKey,
@@ -177,7 +109,7 @@ class MangaDownloadQueueExecutor {
       }
       downloadedComic = downloadedComic.mergeTaskMetadata(task);
 
-      final localCoverPath = await _downloadCoverIfNeeded(
+      final localCoverPath = await _files.downloadCoverIfNeeded(
         task: task,
         comicDir: comicDir,
       );
@@ -194,7 +126,7 @@ class MangaDownloadQueueExecutor {
         throw StateError('manga_download_source_reader_not_configured');
       }
       for (final target in task.targets) {
-        if (await _shouldAbortTask(task.storageKey)) {
+        if (_state.shouldAbortTask(task.storageKey)) {
           return;
         }
         if (_shouldSuspendDownloads()) {
@@ -208,7 +140,7 @@ class MangaDownloadQueueExecutor {
           task = task.copyWith(
             completedEpIds: {...task.completedEpIds, target.epId},
           );
-          if (!_replaceTask(task.storageKey, task)) {
+          if (!_state.updateTask(task.storageKey, task)) {
             return;
           }
           continue;
@@ -219,17 +151,20 @@ class MangaDownloadQueueExecutor {
           epId: target.epId,
           sourceKey: task.sourceKey,
         );
-        if (await _shouldAbortTask(task.storageKey)) {
+        if (_state.shouldAbortTask(task.storageKey)) {
           return;
         }
-        final chapterDir = _chapterDirForTarget(comicDir, target);
-        if (!await chapterDir.exists()) {
-          await chapterDir.create(recursive: true);
-        }
+        final chapterDir = await _files.ensureChapterDirectory(
+          comicDir,
+          target,
+        );
 
         final savedPaths = <String>[];
         for (var i = 0; i < imageUrls.length; i++) {
-          final existingPath = await _findExistingImagePath(chapterDir, i + 1);
+          final existingPath = await _files.findExistingImagePath(
+            chapterDir,
+            i + 1,
+          );
           if (existingPath != null) {
             savedPaths.add(existingPath);
           }
@@ -240,13 +175,13 @@ class MangaDownloadQueueExecutor {
           currentImageIndex: savedPaths.length,
           currentImageTotal: imageUrls.length,
         );
-        if (!_replaceTask(task.storageKey, task)) {
+        if (!_state.updateTask(task.storageKey, task)) {
           return;
         }
         await _flushState();
 
         for (var i = savedPaths.length; i < imageUrls.length; i++) {
-          if (await _shouldAbortTask(task.storageKey)) {
+          if (_state.shouldAbortTask(task.storageKey)) {
             return;
           }
           if (_shouldSuspendDownloads()) {
@@ -263,21 +198,22 @@ class MangaDownloadQueueExecutor {
             epId: target.epId,
             sourceKey: task.sourceKey,
           );
-          if (await _shouldAbortTask(task.storageKey)) {
+          if (_state.shouldAbortTask(task.storageKey)) {
             return;
           }
-          final fileName =
-              '${(i + 1).toString().padLeft(4, '0')}.${prepared.extension}';
-          final file = File('${chapterDir.path}/$fileName');
-          await file.writeAsBytes(prepared.bytes, flush: true);
-          savedPaths.add(file.path);
+          final path = await _files.writeChapterImage(
+            chapterDir,
+            i + 1,
+            prepared,
+          );
+          savedPaths.add(path);
           task = task.copyWith(
             currentChapterEpId: target.epId,
             currentChapterTitle: target.title,
             currentImageIndex: i + 1,
             currentImageTotal: imageUrls.length,
           );
-          if (!_replaceTask(task.storageKey, task)) {
+          if (!_state.updateTask(task.storageKey, task)) {
             return;
           }
           await _flushState();
@@ -300,7 +236,7 @@ class MangaDownloadQueueExecutor {
           currentImageIndex: 0,
           currentImageTotal: 0,
         );
-        if (!_replaceTask(task.storageKey, task)) {
+        if (!_state.updateTask(task.storageKey, task)) {
           return;
         }
 
@@ -308,19 +244,19 @@ class MangaDownloadQueueExecutor {
           chapters: downloadedChapters,
           updatedAtMillis: DateTime.now().millisecondsSinceEpoch,
         );
-        _upsertDownloadedComic(downloadedComic);
-        await _writeMetadataFile(comicDir, downloadedComic);
+        _state.upsertDownloadedComic(downloadedComic);
+        await _files.writeMetadataFile(comicDir, downloadedComic);
         await _flushState();
       }
 
-      final latest = _latestTask(task.storageKey);
+      final latest = _state.taskByStorageKey(task.storageKey);
       final hasPendingTargets =
           latest?.targets.any(
             (target) => !latest.completedEpIds.contains(target.epId),
           ) ??
           false;
       if (latest != null && hasPendingTargets) {
-        _replaceTask(
+        _state.updateTask(
           task.storageKey,
           latest.copyWith(
             status: MangaDownloadTaskStatus.queued,
@@ -334,9 +270,9 @@ class MangaDownloadQueueExecutor {
         return;
       }
 
-      _removeTaskByComicId(task.storageKey);
-      _upsertDownloadedComic(downloadedComic);
-      await _writeMetadataFile(comicDir, downloadedComic);
+      _state.removeTask(task.storageKey);
+      _state.upsertDownloadedComic(downloadedComic);
+      await _files.writeMetadataFile(comicDir, downloadedComic);
       await _flushState();
     } catch (e) {
       if (_isTransientDownloadError(e) &&
@@ -349,7 +285,7 @@ class MangaDownloadQueueExecutor {
         );
         return;
       }
-      final latest = _latestTask(task.storageKey);
+      final latest = _state.taskByStorageKey(task.storageKey);
       if (latest == null) {
         _logDownload(
           'Download task vanished during error handling',
@@ -358,7 +294,7 @@ class MangaDownloadQueueExecutor {
         );
         return;
       }
-      _replaceTask(
+      _state.updateTask(
         task.storageKey,
         latest.copyWith(
           status: MangaDownloadTaskStatus.failed,
@@ -380,7 +316,7 @@ class MangaDownloadQueueExecutor {
     Object? error,
     bool countAsRetry = false,
   }) async {
-    final latest = _latestTask(task.storageKey);
+    final latest = _state.taskByStorageKey(task.storageKey);
     if (latest == null) {
       return;
     }
@@ -397,7 +333,7 @@ class MangaDownloadQueueExecutor {
     if (countAsRetry) {
       final newRetryCount = latest.retryCount + 1;
       if (newRetryCount >= _maxTransientRetries) {
-        _replaceTask(
+        _state.updateTask(
           task.storageKey,
           latest.copyWith(
             status: MangaDownloadTaskStatus.failed,
@@ -412,7 +348,7 @@ class MangaDownloadQueueExecutor {
         await _flushState();
         return;
       }
-      _replaceTask(
+      _state.updateTask(
         task.storageKey,
         latest.copyWith(
           status: MangaDownloadTaskStatus.queued,
@@ -421,7 +357,7 @@ class MangaDownloadQueueExecutor {
         ),
       );
     } else {
-      _replaceTask(
+      _state.updateTask(
         task.storageKey,
         latest.copyWith(
           status: MangaDownloadTaskStatus.queued,

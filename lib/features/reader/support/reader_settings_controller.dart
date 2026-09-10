@@ -6,7 +6,7 @@ import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
 import 'package:hazuki/shared/reading/reader_settings_store.dart';
 import 'package:hazuki/features/reader/support/reader_controller_support.dart';
 import 'package:hazuki/features/reader/support/reader_navigation_controller.dart';
-import 'package:hazuki/features/reader/support/reader_session_controller.dart';
+import 'package:hazuki/features/reader/support/reader_display_session.dart';
 import 'package:hazuki/features/reader/support/reader_zoom_controller.dart';
 
 class ReaderSettingsController {
@@ -14,7 +14,7 @@ class ReaderSettingsController {
     required ReaderRuntimeState runtimeState,
     required ReaderSettingsStore settingsStore,
     required ReaderNavigationController navigationController,
-    required ReaderSessionController sessionController,
+    required ReaderDisplaySession displaySession,
     required ReaderZoomController zoomController,
     required ReaderStateUpdate updateState,
     required ReaderLogEvent logEvent,
@@ -22,7 +22,7 @@ class ReaderSettingsController {
   }) : _runtimeState = runtimeState,
        _settingsStore = settingsStore,
        _navigationController = navigationController,
-       _sessionController = sessionController,
+       _displaySession = displaySession,
        _zoomController = zoomController,
        _updateState = updateState,
        _logEvent = logEvent,
@@ -31,7 +31,7 @@ class ReaderSettingsController {
   final ReaderRuntimeState _runtimeState;
   final ReaderSettingsStore _settingsStore;
   final ReaderNavigationController _navigationController;
-  final ReaderSessionController _sessionController;
+  final ReaderDisplaySession _displaySession;
   final ReaderZoomController _zoomController;
   final ReaderStateUpdate _updateState;
   final ReaderLogEvent _logEvent;
@@ -47,7 +47,7 @@ class ReaderSettingsController {
     final previousMode = _runtimeState.readerMode.prefsValue;
     final changed = _runtimeState.readerMode != value;
     _updateState(() {
-      _runtimeState.readerMode = value;
+      _runtimeState.updateSettings(readerMode: value);
     });
     await _settingsStore.saveReaderMode(value);
     _logEvent(
@@ -74,8 +74,7 @@ class ReaderSettingsController {
     );
     final previousValue = _runtimeState.doublePageMode;
     _updateState(() {
-      _runtimeState.doublePageMode = value;
-      _runtimeState.rebuildSpreadItemKeys();
+      _runtimeState.updateSettings(doublePageMode: value);
     });
     await _settingsStore.saveDoublePageMode(value);
     _logEvent(
@@ -100,7 +99,7 @@ class ReaderSettingsController {
 
   Future<void> toggleTapToTurnPage(bool value) async {
     _updateState(() {
-      _runtimeState.tapToTurnPage = value;
+      _runtimeState.updateSettings(tapToTurnPage: value);
     });
     await _settingsStore.saveTapToTurnPage(value);
     _logEvent(
@@ -112,7 +111,7 @@ class ReaderSettingsController {
 
   Future<void> toggleVolumeButtonTurnPage(bool value) async {
     _updateState(() {
-      _runtimeState.volumeButtonTurnPage = value;
+      _runtimeState.updateSettings(volumeButtonTurnPage: value);
     });
     await _settingsStore.saveVolumeButtonTurnPage(value);
     _logEvent(
@@ -123,12 +122,12 @@ class ReaderSettingsController {
         'value': value,
       }),
     );
-    await _sessionController.syncVolumeButtonPagingPlatformState();
+    await _displaySession.syncVolumeButtonPaging();
   }
 
   Future<void> toggleImmersiveMode(bool value) async {
     _updateState(() {
-      _runtimeState.immersiveMode = value;
+      _runtimeState.updateSettings(immersiveMode: value);
     });
     await _settingsStore.saveImmersiveMode(value);
     _logEvent(
@@ -136,12 +135,12 @@ class ReaderSettingsController {
       source: 'reader_settings',
       content: _logPayload({'setting': 'immersive_mode', 'value': value}),
     );
-    await _sessionController.applyReaderDisplaySettings();
+    await _displaySession.apply();
   }
 
   Future<void> toggleKeepScreenOn(bool value) async {
     _updateState(() {
-      _runtimeState.keepScreenOn = value;
+      _runtimeState.updateSettings(keepScreenOn: value);
     });
     await _settingsStore.saveKeepScreenOn(value);
     _logEvent(
@@ -149,12 +148,12 @@ class ReaderSettingsController {
       source: 'reader_settings',
       content: _logPayload({'setting': 'keep_screen_on', 'value': value}),
     );
-    await _sessionController.applyReaderDisplaySettings();
+    await _displaySession.apply();
   }
 
   Future<void> toggleCustomBrightness(bool value) async {
     _updateState(() {
-      _runtimeState.customBrightness = value;
+      _runtimeState.updateSettings(customBrightness: value);
     });
     await _settingsStore.saveCustomBrightness(value);
     _logEvent(
@@ -162,21 +161,21 @@ class ReaderSettingsController {
       source: 'reader_settings',
       content: _logPayload({'setting': 'custom_brightness', 'value': value}),
     );
-    await _sessionController.applyReaderDisplaySettings();
+    await _displaySession.apply();
   }
 
   Future<void> updateBrightness(double value) async {
     final normalized = ReaderSettingsStore.normalizeBrightnessValue(value);
     _updateState(() {
-      _runtimeState.brightnessValue = normalized;
+      _runtimeState.updateSettings(brightnessValue: normalized);
     });
     await _settingsStore.saveBrightnessValue(normalized);
-    await _sessionController.applyReaderDisplaySettings();
+    await _displaySession.apply();
   }
 
   Future<void> toggleFilter(bool value) async {
     _updateState(() {
-      _runtimeState.filterEnabled = value;
+      _runtimeState.updateSettings(filterEnabled: value);
     });
     await _settingsStore.saveFilterEnabled(value);
     _logEvent(
@@ -188,7 +187,7 @@ class ReaderSettingsController {
 
   Future<void> updateFilterColor(ReaderFilterColor value) async {
     _updateState(() {
-      _runtimeState.filterColor = value;
+      _runtimeState.updateSettings(filterColor: value);
     });
     await _settingsStore.saveFilterColor(value);
     _logEvent(
@@ -204,7 +203,7 @@ class ReaderSettingsController {
   Future<void> updateFilterStrength(double value) async {
     final normalized = ReaderSettingsStore.normalizeFilterStrength(value);
     _updateState(() {
-      _runtimeState.filterStrength = normalized;
+      _runtimeState.updateSettings(filterStrength: normalized);
     });
     await _settingsStore.saveFilterStrength(normalized);
   }
@@ -224,7 +223,7 @@ class ReaderSettingsController {
 
   Future<void> togglePageIndicator(bool value) async {
     _updateState(() {
-      _runtimeState.pageIndicator = value;
+      _runtimeState.updateSettings(pageIndicator: value);
     });
     await _settingsStore.savePageIndicator(value);
     _logEvent(
@@ -243,7 +242,7 @@ class ReaderSettingsController {
       _zoomController.resetZoomImmediately(reason: 'pinch_to_zoom_disabled');
     }
     _updateState(() {
-      _runtimeState.pinchToZoom = value;
+      _runtimeState.updateSettings(pinchToZoom: value);
     });
     await _settingsStore.savePinchToZoom(value);
     _logEvent(
@@ -260,7 +259,7 @@ class ReaderSettingsController {
 
   Future<void> toggleLongPressToSave(bool value) async {
     _updateState(() {
-      _runtimeState.longPressToSave = value;
+      _runtimeState.updateSettings(longPressToSave: value);
     });
     await _settingsStore.saveLongPressToSave(value);
     _logEvent(

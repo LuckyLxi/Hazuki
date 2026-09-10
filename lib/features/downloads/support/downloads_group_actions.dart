@@ -2,8 +2,8 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:hazuki/l10n/l10n.dart';
-import 'package:hazuki/services/download_groups_service.dart';
-import 'package:hazuki/services/manga_download/manga_download_service.dart';
+import 'package:hazuki/services/download_groups/download_group.dart';
+import 'package:hazuki/services/manga_download/manga_download_models.dart';
 import '../state/downloads_bulk_group_controller.dart';
 import '../view/downloads_cover_widgets.dart';
 

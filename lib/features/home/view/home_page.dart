@@ -4,8 +4,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'package:hazuki/app/app.dart';
+import 'package:hazuki/shared/appearance/appearance_settings.dart';
 import 'package:hazuki/features/home/home.dart';
+import 'package:hazuki/services/announcements/announcement_popup_coordinator.dart';
 import 'package:hazuki/shared/source_account/source_account_actions.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/shared/windows/windows_comic_detail.dart';
@@ -44,8 +45,8 @@ class HazukiHomePage extends StatefulWidget {
 
 class _HazukiHomePageState extends State<HazukiHomePage> {
   late final HomeCoordinator _coordinator;
+  late final AnnouncementPopupCoordinator _announcementPopupCoordinator;
   HomeDrawerDestination? _selectedDrawerDestination;
-  bool _showingPopupAnnouncement = false;
 
   Widget _buildComicDetailPage(
     ExploreComic comic,
@@ -74,8 +75,11 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
       dailyRecommendationService: widget.services.dailyRecommendationService,
       announcementService: widget.services.announcementService,
     );
-    _coordinator.announcementService.addListener(
-      _handleAnnouncementStateChanged,
+    _announcementPopupCoordinator = AnnouncementPopupCoordinator(
+      controller: _coordinator.announcementService,
+      showAnnouncement: (announcement) =>
+          widget.services.showAnnouncement(context, announcement),
+      isActive: () => mounted,
     );
     _coordinator.start(context);
     WindowsComicDetailController.instance.panelBuilder =
@@ -92,48 +96,14 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
           onCloseRequested: onCloseRequested,
         );
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      unawaited(_loadAnnouncementsAndShowPopup());
+      unawaited(_announcementPopupCoordinator.start());
     });
-  }
-
-  Future<void> _loadAnnouncementsAndShowPopup() async {
-    await _coordinator.announcementService.refresh();
-    await _showNextPopupAnnouncement();
-  }
-
-  void _handleAnnouncementStateChanged() {
-    unawaited(_showNextPopupAnnouncement());
-  }
-
-  Future<void> _showNextPopupAnnouncement() async {
-    if (!mounted || _showingPopupAnnouncement) {
-      return;
-    }
-    _showingPopupAnnouncement = true;
-    try {
-      while (mounted) {
-        final announcement =
-            _coordinator.announcementService.nextPopupToPresent;
-        if (announcement == null) {
-          break;
-        }
-        if (!mounted) {
-          break;
-        }
-        await widget.services.showAnnouncement(context, announcement);
-        await _coordinator.announcementService.markPopupPresented(announcement);
-      }
-    } finally {
-      _showingPopupAnnouncement = false;
-    }
   }
 
   @override
   void dispose() {
     WindowsComicDetailController.instance.panelBuilder = null;
-    _coordinator.announcementService.removeListener(
-      _handleAnnouncementStateChanged,
-    );
+    _announcementPopupCoordinator.dispose();
     _coordinator.dispose();
     super.dispose();
   }

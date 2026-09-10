@@ -143,36 +143,58 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
           context: context,
           title: Text(widget.section.title),
           enableBlur: false,
+          backgroundAlpha: 1,
         ),
         body: ListenableBuilder(
           listenable: _controller,
           builder: (context, _) {
+            final usesWeeklyDateSelector = _usesWeeklyMustReadDateSelector();
+            final hasSortBar =
+                _controller.sortOptions.isNotEmpty ||
+                _controller.sortOptionGroups.any((group) => group.isNotEmpty);
+            final normalGroupCount = _controller.sortOptionGroups.isEmpty
+                ? (_controller.sortOptions.isEmpty ? 0 : 1)
+                : _controller.sortOptionGroups
+                      .where((group) => group.isNotEmpty)
+                      .length;
+            final sortBar = DiscoverSectionSortBar(
+              sortOptions: _controller.sortOptions,
+              sortOptionGroups: _controller.sortOptionGroups,
+              useDateMorphSelector: usesWeeklyDateSelector,
+              selectedSortValue: _controller.selectedSortValue,
+              selectedSortValues: _controller.selectedSortValues,
+              onSelectSortOption: _onSelectSortOption,
+              onSelectSortOptionInGroup: _onSelectSortOptionInGroup,
+            );
+            final content = DiscoverSectionContent(
+              controller: _controller,
+              scrollController: _scrollController,
+              section: widget.section,
+              comicDetailPageBuilder: widget.comicDetailPageBuilder,
+              comicCoverHeroTagBuilder: widget.comicCoverHeroTagBuilder,
+              topPadding: usesWeeklyDateSelector || !hasSortBar
+                  ? 16
+                  : 26 + normalGroupCount * 48,
+            );
+
             return Stack(
               children: [
-                Column(
-                  children: [
-                    if (_controller.sortOptions.isNotEmpty ||
-                        _controller.sortOptionGroups.any(
-                          (group) => group.isNotEmpty,
-                        ))
-                      DiscoverSectionSortBar(
-                        sortOptions: _controller.sortOptions,
-                        sortOptionGroups: _controller.sortOptionGroups,
-                        useDateMorphSelector: _usesWeeklyMustReadDateSelector(),
-                        selectedSortValue: _controller.selectedSortValue,
-                        selectedSortValues: _controller.selectedSortValues,
-                        onSelectSortOption: _onSelectSortOption,
-                        onSelectSortOptionInGroup: _onSelectSortOptionInGroup,
-                      ),
-                    DiscoverSectionContent(
-                      controller: _controller,
-                      scrollController: _scrollController,
-                      section: widget.section,
-                      comicDetailPageBuilder: widget.comicDetailPageBuilder,
-                      comicCoverHeroTagBuilder: widget.comicCoverHeroTagBuilder,
-                    ),
-                  ],
-                ),
+                if (usesWeeklyDateSelector)
+                  Column(
+                    children: [
+                      if (hasSortBar) sortBar,
+                      Expanded(child: content),
+                    ],
+                  )
+                else
+                  Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      content,
+                      if (hasSortBar)
+                        Positioned(left: 0, top: 0, right: 0, child: sortBar),
+                    ],
+                  ),
                 if (_controller.showLoadMoreFooter)
                   const DiscoverSectionLoadMoreFooterOverlay(),
                 if (_controller.errorMessage != null)
@@ -180,12 +202,12 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
                     errorMessage: _controller.errorMessage!,
                     onRetry: _triggerLoadMore,
                   ),
-                if (!_usesWeeklyMustReadDateSelector())
+                if (!usesWeeklyDateSelector)
                   DiscoverSectionBackToTopButton(
                     showBackToTop: _showBackToTop,
                     onPressed: _scrollToTop,
                   ),
-                if (_usesWeeklyMustReadDateSelector() &&
+                if (usesWeeklyDateSelector &&
                     _controller.sortOptionGroups.isNotEmpty &&
                     _controller.sortOptionGroups.first.isNotEmpty)
                   DiscoverSectionIssueNavigationButtons(

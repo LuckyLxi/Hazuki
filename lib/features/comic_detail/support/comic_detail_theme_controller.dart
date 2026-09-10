@@ -4,7 +4,6 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
-import 'package:hazuki/app/app.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 
 import '../repository/comic_detail_repository.dart';
@@ -48,16 +47,13 @@ class ComicDetailThemeController extends ChangeNotifier {
   ComicDetailThemeController({
     required ComicDetailFeatureFacade repository,
     required String comicCoverUrl,
-    required BuildContext Function() contextGetter,
     required Future<ComicDetailsData> Function() detailsFutureGetter,
   }) : _repository = repository,
        _comicCoverUrl = comicCoverUrl,
-       _contextGetter = contextGetter,
        _detailsFutureGetter = detailsFutureGetter;
 
   final ComicDetailFeatureFacade _repository;
   final String _comicCoverUrl;
-  final BuildContext Function() _contextGetter;
   final Future<ComicDetailsData> Function() _detailsFutureGetter;
 
   bool _disposed = false;
@@ -105,16 +101,14 @@ class ComicDetailThemeController extends ChangeNotifier {
     );
   }
 
-  void syncComicDynamicColorSettingFromScope() {
-    final controller = HazukiThemeControllerScope.maybeOf(_contextGetter());
-    if (controller == null) {
+  void syncComicDynamicColorSetting(bool? enabled) {
+    if (enabled == null) {
       if (_didBindComicDynamicColorSetting) return;
       _didBindComicDynamicColorSetting = true;
       unawaited(_loadDynamicColorSetting());
       return;
     }
 
-    final enabled = controller.settings.comicDetailDynamicColor;
     final hasBound = _didBindComicDynamicColorSetting;
     _didBindComicDynamicColorSetting = true;
     if (hasBound && _observedComicDynamicColorEnabled == enabled) return;

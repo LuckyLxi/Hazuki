@@ -1,4 +1,4 @@
-import '../../software_update/software_update_service.dart';
+import '../../../shared/preferences/software_update_source.dart';
 
 const _jsDelivrBaseUrl =
     'https://cdn.jsdelivr.net/gh/venera-app/venera-configs@main/';

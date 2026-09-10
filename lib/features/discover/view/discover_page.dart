@@ -3,17 +3,21 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/l10n/app_localizations.dart';
-import 'package:hazuki/app/app.dart';
-import 'package:hazuki/services/announcement_service.dart';
+import 'package:hazuki/shared/appearance/appearance_settings.dart';
+import 'package:hazuki/services/announcements/announcement.dart';
+import 'package:hazuki/services/announcements/announcement_controller.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
+import 'package:hazuki/shared/discover_back_to_top_notification.dart';
+import 'package:hazuki/shared/liquid_glass_support.dart';
 
 import '../state/discover_page_controller.dart';
 import 'discover_announcement_card.dart';
 import 'discover_daily_recommendation_carousel.dart';
 import 'discover_page_body.dart';
 import 'discover_page_sections.dart';
+import 'discover_section_page_widgets.dart';
 
 class DiscoverPage extends StatefulWidget {
   const DiscoverPage({
@@ -40,7 +44,7 @@ class DiscoverPage extends StatefulWidget {
   final SourceDiscoverGateway sourceService;
   final SourceRecommendationGateway recommendationSource;
   final DiscoverDailyRecommendationService recommendationService;
-  final AnnouncementService? announcementService;
+  final AnnouncementController? announcementService;
   final Future<void> Function(
     BuildContext context,
     Announcement announcement,
@@ -69,6 +73,27 @@ class _DiscoverPageState extends State<DiscoverPage> {
   late final DiscoverPageController _controller;
   final ScrollController _scrollController = ScrollController();
   double _searchMorphProgress = 0;
+  bool _showBackToTop = false;
+
+  bool get _backToTopVisible =>
+      widget.discoverSectionLayout != DiscoverSectionLayout.horizontal &&
+      _showBackToTop;
+
+  void _notifyBackToTop() {
+    DiscoverBackToTopNotification(
+      visible: _backToTopVisible,
+      onPressed: _scrollToTop,
+    ).dispatch(context);
+  }
+
+  Future<void> _scrollToTop() async {
+    if (!_scrollController.hasClients) return;
+    await _scrollController.animateTo(
+      0,
+      duration: const Duration(milliseconds: 360),
+      curve: Curves.easeOutCubic,
+    );
+  }
 
   @override
   void initState() {
@@ -87,6 +112,7 @@ class _DiscoverPageState extends State<DiscoverPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       widget.onSearchMorphProgressChanged?.call(_effectiveSearchMorphProgress);
+      _notifyBackToTop();
     });
     if (widget.allowInitialLoad) {
       unawaited(_triggerLoadInitial());
@@ -96,6 +122,11 @@ class _DiscoverPageState extends State<DiscoverPage> {
   @override
   void didUpdateWidget(covariant DiscoverPage oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.discoverSectionLayout != widget.discoverSectionLayout) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _notifyBackToTop();
+      });
+    }
     if (oldWidget.announcementService != widget.announcementService) {
       oldWidget.announcementService?.removeListener(_handleAnnouncementChanged);
       widget.announcementService?.addListener(_handleAnnouncementChanged);
@@ -147,8 +178,13 @@ class _DiscoverPageState extends State<DiscoverPage> {
   }
 
   void _handleScroll() {
-    if (widget.usePinnedSearchInAppBar) return;
     if (!_scrollController.hasClients) return;
+    final showBackToTop = _scrollController.position.pixels > 520;
+    if (showBackToTop != _showBackToTop) {
+      setState(() => _showBackToTop = showBackToTop);
+      _notifyBackToTop();
+    }
+    if (widget.usePinnedSearchInAppBar) return;
     final pixels = _scrollController.position.pixels.clamp(
       0.0,
       double.infinity,
@@ -241,7 +277,9 @@ class _DiscoverPageState extends State<DiscoverPage> {
     if (service != null && currentIndex == 0) {
       return DiscoverAnnouncementAnimatedSlot(
         announcements: service.discoverCardAnnouncements,
-        service: service,
+        isRead: service.isRead,
+        onHideCurrent: service.hideCardFromDiscover,
+        onHideAll: service.hideAllCardsFromDiscover,
         onTap: widget.onAnnouncementTap == null
             ? null
             : (anchorContext, announcement, onMorphLanding) =>
@@ -257,24 +295,33 @@ class _DiscoverPageState extends State<DiscoverPage> {
 
   @override
   Widget build(BuildContext context) {
-    return DiscoverPageBody(
-      controller: _controller,
-      scrollController: _scrollController,
-      headerItemCount: _headerItemCount,
-      headerItemBuilder: _buildHeaderItem,
-      onRefresh: _triggerRefresh,
-      onLoginPressed: widget.onRequestLogin == null
-          ? null
-          : () {
-              unawaited(_requestLogin());
-            },
-      allowInitialLoad: widget.allowInitialLoad,
-      hideLoadingUntilInitialLoadAllowed:
-          widget.hideLoadingUntilInitialLoadAllowed,
-      sectionLayout: widget.discoverSectionLayout,
-      comicDetailPageBuilder: widget.comicDetailPageBuilder,
-      comicCoverHeroTagBuilder: widget.comicCoverHeroTagBuilder,
-      sourceService: widget.sourceService,
+    return Stack(
+      children: [
+        DiscoverPageBody(
+          controller: _controller,
+          scrollController: _scrollController,
+          headerItemCount: _headerItemCount,
+          headerItemBuilder: _buildHeaderItem,
+          onRefresh: _triggerRefresh,
+          onLoginPressed: widget.onRequestLogin == null
+              ? null
+              : () {
+                  unawaited(_requestLogin());
+                },
+          allowInitialLoad: widget.allowInitialLoad,
+          hideLoadingUntilInitialLoadAllowed:
+              widget.hideLoadingUntilInitialLoadAllowed,
+          sectionLayout: widget.discoverSectionLayout,
+          comicDetailPageBuilder: widget.comicDetailPageBuilder,
+          comicCoverHeroTagBuilder: widget.comicCoverHeroTagBuilder,
+          sourceService: widget.sourceService,
+        ),
+        if (!HazukiLiquidGlass.isAvailable)
+          DiscoverSectionBackToTopButton(
+            showBackToTop: _backToTopVisible,
+            onPressed: _scrollToTop,
+          ),
+      ],
     );
   }
 }

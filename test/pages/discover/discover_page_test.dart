@@ -5,6 +5,9 @@ import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/features/discover/view/discover_page.dart';
+import 'package:hazuki/features/discover/view/discover_page_body.dart';
+import 'package:hazuki/shared/appearance/appearance_settings.dart';
+import 'package:hazuki/shared/discover_back_to_top_notification.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_assembly.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
@@ -25,6 +28,37 @@ void main() {
   tearDown(() {
     WindowsComicDetailController.instance.close();
   });
+
+  for (final layout in DiscoverSectionLayout.values) {
+    testWidgets('back to top visibility and action for ${layout.name}', (
+      tester,
+    ) async {
+      DiscoverBackToTopNotification? latest;
+      await tester.pumpWidget(
+        NotificationListener<DiscoverBackToTopNotification>(
+          onNotification: (notification) {
+            latest = notification;
+            return true;
+          },
+          child: _buildDiscoverPage(const [], layout: layout),
+        ),
+      );
+      expect(latest?.visible, isFalse);
+      final controller = tester
+          .widget<DiscoverPageBody>(find.byType(DiscoverPageBody))
+          .scrollController;
+      controller.jumpTo(520);
+      expect(latest?.visible, isFalse);
+      controller.jumpTo(600);
+      expect(latest?.visible, layout != DiscoverSectionLayout.horizontal);
+      latest!.onPressed();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(controller.offset, 0);
+      expect(latest?.visible, isFalse);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   group('Discover daily recommendation carousel', () {
     testWidgets('shows login action for Picacg discover before sign in', (
@@ -263,12 +297,14 @@ void main() {
 Widget _buildDiscoverPage(
   List<DiscoverDailyRecommendationEntry> recommendations, {
   Future<void> Function()? onRequestLogin,
+  DiscoverSectionLayout layout = DiscoverSectionLayout.horizontal,
 }) {
   return MaterialApp(
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     home: Scaffold(
       body: DiscoverPage(
+        discoverSectionLayout: layout,
         sourceService: sl<SourceDiscoverGateway>(),
         recommendationSource: sl<SourceRecommendationGateway>(),
         recommendationService: sl<DiscoverDailyRecommendationService>(),

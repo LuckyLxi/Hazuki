@@ -7,11 +7,11 @@ import 'package:flutter/services.dart';
 import 'package:hazuki/features/reader/support/reader_controller_support.dart';
 import 'package:hazuki/features/reader/support/reader_diagnostics_support.dart';
 import 'package:hazuki/shared/reading/reader_mode.dart';
-import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
+import 'package:hazuki/features/reader/state/reader_navigation_state.dart';
 
 class ReaderNavigationController {
   ReaderNavigationController({
-    required ReaderRuntimeState runtimeState,
+    required ReaderNavigationState runtimeState,
     required ReaderDiagnosticsState diagnosticsState,
     required ScrollController scrollController,
     required PageController pageController,
@@ -21,9 +21,7 @@ class ReaderNavigationController {
     required ReaderLogPayloadBuilder logPayload,
     required ReaderVisiblePageLogger logVisiblePageChange,
     required ReaderResetZoom resetZoomImmediately,
-    required void Function(int index) prefetchAround,
-    required void Function(int index) requestPrefetchAhead,
-    required bool Function() noImageModeEnabled,
+    required void Function(int index) onPageTargetChanged,
     required void Function() toggleControlsVisibility,
   }) : _runtimeState = runtimeState,
        _diagnosticsState = diagnosticsState,
@@ -35,15 +33,13 @@ class ReaderNavigationController {
        _logPayload = logPayload,
        _logVisiblePageChange = logVisiblePageChange,
        _resetZoomImmediately = resetZoomImmediately,
-       _prefetchAround = prefetchAround,
-       _requestPrefetchAhead = requestPrefetchAhead,
-       _noImageModeEnabled = noImageModeEnabled,
+       _onPageTargetChanged = onPageTargetChanged,
        _toggleControlsVisibility = toggleControlsVisibility;
 
   static const double unexpectedTopOffsetThreshold = 240;
   static const double topEdgeOffsetEpsilon = 8;
 
-  final ReaderRuntimeState _runtimeState;
+  final ReaderNavigationState _runtimeState;
   final ReaderDiagnosticsState _diagnosticsState;
   final ScrollController _scrollController;
   final PageController _pageController;
@@ -53,9 +49,7 @@ class ReaderNavigationController {
   final ReaderLogPayloadBuilder _logPayload;
   final ReaderVisiblePageLogger _logVisiblePageChange;
   final ReaderResetZoom _resetZoomImmediately;
-  final void Function(int index) _prefetchAround;
-  final void Function(int index) _requestPrefetchAhead;
-  final bool Function() _noImageModeEnabled;
+  final void Function(int index) _onPageTargetChanged;
   final void Function() _toggleControlsVisibility;
   double _pendingListPixelCorrection = 0;
   bool _listPixelCorrectionScheduled = false;
@@ -92,7 +86,7 @@ class ReaderNavigationController {
   bool handleScrollNotification(ScrollNotification notification) {
     if (_runtimeState.readerMode != ReaderMode.topToBottom ||
         notification.depth != 0 ||
-        _runtimeState.images.isEmpty) {
+        _runtimeState.imageCount == 0) {
       return false;
     }
     if (notification is ScrollStartNotification) {
@@ -125,7 +119,7 @@ class ReaderNavigationController {
 
   void handleScrollPositionChanged() {
     if (!_scrollController.hasClients ||
-        _runtimeState.images.isEmpty ||
+        _runtimeState.imageCount == 0 ||
         _runtimeState.itemKeys.isEmpty) {
       return;
     }
@@ -162,8 +156,7 @@ class ReaderNavigationController {
       final target = _runtimeState.normalizeSpreadIndex(
         activeProgrammaticTarget,
       );
-      _runtimeState.currentPageIndex = target;
-      _runtimeState.setDisplayedPageIndex(target);
+      _runtimeState.setCurrentPageIndex(target);
       _diagnosticsState.lastObservedListPixels = currentPixels;
       return;
     }
@@ -172,16 +165,15 @@ class ReaderNavigationController {
       final target = _runtimeState.normalizeSpreadIndex(
         _diagnosticsState.stabilizingProgrammaticListTargetIndex!,
       );
-      _runtimeState.currentPageIndex = target;
-      _runtimeState.setDisplayedPageIndex(target);
+      _runtimeState.setCurrentPageIndex(target);
       _diagnosticsState.lastObservedListPixels = currentPixels;
       return;
     }
-    if (_runtimeState.currentPageIndex != normalizedIndex) {
-      _runtimeState.currentPageIndex = normalizedIndex;
+    final pageChanged = _runtimeState.currentPageIndex != normalizedIndex;
+    _runtimeState.setCurrentPageIndex(normalizedIndex);
+    if (pageChanged) {
       _logVisiblePageChange(index: normalizedIndex, trigger: 'scroll');
     }
-    _runtimeState.setDisplayedPageIndex(normalizedIndex);
 
     if (previousPixels != null) {
       final hasRecentExpectedTopJump =
@@ -220,10 +212,7 @@ class ReaderNavigationController {
     }
 
     _diagnosticsState.lastObservedListPixels = currentPixels;
-    if (!_noImageModeEnabled()) {
-      _prefetchAround(normalizedIndex);
-      _requestPrefetchAhead(normalizedIndex);
-    }
+    _onPageTargetChanged(normalizedIndex);
   }
 
   void handlePageChanged(int index) {
@@ -243,15 +232,13 @@ class ReaderNavigationController {
     _resetZoomImmediately(reason: 'page_swipe');
     if (pageChanged || zoomWasActive) {
       _updateState(() {
-        _runtimeState.currentPageIndex = index;
+        _runtimeState.setCurrentPageIndex(index);
       });
+    } else {
+      _runtimeState.setCurrentPageIndex(index);
     }
-    _runtimeState.setDisplayedPageIndex(index);
     _logVisiblePageChange(index: index, trigger: 'page_swipe');
-    if (!_noImageModeEnabled()) {
-      _prefetchAround(index);
-      _requestPrefetchAhead(index);
-    }
+    _onPageTargetChanged(index);
   }
 
   Future<void> handleTapUp(TapUpDetails details, double maxWidth) async {
@@ -302,12 +289,8 @@ class ReaderNavigationController {
       }),
     );
     final previousIndex = _runtimeState.currentPageIndex;
-    _runtimeState.currentPageIndex = target;
-    _runtimeState.setDisplayedPageIndex(target);
-    if (!_noImageModeEnabled()) {
-      _prefetchAround(target);
-      _requestPrefetchAhead(target);
-    }
+    _runtimeState.setCurrentPageIndex(target);
+    _onPageTargetChanged(target);
     if (_runtimeState.readerMode == ReaderMode.rightToLeft) {
       if (!_pageController.hasClients || target == previousIndex) {
         return;
@@ -345,12 +328,9 @@ class ReaderNavigationController {
     int targetImageIndex, {
     required String trigger,
   }) {
-    final safeImageIndex = _runtimeState.images.isEmpty
+    final safeImageIndex = _runtimeState.imageCount == 0
         ? 0
-        : math.max(
-            0,
-            math.min(targetImageIndex, _runtimeState.images.length - 1),
-          );
+        : math.max(0, math.min(targetImageIndex, _runtimeState.imageCount - 1));
     final target = _runtimeState.readerSpreadCount <= 0
         ? 0
         : _runtimeState.normalizeSpreadIndex(
@@ -362,13 +342,12 @@ class ReaderNavigationController {
       _diagnosticsState.activeProgrammaticListTargetIndex = target;
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_isMounted() || _runtimeState.images.isEmpty) {
+      if (!_isMounted() || _runtimeState.imageCount == 0) {
         _diagnosticsState.activeProgrammaticListScrollReason = null;
         _diagnosticsState.activeProgrammaticListTargetIndex = null;
         return;
       }
-      _runtimeState.currentPageIndex = target;
-      _runtimeState.setDisplayedPageIndex(target);
+      _runtimeState.setCurrentPageIndex(target);
       _logEvent(
         'Reader position synced after layout change',
         source: 'reader_navigation',
@@ -486,18 +465,17 @@ class ReaderNavigationController {
     const maxAttempts = 6;
     for (var attempt = 1; attempt <= maxAttempts; attempt++) {
       await WidgetsBinding.instance.endOfFrame;
-      if (!_isMounted() || _runtimeState.images.isEmpty) {
+      if (!_isMounted() || _runtimeState.imageCount == 0) {
         return;
       }
       final safeImageIndex = math.max(
         0,
-        math.min(targetImageIndex, _runtimeState.images.length - 1),
+        math.min(targetImageIndex, _runtimeState.imageCount - 1),
       );
       final target = _runtimeState.normalizeSpreadIndex(
         safeImageIndex ~/ _runtimeState.readerSpreadSize,
       );
-      _runtimeState.currentPageIndex = target;
-      _runtimeState.setDisplayedPageIndex(target);
+      _runtimeState.setCurrentPageIndex(target);
 
       if (_runtimeState.readerMode == ReaderMode.rightToLeft) {
         if (!_pageController.hasClients) {
@@ -555,7 +533,7 @@ class ReaderNavigationController {
       source: 'reader_navigation',
       content: _logPayload({
         'targetImageIndex': targetImageIndex,
-        'targetImage': _runtimeState.images.isEmpty ? 0 : targetImageIndex + 1,
+        'targetImage': _runtimeState.imageCount == 0 ? 0 : targetImageIndex + 1,
         'reason': _runtimeState.readerMode == ReaderMode.rightToLeft
             ? 'page_controller_unavailable'
             : 'scroll_controller_unavailable',

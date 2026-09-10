@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
+import 'package:hazuki/services/announcements/announcement_controller.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
-import 'package:hazuki/services/announcement_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/features/home/state/home_profile_controller.dart';
 import 'package:hazuki/features/home/support/home_profile_flow.dart';
@@ -20,7 +20,7 @@ class HomeCoordinator extends ChangeNotifier {
     required SourceSwitchGateway sourceSwitchService,
     required SourceImageGateway imageService,
     required DiscoverDailyRecommendationService dailyRecommendationService,
-    required AnnouncementService announcementService,
+    required AnnouncementController announcementService,
   }) : _sourceService = sourceService,
        _sourceSwitchService = sourceSwitchService,
        _imageService = imageService,
@@ -49,7 +49,7 @@ class HomeCoordinator extends ChangeNotifier {
   final HomeProfileController _profileController;
   final HomeShellController _shellController;
   final DiscoverDailyRecommendationService _dailyRecommendationService;
-  final AnnouncementService _announcementService;
+  final AnnouncementController _announcementService;
   final GlobalKey<ScaffoldState> scaffoldKey;
   final FavoritePageActionsBinding favoriteActionsBinding;
   bool _disposed = false;
@@ -78,7 +78,7 @@ class HomeCoordinator extends ChangeNotifier {
   bool get favoriteBackToTopVisible => favoriteActionsBinding.backToTopVisible;
   DiscoverDailyRecommendationState get dailyRecommendationState =>
       _dailyRecommendationService.state;
-  AnnouncementService get announcementService => _announcementService;
+  AnnouncementController get announcementService => _announcementService;
 
   void start(BuildContext context) {
     _context = context;

@@ -4,20 +4,25 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'package:hazuki/services/announcement_service.dart';
+import 'package:hazuki/services/announcements/announcement.dart';
 
+import '../../announcements/view/announcement_card_content.dart';
 import 'discover_announcement_menu.dart';
 
 class DiscoverAnnouncementAnimatedSlot extends StatefulWidget {
   const DiscoverAnnouncementAnimatedSlot({
     super.key,
     required this.announcements,
-    required this.service,
+    required this.isRead,
+    required this.onHideCurrent,
+    required this.onHideAll,
     this.onTap,
   });
 
   final List<Announcement> announcements;
-  final AnnouncementService service;
+  final bool Function(Announcement announcement) isRead;
+  final Future<void> Function(Announcement announcement) onHideCurrent;
+  final Future<void> Function() onHideAll;
   final Future<void> Function(
     BuildContext anchorContext,
     Announcement announcement,
@@ -152,10 +157,10 @@ class _DiscoverAnnouncementAnimatedSlotState
     }
     switch (action) {
       case DiscoverAnnouncementMenuAction.hideCurrent:
-        await widget.service.hideCardFromDiscover(announcement);
+        await widget.onHideCurrent(announcement);
         break;
       case DiscoverAnnouncementMenuAction.hideAll:
-        await widget.service.hideAllCardsFromDiscover();
+        await widget.onHideAll();
         break;
     }
   }
@@ -229,7 +234,7 @@ class _DiscoverAnnouncementAnimatedSlotState
             : (_dragOffset.abs() / (width * 0.32)).clamp(0.0, 1.0);
         return SizedBox(
           key: const ValueKey<String>('discover_announcement_stack'),
-          height: 48 + ((visibleCount - 1) * 4),
+          height: announcementCardHeight + ((visibleCount - 1) * 4),
           child: Stack(
             clipBehavior: Clip.none,
             alignment: Alignment.topCenter,
@@ -290,7 +295,7 @@ class _DiscoverAnnouncementAnimatedSlotState
           ignoring: !isTop || _settleController.isAnimating,
           child: DiscoverAnnouncementCard(
             announcement: announcement,
-            service: widget.service,
+            isRead: widget.isRead(announcement),
             onTap: !isTop || widget.onTap == null
                 ? null
                 : (anchorContext, onMorphLanding) => widget.onTap!(
@@ -342,7 +347,7 @@ class _DiscoverAnnouncementAnimatedSlotState
       left: 0,
       right: 0,
       top: 0,
-      height: 48,
+      height: announcementCardHeight,
       child: card,
     );
   }
@@ -352,12 +357,12 @@ class DiscoverAnnouncementCard extends StatefulWidget {
   const DiscoverAnnouncementCard({
     super.key,
     required this.announcement,
-    required this.service,
+    required this.isRead,
     this.onTap,
   });
 
   final Announcement announcement;
-  final AnnouncementService service;
+  final bool isRead;
   final Future<void> Function(
     BuildContext anchorContext,
     VoidCallback onMorphLanding,
@@ -444,9 +449,6 @@ class _DiscoverAnnouncementCardState extends State<DiscoverAnnouncementCard>
     final background = important
         ? colorScheme.errorContainer
         : colorScheme.primaryContainer;
-    final date = MaterialLocalizations.of(
-      context,
-    ).formatShortDate(announcement.publishedAt.toLocal());
     return ScaleTransition(
       key: const ValueKey<String>('discover_announcement_card_landing_scale'),
       scale: _landingScale,
@@ -458,63 +460,44 @@ class _DiscoverAnnouncementCardState extends State<DiscoverAnnouncementCard>
           ignoring: _dialogOpen,
           child: SizedBox(
             key: _anchorKey,
-            height: 48,
+            height: announcementCardHeight,
             child: Material(
               key: const ValueKey<String>(
                 'discover_announcement_card_material',
               ),
               color: background,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(
+                  announcementCardBorderRadius,
+                ),
                 side: BorderSide(color: accent.withValues(alpha: 0.16)),
               ),
               clipBehavior: Clip.antiAlias,
               child: InkWell(
                 onTap: widget.onTap == null ? null : () => unawaited(_open()),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: Row(
+                child: AnnouncementCardContent(
+                  announcement: announcement,
+                  leading: Stack(
+                    clipBehavior: Clip.none,
                     children: [
-                      Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          Icon(
-                            Icons.notifications_none_rounded,
-                            color: accent,
-                            size: 22,
-                          ),
-                          if (!widget.service.isRead(announcement))
-                            PositionedDirectional(
-                              end: -2,
-                              top: -2,
-                              child: Container(
-                                width: 7,
-                                height: 7,
-                                decoration: BoxDecoration(
-                                  color: colorScheme.error,
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
+                      Icon(
+                        Icons.notifications_none_rounded,
+                        color: accent,
+                        size: announcementCardIconSize,
+                      ),
+                      if (!widget.isRead)
+                        PositionedDirectional(
+                          end: -2,
+                          top: -2,
+                          child: Container(
+                            width: 7,
+                            height: 7,
+                            decoration: BoxDecoration(
+                              color: colorScheme.error,
+                              shape: BoxShape.circle,
                             ),
-                        ],
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          announcement.title,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: Theme.of(context).textTheme.titleSmall
-                              ?.copyWith(fontWeight: FontWeight.w700),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        date,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      ),
                     ],
                   ),
                 ),

@@ -1,8 +1,8 @@
 import 'package:flutter/widgets.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
-import 'package:hazuki/services/manga_download/manga_download_service.dart';
-import 'package:hazuki/services/download_groups_service.dart';
+import 'package:hazuki/services/manga_download/manga_download_library.dart';
+import 'package:hazuki/services/download_groups/download_groups_repository.dart';
 import '../support/downloads_actions.dart';
 
 class UpdateComicGroupsResult {
@@ -29,28 +29,28 @@ class UpdateSelectedComicGroupsResult {
 
 class DownloadsPageController extends ChangeNotifier {
   DownloadsPageController({
-    required MangaDownloadService downloadService,
-    required DownloadGroupsService downloadGroupsService,
+    required MangaDownloadLibrary downloadService,
+    required DownloadGroupsRepository downloadGroupsService,
   }) : _downloadService = downloadService,
        _downloadGroupsService = downloadGroupsService {
     _downloadService.addListener(_handleDownloadsChanged);
     _downloadGroupsService.addListener(_notify);
   }
 
-  final MangaDownloadService _downloadService;
-  final DownloadGroupsService _downloadGroupsService;
-  String _selectedGroupId = DownloadGroupsService.defaultGroupId;
+  final MangaDownloadLibrary _downloadService;
+  final DownloadGroupsRepository _downloadGroupsService;
+  String _selectedGroupId = DownloadGroup.defaultGroupId;
   bool _reconcilingGroups = false;
 
-  MangaDownloadService get downloadService => _downloadService;
-  DownloadGroupsService get downloadGroupsService => _downloadGroupsService;
+  List<MangaDownloadTask> get tasks =>
+      List.unmodifiable(_downloadService.tasks);
   List<DownloadGroup> get groups => _downloadGroupsService.groups;
   String get selectedGroupId => _selectedGroupId;
   DownloadGroup get selectedGroup => groups.firstWhere(
     (group) => group.id == _selectedGroupId,
     orElse: () => const DownloadGroup(
-      id: DownloadGroupsService.defaultGroupId,
-      name: DownloadGroupsService.defaultGroupName,
+      id: DownloadGroup.defaultGroupId,
+      name: DownloadGroup.defaultGroupName,
       createdAtMs: 0,
     ),
   );
@@ -135,7 +135,7 @@ class DownloadsPageController extends ChangeNotifier {
   Future<void> deleteGroup(String groupId) async {
     await _downloadGroupsService.deleteGroup(groupId);
     if (_selectedGroupId == groupId) {
-      _selectedGroupId = DownloadGroupsService.defaultGroupId;
+      _selectedGroupId = DownloadGroup.defaultGroupId;
     }
     _notify();
   }
@@ -189,8 +189,7 @@ class DownloadsPageController extends ChangeNotifier {
 
   Future<int> removeSelectedComicsFromCurrentGroup() async {
     final keys = Set<String>.of(_selectedComicIds);
-    final removableKeys =
-        _selectedGroupId == DownloadGroupsService.defaultGroupId
+    final removableKeys = _selectedGroupId == DownloadGroup.defaultGroupId
         ? {
             for (final key in keys)
               if (_downloadGroupsService.groupIdsForComic(key).length > 1) key,
@@ -206,7 +205,7 @@ class DownloadsPageController extends ChangeNotifier {
 
   Future<bool> removeComicFromCurrentGroup(DownloadedMangaComic comic) async {
     final groupId = _selectedGroupId;
-    if (groupId == DownloadGroupsService.defaultGroupId &&
+    if (groupId == DownloadGroup.defaultGroupId &&
         _downloadGroupsService.groupIdsForComic(comic.storageKey).length <= 1) {
       return false;
     }

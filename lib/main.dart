@@ -1,3 +1,5 @@
+import 'package:hazuki/services/software_update/software_update_service.dart';
+import 'package:hazuki/services/software_update/software_update_download_service.dart';
 import 'dart:async';
 
 import 'package:dynamic_color/dynamic_color.dart';
@@ -110,7 +112,10 @@ class _HazukiAppState extends State<HazukiApp>
   final SourceUpdateDialogSupport _sourceUpdateDialogSupport =
       const SourceUpdateDialogSupport();
   final SoftwareUpdateDialogSupport _softwareUpdateDialogSupport =
-      const SoftwareUpdateDialogSupport();
+      SoftwareUpdateDialogSupport(
+        downloadService: sl<SoftwareUpdateDownloadService>(),
+        checkForUpdates: sl<SoftwareUpdateService>().checkForUpdates,
+      );
 
   late final HazukiThemeController _themeController;
   late final HazukiAppController _appController;

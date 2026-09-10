@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:hazuki/services/manga_download/manga_download_service.dart';
+import 'package:hazuki/services/manga_download/manga_download_models.dart';
 
 class AnimatedDownloadedComicEntry {
   const AnimatedDownloadedComicEntry({

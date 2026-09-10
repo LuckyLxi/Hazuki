@@ -1,7 +1,4 @@
 import 'dart:async';
-import 'dart:io';
-import 'dart:ui' show instantiateImageCodec;
-import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
@@ -11,6 +8,9 @@ import 'package:hazuki/features/reader/support/reader_diagnostics_support.dart';
 import 'package:hazuki/features/reader/state/reader_image_pipeline_state.dart';
 import 'package:hazuki/shared/reading/reader_mode.dart';
 import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
+
+import 'reader_image_loader.dart';
+import 'reader_image_prefetch_scheduler.dart';
 
 class ReaderImagePipelineController {
   ReaderImagePipelineController({
@@ -56,20 +56,79 @@ class ReaderImagePipelineController {
        _epId = epId,
        _sourceKey = sourceKey,
        _loadImagesErrorBuilder = loadImagesErrorBuilder,
-       _imageProviderBuilder = imageProviderBuilder,
        _sourceService = sourceService,
        _evictImageBytesFromMemory =
            evictImageBytesFromMemory ?? sourceService.evictImageBytesFromMemory,
        _evictImageCacheEntries =
            evictImageCacheEntries ?? sourceService.evictImageCacheEntries,
        _precacheImageCallback = precacheImageCallback,
-       _onImageAspectRatioResolved = onImageAspectRatioResolved;
+       _onImageAspectRatioResolved = onImageAspectRatioResolved {
+    _imageLoader = ReaderImageLoader(
+      state: pipelineState,
+      source: sourceService,
+      comicId: comicId,
+      epId: epId,
+      sourceKey: sourceKey,
+      noImageModeEnabled: noImageModeEnabled,
+      evictImageBytesFromMemory: _evictImageBytesFromMemory,
+      evictImageCacheEntries: _evictImageCacheEntries,
+      imageProviderBuilder: imageProviderBuilder,
+      onDecodedAspectRatio: _logDecodedAspectRatio,
+    );
+    _prefetchScheduler = ReaderImagePrefetchScheduler(
+      state: pipelineState,
+      windowFor: (index) => ReaderImagePrefetchWindow(
+        images: _runtimeState.images,
+        anchorImageIndex: _runtimeState.spreadStartIndex(index),
+        visibleImageIndices: _runtimeState.spreadImageIndices(index),
+        spreadSize: _runtimeState.readerSpreadSize,
+      ),
+      getImageProvider: getImageProvider,
+      isLocalImagePath: sourceService.isLocalImagePath,
+      downloadImageBytes: (url) async {
+        await sourceService.downloadImageBytes(
+          url,
+          comicId: comicId,
+          epId: epId,
+          sourceKey: sourceKey,
+          keepInMemory: true,
+          useDiskCache: true,
+        );
+      },
+      evictImageBytesFromMemory: _evictImageBytesFromMemory,
+    );
+  }
 
-  static const int _maxUnscrambleConcurrency = 5;
-  static const int _prefetchAroundCount = 10;
-  static const int _prefetchAheadMemoryCount = 6;
-  static const int _providerKeepBehindCount = 12;
-  static const int _providerKeepAheadCount = 24;
+  late final ReaderImageLoader _imageLoader;
+  late final ReaderImagePrefetchScheduler _prefetchScheduler;
+
+  void prefetchAround(int index) => _prefetchScheduler.prefetchAround(index);
+  void requestPrefetchAhead(int index) =>
+      _prefetchScheduler.requestPrefetchAhead(index);
+
+  void _logDecodedAspectRatio(String url, double aspectRatio) {
+    final index = _pipelineState.imageIndexMap[url];
+    if (index != null &&
+        _runtimeState.readerMode == ReaderMode.topToBottom &&
+        index <
+            _runtimeState.spreadStartIndex(_runtimeState.currentPageIndex) &&
+        index >=
+            _runtimeState.spreadStartIndex(_runtimeState.currentPageIndex) -
+                4) {
+      _logEvent(
+        'Reader upstream page aspect ratio resolved',
+        source: 'reader_position',
+        content: _logPayload({
+          'trigger': 'image_aspect_ratio_resolved',
+          'resolvedPageIndex': index,
+          'resolvedPage': index + 1,
+          'aspectRatio': normalizeReaderLogDouble(aspectRatio),
+          'isBeforeCurrentPage': true,
+        }),
+      );
+    }
+  }
+
   static const double defaultPlaceholderAspectRatio = 0.72;
   static const double readerListCacheExtentViewportMultiplier = 3.0;
   static const double readerListCacheExtentMin = 1600;
@@ -90,8 +149,6 @@ class ReaderImagePipelineController {
   final String _epId;
   final String _sourceKey;
   final String Function(Object error) _loadImagesErrorBuilder;
-  final Future<ImageProvider> Function(String url, {bool useDiskCache})?
-  _imageProviderBuilder;
   final SourceReaderGateway _sourceService;
   final void Function(Iterable<String>) _evictImageBytesFromMemory;
   final Future<void> Function(Iterable<String>) _evictImageCacheEntries;
@@ -202,72 +259,8 @@ class ReaderImagePipelineController {
     }
   }
 
-  void prefetchAround(int currentSpreadIndex) {
-    final anchorImageIndex = _runtimeState.spreadStartIndex(currentSpreadIndex);
-    var start = anchorImageIndex - _prefetchAroundCount;
-    if (start < 0) {
-      start = 0;
-    }
-    final max = _runtimeState.images.length;
-    var end = anchorImageIndex + _prefetchAroundCount;
-    if (end > max) {
-      end = max;
-    }
-
-    final visibleImageIndices = _runtimeState
-        .spreadImageIndices(currentSpreadIndex)
-        .where((index) => index >= start && index < end)
-        .toSet();
-
-    for (final index in visibleImageIndices) {
-      final url = _runtimeState.images[index];
-      if (providerCache.containsKey(url) ||
-          (providerFutureCache.containsKey(url) &&
-              _pipelineState.priorityProviderRequests.contains(url))) {
-        continue;
-      }
-      _prefetchImageProvider(url, priority: true);
-    }
-
-    for (var i = start; i < end; i++) {
-      if (visibleImageIndices.contains(i)) {
-        continue;
-      }
-      final url = _runtimeState.images[i];
-      if (providerCache.containsKey(url) ||
-          providerFutureCache.containsKey(url)) {
-        continue;
-      }
-      _prefetchImageProvider(url);
-    }
-
-    _trimProviderCachesAround(anchorImageIndex);
-  }
-
-  void requestPrefetchAhead(int currentIndex) {
-    if (_runtimeState.images.isEmpty) {
-      return;
-    }
-    _pipelineState.queuedPrefetchAheadIndex = currentIndex;
-    if (_pipelineState.prefetchAheadRunning) {
-      return;
-    }
-    unawaited(_drainPrefetchAheadQueue());
-  }
-
   Future<ImageProvider> getImageProvider(String url, {bool priority = false}) {
     return _getImageProvider(url, useDiskCache: true, priority: priority);
-  }
-
-  void _prefetchImageProvider(String url, {bool priority = false}) {
-    unawaited(() async {
-      try {
-        await getImageProvider(url, priority: priority);
-      } catch (_) {
-        // Prefetch is best-effort; visible image builders and retries surface
-        // load failures through their own awaited futures.
-      }
-    }());
   }
 
   Future<ImageProvider> _getImageProvider(
@@ -285,35 +278,35 @@ class ReaderImagePipelineController {
       _pipelineState.priorityProviderRequests.add(url);
     }
     late final Future<ImageProvider> created;
-    created =
-        _buildImageProvider(url, useDiskCache: useDiskCache, priority: priority)
-            .then((provider) async {
-              if (_pipelineState.disposed) return provider;
-              if (_isMounted()) {
-                try {
-                  final precacheImageCallback = _precacheImageCallback;
-                  if (precacheImageCallback != null) {
-                    await precacheImageCallback(provider);
-                  } else {
-                    await precacheImage(provider, _context());
-                  }
-                } catch (_) {}
+    created = _imageLoader
+        .load(url, useDiskCache: useDiskCache, priority: priority)
+        .then((provider) async {
+          if (_pipelineState.disposed) return provider;
+          if (_isMounted()) {
+            try {
+              final precacheImageCallback = _precacheImageCallback;
+              if (precacheImageCallback != null) {
+                await precacheImageCallback(provider);
+              } else {
+                await precacheImage(provider, _context());
               }
-              if (_pipelineState.disposed) return provider;
-              providerCache[url] = provider;
-              if (_isMounted()) {
-                _updateState(() {});
-              }
-              _notifyImageAspectRatioResolved(url);
-              return provider;
-            })
-            .catchError((Object error, StackTrace stackTrace) {
-              if (identical(providerFutureCache[url], created)) {
-                providerFutureCache.remove(url);
-                _pipelineState.priorityProviderRequests.remove(url);
-              }
-              throw error;
-            });
+            } catch (_) {}
+          }
+          if (_pipelineState.disposed) return provider;
+          providerCache[url] = provider;
+          if (_isMounted()) {
+            _updateState(() {});
+          }
+          _notifyImageAspectRatioResolved(url);
+          return provider;
+        })
+        .catchError((Object error, StackTrace stackTrace) {
+          if (identical(providerFutureCache[url], created)) {
+            providerFutureCache.remove(url);
+            _pipelineState.priorityProviderRequests.remove(url);
+          }
+          throw error;
+        });
 
     providerFutureCache[url] = created;
     return created;
@@ -446,209 +439,6 @@ class ReaderImagePipelineController {
     _pipelineState.dispose();
   }
 
-  void _trimProviderCachesAround(int centerIndex) {
-    final keepStart = centerIndex - _providerKeepBehindCount;
-    final keepEnd = centerIndex + _providerKeepAheadCount;
-
-    final staleProviderKeys = <String>[];
-    providerCache.forEach((key, _) {
-      final index = _pipelineState.imageIndexMap[key];
-      if (index == null || index < keepStart || index > keepEnd) {
-        staleProviderKeys.add(key);
-      }
-    });
-    for (final key in staleProviderKeys) {
-      providerCache.remove(key);
-    }
-
-    final staleFutureKeys = <String>[];
-    providerFutureCache.forEach((key, _) {
-      final index = _pipelineState.imageIndexMap[key];
-      if (index == null || index < keepStart || index > keepEnd) {
-        staleFutureKeys.add(key);
-      }
-    });
-    for (final key in staleFutureKeys) {
-      providerFutureCache.remove(key);
-      _pipelineState.priorityProviderRequests.remove(key);
-    }
-
-    final staleByteUrls = <String>[];
-    for (var i = 0; i < _runtimeState.images.length; i++) {
-      if (i < keepStart || i > keepEnd) {
-        staleByteUrls.add(_runtimeState.images[i]);
-      }
-    }
-    if (staleByteUrls.isNotEmpty) {
-      _evictImageBytesFromMemory(staleByteUrls);
-    }
-  }
-
-  Future<void> _drainPrefetchAheadQueue() async {
-    if (_pipelineState.prefetchAheadRunning) {
-      return;
-    }
-    _pipelineState.prefetchAheadRunning = true;
-    try {
-      while (true) {
-        final currentIndex = _pipelineState.queuedPrefetchAheadIndex;
-        _pipelineState.queuedPrefetchAheadIndex = null;
-        if (currentIndex == null || _runtimeState.images.isEmpty) {
-          break;
-        }
-        await _prefetchAheadFrom(currentIndex);
-        if (_pipelineState.disposed) break;
-      }
-    } finally {
-      _pipelineState.prefetchAheadRunning = false;
-      if (!_pipelineState.disposed &&
-          _pipelineState.queuedPrefetchAheadIndex != null) {
-        unawaited(_drainPrefetchAheadQueue());
-      }
-    }
-  }
-
-  Future<void> _prefetchAheadFrom(int currentSpreadIndex) async {
-    if (_pipelineState.disposed || _runtimeState.images.isEmpty) {
-      return;
-    }
-    var start =
-        _runtimeState.spreadStartIndex(currentSpreadIndex) +
-        _runtimeState.readerSpreadSize;
-    if (start < 0) {
-      start = 0;
-    }
-    if (start >= _runtimeState.images.length) {
-      return;
-    }
-    final endExclusive =
-        (start + _prefetchAheadMemoryCount) < _runtimeState.images.length
-        ? (start + _prefetchAheadMemoryCount)
-        : _runtimeState.images.length;
-    final futures = <Future<void>>[];
-
-    for (var i = start; i < endExclusive; i++) {
-      if (_pipelineState.queuedPrefetchAheadIndex != null &&
-          _pipelineState.queuedPrefetchAheadIndex != currentSpreadIndex) {
-        break;
-      }
-
-      final url = _runtimeState.images[i];
-      if (url.trim().isEmpty) {
-        continue;
-      }
-
-      if (_sourceService.isLocalImagePath(url)) {
-        _prefetchImageProvider(url);
-        continue;
-      }
-
-      futures.add(
-        _sourceService
-            .downloadImageBytes(
-              url,
-              comicId: _comicId,
-              epId: _epId,
-              keepInMemory: true,
-              useDiskCache: true,
-              sourceKey: _sourceKey,
-            )
-            .then((_) {})
-            .catchError((_) {}),
-      );
-      _prefetchImageProvider(url);
-    }
-
-    if (futures.isNotEmpty) {
-      await Future.wait(futures);
-    }
-  }
-
-  Future<bool> _acquireUnscramblePermit({required bool priority}) async {
-    if (_pipelineState.activeUnscrambleTasks < _maxUnscrambleConcurrency) {
-      _pipelineState.activeUnscrambleTasks++;
-      return true;
-    }
-    final waiter = ReaderImagePipelinePermitWaiter();
-    if (priority) {
-      _pipelineState.decodeWaiters.insert(0, waiter);
-    } else {
-      _pipelineState.decodeWaiters.add(waiter);
-    }
-    await waiter.completer.future;
-    if (_pipelineState.disposed) return false;
-    _pipelineState.activeUnscrambleTasks++;
-    return true;
-  }
-
-  void _releaseUnscramblePermit() {
-    if (_pipelineState.activeUnscrambleTasks > 0) {
-      _pipelineState.activeUnscrambleTasks--;
-    }
-    while (_pipelineState.decodeWaiters.isNotEmpty) {
-      final waiter = _pipelineState.decodeWaiters.removeAt(0);
-      if (!waiter.completer.isCompleted) {
-        waiter.completer.complete();
-        break;
-      }
-    }
-  }
-
-  Future<bool> _rememberAspectRatioFromBytes(
-    String url,
-    Uint8List bytes,
-  ) async {
-    if (imageAspectRatioCache.containsKey(url)) {
-      return true;
-    }
-    try {
-      final codec = await instantiateImageCodec(bytes);
-      final frame = await codec.getNextFrame();
-      final image = frame.image;
-      try {
-        if (image.height <= 0) {
-          return false;
-        }
-        final aspectRatio = image.width / image.height;
-        imageAspectRatioCache[url] = aspectRatio;
-        final index = _pipelineState.imageIndexMap[url];
-        if (index != null &&
-            _runtimeState.readerMode == ReaderMode.topToBottom &&
-            index <
-                _runtimeState.spreadStartIndex(
-                  _runtimeState.currentPageIndex,
-                ) &&
-            index >=
-                _runtimeState.spreadStartIndex(_runtimeState.currentPageIndex) -
-                    4) {
-          _logEvent(
-            'Reader upstream page aspect ratio resolved',
-            source: 'reader_position',
-            content: _logPayload({
-              'trigger': 'image_aspect_ratio_resolved',
-              'resolvedPageIndex': index,
-              'resolvedPage': index + 1,
-              'aspectRatio': normalizeReaderLogDouble(aspectRatio),
-              'isBeforeCurrentPage': true,
-            }),
-          );
-        }
-        return true;
-      } finally {
-        image.dispose();
-      }
-    } catch (_) {
-      return false;
-    }
-  }
-
-  void _rememberAspectRatio(String url, double? aspectRatio) {
-    if (aspectRatio == null || !aspectRatio.isFinite || aspectRatio <= 0) {
-      return;
-    }
-    imageAspectRatioCache[url] = aspectRatio;
-  }
-
   void _notifyImageAspectRatioResolved(String url) {
     final resolvedAspectRatio = imageAspectRatioCache[url];
     if (resolvedAspectRatio == null ||
@@ -681,63 +471,5 @@ class ReaderImagePipelineController {
       return;
     }
     _pipelineState.listPlaceholderAspectRatioCache[url] = aspectRatio;
-  }
-
-  Future<ImageProvider> _buildImageProvider(
-    String url, {
-    required bool useDiskCache,
-    bool priority = false,
-  }) async {
-    final overrideBuilder = _imageProviderBuilder;
-    if (overrideBuilder != null) {
-      return overrideBuilder(url, useDiskCache: useDiskCache);
-    }
-    if (_noImageModeEnabled()) {
-      throw StateError('no-image mode enabled');
-    }
-
-    if (_sourceService.isLocalImagePath(url)) {
-      final file = File(_sourceService.normalizeLocalImagePath(url));
-      try {
-        final bytes = await file.readAsBytes();
-        await _rememberAspectRatioFromBytes(url, bytes);
-      } catch (_) {}
-      return FileImage(file);
-    }
-
-    if (!await _acquireUnscramblePermit(priority: priority)) {
-      throw StateError('reader_disposed');
-    }
-    try {
-      final prepared = await _sourceService.prepareChapterImageData(
-        url,
-        comicId: _comicId,
-        epId: _epId,
-        useDiskCache: useDiskCache,
-        priority: priority,
-        sourceKey: _sourceKey,
-      );
-      _rememberAspectRatio(url, prepared.aspectRatio);
-      final decoded = imageAspectRatioCache.containsKey(url)
-          ? true
-          : await _rememberAspectRatioFromBytes(url, prepared.bytes);
-      if (!decoded) {
-        if (!useDiskCache) {
-          throw StateError('reader_image_decode_failed');
-        }
-        _evictImageBytesFromMemory([url]);
-        await _evictImageCacheEntries([url]);
-        providerCache.remove(url);
-        providerFutureCache.remove(url);
-        return await _buildImageProvider(
-          url,
-          useDiskCache: false,
-          priority: true,
-        );
-      }
-      return MemoryImage(prepared.bytes);
-    } finally {
-      _releaseUnscramblePermit();
-    }
   }
 }

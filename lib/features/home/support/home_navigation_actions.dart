@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import 'package:hazuki/app/app.dart';
+import 'package:hazuki/shared/appearance/appearance_settings.dart';
 import 'package:hazuki/features/home/support/home_feature_contracts.dart';
 import 'package:hazuki/features/home/view/home_drawer.dart';
 import 'package:hazuki/l10n/l10n.dart';

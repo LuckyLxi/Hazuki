@@ -5,7 +5,11 @@ import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/local_favorites/local_favorites_contracts.dart';
 import 'package:hazuki/services/local_favorites/local_favorites_preferences_store.dart';
-import 'package:hazuki/shared/picacg_comic_tags.dart';
+import '../support/favorite_comic_tag_loader.dart';
+import '../support/favorite_source_policy.dart';
+import '../support/favorite_list_loader.dart';
+import '../support/favorite_selection_store.dart';
+import '../support/favorite_change_coordinator.dart';
 
 import 'favorite_app_bar_actions_state.dart';
 import 'favorite_page_state.dart';
@@ -19,7 +23,8 @@ class FavoritePageController extends ChangeNotifier {
     required LocalFavoritesRepository localFavoritesRepository,
     required LocalFavoritesPreferencesStore localFavoritesPreferences,
   }) : _sourceService = sourceService,
-       _readerService = readerService,
+       _tagLoader = FavoriteComicTagLoader(readerService),
+       _selectionStore = FavoriteSelectionStore(localFavoritesPreferences),
        _localFavoritesRepository = localFavoritesRepository,
        _cloudFlow = FavoriteCloudFlow(sourceService),
        _localFlow = FavoriteLocalFlow(
@@ -27,27 +32,66 @@ class FavoritePageController extends ChangeNotifier {
          preferences: localFavoritesPreferences,
        ) {
     _lastActiveSourceKey = _activeSourceKey;
-    _localFavoritesRepository.addListener(_handleLocalFavoritesChanged);
+    _listLoader = FavoriteListLoader(cloud: _cloudFlow, local: _localFlow);
+    _changes = FavoriteChangeCoordinator(
+      localChanges: _localFavoritesRepository,
+      cloudChanges: _sourceService.cloudFavoritesChangedStream,
+      shouldRefreshLocal: () => _state.mode == FavoritePageMode.local,
+      shouldRefreshCloud: () =>
+          _state.mode == FavoritePageMode.cloud &&
+          _sourcePolicy.refreshOnCloudFavoritesChanged(_activeSourceKey),
+      refreshLocal: _syncLocalFavoritesAfterExternalChange,
+      refreshCloud: _syncCloudFavoritesAfterExternalChange,
+    );
     _sourceService.addListener(_handleSourceServiceChanged);
-    _cloudFavoritesSubscription = _sourceService.cloudFavoritesChangedStream
-        .listen((_) {
-          _handleCloudFavoritesChanged();
-        });
   }
 
-  static const favoriteLoadTimeout = Duration(seconds: 90);
+  static const favoriteLoadTimeout = FavoriteListLoader.timeout;
 
   final SourceFavoriteGateway _sourceService;
-  final SourceReaderGateway? _readerService;
+  final FavoriteComicTagLoader _tagLoader;
+  final FavoriteSourcePolicy _sourcePolicy = const FavoriteSourcePolicy();
   final FavoriteCloudFlow _cloudFlow;
   final FavoriteLocalFlow _localFlow;
   final LocalFavoritesRepository _localFavoritesRepository;
   final FavoritePageData _state = FavoritePageData();
 
   bool _disposed = false;
-  bool _syncingExternalLocalChange = false;
-  bool _queuedExternalLocalChange = false;
-  StreamSubscription<void>? _cloudFavoritesSubscription;
+  late final FavoriteListLoader _listLoader;
+  late final FavoriteChangeCoordinator _changes;
+  final FavoriteSelectionStore _selectionStore;
+  int _folderRequestVersion = 0;
+
+  FavoriteListRequest _captureFolderRequest() => FavoriteListRequest(
+    generation: ++_folderRequestVersion,
+    sourceKey: _activeSourceKey,
+    mode: _state.mode,
+  );
+
+  bool _isCurrentFolderRequest(FavoriteListRequest request) =>
+      !_disposed &&
+      request.generation == _folderRequestVersion &&
+      request.sourceKey == _activeSourceKey &&
+      request.mode == _state.mode;
+
+  void _invalidateRequests() {
+    _listLoader.invalidate();
+    _folderRequestVersion++;
+    _state.loadingFolders = false;
+  }
+
+  FavoriteListRequest _captureRequest({bool replace = false}) =>
+      _listLoader.capture(
+        sourceKey: _activeSourceKey,
+        mode: _state.mode,
+        replace: replace,
+      );
+
+  bool _isCurrent(FavoriteListRequest request) => _listLoader.isCurrent(
+    request,
+    sourceKey: _activeSourceKey,
+    mode: _state.mode,
+  );
   String _lastActiveSourceKey = '';
   List<ExploreComic> get comics => _state.comics;
   List<FavoriteFolder> get folders => _state.folders;
@@ -97,6 +141,7 @@ class FavoritePageController extends ChangeNotifier {
     if (_state.mode == FavoritePageMode.local) {
       return;
     }
+    _invalidateRequests();
     _state.resetForReload();
     _notify();
   }
@@ -105,6 +150,7 @@ class FavoritePageController extends ChangeNotifier {
     if (_state.mode == FavoritePageMode.local) {
       return;
     }
+    _invalidateRequests();
     _state.resetLoggedOut();
     _notify();
   }
@@ -115,17 +161,12 @@ class FavoritePageController extends ChangeNotifier {
   }) async {
     if (_state.isFirstLoad) {
       _state.isFirstLoad = false;
-      final savedMode = await _localFlow.loadFavoritePageMode(
-        sourceKey: _activeSourceKey,
-      );
-      _state.selectedCloudFolderId = await _localFlow.loadSelectedFolderId(
-        FavoritePageMode.cloud,
-        sourceKey: _activeSourceKey,
-      );
-      _state.selectedLocalFolderId = await _localFlow.loadSelectedFolderId(
-        FavoritePageMode.local,
-        sourceKey: _activeSourceKey,
-      );
+      final request = _captureRequest();
+      final selection = await _selectionStore.load(request.sourceKey);
+      if (!_isCurrent(request)) return;
+      final savedMode = selection.mode;
+      _state.selectedCloudFolderId = selection.cloudFolderId;
+      _state.selectedLocalFolderId = selection.localFolderId;
       if (savedMode != _state.mode) {
         _state.setMode(savedMode);
         _state.folders = _state.mode == FavoritePageMode.local
@@ -140,9 +181,12 @@ class FavoritePageController extends ChangeNotifier {
       return;
     }
 
+    final requestVersion = _captureRequest(replace: true);
     try {
       await _cloudFlow.ensureInitialized();
+      if (!_isCurrent(requestVersion)) return;
     } catch (e) {
+      if (!_isCurrent(requestVersion)) return;
       _state.initialLoading = false;
       _state.errorMessage = e.toString();
       _notify();
@@ -160,17 +204,17 @@ class FavoritePageController extends ChangeNotifier {
       return;
     }
 
-    final requestVersion = ++_state.listRequestVersion;
-
     await reloadFolders(onError: onFolderLoadError);
+    if (!_isCurrent(requestVersion)) return;
 
-    final result = await _cloudFlow.loadPage(
+    final result = await _listLoader.load(
+      request: requestVersion,
+      sortOrder: _state.favoriteSortOrder,
       page: 1,
       folderId: _state.selectedCloudFolderId,
       timeoutMessage: timeoutMessage,
-      timeout: favoriteLoadTimeout,
     );
-    if (_disposed || requestVersion != _state.listRequestVersion) {
+    if (!_isCurrent(requestVersion)) {
       return;
     }
 
@@ -186,11 +230,11 @@ class FavoritePageController extends ChangeNotifier {
     final nextMode = _state.mode == FavoritePageMode.cloud
         ? FavoritePageMode.local
         : FavoritePageMode.cloud;
+    _invalidateRequests();
     _state.setMode(nextMode);
-    await _localFlow.saveFavoritePageMode(
-      _state.mode,
-      sourceKey: _activeSourceKey,
-    );
+    final request = _captureRequest();
+    await _selectionStore.saveMode(nextMode, request.sourceKey);
+    if (!_isCurrent(request)) return;
     _state.resetForModeChange();
     if (nextMode == FavoritePageMode.local) {
       await _loadInitialLocal(notifyIntermediate: false);
@@ -210,10 +254,13 @@ class FavoritePageController extends ChangeNotifier {
       return;
     }
 
+    final request = _captureFolderRequest();
     if (!_cloudFlow.supportsFolderLoad) {
       _state.folders = const <FavoriteFolder>[defaultCloudFavoriteFolder];
       _state.selectedCloudFolderId = '0';
       await _saveSelectedFolderId(FavoritePageMode.cloud, '0');
+      if (!_isCurrentFolderRequest(request)) return;
+      _state.loadingFolders = false;
       _notify();
       return;
     }
@@ -222,7 +269,7 @@ class FavoritePageController extends ChangeNotifier {
     _notify();
 
     final result = await _cloudFlow.loadFolders();
-    if (_disposed) {
+    if (!_isCurrentFolderRequest(request)) {
       return;
     }
 
@@ -246,6 +293,7 @@ class FavoritePageController extends ChangeNotifier {
         _state.selectedCloudFolderId,
       );
     }
+    if (!_isCurrentFolderRequest(request)) return;
     _state.loadingFolders = false;
     _notify();
   }
@@ -261,7 +309,7 @@ class FavoritePageController extends ChangeNotifier {
       return null;
     }
 
-    final requestVersion = _state.listRequestVersion;
+    final requestVersion = _captureRequest();
     final targetFolderId = selectedFolderId;
 
     _state.loadingMore = true;
@@ -274,7 +322,7 @@ class FavoritePageController extends ChangeNotifier {
         folderId: targetFolderId,
         timeoutMessage: timeoutMessage,
       );
-      if (_disposed || requestVersion != _state.listRequestVersion) {
+      if (!_isCurrent(requestVersion)) {
         return null;
       }
 
@@ -289,7 +337,7 @@ class FavoritePageController extends ChangeNotifier {
       _notify();
       return null;
     } catch (_) {
-      if (!_disposed && requestVersion == _state.listRequestVersion) {
+      if (_isCurrent(requestVersion)) {
         _state.loadingMore = false;
         _notify();
       }
@@ -308,7 +356,7 @@ class FavoritePageController extends ChangeNotifier {
       return;
     }
 
-    final requestVersion = ++_state.listRequestVersion;
+    final requestVersion = _captureRequest(replace: true);
 
     _state.refreshing = true;
     _state.loadingMore = false;
@@ -316,6 +364,7 @@ class FavoritePageController extends ChangeNotifier {
 
     try {
       await reloadFolders(onError: onFolderLoadError);
+      if (!_isCurrent(requestVersion)) return;
       if (_state.mode == FavoritePageMode.local && selectedFolderId.isEmpty) {
         _state.comics = const <ExploreComic>[];
         _state.errorMessage = null;
@@ -329,14 +378,14 @@ class FavoritePageController extends ChangeNotifier {
         folderId: selectedFolderId,
         timeoutMessage: timeoutMessage,
       );
-      if (_disposed || requestVersion != _state.listRequestVersion) {
+      if (!_isCurrent(requestVersion)) {
         return;
       }
 
       _state.applyFirstPageResult(result);
       _notify();
     } finally {
-      if (!_disposed && requestVersion == _state.listRequestVersion) {
+      if (_isCurrent(requestVersion)) {
         _state.refreshing = false;
         _notify();
       }
@@ -356,9 +405,10 @@ class FavoritePageController extends ChangeNotifier {
       return;
     }
 
-    final requestVersion = ++_state.listRequestVersion;
+    final requestVersion = _captureRequest(replace: true);
     _state.setSelectedFolderId(folderId);
     await _saveSelectedFolderId(_state.mode, folderId);
+    if (!_isCurrent(requestVersion)) return;
     _state.initialLoading = true;
     _state.errorMessage = null;
     _state.comics = const <ExploreComic>[];
@@ -372,7 +422,7 @@ class FavoritePageController extends ChangeNotifier {
       folderId: folderId,
       timeoutMessage: timeoutMessage,
     );
-    if (_disposed || requestVersion != _state.listRequestVersion) {
+    if (!_isCurrent(requestVersion)) {
       return;
     }
 
@@ -443,7 +493,7 @@ class FavoritePageController extends ChangeNotifier {
     final allowedOrders = _state.mode == FavoritePageMode.local
         ? _favoriteSortOrders
         : _cloudFlow.sortOrders;
-    final normalized = _normalizeFavoriteSortOrder(
+    final normalized = _sourcePolicy.normalizeSortOrder(
       order,
       allowedOrders: allowedOrders,
     );
@@ -478,7 +528,7 @@ class FavoritePageController extends ChangeNotifier {
   }
 
   Future<String?> _reloadLocalComicsAfterSort() async {
-    final requestVersion = ++_state.listRequestVersion;
+    final requestVersion = _captureRequest(replace: true);
     final targetFolderId = _state.selectedLocalFolderId;
 
     _state.refreshing = true;
@@ -487,7 +537,7 @@ class FavoritePageController extends ChangeNotifier {
     _notify();
 
     if (targetFolderId.isEmpty) {
-      if (!_disposed && requestVersion == _state.listRequestVersion) {
+      if (_isCurrent(requestVersion)) {
         _state.comics = const <ExploreComic>[];
         _state.currentPage = 1;
         _state.hasMore = false;
@@ -497,13 +547,14 @@ class FavoritePageController extends ChangeNotifier {
       return null;
     }
 
-    final result = await _localFlow.loadPage(
+    final result = await _listLoader.load(
+      request: requestVersion,
+      timeoutMessage: '',
       page: 1,
       folderId: targetFolderId,
       sortOrder: _state.favoriteSortOrder,
-      sourceKey: _activeSourceKey,
     );
-    if (_disposed || requestVersion != _state.listRequestVersion) {
+    if (!_isCurrent(requestVersion)) {
       return null;
     }
 
@@ -557,8 +608,8 @@ class FavoritePageController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
-    _cloudFavoritesSubscription?.cancel();
-    _localFavoritesRepository.removeListener(_handleLocalFavoritesChanged);
+    _listLoader.dispose();
+    _changes.dispose();
     _sourceService.removeListener(_handleSourceServiceChanged);
     super.dispose();
   }
@@ -570,7 +621,8 @@ class FavoritePageController extends ChangeNotifier {
       return;
     }
     _lastActiveSourceKey = activeSourceKey;
-    _state.favoriteSortOrder = _normalizeFavoriteSortOrder(
+    _invalidateRequests();
+    _state.favoriteSortOrder = _sourcePolicy.normalizeSortOrder(
       _state.favoriteSortOrder,
       allowedOrders: _favoriteSortOrders,
     );
@@ -578,60 +630,22 @@ class FavoritePageController extends ChangeNotifier {
   }
 
   Future<void> _restoreModeForActiveSource() async {
-    final sourceKey = _activeSourceKey;
-    final savedMode = await _localFlow.loadFavoritePageMode(
-      sourceKey: sourceKey,
-    );
-    if (_disposed || sourceKey != _activeSourceKey) {
-      return;
-    }
-    await _restoreSelectedFolderIdsForSource(sourceKey);
-    if (_disposed || sourceKey != _activeSourceKey) {
-      return;
-    }
-    if (_state.mode != savedMode) {
-      _state.setMode(savedMode);
-    }
+    final request = _captureRequest();
+    final selection = await _selectionStore.load(request.sourceKey);
+    if (!_isCurrent(request)) return;
+    _state.selectedCloudFolderId = selection.cloudFolderId;
+    _state.selectedLocalFolderId = selection.localFolderId;
+    _state.setMode(selection.mode);
     if (_state.mode == FavoritePageMode.local) {
       _state.resetForModeChange();
       _notify();
       unawaited(_loadInitialLocal());
       return;
     }
+    _invalidateRequests();
     _state.resetForReload();
     _notify();
     unawaited(_backgroundRefreshCloud());
-  }
-
-  Future<void> _restoreSelectedFolderIdsForSource(String sourceKey) async {
-    _state.selectedCloudFolderId = await _localFlow.loadSelectedFolderId(
-      FavoritePageMode.cloud,
-      sourceKey: sourceKey,
-    );
-    _state.selectedLocalFolderId = await _localFlow.loadSelectedFolderId(
-      FavoritePageMode.local,
-      sourceKey: sourceKey,
-    );
-  }
-
-  void _handleLocalFavoritesChanged() {
-    if (_disposed || _state.mode != FavoritePageMode.local) {
-      return;
-    }
-    if (_syncingExternalLocalChange) {
-      _queuedExternalLocalChange = true;
-      return;
-    }
-    unawaited(_syncLocalFavoritesAfterExternalChange());
-  }
-
-  void _handleCloudFavoritesChanged() {
-    if (_disposed || _state.mode != FavoritePageMode.cloud) {
-      return;
-    }
-    if (isHazukiCopyMangaSourceKey(_activeSourceKey)) {
-      unawaited(_syncCloudFavoritesAfterExternalChange());
-    }
   }
 
   Future<FavoriteComicsResult> _loadPage({
@@ -639,62 +653,37 @@ class FavoritePageController extends ChangeNotifier {
     required String folderId,
     required String timeoutMessage,
   }) async {
-    final result = _state.mode == FavoritePageMode.local
-        ? await _localFlow.loadPage(
-            page: page,
-            folderId: folderId,
-            sortOrder: _state.favoriteSortOrder,
-            sourceKey: _activeSourceKey,
-          )
-        : await _cloudFlow.loadPage(
-            page: page,
-            folderId: folderId,
-            timeoutMessage: timeoutMessage,
-            timeout: favoriteLoadTimeout,
-          );
-    unawaited(_backfillPicacgTags(result));
+    final request = _captureRequest();
+    final result = await _listLoader.load(
+      request: request,
+      page: page,
+      folderId: folderId,
+      sortOrder: _state.favoriteSortOrder,
+      timeoutMessage: timeoutMessage,
+    );
+    if (_isCurrent(request)) unawaited(_backfillComicTags(result, request));
     return result;
   }
 
-  Future<void> _backfillPicacgTags(FavoriteComicsResult result) async {
-    if (_readerService == null || result.errorMessage != null) return;
-    final comics = List<ExploreComic>.of(result.comics);
-    for (var start = 0; start < comics.length; start += 4) {
-      final end = (start + 4).clamp(0, comics.length);
-      await Future.wait(
-        List<Future<void>>.generate(end - start, (offset) async {
-          final index = start + offset;
-          final comic = comics[index];
-          if (comic.sourceKey.trim().toLowerCase() != 'picacg' ||
-              comic.tags.isNotEmpty) {
-            return;
-          }
-          try {
-            final details = await _readerService.loadComicDetails(
-              comic.id,
+  Future<void> _backfillComicTags(
+    FavoriteComicsResult result,
+    FavoriteListRequest request,
+  ) async {
+    final tagsByComic = await _tagLoader.load(
+      result,
+      onTagsLoaded: (comic, tags) {
+        if (_isCurrent(request) && request.mode == FavoritePageMode.local) {
+          unawaited(
+            _localFavoritesRepository.updateComicTags(
+              comicId: comic.id,
               sourceKey: comic.sourceKey,
-            );
-            final tags = picacgComicDetailTags(details);
-            if (tags.isEmpty) return;
-            comics[index] = comic.copyWith(tags: tags);
-            if (_state.mode == FavoritePageMode.local) {
-              unawaited(
-                _localFavoritesRepository.updateComicTags(
-                  comicId: comic.id,
-                  sourceKey: comic.sourceKey,
-                  tags: tags,
-                ),
-              );
-            }
-          } catch (_) {}
-        }),
-      );
-    }
-    if (_disposed) return;
-    final tagsByComic = <String, List<String>>{
-      for (final comic in comics)
-        if (comic.tags.isNotEmpty) comic.scopedId.storageKey: comic.tags,
-    };
+              tags: tags,
+            ),
+          );
+        }
+      },
+    );
+    if (!_isCurrent(request) || tagsByComic.isEmpty) return;
     var changed = false;
     _state.comics = _state.comics
         .map((comic) {
@@ -708,14 +697,17 @@ class FavoritePageController extends ChangeNotifier {
   }
 
   Future<void> _loadInitialLocal({bool notifyIntermediate = true}) async {
-    final requestVersion = ++_state.listRequestVersion;
-    _state.favoriteSortOrder = _normalizeFavoriteSortOrder(
-      await _localFlow.loadSortOrder(),
+    final requestVersion = _captureRequest(replace: true);
+    final sortOrder = await _localFlow.loadSortOrder();
+    if (!_isCurrent(requestVersion)) return;
+    _state.favoriteSortOrder = _sourcePolicy.normalizeSortOrder(
+      sortOrder,
       allowedOrders: _favoriteSortOrders,
     );
     await _reloadLocalFolders(notifyChanges: notifyIntermediate);
+    if (!_isCurrent(requestVersion)) return;
     if (_state.selectedLocalFolderId.isEmpty) {
-      if (_disposed || requestVersion != _state.listRequestVersion) {
+      if (!_isCurrent(requestVersion)) {
         return;
       }
       _state.comics = const <ExploreComic>[];
@@ -731,7 +723,7 @@ class FavoritePageController extends ChangeNotifier {
       folderId: _state.selectedLocalFolderId,
       timeoutMessage: '',
     );
-    if (_disposed || requestVersion != _state.listRequestVersion) {
+    if (!_isCurrent(requestVersion)) {
       return;
     }
 
@@ -751,46 +743,39 @@ class FavoritePageController extends ChangeNotifier {
   }
 
   Future<void> _syncLocalFavoritesAfterExternalChange() async {
-    _syncingExternalLocalChange = true;
-    try {
-      do {
-        _queuedExternalLocalChange = false;
-        final requestVersion = ++_state.listRequestVersion;
-        await _reloadLocalFolders();
-        if (_disposed ||
-            _state.mode != FavoritePageMode.local ||
-            requestVersion != _state.listRequestVersion) {
-          continue;
-        }
-
-        final targetFolderId = _state.selectedLocalFolderId;
-        if (targetFolderId.isEmpty) {
-          _state.comics = const <ExploreComic>[];
-          _state.errorMessage = null;
-          _state.currentPage = 1;
-          _state.hasMore = false;
-          _notify();
-          continue;
-        }
-
-        final result = await _localFlow.loadPage(
-          page: 1,
-          folderId: targetFolderId,
-          sortOrder: _state.favoriteSortOrder,
-          sourceKey: _activeSourceKey,
-        );
-        if (_disposed ||
-            _state.mode != FavoritePageMode.local ||
-            requestVersion != _state.listRequestVersion) {
-          continue;
-        }
-
-        _state.applyFirstPageResult(result);
-        _notify();
-      } while (_queuedExternalLocalChange && !_disposed);
-    } finally {
-      _syncingExternalLocalChange = false;
+    final requestVersion = _captureRequest(replace: true);
+    await _reloadLocalFolders();
+    if (_disposed ||
+        _state.mode != FavoritePageMode.local ||
+        !_isCurrent(requestVersion)) {
+      return;
     }
+
+    final targetFolderId = _state.selectedLocalFolderId;
+    if (targetFolderId.isEmpty) {
+      _state.comics = const <ExploreComic>[];
+      _state.errorMessage = null;
+      _state.currentPage = 1;
+      _state.hasMore = false;
+      _notify();
+      return;
+    }
+
+    final result = await _listLoader.load(
+      request: requestVersion,
+      timeoutMessage: '',
+      page: 1,
+      folderId: targetFolderId,
+      sortOrder: _state.favoriteSortOrder,
+    );
+    if (_disposed ||
+        _state.mode != FavoritePageMode.local ||
+        !_isCurrent(requestVersion)) {
+      return;
+    }
+
+    _state.applyFirstPageResult(result);
+    _notify();
   }
 
   Future<void> _syncCloudFavoritesAfterExternalChange() async {
@@ -800,20 +785,21 @@ class FavoritePageController extends ChangeNotifier {
       return;
     }
 
-    final requestVersion = ++_state.listRequestVersion;
+    final requestVersion = _captureRequest(replace: true);
     _state.refreshing = true;
     _notify();
 
     try {
-      final result = await _cloudFlow.loadPage(
+      final result = await _listLoader.load(
+        request: requestVersion,
+        sortOrder: _state.favoriteSortOrder,
         page: 1,
         folderId: selectedFolderId,
         timeoutMessage: 'Timeout',
-        timeout: favoriteLoadTimeout,
       );
       if (_disposed ||
           _state.mode != FavoritePageMode.cloud ||
-          requestVersion != _state.listRequestVersion) {
+          !_isCurrent(requestVersion)) {
         return;
       }
       _state.applyFirstPageResult(result);
@@ -821,7 +807,7 @@ class FavoritePageController extends ChangeNotifier {
     } catch (_) {
       // Ignore background errors
     } finally {
-      if (!_disposed && requestVersion == _state.listRequestVersion) {
+      if (_isCurrent(requestVersion)) {
         _state.refreshing = false;
         _notify();
       }
@@ -829,13 +815,14 @@ class FavoritePageController extends ChangeNotifier {
   }
 
   Future<void> _reloadLocalFolders({bool notifyChanges = true}) async {
+    final request = _captureFolderRequest();
     _state.loadingFolders = true;
     if (notifyChanges) {
       _notify();
     }
 
-    final result = await _localFlow.loadFoldersForSource(_activeSourceKey);
-    if (_disposed) {
+    final result = await _localFlow.loadFoldersForSource(request.sourceKey);
+    if (!_isCurrentFolderRequest(request)) {
       return;
     }
 
@@ -851,6 +838,7 @@ class FavoritePageController extends ChangeNotifier {
         _state.selectedLocalFolderId,
       );
     }
+    if (!_isCurrentFolderRequest(request)) return;
     if (folders.isEmpty) {
       _state.comics = const <ExploreComic>[];
       _state.errorMessage = null;
@@ -869,37 +857,10 @@ class FavoritePageController extends ChangeNotifier {
     }
   }
 
-  String _normalizeFavoriteSortOrder(
-    String order, {
-    required List<String> allowedOrders,
-  }) {
-    final normalized = order.trim();
-    if (allowedOrders.contains(normalized)) {
-      return normalized;
-    }
-    if (allowedOrders.contains('-datetime_updated') && normalized == 'mp') {
-      return '-datetime_updated';
-    }
-    if (allowedOrders.contains('-datetime_modifier') && normalized == 'mr') {
-      return '-datetime_modifier';
-    }
-    if (allowedOrders.contains('mp') && normalized == '-datetime_updated') {
-      return 'mp';
-    }
-    if (allowedOrders.contains('mr')) {
-      return 'mr';
-    }
-    return allowedOrders.firstOrNull ?? 'mr';
-  }
-
   Future<void> _saveSelectedFolderId(
     FavoritePageMode mode,
     String folderId,
   ) async {
-    await _localFlow.saveSelectedFolderId(
-      mode,
-      folderId,
-      sourceKey: _activeSourceKey,
-    );
+    await _selectionStore.saveFolder(mode, folderId, _activeSourceKey);
   }
 }

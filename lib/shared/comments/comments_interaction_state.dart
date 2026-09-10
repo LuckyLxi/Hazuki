@@ -6,7 +6,7 @@ import 'package:hazuki/models/hazuki_models.dart';
 /// Flutter-only objects such as focus and scrolling.
 class CommentsInteractionState {
   List<ComicCommentData> comments = const [];
-  String? errorMessage;
+  Object? loadError;
   bool initialLoading = true;
   bool initialLoadSucceeded = false;
   bool loadingMore = false;

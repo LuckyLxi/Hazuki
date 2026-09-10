@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 
-import 'package:hazuki/app/app.dart';
+import 'package:hazuki/shared/appearance/appearance_settings.dart';
 import 'package:hazuki/models/hazuki_models.dart';
+import 'package:hazuki/services/announcements/announcement.dart';
+import 'package:hazuki/services/announcements/announcement_controller.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
-import 'package:hazuki/services/announcement_service.dart';
 import 'package:hazuki/services/manga_download/manga_download_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/shared/favorites/favorite_app_bar_actions_state.dart';
@@ -31,7 +32,7 @@ class HomeServices {
   final SourceSwitchGateway sourceSwitchService;
   final SourceImageGateway imageService;
   final DiscoverDailyRecommendationService dailyRecommendationService;
-  final AnnouncementService announcementService;
+  final AnnouncementController announcementService;
   final HomeDownloadStatusListenable downloadStatus;
   final Future<void> Function(BuildContext context, Announcement announcement)
   showAnnouncement;

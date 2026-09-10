@@ -8,11 +8,11 @@ import 'package:flutter/material.dart';
 
 import 'package:hazuki/features/reader/support/reader_controller_support.dart';
 import 'package:hazuki/features/reader/support/reader_page_context.dart';
-import 'package:hazuki/features/reader/support/reader_session_controller.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/features/reader/view/reader_comments_sheet.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/services/manga_download/manga_download_service.dart';
+import 'package:hazuki/services/manga_download/manga_download_commands.dart';
 import 'package:hazuki/shared/chapter_title_resolver.dart';
 import 'package:hazuki/shared/comments/comments_interaction_state.dart';
 import 'package:hazuki/shared/downloads/download_conflict_dialog.dart';
@@ -28,16 +28,16 @@ class ReaderActionsController {
     required ReaderStateUpdate updateState,
     required ReaderLogEvent logEvent,
     required ReaderLogPayloadBuilder logPayload,
-    required ReaderSessionController sessionController,
+    required SourceReaderGateway sourceReader,
     required ReaderPageContext pageContext,
     required ReaderReplacementPageBuilder buildReplacementPage,
-    required MangaDownloadService downloader,
+    required MangaDownloadCommands downloader,
   }) : _context = context,
        _isMounted = isMounted,
        _updateState = updateState,
        _logEvent = logEvent,
        _logPayload = logPayload,
-       _sessionController = sessionController,
+       _sourceReader = sourceReader,
        _pageContext = pageContext,
        _buildReplacementPage = buildReplacementPage,
        _downloader = downloader;
@@ -47,10 +47,10 @@ class ReaderActionsController {
   final ReaderStateUpdate _updateState;
   final ReaderLogEvent _logEvent;
   final ReaderLogPayloadBuilder _logPayload;
-  final ReaderSessionController _sessionController;
+  final SourceReaderGateway _sourceReader;
   final ReaderPageContext _pageContext;
   final ReaderReplacementPageBuilder _buildReplacementPage;
-  final MangaDownloadService _downloader;
+  final MangaDownloadCommands _downloader;
 
   ComicDetailsData? _chapterDetailsCache;
   bool _chapterPanelLoading = false;
@@ -64,7 +64,7 @@ class ReaderActionsController {
         _chapterDetailsCache ??
         (_pageContext.offlineMode
             ? _buildOfflineComicDetails()
-            : await _sessionController.loadComicDetails(
+            : await _sourceReader.loadComicDetails(
                 _pageContext.comicId,
                 sourceKey: _pageContext.sourceKey,
               ));
