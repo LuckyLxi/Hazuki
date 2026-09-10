@@ -7,6 +7,8 @@ export '../../shared/software_update/software_update_dialog_presenter.dart';
 class SoftwareUpdateDialogSupport extends SoftwareUpdateDialogPresenter {
   const SoftwareUpdateDialogSupport({
     required super.downloadService,
+    super.reminderStore,
+    super.reminderPolicy,
     required Future<SoftwareUpdateCheckResult?> Function() checkForUpdates,
   }) : _checkForUpdates = checkForUpdates;
 

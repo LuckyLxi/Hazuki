@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:hazuki/shared/chapter_title_resolver.dart';
 import 'package:hazuki/shared/window/window_title_bar_control.dart';
 import 'package:hazuki/l10n/l10n.dart';
-import 'package:hazuki/services/manga_download/manga_download_service.dart';
+import 'package:hazuki/services/manga_download/manga_download_models.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'downloaded_comic_detail_widgets.dart';
 import 'downloads_cover_widgets.dart';

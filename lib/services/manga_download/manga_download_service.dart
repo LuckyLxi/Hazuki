@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../models/hazuki_models.dart';
 import '../source/source_capabilities.dart';
 import 'manga_download_commands.dart';
+import 'manga_download_library.dart';
 import 'manga_download_lifecycle_coordinator.dart';
 import 'manga_download_state.dart';
 import 'manga_download_files.dart';
@@ -17,7 +18,7 @@ import 'manga_download_storage_support.dart';
 export 'manga_download_models.dart';
 
 class MangaDownloadService extends ChangeNotifier
-    implements MangaDownloadCommands {
+    implements MangaDownloadCommands, MangaDownloadLibrary {
   MangaDownloadService({SourceReaderGateway? sourceReader}) {
     _stateStore = MangaDownloadStateStore(logScan: _logScan);
     _access = MangaDownloadAccess(logScan: _logScan);
@@ -60,7 +61,9 @@ class MangaDownloadService extends ChangeNotifier
   late final MangaDownloadQueueExecutor _queueExecutor;
   late final MangaDownloadLifecycleCoordinator _lifecycle;
 
+  @override
   List<MangaDownloadTask> get tasks => _state.tasks;
+  @override
   List<DownloadedMangaComic> get downloadedComics => _state.downloadedComics;
 
   // 下载扫描日志已禁用，不再写入应用日志
@@ -83,6 +86,7 @@ class MangaDownloadService extends ChangeNotifier
         t.status == MangaDownloadTaskStatus.downloading,
   );
 
+  @override
   Future<Set<String>> checkDownloadedIntegrity() async {
     final issueIds = <String>{};
     for (final comic in _downloaded) {
@@ -103,6 +107,7 @@ class MangaDownloadService extends ChangeNotifier
     return issueIds;
   }
 
+  @override
   Future<void> ensureInitialized() async {
     final inFlight = _initFuture;
     if (inFlight != null) {
@@ -114,6 +119,7 @@ class MangaDownloadService extends ChangeNotifier
     await future;
   }
 
+  @override
   Future<MangaDownloadedScanResult> scanDownloadedComics() async {
     await ensureInitialized();
     final hasAccess = await _ensureAndroidDownloadsAccess();
@@ -353,6 +359,7 @@ class MangaDownloadService extends ChangeNotifier
     return Directory('${rootDir.path}/${relativeParts.first}');
   }
 
+  @override
   Future<void> deleteDownloadedComics(Iterable<String> comicIds) async {
     await ensureInitialized();
     final ids = comicIds
@@ -402,6 +409,7 @@ class MangaDownloadService extends ChangeNotifier
     notifyListeners();
   }
 
+  @override
   Future<void> pauseTask(String storageKey) async {
     await ensureInitialized();
     if (!_state.pauseTask(storageKey)) return;
@@ -409,6 +417,7 @@ class MangaDownloadService extends ChangeNotifier
     notifyListeners();
   }
 
+  @override
   Future<void> resumeTask(String storageKey) async {
     await ensureInitialized();
     if (!_state.resumeTask(storageKey)) return;
@@ -417,6 +426,7 @@ class MangaDownloadService extends ChangeNotifier
     unawaited(_queueExecutor.processQueue());
   }
 
+  @override
   Future<void> pauseAllTasks() async {
     await ensureInitialized();
     if (!_state.pauseAllTasks()) return;
@@ -424,6 +434,7 @@ class MangaDownloadService extends ChangeNotifier
     notifyListeners();
   }
 
+  @override
   Future<void> resumeAllTasks() async {
     await ensureInitialized();
     if (!_state.resumeAllTasks()) return;
@@ -432,6 +443,7 @@ class MangaDownloadService extends ChangeNotifier
     unawaited(_queueExecutor.processQueue());
   }
 
+  @override
   Future<void> deleteTask(String storageKey) async {
     await ensureInitialized();
     if (_state.taskByStorageKey(storageKey) == null) {

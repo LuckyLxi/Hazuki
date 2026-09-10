@@ -471,7 +471,7 @@ class _DownloadsCategoryShellDialogState
       _deletingGroupIds.remove(group.id);
       _groups = _groups.where((item) => item.id != group.id).toList();
       if (_selectedGroupId == group.id) {
-        _selectedGroupId = DownloadGroupsService.defaultGroupId;
+        _selectedGroupId = DownloadGroup.defaultGroupId;
       }
     });
   }

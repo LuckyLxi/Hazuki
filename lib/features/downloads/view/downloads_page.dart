@@ -1,8 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:hazuki/services/manga_download/manga_download_service.dart';
-import 'package:hazuki/services/download_groups_service.dart';
+import 'package:hazuki/services/manga_download/manga_download_library.dart';
+import 'package:hazuki/services/download_groups/download_groups_repository.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/widgets/windows_comic_detail_host.dart';
 import 'package:hazuki/widgets/widgets.dart';
@@ -20,8 +20,8 @@ class DownloadsPage extends StatefulWidget {
   });
 
   final DownloadedComicReaderPageBuilder readerPageBuilder;
-  final MangaDownloadService downloadService;
-  final DownloadGroupsService downloadGroupsService;
+  final MangaDownloadLibrary downloadService;
+  final DownloadGroupsRepository downloadGroupsService;
   final WindowsComicDetailController? windowsComicDetailController;
 
   @override
@@ -38,7 +38,6 @@ class _DownloadsPageState extends State<DownloadsPage>
   bool get _selectionMode =>
       _controller.selectionModeForTab(_tabController.index);
 
-  MangaDownloadService get _downloadService => _controller.downloadService;
   WindowsComicDetailController get _windowsController =>
       widget.windowsComicDetailController ??
       WindowsComicDetailController.instance;
@@ -55,11 +54,7 @@ class _DownloadsPageState extends State<DownloadsPage>
       if (mounted) unawaited(_controller.runIntegrityCheck());
     });
     _tabController = TabController(length: 2, vsync: this);
-    _pageListenable = Listenable.merge([
-      _tabController,
-      _controller,
-      _downloadService,
-    ]);
+    _pageListenable = Listenable.merge([_tabController, _controller]);
     _tabController.addListener(_handleTabChanged);
   }
 
@@ -105,7 +100,7 @@ class _DownloadsPageState extends State<DownloadsPage>
         return AnimatedBuilder(
           animation: _pageListenable,
           builder: (context, child) {
-            final tasks = _downloadService.tasks;
+            final tasks = _controller.tasks;
             final comics = _controller.filteredDownloadedComics;
             return PopScope(
               canPop: !_selectionMode,

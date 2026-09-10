@@ -1,28 +1,37 @@
 // ignore_for_file: use_build_context_synchronously
 
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../l10n/l10n.dart';
 import '../../services/software_update/software_update_download_service.dart';
 import '../../services/software_update/software_update_service.dart';
+import '../../services/software_update/software_update_reminder_policy.dart';
+import '../../services/software_update/software_update_reminder_store.dart';
 import '../../widgets/widgets.dart';
 
 enum SoftwareUpdateDialogAction { skipToday, cancel }
 
 class SoftwareUpdateDialogPresenter {
-  const SoftwareUpdateDialogPresenter({required this.downloadService});
+  const SoftwareUpdateDialogPresenter({
+    required this.downloadService,
+    SoftwareUpdateReminderStore reminderStore =
+        const SharedPreferencesSoftwareUpdateReminderStore(),
+    SoftwareUpdateReminderPolicy reminderPolicy =
+        const SoftwareUpdateReminderPolicy(),
+  }) : _reminderStore = reminderStore,
+       _reminderPolicy = reminderPolicy;
 
   final SoftwareUpdateDownloadService downloadService;
+  final SoftwareUpdateReminderStore _reminderStore;
+  final SoftwareUpdateReminderPolicy _reminderPolicy;
 
   Future<SoftwareUpdateDialogAction?> showForCheck({
     GlobalKey<NavigatorState>? navigatorKey,
@@ -36,13 +45,13 @@ class SoftwareUpdateDialogPresenter {
       return null;
     }
 
-    final prefs = await SharedPreferences.getInstance();
+    final reminder = await _reminderStore.read(skipPrefsKey);
     if (!isMounted()) return null;
-    final skipPayload = prefs.getString(skipPrefsKey);
     if (respectSkipPreference &&
-        _shouldSkipSoftwareUpdateDialog(
-          skipPayload: skipPayload,
-          check: check,
+        _reminderPolicy.shouldSkip(
+          reminder: reminder,
+          currentVersion: check.currentVersion,
+          latestVersion: check.latestVersion,
         )) {
       return null;
     }
@@ -54,54 +63,16 @@ class SoftwareUpdateDialogPresenter {
     );
 
     if (result == SoftwareUpdateDialogAction.skipToday) {
-      await prefs.setString(
+      await _reminderStore.write(
         skipPrefsKey,
-        _buildSoftwareUpdateSkipPayload(check),
+        _reminderPolicy.remindLaterToday(
+          currentVersion: check.currentVersion,
+          latestVersion: check.latestVersion,
+        ),
       );
     }
 
     return result;
-  }
-
-  bool _shouldSkipSoftwareUpdateDialog({
-    required String? skipPayload,
-    required SoftwareUpdateCheckResult check,
-  }) {
-    if (skipPayload == null || skipPayload.isEmpty) {
-      return false;
-    }
-
-    try {
-      final decoded = jsonDecode(skipPayload);
-      if (decoded is! Map) {
-        return false;
-      }
-      final map = Map<String, dynamic>.from(decoded);
-      final date = map['date']?.toString();
-      final currentVersion = map['currentVersion']?.toString();
-      final latestVersion = map['latestVersion']?.toString();
-      return date == _formatTodayKey() &&
-          currentVersion == check.currentVersion &&
-          latestVersion == check.latestVersion;
-    } catch (_) {
-      return false;
-    }
-  }
-
-  String _buildSoftwareUpdateSkipPayload(SoftwareUpdateCheckResult check) {
-    return jsonEncode({
-      'date': _formatTodayKey(),
-      'currentVersion': check.currentVersion,
-      'latestVersion': check.latestVersion,
-    });
-  }
-
-  String _formatTodayKey() {
-    final now = DateTime.now();
-    final y = now.year.toString().padLeft(4, '0');
-    final m = now.month.toString().padLeft(2, '0');
-    final d = now.day.toString().padLeft(2, '0');
-    return '$y-$m-$d';
   }
 
   Future<SoftwareUpdateDialogAction?> _showDialog({

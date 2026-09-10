@@ -7,6 +7,8 @@ import 'package:hazuki/app/software_update/software_update_dialog_support.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/software_update/software_update_download_service.dart';
 import 'package:hazuki/services/software_update/software_update_service.dart';
+import 'package:hazuki/services/software_update/software_update_reminder_policy.dart';
+import 'package:hazuki/services/software_update/software_update_reminder_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 const _check = SoftwareUpdateCheckResult(
@@ -17,20 +19,18 @@ const _check = SoftwareUpdateCheckResult(
 );
 const _skipKey = 'update_skip';
 
-String _today() {
-  final now = DateTime.now();
-  return '${now.year.toString().padLeft(4, '0')}-'
-      '${now.month.toString().padLeft(2, '0')}-'
-      '${now.day.toString().padLeft(2, '0')}';
-}
-
 void main() {
   late SoftwareUpdateDownloadService downloads;
   late SoftwareUpdateDialogPresenter presenter;
   setUp(() {
     SharedPreferences.setMockInitialValues({});
     downloads = SoftwareUpdateDownloadService();
-    presenter = SoftwareUpdateDialogPresenter(downloadService: downloads);
+    presenter = SoftwareUpdateDialogPresenter(
+      downloadService: downloads,
+      reminderPolicy: SoftwareUpdateReminderPolicy(
+        now: () => DateTime(2026, 9, 10),
+      ),
+    );
   });
   tearDown(() => downloads.dispose());
 
@@ -38,7 +38,7 @@ void main() {
     tester,
   ) async {
     final saved = jsonEncode({
-      'date': _today(),
+      'date': '2026-09-10',
       'currentVersion': _check.currentVersion,
       'latestVersion': _check.latestVersion,
     });
@@ -82,6 +82,12 @@ void main() {
   testWidgets('stops if owner leaves while preferences are being loaded', (
     tester,
   ) async {
+    final pending = Completer<SoftwareUpdateReminder?>();
+    final store = _ReminderStore()..pendingRead = pending.future;
+    presenter = SoftwareUpdateDialogPresenter(
+      downloadService: downloads,
+      reminderStore: store,
+    );
     final navigatorKey = GlobalKey<NavigatorState>();
     await tester.pumpWidget(
       MaterialApp(
@@ -100,12 +106,62 @@ void main() {
       check: _check,
     );
     mounted = false;
+    pending.complete(null);
     await tester.pumpAndSettle();
     final strings = AppLocalizations.of(navigatorKey.currentContext!)!;
     expect(find.text(strings.softwareUpdateAvailableTitle), findsNothing);
     expect(await result, isNull);
     final prefs = await SharedPreferences.getInstance();
     expect(prefs.containsKey(_skipKey), isFalse);
+    expect(store.writes, isEmpty);
+  });
+
+  testWidgets('records the day of dismissal and cancellation does not write', (
+    tester,
+  ) async {
+    var now = DateTime(2026, 9, 10, 23, 59);
+    final store = _ReminderStore();
+    presenter = SoftwareUpdateDialogPresenter(
+      downloadService: downloads,
+      reminderStore: store,
+      reminderPolicy: SoftwareUpdateReminderPolicy(now: () => now),
+    );
+    final navigatorKey = GlobalKey<NavigatorState>();
+    await tester.pumpWidget(
+      MaterialApp(
+        navigatorKey: navigatorKey,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        locale: const Locale('en'),
+        home: const Scaffold(),
+      ),
+    );
+    final shown = presenter.showForCheck(
+      navigatorKey: navigatorKey,
+      isMounted: () => true,
+      skipPrefsKey: _skipKey,
+      check: _check,
+    );
+    await tester.pumpAndSettle();
+    now = DateTime(2026, 9, 11);
+    final strings = AppLocalizations.of(navigatorKey.currentContext!)!;
+    await tester.tap(find.text(strings.comicDetailRemindLaterToday));
+    await tester.pumpAndSettle();
+    expect(await shown, SoftwareUpdateDialogAction.skipToday);
+    expect(store.writes.single.$1, _skipKey);
+    expect(store.writes.single.$2.date, '2026-09-11');
+
+    final cancelled = presenter.showForCheck(
+      navigatorKey: navigatorKey,
+      isMounted: () => true,
+      skipPrefsKey: _skipKey,
+      check: _check,
+    );
+    await tester.pumpAndSettle();
+    navigatorKey.currentState!.pop(SoftwareUpdateDialogAction.cancel);
+    await tester.pumpAndSettle();
+    expect(await cancelled, SoftwareUpdateDialogAction.cancel);
+    expect(store.writes, hasLength(1));
   });
 
   test(
@@ -131,4 +187,18 @@ void main() {
       expect(await result, isNull);
     },
   );
+}
+
+class _ReminderStore implements SoftwareUpdateReminderStore {
+  Future<SoftwareUpdateReminder?>? pendingRead;
+  final writes = <(String, SoftwareUpdateReminder)>[];
+
+  @override
+  Future<SoftwareUpdateReminder?> read(String key) =>
+      pendingRead ?? Future.value();
+
+  @override
+  Future<void> write(String key, SoftwareUpdateReminder reminder) async {
+    writes.add((key, reminder));
+  }
 }

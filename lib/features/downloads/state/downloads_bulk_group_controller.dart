@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 
-import 'package:hazuki/services/download_groups_service.dart';
-import 'package:hazuki/services/manga_download/manga_download_service.dart';
+import 'package:hazuki/services/download_groups/download_group.dart';
+import 'package:hazuki/services/manga_download/manga_download_models.dart';
 
 enum DownloadsBulkDialogStage { actions, groups, removeConfirmation }
 
