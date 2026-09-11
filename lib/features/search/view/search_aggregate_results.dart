@@ -297,6 +297,7 @@ class _SearchAggregateSectionPageState
   Widget build(BuildContext context) {
     final section = widget.section;
     return WindowsComicDetailHost(
+      suppressExistingPanel: true,
       child: ListenableBuilder(
         listenable: widget.controller,
         builder: (context, _) {

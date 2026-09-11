@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/l10n/l10n.dart';
@@ -46,6 +48,7 @@ class ComicDetailBody extends StatelessWidget {
     final session = scope.session;
     final uiState = scope.uiState;
     final surface = Theme.of(context).colorScheme.surface;
+    final isDesktop = Theme.of(context).platform == TargetPlatform.windows;
 
     return ListenableBuilder(
       listenable: session,
@@ -86,7 +89,12 @@ class ComicDetailBody extends StatelessWidget {
                 return [
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                      padding: EdgeInsets.fromLTRB(
+                        isDesktop ? 24 : 16,
+                        isDesktop ? 28 : 16,
+                        isDesktop ? 24 : 16,
+                        0,
+                      ),
                       child: AnimatedSize(
                         duration: const Duration(milliseconds: 320),
                         curve: Curves.easeOutCubic,
@@ -94,6 +102,7 @@ class ComicDetailBody extends StatelessWidget {
                         clipBehavior: Clip.hardEdge,
                         child: RepaintBoundary(
                           child: ComicDetailHeaderSection(
+                            isDesktop: isDesktop,
                             heroTag: heroTag,
                             details: details,
                             skeletonColor: skeletonColor,
@@ -125,8 +134,12 @@ class ComicDetailBody extends StatelessWidget {
                           onTap: (_) =>
                               FocusManager.instance.primaryFocus?.unfocus(),
                           isScrollable: true,
-                          tabAlignment: TabAlignment.center,
-                          padding: EdgeInsets.zero,
+                          tabAlignment: isDesktop
+                              ? TabAlignment.start
+                              : TabAlignment.center,
+                          padding: isDesktop
+                              ? const EdgeInsets.symmetric(horizontal: 24)
+                              : EdgeInsets.zero,
                           labelPadding: const EdgeInsets.symmetric(
                             horizontal: 18,
                           ),
@@ -170,6 +183,7 @@ class ComicDetailBody extends StatelessWidget {
                       builder: (context, shouldRender) {
                         return RepaintBoundary(
                           child: ComicDetailInfoTab(
+                            isDesktop: isDesktop,
                             details: details,
                             error: snapshot.error,
                             hasTimedOut: session.hasDetailsTimedOut,
@@ -216,9 +230,28 @@ class ComicDetailBody extends StatelessWidget {
                             child: ComicDetailRelatedTab(
                               details: details,
                               isActiveInTabView: shouldRender,
-                              isDesktopPanel: isDesktopPanel,
-                              onCloseRequested: onCloseRequested,
-                              pageBuilder: buildComicDetailPage,
+                              onOpenComic: (comic, heroTag) {
+                                if (isDesktopPanel &&
+                                    useWindowsComicDetailPanel) {
+                                  WindowsComicDetailControllerScope.of(
+                                    context,
+                                  ).pushRelated(
+                                    comic,
+                                    heroTag,
+                                    historyTabIndex:
+                                        uiState.tabController.index,
+                                  );
+                                  return;
+                                }
+                                unawaited(
+                                  Navigator.of(context).push(
+                                    MaterialPageRoute<void>(
+                                      builder: (_) =>
+                                          buildComicDetailPage(comic, heroTag),
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
                           );
                         },

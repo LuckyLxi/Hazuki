@@ -436,6 +436,7 @@ class _SearchEntryPageState extends State<SearchEntryPage>
   @override
   Widget build(BuildContext context) {
     return WindowsComicDetailHost(
+      suppressExistingPanel: true,
       child: ListenableBuilder(
         listenable: Listenable.merge([_focusCoordinator, _idExtractController]),
         builder: (context, _) {

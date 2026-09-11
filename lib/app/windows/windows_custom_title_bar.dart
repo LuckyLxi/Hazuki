@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 
-const double hazukiWindowsCaptionButtonsWidth = 138;
+import 'package:hazuki/shared/window/windows_app_bar_drag_area.dart';
+
 const double hazukiWindowsTitleBarHeight = kWindowCaptionHeight;
 
 class HazukiWindowsCustomTitleBar extends StatefulWidget {
@@ -68,7 +69,7 @@ class _HazukiWindowsCustomTitleBarState
       height: kWindowCaptionHeight,
       child: Row(
         children: [
-          const Expanded(child: DragToMoveArea(child: SizedBox.expand())),
+          const Expanded(child: SizedBox.expand()),
           SizedBox(
             width: hazukiWindowsCaptionButtonsWidth,
             height: kWindowCaptionHeight,

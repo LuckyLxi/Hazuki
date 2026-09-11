@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import 'package:hazuki/features/reader/support/reader_controller_support.dart';
 import 'package:hazuki/features/reader/support/reader_diagnostics_support.dart';
@@ -53,22 +52,6 @@ class ReaderNavigationController {
   final void Function() _toggleControlsVisibility;
   double _pendingListPixelCorrection = 0;
   bool _listPixelCorrectionScheduled = false;
-
-  KeyEventResult handleKeyEvent(FocusNode node, KeyEvent event) {
-    if (!_runtimeState.volumeButtonTurnPage || event is! KeyDownEvent) {
-      return KeyEventResult.ignored;
-    }
-
-    if (event.logicalKey == LogicalKeyboardKey.audioVolumeUp) {
-      unawaited(goPreviousPage(trigger: 'keyboard_volume_up'));
-      return KeyEventResult.handled;
-    }
-    if (event.logicalKey == LogicalKeyboardKey.audioVolumeDown) {
-      unawaited(goNextPage(trigger: 'keyboard_volume_down'));
-      return KeyEventResult.handled;
-    }
-    return KeyEventResult.ignored;
-  }
 
   Future<void> handlePlatformVolumeButtonPressed(String? direction) async {
     if (!_runtimeState.volumeButtonTurnPage) {

@@ -179,7 +179,10 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
           heroTag, {
           isDesktopPanel = false,
           shouldAnimateInitialRevealOverride,
+          initialTabIndex = 0,
           onCloseRequested,
+          showHomeAction = false,
+          onHomeRequested,
         }) {
           return ComicDetailPage(
             comic: comic,
@@ -212,7 +215,10 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
             isDesktopPanel: isDesktopPanel,
             shouldAnimateInitialRevealOverride:
                 shouldAnimateInitialRevealOverride,
+            initialTabIndex: initialTabIndex,
             onCloseRequested: onCloseRequested,
+            showHomeAction: showHomeAction,
+            onHomeRequested: onHomeRequested,
           );
         },
     buildReaderPage: buildReaderPage,

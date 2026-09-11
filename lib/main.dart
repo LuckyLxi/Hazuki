@@ -1,3 +1,4 @@
+import 'package:hazuki/widgets/windows_comic_detail_presentation_scope.dart';
 import 'package:hazuki/services/software_update/software_update_service.dart';
 import 'package:hazuki/services/software_update/software_update_download_service.dart';
 import 'dart:async';
@@ -416,10 +417,35 @@ class _HazukiAppState extends State<HazukiApp>
                     ),
                   ),
                 );
-                return SourceImageGatewayScope(
-                  gateway: sl<SourceImageGateway>(),
-                  sourceListenable: sl<SourceSelectionGateway>(),
-                  child: app,
+                return TooltipVisibility(
+                  visible: false,
+                  child: SourceImageGatewayScope(
+                    gateway: sl<SourceImageGateway>(),
+                    sourceListenable: sl<SourceSelectionGateway>(),
+                    child: WindowsComicDetailPresentationScope(
+                      panelBuilder:
+                          (
+                            comic,
+                            heroTag, {
+                            required shouldAnimatePanelReveal,
+                            required initialTabIndex,
+                            required showHomeAction,
+                            required onBackRequested,
+                            required onHomeRequested,
+                          }) => _homeFeatureEntrypoints.buildComicDetailPage(
+                            comic,
+                            heroTag,
+                            isDesktopPanel: true,
+                            shouldAnimateInitialRevealOverride:
+                                shouldAnimatePanelReveal,
+                            initialTabIndex: initialTabIndex,
+                            showHomeAction: showHomeAction,
+                            onCloseRequested: onBackRequested,
+                            onHomeRequested: onHomeRequested,
+                          ),
+                      child: app,
+                    ),
+                  ),
                 );
               },
               home: HazukiHomePage(

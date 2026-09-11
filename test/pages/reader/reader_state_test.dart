@@ -1,3 +1,4 @@
+import 'package:hazuki/features/reader/support/reader_input_controller.dart';
 import 'package:hazuki/features/reader/support/reader_display_session.dart';
 import 'package:hazuki/shared/ui_flags.dart';
 import 'package:hazuki/features/reader/support/reader_view_bindings.dart';
@@ -112,6 +113,15 @@ void main() {
     0x60,
     0x82,
   ]);
+
+  test('Windows shortcuts guide seen state persists', () async {
+    SharedPreferences.setMockInitialValues({});
+    const store = ReaderSettingsStore();
+
+    expect(await store.hasSeenWindowsShortcutsGuide(), isFalse);
+    await store.markWindowsShortcutsGuideSeen();
+    expect(await store.hasSeenWindowsShortcutsGuide(), isTrue);
+  });
 
   group('ReaderRuntimeState', () {
     test('applySettingsSnapshot updates settings and rebuilds spread keys', () {
@@ -1061,6 +1071,110 @@ void main() {
   });
 
   group('ReaderNavigationController', () {
+    test('arrow keys follow the active reader direction', () async {
+      final state = ReaderRuntimeState()
+        ..applyImages(['a', 'b', 'c'])
+        ..updateSettings(readerMode: ReaderMode.topToBottom)
+        ..setCurrentPageIndex(1);
+      final scrollController = ScrollController();
+      final pageController = PageController();
+      final focusNode = FocusNode();
+      addTearDown(scrollController.dispose);
+      addTearDown(pageController.dispose);
+      addTearDown(focusNode.dispose);
+      addTearDown(state.dispose);
+      final controller = ReaderNavigationController(
+        runtimeState: state,
+        diagnosticsState: ReaderDiagnosticsState(),
+        scrollController: scrollController,
+        pageController: pageController,
+        isMounted: () => true,
+        updateState: (update) => update(),
+        logEvent: (_, {level = 'info', source = 'reader_ui', content}) {},
+        logPayload: ([extra]) => extra ?? <String, dynamic>{},
+        logVisiblePageChange: ({required index, required trigger}) {},
+        resetZoomImmediately: ({reason = 'unspecified'}) {},
+        onPageTargetChanged: (_) {},
+        toggleControlsVisibility: () {},
+      );
+
+      final input = ReaderInputController(
+        readState: () => ReaderInputState(
+          readerMode: state.readerMode,
+          volumeButtonTurnPage: state.volumeButtonTurnPage,
+          isWindows: true,
+          isAltPressed: false,
+          isControlPressed: false,
+          activePointerCount: 0,
+        ),
+        previousPage: (trigger) => controller.goPreviousPage(trigger: trigger),
+        nextPage: (trigger) => controller.goNextPage(trigger: trigger),
+        jumpToAdjacentChapter: (_) async {},
+        onScalingInputChanged: () {},
+      );
+
+      KeyDownEvent keyEvent(
+        LogicalKeyboardKey logicalKey,
+        PhysicalKeyboardKey physicalKey,
+      ) {
+        return KeyDownEvent(
+          logicalKey: logicalKey,
+          physicalKey: physicalKey,
+          timeStamp: Duration.zero,
+        );
+      }
+
+      expect(
+        input.handleKeyEvent(
+          focusNode,
+          keyEvent(LogicalKeyboardKey.arrowDown, PhysicalKeyboardKey.arrowDown),
+        ),
+        KeyEventResult.handled,
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(state.currentPageIndex, 2);
+
+      input.handleKeyEvent(
+        focusNode,
+        keyEvent(LogicalKeyboardKey.arrowUp, PhysicalKeyboardKey.arrowUp),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(state.currentPageIndex, 1);
+      expect(
+        input.handleKeyEvent(
+          focusNode,
+          keyEvent(LogicalKeyboardKey.arrowLeft, PhysicalKeyboardKey.arrowLeft),
+        ),
+        KeyEventResult.handled,
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(state.currentPageIndex, 1);
+
+      state.updateSettings(readerMode: ReaderMode.rightToLeft);
+      input.handleKeyEvent(
+        focusNode,
+        keyEvent(LogicalKeyboardKey.arrowRight, PhysicalKeyboardKey.arrowRight),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(state.currentPageIndex, 2);
+
+      input.handleKeyEvent(
+        focusNode,
+        keyEvent(LogicalKeyboardKey.arrowLeft, PhysicalKeyboardKey.arrowLeft),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(state.currentPageIndex, 1);
+      expect(
+        input.handleKeyEvent(
+          focusNode,
+          keyEvent(LogicalKeyboardKey.arrowDown, PhysicalKeyboardKey.arrowDown),
+        ),
+        KeyEventResult.handled,
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(state.currentPageIndex, 1);
+    });
+
     test(
       'center tap toggles controls and edge taps request page navigation',
       () async {

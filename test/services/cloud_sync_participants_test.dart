@@ -14,6 +14,7 @@ import 'package:hazuki/services/read_history_service.dart';
 import 'package:hazuki/services/reading_progress_service.dart';
 import 'package:hazuki/services/storage/hazuki_database.dart';
 import 'package:hazuki/services/source/common/source_prefs_keys.dart';
+import 'package:hazuki/shared/reading/reader_settings_store.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -205,6 +206,75 @@ void main() {
           contains('${hazukiDiscoverDailyRecommendationCachePreferenceKey}_jm'),
         ),
       );
+    },
+  );
+
+  test(
+    'settings participant keeps experience-sensitive reader settings local',
+    () async {
+      const localSettings = <String, Object>{
+        ReaderSettingsStore.readingModeKey: 'top_to_bottom',
+        ReaderSettingsStore.doublePageModeKey: true,
+        ReaderSettingsStore.filterEnabledKey: true,
+        ReaderSettingsStore.filterColorKey: 'yellow',
+        ReaderSettingsStore.filterStrengthKey: 0.4,
+      };
+      SharedPreferences.setMockInitialValues({
+        ...localSettings,
+        ReaderSettingsStore.tapToTurnPageKey: false,
+      });
+      final database = HazukiDatabase.memory();
+      addTearDown(database.close);
+      final groups = DownloadGroupsService(database: database);
+      addTearDown(groups.dispose);
+      final participant = CloudSyncSettingsParticipant(
+        localFavorites: LocalFavoritesSyncParticipant(
+          LocalFavoritesService(database: database),
+        ),
+        downloadGroups: DownloadGroupsSyncParticipant(groups),
+        commentFilter: const CommentFilterSyncParticipant(),
+      );
+
+      final exported = jsonDecode(await participant.exportSnapshot()) as Map;
+      final exportedData = exported['data'] as Map;
+      for (final key in localSettings.keys) {
+        expect(exportedData, isNot(contains(key)));
+      }
+      expect(exportedData[ReaderSettingsStore.tapToTurnPageKey], isFalse);
+
+      final remoteData = <String, Object>{
+        ReaderSettingsStore.readingModeKey: 'right_to_left',
+        ReaderSettingsStore.doublePageModeKey: false,
+        ReaderSettingsStore.filterEnabledKey: false,
+        ReaderSettingsStore.filterColorKey: 'black',
+        ReaderSettingsStore.filterStrengthKey: 0.9,
+        ReaderSettingsStore.tapToTurnPageKey: true,
+      };
+      final localMergeSnapshot = await participant.captureMergeSnapshot();
+      await participant.mergeRemote(
+        jsonEncode({'version': 2, 'data': remoteData}),
+        localMergeSnapshot,
+        applyRemoteSettings: true,
+      );
+
+      var prefs = await SharedPreferences.getInstance();
+      for (final entry in localSettings.entries) {
+        expect(prefs.get(entry.key), entry.value);
+      }
+      expect(prefs.getBool(ReaderSettingsStore.tapToTurnPageKey), isTrue);
+
+      final restoreResult = await participant.restoreSnapshot(
+        jsonEncode({
+          'version': 2,
+          'data': {...remoteData, ReaderSettingsStore.tapToTurnPageKey: false},
+        }),
+      );
+      prefs = await SharedPreferences.getInstance();
+      for (final entry in localSettings.entries) {
+        expect(prefs.get(entry.key), entry.value);
+        expect(restoreResult.skippedKeys, contains(entry.key));
+      }
+      expect(prefs.getBool(ReaderSettingsStore.tapToTurnPageKey), isFalse);
     },
   );
 

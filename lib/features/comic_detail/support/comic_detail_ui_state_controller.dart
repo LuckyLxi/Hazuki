@@ -6,17 +6,20 @@ class ComicDetailUiStateController extends ChangeNotifier {
   ComicDetailUiStateController({
     required String comicId,
     required bool? shouldAnimateInitialRevealOverride,
+    required int initialTabIndex,
     required TickerProvider vsync,
     required ScrollController scrollController,
     required bool includeRelatedTab,
   }) : _comicId = comicId,
        _shouldAnimateInitialRevealOverride = shouldAnimateInitialRevealOverride,
+       _initialTabIndex = initialTabIndex,
        _vsync = vsync,
        _scrollController = scrollController,
        _includeRelatedTab = includeRelatedTab;
 
   final String _comicId;
   final bool? _shouldAnimateInitialRevealOverride;
+  final int _initialTabIndex;
   final TickerProvider _vsync;
   final ScrollController _scrollController;
   final bool _includeRelatedTab;
@@ -51,6 +54,7 @@ class ComicDetailUiStateController extends ChangeNotifier {
     _collapsedTitleNotifier = ValueNotifier<bool>(false);
     _tabController = TabController(
       length: _includeRelatedTab ? 3 : 2,
+      initialIndex: _initialTabIndex.clamp(0, _includeRelatedTab ? 2 : 1),
       vsync: _vsync,
     )..addListener(_handleTabChanged);
     _appBarComicTitle = initialAppBarTitle;

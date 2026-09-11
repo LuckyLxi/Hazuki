@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/shared/appearance/appearance_settings.dart';
+import 'package:hazuki/shared/navigation/snapshotting_page_route.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
@@ -90,16 +91,16 @@ class _DiscoverSectionBlockState extends State<DiscoverSectionBlock> {
               if (widget.section.comics.isNotEmpty)
                 TextButton(
                   onPressed: () {
+                    Widget buildPage(BuildContext _) => DiscoverSectionPage(
+                      section: widget.section,
+                      comicDetailPageBuilder: widget.comicDetailPageBuilder,
+                      comicCoverHeroTagBuilder: widget.comicCoverHeroTagBuilder,
+                      sourceService: widget.sourceService,
+                    );
                     Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => DiscoverSectionPage(
-                          section: widget.section,
-                          comicDetailPageBuilder: widget.comicDetailPageBuilder,
-                          comicCoverHeroTagBuilder:
-                              widget.comicCoverHeroTagBuilder,
-                          sourceService: widget.sourceService,
-                        ),
-                      ),
+                      useWindowsLayout
+                          ? buildSnapshottingPageRoute<void>(builder: buildPage)
+                          : MaterialPageRoute<void>(builder: buildPage),
                     );
                   },
                   child: Text(strings.discoverMore),

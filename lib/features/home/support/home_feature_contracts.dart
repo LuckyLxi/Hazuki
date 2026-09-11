@@ -44,7 +44,10 @@ typedef HomeComicDetailPageBuilder =
       String heroTag, {
       bool isDesktopPanel,
       bool? shouldAnimateInitialRevealOverride,
+      int initialTabIndex,
       VoidCallback? onCloseRequested,
+      bool showHomeAction,
+      VoidCallback? onHomeRequested,
     });
 
 typedef HomeSearchPageBuilder =

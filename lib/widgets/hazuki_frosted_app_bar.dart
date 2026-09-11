@@ -2,6 +2,8 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
+import 'package:hazuki/shared/window/windows_app_bar_drag_area.dart';
+
 PreferredSizeWidget hazukiFrostedAppBar({
   required BuildContext context,
   Widget? title,
@@ -20,7 +22,7 @@ PreferredSizeWidget hazukiFrostedAppBar({
   final surface = Theme.of(context).colorScheme.surface;
   return AppBar(
     title: title,
-    actions: actions,
+    actions: [...?actions, const HazukiWindowsCaptionButtonSpacer()],
     leading: leading,
     leadingWidth: leadingWidth,
     automaticallyImplyLeading: automaticallyImplyLeading,
@@ -33,13 +35,15 @@ PreferredSizeWidget hazukiFrostedAppBar({
     surfaceTintColor: Colors.transparent,
     scrolledUnderElevation: 0,
     clipBehavior: Clip.antiAlias,
-    flexibleSpace: enableBlur
-        ? ClipRect(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-              child: const SizedBox.expand(),
-            ),
-          )
-        : null,
+    flexibleSpace: HazukiWindowsAppBarDragArea(
+      child: enableBlur
+          ? ClipRect(
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+                child: const SizedBox.expand(),
+              ),
+            )
+          : const SizedBox.expand(),
+    ),
   );
 }

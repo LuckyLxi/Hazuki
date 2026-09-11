@@ -112,6 +112,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
   @override
   Widget build(BuildContext context) {
     return WindowsComicDetailHost(
+      suppressExistingPanel: true,
       child: ListenableBuilder(
         listenable: Listenable.merge([
           _resultsController,

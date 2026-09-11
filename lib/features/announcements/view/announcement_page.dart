@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/announcements/announcement.dart';
 import 'package:hazuki/services/announcements/announcement_controller.dart';
+import 'package:hazuki/shared/window/windows_app_bar_drag_area.dart';
 
 import 'announcement_content.dart';
 
@@ -58,10 +59,14 @@ class _AnnouncementPageState extends State<AnnouncementPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(l10n(context).announcementTitle),
+        actions: const [HazukiWindowsCaptionButtonSpacer()],
         backgroundColor: colorScheme.surface,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
+        flexibleSpace: const HazukiWindowsAppBarDragArea(
+          child: SizedBox.expand(),
+        ),
       ),
       body: ListenableBuilder(
         listenable: widget.service,

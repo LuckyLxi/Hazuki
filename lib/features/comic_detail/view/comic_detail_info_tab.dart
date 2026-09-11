@@ -22,6 +22,7 @@ class ComicDetailInfoTab extends StatelessWidget {
     required this.skeletonColor,
     required this.isActiveInTabView,
     required this.shouldAnimateResolvedContent,
+    this.isDesktop = false,
   });
 
   final ComicDetailsData? details;
@@ -32,6 +33,7 @@ class ComicDetailInfoTab extends StatelessWidget {
   final Color skeletonColor;
   final bool isActiveInTabView;
   final bool shouldAnimateResolvedContent;
+  final bool isDesktop;
 
   Widget _buildMetaSection(BuildContext context, ComicDetailsData details) {
     final actions = ComicDetailScope.of(context).actions;
@@ -99,31 +101,33 @@ class ComicDetailInfoTab extends StatelessWidget {
       slivers: [
         SliverOverlapInjector(handle: overlapHandle),
         SliverPadding(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.all(isDesktop ? 24 : 16),
           sliver: SliverToBoxAdapter(
             child: ComicDetailEntranceReveal(
               key: ValueKey<String>('comic-detail-info-${resolvedDetails.id}'),
               beginOffset: const Offset(0, 20),
               enabled: shouldAnimate,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (resolvedDetails.description.isNotEmpty) ...[
-                    Text(
-                      l10n(context).comicDetailSummary,
-                      style: Theme.of(context).textTheme.titleMedium,
+              child: isDesktop
+                  ? _buildDesktopInfo(context, resolvedDetails, hasVisibleMeta)
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (resolvedDetails.description.isNotEmpty) ...[
+                          Text(
+                            l10n(context).comicDetailSummary,
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 6),
+                          ComicDetailExpandableDescription(
+                            text: resolvedDetails.description,
+                          ),
+                        ],
+                        if (hasVisibleMeta) ...[
+                          const SizedBox(height: 12),
+                          _buildMetaSection(context, resolvedDetails),
+                        ],
+                      ],
                     ),
-                    const SizedBox(height: 6),
-                    ComicDetailExpandableDescription(
-                      text: resolvedDetails.description,
-                    ),
-                  ],
-                  if (hasVisibleMeta) ...[
-                    const SizedBox(height: 12),
-                    _buildMetaSection(context, resolvedDetails),
-                  ],
-                ],
-              ),
             ),
           ),
         ),
@@ -132,6 +136,69 @@ class ComicDetailInfoTab extends StatelessWidget {
           child: SizedBox.shrink(),
         ),
       ],
+    );
+  }
+
+  Widget _buildDesktopInfo(
+    BuildContext context,
+    ComicDetailsData details,
+    bool hasVisibleMeta,
+  ) {
+    final theme = Theme.of(context);
+    Widget card(Widget child) => Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: theme.colorScheme.outlineVariant.withValues(alpha: 0.5),
+        ),
+      ),
+      child: child,
+    );
+    final summary = details.description.isEmpty
+        ? null
+        : card(
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n(context).comicDetailSummary,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ComicDetailExpandableDescription(text: details.description),
+              ],
+            ),
+          );
+    final metadata = hasVisibleMeta
+        ? card(_buildMetaSection(context, details))
+        : null;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth >= 860 &&
+            summary != null &&
+            metadata != null) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(flex: 5, child: summary),
+              const SizedBox(width: 20),
+              Expanded(flex: 6, child: metadata),
+            ],
+          );
+        }
+        return Column(
+          children: [
+            ?summary,
+            if (summary != null && metadata != null) const SizedBox(height: 20),
+            ?metadata,
+          ],
+        );
+      },
     );
   }
 }

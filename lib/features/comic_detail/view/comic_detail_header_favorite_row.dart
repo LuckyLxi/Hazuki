@@ -19,6 +19,7 @@ class ComicDetailHeaderFavoriteRow extends StatelessWidget {
     required this.viewsText,
     required this.shouldAnimateInitialDetailReveal,
     required this.favoriteButtonWidth,
+    this.isDesktop = false,
   });
 
   final ComicDetailsData? details;
@@ -27,6 +28,7 @@ class ComicDetailHeaderFavoriteRow extends StatelessWidget {
   final String viewsText;
   final bool shouldAnimateInitialDetailReveal;
   final double favoriteButtonWidth;
+  final bool isDesktop;
 
   @override
   Widget build(BuildContext context) {
@@ -52,6 +54,89 @@ class ComicDetailHeaderFavoriteRow extends StatelessWidget {
     final favoriteActive =
         favorite.favoriteOverride ?? details?.isFavorite ?? false;
     final likedActive = favorite.likedOverride ?? details?.isLiked ?? false;
+
+    if (isDesktop) {
+      ButtonStyle buttonStyle(bool active) => OutlinedButton.styleFrom(
+        minimumSize: const Size(0, 40),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        foregroundColor: active
+            ? theme.colorScheme.onPrimaryContainer
+            : theme.colorScheme.onSurface,
+        backgroundColor: active
+            ? theme.colorScheme.primaryContainer
+            : Colors.transparent,
+        side: BorderSide(color: theme.colorScheme.outlineVariant),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      );
+      return Column(
+        key: favoriteRowKey,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (!detailsReady)
+            ComicDetailSkeletonBlock(
+              color: skeletonColor,
+              width: 160,
+              height: 16,
+            )
+          else if (statsText.isNotEmpty)
+            Text(
+              statsText,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 10,
+            runSpacing: 8,
+            children: [
+              if (showLikeButton)
+                OutlinedButton.icon(
+                  style: buttonStyle(likedActive),
+                  onPressed: detailsReady && !favorite.isLikeBusy
+                      ? () => unawaited(favorite.toggleLike(context, details!))
+                      : null,
+                  icon: Icon(
+                    likedActive
+                        ? Icons.thumb_up_alt_rounded
+                        : Icons.thumb_up_alt_outlined,
+                    size: 18,
+                  ),
+                  label: Text(
+                    likedActive
+                        ? l10n(context).comicDetailUnlike
+                        : l10n(context).comicDetailLike,
+                  ),
+                ),
+              OutlinedButton.icon(
+                style: buttonStyle(favoriteActive),
+                onPressed: detailsReady && !favorite.isBusy
+                    ? () => unawaited(
+                        favorite.showFoldersDialog(
+                          context,
+                          details!,
+                          (vm) => Theme(
+                            data: scope.theme.buildDetailTheme(theme),
+                            child: FavoriteFoldersMorphDialog(viewModel: vm),
+                          ),
+                        ),
+                      )
+                    : null,
+                icon: Icon(
+                  favoriteActive ? Icons.favorite : Icons.favorite_border,
+                  size: 18,
+                ),
+                label: Text(
+                  favoriteActive
+                      ? l10n(context).comicDetailUnfavorite
+                      : l10n(context).comicDetailFavorite,
+                ),
+              ),
+            ],
+          ),
+        ],
+      );
+    }
 
     return Padding(
       key: favoriteRowKey,

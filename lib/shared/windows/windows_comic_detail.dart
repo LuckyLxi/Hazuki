@@ -7,13 +7,7 @@ import '../../models/hazuki_models.dart';
 bool get useWindowsComicDetailPanel => Platform.isWindows;
 const windowsComicDetailPanelAnimationDuration = Duration(milliseconds: 320);
 
-typedef WindowsComicDetailPanelBuilder =
-    Widget Function(
-      ExploreComic comic,
-      String heroTag, {
-      required bool shouldAnimatePanelReveal,
-      required VoidCallback onCloseRequested,
-    });
+enum WindowsComicDetailNavigation { open, replace, push, pop }
 
 @immutable
 class WindowsComicDetailEntry {
@@ -21,52 +15,80 @@ class WindowsComicDetailEntry {
     required this.comic,
     required this.heroTag,
     required this.revision,
+    required this.navigation,
+    required this.initialTabIndex,
   });
 
   final ExploreComic comic;
   final String heroTag;
   final int revision;
+  final WindowsComicDetailNavigation navigation;
+  final int initialTabIndex;
 }
 
 class WindowsComicDetailController extends ChangeNotifier {
-  WindowsComicDetailController._();
+  WindowsComicDetailController();
 
   static final WindowsComicDetailController instance =
-      WindowsComicDetailController._();
+      WindowsComicDetailController();
 
   WindowsComicDetailEntry? _entry;
+  final List<WindowsComicDetailEntry> _history = <WindowsComicDetailEntry>[];
   int _revision = 0;
-  int _temporaryHideDepth = 0;
+  final Set<int> _temporaryHideTokens = <int>{};
   int _temporaryHideTokenSeed = 0;
-  int? _pendingPanelRevealRevision;
-
-  WindowsComicDetailPanelBuilder? panelBuilder;
 
   WindowsComicDetailEntry? get entry => _entry;
   bool get isOpen => _entry != null;
-  bool get isTemporarilyHidden => _temporaryHideDepth > 0;
+  bool get canGoBack => _history.isNotEmpty;
+  bool get isTemporarilyHidden => _temporaryHideTokens.isNotEmpty;
   bool get isPanelVisible => _entry != null && !isTemporarilyHidden;
 
-  bool shouldAnimatePanelReveal(WindowsComicDetailEntry entry) {
-    return _pendingPanelRevealRevision == entry.revision;
+  /// Opens a root detail and clears the previous history.
+  void open(ExploreComic comic, String heroTag) {
+    final navigation = _entry == null
+        ? WindowsComicDetailNavigation.open
+        : WindowsComicDetailNavigation.replace;
+    _history.clear();
+    _show(comic, heroTag, navigation);
   }
 
-  void markPanelRevealHandled(WindowsComicDetailEntry entry) {
-    if (_pendingPanelRevealRevision != entry.revision) {
+  /// Opens a related detail, preserving the current page's restoration state.
+  void pushRelated(
+    ExploreComic comic,
+    String heroTag, {
+    int historyTabIndex = 0,
+  }) {
+    final current = _entry;
+    if (current == null) {
+      open(comic, heroTag);
       return;
     }
-    _pendingPanelRevealRevision = null;
+    _history.add(
+      WindowsComicDetailEntry(
+        comic: current.comic,
+        heroTag: current.heroTag,
+        revision: current.revision,
+        navigation: current.navigation,
+        initialTabIndex: historyTabIndex,
+      ),
+    );
+    _show(comic, heroTag, WindowsComicDetailNavigation.push);
   }
 
-  void open(ExploreComic comic, String heroTag) {
-    final shouldAnimatePanelReveal = _entry == null;
-    _revision += 1;
+  void _show(
+    ExploreComic comic,
+    String heroTag,
+    WindowsComicDetailNavigation navigation,
+  ) {
+    _temporaryHideTokens.clear();
     _entry = WindowsComicDetailEntry(
       comic: comic,
       heroTag: heroTag,
-      revision: _revision,
+      revision: ++_revision,
+      navigation: navigation,
+      initialTabIndex: 0,
     );
-    _pendingPanelRevealRevision = shouldAnimatePanelReveal ? _revision : null;
     notifyListeners();
   }
 
@@ -75,7 +97,25 @@ class WindowsComicDetailController extends ChangeNotifier {
       return;
     }
     _entry = null;
-    _pendingPanelRevealRevision = null;
+    _history.clear();
+    notifyListeners();
+  }
+
+  void goBack() {
+    if (_history.isEmpty) {
+      close();
+      return;
+    }
+
+    final previous = _history.removeLast();
+    _revision += 1;
+    _entry = WindowsComicDetailEntry(
+      comic: previous.comic,
+      heroTag: previous.heroTag,
+      revision: _revision,
+      navigation: WindowsComicDetailNavigation.pop,
+      initialTabIndex: previous.initialTabIndex,
+    );
     notifyListeners();
   }
 
@@ -91,17 +131,16 @@ class WindowsComicDetailController extends ChangeNotifier {
     if (_entry == null) {
       return 0;
     }
-    _temporaryHideDepth += 1;
     _temporaryHideTokenSeed += 1;
+    _temporaryHideTokens.add(_temporaryHideTokenSeed);
     notifyListeners();
     return _temporaryHideTokenSeed;
   }
 
   void endTemporaryHide(int token) {
-    if (token <= 0 || _temporaryHideDepth <= 0) {
+    if (token <= 0 || !_temporaryHideTokens.remove(token)) {
       return;
     }
-    _temporaryHideDepth -= 1;
     notifyListeners();
   }
 
@@ -127,7 +166,7 @@ Future<void> openComicDetail(
   bool replaceCurrentRoute = false,
 }) async {
   if (useWindowsComicDetailPanel) {
-    WindowsComicDetailController.instance.open(comic, heroTag);
+    WindowsComicDetailControllerScope.of(context).open(comic, heroTag);
     return;
   }
 
@@ -142,4 +181,24 @@ Future<void> openComicDetail(
   }
 
   await navigator.push(route);
+}
+
+/// Shares a host session with its descendants without owning its lifetime.
+class WindowsComicDetailControllerScope extends InheritedWidget {
+  const WindowsComicDetailControllerScope({
+    super.key,
+    required this.controller,
+    required super.child,
+  });
+  final WindowsComicDetailController controller;
+  static WindowsComicDetailController of(BuildContext context) =>
+      context
+          .dependOnInheritedWidgetOfExactType<
+            WindowsComicDetailControllerScope
+          >()
+          ?.controller ??
+      WindowsComicDetailController.instance;
+  @override
+  bool updateShouldNotify(WindowsComicDetailControllerScope oldWidget) =>
+      controller != oldWidget.controller;
 }

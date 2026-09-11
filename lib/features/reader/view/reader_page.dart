@@ -1,3 +1,4 @@
+import 'package:hazuki/features/reader/support/reader_input_controller.dart';
 import 'package:hazuki/features/reader/support/reader_navigation_prefetch.dart';
 import 'package:hazuki/features/reader/support/reader_display_session.dart';
 import 'package:hazuki/features/reader/support/reader_view_bindings.dart';
@@ -5,6 +6,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'package:hazuki/shared/window/window_title_bar_control.dart';
 import 'package:hazuki/features/reader/reader.dart';
@@ -27,6 +29,7 @@ import 'package:hazuki/features/reader/view/reader_image_views.dart';
 import 'package:hazuki/features/reader/view/reader_overlay_builders.dart';
 import 'package:hazuki/features/reader/view/reader_overlay_host.dart';
 import 'package:hazuki/features/reader/view/reader_state_views.dart';
+import 'package:hazuki/features/reader/view/reader_windows_shortcuts_dialog.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/shared/ui_flags.dart';
 
@@ -271,6 +274,8 @@ class _ReaderPageState extends State<ReaderPage>
     scrollController: _scrollController,
     pageController: _pageController,
     readerZoomController: _readerZoomController,
+    enableInteractiveScaling: _inputState.enableInteractiveScaling,
+    blockPageScrolling: _inputState.blockPageScrolling,
     wrapImageWidget: _wrapImageWidget,
     noImageModeEnabled: _noImageModeEnabled,
   );
@@ -282,6 +287,60 @@ class _ReaderPageState extends State<ReaderPage>
     setState(update);
   }
 
+  ReaderInputState get _inputState => ReaderInputState(
+    readerMode: _runtimeState.readerMode,
+    volumeButtonTurnPage: _runtimeState.volumeButtonTurnPage,
+    isWindows: Platform.isWindows,
+    isAltPressed: HardwareKeyboard.instance.isAltPressed,
+    isControlPressed: HardwareKeyboard.instance.isControlPressed,
+    activePointerCount: _runtimeState.activePointerCount,
+  );
+
+  late final _inputController = ReaderInputController(
+    readState: () => _inputState,
+    previousPage: (trigger) =>
+        _navigationController.goPreviousPage(trigger: trigger),
+    nextPage: (trigger) => _navigationController.goNextPage(trigger: trigger),
+    jumpToAdjacentChapter: _actionsController.jumpToAdjacentChapter,
+    onScalingInputChanged: () => _updateReaderState(() {}),
+  );
+
+  Future<void> _openFavoriteDialogAndRestoreFocus() async {
+    await _actionsController.openFavoriteDialog();
+    if (!mounted) {
+      return;
+    }
+    _readerKeyFocusNode.requestFocus();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _readerKeyFocusNode.requestFocus();
+      }
+    });
+  }
+
+  Future<void> _showWindowsShortcutsGuide() async {
+    if (!Platform.isWindows || !mounted) {
+      return;
+    }
+    await showReaderWindowsShortcutsDialog(
+      context,
+      theme: _resolveReaderTheme(context),
+    );
+    if (mounted) {
+      _readerKeyFocusNode.requestFocus();
+    }
+  }
+
+  Future<void> _showInitialWindowsShortcutsGuideIfNeeded() async {
+    if (!Platform.isWindows ||
+        await _readerSettingsStore.hasSeenWindowsShortcutsGuide() ||
+        !mounted) {
+      return;
+    }
+    await _showWindowsShortcutsGuide();
+    await _readerSettingsStore.markWindowsShortcutsGuideSeen();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -290,6 +349,11 @@ class _ReaderPageState extends State<ReaderPage>
       _sourceSettings,
       widget.sourceKey,
     );
+    if (Platform.isWindows) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        unawaited(_showInitialWindowsShortcutsGuideIfNeeded());
+      });
+    }
   }
 
   @override
@@ -360,7 +424,7 @@ class _ReaderPageState extends State<ReaderPage>
         body: Focus(
           autofocus: true,
           focusNode: _readerKeyFocusNode,
-          onKeyEvent: _navigationController.handleKeyEvent,
+          onKeyEvent: _inputController.handleKeyEvent,
           child: SafeArea(
             top: false,
             bottom: false,
@@ -384,7 +448,7 @@ class _ReaderPageState extends State<ReaderPage>
               onFavorite:
                   !widget.offlineMode && widget.onFavoriteRequested != null
                   ? () {
-                      unawaited(_actionsController.openFavoriteDialog());
+                      unawaited(_openFavoriteDialogAndRestoreFocus());
                     }
                   : null,
               onComments: widget.offlineMode
@@ -546,6 +610,9 @@ class _ReaderPageState extends State<ReaderPage>
           normalized,
         );
       },
+      onShowWindowsShortcuts: Platform.isWindows
+          ? () => unawaited(_showWindowsShortcutsGuide())
+          : null,
     );
   }
 

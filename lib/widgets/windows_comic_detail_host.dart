@@ -1,3 +1,5 @@
+import 'windows_comic_detail_transition.dart';
+import 'windows_comic_detail_presentation_scope.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -5,9 +7,16 @@ import 'package:flutter/material.dart';
 import '../shared/windows/windows_comic_detail.dart';
 
 class WindowsComicDetailHost extends StatefulWidget {
-  const WindowsComicDetailHost({super.key, required this.child});
+  const WindowsComicDetailHost({
+    super.key,
+    required this.child,
+    this.suppressExistingPanel = false,
+    this.controller,
+  });
 
   final Widget child;
+  final WindowsComicDetailController? controller;
+  final bool suppressExistingPanel;
 
   @override
   State<WindowsComicDetailHost> createState() => _WindowsComicDetailHostState();
@@ -17,28 +26,51 @@ class _WindowsComicDetailHostState extends State<WindowsComicDetailHost> {
   WindowsComicDetailEntry? _displayEntry;
   bool _displayEntryShouldAnimatePanelReveal = false;
   Animation<double>? _routeAnimation;
-  Animation<double>? _secondaryRouteAnimation;
   bool _deferPanelUntilRouteSettles = false;
   Timer? _closeTimer;
+  int? _suppressedEntryRevision;
+  int? _handledRevealRevision;
+
+  WindowsComicDetailController get _controller =>
+      widget.controller ?? WindowsComicDetailController.instance;
 
   @override
   void initState() {
     super.initState();
-    final controller = WindowsComicDetailController.instance;
-    _displayEntry = controller.entry;
+    final controller = _controller;
+    _initializePresentation();
+    controller.addListener(_handleControllerChanged);
+  }
+
+  void _initializePresentation() {
+    final entry = _controller.entry;
+    _suppressedEntryRevision = widget.suppressExistingPanel
+        ? entry?.revision
+        : null;
+    _displayEntry = _isEntrySuppressed(entry) ? null : entry;
     _displayEntryShouldAnimatePanelReveal = _consumePendingPanelReveal(
       _displayEntry,
     );
-    controller.addListener(_handleControllerChanged);
+  }
+
+  @override
+  void didUpdateWidget(WindowsComicDetailHost oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final previous =
+        oldWidget.controller ?? WindowsComicDetailController.instance;
+    if (identical(previous, _controller)) return;
+    previous.removeListener(_handleControllerChanged);
+    _closeTimer?.cancel();
+    _handledRevealRevision = null;
+    _initializePresentation();
+    _controller.addListener(_handleControllerChanged);
   }
 
   @override
   void dispose() {
     _closeTimer?.cancel();
     _detachRouteAnimation();
-    WindowsComicDetailController.instance.removeListener(
-      _handleControllerChanged,
-    );
+    _controller.removeListener(_handleControllerChanged);
     super.dispose();
   }
 
@@ -49,8 +81,9 @@ class _WindowsComicDetailHostState extends State<WindowsComicDetailHost> {
   }
 
   void _handleControllerChanged() {
-    final controller = WindowsComicDetailController.instance;
-    final entry = controller.entry;
+    final controller = _controller;
+    final controllerEntry = controller.entry;
+    final entry = _isEntrySuppressed(controllerEntry) ? null : controllerEntry;
     _closeTimer?.cancel();
 
     if (controller.isPanelVisible && entry != null) {
@@ -62,7 +95,7 @@ class _WindowsComicDetailHostState extends State<WindowsComicDetailHost> {
       return;
     }
 
-    if (entry != null) {
+    if (controllerEntry != null) {
       setState(() {});
       return;
     }
@@ -73,7 +106,7 @@ class _WindowsComicDetailHostState extends State<WindowsComicDetailHost> {
 
     setState(() {});
     _closeTimer = Timer(windowsComicDetailPanelAnimationDuration, () {
-      if (!mounted || WindowsComicDetailController.instance.entry != null) {
+      if (!mounted || _controller.entry != null) {
         return;
       }
       setState(() {
@@ -83,42 +116,41 @@ class _WindowsComicDetailHostState extends State<WindowsComicDetailHost> {
     });
   }
 
+  bool _isEntrySuppressed(WindowsComicDetailEntry? entry) {
+    return entry != null && entry.revision == _suppressedEntryRevision;
+  }
+
+  void _handleHomeRequested() {
+    final navigator = Navigator.of(context, rootNavigator: true);
+    _controller.close();
+    navigator.popUntil((route) => route.isFirst);
+  }
+
   bool _consumePendingPanelReveal(WindowsComicDetailEntry? entry) {
     if (entry == null) {
       return false;
     }
-    final controller = WindowsComicDetailController.instance;
-    final shouldAnimatePanelReveal = controller.shouldAnimatePanelReveal(entry);
-    controller.markPanelRevealHandled(entry);
-    return shouldAnimatePanelReveal;
+    if (_handledRevealRevision == entry.revision) return false;
+    _handledRevealRevision = entry.revision;
+    return entry.navigation != WindowsComicDetailNavigation.replace;
   }
 
   void _attachRouteAnimationIfNeeded() {
     final route = ModalRoute.of(context);
     final nextAnimation = route?.animation;
-    final nextSecondaryAnimation = route?.secondaryAnimation;
-    if (identical(nextAnimation, _routeAnimation) &&
-        identical(nextSecondaryAnimation, _secondaryRouteAnimation)) {
+    if (identical(nextAnimation, _routeAnimation)) {
       _syncDeferredPanelVisibility();
       return;
     }
     _detachRouteAnimation();
     _routeAnimation = nextAnimation;
-    _secondaryRouteAnimation = nextSecondaryAnimation;
     _routeAnimation?.addStatusListener(_handleRouteAnimationStatusChanged);
-    _secondaryRouteAnimation?.addStatusListener(
-      _handleRouteAnimationStatusChanged,
-    );
     _syncDeferredPanelVisibility();
   }
 
   void _detachRouteAnimation() {
     _routeAnimation?.removeStatusListener(_handleRouteAnimationStatusChanged);
-    _secondaryRouteAnimation?.removeStatusListener(
-      _handleRouteAnimationStatusChanged,
-    );
     _routeAnimation = null;
-    _secondaryRouteAnimation = null;
   }
 
   void _handleRouteAnimationStatusChanged(AnimationStatus _) {
@@ -128,15 +160,6 @@ class _WindowsComicDetailHostState extends State<WindowsComicDetailHost> {
     _syncDeferredPanelVisibility();
   }
 
-  bool get _isCoveredByAnotherRoute {
-    final secondaryAnimation = _secondaryRouteAnimation;
-    if (secondaryAnimation == null) {
-      return false;
-    }
-    return secondaryAnimation.status != AnimationStatus.dismissed &&
-        secondaryAnimation.value > 0;
-  }
-
   void _syncDeferredPanelVisibility() {
     final animation = _routeAnimation;
     final routeInTransition =
@@ -144,9 +167,7 @@ class _WindowsComicDetailHostState extends State<WindowsComicDetailHost> {
         animation.status != AnimationStatus.dismissed &&
         animation.status != AnimationStatus.completed &&
         animation.value < 1;
-    final shouldDefer =
-        _displayEntry != null &&
-        (routeInTransition || _isCoveredByAnotherRoute);
+    final shouldDefer = _displayEntry != null && routeInTransition;
     if (shouldDefer == _deferPanelUntilRouteSettles) {
       return;
     }
@@ -161,134 +182,80 @@ class _WindowsComicDetailHostState extends State<WindowsComicDetailHost> {
       return widget.child;
     }
 
-    return ListenableBuilder(
-      listenable: WindowsComicDetailController.instance,
-      builder: (context, _) {
-        final controller = WindowsComicDetailController.instance;
-        final entry = controller.isPanelVisible ? controller.entry : null;
-        final activeEntry = entry ?? _displayEntry;
-        final shouldReservePanelSpace =
-            activeEntry != null &&
-            (controller.isPanelVisible || _isCoveredByAnotherRoute);
-        final shouldAnimatePanelReveal =
-            activeEntry != null &&
-            _displayEntry != null &&
-            activeEntry.revision == _displayEntry!.revision &&
-            _displayEntryShouldAnimatePanelReveal;
-        final showPanel = activeEntry != null && !_deferPanelUntilRouteSettles;
-        final totalWidth = MediaQuery.sizeOf(context).width;
-        final panelWidth = totalWidth * 0.6;
-        final contentWidth = shouldReservePanelSpace
-            ? totalWidth - panelWidth
-            : totalWidth;
+    return WindowsComicDetailControllerScope(
+      controller: _controller,
+      child: ListenableBuilder(
+        listenable: _controller,
+        builder: (context, _) {
+          final controller = _controller;
+          final controllerEntry = controller.isPanelVisible
+              ? controller.entry
+              : null;
+          final entry = _isEntrySuppressed(controllerEntry)
+              ? null
+              : controllerEntry;
+          final activeEntry = entry ?? _displayEntry;
+          final shouldAnimatePanelReveal =
+              activeEntry != null &&
+              _displayEntry != null &&
+              activeEntry.revision == _displayEntry!.revision &&
+              _displayEntryShouldAnimatePanelReveal;
+          final showPanel =
+              activeEntry != null &&
+              controller.isPanelVisible &&
+              !_deferPanelUntilRouteSettles;
 
-        return Row(
-          children: [
-            AnimatedContainer(
-              duration: windowsComicDetailPanelAnimationDuration,
-              curve: Curves.easeOutCubic,
-              width: contentWidth,
-              child: HeroMode(
-                enabled: !shouldReservePanelSpace,
-                child: widget.child,
+          return Stack(
+            clipBehavior: Clip.hardEdge,
+            children: [
+              Positioned.fill(
+                child: HeroMode(enabled: !showPanel, child: widget.child),
               ),
-            ),
-            AnimatedContainer(
-              duration: windowsComicDetailPanelAnimationDuration,
-              curve: Curves.easeOutCubic,
-              width: shouldReservePanelSpace ? panelWidth : 0,
-              child: IgnorePointer(
-                ignoring: !shouldReservePanelSpace || !showPanel,
-                child: Align(
-                  alignment: Alignment.centerRight,
-                  child: SizedBox(
-                    width: panelWidth,
-                    child: ClipRRect(
-                      borderRadius: const BorderRadius.horizontal(
-                        left: Radius.circular(24),
-                      ),
-                      child: Opacity(
-                        opacity: showPanel ? 1 : 0,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: Theme.of(context).colorScheme.surface,
-                            boxShadow: const [
-                              BoxShadow(
-                                color: Color(0x22000000),
-                                blurRadius: 28,
-                                offset: Offset(-8, 0),
-                              ),
-                            ],
-                          ),
-                          child: activeEntry == null
-                              ? const SizedBox.shrink()
-                              : HeroMode(
-                                  enabled: showPanel,
-                                  child: AnimatedSwitcher(
-                                    duration: const Duration(milliseconds: 280),
-                                    reverseDuration: const Duration(
-                                      milliseconds: 220,
-                                    ),
-                                    switchInCurve: Curves.easeOutCubic,
-                                    switchOutCurve: Curves.easeInCubic,
-                                    layoutBuilder:
-                                        (currentChild, previousChildren) {
-                                          final overlayChildren =
-                                              currentChild == null
-                                              ? const <Widget>[]
-                                              : <Widget>[currentChild];
-                                          return Stack(
-                                            fit: StackFit.expand,
-                                            children: [
-                                              ...previousChildren,
-                                              ...overlayChildren,
-                                            ],
-                                          );
-                                        },
-                                    transitionBuilder: (child, animation) {
-                                      final slide =
-                                          Tween<Offset>(
-                                            begin: const Offset(0.08, 0),
-                                            end: Offset.zero,
-                                          ).animate(
-                                            CurvedAnimation(
-                                              parent: animation,
-                                              curve: Curves.easeOutCubic,
-                                              reverseCurve: Curves.easeInCubic,
-                                            ),
-                                          );
-                                      return FadeTransition(
-                                        opacity: animation,
-                                        child: SlideTransition(
-                                          position: slide,
-                                          child: child,
-                                        ),
-                                      );
-                                    },
-                                    child: KeyedSubtree(
-                                      key: ValueKey<int>(activeEntry.revision),
-                                      child:
-                                          controller.panelBuilder?.call(
-                                            activeEntry.comic,
-                                            activeEntry.heroTag,
-                                            shouldAnimatePanelReveal:
-                                                shouldAnimatePanelReveal,
-                                            onCloseRequested: controller.close,
-                                          ) ??
-                                          const SizedBox.shrink(),
-                                    ),
-                                  ),
+              Positioned.fill(
+                child: AnimatedSlide(
+                  duration: windowsComicDetailPanelAnimationDuration,
+                  curve: Curves.easeOutCubic,
+                  offset: showPanel ? Offset.zero : const Offset(0, 1),
+                  child: IgnorePointer(
+                    ignoring: !showPanel,
+                    child: ColoredBox(
+                      color: Theme.of(context).colorScheme.surface,
+                      child: activeEntry == null
+                          ? const SizedBox.shrink()
+                          : HeroMode(
+                              enabled: showPanel,
+                              child: WindowsComicDetailTransition(
+                                entry: activeEntry,
+                                shouldAnimatePanelReveal:
+                                    shouldAnimatePanelReveal,
+                                child: KeyedSubtree(
+                                  key: ValueKey<int>(activeEntry.revision),
+                                  child:
+                                      WindowsComicDetailPresentationScope.maybeOf(
+                                        context,
+                                      )?.call(
+                                        activeEntry.comic,
+                                        activeEntry.heroTag,
+                                        shouldAnimatePanelReveal:
+                                            shouldAnimatePanelReveal,
+                                        initialTabIndex:
+                                            activeEntry.initialTabIndex,
+                                        showHomeAction: controller.canGoBack,
+                                        onBackRequested: controller.goBack,
+                                        onHomeRequested: _handleHomeRequested,
+                                      ) ??
+                                      const SizedBox.shrink(),
                                 ),
-                        ),
-                      ),
+                              ),
+                            ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ],
-        );
-      },
+            ],
+          );
+        },
+      ),
     );
   }
 }

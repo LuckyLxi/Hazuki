@@ -12,16 +12,12 @@ class ComicDetailRelatedTab extends StatefulWidget {
     super.key,
     required this.details,
     required this.isActiveInTabView,
-    required this.isDesktopPanel,
-    required this.onCloseRequested,
-    required this.pageBuilder,
+    required this.onOpenComic,
   });
 
   final ComicDetailsData? details;
   final bool isActiveInTabView;
-  final bool isDesktopPanel;
-  final VoidCallback? onCloseRequested;
-  final Widget Function(ExploreComic comic, String heroTag) pageBuilder;
+  final void Function(ExploreComic comic, String heroTag) onOpenComic;
 
   @override
   State<ComicDetailRelatedTab> createState() => _ComicDetailRelatedTabState();
@@ -67,49 +63,63 @@ class _ComicDetailRelatedTabState extends State<ComicDetailRelatedTab>
       );
     }
 
-    const crossAxisCount = 3;
-    const gridPadding = 16.0;
-    const crossSpacing = 10.0;
-    final mediaSize = MediaQuery.sizeOf(context);
-    final tileWidth =
-        (mediaSize.width -
-            (gridPadding * 2) -
-            (crossSpacing * (crossAxisCount - 1))) /
-        crossAxisCount;
-    final thumbnailCacheWidth =
-        (tileWidth * MediaQuery.devicePixelRatioOf(context))
-            .round()
-            .clamp(120, 480)
-            .toInt();
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isDesktop = Theme.of(context).platform == TargetPlatform.windows;
+        final gridPadding = isDesktop ? 24.0 : 16.0;
+        final crossSpacing = isDesktop ? 16.0 : 10.0;
+        final availableWidth = constraints.maxWidth - gridPadding * 2;
+        final crossAxisCount = isDesktop
+            ? ((availableWidth + crossSpacing) / (160 + crossSpacing))
+                  .ceil()
+                  .clamp(1, 20)
+            : 3;
+        final tileWidth =
+            (availableWidth - (crossSpacing * (crossAxisCount - 1))) /
+            crossAxisCount;
+        final thumbnailCacheWidth =
+            (tileWidth * MediaQuery.devicePixelRatioOf(context))
+                .round()
+                .clamp(120, 480)
+                .toInt();
 
-    return CustomScrollView(
-      key: const PageStorageKey<String>('comic-detail-related-tab'),
-      physics: const ClampingScrollPhysics(),
-      slivers: [
-        SliverOverlapInjector(handle: overlapHandle),
-        SliverPadding(
-          padding: const EdgeInsets.all(16),
-          sliver: SliverGrid(
-            delegate: SliverChildBuilderDelegate((context, index) {
-              final comic = details.recommend[index];
-              final heroTag = comicCoverHeroTag(comic, salt: 'related-$index');
-              return ComicDetailRelatedTile(
-                comic: comic,
-                heroTag: heroTag,
-                isDesktopPanel: widget.isDesktopPanel,
-                pageBuilder: widget.pageBuilder,
-                thumbnailCacheWidth: thumbnailCacheWidth,
-              );
-            }, childCount: details.recommend.length),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              mainAxisSpacing: 10,
-              crossAxisSpacing: 10,
-              childAspectRatio: 0.57,
+        return CustomScrollView(
+          key: const PageStorageKey<String>('comic-detail-related-tab'),
+          physics: const ClampingScrollPhysics(),
+          slivers: [
+            SliverOverlapInjector(handle: overlapHandle),
+            SliverPadding(
+              padding: EdgeInsets.all(gridPadding),
+              sliver: SliverGrid(
+                delegate: SliverChildBuilderDelegate((context, index) {
+                  final comic = details.recommend[index];
+                  final heroTag = comicCoverHeroTag(
+                    comic,
+                    salt: 'related-$index',
+                  );
+                  return ComicDetailRelatedTile(
+                    comic: comic,
+                    heroTag: heroTag,
+                    onOpen: () => widget.onOpenComic(comic, heroTag),
+                    thumbnailCacheWidth: thumbnailCacheWidth,
+                  );
+                }, childCount: details.recommend.length),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: crossAxisCount,
+                  mainAxisSpacing: isDesktop ? 20 : 10,
+                  crossAxisSpacing: crossSpacing,
+                  mainAxisExtent: isDesktop
+                      ? tileWidth / 0.7 +
+                            MediaQuery.textScalerOf(context).scale(64) +
+                            6
+                      : null,
+                  childAspectRatio: 0.57,
+                ),
+              ),
             ),
-          ),
-        ),
-      ],
+          ],
+        );
+      },
     );
   }
 }

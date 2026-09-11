@@ -34,7 +34,9 @@ class ComicDetailActionsController extends ChangeNotifier {
     required ComicDetailNestedPageBuilder comicDetailPageBuilder,
     ComicDetailCategoryPageBuilder? categoryPageBuilder,
     required MethodChannel mediaChannel,
-  }) : _repository = repository,
+    required Route<void> Function(WidgetBuilder) destinationRouteBuilder,
+  }) : _destinationRouteBuilder = destinationRouteBuilder,
+       _repository = repository,
        _comic = comic,
        _heroTag = heroTag,
        _detailThemeApplier = detailThemeApplier,
@@ -48,6 +50,7 @@ class ComicDetailActionsController extends ChangeNotifier {
        _categoryPageBuilder = categoryPageBuilder,
        _mediaChannel = mediaChannel;
 
+  final Route<void> Function(WidgetBuilder) _destinationRouteBuilder;
   final ComicDetailFeatureFacade _repository;
   final ExploreComic _comic;
   final String _heroTag;
@@ -230,8 +233,8 @@ class ComicDetailActionsController extends ChangeNotifier {
     titleBarController?.suppressCustomTitleBar(titleBarSuppressionOwner);
     try {
       await Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (_) => _readerPageBuilder(
+        _destinationRouteBuilder(
+          (_) => _readerPageBuilder(
             details: details,
             chapterTitle: initialChapterTitle,
             epId: initialEntry!.key,
@@ -257,12 +260,11 @@ class ComicDetailActionsController extends ChangeNotifier {
     unawaited(showHazukiPrompt(context, l10n(context).comicDetailCopiedId));
   }
 
-  void openSearchForKeyword(BuildContext context, String value) {
+  Future<void> openSearchForKeyword(BuildContext context, String value) async {
     final trimmedValue = value.trim();
     if (trimmedValue.isEmpty) return;
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => _searchPageBuilder(trimmedValue)),
-    );
+
+    await _pushTagDestination(context, (_) => _searchPageBuilder(trimmedValue));
   }
 
   Future<void> openTagValue(BuildContext context, String value) async {
@@ -277,13 +279,12 @@ class ComicDetailActionsController extends ChangeNotifier {
       final target = resolveCategoryTagNavigationTarget(groups, trimmedValue);
       final categoryPageBuilder = _categoryPageBuilder;
       if (target != null && categoryPageBuilder != null) {
-        await Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => categoryPageBuilder(
-              title: target.title,
-              viewMoreUrl: target.viewMoreUrl,
-              comicDetailPageBuilder: _comicDetailPageBuilder,
-            ),
+        await _pushTagDestination(
+          context,
+          (_) => categoryPageBuilder(
+            title: target.title,
+            viewMoreUrl: target.viewMoreUrl,
+            comicDetailPageBuilder: _comicDetailPageBuilder,
           ),
         );
         return;
@@ -296,7 +297,14 @@ class ComicDetailActionsController extends ChangeNotifier {
     if (_disposed) {
       return;
     }
-    openSearchForKeyword(context, trimmedValue);
+    await openSearchForKeyword(context, trimmedValue);
+  }
+
+  Future<void> _pushTagDestination(
+    BuildContext context,
+    WidgetBuilder builder,
+  ) async {
+    await Navigator.of(context).push(_destinationRouteBuilder(builder));
   }
 
   Future<void> copyMetaValue(BuildContext context, String value) async {
