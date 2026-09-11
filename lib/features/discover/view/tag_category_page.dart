@@ -290,6 +290,7 @@ class _TagCategoryPageState extends State<TagCategoryPage> {
     final strings = AppLocalizations.of(context)!;
 
     return WindowsComicDetailHost(
+      suppressExistingPanel: true,
       child: Scaffold(
         appBar: hazukiFrostedAppBar(
           context: context,

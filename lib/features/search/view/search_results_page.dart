@@ -20,6 +20,7 @@ import 'search_bar_shell.dart';
 import 'search_aggregate_results.dart';
 import 'search_results_page_widgets.dart';
 import 'search_results_widgets.dart';
+import '../support/search_submission_coordinator.dart';
 
 class SearchResultsPage extends StatefulWidget {
   const SearchResultsPage({
@@ -33,6 +34,7 @@ class SearchResultsPage extends StatefulWidget {
     this.comicCoverHeroTagBuilder = comicCoverHeroTag,
     this.searchPageLoader,
     this.aggregateSearchEnabled,
+    this.comicLayout,
     this.comicDetailsLoader,
   });
 
@@ -45,6 +47,7 @@ class SearchResultsPage extends StatefulWidget {
   final ComicHeroTagBuilder comicCoverHeroTagBuilder;
   final SearchPageLoader? searchPageLoader;
   final bool? aggregateSearchEnabled;
+  final SearchComicLayout? comicLayout;
   final SearchComicDetailsLoader? comicDetailsLoader;
 
   @override
@@ -54,6 +57,28 @@ class SearchResultsPage extends StatefulWidget {
 class _SearchResultsPageState extends State<SearchResultsPage>
     with WidgetsBindingObserver {
   late final SearchResultsController _resultsController;
+  late final SearchSubmissionCoordinator _submissionCoordinator =
+      SearchSubmissionCoordinator(
+        results: _resultsController,
+        aggregateResults: _aggregateResultsController,
+        recordHistory: (keyword) =>
+            addSearchHistory(widget.historyService, keyword),
+        isActive: () => mounted,
+        openComic: (comic) async {
+          await _focusCoordinator.dismissKeyboard(context);
+          if (!mounted) return;
+          await openComicDetail(
+            context,
+            comic: comic,
+            heroTag: widget.comicCoverHeroTagBuilder(
+              comic,
+              salt: 'search-id-direct',
+            ),
+            pageBuilder: widget.comicDetailPageBuilder,
+            replaceCurrentRoute: true,
+          );
+        },
+      );
   late final AggregateSearchResultsController _aggregateResultsController;
   late final SearchFocusCoordinator _focusCoordinator = SearchFocusCoordinator(
     isMounted: () => mounted,
@@ -72,6 +97,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
 
   bool _showBackToTop = false;
   late bool _aggregateSearchEnabled;
+  late SearchComicLayout _comicLayout;
   bool _keyboardDismissPopInProgress = false;
 
   String get _searchKeyword => _aggregateSearchEnabled
@@ -112,6 +138,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
   @override
   Widget build(BuildContext context) {
     return WindowsComicDetailHost(
+      suppressExistingPanel: true,
       child: ListenableBuilder(
         listenable: Listenable.merge([
           _resultsController,
@@ -149,6 +176,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
 
   void _initializeSearchResultsPage() {
     _aggregateSearchEnabled = widget.aggregateSearchEnabled ?? false;
+    _comicLayout = widget.comicLayout ?? SearchComicLayout.list;
     _resultsController = SearchResultsController(
       initialOrder: widget.initialOrder,
       sourceService: widget.sourceService,
@@ -174,6 +202,13 @@ class _SearchResultsPageState extends State<SearchResultsPage>
             _aggregateSearchEnabled = enabled;
           });
         }
+        if (widget.comicLayout == null) {
+          final comicLayout = await loadSearchComicLayout();
+          if (!mounted) return;
+          setState(() {
+            _comicLayout = comicLayout;
+          });
+        }
         _focusCoordinator.syncKeyboardVisibility();
         _focusCoordinator.attachRouteAutoFocus(
           context,
@@ -187,6 +222,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
   }
 
   void _disposeSearchResultsPage() {
+    _submissionCoordinator.invalidate();
     _focusCoordinator.primaryFocusNode.removeListener(
       _handleSearchFocusChanged,
     );
@@ -269,7 +305,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
     }
 
     if (shouldLoadMore && !_aggregateSearchEnabled) {
-      unawaited(_resultsController.loadMoreSearch(context));
+      unawaited(_resultsController.loadMoreSearch(searchMessages(context)));
     }
   }
 
@@ -312,7 +348,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
     _resultsController.setSearchOrder(order);
     if (_searchKeyword.isNotEmpty) {
       await _resultsController.search(
-        context,
+        searchMessages(context),
         keyword: _searchKeyword,
         page: 1,
       );
@@ -358,62 +394,6 @@ class _SearchResultsPageState extends State<SearchResultsPage>
     Navigator.of(context).pop();
   }
 
-  String? _normalizeComicIdKeyword(String keyword) {
-    return normalizeDirectComicIdKeyword(keyword);
-  }
-
-  Future<bool> _tryOpenComicDetailByKeywordId(
-    String keyword, {
-    required String sourceKey,
-  }) async {
-    if (!isHazukiJmSourceKey(sourceKey)) {
-      return false;
-    }
-    final comicId = _normalizeComicIdKeyword(keyword);
-    if (comicId == null) {
-      return false;
-    }
-
-    try {
-      final details = await _resultsController.loadComicById(
-        comicId,
-        sourceKey: sourceKey,
-      );
-      if (!mounted) {
-        return true;
-      }
-
-      final comic = ExploreComic(
-        id: details.id,
-        title: details.title.trim().isEmpty ? keyword.trim() : details.title,
-        subTitle: details.subTitle,
-        cover: details.cover,
-        sourceKey: details.sourceKey,
-      );
-      await addSearchHistory(widget.historyService, keyword);
-      if (!mounted) {
-        return true;
-      }
-      await _focusCoordinator.dismissKeyboard(context);
-      if (!mounted) {
-        return true;
-      }
-      await openComicDetail(
-        context,
-        comic: comic,
-        heroTag: widget.comicCoverHeroTagBuilder(
-          comic,
-          salt: 'search-id-direct',
-        ),
-        pageBuilder: widget.comicDetailPageBuilder,
-        replaceCurrentRoute: true,
-      );
-      return true;
-    } catch (_) {
-      return false;
-    }
-  }
-
   Future<void> _submitSearch({String? submittedText}) async {
     _idExtractController.hide();
     final activeController = _focusCoordinator.activeController;
@@ -435,49 +415,12 @@ class _SearchResultsPageState extends State<SearchResultsPage>
       return;
     }
 
-    final directIdSourceKey = directComicIdSourceKey(
-      aggregateSearchEnabled: _aggregateSearchEnabled,
+    await _submissionCoordinator.submit(
+      keyword: keyword,
+      aggregate: _aggregateSearchEnabled,
       activeSourceKey: _sourceService.activeSourceKey,
+      messages: searchMessages(context),
     );
-    final idKeyword = directIdSourceKey == null
-        ? null
-        : _normalizeComicIdKeyword(keyword);
-    final requestToken = idKeyword != null
-        ? _resultsController.prepareDirectIdLookup(keyword)
-        : -1;
-
-    final openedById = directIdSourceKey != null
-        ? await _tryOpenComicDetailByKeywordId(
-            keyword,
-            sourceKey: directIdSourceKey,
-          )
-        : false;
-    if (!openedById) {
-      await addSearchHistory(widget.historyService, keyword);
-    }
-
-    if (!mounted ||
-        (requestToken != -1 &&
-            !_resultsController.isCurrentRequest(requestToken))) {
-      return;
-    }
-
-    if (openedById) {
-      if (requestToken != -1) {
-        _resultsController.finishDirectIdLookup(requestToken);
-      }
-      return;
-    }
-
-    if (requestToken != -1) {
-      _resultsController.finishDirectIdLookup(requestToken);
-    }
-
-    if (_aggregateSearchEnabled) {
-      await _aggregateResultsController.search(context, keyword);
-    } else {
-      await _resultsController.search(context, keyword: keyword, page: 1);
-    }
   }
 
   Widget _buildSearchBar({
@@ -545,7 +488,11 @@ class _SearchResultsPageState extends State<SearchResultsPage>
     if (_resultsController.canRetry) {
       _resultsController.logRuntimeRetryRequested('search_results_page');
     }
-    await _resultsController.search(context, keyword: _searchKeyword, page: 1);
+    await _resultsController.search(
+      searchMessages(context),
+      keyword: _searchKeyword,
+      page: 1,
+    );
   }
 
   Widget _buildSearchComicItem(ExploreComic comic, int index) {
@@ -554,6 +501,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
       salt: 'search-results',
     );
     return SearchComicListItem(
+      key: ValueKey('search-list-comic-${comic.sourceKey}-${comic.id}'),
       comic: comic,
       heroTag: heroTag,
       index: index,
@@ -570,6 +518,35 @@ class _SearchResultsPageState extends State<SearchResultsPage>
             pageBuilder: widget.comicDetailPageBuilder,
           );
         }());
+      },
+    );
+  }
+
+  Widget _buildSearchComicGridItem(
+    ExploreComic comic,
+    int index,
+    int coverCacheWidth,
+  ) {
+    final heroTag = widget.comicCoverHeroTagBuilder(
+      comic,
+      salt: 'search-results-grid-$index',
+    );
+    return SearchComicGridItem(
+      key: ValueKey('search-grid-comic-${comic.sourceKey}-${comic.id}'),
+      comic: comic,
+      heroTag: heroTag,
+      index: index,
+      coverCacheWidth: coverCacheWidth,
+      placeholderColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+      onTap: () async {
+        await _dismissSearchInputIfFocused();
+        if (!mounted) return;
+        await openComicDetail(
+          context,
+          comic: comic,
+          heroTag: heroTag,
+          pageBuilder: widget.comicDetailPageBuilder,
+        );
       },
     );
   }
@@ -620,10 +597,17 @@ class _SearchResultsPageState extends State<SearchResultsPage>
         onRefresh: _refreshSearchResults,
         onScrollNotification: _handleSearchResultsScrollNotification,
         onRetry: (section) {
-          unawaited(_aggregateResultsController.retry(context, section));
+          unawaited(
+            _aggregateResultsController.retry(searchMessages(context), section),
+          );
         },
         onLoadMore: (section) {
-          unawaited(_aggregateResultsController.loadMore(context, section));
+          unawaited(
+            _aggregateResultsController.loadMore(
+              searchMessages(context),
+              section,
+            ),
+          );
         },
         onComicTap: _openAggregateComic,
         onViewMore: _openAggregateSection,
@@ -640,6 +624,8 @@ class _SearchResultsPageState extends State<SearchResultsPage>
       onRefresh: _refreshSearchResults,
       onScrollNotification: _handleSearchResultsScrollNotification,
       itemBuilder: _buildSearchComicItem,
+      gridItemBuilder: _buildSearchComicGridItem,
+      comicLayout: _comicLayout,
       onRetryPartialError: _retrySearchFromCurrentKeyword,
     );
   }
@@ -654,10 +640,13 @@ class _SearchResultsPageState extends State<SearchResultsPage>
       return;
     }
     if (_aggregateSearchEnabled) {
-      await _aggregateResultsController.search(context, _searchKeyword);
+      await _aggregateResultsController.search(
+        searchMessages(context),
+        _searchKeyword,
+      );
     } else {
       await _resultsController.search(
-        context,
+        searchMessages(context),
         keyword: _searchKeyword,
         page: 1,
         silentRefresh: _searchComics.isNotEmpty,
@@ -695,6 +684,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
           onComicTap: _openAggregateComic,
           heroTagBuilder: (comic, salt) =>
               widget.comicCoverHeroTagBuilder(comic, salt: salt),
+          comicLayout: _comicLayout,
         ),
       ),
     );

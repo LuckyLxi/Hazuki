@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:hazuki/features/search/support/search_shared.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/search/state/aggregate_search_results_controller.dart';
@@ -66,7 +67,7 @@ void main() {
     );
     addTearDown(controller.dispose);
 
-    await controller.search(testContext, 'Hazuki');
+    await controller.search(searchMessages(testContext), 'Hazuki');
 
     final jm = controller.sections.firstWhere(
       (section) => section.source.normalizedKey == hazukiDefaultSourceKey,
@@ -175,12 +176,12 @@ void main() {
     );
     addTearDown(controller.dispose);
 
-    await controller.search(testContext, 'Hazuki');
+    await controller.search(searchMessages(testContext), 'Hazuki');
     final section = controller.sections.firstWhere(
       (section) => section.source.normalizedKey == hazukiDefaultSourceKey,
     );
 
-    await controller.changeOrder(testContext, section, 'mv');
+    await controller.changeOrder(searchMessages(testContext), section, 'mv');
 
     expect(section.order, 'mv');
     expect(requestedOrders, ['mr', 'mv']);
@@ -236,12 +237,16 @@ void main() {
     );
     addTearDown(controller.dispose);
 
-    await controller.search(testContext, 'Hazuki');
+    await controller.search(searchMessages(testContext), 'Hazuki');
     final section = controller.sections.firstWhere(
       (section) => section.source.normalizedKey == hazukiDefaultSourceKey,
     );
 
-    final reload = controller.changeOrder(testContext, section, 'mv');
+    final reload = controller.changeOrder(
+      searchMessages(testContext),
+      section,
+      'mv',
+    );
 
     expect(section.loading, isTrue);
     expect(section.comics, isEmpty);
@@ -294,15 +299,20 @@ void main() {
         home: SearchAggregateSectionPage(
           controller: controller,
           section: section,
+          comicLayout: SearchComicLayout.grid3,
           onComicTap: (_, _) async {},
           heroTagBuilder: (comic, salt) => '${comic.id}-$salt',
         ),
       ),
     );
     final pageContext = tester.element(find.byType(SearchAggregateSectionPage));
-    await controller.search(pageContext, 'Hazuki');
+    await controller.search(searchMessages(pageContext), 'Hazuki');
     await tester.pump();
     final strings = AppLocalizations.of(pageContext)!;
+    expect(
+      find.byKey(const ValueKey('aggregate-search-more-grid3')),
+      findsOneWidget,
+    );
 
     await tester.tap(find.byType(PopupMenuButton<String>));
     await tester.pumpAndSettle();

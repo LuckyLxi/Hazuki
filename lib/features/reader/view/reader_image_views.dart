@@ -25,6 +25,8 @@ class ReaderImageViews {
     required this.scrollController,
     required this.pageController,
     required this.readerZoomController,
+    required this.enableInteractiveScaling,
+    required this.blockPageScrolling,
     required this.wrapImageWidget,
     required this.noImageModeEnabled,
   });
@@ -41,6 +43,8 @@ class ReaderImageViews {
   final ScrollController scrollController;
   final PageController pageController;
   final ReaderZoomController readerZoomController;
+  final bool enableInteractiveScaling;
+  final bool blockPageScrolling;
   final Widget Function(Widget imageWidget, String url) wrapImageWidget;
   final bool noImageModeEnabled;
 
@@ -64,7 +68,7 @@ class ReaderImageViews {
     return InteractiveViewer(
       transformationController: zoomController,
       panEnabled: runtimeState.isZoomed || runtimeState.zoomInteracting,
-      scaleEnabled: true,
+      scaleEnabled: enableInteractiveScaling,
       panAxis: PanAxis.free,
       boundaryMargin: EdgeInsets.zero,
       constrained: constrained,
@@ -100,7 +104,7 @@ class ReaderImageViews {
         ),
         itemCount: runtimeState.readerSpreadCount,
         controller: scrollController,
-        physics: runtimeState.zoomGestureActive
+        physics: runtimeState.zoomGestureActive || blockPageScrolling
             ? const NeverScrollableScrollPhysics()
             : const ReaderScrollPhysics(),
         itemBuilder: (context, index) => _buildReaderListItem(index),
@@ -202,7 +206,7 @@ class ReaderImageViews {
       reverse: false,
       allowImplicitScrolling: true,
       itemCount: runtimeState.readerSpreadCount,
-      physics: runtimeState.pageNavigationLocked
+      physics: runtimeState.pageNavigationLocked || blockPageScrolling
           ? const NeverScrollableScrollPhysics()
           : const PageScrollPhysics(),
       onPageChanged: navigationController.handlePageChanged,

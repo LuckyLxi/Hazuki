@@ -9,7 +9,6 @@ import 'package:hazuki/features/home/home.dart';
 import 'package:hazuki/services/announcements/announcement_popup_coordinator.dart';
 import 'package:hazuki/shared/source_account/source_account_actions.dart';
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 import 'package:hazuki/shared/chapter_title_resolver.dart';
 import 'package:hazuki/shared/reading/reader_offline_chapter_data.dart';
 
@@ -48,20 +47,8 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
   late final AnnouncementPopupCoordinator _announcementPopupCoordinator;
   HomeDrawerDestination? _selectedDrawerDestination;
 
-  Widget _buildComicDetailPage(
-    ExploreComic comic,
-    String heroTag, {
-    bool isDesktopPanel = false,
-    bool? shouldAnimateInitialRevealOverride,
-    VoidCallback? onCloseRequested,
-  }) {
-    return widget.featureEntrypoints.buildComicDetailPage(
-      comic,
-      heroTag,
-      isDesktopPanel: isDesktopPanel,
-      shouldAnimateInitialRevealOverride: shouldAnimateInitialRevealOverride,
-      onCloseRequested: onCloseRequested,
-    );
+  Widget _buildComicDetailPage(ExploreComic comic, String heroTag) {
+    return widget.featureEntrypoints.buildComicDetailPage(comic, heroTag);
   }
 
   @override
@@ -82,19 +69,6 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
       isActive: () => mounted,
     );
     _coordinator.start(context);
-    WindowsComicDetailController.instance.panelBuilder =
-        (
-          comic,
-          heroTag, {
-          required shouldAnimatePanelReveal,
-          required onCloseRequested,
-        }) => _buildComicDetailPage(
-          comic,
-          heroTag,
-          isDesktopPanel: true,
-          shouldAnimateInitialRevealOverride: shouldAnimatePanelReveal,
-          onCloseRequested: onCloseRequested,
-        );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(_announcementPopupCoordinator.start());
     });
@@ -102,7 +76,6 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
 
   @override
   void dispose() {
-    WindowsComicDetailController.instance.panelBuilder = null;
     _announcementPopupCoordinator.dispose();
     _coordinator.dispose();
     super.dispose();

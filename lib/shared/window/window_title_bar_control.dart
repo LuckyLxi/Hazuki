@@ -17,9 +17,14 @@ class HazukiWindowsTitleBarScope
   }) : super(notifier: controller);
 
   static WindowTitleBarControl of(BuildContext context) {
-    final scope = context
-        .dependOnInheritedWidgetOfExactType<HazukiWindowsTitleBarScope>();
+    final scope = maybeOf(context);
     assert(scope != null, 'HazukiWindowsTitleBarScope is missing.');
-    return scope!.notifier!;
+    return scope!;
+  }
+
+  static WindowTitleBarControl? maybeOf(BuildContext context) {
+    return context
+        .dependOnInheritedWidgetOfExactType<HazukiWindowsTitleBarScope>()
+        ?.notifier;
   }
 }

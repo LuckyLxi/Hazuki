@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/shared/reading/reader_mode.dart';
 import 'package:hazuki/features/settings/state/reading_settings_controller.dart';
+import 'package:hazuki/features/reader/view/reader_windows_shortcuts_dialog.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/widgets/widgets.dart';
@@ -91,6 +93,9 @@ class _ReadingSettingsPageState extends State<ReadingSettingsPage> {
               onCopyMangaImageQualityChanged:
                   _controller.updateCopyMangaImageQuality,
               onPicacgImageQualityChanged: _controller.updatePicacgImageQuality,
+              onShowWindowsShortcuts: Platform.isWindows
+                  ? () => unawaited(showReaderWindowsShortcutsDialog(context))
+                  : null,
             );
           },
         ),

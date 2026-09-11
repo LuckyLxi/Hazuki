@@ -1,9 +1,6 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
 class ComicDetailRelatedTile extends StatelessWidget {
@@ -11,37 +8,20 @@ class ComicDetailRelatedTile extends StatelessWidget {
     super.key,
     required this.comic,
     required this.heroTag,
-    required this.isDesktopPanel,
-    required this.pageBuilder,
+    required this.onOpen,
     required this.thumbnailCacheWidth,
   });
 
   final ExploreComic comic;
   final String heroTag;
-  final bool isDesktopPanel;
-  final Widget Function(ExploreComic comic, String heroTag) pageBuilder;
+  final VoidCallback onOpen;
   final int thumbnailCacheWidth;
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
       borderRadius: BorderRadius.circular(8),
-      onTap: () {
-        if (isDesktopPanel) {
-          unawaited(
-            openComicDetail(
-              context,
-              comic: comic,
-              heroTag: heroTag,
-              pageBuilder: pageBuilder,
-            ),
-          );
-          return;
-        }
-        Navigator.of(context).push(
-          MaterialPageRoute<void>(builder: (_) => pageBuilder(comic, heroTag)),
-        );
-      },
+      onTap: onOpen,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -64,7 +44,10 @@ class ComicDetailRelatedTile extends StatelessWidget {
                         sourceKey: comic.sourceKey,
                         fit: BoxFit.cover,
                         width: double.infinity,
-                        keepInMemory: false,
+                        // Windows restores a previous detail by rebuilding it.
+                        // Retaining displayed related covers lets the restored
+                        // grid paint them on its first frame.
+                        keepInMemory: true,
                         cacheWidth: thumbnailCacheWidth,
                         animateOnLoad: true,
                         loadAnimationBeginScale: 1,

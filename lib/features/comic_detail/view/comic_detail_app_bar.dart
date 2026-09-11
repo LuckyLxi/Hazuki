@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'package:hazuki/l10n/l10n.dart';
+import 'package:hazuki/shared/window/windows_app_bar_drag_area.dart';
+
 import 'comic_detail_view_primitives.dart';
 
 class ComicDetailScrollAwareAppBar extends StatelessWidget
@@ -12,6 +15,8 @@ class ComicDetailScrollAwareAppBar extends StatelessWidget
     required this.theme,
     required this.isDesktopPanel,
     required this.onCloseRequested,
+    required this.showHomeAction,
+    required this.onHomeRequested,
   });
 
   final ValueNotifier<bool> collapsedTitleListenable;
@@ -20,6 +25,8 @@ class ComicDetailScrollAwareAppBar extends StatelessWidget
   final ThemeData theme;
   final bool isDesktopPanel;
   final VoidCallback? onCloseRequested;
+  final bool showHomeAction;
+  final VoidCallback? onHomeRequested;
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
@@ -28,11 +35,22 @@ class ComicDetailScrollAwareAppBar extends StatelessWidget
   Widget build(BuildContext context) {
     return AppBar(
       automaticallyImplyLeading: !isDesktopPanel,
+      leadingWidth: isDesktopPanel && showHomeAction ? 96 : null,
       leading: isDesktopPanel
-          ? IconButton(
-              tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
-              onPressed: onCloseRequested,
-              icon: const Icon(Icons.close),
+          ? Row(
+              children: [
+                IconButton(
+                  tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+                  onPressed: onCloseRequested,
+                  icon: const Icon(Icons.arrow_back),
+                ),
+                if (showHomeAction)
+                  IconButton(
+                    tooltip: l10n(context).comicDetailBackToHome,
+                    onPressed: onHomeRequested,
+                    icon: const Icon(Icons.home_outlined),
+                  ),
+              ],
             )
           : null,
       titleSpacing: 0,
@@ -47,10 +65,14 @@ class ComicDetailScrollAwareAppBar extends StatelessWidget
           );
         },
       ),
+      actions: const [HazukiWindowsCaptionButtonSpacer()],
       backgroundColor: Colors.transparent,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       scrolledUnderElevation: 0,
+      flexibleSpace: const HazukiWindowsAppBarDragArea(
+        child: SizedBox.expand(),
+      ),
     );
   }
 }

@@ -1,3 +1,4 @@
+import 'comic_detail_destination_route.dart';
 import 'package:hazuki/shared/appearance/appearance_settings_scope.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -5,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/shared/comments/comments_widget_builder.dart';
+import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 
 import '../repository/comic_detail_repository.dart';
 import '../support/comic_detail_actions_controller.dart';
@@ -39,7 +41,10 @@ class ComicDetailPage extends StatefulWidget {
     this.categoryPageBuilder,
     this.isDesktopPanel = false,
     this.shouldAnimateInitialRevealOverride,
+    this.initialTabIndex = 0,
     this.onCloseRequested,
+    this.showHomeAction = false,
+    this.onHomeRequested,
     this.repository,
   });
 
@@ -52,7 +57,10 @@ class ComicDetailPage extends StatefulWidget {
   final ComicDetailCategoryPageBuilder? categoryPageBuilder;
   final bool isDesktopPanel;
   final bool? shouldAnimateInitialRevealOverride;
+  final int initialTabIndex;
   final VoidCallback? onCloseRequested;
+  final bool showHomeAction;
+  final VoidCallback? onHomeRequested;
   final ComicDetailFeatureFacade? repository;
 
   @override
@@ -135,6 +143,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
       detailsFutureGetter: () => _sessionController.future,
     );
     _actionsController = ComicDetailActionsController(
+      destinationRouteBuilder: buildComicDetailDestinationRoute,
       repository: _repository,
       comic: widget.comic,
       heroTag: widget.heroTag,
@@ -216,6 +225,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
       comicId: widget.comic.id,
       shouldAnimateInitialRevealOverride:
           widget.shouldAnimateInitialRevealOverride,
+      initialTabIndex: widget.initialTabIndex,
       vsync: this,
       scrollController: _scrollController,
       includeRelatedTab: _supportsJmExclusiveActions,
@@ -227,6 +237,15 @@ class _ComicDetailPageState extends State<ComicDetailPage>
     final theme = _themeController.buildDetailTheme(Theme.of(context));
     final topInset = MediaQuery.viewPaddingOf(context).top + kToolbarHeight;
     final surface = theme.colorScheme.surface;
+    final showCachedCoverImmediately =
+        widget.isDesktopPanel &&
+        switch (WindowsComicDetailControllerScope.of(
+          context,
+        ).entry?.navigation) {
+          WindowsComicDetailNavigation.pop ||
+          WindowsComicDetailNavigation.resume => true,
+          _ => false,
+        };
 
     return ComicDetailScope(
       session: _sessionController,
@@ -251,6 +270,8 @@ class _ComicDetailPageState extends State<ComicDetailPage>
             theme: theme,
             isDesktopPanel: widget.isDesktopPanel,
             onCloseRequested: widget.onCloseRequested,
+            showHomeAction: widget.showHomeAction,
+            onHomeRequested: widget.onHomeRequested,
           ),
           body: Stack(
             children: [
@@ -259,6 +280,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
                 sourceKey: widget.comic.sourceKey,
                 scrollController: _scrollController,
                 imageGateway: widget.dependencies.imageGateway,
+                showCachedCoverImmediately: showCachedCoverImmediately,
               ),
               ComicDetailTopSurfaceOverlay(
                 progressListenable:
@@ -268,27 +290,38 @@ class _ComicDetailPageState extends State<ComicDetailPage>
               ),
               Padding(
                 padding: EdgeInsets.only(top: topInset),
-                child: ComicDetailBody(
-                  scrollController: _scrollController,
-                  heroTag: widget.heroTag,
-                  comic: widget.comic,
-                  headerTitleKey: _headerTitleKey,
-                  favoriteRowKey: _favoriteRowKey,
-                  actionButtonsKey: _actionButtonsKey,
-                  isDesktopPanel: widget.isDesktopPanel,
-                  onCloseRequested: widget.onCloseRequested,
-                  buildComicDetailPage: (comic, heroTag) => ComicDetailPage(
-                    comic: comic,
-                    dependencies: widget.dependencies,
-                    heroTag: heroTag,
-                    readerWidgetBuilder: widget.readerWidgetBuilder,
-                    searchPageBuilder: widget.searchPageBuilder,
-                    commentsWidgetBuilder: widget.commentsWidgetBuilder,
-                    categoryPageBuilder: widget.categoryPageBuilder,
-                    isDesktopPanel: widget.isDesktopPanel,
-                    onCloseRequested: widget.onCloseRequested,
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: theme.platform == TargetPlatform.windows
+                          ? 1120
+                          : double.infinity,
+                    ),
+                    child: ComicDetailBody(
+                      scrollController: _scrollController,
+                      heroTag: widget.heroTag,
+                      comic: widget.comic,
+                      headerTitleKey: _headerTitleKey,
+                      favoriteRowKey: _favoriteRowKey,
+                      actionButtonsKey: _actionButtonsKey,
+                      isDesktopPanel: widget.isDesktopPanel,
+                      onCloseRequested: widget.onCloseRequested,
+                      buildComicDetailPage: (comic, heroTag) => ComicDetailPage(
+                        comic: comic,
+                        dependencies: widget.dependencies,
+                        heroTag: heroTag,
+                        readerWidgetBuilder: widget.readerWidgetBuilder,
+                        searchPageBuilder: widget.searchPageBuilder,
+                        commentsWidgetBuilder: widget.commentsWidgetBuilder,
+                        categoryPageBuilder: widget.categoryPageBuilder,
+                        isDesktopPanel: widget.isDesktopPanel,
+                        onCloseRequested: widget.onCloseRequested,
+                        showHomeAction: widget.showHomeAction,
+                        onHomeRequested: widget.onHomeRequested,
+                      ),
+                      commentsWidgetBuilder: widget.commentsWidgetBuilder,
+                    ),
                   ),
-                  commentsWidgetBuilder: widget.commentsWidgetBuilder,
                 ),
               ),
             ],

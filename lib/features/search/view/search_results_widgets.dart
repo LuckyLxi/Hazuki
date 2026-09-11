@@ -258,21 +258,69 @@ class SearchComicListItem extends StatelessWidget {
     );
 
     return TweenAnimationBuilder<double>(
-      // 首次加载或滑入视野时的从下方放出放大动画
       tween: Tween<double>(begin: 0.0, end: 1.0),
-      duration: Duration(milliseconds: 350 + (index.clamp(0, 10)) * 60),
-      curve: Curves.easeOutBack,
-      builder: (context, value, child) {
-        return Transform.scale(
-          scale: 0.85 + 0.15 * value,
-          alignment: Alignment.bottomCenter,
-          child: Transform.translate(
-            offset: Offset(0, 50 * (1 - value)),
-            child: Opacity(opacity: value.clamp(0.0, 1.0), child: child),
+      duration: Duration(milliseconds: 240 + index.clamp(0, 10) * 35),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) => Transform.translate(
+        offset: Offset(-24 * (1 - value), 0),
+        child: Opacity(
+          key: ValueKey(
+            'search-list-entry-opacity-${comic.sourceKey}-${comic.id}',
           ),
-        );
-      },
+          opacity: value,
+          child: child,
+        ),
+      ),
       child: item,
+    );
+  }
+}
+
+class SearchComicGridItem extends StatelessWidget {
+  const SearchComicGridItem({
+    super.key,
+    required this.comic,
+    required this.heroTag,
+    required this.index,
+    required this.coverCacheWidth,
+    required this.placeholderColor,
+    required this.onTap,
+  });
+
+  final ExploreComic comic;
+  final String heroTag;
+  final int index;
+  final int coverCacheWidth;
+  final Color placeholderColor;
+  final Future<void> Function() onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0, end: 1),
+      duration: Duration(milliseconds: 260 + index.clamp(0, 8) * 45),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) => Transform.translate(
+        offset: Offset(0, 18 * (1 - value)),
+        child: Transform.scale(
+          scale: 0.9 + 0.1 * value,
+          alignment: Alignment.bottomCenter,
+          child: Opacity(
+            key: ValueKey(
+              'search-grid-entry-opacity-${comic.sourceKey}-${comic.id}',
+            ),
+            opacity: value.clamp(0, 1),
+            child: child,
+          ),
+        ),
+      ),
+      child: ComicCoverTile(
+        comic: comic,
+        heroTag: heroTag,
+        coverCacheWidth: coverCacheWidth,
+        placeholderColor: placeholderColor,
+        onTap: onTap,
+      ),
     );
   }
 }

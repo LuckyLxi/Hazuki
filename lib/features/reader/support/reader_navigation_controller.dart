@@ -2,17 +2,18 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import 'package:hazuki/features/reader/support/reader_controller_support.dart';
 import 'package:hazuki/features/reader/support/reader_diagnostics_support.dart';
 import 'package:hazuki/shared/reading/reader_mode.dart';
 import 'package:hazuki/features/reader/state/reader_navigation_state.dart';
+import '../state/reader_scroll_state.dart';
 
 class ReaderNavigationController {
   ReaderNavigationController({
     required ReaderNavigationState runtimeState,
     required ReaderDiagnosticsState diagnosticsState,
+    required ReaderScrollState scrollState,
     required ScrollController scrollController,
     required PageController pageController,
     required ReaderIsMounted isMounted,
@@ -25,6 +26,7 @@ class ReaderNavigationController {
     required void Function() toggleControlsVisibility,
   }) : _runtimeState = runtimeState,
        _diagnosticsState = diagnosticsState,
+       _scrollState = scrollState,
        _scrollController = scrollController,
        _pageController = pageController,
        _isMounted = isMounted,
@@ -41,6 +43,7 @@ class ReaderNavigationController {
 
   final ReaderNavigationState _runtimeState;
   final ReaderDiagnosticsState _diagnosticsState;
+  final ReaderScrollState _scrollState;
   final ScrollController _scrollController;
   final PageController _pageController;
   final ReaderIsMounted _isMounted;
@@ -53,22 +56,6 @@ class ReaderNavigationController {
   final void Function() _toggleControlsVisibility;
   double _pendingListPixelCorrection = 0;
   bool _listPixelCorrectionScheduled = false;
-
-  KeyEventResult handleKeyEvent(FocusNode node, KeyEvent event) {
-    if (!_runtimeState.volumeButtonTurnPage || event is! KeyDownEvent) {
-      return KeyEventResult.ignored;
-    }
-
-    if (event.logicalKey == LogicalKeyboardKey.audioVolumeUp) {
-      unawaited(goPreviousPage(trigger: 'keyboard_volume_up'));
-      return KeyEventResult.handled;
-    }
-    if (event.logicalKey == LogicalKeyboardKey.audioVolumeDown) {
-      unawaited(goNextPage(trigger: 'keyboard_volume_down'));
-      return KeyEventResult.handled;
-    }
-    return KeyEventResult.ignored;
-  }
 
   Future<void> handlePlatformVolumeButtonPressed(String? direction) async {
     if (!_runtimeState.volumeButtonTurnPage) {
@@ -90,15 +77,14 @@ class ReaderNavigationController {
       return false;
     }
     if (notification is ScrollStartNotification) {
-      _diagnosticsState.listUserScrollInProgress =
-          notification.dragDetails != null;
-      if (_diagnosticsState.listUserScrollInProgress) {
-        _diagnosticsState.clearProgrammaticListStabilization();
+      _scrollState.listUserScrollInProgress = notification.dragDetails != null;
+      if (_scrollState.listUserScrollInProgress) {
+        _scrollState.clearProgrammaticListStabilization();
       }
     } else if (notification is ScrollEndNotification) {
-      _diagnosticsState.listUserScrollInProgress = false;
+      _scrollState.listUserScrollInProgress = false;
     } else if (notification is OverscrollNotification) {
-      final previousPixels = _diagnosticsState.lastObservedListPixels;
+      final previousPixels = _scrollState.lastObservedListPixels;
       _logListPositionSnapshot(
         'Reader list overscrolled',
         trigger: notification.overscroll < 0
@@ -130,7 +116,7 @@ class ReaderNavigationController {
     }
 
     final currentPixels = position.pixels;
-    final previousPixels = _diagnosticsState.lastObservedListPixels;
+    final previousPixels = _scrollState.lastObservedListPixels;
     var normalizedIndex = _runtimeState.currentPageIndex;
 
     for (var i = 0; i < _runtimeState.itemKeys.length; i++) {
@@ -151,22 +137,22 @@ class ReaderNavigationController {
 
     normalizedIndex = _runtimeState.normalizeSpreadIndex(normalizedIndex);
     final activeProgrammaticTarget =
-        _diagnosticsState.activeProgrammaticListTargetIndex;
+        _scrollState.activeProgrammaticListTargetIndex;
     if (activeProgrammaticTarget != null) {
       final target = _runtimeState.normalizeSpreadIndex(
         activeProgrammaticTarget,
       );
       _runtimeState.setCurrentPageIndex(target);
-      _diagnosticsState.lastObservedListPixels = currentPixels;
+      _scrollState.lastObservedListPixels = currentPixels;
       return;
     }
-    if (_diagnosticsState.hasActiveProgrammaticListStabilization &&
-        !_diagnosticsState.listUserScrollInProgress) {
+    if (_scrollState.hasActiveProgrammaticListStabilization &&
+        !_scrollState.listUserScrollInProgress) {
       final target = _runtimeState.normalizeSpreadIndex(
-        _diagnosticsState.stabilizingProgrammaticListTargetIndex!,
+        _scrollState.stabilizingProgrammaticListTargetIndex!,
       );
       _runtimeState.setCurrentPageIndex(target);
-      _diagnosticsState.lastObservedListPixels = currentPixels;
+      _scrollState.lastObservedListPixels = currentPixels;
       return;
     }
     final pageChanged = _runtimeState.currentPageIndex != normalizedIndex;
@@ -177,11 +163,11 @@ class ReaderNavigationController {
 
     if (previousPixels != null) {
       final hasRecentExpectedTopJump =
-          _diagnosticsState.activeProgrammaticListTargetIndex == 0 ||
-          (_diagnosticsState.lastCompletedProgrammaticListTargetIndex == 0 &&
-              _diagnosticsState.lastCompletedProgrammaticListScrollAt != null &&
+          _scrollState.activeProgrammaticListTargetIndex == 0 ||
+          (_scrollState.lastCompletedProgrammaticListTargetIndex == 0 &&
+              _scrollState.lastCompletedProgrammaticListScrollAt != null &&
               DateTime.now().difference(
-                    _diagnosticsState.lastCompletedProgrammaticListScrollAt!,
+                    _scrollState.lastCompletedProgrammaticListScrollAt!,
                   ) <
                   const Duration(seconds: 1));
       final jumpedToTop =
@@ -211,7 +197,7 @@ class ReaderNavigationController {
       }
     }
 
-    _diagnosticsState.lastObservedListPixels = currentPixels;
+    _scrollState.lastObservedListPixels = currentPixels;
     _onPageTargetChanged(normalizedIndex);
   }
 
@@ -338,13 +324,13 @@ class ReaderNavigationController {
           );
     if (_runtimeState.readerMode == ReaderMode.topToBottom &&
         _runtimeState.readerSpreadCount > 0) {
-      _diagnosticsState.activeProgrammaticListScrollReason = trigger;
-      _diagnosticsState.activeProgrammaticListTargetIndex = target;
+      _scrollState.activeProgrammaticListScrollReason = trigger;
+      _scrollState.activeProgrammaticListTargetIndex = target;
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_isMounted() || _runtimeState.imageCount == 0) {
-        _diagnosticsState.activeProgrammaticListScrollReason = null;
-        _diagnosticsState.activeProgrammaticListTargetIndex = null;
+        _scrollState.activeProgrammaticListScrollReason = null;
+        _scrollState.activeProgrammaticListTargetIndex = null;
         return;
       }
       _runtimeState.setCurrentPageIndex(target);
@@ -393,11 +379,11 @@ class ReaderNavigationController {
         previousAspectRatio <= 0 ||
         !resolvedAspectRatio.isFinite ||
         resolvedAspectRatio <= 0 ||
-        !_diagnosticsState.hasActiveProgrammaticListStabilization) {
+        !_scrollState.hasActiveProgrammaticListStabilization) {
       return;
     }
     final target = _runtimeState.normalizeSpreadIndex(
-      _diagnosticsState.stabilizingProgrammaticListTargetIndex!,
+      _scrollState.stabilizingProgrammaticListTargetIndex!,
     );
     if (imageIndex >= _runtimeState.spreadStartIndex(target)) {
       return;
@@ -432,8 +418,8 @@ class ReaderNavigationController {
       if (!_isMounted() ||
           _runtimeState.readerMode != ReaderMode.topToBottom ||
           !_scrollController.hasClients ||
-          !_diagnosticsState.hasActiveProgrammaticListStabilization ||
-          _diagnosticsState.listUserScrollInProgress ||
+          !_scrollState.hasActiveProgrammaticListStabilization ||
+          _scrollState.listUserScrollInProgress ||
           correction.abs() < 0.5) {
         return;
       }
@@ -445,18 +431,18 @@ class ReaderNavigationController {
       if ((nextPixels - position.pixels).abs() < 0.5) {
         return;
       }
-      _diagnosticsState.activeProgrammaticListScrollReason =
+      _scrollState.activeProgrammaticListScrollReason =
           'image_aspect_ratio_resolved_stabilization';
-      _diagnosticsState.activeProgrammaticListTargetIndex = target;
+      _scrollState.activeProgrammaticListTargetIndex = target;
       try {
         position.jumpTo(nextPixels);
-        _diagnosticsState.markProgrammaticListScrollCompleted(
+        _scrollState.markProgrammaticListScrollCompleted(
           target,
           stabilize: true,
         );
       } finally {
-        _diagnosticsState.activeProgrammaticListScrollReason = null;
-        _diagnosticsState.activeProgrammaticListTargetIndex = null;
+        _scrollState.activeProgrammaticListScrollReason = null;
+        _scrollState.activeProgrammaticListTargetIndex = null;
       }
     });
   }
@@ -567,8 +553,8 @@ class ReaderNavigationController {
     final visibleContext = target < _runtimeState.itemKeys.length
         ? _runtimeState.itemKeys[target].currentContext
         : null;
-    _diagnosticsState.activeProgrammaticListScrollReason = trigger;
-    _diagnosticsState.activeProgrammaticListTargetIndex = target;
+    _scrollState.activeProgrammaticListScrollReason = trigger;
+    _scrollState.activeProgrammaticListTargetIndex = target;
     try {
       if (visibleContext != null) {
         await Scrollable.ensureVisible(
@@ -580,7 +566,7 @@ class ReaderNavigationController {
         if (!_isMounted()) {
           return;
         }
-        _diagnosticsState.markProgrammaticListScrollCompleted(
+        _scrollState.markProgrammaticListScrollCompleted(
           target,
           stabilize: stabilizeAfterScroll,
         );
@@ -608,7 +594,7 @@ class ReaderNavigationController {
       if (!_isMounted()) {
         return;
       }
-      _diagnosticsState.markProgrammaticListScrollCompleted(
+      _scrollState.markProgrammaticListScrollCompleted(
         target,
         stabilize: stabilizeAfterScroll,
       );
@@ -635,9 +621,9 @@ class ReaderNavigationController {
           );
           return;
         }
-        _diagnosticsState.activeProgrammaticListScrollReason =
+        _scrollState.activeProgrammaticListScrollReason =
             '${trigger}_post_frame_exact_alignment';
-        _diagnosticsState.activeProgrammaticListTargetIndex = target;
+        _scrollState.activeProgrammaticListTargetIndex = target;
         unawaited(
           Scrollable.ensureVisible(
             exactContext,
@@ -647,9 +633,9 @@ class ReaderNavigationController {
             curve: Curves.easeOutCubic,
             alignment: 0,
           ).then((_) {
-            _diagnosticsState.activeProgrammaticListScrollReason = null;
-            _diagnosticsState.activeProgrammaticListTargetIndex = null;
-            _diagnosticsState.markProgrammaticListScrollCompleted(
+            _scrollState.activeProgrammaticListScrollReason = null;
+            _scrollState.activeProgrammaticListTargetIndex = null;
+            _scrollState.markProgrammaticListScrollCompleted(
               target,
               stabilize: stabilizeAfterScroll,
             );
@@ -657,8 +643,8 @@ class ReaderNavigationController {
         );
       });
     } finally {
-      _diagnosticsState.activeProgrammaticListScrollReason = null;
-      _diagnosticsState.activeProgrammaticListTargetIndex = null;
+      _scrollState.activeProgrammaticListScrollReason = null;
+      _scrollState.activeProgrammaticListTargetIndex = null;
     }
   }
 

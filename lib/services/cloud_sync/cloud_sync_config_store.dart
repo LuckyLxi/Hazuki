@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../shared/preferences/hazuki_preference_keys.dart';
+import '../../shared/reading/reader_settings_store.dart';
 import 'cloud_sync_models.dart';
 
 class CloudSyncConfigStore {
@@ -41,6 +42,11 @@ class CloudSyncConfigStore {
     downloadsRootPathKey,
     imageCacheMaxBytesKey,
     imageCacheLastAutoCleanAtKey,
+    ReaderSettingsStore.readingModeKey,
+    ReaderSettingsStore.doublePageModeKey,
+    ReaderSettingsStore.filterEnabledKey,
+    ReaderSettingsStore.filterColorKey,
+    ReaderSettingsStore.filterStrengthKey,
   };
 
   static bool shouldAlwaysSkipSetting(String key) {

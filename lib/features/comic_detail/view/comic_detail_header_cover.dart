@@ -14,6 +14,8 @@ class ComicDetailHeaderCover extends StatelessWidget {
     required this.headerCoverCacheHeight,
     required this.coverBorderRadius,
     required this.onTap,
+    this.width = 135,
+    this.height = 190,
   });
 
   final String heroTag;
@@ -24,13 +26,15 @@ class ComicDetailHeaderCover extends StatelessWidget {
   final int headerCoverCacheHeight;
   final double coverBorderRadius;
   final VoidCallback? onTap;
+  final double width;
+  final double height;
 
   @override
   Widget build(BuildContext context) {
     return RepaintBoundary(
       child: SizedBox(
-        width: 135,
-        height: 190,
+        width: width,
+        height: height,
         child: InkWell(
           borderRadius: BorderRadius.circular(coverBorderRadius),
           onTap: onTap,

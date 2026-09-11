@@ -1,7 +1,9 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/app/app.dart';
 import 'package:hazuki/features/discover/view/discover_page_section_block.dart';
+import 'package:hazuki/features/discover/view/discover_section_page.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
@@ -9,6 +11,15 @@ import 'package:mocktail/mocktail.dart';
 
 class _MockSourceDiscoverGateway extends Mock
     implements SourceDiscoverGateway {}
+
+class _RecordingNavigatorObserver extends NavigatorObserver {
+  Route<dynamic>? latestRoute;
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    latestRoute = route;
+  }
+}
 
 const _section = ExploreSection(
   title: 'Recommended',
@@ -92,14 +103,41 @@ void main() {
       findsOneWidget,
     );
   });
+
+  testWidgets(
+    'Windows view more reuses the search transition and adaptive cover wall',
+    (tester) async {
+      final observer = _RecordingNavigatorObserver();
+      await tester.pumpWidget(
+        _buildSubject(
+          layout: DiscoverSectionLayout.horizontal,
+          platform: TargetPlatform.windows,
+          navigatorObservers: [observer],
+        ),
+      );
+
+      await tester.tap(find.byType(TextButton));
+      await tester.pump();
+
+      expect(observer.latestRoute, isA<CupertinoPageRoute<void>>());
+      await tester.pumpAndSettle();
+      expect(find.byType(DiscoverSectionPage), findsOneWidget);
+      final grid = tester.widget<GridView>(find.byType(GridView));
+      final delegate =
+          grid.gridDelegate as SliverGridDelegateWithMaxCrossAxisExtent;
+      expect(delegate.maxCrossAxisExtent, 170);
+    },
+  );
 }
 
 Widget _buildSubject({
   required DiscoverSectionLayout layout,
   required TargetPlatform platform,
+  List<NavigatorObserver> navigatorObservers = const <NavigatorObserver>[],
 }) {
   return MaterialApp(
     theme: ThemeData(platform: platform),
+    navigatorObservers: navigatorObservers,
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
     home: Scaffold(

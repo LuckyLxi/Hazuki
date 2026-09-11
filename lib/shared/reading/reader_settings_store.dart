@@ -58,6 +58,8 @@ class ReaderSettingsStore {
   static const String pageIndicatorKey = 'reader_page_indicator';
   static const String pinchToZoomKey = 'reader_pinch_to_zoom';
   static const String longPressToSaveKey = 'reader_long_press_save';
+  static const String windowsShortcutsGuideSeenKey =
+      'reader_windows_shortcuts_guide_seen';
 
   static const ReaderMode defaultReaderMode = ReaderMode.topToBottom;
   static const bool defaultDoublePageMode = false;
@@ -155,6 +157,15 @@ class ReaderSettingsStore {
 
   Future<void> saveLongPressToSave(bool value) {
     return _saveBool(longPressToSaveKey, value);
+  }
+
+  Future<bool> hasSeenWindowsShortcutsGuide() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(windowsShortcutsGuideSeenKey) ?? false;
+  }
+
+  Future<void> markWindowsShortcutsGuideSeen() {
+    return _saveBool(windowsShortcutsGuideSeenKey, true);
   }
 
   static double normalizeBrightnessValue(double value) {

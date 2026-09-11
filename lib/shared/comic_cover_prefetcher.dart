@@ -5,7 +5,7 @@ import 'package:flutter/widgets.dart';
 
 import '../models/hazuki_models.dart';
 import '../services/source/source_capabilities.dart';
-import '../widgets/cached_image_widgets.dart';
+import 'images/widget_image_memory.dart';
 import 'ui_flags.dart';
 
 class ComicCoverPrefetcher {

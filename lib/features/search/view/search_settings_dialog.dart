@@ -3,10 +3,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 
+import '../support/search_shared.dart';
+
 Future<void> showSearchSettingsDialog(
   BuildContext context, {
   required bool aggregateSearchEnabled,
   required ValueChanged<bool> onAggregateSearchChanged,
+  required SearchComicLayout comicLayout,
+  required ValueChanged<SearchComicLayout> onComicLayoutChanged,
 }) {
   final strings = AppLocalizations.of(context)!;
   return showGeneralDialog<void>(
@@ -21,6 +25,8 @@ Future<void> showSearchSettingsDialog(
         _SearchSettingsDialog(
           aggregateSearchEnabled: aggregateSearchEnabled,
           onAggregateSearchChanged: onAggregateSearchChanged,
+          comicLayout: comicLayout,
+          onComicLayoutChanged: onComicLayoutChanged,
         ),
       );
     },
@@ -49,10 +55,14 @@ class _SearchSettingsDialog extends StatefulWidget {
   const _SearchSettingsDialog({
     required this.aggregateSearchEnabled,
     required this.onAggregateSearchChanged,
+    required this.comicLayout,
+    required this.onComicLayoutChanged,
   });
 
   final bool aggregateSearchEnabled;
   final ValueChanged<bool> onAggregateSearchChanged;
+  final SearchComicLayout comicLayout;
+  final ValueChanged<SearchComicLayout> onComicLayoutChanged;
 
   @override
   State<_SearchSettingsDialog> createState() => _SearchSettingsDialogState();
@@ -60,24 +70,54 @@ class _SearchSettingsDialog extends StatefulWidget {
 
 class _SearchSettingsDialogState extends State<_SearchSettingsDialog> {
   late bool _aggregateSearchEnabled = widget.aggregateSearchEnabled;
+  late SearchComicLayout _comicLayout = widget.comicLayout;
 
   @override
   Widget build(BuildContext context) {
     final strings = AppLocalizations.of(context)!;
     return AlertDialog(
+      scrollable: true,
       title: Text(strings.searchSettingsTitle),
       contentPadding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-      content: SwitchListTile(
-        key: const ValueKey('aggregate-search-switch'),
-        value: _aggregateSearchEnabled,
-        secondary: const Icon(Icons.hub_outlined),
-        title: Text(strings.searchAggregateSearch),
-        onChanged: (enabled) {
-          setState(() {
-            _aggregateSearchEnabled = enabled;
-          });
-          widget.onAggregateSearchChanged(enabled);
-        },
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SwitchListTile(
+            key: const ValueKey('aggregate-search-switch'),
+            value: _aggregateSearchEnabled,
+            secondary: const Icon(Icons.hub_outlined),
+            title: Text(strings.searchAggregateSearch),
+            subtitle: Text(strings.searchAggregateSearchDescription),
+            onChanged: (enabled) {
+              setState(() {
+                _aggregateSearchEnabled = enabled;
+              });
+              widget.onAggregateSearchChanged(enabled);
+            },
+          ),
+          const Divider(height: 24),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              strings.searchResultLayout,
+              style: Theme.of(context).textTheme.labelLarge,
+            ),
+          ),
+          const SizedBox(height: 4),
+          _buildLayoutTile(
+            context,
+            layout: SearchComicLayout.list,
+            icon: Icons.view_list_rounded,
+            label: strings.searchLayoutList,
+          ),
+          _buildLayoutTile(
+            context,
+            layout: SearchComicLayout.grid3,
+            icon: Icons.apps_rounded,
+            label: strings.searchLayoutGrid3,
+          ),
+        ],
       ),
       actions: [
         TextButton(
@@ -85,6 +125,34 @@ class _SearchSettingsDialogState extends State<_SearchSettingsDialog> {
           child: Text(strings.commonClose),
         ),
       ],
+    );
+  }
+
+  Widget _buildLayoutTile(
+    BuildContext context, {
+    required SearchComicLayout layout,
+    required IconData icon,
+    required String label,
+  }) {
+    final selected = _comicLayout == layout;
+    return ListTile(
+      key: ValueKey('search-layout-${layout.name}'),
+      leading: Icon(icon),
+      title: Text(label),
+      trailing: selected
+          ? Icon(
+              Icons.check_rounded,
+              color: Theme.of(context).colorScheme.primary,
+            )
+          : null,
+      selected: selected,
+      onTap: () {
+        if (selected) return;
+        setState(() {
+          _comicLayout = layout;
+        });
+        widget.onComicLayoutChanged(layout);
+      },
     );
   }
 }

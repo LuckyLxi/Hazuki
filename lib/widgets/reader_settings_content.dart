@@ -44,6 +44,7 @@ class ReaderSettingsContent extends StatelessWidget {
     required this.onPicacgImageQualityChanged,
     this.onBrightnessChangeEnd,
     this.onFilterStrengthChangeEnd,
+    this.onShowWindowsShortcuts,
     this.onClose,
   });
 
@@ -81,6 +82,7 @@ class ReaderSettingsContent extends StatelessWidget {
   final ValueChanged<double>? onFilterStrengthChangeEnd;
   final ValueChanged<String?> onCopyMangaImageQualityChanged;
   final ValueChanged<String?> onPicacgImageQualityChanged;
+  final VoidCallback? onShowWindowsShortcuts;
   final VoidCallback? onClose;
 
   @override
@@ -190,6 +192,8 @@ class ReaderSettingsContent extends StatelessWidget {
               _buildPicacgImageQualityField(),
             ],
           ),
+        if (onShowWindowsShortcuts != null)
+          _PageSettingsGroup(children: [_buildWindowsShortcutsTile(context)]),
       ],
     );
   }
@@ -335,8 +339,24 @@ class ReaderSettingsContent extends StatelessWidget {
                 ],
               ],
             ),
+          if (onShowWindowsShortcuts != null)
+            _DrawerSettingsGroup(
+              theme: theme,
+              children: [_buildWindowsShortcutsTile(context)],
+            ),
         ],
       ),
+    );
+  }
+
+  Widget _buildWindowsShortcutsTile(BuildContext context) {
+    return ListTile(
+      key: const ValueKey('reader-windows-shortcuts-settings-entry'),
+      leading: const Icon(Icons.keyboard_alt_outlined),
+      title: Text(l10n(context).readerWindowsShortcutsOpenTitle),
+      subtitle: Text(l10n(context).readerWindowsShortcutsOpenSubtitle),
+      trailing: const Icon(Icons.chevron_right),
+      onTap: onShowWindowsShortcuts,
     );
   }
 

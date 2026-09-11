@@ -247,6 +247,7 @@ class DiscoverSectionContent extends StatelessWidget {
 
   static const int _gridCrossAxisCount = 3;
   static const double _gridSpacing = 10;
+  static const double _windowsMaxCoverExtent = 170;
 
   final DiscoverSectionPageController controller;
   final ScrollController scrollController;
@@ -275,24 +276,35 @@ class DiscoverSectionContent extends StatelessWidget {
               : Center(child: Text(strings.discoverSectionEmpty))
         : LayoutBuilder(
             builder: (context, constraints) {
+              final useWindowsLayout =
+                  Theme.of(context).platform == TargetPlatform.windows;
               final contentWidth = constraints.maxWidth - 32;
-              final coverWidth =
-                  (contentWidth - (_gridCrossAxisCount - 1) * _gridSpacing) /
-                  _gridCrossAxisCount;
+              final coverWidth = useWindowsLayout
+                  ? _windowsMaxCoverExtent
+                  : (contentWidth - (_gridCrossAxisCount - 1) * _gridSpacing) /
+                        _gridCrossAxisCount;
               final coverCacheWidth =
                   (coverWidth * MediaQuery.devicePixelRatioOf(context)).round();
+              final SliverGridDelegate gridDelegate = useWindowsLayout
+                  ? const SliverGridDelegateWithMaxCrossAxisExtent(
+                      maxCrossAxisExtent: _windowsMaxCoverExtent,
+                      mainAxisSpacing: _gridSpacing,
+                      crossAxisSpacing: _gridSpacing,
+                      childAspectRatio: 0.57,
+                    )
+                  : const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: _gridCrossAxisCount,
+                      mainAxisSpacing: _gridSpacing,
+                      crossAxisSpacing: _gridSpacing,
+                      childAspectRatio: 0.57,
+                    );
 
               return GridView.builder(
                 controller: scrollController,
                 addAutomaticKeepAlives: false,
                 padding: EdgeInsets.fromLTRB(16, topPadding, 16, 12),
                 itemCount: controller.comics.length,
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: _gridCrossAxisCount,
-                  mainAxisSpacing: _gridSpacing,
-                  crossAxisSpacing: _gridSpacing,
-                  childAspectRatio: 0.57,
-                ),
+                gridDelegate: gridDelegate,
                 itemBuilder: (context, index) {
                   final comic = controller.comics[index];
                   final heroTag = comicCoverHeroTagBuilder(

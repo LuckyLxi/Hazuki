@@ -60,11 +60,13 @@ class ComicBlurredCoverBackground extends StatefulWidget {
     required this.coverUrl,
     required this.sourceKey,
     required this.imageGateway,
+    this.showCachedCoverImmediately = false,
   });
 
   final String coverUrl;
   final String sourceKey;
   final SourceImageGateway imageGateway;
+  final bool showCachedCoverImmediately;
 
   @override
   State<ComicBlurredCoverBackground> createState() =>
@@ -85,7 +87,10 @@ class _ComicBlurredCoverBackgroundState
     );
     if (cached != null) {
       _coverBytes = cached;
-      _queueBackgroundReveal();
+      _showBackground = widget.showCachedCoverImmediately;
+      if (!_showBackground) {
+        _queueBackgroundReveal();
+      }
       return;
     }
     final normalizedUrl = widget.coverUrl.trim();
@@ -99,6 +104,14 @@ class _ComicBlurredCoverBackgroundState
     super.didUpdateWidget(oldWidget);
     if (oldWidget.coverUrl == widget.coverUrl &&
         oldWidget.sourceKey == widget.sourceKey) {
+      if (widget.showCachedCoverImmediately &&
+          !oldWidget.showCachedCoverImmediately &&
+          _coverBytes != null &&
+          !_showBackground) {
+        setState(() {
+          _showBackground = true;
+        });
+      }
       return;
     }
     final cached = _takeBackgroundCoverBytes(
@@ -108,9 +121,11 @@ class _ComicBlurredCoverBackgroundState
     if (cached != null) {
       setState(() {
         _coverBytes = cached;
-        _showBackground = false;
+        _showBackground = widget.showCachedCoverImmediately;
       });
-      _queueBackgroundReveal();
+      if (!_showBackground) {
+        _queueBackgroundReveal();
+      }
       return;
     }
     setState(() {
