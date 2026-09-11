@@ -12,12 +12,14 @@ class ComicDetailParallaxBackground extends StatefulWidget {
     required this.sourceKey,
     required this.scrollController,
     required this.imageGateway,
+    this.showCachedCoverImmediately = false,
   });
 
   final String coverUrl;
   final String sourceKey;
   final ScrollController scrollController;
   final SourceImageGateway imageGateway;
+  final bool showCachedCoverImmediately;
 
   @override
   State<ComicDetailParallaxBackground> createState() =>
@@ -98,6 +100,7 @@ class _ComicDetailParallaxBackgroundState
               coverUrl: widget.coverUrl,
               sourceKey: widget.sourceKey,
               imageGateway: widget.imageGateway,
+              showCachedCoverImmediately: widget.showCachedCoverImmediately,
             ),
           ),
         ),

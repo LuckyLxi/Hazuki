@@ -44,7 +44,10 @@ class ComicDetailRelatedTile extends StatelessWidget {
                         sourceKey: comic.sourceKey,
                         fit: BoxFit.cover,
                         width: double.infinity,
-                        keepInMemory: false,
+                        // Windows restores a previous detail by rebuilding it.
+                        // Retaining displayed related covers lets the restored
+                        // grid paint them on its first frame.
+                        keepInMemory: true,
                         cacheWidth: thumbnailCacheWidth,
                         animateOnLoad: true,
                         loadAnimationBeginScale: 1,

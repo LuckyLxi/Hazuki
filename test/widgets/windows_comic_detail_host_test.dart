@@ -26,6 +26,7 @@ void main() {
           comic,
           heroTag, {
           required shouldAnimatePanelReveal,
+          required isRestoringPreviousDetail,
           required initialTabIndex,
           required showHomeAction,
           required onBackRequested,
@@ -60,6 +61,7 @@ void main() {
             comic,
             heroTag, {
             required shouldAnimatePanelReveal,
+            required isRestoringPreviousDetail,
             required initialTabIndex,
             required showHomeAction,
             required onBackRequested,
@@ -137,6 +139,7 @@ void main() {
             comic,
             heroTag, {
             required shouldAnimatePanelReveal,
+            required isRestoringPreviousDetail,
             required initialTabIndex,
             required showHomeAction,
             required onBackRequested,
@@ -358,19 +361,24 @@ void main() {
       return;
     }
 
+    final restoreStateByComic = <String, bool>{};
     panelBuilder =
         (
           comic,
           heroTag, {
           required shouldAnimatePanelReveal,
+          required isRestoringPreviousDetail,
           required initialTabIndex,
           required showHomeAction,
           required onBackRequested,
           required onHomeRequested,
-        }) => ColoredBox(
-          key: ValueKey('comic-detail-panel-${comic.id}'),
-          color: Colors.white,
-        );
+        }) {
+          restoreStateByComic[comic.id] = isRestoringPreviousDetail;
+          return ColoredBox(
+            key: ValueKey('comic-detail-panel-${comic.id}'),
+            color: Colors.white,
+          );
+        };
     await tester.pumpWidget(
       MaterialApp(
         builder: presentationBuilder,
@@ -392,6 +400,7 @@ void main() {
       'original-hero-tag',
     );
     await tester.pumpAndSettle();
+    expect(restoreStateByComic['original-comic'], isFalse);
 
     controller.pushRelated(
       const ExploreComic(
@@ -404,6 +413,7 @@ void main() {
       historyTabIndex: 2,
     );
     await tester.pump();
+    expect(restoreStateByComic['related-comic'], isFalse);
 
     final relatedPanel = find.byKey(
       const ValueKey('comic-detail-panel-related-comic'),
@@ -423,6 +433,7 @@ void main() {
 
     controller.goBack();
     await tester.pump();
+    expect(restoreStateByComic['original-comic'], isTrue);
     await tester.pump(const Duration(milliseconds: 140));
 
     final restoredOriginalPanel = find.byKey(
@@ -431,6 +442,119 @@ void main() {
     expect(tester.getTopLeft(restoredOriginalPanel).dy, closeTo(0, 0.01));
     expect(tester.getTopLeft(relatedPanel).dy, greaterThan(0));
   });
+
+  testWidgets(
+    'nested search routes restore the original detail and related history',
+    (tester) async {
+      if (!Platform.isWindows) {
+        return;
+      }
+      final navigatorKey = GlobalKey<NavigatorState>();
+      panelBuilder =
+          (
+            comic,
+            heroTag, {
+            required shouldAnimatePanelReveal,
+            required isRestoringPreviousDetail,
+            required initialTabIndex,
+            required showHomeAction,
+            required onBackRequested,
+            required onHomeRequested,
+          }) => Material(
+            key: ValueKey('comic-detail-panel-${comic.id}'),
+            child: Text('Detail ${comic.id}'),
+          );
+
+      await tester.pumpWidget(
+        MaterialApp(
+          navigatorKey: navigatorKey,
+          builder: presentationBuilder,
+          home: const WindowsComicDetailHost(
+            child: Scaffold(body: Text('Home')),
+          ),
+        ),
+      );
+      controller.open(
+        const ExploreComic(
+          id: 'root-detail',
+          title: 'Root detail',
+          subTitle: '',
+          cover: '',
+        ),
+        'root-detail-hero',
+      );
+      controller.pushRelated(
+        const ExploreComic(
+          id: 'first-detail',
+          title: 'First detail',
+          subTitle: '',
+          cover: '',
+        ),
+        'first-detail-hero',
+        historyTabIndex: 2,
+      );
+      await tester.pumpAndSettle();
+
+      navigatorKey.currentState!.push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => const WindowsComicDetailHost(
+            suppressExistingPanel: true,
+            child: Scaffold(body: Text('First search')),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('First search'), findsOneWidget);
+
+      controller.open(
+        const ExploreComic(
+          id: 'second-detail',
+          title: 'Second detail',
+          subTitle: '',
+          cover: '',
+        ),
+        'second-detail-hero',
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Detail second-detail'), findsOneWidget);
+
+      navigatorKey.currentState!.push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => const WindowsComicDetailHost(
+            suppressExistingPanel: true,
+            child: Scaffold(body: Text('Second search')),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Second search'), findsOneWidget);
+
+      navigatorKey.currentState!.pop();
+      await tester.pumpAndSettle();
+      expect(find.text('Detail second-detail'), findsOneWidget);
+
+      controller.close();
+      await tester.pumpAndSettle();
+      expect(find.text('First search'), findsOneWidget);
+
+      navigatorKey.currentState!.pop();
+      await tester.pump();
+      expect(controller.entry?.comic.id, 'first-detail');
+      expect(find.text('Detail first-detail'), findsWidgets);
+      expect(find.text('First search'), findsOneWidget);
+      await tester.pump(const Duration(milliseconds: 500));
+      expect(controller.entry?.comic.id, 'first-detail');
+      expect(find.text('Detail first-detail'), findsOneWidget);
+      await tester.pumpAndSettle();
+      expect(controller.canGoBack, isTrue);
+      controller.goBack();
+      await tester.pumpAndSettle();
+      expect(find.text('Detail root-detail'), findsOneWidget);
+      expect(controller.entry?.heroTag, 'root-detail-hero');
+      expect(controller.entry?.initialTabIndex, 2);
+      expect(controller.canGoBack, isFalse);
+    },
+  );
 
   testWidgets('nested page suppresses only the detail that was already open', (
     tester,

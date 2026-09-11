@@ -81,6 +81,25 @@ class ComicDetailBody extends StatelessWidget {
             if (details != null) {
               uiState.markComicDetailRevealHandled(details.id);
             }
+            final header = RepaintBoundary(
+              child: ComicDetailHeaderSection(
+                isDesktop: isDesktop,
+                heroTag: heroTag,
+                details: details,
+                skeletonColor: skeletonColor,
+                displayTitle: displayTitle,
+                displaySubTitle: displaySubTitle,
+                displayCoverUrl: displayCoverUrl,
+                viewsText: details != null
+                    ? extractComicViewsText(details)
+                    : '',
+                headerTitleKey: headerTitleKey,
+                favoriteRowKey: favoriteRowKey,
+                actionButtonsKey: actionButtonsKey,
+                shouldAnimateInitialDetailReveal:
+                    shouldAnimateInitialDetailReveal,
+              ),
+            );
 
             return NestedScrollView(
               controller: scrollController,
@@ -95,31 +114,15 @@ class ComicDetailBody extends StatelessWidget {
                         isDesktop ? 24 : 16,
                         0,
                       ),
-                      child: AnimatedSize(
-                        duration: const Duration(milliseconds: 320),
-                        curve: Curves.easeOutCubic,
-                        alignment: Alignment.topCenter,
-                        clipBehavior: Clip.hardEdge,
-                        child: RepaintBoundary(
-                          child: ComicDetailHeaderSection(
-                            isDesktop: isDesktop,
-                            heroTag: heroTag,
-                            details: details,
-                            skeletonColor: skeletonColor,
-                            displayTitle: displayTitle,
-                            displaySubTitle: displaySubTitle,
-                            displayCoverUrl: displayCoverUrl,
-                            viewsText: details != null
-                                ? extractComicViewsText(details)
-                                : '',
-                            headerTitleKey: headerTitleKey,
-                            favoriteRowKey: favoriteRowKey,
-                            actionButtonsKey: actionButtonsKey,
-                            shouldAnimateInitialDetailReveal:
-                                shouldAnimateInitialDetailReveal,
-                          ),
-                        ),
-                      ),
+                      child: shouldAnimateInitialDetailReveal
+                          ? AnimatedSize(
+                              duration: const Duration(milliseconds: 320),
+                              curve: Curves.easeOutCubic,
+                              alignment: Alignment.topCenter,
+                              clipBehavior: Clip.hardEdge,
+                              child: header,
+                            )
+                          : header,
                     ),
                   ),
                   SliverOverlapAbsorber(

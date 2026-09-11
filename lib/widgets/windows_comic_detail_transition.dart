@@ -51,7 +51,8 @@ class WindowsComicDetailTransition extends StatelessWidget {
             WindowsComicDetailNavigation.pop => !isActiveEntry,
             WindowsComicDetailNavigation.push => isActiveEntry,
             WindowsComicDetailNavigation.open ||
-            WindowsComicDetailNavigation.replace => false,
+            WindowsComicDetailNavigation.replace ||
+            WindowsComicDetailNavigation.resume => false,
           };
           return shouldSlide
               ? _slide(child, animation, const Offset(0, 1))

@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/shared/comments/comments_widget_builder.dart';
+import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 
 import '../repository/comic_detail_repository.dart';
 import '../support/comic_detail_actions_controller.dart';
@@ -236,6 +237,15 @@ class _ComicDetailPageState extends State<ComicDetailPage>
     final theme = _themeController.buildDetailTheme(Theme.of(context));
     final topInset = MediaQuery.viewPaddingOf(context).top + kToolbarHeight;
     final surface = theme.colorScheme.surface;
+    final showCachedCoverImmediately =
+        widget.isDesktopPanel &&
+        switch (WindowsComicDetailControllerScope.of(
+          context,
+        ).entry?.navigation) {
+          WindowsComicDetailNavigation.pop ||
+          WindowsComicDetailNavigation.resume => true,
+          _ => false,
+        };
 
     return ComicDetailScope(
       session: _sessionController,
@@ -270,6 +280,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
                 sourceKey: widget.comic.sourceKey,
                 scrollController: _scrollController,
                 imageGateway: widget.dependencies.imageGateway,
+                showCachedCoverImmediately: showCachedCoverImmediately,
               ),
               ComicDetailTopSurfaceOverlay(
                 progressListenable:

@@ -29,6 +29,8 @@ class _WindowsComicDetailHostState extends State<WindowsComicDetailHost> {
   bool _deferPanelUntilRouteSettles = false;
   Timer? _closeTimer;
   int? _suppressedEntryRevision;
+  WindowsComicDetailSnapshot? _suppressedEntry;
+  int? _suppressedEntryRestorationEpoch;
   int? _handledRevealRevision;
 
   WindowsComicDetailController get _controller =>
@@ -46,6 +48,12 @@ class _WindowsComicDetailHostState extends State<WindowsComicDetailHost> {
     final entry = _controller.entry;
     _suppressedEntryRevision = widget.suppressExistingPanel
         ? entry?.revision
+        : null;
+    _suppressedEntry = widget.suppressExistingPanel
+        ? _controller.captureSnapshot()
+        : null;
+    _suppressedEntryRestorationEpoch = widget.suppressExistingPanel
+        ? _controller.restorationEpoch
         : null;
     _displayEntry = _isEntrySuppressed(entry) ? null : entry;
     _displayEntryShouldAnimatePanelReveal = _consumePendingPanelReveal(
@@ -68,9 +76,13 @@ class _WindowsComicDetailHostState extends State<WindowsComicDetailHost> {
 
   @override
   void dispose() {
+    final controller = _controller;
     _closeTimer?.cancel();
     _detachRouteAnimation();
-    _controller.removeListener(_handleControllerChanged);
+    controller.removeListener(_handleControllerChanged);
+    if (_suppressedEntry != null) {
+      scheduleMicrotask(_restoreSuppressedEntry);
+    }
     super.dispose();
   }
 
@@ -122,7 +134,7 @@ class _WindowsComicDetailHostState extends State<WindowsComicDetailHost> {
 
   void _handleHomeRequested() {
     final navigator = Navigator.of(context, rootNavigator: true);
-    _controller.close();
+    _controller.close(discardSuspendedDetails: true);
     navigator.popUntil((route) => route.isFirst);
   }
 
@@ -132,7 +144,8 @@ class _WindowsComicDetailHostState extends State<WindowsComicDetailHost> {
     }
     if (_handledRevealRevision == entry.revision) return false;
     _handledRevealRevision = entry.revision;
-    return entry.navigation != WindowsComicDetailNavigation.replace;
+    return entry.navigation != WindowsComicDetailNavigation.replace &&
+        entry.navigation != WindowsComicDetailNavigation.resume;
   }
 
   void _attachRouteAnimationIfNeeded() {
@@ -153,11 +166,41 @@ class _WindowsComicDetailHostState extends State<WindowsComicDetailHost> {
     _routeAnimation = null;
   }
 
-  void _handleRouteAnimationStatusChanged(AnimationStatus _) {
+  void _handleRouteAnimationStatusChanged(AnimationStatus status) {
     if (!mounted) {
       return;
     }
+    if (status == AnimationStatus.reverse ||
+        status == AnimationStatus.dismissed) {
+      _restoreSuppressedEntry();
+    }
     _syncDeferredPanelVisibility();
+  }
+
+  void _restoreSuppressedEntry() {
+    final suppressedEntry = _suppressedEntry;
+    final restorationEpoch = _suppressedEntryRestorationEpoch;
+    _suppressedEntry = null;
+    _suppressedEntryRestorationEpoch = null;
+    if (suppressedEntry == null || restorationEpoch == null) {
+      return;
+    }
+    final controller = _controller;
+    final wasMounted = mounted;
+    if (wasMounted) {
+      controller.removeListener(_handleControllerChanged);
+    }
+    controller.restoreSuspended(
+      suppressedEntry,
+      restorationEpoch: restorationEpoch,
+    );
+    if (wasMounted) {
+      _suppressedEntryRevision = controller.entry?.revision;
+      _displayEntry = null;
+      _displayEntryShouldAnimatePanelReveal = false;
+      controller.addListener(_handleControllerChanged);
+      setState(() {});
+    }
   }
 
   void _syncDeferredPanelVisibility() {
@@ -213,7 +256,12 @@ class _WindowsComicDetailHostState extends State<WindowsComicDetailHost> {
               ),
               Positioned.fill(
                 child: AnimatedSlide(
-                  duration: windowsComicDetailPanelAnimationDuration,
+                  duration:
+                      activeEntry?.navigation ==
+                              WindowsComicDetailNavigation.resume &&
+                          showPanel
+                      ? Duration.zero
+                      : windowsComicDetailPanelAnimationDuration,
                   curve: Curves.easeOutCubic,
                   offset: showPanel ? Offset.zero : const Offset(0, 1),
                   child: IgnorePointer(
@@ -238,6 +286,13 @@ class _WindowsComicDetailHostState extends State<WindowsComicDetailHost> {
                                         activeEntry.heroTag,
                                         shouldAnimatePanelReveal:
                                             shouldAnimatePanelReveal,
+                                        isRestoringPreviousDetail:
+                                            activeEntry.navigation ==
+                                                WindowsComicDetailNavigation
+                                                    .pop ||
+                                            activeEntry.navigation ==
+                                                WindowsComicDetailNavigation
+                                                    .resume,
                                         initialTabIndex:
                                             activeEntry.initialTabIndex,
                                         showHomeAction: controller.canGoBack,

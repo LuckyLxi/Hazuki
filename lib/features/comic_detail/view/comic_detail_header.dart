@@ -105,6 +105,15 @@ class ComicDetailHeaderSection extends StatelessWidget {
               ],
             ],
           );
+          final animatedTitle = shouldAnimateInitialDetailReveal
+              ? AnimatedSize(
+                  duration: const Duration(milliseconds: 320),
+                  curve: Curves.easeOutCubic,
+                  alignment: Alignment.topLeft,
+                  clipBehavior: Clip.hardEdge,
+                  child: title,
+                )
+              : title;
           final controls = Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -142,7 +151,7 @@ class ComicDetailHeaderSection extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            title,
+                            animatedTitle,
                             const SizedBox(height: 28),
                             controls,
                           ],
@@ -157,7 +166,7 @@ class ComicDetailHeaderSection extends StatelessWidget {
                         children: [
                           cover,
                           const SizedBox(width: 20),
-                          Expanded(child: title),
+                          Expanded(child: animatedTitle),
                         ],
                       ),
                       const SizedBox(height: 20),

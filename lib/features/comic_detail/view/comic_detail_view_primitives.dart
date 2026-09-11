@@ -212,7 +212,7 @@ class _ComicDetailTabTickerScopeState extends State<ComicDetailTabTickerScope> {
   }
 }
 
-class ComicDetailEntranceReveal extends StatelessWidget {
+class ComicDetailEntranceReveal extends StatefulWidget {
   const ComicDetailEntranceReveal({
     super.key,
     required this.child,
@@ -225,18 +225,26 @@ class ComicDetailEntranceReveal extends StatelessWidget {
   final bool enabled;
 
   @override
+  State<ComicDetailEntranceReveal> createState() =>
+      _ComicDetailEntranceRevealState();
+}
+
+class _ComicDetailEntranceRevealState extends State<ComicDetailEntranceReveal> {
+  late final bool _playsEntrance = widget.enabled;
+
+  @override
   Widget build(BuildContext context) {
-    if (!enabled) {
-      return child;
+    if (!_playsEntrance) {
+      return widget.child;
     }
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(begin: 0, end: 1),
       duration: const Duration(milliseconds: 320),
       curve: Curves.easeOutCubic,
-      child: child,
+      child: widget.child,
       builder: (context, value, child) {
-        final dx = lerpDouble(beginOffset.dx, 0, value) ?? 0;
-        final dy = lerpDouble(beginOffset.dy, 0, value) ?? 0;
+        final dx = lerpDouble(widget.beginOffset.dx, 0, value) ?? 0;
+        final dy = lerpDouble(widget.beginOffset.dy, 0, value) ?? 0;
         return Opacity(
           opacity: value,
           child: Transform.translate(offset: Offset(dx, dy), child: child),

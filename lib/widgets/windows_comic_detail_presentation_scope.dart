@@ -6,6 +6,7 @@ typedef WindowsComicDetailPanelBuilder =
       ExploreComic comic,
       String heroTag, {
       required bool shouldAnimatePanelReveal,
+      required bool isRestoringPreviousDetail,
       required int initialTabIndex,
       required bool showHomeAction,
       required VoidCallback onBackRequested,

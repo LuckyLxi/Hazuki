@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/app/service_locator.dart';
@@ -57,6 +60,47 @@ void main() {
 
     expect(longPressed, isTrue);
   });
+
+  testWidgets('restored cached background is visible on its first frame', (
+    tester,
+  ) async {
+    const url = 'https://example.test/restored-background.png';
+    final gateway = _CoverImageGateway();
+
+    await tester.pumpWidget(
+      _wrapBackground(gateway: gateway, url: url, key: const ValueKey('seed')),
+    );
+    await tester.pumpAndSettle();
+    expect(gateway.downloadCount, 1);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+    await tester.pumpWidget(
+      _wrapBackground(
+        gateway: gateway,
+        url: url,
+        key: const ValueKey('normal-cache-hit'),
+      ),
+    );
+    final backgroundOpacity = find.byKey(
+      const ValueKey('static-cover-blur-$url'),
+    );
+    expect(tester.widget<AnimatedOpacity>(backgroundOpacity).opacity, 0);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+    await tester.pumpWidget(
+      _wrapBackground(
+        gateway: gateway,
+        url: url,
+        key: const ValueKey('restored-cache-hit'),
+        showCachedCoverImmediately: true,
+      ),
+    );
+    expect(tester.widget<AnimatedOpacity>(backgroundOpacity).opacity, 1);
+    expect(gateway.downloadCount, 1);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 Widget _wrapPreview({VoidCallback? onLongPress}) {
@@ -71,4 +115,55 @@ Widget _wrapPreview({VoidCallback? onLongPress}) {
       ),
     ),
   );
+}
+
+Widget _wrapBackground({
+  required SourceImageGateway gateway,
+  required String url,
+  required Key key,
+  bool showCachedCoverImmediately = false,
+}) {
+  return MaterialApp(
+    theme: ThemeData.dark(),
+    home: SizedBox.expand(
+      child: ComicBlurredCoverBackground(
+        key: key,
+        coverUrl: url,
+        sourceKey: 'copy_manga',
+        imageGateway: gateway,
+        showCachedCoverImmediately: showCachedCoverImmediately,
+      ),
+    ),
+  );
+}
+
+class _CoverImageGateway implements SourceImageGateway {
+  static final Uint8List _imageBytes = Uint8List.fromList(
+    base64Decode(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+    ),
+  );
+
+  int downloadCount = 0;
+
+  @override
+  String get activeSourceKey => 'copy_manga';
+
+  @override
+  Uint8List? peekImageBytesFromMemory(String url, {String sourceKey = ''}) =>
+      null;
+
+  @override
+  Future<Uint8List> downloadImageBytes(
+    String url, {
+    String comicId = '',
+    String epId = '',
+    bool keepInMemory = false,
+    bool useDiskCache = true,
+    bool priority = false,
+    String sourceKey = '',
+  }) async {
+    downloadCount += 1;
+    return _imageBytes;
+  }
 }

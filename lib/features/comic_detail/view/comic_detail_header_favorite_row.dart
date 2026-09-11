@@ -72,19 +72,28 @@ class ComicDetailHeaderFavoriteRow extends StatelessWidget {
         key: favoriteRowKey,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (!detailsReady)
-            ComicDetailSkeletonBlock(
-              color: skeletonColor,
-              width: 160,
-              height: 16,
-            )
-          else if (statsText.isNotEmpty)
-            Text(
-              statsText,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
+          SizedBox(
+            height: 20,
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: !detailsReady
+                  ? ComicDetailSkeletonBlock(
+                      color: skeletonColor,
+                      width: 160,
+                      height: 16,
+                    )
+                  : statsText.isNotEmpty
+                  ? Text(
+                      statsText,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    )
+                  : const SizedBox.shrink(),
             ),
+          ),
           const SizedBox(height: 16),
           Wrap(
             spacing: 10,

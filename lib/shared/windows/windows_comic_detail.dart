@@ -7,7 +7,7 @@ import '../../models/hazuki_models.dart';
 bool get useWindowsComicDetailPanel => Platform.isWindows;
 const windowsComicDetailPanelAnimationDuration = Duration(milliseconds: 320);
 
-enum WindowsComicDetailNavigation { open, replace, push, pop }
+enum WindowsComicDetailNavigation { open, replace, push, pop, resume }
 
 @immutable
 class WindowsComicDetailEntry {
@@ -26,6 +26,17 @@ class WindowsComicDetailEntry {
   final int initialTabIndex;
 }
 
+@immutable
+class WindowsComicDetailSnapshot {
+  WindowsComicDetailSnapshot._(
+    this.entry,
+    List<WindowsComicDetailEntry> history,
+  ) : history = List.unmodifiable(history);
+
+  final WindowsComicDetailEntry entry;
+  final List<WindowsComicDetailEntry> history;
+}
+
 class WindowsComicDetailController extends ChangeNotifier {
   WindowsComicDetailController();
 
@@ -35,6 +46,7 @@ class WindowsComicDetailController extends ChangeNotifier {
   WindowsComicDetailEntry? _entry;
   final List<WindowsComicDetailEntry> _history = <WindowsComicDetailEntry>[];
   int _revision = 0;
+  int _restorationEpoch = 0;
   final Set<int> _temporaryHideTokens = <int>{};
   int _temporaryHideTokenSeed = 0;
 
@@ -43,6 +55,13 @@ class WindowsComicDetailController extends ChangeNotifier {
   bool get canGoBack => _history.isNotEmpty;
   bool get isTemporarilyHidden => _temporaryHideTokens.isNotEmpty;
   bool get isPanelVisible => _entry != null && !isTemporarilyHidden;
+  int get restorationEpoch => _restorationEpoch;
+
+  /// Captures the current detail and its back stack before another route opens.
+  WindowsComicDetailSnapshot? captureSnapshot() {
+    final entry = _entry;
+    return entry == null ? null : WindowsComicDetailSnapshot._(entry, _history);
+  }
 
   /// Opens a root detail and clears the previous history.
   void open(ExploreComic comic, String heroTag) {
@@ -92,12 +111,35 @@ class WindowsComicDetailController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void close() {
+  void close({bool discardSuspendedDetails = false}) {
+    if (discardSuspendedDetails) {
+      _restorationEpoch += 1;
+    }
     if (_entry == null) {
       return;
     }
     _entry = null;
     _history.clear();
+    notifyListeners();
+  }
+
+  void restoreSuspended(
+    WindowsComicDetailSnapshot suspended, {
+    required int restorationEpoch,
+  }) {
+    if (_entry != null || restorationEpoch != _restorationEpoch) {
+      return;
+    }
+    _history
+      ..clear()
+      ..addAll(suspended.history);
+    _entry = WindowsComicDetailEntry(
+      comic: suspended.entry.comic,
+      heroTag: suspended.entry.heroTag,
+      revision: ++_revision,
+      navigation: WindowsComicDetailNavigation.resume,
+      initialTabIndex: suspended.entry.initialTabIndex,
+    );
     notifyListeners();
   }
 
