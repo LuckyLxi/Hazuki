@@ -951,8 +951,7 @@ Future<void> _pumpSearchSettled(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
-Future<SearchComicsResult> _fakeSearchPageLoader(
-  BuildContext context, {
+Future<SearchComicsResult> _fakeSearchPageLoader({
   required String keyword,
   required int page,
   required String order,
@@ -972,19 +971,9 @@ Future<SearchComicsResult> _fakeSearchPageLoader(
 }
 
 SearchPageLoader _recordingSearchPageLoader(List<String> requests) {
-  return (
-    BuildContext context, {
-    required String keyword,
-    required int page,
-    required String order,
-  }) {
+  return ({required String keyword, required int page, required String order}) {
     requests.add(keyword);
-    return _fakeSearchPageLoader(
-      context,
-      keyword: keyword,
-      page: page,
-      order: order,
-    );
+    return _fakeSearchPageLoader(keyword: keyword, page: page, order: order);
   };
 }
 

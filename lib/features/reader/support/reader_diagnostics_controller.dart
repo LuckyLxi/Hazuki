@@ -6,6 +6,7 @@ import 'package:hazuki/features/reader/state/reader_image_pipeline_state.dart';
 import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
 import 'package:hazuki/features/reader/support/reader_diagnostics_support.dart';
 import 'package:hazuki/shared/reading/reader_mode.dart';
+import '../state/reader_scroll_state.dart';
 
 typedef ReaderDiagnosticLogSink =
     void Function(String title, {String level, String source, Object? content});
@@ -15,6 +16,7 @@ class ReaderDiagnosticsController {
     required ReaderRuntimeState runtimeState,
     required ReaderImagePipelineState imagePipelineState,
     required ReaderDiagnosticsState diagnosticsState,
+    required ReaderScrollState scrollState,
     required ScrollController scrollController,
     required PageController pageController,
     required TransformationController zoomController,
@@ -28,6 +30,7 @@ class ReaderDiagnosticsController {
   }) : _runtimeState = runtimeState,
        _imagePipelineState = imagePipelineState,
        _diagnosticsState = diagnosticsState,
+       _scrollState = scrollState,
        _scrollController = scrollController,
        _pageController = pageController,
        _zoomController = zoomController,
@@ -38,6 +41,7 @@ class ReaderDiagnosticsController {
   final ReaderRuntimeState _runtimeState;
   final ReaderImagePipelineState _imagePipelineState;
   final ReaderDiagnosticsState _diagnosticsState;
+  final ReaderScrollState _scrollState;
   final ScrollController _scrollController;
   final PageController _pageController;
   final TransformationController _zoomController;
@@ -118,16 +122,16 @@ class ReaderDiagnosticsController {
       aspectRatioCacheSize: _imagePipelineState.imageAspectRatioCache.length,
       prefetchAheadRunning: _imagePipelineState.prefetchAheadRunning,
       activeUnscrambleTasks: _imagePipelineState.activeUnscrambleTasks,
-      listUserScrollInProgress: _diagnosticsState.listUserScrollInProgress,
+      listUserScrollInProgress: _scrollState.listUserScrollInProgress,
       activeProgrammaticListScrollReason:
-          _diagnosticsState.activeProgrammaticListScrollReason,
+          _scrollState.activeProgrammaticListScrollReason,
       activeProgrammaticListTargetIndex:
-          _diagnosticsState.activeProgrammaticListTargetIndex,
+          _scrollState.activeProgrammaticListTargetIndex,
       lastCompletedProgrammaticListTargetIndex:
-          _diagnosticsState.lastCompletedProgrammaticListTargetIndex,
-      lastObservedListPixels: _diagnosticsState.lastObservedListPixels == null
+          _scrollState.lastCompletedProgrammaticListTargetIndex,
+      lastObservedListPixels: _scrollState.lastObservedListPixels == null
           ? null
-          : normalizeReaderLogDouble(_diagnosticsState.lastObservedListPixels!),
+          : normalizeReaderLogDouble(_scrollState.lastObservedListPixels!),
       pageControllerPage: pageControllerPage,
       listSnapshot: listSnapshot,
     );

@@ -32,6 +32,7 @@ import 'package:hazuki/features/reader/view/reader_state_views.dart';
 import 'package:hazuki/features/reader/view/reader_windows_shortcuts_dialog.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/shared/ui_flags.dart';
+import '../state/reader_scroll_state.dart';
 
 class ReaderPage extends StatefulWidget {
   const ReaderPage({
@@ -83,6 +84,7 @@ class _ReaderPageState extends State<ReaderPage>
   final PageController _pageController = PageController();
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   final TransformationController _zoomController = TransformationController();
+  final ReaderScrollState _scrollState = ReaderScrollState();
   final ReaderDiagnosticsState _diagnosticsState = ReaderDiagnosticsState();
   final FocusNode _readerKeyFocusNode = FocusNode();
   final ReaderRuntimeState _runtimeState = ReaderRuntimeState();
@@ -151,6 +153,7 @@ class _ReaderPageState extends State<ReaderPage>
         runtimeState: _runtimeState,
         imagePipelineState: _imagePipelineState,
         diagnosticsState: _diagnosticsState,
+        scrollState: _scrollState,
         scrollController: _scrollController,
         pageController: _pageController,
         zoomController: _zoomController,
@@ -178,6 +181,7 @@ class _ReaderPageState extends State<ReaderPage>
       ReaderNavigationController(
         runtimeState: _runtimeState,
         diagnosticsState: _diagnosticsState,
+        scrollState: _scrollState,
         scrollController: _scrollController,
         pageController: _pageController,
         isMounted: () => mounted,

@@ -1,9 +1,8 @@
-import 'package:flutter/material.dart';
-import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:flutter/foundation.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 
-import '../support/search_shared.dart';
+import '../support/search_contracts.dart';
 
 class SearchResultsController extends ChangeNotifier {
   static const Duration _initialSearchRetryDelay = Duration(milliseconds: 450);
@@ -144,21 +143,16 @@ class SearchResultsController extends ChangeNotifier {
   }
 
   Future<SearchComicsResult> _loadSearchPage(
-    BuildContext context, {
+    SearchMessages messages, {
     required String keyword,
     required int page,
     required String order,
   }) {
     final overrideLoader = _searchPageLoader;
     if (overrideLoader != null) {
-      return overrideLoader(
-        context,
-        keyword: keyword,
-        page: page,
-        order: order,
-      );
+      return overrideLoader(keyword: keyword, page: page, order: order);
     }
-    final timeoutMessage = AppLocalizations.of(context)!.searchTimeout;
+    final timeoutMessage = messages.timeout;
     return _sourceService
         .searchComics(keyword: keyword, page: page, order: order)
         .timeout(
@@ -178,13 +172,12 @@ class SearchResultsController extends ChangeNotifier {
   }
 
   Future<void> search(
-    BuildContext context, {
+    SearchMessages messages, {
     required String keyword,
     required int page,
     bool append = false,
     bool silentRefresh = false,
   }) async {
-    final strings = AppLocalizations.of(context)!;
     final normalized = keyword.trim();
     if (normalized.isEmpty) {
       return;
@@ -225,7 +218,7 @@ class SearchResultsController extends ChangeNotifier {
       for (var attempt = 0; attempt < maxAttempts; attempt++) {
         try {
           result = await _loadSearchPage(
-            context,
+            messages,
             keyword: normalized,
             page: page,
             order: _searchOrder,
@@ -280,7 +273,7 @@ class SearchResultsController extends ChangeNotifier {
       if (!isCurrentRequest(requestToken)) {
         return;
       }
-      _searchErrorMessage = strings.searchFailed('$e');
+      _searchErrorMessage = messages.failed('$e');
     } finally {
       if (isCurrentRequest(requestToken)) {
         if (isLoadMore) {
@@ -293,7 +286,7 @@ class SearchResultsController extends ChangeNotifier {
     }
   }
 
-  Future<void> loadMoreSearch(BuildContext context) async {
+  Future<void> loadMoreSearch(SearchMessages messages) async {
     if (_searchKeyword.isEmpty ||
         _searchLoading ||
         _searchLoadingMore ||
@@ -307,7 +300,7 @@ class SearchResultsController extends ChangeNotifier {
     }
 
     await search(
-      context,
+      messages,
       keyword: _searchKeyword,
       page: _searchPage + 1,
       append: true,

@@ -289,7 +289,7 @@ class _SearchAggregateSectionPageState
     }
     final position = _scrollController.position;
     if (position.pixels >= position.maxScrollExtent - 300) {
-      widget.controller.loadMore(context, widget.section);
+      widget.controller.loadMore(searchMessages(context), widget.section);
     }
   }
 
@@ -314,7 +314,11 @@ class _SearchAggregateSectionPageState
               onOrderMenuOpened: () {},
               onOrderSelected: (order) {
                 unawaited(
-                  widget.controller.changeOrder(context, section, order),
+                  widget.controller.changeOrder(
+                    searchMessages(context),
+                    section,
+                    order,
+                  ),
                 );
               },
             ),
@@ -341,7 +345,8 @@ class _SearchAggregateSectionPageState
             icon: Icons.error_outline_rounded,
             message: section.errorMessage!,
             actionLabel: AppLocalizations.of(context)!.commonRetry,
-            onAction: () => widget.controller.retry(context, section),
+            onAction: () =>
+                widget.controller.retry(searchMessages(context), section),
           ),
         ),
       );
@@ -420,8 +425,10 @@ class _SearchAggregateSectionPageState
                       ),
                     ),
                     TextButton(
-                      onPressed: () =>
-                          widget.controller.loadMore(context, section),
+                      onPressed: () => widget.controller.loadMore(
+                        searchMessages(context),
+                        section,
+                      ),
                       child: Text(AppLocalizations.of(context)!.commonRetry),
                     ),
                   ],

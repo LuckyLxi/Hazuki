@@ -1,3 +1,4 @@
+import 'package:hazuki/features/reader/state/reader_scroll_state.dart';
 import 'package:hazuki/features/reader/support/reader_input_controller.dart';
 import 'package:hazuki/features/reader/support/reader_display_session.dart';
 import 'package:hazuki/shared/ui_flags.dart';
@@ -281,6 +282,7 @@ void main() {
           ..applyImages(['a', 'b', 'c', 'd'])
           ..setCurrentPageIndex(1);
         runtimeState.setCurrentPageIndex(1);
+        final scrollState = ReaderScrollState();
         final diagnosticsState = ReaderDiagnosticsState();
         final scrollController = ScrollController();
         final pageController = PageController();
@@ -313,6 +315,7 @@ void main() {
         final navigationController = ReaderNavigationController(
           runtimeState: runtimeState,
           diagnosticsState: diagnosticsState,
+          scrollState: scrollState,
           scrollController: scrollController,
           pageController: pageController,
           isMounted: () => true,
@@ -1086,6 +1089,7 @@ void main() {
       final controller = ReaderNavigationController(
         runtimeState: state,
         diagnosticsState: ReaderDiagnosticsState(),
+        scrollState: ReaderScrollState(),
         scrollController: scrollController,
         pageController: pageController,
         isMounted: () => true,
@@ -1189,6 +1193,7 @@ void main() {
         final controller = ReaderNavigationController(
           runtimeState: state,
           diagnosticsState: ReaderDiagnosticsState(),
+          scrollState: ReaderScrollState(),
           scrollController: ScrollController(),
           pageController: PageController(),
           isMounted: () => true,
@@ -1247,6 +1252,7 @@ void main() {
       final controller = ReaderNavigationController(
         runtimeState: state,
         diagnosticsState: ReaderDiagnosticsState(),
+        scrollState: ReaderScrollState(),
         scrollController: scrollController,
         pageController: pageController,
         isMounted: () => true,
@@ -1276,6 +1282,7 @@ void main() {
       final state = ReaderRuntimeState()
         ..applyImages(List<String>.generate(30, (index) => 'img$index'))
         ..updateSettings(readerMode: ReaderMode.topToBottom);
+      final scrollState = ReaderScrollState();
       final diagnosticsState = ReaderDiagnosticsState();
       final scrollController = ScrollController();
       final pageController = PageController();
@@ -1305,6 +1312,7 @@ void main() {
       final controller = ReaderNavigationController(
         runtimeState: state,
         diagnosticsState: diagnosticsState,
+        scrollState: scrollState,
         scrollController: scrollController,
         pageController: pageController,
         isMounted: () => true,
@@ -1321,8 +1329,8 @@ void main() {
       await tester.pumpAndSettle();
       await navigation;
 
-      expect(diagnosticsState.stabilizingProgrammaticListTargetIndex, 12);
-      expect(diagnosticsState.hasActiveProgrammaticListStabilization, isTrue);
+      expect(scrollState.stabilizingProgrammaticListTargetIndex, 12);
+      expect(scrollState.hasActiveProgrammaticListStabilization, isTrue);
 
       controller.handleScrollNotification(
         ScrollStartNotification(
@@ -1332,7 +1340,7 @@ void main() {
         ),
       );
 
-      expect(diagnosticsState.stabilizingProgrammaticListTargetIndex, isNull);
+      expect(scrollState.stabilizingProgrammaticListTargetIndex, isNull);
     });
 
     testWidgets(
@@ -1341,6 +1349,7 @@ void main() {
         final state = ReaderRuntimeState()
           ..applyImages(List<String>.generate(30, (index) => 'img$index'))
           ..updateSettings(readerMode: ReaderMode.topToBottom);
+        final scrollState = ReaderScrollState();
         final diagnosticsState = ReaderDiagnosticsState();
         final scrollController = ScrollController();
         final pageController = PageController();
@@ -1370,6 +1379,7 @@ void main() {
         final controller = ReaderNavigationController(
           runtimeState: state,
           diagnosticsState: diagnosticsState,
+          scrollState: scrollState,
           scrollController: scrollController,
           pageController: pageController,
           isMounted: () => true,
@@ -1383,11 +1393,11 @@ void main() {
         );
 
         controller.syncPositionToImageIndex(12, trigger: 'mode_changed_sync');
-        expect(diagnosticsState.activeProgrammaticListTargetIndex, 12);
+        expect(scrollState.activeProgrammaticListTargetIndex, 12);
         await tester.pumpAndSettle();
 
-        expect(diagnosticsState.stabilizingProgrammaticListTargetIndex, 12);
-        expect(diagnosticsState.hasActiveProgrammaticListStabilization, isTrue);
+        expect(scrollState.stabilizingProgrammaticListTargetIndex, 12);
+        expect(scrollState.hasActiveProgrammaticListStabilization, isTrue);
       },
     );
 
@@ -1397,6 +1407,7 @@ void main() {
         final state = ReaderRuntimeState()
           ..applyImages(List<String>.generate(30, (index) => 'img$index'))
           ..updateSettings(readerMode: ReaderMode.topToBottom);
+        final scrollState = ReaderScrollState();
         final diagnosticsState = ReaderDiagnosticsState();
         final scrollController = ScrollController();
         final pageController = PageController();
@@ -1427,6 +1438,7 @@ void main() {
         final controller = ReaderNavigationController(
           runtimeState: state,
           diagnosticsState: diagnosticsState,
+          scrollState: scrollState,
           scrollController: scrollController,
           pageController: pageController,
           isMounted: () => true,
@@ -1440,10 +1452,7 @@ void main() {
         );
 
         scrollController.jumpTo(100);
-        diagnosticsState.markProgrammaticListScrollCompleted(
-          5,
-          stabilize: true,
-        );
+        scrollState.markProgrammaticListScrollCompleted(5, stabilize: true);
         await tester.pump();
 
         final beforeCorrection = scrollController.position.pixels;
@@ -1470,8 +1479,9 @@ void main() {
       final pipelineState = ReaderImagePipelineState()
         ..activeUnscrambleTasks = 2
         ..prefetchAheadRunning = true;
-      final diagnosticsState = ReaderDiagnosticsState()
-        ..lastObservedListPixels = 12.345;
+      final scrollState = ReaderScrollState();
+      final diagnosticsState = ReaderDiagnosticsState();
+      scrollState.lastObservedListPixels = 12.345;
       final scrollController = ScrollController();
       final pageController = PageController();
       final zoomController = TransformationController();
@@ -1485,6 +1495,7 @@ void main() {
         runtimeState: runtimeState,
         imagePipelineState: pipelineState,
         diagnosticsState: diagnosticsState,
+        scrollState: scrollState,
         scrollController: scrollController,
         pageController: pageController,
         zoomController: zoomController,
@@ -1519,6 +1530,7 @@ void main() {
         ..applyImages(['a', 'b', 'c', 'd'])
         ..updateSettings(readerMode: ReaderMode.topToBottom);
       final pipelineState = ReaderImagePipelineState();
+      final scrollState = ReaderScrollState();
       final diagnosticsState = ReaderDiagnosticsState();
       final scrollController = ScrollController();
       final pageController = PageController();
@@ -1534,6 +1546,7 @@ void main() {
         runtimeState: runtimeState,
         imagePipelineState: pipelineState,
         diagnosticsState: diagnosticsState,
+        scrollState: scrollState,
         scrollController: scrollController,
         pageController: pageController,
         zoomController: zoomController,

@@ -1,11 +1,10 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
-import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:flutter/foundation.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 
-import '../support/search_shared.dart';
+import '../support/search_contracts.dart';
 
 typedef AggregateSearchPageLoader =
     Future<SearchComicsResult> Function({
@@ -77,7 +76,7 @@ class AggregateSearchResultsController extends ChangeNotifier {
     _notify();
   }
 
-  Future<void> search(BuildContext context, String keyword) async {
+  Future<void> search(SearchMessages messages, String keyword) async {
     final normalized = keyword.trim();
     if (normalized.isEmpty) return;
 
@@ -97,12 +96,12 @@ class AggregateSearchResultsController extends ChangeNotifier {
 
     await Future.wait([
       for (final section in sections)
-        _loadSectionPage(context, section, page: 1, append: false),
+        _loadSectionPage(messages, section, page: 1, append: false),
     ]);
   }
 
   Future<void> retry(
-    BuildContext context,
+    SearchMessages messages,
     AggregateSearchSectionState section,
   ) {
     if (_keyword.isEmpty || section.loading || section.loadingMore) {
@@ -113,11 +112,11 @@ class AggregateSearchResultsController extends ChangeNotifier {
       ..errorMessage = null
       ..loading = true;
     _notify();
-    return _loadSectionPage(context, section, page: 1, append: false);
+    return _loadSectionPage(messages, section, page: 1, append: false);
   }
 
   Future<void> changeOrder(
-    BuildContext context,
+    SearchMessages messages,
     AggregateSearchSectionState section,
     String order,
   ) {
@@ -138,11 +137,11 @@ class AggregateSearchResultsController extends ChangeNotifier {
       ..page = 0
       ..maxPage = null;
     _notify();
-    return _loadSectionPage(context, section, page: 1, append: false);
+    return _loadSectionPage(messages, section, page: 1, append: false);
   }
 
   Future<void> loadMore(
-    BuildContext context,
+    SearchMessages messages,
     AggregateSearchSectionState section,
   ) {
     if (_keyword.isEmpty ||
@@ -156,7 +155,7 @@ class AggregateSearchResultsController extends ChangeNotifier {
     section.loadingMore = true;
     _notify();
     return _loadSectionPage(
-      context,
+      messages,
       section,
       page: section.page + 1,
       append: true,
@@ -164,13 +163,12 @@ class AggregateSearchResultsController extends ChangeNotifier {
   }
 
   Future<void> _loadSectionPage(
-    BuildContext context,
+    SearchMessages messages,
     AggregateSearchSectionState section, {
     required int page,
     required bool append,
   }) async {
     final token = section.requestToken;
-    final strings = AppLocalizations.of(context)!;
     try {
       final sourceKey = section.source.normalizedKey;
       final order = section.order;
@@ -190,7 +188,7 @@ class AggregateSearchResultsController extends ChangeNotifier {
             );
       final result = await request.timeout(
         searchLoadTimeout,
-        onTimeout: () => throw Exception(strings.searchTimeout),
+        onTimeout: () => throw Exception(messages.timeout),
       );
       if (!_isCurrent(section, token)) return;
 
@@ -217,7 +215,7 @@ class AggregateSearchResultsController extends ChangeNotifier {
           !reachedMaxPage && result.comics.isNotEmpty && !noNewItems;
     } catch (error) {
       if (!_isCurrent(section, token)) return;
-      section.errorMessage = strings.searchFailed('$error');
+      section.errorMessage = messages.failed('$error');
     } finally {
       if (_isCurrent(section, token)) {
         section
