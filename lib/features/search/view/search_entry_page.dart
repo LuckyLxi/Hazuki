@@ -62,6 +62,7 @@ class _SearchEntryPageState extends State<SearchEntryPage>
   bool _historyExpanded = false;
   bool _initialDataLoadScheduled = false;
   bool _aggregateSearchEnabled = false;
+  SearchComicLayout _comicLayout = SearchComicLayout.list;
   bool _keyboardDismissPopInProgress = false;
   bool _forceInitialFocusedAppearance = false;
 
@@ -174,11 +175,14 @@ class _SearchEntryPageState extends State<SearchEntryPage>
 
   Future<void> _loadInitialData() async {
     final aggregateSearchFuture = isAggregateSearchEnabled();
+    final comicLayoutFuture = loadSearchComicLayout();
     await _idExtractController.load();
     final aggregateSearchEnabled = await aggregateSearchFuture;
+    final comicLayout = await comicLayoutFuture;
     if (!mounted) return;
     setState(() {
       _aggregateSearchEnabled = aggregateSearchEnabled;
+      _comicLayout = comicLayout;
     });
   }
 
@@ -287,6 +291,7 @@ class _SearchEntryPageState extends State<SearchEntryPage>
           comicCoverHeroTagBuilder: widget.comicCoverHeroTagBuilder,
           searchPageLoader: widget.searchPageLoader,
           aggregateSearchEnabled: _aggregateSearchEnabled,
+          comicLayout: _comicLayout,
         ),
       ),
     );
@@ -414,6 +419,15 @@ class _SearchEntryPageState extends State<SearchEntryPage>
           });
         }
         unawaited(setAggregateSearchEnabled(enabled));
+      },
+      comicLayout: _comicLayout,
+      onComicLayoutChanged: (layout) {
+        if (mounted) {
+          setState(() {
+            _comicLayout = layout;
+          });
+        }
+        unawaited(setSearchComicLayout(layout));
       },
     );
   }

@@ -5,6 +5,8 @@ import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
+import '../support/search_shared.dart';
+
 import 'search_id_extract_pill.dart';
 
 class SearchResultsAppBar extends StatelessWidget
@@ -91,6 +93,8 @@ class SearchResultsBody extends StatelessWidget {
     required this.onRefresh,
     required this.onScrollNotification,
     required this.itemBuilder,
+    required this.gridItemBuilder,
+    required this.comicLayout,
     required this.onRetryPartialError,
   });
 
@@ -102,6 +106,9 @@ class SearchResultsBody extends StatelessWidget {
   final Future<void> Function() onRefresh;
   final bool Function(ScrollNotification notification) onScrollNotification;
   final Widget Function(ExploreComic comic, int index) itemBuilder;
+  final Widget Function(ExploreComic comic, int index, int coverCacheWidth)
+  gridItemBuilder;
+  final SearchComicLayout comicLayout;
   final Future<void> Function() onRetryPartialError;
 
   @override
@@ -119,10 +126,38 @@ class SearchResultsBody extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
           children: [
             resultState,
-            if (searchComics.isNotEmpty) ...[
+            if (searchComics.isNotEmpty &&
+                comicLayout == SearchComicLayout.list) ...[
               for (int i = 0; i < searchComics.length; i++)
                 itemBuilder(searchComics[i], i),
-            ],
+            ] else if (searchComics.isNotEmpty)
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  const spacing = 10.0;
+                  final coverWidth = (constraints.maxWidth - spacing * 2) / 3;
+                  final coverCacheWidth =
+                      (coverWidth * MediaQuery.devicePixelRatioOf(context))
+                          .round();
+                  return GridView.builder(
+                    key: const ValueKey('search-results-grid3'),
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: searchComics.length,
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 3,
+                          mainAxisSpacing: spacing,
+                          crossAxisSpacing: spacing,
+                          childAspectRatio: 0.57,
+                        ),
+                    itemBuilder: (context, index) => gridItemBuilder(
+                      searchComics[index],
+                      index,
+                      coverCacheWidth,
+                    ),
+                  );
+                },
+              ),
             if (searchLoadingMore) const HazukiLoadMoreFooter(),
             if (searchErrorMessage != null && searchComics.isNotEmpty)
               Padding(

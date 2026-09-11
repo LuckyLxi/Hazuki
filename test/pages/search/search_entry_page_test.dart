@@ -351,6 +351,7 @@ void main() {
   ) async {
     SharedPreferences.setMockInitialValues({
       hazukiAggregateSearchEnabledPreferenceKey: false,
+      hazukiSearchComicLayoutPreferenceKey: SearchComicLayout.list.name,
     });
 
     await tester.pumpWidget(
@@ -377,8 +378,40 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(tester.widget<SwitchListTile>(switchFinder).value, isTrue);
+    await tester.tap(find.byKey(const ValueKey('search-layout-grid3')));
+    await tester.pumpAndSettle();
+
     final prefs = await SharedPreferences.getInstance();
     expect(prefs.getBool(hazukiAggregateSearchEnabledPreferenceKey), isTrue);
+    expect(
+      prefs.getString(hazukiSearchComicLayoutPreferenceKey),
+      SearchComicLayout.grid3.name,
+    );
+  });
+
+  testWidgets('saved grid layout is used by regular search results', (
+    tester,
+  ) async {
+    SharedPreferences.setMockInitialValues({
+      hazukiSearchComicLayoutPreferenceKey: SearchComicLayout.grid3.name,
+    });
+
+    await tester.pumpWidget(
+      _buildTestApp(
+        SearchPage(
+          sourceService: sl<SourceSearchGateway>(),
+          historyService: sl<SearchHistoryService>(),
+          initialKeyword: 'grid-results',
+          comicDetailPageBuilder: _comicDetailPageBuilder,
+          comicCoverHeroTagBuilder: _testComicCoverHeroTag,
+          searchPageLoader: _fakeSearchPageLoader,
+        ),
+      ),
+    );
+    await _pumpSearchSettled(tester);
+
+    expect(find.byKey(const ValueKey('search-results-grid3')), findsOneWidget);
+    expect(find.text('Comic grid-results 0'), findsOneWidget);
   });
 
   testWidgets('search entry page refreshes after external history changes', (

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../l10n/app_localizations.dart';
 import '../../../models/hazuki_models.dart';
@@ -9,6 +10,8 @@ import '../../../widgets/widgets.dart';
 import '../../../widgets/windows_comic_detail_host.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
 import 'package:hazuki/shared/windows/windows_comic_detail.dart';
+
+enum _RankingComicLayout { list, grid3 }
 
 class RankingPage extends StatefulWidget {
   const RankingPage({
@@ -28,6 +31,7 @@ class RankingPage extends StatefulWidget {
 
 class _RankingPageState extends State<RankingPage> {
   static const _loadTimeout = Duration(seconds: 25);
+  static const _comicLayoutPreferenceKey = 'ranking_comic_layout';
 
   SourceCategoryGateway get _sourceService => widget.sourceService;
   final ScrollController _scrollController = ScrollController();
@@ -44,6 +48,7 @@ class _RankingPageState extends State<RankingPage> {
   bool _rankingLoadingMore = false;
   bool _showBackToTop = false;
   bool _rankingOptionsIntroPlayed = false;
+  _RankingComicLayout _comicLayout = _RankingComicLayout.list;
 
   int _rankingPage = 1;
   bool _rankingHasMore = true;
@@ -57,8 +62,39 @@ class _RankingPageState extends State<RankingPage> {
       if (!mounted) {
         return;
       }
-      unawaited(_loadInitial());
+      unawaited(_initialize());
     });
+  }
+
+  Future<void> _initialize() async {
+    try {
+      await _restoreComicLayout();
+    } catch (_) {
+      // A preference read failure must not prevent rankings from loading.
+    }
+    if (mounted) {
+      await _loadInitial();
+    }
+  }
+
+  Future<void> _restoreComicLayout() async {
+    final preferences = await SharedPreferences.getInstance();
+    final savedLayout = preferences.getString(_comicLayoutPreferenceKey);
+    final restoredLayout = _RankingComicLayout.values.firstWhere(
+      (layout) => layout.name == savedLayout,
+      orElse: () => _RankingComicLayout.list,
+    );
+    if (!mounted || restoredLayout == _comicLayout) {
+      return;
+    }
+    setState(() {
+      _comicLayout = restoredLayout;
+    });
+  }
+
+  Future<void> _persistComicLayout() async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setString(_comicLayoutPreferenceKey, _comicLayout.name);
   }
 
   @override
@@ -286,6 +322,83 @@ class _RankingPageState extends State<RankingPage> {
     unawaited(_loadRankingComics(reset: true));
   }
 
+  Future<void> _showLayoutDialog() async {
+    final strings = AppLocalizations.of(context)!;
+    final selected = await showGeneralDialog<_RankingComicLayout>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: strings.commonClose,
+      barrierColor: Colors.black.withValues(alpha: 0.32),
+      transitionDuration: const Duration(milliseconds: 240),
+      pageBuilder: (dialogContext, animation, secondaryAnimation) =>
+          InheritedTheme.captureAll(
+            context,
+            AlertDialog(
+              title: Text(strings.rankingLayoutDialogTitle),
+              contentPadding: const EdgeInsets.fromLTRB(8, 12, 8, 8),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ListTile(
+                    key: const ValueKey('ranking-layout-list'),
+                    leading: const Icon(Icons.view_list_rounded),
+                    title: Text(strings.rankingLayoutList),
+                    trailing: _comicLayout == _RankingComicLayout.list
+                        ? Icon(
+                            Icons.check_rounded,
+                            color: Theme.of(dialogContext).colorScheme.primary,
+                          )
+                        : null,
+                    onTap: () => Navigator.of(
+                      dialogContext,
+                    ).pop(_RankingComicLayout.list),
+                  ),
+                  ListTile(
+                    key: const ValueKey('ranking-layout-grid3'),
+                    leading: const Icon(Icons.apps_rounded),
+                    title: Text(strings.rankingLayoutGrid3),
+                    trailing: _comicLayout == _RankingComicLayout.grid3
+                        ? Icon(
+                            Icons.check_rounded,
+                            color: Theme.of(dialogContext).colorScheme.primary,
+                          )
+                        : null,
+                    onTap: () => Navigator.of(
+                      dialogContext,
+                    ).pop(_RankingComicLayout.grid3),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        final opacity = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        );
+        final scale = Tween<double>(begin: 0.92, end: 1).animate(
+          CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutBack,
+            reverseCurve: Curves.easeInCubic,
+          ),
+        );
+        return FadeTransition(
+          opacity: opacity,
+          child: ScaleTransition(scale: scale, child: child),
+        );
+      },
+    );
+    if (!mounted || selected == null || selected == _comicLayout) {
+      return;
+    }
+    setState(() {
+      _comicLayout = selected;
+    });
+    await _persistComicLayout();
+  }
+
   Widget _buildRankingComicItem(ExploreComic comic, int index) {
     final heroTag = widget.comicCoverHeroTagBuilder(
       comic,
@@ -383,21 +496,116 @@ class _RankingPageState extends State<RankingPage> {
     );
 
     return TweenAnimationBuilder<double>(
-      // 棣栨鍔犺浇鎴栨粦鍏ヨ閲庢椂鐨勪粠涓嬫柟鏀惧嚭鏀惧ぇ鍔ㄧ敾
+      key: ValueKey('ranking-list-entry-${comic.sourceKey}-${comic.id}-$index'),
       tween: Tween<double>(begin: 0.0, end: 1.0),
-      duration: Duration(milliseconds: 350 + (index.clamp(0, 10)) * 60),
-      curve: Curves.easeOutBack,
-      builder: (context, value, child) {
-        return Transform.scale(
-          scale: 0.85 + 0.15 * value,
-          alignment: Alignment.bottomCenter,
-          child: Transform.translate(
-            offset: Offset(0, 50 * (1 - value)),
-            child: Opacity(opacity: value.clamp(0.0, 1.0), child: child),
+      duration: Duration(milliseconds: 240 + index.clamp(0, 10) * 35),
+      curve: Curves.easeOutCubic,
+      builder: (context, value, child) => Transform.translate(
+        offset: Offset(-24 * (1 - value), 0),
+        child: Opacity(
+          key: ValueKey(
+            'ranking-list-entry-opacity-${comic.sourceKey}-${comic.id}',
           ),
+          opacity: value,
+          child: child,
+        ),
+      ),
+      child: item,
+    );
+  }
+
+  Widget _buildRankingComicGrid() {
+    final colorScheme = Theme.of(context).colorScheme;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        const spacing = 10.0;
+        final coverWidth = (constraints.maxWidth - spacing * 2) / 3;
+        final coverCacheWidth =
+            (coverWidth * MediaQuery.devicePixelRatioOf(context)).round();
+        return GridView.builder(
+          key: const ValueKey('ranking-comic-grid3'),
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: _rankingComics.length,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 3,
+            mainAxisSpacing: spacing,
+            crossAxisSpacing: spacing,
+            childAspectRatio: 0.57,
+          ),
+          itemBuilder: (context, index) {
+            final comic = _rankingComics[index];
+            final heroTag = widget.comicCoverHeroTagBuilder(
+              comic,
+              salt: 'ranking-page-${_selectedRankingValue ?? 'none'}-$index',
+            );
+            return TweenAnimationBuilder<double>(
+              key: ValueKey(
+                'ranking-grid-entry-${comic.sourceKey}-${comic.id}-$index',
+              ),
+              tween: Tween<double>(begin: 0, end: 1),
+              duration: Duration(milliseconds: 260 + index.clamp(0, 8) * 45),
+              curve: Curves.easeOutCubic,
+              builder: (context, value, child) => Transform.translate(
+                offset: Offset(0, 18 * (1 - value)),
+                child: Opacity(
+                  key: ValueKey('ranking-grid-entry-opacity-$index'),
+                  opacity: value,
+                  child: child,
+                ),
+              ),
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: ComicCoverTile(
+                      comic: comic,
+                      heroTag: heroTag,
+                      coverCacheWidth: coverCacheWidth,
+                      placeholderColor: colorScheme.surfaceContainerHighest,
+                      onTap: () => openComicDetail(
+                        context,
+                        comic: comic,
+                        heroTag: heroTag,
+                        pageBuilder: widget.comicDetailPageBuilder,
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    left: 6,
+                    top: 6,
+                    child: IgnorePointer(
+                      child: Container(
+                        constraints: const BoxConstraints(minWidth: 28),
+                        height: 28,
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: colorScheme.surface.withValues(alpha: 0.88),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Text(
+                          '${index + 1}',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w900,
+                            fontStyle: FontStyle.italic,
+                            color: index == 0
+                                ? Colors.red.shade400
+                                : index == 1
+                                ? Colors.orange.shade400
+                                : index == 2
+                                ? Colors.amber.shade400
+                                : colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
         );
       },
-      child: item,
     );
   }
 
@@ -447,6 +655,18 @@ class _RankingPageState extends State<RankingPage> {
           context: context,
           enableBlur: false,
           title: Text(strings.rankingTitle),
+          actions: [
+            IconButton(
+              key: const ValueKey('ranking-layout-button'),
+              tooltip: strings.rankingLayoutButtonTooltip,
+              onPressed: _showLayoutDialog,
+              icon: Icon(
+                _comicLayout == _RankingComicLayout.list
+                    ? Icons.view_list_rounded
+                    : Icons.apps_rounded,
+              ),
+            ),
+          ],
         ),
         body: Stack(
           children: [
@@ -558,9 +778,11 @@ class _RankingPageState extends State<RankingPage> {
                               child: Text(strings.rankingEmptyComics),
                             ),
                           )
-                        else
+                        else if (_comicLayout == _RankingComicLayout.list) ...[
                           for (int i = 0; i < _rankingComics.length; i++)
                             _buildRankingComicItem(_rankingComics[i], i),
+                        ] else
+                          _buildRankingComicGrid(),
                         if (_rankingLoadingMore)
                           const HazukiLoadMoreFooter(verticalPadding: 8),
                         if (!_rankingLoading &&

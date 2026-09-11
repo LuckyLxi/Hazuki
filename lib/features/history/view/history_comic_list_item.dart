@@ -89,9 +89,9 @@ class _HistoryComicListItemState extends State<HistoryComicListItem> {
         end: 1.0,
       ),
       duration: _animateEntryForThisMount
-          ? Duration(milliseconds: 350 + (widget.index.clamp(0, 10)) * 60)
+          ? Duration(milliseconds: 260 + widget.index.clamp(0, 10) * 40)
           : Duration.zero,
-      curve: Curves.easeOutBack,
+      curve: Curves.easeOutCubic,
       builder: _buildEntryTransition,
       child: _buildInteractiveItem(context),
     );
@@ -231,12 +231,17 @@ class _HistoryComicListItemState extends State<HistoryComicListItem> {
     if (value == 1.0) {
       return child!;
     }
-    return Transform.scale(
-      scale: 0.85 + 0.15 * value,
-      alignment: Alignment.bottomCenter,
-      child: Transform.translate(
-        offset: Offset(0, 50 * (1 - value)),
-        child: Opacity(opacity: value.clamp(0.0, 1.0), child: child),
+    return Transform.translate(
+      key: ValueKey(
+        'history-entry-transform-${widget.comic.scopedId.storageKey}',
+      ),
+      offset: Offset(28 * (1 - value), 0),
+      child: Opacity(
+        key: ValueKey(
+          'history-entry-opacity-${widget.comic.scopedId.storageKey}',
+        ),
+        opacity: value,
+        child: child,
       ),
     );
   }

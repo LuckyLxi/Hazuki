@@ -16,6 +16,7 @@ const hazukiWindowsAdaptationNoticeAcceptedPreferenceKey =
 const hazukiComicIdSearchEnhancePreferenceKey =
     'advanced_comic_id_search_enhance';
 const hazukiAggregateSearchEnabledPreferenceKey = 'search_aggregate_enabled';
+const hazukiSearchComicLayoutPreferenceKey = 'search_comic_layout';
 const hazukiCommentFilterKeywordsKey = 'comment_filter_keywords';
 const hazukiCommentFilterKeywordsUpdatedAtKey =
     'comment_filter_keywords_updated_at_ms';

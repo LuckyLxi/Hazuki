@@ -299,6 +299,7 @@ void main() {
         home: SearchAggregateSectionPage(
           controller: controller,
           section: section,
+          comicLayout: SearchComicLayout.grid3,
           onComicTap: (_, _) async {},
           heroTagBuilder: (comic, salt) => '${comic.id}-$salt',
         ),
@@ -308,6 +309,10 @@ void main() {
     await controller.search(searchMessages(pageContext), 'Hazuki');
     await tester.pump();
     final strings = AppLocalizations.of(pageContext)!;
+    expect(
+      find.byKey(const ValueKey('aggregate-search-more-grid3')),
+      findsOneWidget,
+    );
 
     await tester.tap(find.byType(PopupMenuButton<String>));
     await tester.pumpAndSettle();

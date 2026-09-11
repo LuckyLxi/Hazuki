@@ -14,6 +14,8 @@ enum SearchEntryIntent {
   externalKeyword,
 }
 
+enum SearchComicLayout { list, grid3 }
+
 extension SearchEntryIntentExtension on SearchEntryIntent {
   bool get showKeyboardOnEnter => this == SearchEntryIntent.editFromEntry;
 }
@@ -70,6 +72,20 @@ Future<bool> isAggregateSearchEnabled() async {
 Future<void> setAggregateSearchEnabled(bool enabled) async {
   final prefs = await SharedPreferences.getInstance();
   await prefs.setBool(hazukiAggregateSearchEnabledPreferenceKey, enabled);
+}
+
+Future<SearchComicLayout> loadSearchComicLayout() async {
+  final prefs = await SharedPreferences.getInstance();
+  final savedLayout = prefs.getString(hazukiSearchComicLayoutPreferenceKey);
+  return SearchComicLayout.values.firstWhere(
+    (layout) => layout.name == savedLayout,
+    orElse: () => SearchComicLayout.list,
+  );
+}
+
+Future<void> setSearchComicLayout(SearchComicLayout layout) async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.setString(hazukiSearchComicLayoutPreferenceKey, layout.name);
 }
 
 Future<String> normalizeSubmittedKeyword(

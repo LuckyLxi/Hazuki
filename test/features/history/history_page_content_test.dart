@@ -145,6 +145,38 @@ void main() {
     expect(find.text('Comic B'), findsNothing);
     expect(find.text('Comic C'), findsOneWidget);
   });
+
+  testWidgets('history items fade in while sliding from the right', (
+    tester,
+  ) async {
+    final scrollController = ScrollController();
+    addTearDown(scrollController.dispose);
+
+    await tester.pumpWidget(
+      _wrapContent(
+        scrollController: scrollController,
+        loading: false,
+        history: const <ExploreComic>[_comicA],
+        playItemEntryAnimation: true,
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+
+    final opacity = tester.widget<Opacity>(
+      find.byKey(
+        ValueKey('history-entry-opacity-${_comicA.scopedId.storageKey}'),
+      ),
+    );
+    expect(opacity.opacity, greaterThan(0));
+    expect(opacity.opacity, lessThan(1));
+    final transform = tester.widget<Transform>(
+      find.byKey(
+        ValueKey('history-entry-transform-${_comicA.scopedId.storageKey}'),
+      ),
+    );
+    expect(transform.transform.storage[12], greaterThan(0));
+    expect(transform.transform.storage[13], 0);
+  });
 }
 
 Widget _wrapContent({
@@ -152,6 +184,7 @@ Widget _wrapContent({
   required bool loading,
   required List<ExploreComic> history,
   bool selectionMode = false,
+  bool playItemEntryAnimation = false,
   Set<String> selectedStorageKeys = const <String>{},
   Future<void> Function(ExploreComic comic, String heroTag)? onOpenComic,
   void Function(String storageKey, {bool? selected})? onToggleSelection,
@@ -168,7 +201,7 @@ Widget _wrapContent({
             history: history,
             scrollController: scrollController,
             showBackToTop: false,
-            playItemEntryAnimation: false,
+            playItemEntryAnimation: playItemEntryAnimation,
             selectionMode: selectionMode,
             selectedStorageKeys: selectedStorageKeys,
             strings: strings,

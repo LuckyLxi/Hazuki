@@ -34,6 +34,7 @@ class SearchResultsPage extends StatefulWidget {
     this.comicCoverHeroTagBuilder = comicCoverHeroTag,
     this.searchPageLoader,
     this.aggregateSearchEnabled,
+    this.comicLayout,
     this.comicDetailsLoader,
   });
 
@@ -46,6 +47,7 @@ class SearchResultsPage extends StatefulWidget {
   final ComicHeroTagBuilder comicCoverHeroTagBuilder;
   final SearchPageLoader? searchPageLoader;
   final bool? aggregateSearchEnabled;
+  final SearchComicLayout? comicLayout;
   final SearchComicDetailsLoader? comicDetailsLoader;
 
   @override
@@ -95,6 +97,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
 
   bool _showBackToTop = false;
   late bool _aggregateSearchEnabled;
+  late SearchComicLayout _comicLayout;
   bool _keyboardDismissPopInProgress = false;
 
   String get _searchKeyword => _aggregateSearchEnabled
@@ -173,6 +176,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
 
   void _initializeSearchResultsPage() {
     _aggregateSearchEnabled = widget.aggregateSearchEnabled ?? false;
+    _comicLayout = widget.comicLayout ?? SearchComicLayout.list;
     _resultsController = SearchResultsController(
       initialOrder: widget.initialOrder,
       sourceService: widget.sourceService,
@@ -196,6 +200,13 @@ class _SearchResultsPageState extends State<SearchResultsPage>
           if (!mounted) return;
           setState(() {
             _aggregateSearchEnabled = enabled;
+          });
+        }
+        if (widget.comicLayout == null) {
+          final comicLayout = await loadSearchComicLayout();
+          if (!mounted) return;
+          setState(() {
+            _comicLayout = comicLayout;
           });
         }
         _focusCoordinator.syncKeyboardVisibility();
@@ -490,6 +501,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
       salt: 'search-results',
     );
     return SearchComicListItem(
+      key: ValueKey('search-list-comic-${comic.sourceKey}-${comic.id}'),
       comic: comic,
       heroTag: heroTag,
       index: index,
@@ -506,6 +518,35 @@ class _SearchResultsPageState extends State<SearchResultsPage>
             pageBuilder: widget.comicDetailPageBuilder,
           );
         }());
+      },
+    );
+  }
+
+  Widget _buildSearchComicGridItem(
+    ExploreComic comic,
+    int index,
+    int coverCacheWidth,
+  ) {
+    final heroTag = widget.comicCoverHeroTagBuilder(
+      comic,
+      salt: 'search-results-grid-$index',
+    );
+    return SearchComicGridItem(
+      key: ValueKey('search-grid-comic-${comic.sourceKey}-${comic.id}'),
+      comic: comic,
+      heroTag: heroTag,
+      index: index,
+      coverCacheWidth: coverCacheWidth,
+      placeholderColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+      onTap: () async {
+        await _dismissSearchInputIfFocused();
+        if (!mounted) return;
+        await openComicDetail(
+          context,
+          comic: comic,
+          heroTag: heroTag,
+          pageBuilder: widget.comicDetailPageBuilder,
+        );
       },
     );
   }
@@ -583,6 +624,8 @@ class _SearchResultsPageState extends State<SearchResultsPage>
       onRefresh: _refreshSearchResults,
       onScrollNotification: _handleSearchResultsScrollNotification,
       itemBuilder: _buildSearchComicItem,
+      gridItemBuilder: _buildSearchComicGridItem,
+      comicLayout: _comicLayout,
       onRetryPartialError: _retrySearchFromCurrentKeyword,
     );
   }
@@ -641,6 +684,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
           onComicTap: _openAggregateComic,
           heroTagBuilder: (comic, salt) =>
               widget.comicCoverHeroTagBuilder(comic, salt: salt),
+          comicLayout: _comicLayout,
         ),
       ),
     );

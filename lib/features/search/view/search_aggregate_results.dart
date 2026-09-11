@@ -10,6 +10,7 @@ import 'package:loading_indicator_m3e/loading_indicator_m3e.dart';
 import '../state/aggregate_search_results_controller.dart';
 import '../support/search_shared.dart';
 import 'search_results_page_widgets.dart';
+import 'search_results_widgets.dart';
 
 class SearchAggregateResultsBody extends StatelessWidget {
   const SearchAggregateResultsBody({
@@ -251,12 +252,14 @@ class SearchAggregateSectionPage extends StatefulWidget {
     required this.section,
     required this.onComicTap,
     required this.heroTagBuilder,
+    required this.comicLayout,
   });
 
   final AggregateSearchResultsController controller;
   final AggregateSearchSectionState section;
   final Future<void> Function(ExploreComic comic, String heroTag) onComicTap;
   final String Function(ExploreComic comic, String salt) heroTagBuilder;
+  final SearchComicLayout comicLayout;
 
   @override
   State<SearchAggregateSectionPage> createState() =>
@@ -362,37 +365,66 @@ class _SearchAggregateSectionPageState
         ),
       );
     }
+    final results = widget.comicLayout == SearchComicLayout.list
+        ? ListView.builder(
+            key: const ValueKey('aggregate-search-more-list'),
+            controller: _scrollController,
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+            itemCount: section.comics.length,
+            itemBuilder: (context, index) {
+              final comic = section.comics[index];
+              final heroTag = widget.heroTagBuilder(
+                comic,
+                'aggregate-search-more-${section.source.normalizedKey}-$index',
+              );
+              return SearchComicListItem(
+                key: ValueKey(
+                  'aggregate-search-list-${section.source.normalizedKey}-${comic.id}',
+                ),
+                comic: comic,
+                heroTag: heroTag,
+                index: index,
+                onTap: () => unawaited(widget.onComicTap(comic, heroTag)),
+              );
+            },
+          )
+        : GridView.builder(
+            key: const ValueKey('aggregate-search-more-grid3'),
+            controller: _scrollController,
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
+            itemCount: section.comics.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              childAspectRatio: 0.57,
+            ),
+            itemBuilder: (context, index) {
+              final comic = section.comics[index];
+              final heroTag = widget.heroTagBuilder(
+                comic,
+                'aggregate-search-more-${section.source.normalizedKey}-$index',
+              );
+              final contentWidth = MediaQuery.sizeOf(context).width - 52;
+              final coverCacheWidth =
+                  (contentWidth / 3 * MediaQuery.devicePixelRatioOf(context))
+                      .round();
+              return SearchComicGridItem(
+                key: ValueKey(
+                  'aggregate-search-grid-${section.source.normalizedKey}-${comic.id}',
+                ),
+                comic: comic,
+                heroTag: heroTag,
+                index: index,
+                coverCacheWidth: coverCacheWidth,
+                placeholderColor: colorScheme.surfaceContainerHighest,
+                onTap: () => widget.onComicTap(comic, heroTag),
+              );
+            },
+          );
     return Stack(
       children: [
-        GridView.builder(
-          controller: _scrollController,
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
-          itemCount: section.comics.length,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 3,
-            mainAxisSpacing: 10,
-            crossAxisSpacing: 10,
-            childAspectRatio: 0.57,
-          ),
-          itemBuilder: (context, index) {
-            final comic = section.comics[index];
-            final heroTag = widget.heroTagBuilder(
-              comic,
-              'aggregate-search-more-${section.source.normalizedKey}-$index',
-            );
-            final contentWidth = MediaQuery.sizeOf(context).width - 52;
-            final coverCacheWidth =
-                (contentWidth / 3 * MediaQuery.devicePixelRatioOf(context))
-                    .round();
-            return ComicCoverTile(
-              comic: comic,
-              heroTag: heroTag,
-              coverCacheWidth: coverCacheWidth,
-              placeholderColor: colorScheme.surfaceContainerHighest,
-              onTap: () => widget.onComicTap(comic, heroTag),
-            );
-          },
-        ),
+        results,
         if (section.loadingMore)
           const Positioned(
             left: 0,
