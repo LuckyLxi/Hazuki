@@ -32,6 +32,7 @@ class ComicDetailFavoriteController extends ChangeNotifier {
 
   bool get isBusy => _busy;
   bool get isLikeBusy => _likeBusy;
+  bool get supportComicLike => _repository.supportComicLike;
   bool? get favoriteOverride => _favoriteOverride;
   bool? get cloudFavoriteOverride => _cloudFavoriteOverride;
   bool? get likedOverride => _likedOverride;
@@ -51,7 +52,7 @@ class ComicDetailFavoriteController extends ChangeNotifier {
     ComicDetailsData details,
   ) async {
     if (_likeBusy) return;
-    if (!_repository.supportComicLike) {
+    if (!supportComicLike) {
       unawaited(
         showHazukiPrompt(
           context,

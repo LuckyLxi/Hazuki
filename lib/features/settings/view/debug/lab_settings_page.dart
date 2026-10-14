@@ -5,12 +5,18 @@ import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../settings_group.dart';
-import 'source_account_lab_page.dart';
+import '../plugins/source_plugins_page.dart';
+import '../plugins/source_plugin_action_widgets.dart';
 
 class LabSettingsPage extends StatefulWidget {
-  const LabSettingsPage({super.key, required this.sourceService});
+  const LabSettingsPage({
+    super.key,
+    required this.sourceService,
+    required this.sourcePlugins,
+  });
 
   final SourceRuntimeGateway sourceService;
+  final SourcePluginGateway sourcePlugins;
 
   @override
   State<LabSettingsPage> createState() => _LabSettingsPageState();
@@ -83,20 +89,24 @@ class _LabSettingsPageState extends State<LabSettingsPage> {
                           onChanged: _toggleComicIdSearchEnhance,
                         ),
                       ListTile(
-                        leading: const Icon(Icons.account_tree_outlined),
-                        title: Text(strings.labSourceAccountTitle),
-                        subtitle: Text(strings.labSourceAccountSubtitle),
+                        leading: const Icon(Icons.extension_outlined),
+                        title: Text(strings.pluginsTitle),
+                        subtitle: Text(strings.pluginsSubtitle),
                         onTap: () {
                           Navigator.of(context).push(
                             MaterialPageRoute<void>(
-                              builder: (_) => SourceAccountLabPage(
-                                sourceService: widget.sourceService,
+                              builder: (_) => SourcePluginsPage(
+                                manager: widget.sourcePlugins,
                               ),
                             ),
                           );
                         },
                       ),
                     ],
+                  ),
+                  SourcePluginActionList(
+                    gateway: widget.sourcePlugins,
+                    location: SourcePluginActionLocation.lab,
                   ),
                 ],
               ),

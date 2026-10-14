@@ -1,4 +1,6 @@
 export 'models/source_contract_models.dart';
+export 'gateways/source_plugin_gateway.dart';
+export 'plugins/source_plugin_models.dart';
 export 'models/source_identity.dart';
 export 'adapters/hazuki_source_content_adapters.dart';
 export 'adapters/hazuki_source_image_adapters.dart';

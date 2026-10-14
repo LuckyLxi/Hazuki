@@ -1,25 +1,30 @@
+import '../../support/source_presentation_fixtures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/search/view/search_results_widgets.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 
 void main() {
-  testWidgets('shows tags for Picacg search results only', (tester) async {
+  testWidgets('shows tags when the installed plugin declares them', (
+    tester,
+  ) async {
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: SearchComicListItem(
-            comic: const ExploreComic(
-              id: 'picacg-comic',
-              title: 'Picacg comic',
-              subTitle: 'Author',
-              cover: '',
-              sourceKey: 'picacg',
-              tags: ['Action', 'Romance'],
+      withTestSourcePresentation(
+        MaterialApp(
+          home: Scaffold(
+            body: SearchComicListItem(
+              comic: const ExploreComic(
+                id: 'picacg-comic',
+                title: 'Picacg comic',
+                subTitle: 'Author',
+                cover: '',
+                sourceKey: 'picacg',
+                tags: ['Action', 'Romance'],
+              ),
+              heroTag: 'picacg-comic',
+              index: 0,
+              onTap: () {},
             ),
-            heroTag: 'picacg-comic',
-            index: 0,
-            onTap: () {},
           ),
         ),
       ),
@@ -30,22 +35,26 @@ void main() {
     expect(find.text('Romance'), findsOneWidget);
   });
 
-  testWidgets('does not show tags for other sources', (tester) async {
+  testWidgets('hides tags when the installed plugin omits showTags', (
+    tester,
+  ) async {
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: SearchComicListItem(
-            comic: const ExploreComic(
-              id: 'other-comic',
-              title: 'Other comic',
-              subTitle: '',
-              cover: '',
-              sourceKey: 'jm',
-              tags: ['Hidden tag'],
+      withTestSourcePresentation(
+        MaterialApp(
+          home: Scaffold(
+            body: SearchComicListItem(
+              comic: const ExploreComic(
+                id: 'other-comic',
+                title: 'Other comic',
+                subTitle: '',
+                cover: '',
+                sourceKey: 'jm',
+                tags: ['Hidden tag'],
+              ),
+              heroTag: 'other-comic',
+              index: 0,
+              onTap: () {},
             ),
-            heroTag: 'other-comic',
-            index: 0,
-            onTap: () {},
           ),
         ),
       ),
@@ -63,13 +72,15 @@ void main() {
       cover: '',
     );
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: SearchComicListItem(
-            comic: comic,
-            heroTag: 'animated-list',
-            index: 0,
-            onTap: () {},
+      withTestSourcePresentation(
+        MaterialApp(
+          home: Scaffold(
+            body: SearchComicListItem(
+              comic: comic,
+              heroTag: 'animated-list',
+              index: 0,
+              onTap: () {},
+            ),
           ),
         ),
       ),
@@ -97,18 +108,20 @@ void main() {
       cover: '',
     );
     await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: SizedBox(
-            width: 120,
-            height: 220,
-            child: SearchComicGridItem(
-              comic: comic,
-              heroTag: 'animated-grid',
-              index: 0,
-              coverCacheWidth: 120,
-              placeholderColor: Colors.grey,
-              onTap: () async {},
+      withTestSourcePresentation(
+        MaterialApp(
+          home: Scaffold(
+            body: SizedBox(
+              width: 120,
+              height: 220,
+              child: SearchComicGridItem(
+                comic: comic,
+                heroTag: 'animated-grid',
+                index: 0,
+                coverCacheWidth: 120,
+                placeholderColor: Colors.grey,
+                onTap: () async {},
+              ),
             ),
           ),
         ),

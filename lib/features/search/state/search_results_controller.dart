@@ -19,6 +19,7 @@ class SearchResultsController extends ChangeNotifier {
          initialOrder,
          sourceService.activeSourceKey,
        ) {
+    _lastSourceEpoch = _sourceEpoch;
     _sourceService.addListener(_onSourceChanged);
   }
 
@@ -37,6 +38,14 @@ class SearchResultsController extends ChangeNotifier {
   int _searchRequestToken = 0;
   String _searchOrder;
   bool _disposed = false;
+  late String _lastSourceEpoch;
+  String get _sourceEpoch {
+    final id = _sourceService.activeSourceKey;
+    final source = _sourceService.allowedSources
+        .where((source) => source.key == id)
+        .firstOrNull;
+    return '$id|${source?.pluginVersion}|${source?.pluginDirectory}';
+  }
 
   String get searchKeyword => _searchKeyword;
   String? get searchErrorMessage => _searchErrorMessage;
@@ -55,18 +64,20 @@ class SearchResultsController extends ChangeNotifier {
   void logRuntimeRetryRequested(String source) =>
       _sourceService.logRuntimeRetryRequested(source);
 
-  static String _normalizeSearchOrder(String order, String sourceKey) {
+  static String _normalizeSearchOrder(String order, String? sourceKey) {
     final normalized = order.trim();
-    if (sourceKey.trim() == copyMangaSourceKey) {
-      return copyMangaSearchModeKeys.contains(normalized) ? normalized : '-';
-    }
-    if (sourceKey.trim() == picacgSourceKey) {
-      return picacgSearchOrderKeys.contains(normalized) ? normalized : 'dd';
-    }
-    return searchOrderKeys.contains(normalized) ? normalized : 'mr';
+    return normalized;
   }
 
   void _onSourceChanged() {
+    if (_sourceEpoch != _lastSourceEpoch) {
+      _lastSourceEpoch = _sourceEpoch;
+      _searchRequestToken++;
+      _searchComics = const [];
+      _searchLoading = false;
+      _searchLoadingMore = false;
+      _searchErrorMessage = null;
+    }
     final nextOrder = _normalizeSearchOrder(
       _searchOrder,
       _sourceService.activeSourceKey,

@@ -1,3 +1,5 @@
+import 'package:hazuki/shared/source_presentation.dart';
+import 'package:hazuki/services/source/plugins/source_presentation_metadata.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -53,6 +55,9 @@ class _HistoryPageState extends State<HistoryPage> {
       readHistoryService: widget.readHistoryService,
       sourceService: widget.sourceService,
       readerService: widget.readerService,
+      presentationFor:
+          SourcePresentationScope.read(context)?.presentationFor ??
+          emptySourcePresentation,
     );
     _scrollCoordinator = HistoryPageScrollCoordinator();
     _coverPrefetcher = ComicCoverPrefetcher(imageGateway: widget.imageGateway);

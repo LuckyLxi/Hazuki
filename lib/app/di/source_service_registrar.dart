@@ -1,6 +1,7 @@
 import 'package:get_it/get_it.dart';
 
 import '../../services/source/runtime/source_runtime_assembly.dart';
+import '../../services/source/plugins/source_plugin_manager.dart';
 import '../../services/source/source_capabilities.dart';
 
 /// Registers the source runtime and its focused gateway contracts.
@@ -17,6 +18,16 @@ void registerSourceServices(GetIt services) {
   if (!services.isRegistered<SourceRuntimeRegistry>()) {
     services.registerLazySingleton<SourceRuntimeRegistry>(
       () => services<SourceRuntimeAssembly>().runtimeRegistry,
+    );
+  }
+  if (!services.isRegistered<SourcePluginManager>()) {
+    services.registerLazySingleton<SourcePluginManager>(
+      () => services<SourceRuntimeAssembly>().plugins,
+    );
+  }
+  if (!services.isRegistered<SourcePluginGateway>()) {
+    services.registerLazySingleton<SourcePluginGateway>(
+      () => services<SourceRuntimeAssembly>().pluginGateway,
     );
   }
 

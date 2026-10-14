@@ -89,7 +89,6 @@ class SourceGatewaySet {
       runtimeOperations: runtimeOperations,
       account: account,
       favorites: favorites,
-      settings: settings,
     );
     runtimeGateway = runtimeAdapter;
     selection = runtimeAdapter;
@@ -103,7 +102,6 @@ class SourceGatewaySet {
     advanced = HazukiSourceAdvancedAdapter(
       runtime: runtime,
       runtimeOperations: runtimeOperations,
-      settings: settings,
     );
     category = HazukiSourceCategoryAdapter(content: content, debug: debug);
     commentsGateway = HazukiSourceCommentsAdapter(
@@ -117,7 +115,7 @@ class SourceGatewaySet {
       content: content,
       image: image,
     );
-    bootstrap = HazukiSourceBootstrapAdapter(runtimeOperations);
+    bootstrap = HazukiSourceBootstrapAdapter(runtimeOperations, runtime);
     update = HazukiSourceUpdateAdapter(runtimeOperations);
     script = HazukiSourceScriptAdapter(runtimeOperations);
     localizationGateway = HazukiSourceLocalizationAdapter(localization);

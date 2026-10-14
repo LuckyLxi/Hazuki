@@ -12,8 +12,6 @@ class SourceLoginOperations {
 
   final SourceRuntimeHost _runtimeHost;
   final SourceLoginSideDataOperations _sideData;
-  final SourceLoginScriptFactory _scriptFactory =
-      const SourceLoginScriptFactory();
 
   HazukiSourceFacade get facade => _runtimeHost.activeHandle.facade;
 
@@ -40,8 +38,7 @@ class SourceLoginOperations {
       throw Exception('account_login_not_supported');
     }
 
-    final script = _scriptFactory.build(
-      sourceKey: sourceMeta.key,
+    final script = const SourceLoginScriptFactory().generic(
       account: account,
       password: password,
     );
@@ -52,11 +49,6 @@ class SourceLoginOperations {
       final result = engine.evaluate(script.code, name: script.name);
       resolvedResult = await facade.js.resolve(result);
       await _sideData.persistLoginSideData(
-        facade,
-        sourceKey: sourceMeta.key,
-        result: resolvedResult,
-      );
-      _sideData.logPicacgLoginResponseTrace(
         facade,
         sourceKey: sourceMeta.key,
         result: resolvedResult,
@@ -78,12 +70,6 @@ class SourceLoginOperations {
         password,
       ]);
     } catch (error) {
-      _sideData.logPicacgLoginResponseTrace(
-        facade,
-        sourceKey: sourceMeta.key,
-        result: resolvedResult,
-        error: error.toString(),
-      );
       _recordLoginDebugInfo(
         facade,
         account: account,

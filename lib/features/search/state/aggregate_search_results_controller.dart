@@ -16,9 +16,7 @@ typedef AggregateSearchPageLoader =
 
 class AggregateSearchSectionState {
   AggregateSearchSectionState({required this.source})
-    : order = AggregateSearchResultsController.defaultOrderForSource(
-        source.normalizedKey,
-      );
+    : order = (source.presentation['searchDefaultOrder']?.toString() ?? '');
 
   final SourceCatalogEntry source;
   String order;
@@ -38,7 +36,9 @@ class AggregateSearchResultsController extends ChangeNotifier {
       _loader = null,
       sections = sourceService.allowedSources
           .map((source) => AggregateSearchSectionState(source: source))
-          .toList(growable: false);
+          .toList() {
+    _sourceService.addListener(_syncSources);
+  }
 
   AggregateSearchResultsController.withLoader({
     required SourceSearchGateway sourceService,
@@ -47,7 +47,9 @@ class AggregateSearchResultsController extends ChangeNotifier {
        _loader = loader,
        sections = sourceService.allowedSources
            .map((source) => AggregateSearchSectionState(source: source))
-           .toList(growable: false);
+           .toList() {
+    _sourceService.addListener(_syncSources);
+  }
 
   final SourceSearchGateway _sourceService;
   final AggregateSearchPageLoader? _loader;
@@ -227,24 +229,46 @@ class AggregateSearchResultsController extends ChangeNotifier {
   }
 
   bool _isCurrent(AggregateSearchSectionState section, int token) {
-    return !_disposed && token == section.requestToken;
+    return !_disposed &&
+        sections.contains(section) &&
+        token == section.requestToken;
   }
 
-  static String defaultOrderForSource(String sourceKey) {
-    if (sourceKey == copyMangaSourceKey) return '-';
-    if (sourceKey == picacgSourceKey) return 'dd';
-    return 'mr';
+  void _syncSources() {
+    final current = {
+      for (final section in sections) section.source.key: section,
+    };
+    final updated = <AggregateSearchSectionState>[];
+    for (final source in _sourceService.allowedSources) {
+      final previous = current.remove(source.key);
+      if (previous != null &&
+          previous.source.pluginDirectory == source.pluginDirectory &&
+          previous.source.pluginVersion == source.pluginVersion) {
+        updated.add(previous);
+      } else {
+        if (previous != null) previous.requestToken++;
+        updated.add(AggregateSearchSectionState(source: source));
+      }
+    }
+    for (final removed in current.values) {
+      removed.requestToken++;
+    }
+    sections
+      ..clear()
+      ..addAll(updated);
+    _notify();
   }
 
-  static String _normalizeOrder(String order, String sourceKey) {
-    final normalized = order.trim();
-    if (sourceKey == copyMangaSourceKey) {
-      return copyMangaSearchModeKeys.contains(normalized) ? normalized : '-';
-    }
-    if (sourceKey == picacgSourceKey) {
-      return picacgSearchOrderKeys.contains(normalized) ? normalized : 'dd';
-    }
-    return searchOrderKeys.contains(normalized) ? normalized : 'mr';
+  static String defaultOrderForSource(String sourceKey) => '';
+  String _normalizeOrder(String order, String sourceKey) {
+    final source = sections
+        .where((s) => s.source.key == sourceKey)
+        .firstOrNull
+        ?.source;
+    final options = source?.presentation['searchOrders'];
+    return options is Map && !options.containsKey(order)
+        ? source?.presentation['searchDefaultOrder']?.toString() ?? ''
+        : order;
   }
 
   void _notify() {
@@ -254,6 +278,7 @@ class AggregateSearchResultsController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _sourceService.removeListener(_syncSources);
     for (final section in sections) {
       section.requestToken++;
     }

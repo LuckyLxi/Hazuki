@@ -3,7 +3,6 @@ import 'dart:convert';
 import '../../../models/hazuki_models.dart';
 import '../account/source_relogin_coordinator.dart';
 import '../common/source_json_coerce.dart';
-import '../models/source_identity.dart';
 import '../runtime/source_runtime_facade.dart';
 import '../runtime/source_runtime_host.dart';
 
@@ -222,17 +221,15 @@ class SourceCommentsCapability {
 
   bool supportCommentRepliesForSource(String sourceKey) {
     final resolvedSourceKey = _resolveSourceKey(sourceKey);
-    if (!isHazukiPicacgSourceKey(resolvedSourceKey) &&
-        !isHazukiCopyMangaSourceKey(resolvedSourceKey)) {
-      return false;
-    }
     final facade = _runtimeHost.handleFor(resolvedSourceKey).facade;
     final engine = facade.js.engine;
     if (engine == null) {
       return false;
     }
     return facade.js.asBool(
-      facade.js.evaluate('!!this.__hazuki_source.comic?.loadComments'),
+      facade.js.evaluate(
+        '!!this.__hazuki_source.comic?.loadComments && this.__hazuki_source.presentation?.commentReplies == true',
+      ),
     );
   }
 }

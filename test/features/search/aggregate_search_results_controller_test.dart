@@ -1,3 +1,5 @@
+import '../../support/source_presentation_fixtures.dart';
+import '../../support/source_catalog_fixtures.dart';
 import 'dart:async';
 
 import 'package:hazuki/features/search/support/search_shared.dart';
@@ -16,14 +18,16 @@ void main() {
   ) async {
     late BuildContext testContext;
     await tester.pumpWidget(
-      MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: Builder(
-          builder: (context) {
-            testContext = context;
-            return const SizedBox();
-          },
+      withTestSourcePresentation(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Builder(
+            builder: (context) {
+              testContext = context;
+              return const SizedBox();
+            },
+          ),
         ),
       ),
     );
@@ -31,7 +35,9 @@ void main() {
     final requestedOrders = <String, String>{};
     final controller = AggregateSearchResultsController.withLoader(
       sourceService: (() {
-        final source = SourceRuntimeAssembly();
+        final source = SourceRuntimeAssembly(
+          initialCatalog: hazukiAllowedSourceCatalog,
+        );
         return HazukiSourceSearchAdapter(
           runtime: source.testing.runtime,
           content: source.testing.content,
@@ -108,20 +114,22 @@ void main() {
     AggregateSearchSectionState? openedSection;
 
     await tester.pumpWidget(
-      MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: Scaffold(
-          body: SearchAggregateResultsBody(
-            scrollController: scrollController,
-            sections: [section],
-            onRefresh: () async {},
-            onScrollNotification: (_) => false,
-            onRetry: (_) {},
-            onLoadMore: (_) {},
-            onComicTap: (_, _) async {},
-            onViewMore: (value) => openedSection = value,
-            heroTagBuilder: (comic, salt) => '${comic.id}-$salt',
+      withTestSourcePresentation(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: SearchAggregateResultsBody(
+              scrollController: scrollController,
+              sections: [section],
+              onRefresh: () async {},
+              onScrollNotification: (_) => false,
+              onRetry: (_) {},
+              onLoadMore: (_) {},
+              onComicTap: (_, _) async {},
+              onViewMore: (value) => openedSection = value,
+              heroTagBuilder: (comic, salt) => '${comic.id}-$salt',
+            ),
           ),
         ),
       ),
@@ -141,21 +149,25 @@ void main() {
   ) async {
     late BuildContext testContext;
     await tester.pumpWidget(
-      MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: Builder(
-          builder: (context) {
-            testContext = context;
-            return const SizedBox();
-          },
+      withTestSourcePresentation(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Builder(
+            builder: (context) {
+              testContext = context;
+              return const SizedBox();
+            },
+          ),
         ),
       ),
     );
     final requestedOrders = <String>[];
     final controller = AggregateSearchResultsController.withLoader(
       sourceService: (() {
-        final source = SourceRuntimeAssembly();
+        final source = SourceRuntimeAssembly(
+          initialCatalog: hazukiAllowedSourceCatalog,
+        );
         return HazukiSourceSearchAdapter(
           runtime: source.testing.runtime,
           content: source.testing.content,
@@ -192,19 +204,23 @@ void main() {
   ) async {
     late BuildContext testContext;
     await tester.pumpWidget(
-      MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: Builder(
-          builder: (context) {
-            testContext = context;
-            return const SizedBox();
-          },
+      withTestSourcePresentation(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Builder(
+            builder: (context) {
+              testContext = context;
+              return const SizedBox();
+            },
+          ),
         ),
       ),
     );
     final pendingReload = Completer<SearchComicsResult>();
-    final source = SourceRuntimeAssembly();
+    final source = SourceRuntimeAssembly(
+      initialCatalog: hazukiAllowedSourceCatalog,
+    );
     final controller = AggregateSearchResultsController.withLoader(
       sourceService: HazukiSourceSearchAdapter(
         runtime: source.testing.runtime,
@@ -257,7 +273,9 @@ void main() {
   testWidgets('source section page updates its sort label and empty state', (
     tester,
   ) async {
-    final source = SourceRuntimeAssembly();
+    final source = SourceRuntimeAssembly(
+      initialCatalog: hazukiAllowedSourceCatalog,
+    );
     final controller = AggregateSearchResultsController.withLoader(
       sourceService: HazukiSourceSearchAdapter(
         runtime: source.testing.runtime,
@@ -293,15 +311,17 @@ void main() {
     );
 
     await tester.pumpWidget(
-      MaterialApp(
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: SearchAggregateSectionPage(
-          controller: controller,
-          section: section,
-          comicLayout: SearchComicLayout.grid3,
-          onComicTap: (_, _) async {},
-          heroTagBuilder: (comic, salt) => '${comic.id}-$salt',
+      withTestSourcePresentation(
+        MaterialApp(
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: SearchAggregateSectionPage(
+            controller: controller,
+            section: section,
+            comicLayout: SearchComicLayout.grid3,
+            onComicTap: (_, _) async {},
+            heroTagBuilder: (comic, salt) => '${comic.id}-$salt',
+          ),
         ),
       ),
     );

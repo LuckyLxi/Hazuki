@@ -72,7 +72,7 @@ class ComicDetailBody extends StatelessWidget {
                 uiState.shouldAnimateInitialDetailReveal;
             final shouldAnimateResolvedContent =
                 shouldAnimateInitialDetailReveal && details != null;
-            final supportsJmExclusiveActions = scope.supportsJmExclusiveActions;
+            final supportsRelatedTab = scope.supportsRelatedTab;
 
             uiState.updateAppBarMetadata(
               title: displayTitle,
@@ -158,7 +158,7 @@ class ComicDetailBody extends StatelessWidget {
                               height: 44,
                               text: l10n(context).comicDetailTabComments,
                             ),
-                            if (supportsJmExclusiveActions)
+                            if (supportsRelatedTab)
                               Tab(
                                 height: 44,
                                 text: l10n(context).comicDetailTabRelated,
@@ -224,7 +224,7 @@ class ComicDetailBody extends StatelessWidget {
                             : const CommentsInitialLoadingView();
                       },
                     ),
-                    if (supportsJmExclusiveActions)
+                    if (supportsRelatedTab)
                       ComicDetailTabTickerScope(
                         tabController: uiState.tabController,
                         tabIndex: 2,

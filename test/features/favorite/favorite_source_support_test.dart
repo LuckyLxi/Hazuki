@@ -1,4 +1,9 @@
 import 'dart:async';
+import 'package:hazuki/features/favorite/support/favorite_list_loader.dart';
+import 'package:hazuki/features/favorite/support/favorite_local_flow.dart';
+import 'package:hazuki/features/favorite/support/favorite_cloud_flow.dart';
+import 'package:hazuki/services/local_favorites/local_favorites_contracts.dart';
+import 'package:hazuki/services/local_favorites/local_favorites_preferences_store.dart';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -9,11 +14,17 @@ import 'package:hazuki/services/source/source_capabilities.dart';
 
 class _Reader extends Mock implements SourceReaderGateway {}
 
+class _Local extends Mock implements LocalFavoritesRepository {}
+
+class _Preferences extends Mock implements LocalFavoritesPreferencesStore {}
+
+class _Source extends Mock implements SourceFavoriteGateway {}
+
 class _Details extends Mock implements ComicDetailsData {}
 
 ExploreComic _comic(
   String id, {
-  String source = 'picacg',
+  String source = 'custom_tags',
   List<String> tags = const [],
 }) => ExploreComic(
   id: id,
@@ -34,12 +45,24 @@ ComicDetailsData _details() {
   return details;
 }
 
-void main() {
-  const policy = FavoriteSourcePolicy();
+Map<String, dynamic> _presentation(String key) => switch (key.trim()) {
+  'custom_tags' => {
+    'enrichMissingTags': true,
+    'listTagGroups': ['tags', 'categories'],
+  },
+  'custom_sort' => {
+    'refreshCloudFavorites': true,
+    'favoriteOrderAliases': {'old': 'new'},
+  },
+  _ => const {},
+};
 
-  test('only CopyManga cloud changes trigger a refresh', () {
-    expect(policy.refreshOnCloudFavoritesChanged(' copy_manga '), isTrue);
-    for (final source in ['jm', 'picacg', '', 'COPY_MANGA']) {
+void main() {
+  const policy = FavoriteSourcePolicy(presentationFor: _presentation);
+
+  test('cloud refresh follows plugin metadata for arbitrary identities', () {
+    expect(policy.refreshOnCloudFavoritesChanged(' custom_sort '), isTrue);
+    for (final source in ['jm', 'picacg', 'copy_manga', '', 'CUSTOM_SORT']) {
       expect(policy.refreshOnCloudFavoritesChanged(source), isFalse);
     }
   });
@@ -47,22 +70,26 @@ void main() {
   test('sort compatibility preserves supported values and legacy mappings', () {
     for (final entry in <(String, List<String>, String)>[
       (' mp ', ['mp', 'mr'], 'mp'),
-      ('mp', ['-datetime_updated'], '-datetime_updated'),
-      ('mr', ['-datetime_modifier'], '-datetime_modifier'),
+      ('old', ['other', 'new'], 'new'),
+      ('mr', ['custom', '-datetime_modifier'], 'custom'),
       ('-datetime_updated', ['mp'], 'mp'),
-      ('unknown', ['mp', 'mr'], 'mr'),
+      ('unknown', ['mp', 'mr'], 'mp'),
       ('unknown', ['custom'], 'custom'),
-      ('unknown', [], 'mr'),
+      ('unknown', [], ''),
     ]) {
       expect(
-        policy.normalizeSortOrder(entry.$1, allowedOrders: entry.$2),
+        policy.normalizeSortOrder(
+          entry.$1,
+          allowedOrders: entry.$2,
+          sourceKey: 'custom_sort',
+        ),
         entry.$3,
       );
     }
   });
 
   test(
-    'fills only missing Picacg tags and keeps source-scoped identities',
+    'fills only plugin-declared missing tags and keeps source-scoped identities',
     () async {
       final reader = _Reader();
       when(
@@ -71,22 +98,26 @@ void main() {
       ).thenAnswer((_) async => _details());
       final comics = [
         _comic('same'),
-        _comic('same', source: 'jm', tags: ['jm tag']),
+        _comic('same', source: 'plain', tags: ['jm tag']),
         _comic('existing', tags: ['original']),
-        _comic('other', source: 'jm'),
+        _comic('other', source: 'plain'),
       ];
       final loaded = <String>[];
-      final tags = await FavoriteComicTagLoader(reader).load(
-        FavoriteComicsResult.success(comics),
-        onTagsLoaded: (comic, tags) => loaded.add(comic.id),
-      );
+      final tags =
+          await FavoriteComicTagLoader(
+            reader,
+            presentationFor: _presentation,
+          ).load(
+            FavoriteComicsResult.success(comics),
+            onTagsLoaded: (comic, tags) => loaded.add(comic.id),
+          );
       expect(loaded, ['same']);
       expect(tags[comics[0].scopedId.storageKey], ['tag', 'category']);
       expect(tags[comics[1].scopedId.storageKey], ['jm tag']);
       expect(tags[comics[2].scopedId.storageKey], ['original']);
       expect(comics[0].tags, isEmpty);
       verify(
-        () => reader.loadComicDetails('same', sourceKey: 'picacg'),
+        () => reader.loadComicDetails('same', sourceKey: 'custom_tags'),
       ).called(1);
       verifyNoMoreInteractions(reader);
     },
@@ -97,16 +128,20 @@ void main() {
     () async {
       final reader = _Reader();
       when(
-        () => reader.loadComicDetails('bad', sourceKey: 'picacg'),
+        () => reader.loadComicDetails('bad', sourceKey: 'custom_tags'),
       ).thenThrow(StateError('unavailable'));
       when(
-        () => reader.loadComicDetails('ok', sourceKey: 'picacg'),
+        () => reader.loadComicDetails('ok', sourceKey: 'custom_tags'),
       ).thenAnswer((_) async => _details());
       final loaded = <String>[];
-      final tags = await FavoriteComicTagLoader(reader).load(
-        FavoriteComicsResult.success([_comic('bad'), _comic('ok')]),
-        onTagsLoaded: (comic, tags) => loaded.add(comic.id),
-      );
+      final tags =
+          await FavoriteComicTagLoader(
+            reader,
+            presentationFor: _presentation,
+          ).load(
+            FavoriteComicsResult.success([_comic('bad'), _comic('ok')]),
+            onTagsLoaded: (comic, tags) => loaded.add(comic.id),
+          );
       expect(loaded, ['ok']);
       expect(tags.length, 1);
     },
@@ -127,17 +162,23 @@ void main() {
       void unexpectedUpdate(ExploreComic comic, List<String> tags) =>
           fail('Unexpected update');
       expect(
-        await FavoriteComicTagLoader(reader).load(
+        await FavoriteComicTagLoader(
+          reader,
+          presentationFor: _presentation,
+        ).load(
           FavoriteComicsResult.success([_comic('empty')]),
           onTagsLoaded: unexpectedUpdate,
         ),
         isEmpty,
       );
       verify(
-        () => reader.loadComicDetails('empty', sourceKey: 'picacg'),
+        () => reader.loadComicDetails('empty', sourceKey: 'custom_tags'),
       ).called(1);
       expect(
-        await FavoriteComicTagLoader(reader).load(
+        await FavoriteComicTagLoader(
+          reader,
+          presentationFor: _presentation,
+        ).load(
           const FavoriteComicsResult.error('failed'),
           onTagsLoaded: unexpectedUpdate,
         ),
@@ -154,6 +195,84 @@ void main() {
     },
   );
 
+  test(
+    'stale requests stop before subsequent batches and perform no updates',
+    () async {
+      final reader = _Reader();
+      final pending = <Completer<ComicDetailsData>>[];
+      when(
+        () =>
+            reader.loadComicDetails(any(), sourceKey: any(named: 'sourceKey')),
+      ).thenAnswer((_) {
+        final request = Completer<ComicDetailsData>();
+        pending.add(request);
+        return request.future;
+      });
+      var current = true;
+      final future =
+          FavoriteComicTagLoader(reader, presentationFor: _presentation).load(
+            FavoriteComicsResult.success(
+              List.generate(5, (index) => _comic('$index')),
+            ),
+            isCurrent: () => current,
+            onTagsLoaded: (_, _) => fail('stale request updated tags'),
+          );
+      expect(pending.length, 4);
+      current = false;
+      for (final request in pending) {
+        request.complete(_details());
+      }
+      expect(await future, isEmpty);
+      expect(pending.length, 4);
+    },
+  );
+
+  test(
+    'local loader maps arbitrary plugin orders to generic sorting',
+    () async {
+      final local = _Local();
+      when(
+        () => local.loadFavoriteComics(
+          page: 1,
+          folderId: 'folder',
+          sourceKey: '',
+          sortOrder: 'updatedNewest',
+        ),
+      ).thenAnswer((_) async => const FavoriteComicsResult.success([]));
+      final loader = FavoriteListLoader(
+        cloud: FavoriteCloudFlow(_Source()),
+        local: FavoriteLocalFlow(
+          repository: local,
+          preferences: _Preferences(),
+        ),
+        presentationFor: (key) => key == 'custom_sort'
+            ? {
+                'localFavoriteOrders': {'custom_updated': 'updatedNewest'},
+              }
+            : const {},
+      );
+      await loader.load(
+        request: loader.capture(
+          sourceKey: 'custom_sort',
+          mode: FavoritePageMode.local,
+        ),
+        page: 1,
+        folderId: 'folder',
+        sortOrder: 'custom_updated',
+        timeoutMessage: '',
+      );
+      verify(
+        () => local.loadFavoriteComics(
+          page: 1,
+          folderId: 'folder',
+          sourceKey: '',
+          sortOrder: 'updatedNewest',
+        ),
+      ).called(1);
+      loader.dispose();
+    },
+  );
+
   test('detail requests run in batches of at most four', () async {
     final reader = _Reader();
     final pending = <Completer<ComicDetailsData>>[];
@@ -164,12 +283,13 @@ void main() {
       pending.add(completer);
       return completer.future;
     });
-    final future = FavoriteComicTagLoader(reader).load(
-      FavoriteComicsResult.success(
-        List.generate(5, (index) => _comic('$index')),
-      ),
-      onTagsLoaded: (_, _) {},
-    );
+    final future =
+        FavoriteComicTagLoader(reader, presentationFor: _presentation).load(
+          FavoriteComicsResult.success(
+            List.generate(5, (index) => _comic('$index')),
+          ),
+          onTagsLoaded: (_, _) {},
+        );
     expect(pending.length, 4);
     for (final request in pending.take(3)) {
       request.complete(_details());

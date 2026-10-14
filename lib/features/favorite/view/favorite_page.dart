@@ -1,3 +1,5 @@
+import 'package:hazuki/shared/source_presentation.dart';
+import 'package:hazuki/services/source/plugins/source_presentation_metadata.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -77,6 +79,9 @@ class FavoritePageState extends State<FavoritePage>
     _controller = FavoritePageController(
       sourceService: widget.sourceService,
       readerService: widget.readerService,
+      presentationFor:
+          SourcePresentationScope.read(context)?.presentationFor ??
+          emptySourcePresentation,
       localFavoritesRepository: widget.localFavoritesRepository,
       localFavoritesPreferences: widget.localFavoritesPreferences,
     );

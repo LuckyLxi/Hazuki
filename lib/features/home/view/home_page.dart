@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:hazuki/shared/source_presentation.dart';
 import 'package:flutter/services.dart';
 
 import 'package:hazuki/shared/appearance/appearance_settings.dart';
@@ -106,7 +107,14 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
           avatarUrl: _coordinator.avatarUrl,
           username: _coordinator.username,
           autoCheckInEnabled: _coordinator.autoCheckInEnabled,
-          showCheckInActions: _coordinator.isCheckInAvailable,
+          showCheckInActions:
+              _coordinator.isCheckInAvailable &&
+              activeSourceButton(
+                    context,
+                    'checkIn',
+                    SourcePluginButtonLocation.homeProfile,
+                  ) !=
+                  null,
           checkInBusy: _coordinator.checkInBusy,
           checkedInToday: _coordinator.checkedInToday,
         );
@@ -129,7 +137,8 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
               : HomeDrawerContent(
                   profile: sidebarProfile,
                   actions: const HomeSidebarActions(),
-                  activeSourceKey: _coordinator.sourceService.activeSourceKey,
+                  activeSourceKey:
+                      (_coordinator.sourceService.activeSourceKey ?? ''),
                   selectedDestination: _selectedDrawerDestination,
                   unreadAnnouncementCount:
                       _coordinator.announcementService.unreadCount,
@@ -200,7 +209,7 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
           usePinnedDiscoverSearch:
               _coordinator.dailyRecommendationState.hasRecommendations,
           downloadStatus: widget.services.downloadStatus,
-          activeSourceKey: _coordinator.sourceService.activeSourceKey,
+          activeSourceKey: (_coordinator.sourceService.activeSourceKey ?? ''),
           supportsSourceAccount:
               _coordinator.sourceService.sourceMeta?.supportsAccount == true,
           discoverChild: discoverChild,
@@ -212,7 +221,14 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
           avatarUrl: _coordinator.avatarUrl,
           username: _coordinator.username,
           autoCheckInEnabled: _coordinator.autoCheckInEnabled,
-          showCheckInActions: _coordinator.isCheckInAvailable,
+          showCheckInActions:
+              _coordinator.isCheckInAvailable &&
+              activeSourceButton(
+                    context,
+                    'checkIn',
+                    SourcePluginButtonLocation.homeProfile,
+                  ) !=
+                  null,
           checkInBusy: _coordinator.checkInBusy,
           checkedInToday: _coordinator.checkedInToday,
           onWillPop: () => _coordinator.handleWillPop(context),
@@ -233,6 +249,10 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
             unawaited(_coordinator.scrollFavoriteToTop());
           },
           onProfileTap: () {
+            if (_coordinator.sourceService.sourceMeta?.supportsAccount !=
+                true) {
+              return;
+            }
             if (profileLoading) {
               return;
             }

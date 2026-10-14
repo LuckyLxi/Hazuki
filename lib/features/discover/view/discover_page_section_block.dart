@@ -1,3 +1,4 @@
+import 'package:hazuki/shared/source_presentation.dart';
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/shared/appearance/appearance_settings.dart';
@@ -273,10 +274,14 @@ class _DiscoverSectionBlockState extends State<DiscoverSectionBlock> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ],
-                      if (comic.sourceKey == 'picacg' &&
+                      if (sourceFeature(
+                            comic.sourceKey,
+                            'showTags',
+                            context: context,
+                          ) &&
                           comic.tags.isNotEmpty) ...[
                         const SizedBox(height: 6),
-                        PicacgComicTags(
+                        SourceComicTags(
                           sourceKey: comic.sourceKey,
                           tags: comic.tags,
                         ),

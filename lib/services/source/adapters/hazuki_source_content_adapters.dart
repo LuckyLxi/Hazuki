@@ -25,7 +25,7 @@ class HazukiSourceSearchAdapter extends HazukiSourceListenableAdapter
   final SourceContentOperations _content;
 
   @override
-  String get activeSourceKey => runtime.activeSourceKey;
+  String? get activeSourceKey => runtime.activeSourceKey;
   @override
   bool get isActiveJmSource => runtime.isActiveJmSource;
   @override
@@ -69,7 +69,16 @@ class HazukiSourceDiscoverAdapter extends HazukiSourceListenableAdapter
   final SourceAccountOperations _account;
 
   @override
-  String get activeSourceKey => runtime.activeSourceKey;
+  String? get sourceRevision => runtime.sourceRevision;
+  @override
+  bool get requiresLogin =>
+      runtime.runtimeRegistry.allowedSources
+          .where((s) => s.key == runtime.activeSourceKey)
+          .firstOrNull
+          ?.presentation['requiresLogin'] ==
+      true;
+  @override
+  String? get activeSourceKey => runtime.activeSourceKey;
   @override
   bool get isLogged => _account.isLogged;
   @override
@@ -254,7 +263,7 @@ class HazukiSourceComicDetailAdapter implements SourceComicDetailGateway {
   final SourceRuntimeView _runtime;
 
   @override
-  String get activeSourceKey => _runtime.activeSourceKey;
+  String? get activeSourceKey => _runtime.activeSourceKey;
   @override
   bool isLoggedForSource(String sourceKey) =>
       _account.isLoggedForSource(sourceKey);
@@ -392,7 +401,7 @@ class HazukiSourceFavoriteAdapter extends HazukiSourceListenableAdapter
   final SourceRuntimeOperations _runtimeOperations;
 
   @override
-  String get activeSourceKey => runtime.activeSourceKey;
+  String? get activeSourceKey => runtime.activeSourceKey;
   @override
   bool get isLogged => _account.isLogged;
   @override

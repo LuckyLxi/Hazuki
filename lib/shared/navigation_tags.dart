@@ -46,7 +46,7 @@ Future<void> precacheComicCoverHeroImages(
   final imageGateway = SourceImageGatewayScope.of(context);
   final resolvedSourceKey = sourceKey.trim().isNotEmpty
       ? sourceKey.trim()
-      : imageGateway.activeSourceKey;
+      : (imageGateway.activeSourceKey ?? '');
   try {
     var bytes =
         peekHazukiWidgetImageMemory(normalized, sourceKey: resolvedSourceKey) ??
@@ -165,7 +165,8 @@ Widget buildComicCoverHeroFlightShuttle(
     if (url.isNotEmpty) {
       final sourceKey = cachedImage.sourceKey.trim().isNotEmpty
           ? cachedImage.sourceKey
-          : (cachedImage.imageGateway ?? scopedImageGateway).activeSourceKey;
+          : ((cachedImage.imageGateway ?? scopedImageGateway).activeSourceKey ??
+                '');
       final imageGateway = cachedImage.imageGateway ?? scopedImageGateway;
       var bytes = peekHazukiWidgetImageMemory(url, sourceKey: sourceKey);
       if (bytes == null) {

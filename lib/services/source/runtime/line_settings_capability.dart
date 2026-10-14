@@ -12,64 +12,10 @@ class LineSettingsCapability {
       throw Exception('source_not_initialized');
     }
 
-    final store = _facade.session.loadSourceStore(sourceMeta.key);
-    final settingsInStore = store['settings'];
-    final settingsMap = settingsInStore is Map
-        ? Map<String, dynamic>.from(settingsInStore)
-        : <String, dynamic>{};
-
-    String readSelectSetting(String key, String fallback) {
-      final raw = settingsMap.containsKey(key)
-          ? settingsMap[key]
-          : sourceMeta.settingsDefaults[key];
-      final normalized = raw?.toString().trim() ?? '';
-      if (normalized.isEmpty) {
-        return fallback;
-      }
-      return normalized;
-    }
-
-    final refreshRaw = settingsMap.containsKey('refreshDomainsOnStart')
-        ? settingsMap['refreshDomainsOnStart']
-        : sourceMeta.settingsDefaults['refreshDomainsOnStart'];
-
-    final dynamic domainsRaw = engine.evaluate(
-      'Array.isArray(JM?.apiDomains) ? JM.apiDomains.slice() : []',
+    final result = await _facade.js.resolve(
+      engine.evaluate('this.__hazuki_source.lines?.snapshot?.() ?? {}'),
     );
-    final domainsResolved = await _facade.js.resolve(domainsRaw);
-    final apiDomains = <String>[];
-    if (domainsResolved is List) {
-      for (final item in domainsResolved) {
-        final text = item?.toString().trim() ?? '';
-        if (text.isNotEmpty) {
-          apiDomains.add(text);
-        }
-      }
-    }
-
-    final dynamic imageStreamOptionsCountRaw = engine.evaluate(
-      'this.__hazuki_source.settings?.imageStream?.options?.length ?? 4',
-    );
-    final imageStreamOptionsCount =
-        _facade.js.asInt(imageStreamOptionsCountRaw) ?? 4;
-
-    final dynamic imageHostRaw = engine.evaluate('JM?.imageUrl ?? ""');
-    final imageHost = imageHostRaw?.toString() ?? '';
-
-    final apiDomain = readSelectSetting('apiDomain', '1');
-    final imageStream = readSelectSetting('imageStream', '1');
-    final refreshDomainsOnStart = _facade.js.asBool(refreshRaw);
-
-    return {
-      'apiDomain': apiDomain,
-      'imageStream': imageStream,
-      'refreshDomainsOnStart': refreshDomainsOnStart,
-      'apiDomains': apiDomains,
-      'imageStreamOptionsCount': imageStreamOptionsCount < 1
-          ? 1
-          : imageStreamOptionsCount,
-      'imageHost': imageHost,
-    };
+    return result is Map ? Map<String, dynamic>.from(result) : {};
   }
 
   Future<void> updateSetting(String key, dynamic value) async {

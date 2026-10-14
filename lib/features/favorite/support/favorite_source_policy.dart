@@ -1,32 +1,30 @@
-import 'package:hazuki/services/source/source_capabilities.dart';
+import 'package:hazuki/services/source/plugins/source_presentation_metadata.dart';
 
-/// Source-specific compatibility rules for the favorites page.
 class FavoriteSourcePolicy {
-  const FavoriteSourcePolicy();
+  const FavoriteSourcePolicy({
+    SourcePresentationReader presentationFor = emptySourcePresentation,
+  }) : _presentationFor = presentationFor;
+
+  final SourcePresentationReader _presentationFor;
 
   bool refreshOnCloudFavoritesChanged(String sourceKey) =>
-      isHazukiCopyMangaSourceKey(sourceKey);
+      _presentationFor(sourceKey.trim())['refreshCloudFavorites'] == true;
 
   String normalizeSortOrder(
     String order, {
     required List<String> allowedOrders,
+    required String sourceKey,
   }) {
     final normalized = order.trim();
-    if (allowedOrders.contains(normalized)) {
-      return normalized;
+    if (allowedOrders.contains(normalized)) return normalized;
+    final presentation = _presentationFor(sourceKey);
+    final aliases = presentation['favoriteOrderAliases'];
+    final alias = aliases is Map ? aliases[normalized] : null;
+    if (alias is String && allowedOrders.contains(alias)) return alias;
+    final defaultOrder = presentation['favoriteDefaultOrder'];
+    if (defaultOrder is String && allowedOrders.contains(defaultOrder)) {
+      return defaultOrder;
     }
-    if (allowedOrders.contains('-datetime_updated') && normalized == 'mp') {
-      return '-datetime_updated';
-    }
-    if (allowedOrders.contains('-datetime_modifier') && normalized == 'mr') {
-      return '-datetime_modifier';
-    }
-    if (allowedOrders.contains('mp') && normalized == '-datetime_updated') {
-      return 'mp';
-    }
-    if (allowedOrders.contains('mr')) {
-      return 'mr';
-    }
-    return allowedOrders.firstOrNull ?? 'mr';
+    return allowedOrders.firstOrNull ?? '';
   }
 }

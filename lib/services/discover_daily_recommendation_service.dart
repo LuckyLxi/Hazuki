@@ -95,7 +95,7 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
     }
 
     final cached = await _cacheStore.readSnapshot(
-      activeSourceKey: _source.activeSourceKey,
+      activeSourceKey: (_source.activeSourceKey ?? ''),
     );
     if (cached != null) {
       _setState(_snapshotToDisplayedState(cached));

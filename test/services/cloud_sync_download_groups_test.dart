@@ -1,3 +1,4 @@
+import '../support/source_catalog_fixtures.dart';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -22,7 +23,9 @@ void main() {
 
   test('webdav settings snapshot includes download group metadata', () async {
     final database = HazukiDatabase.memory();
-    final source = SourceRuntimeAssembly();
+    final source = SourceRuntimeAssembly(
+      initialCatalog: hazukiAllowedSourceCatalog,
+    );
     final groups = DownloadGroupsService(database: database);
     try {
       await groups.initialize(const ['comic-a']);

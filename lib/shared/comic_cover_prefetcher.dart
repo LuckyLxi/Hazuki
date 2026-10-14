@@ -102,7 +102,7 @@ class ComicCoverPrefetcher {
     }
     final sourceKey = comic.sourceKey.trim().isNotEmpty
         ? comic.sourceKey.trim()
-        : _imageGateway.activeSourceKey;
+        : (_imageGateway.activeSourceKey ?? '');
     return _CoverPrefetchRequest(
       url: url,
       sourceKey: sourceKey,

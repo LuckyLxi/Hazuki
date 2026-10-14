@@ -572,33 +572,16 @@ void main() {
   });
 
   group('ReaderSourceImageQualitySettings', () {
-    test('normalizes source image quality values', () {
-      expect(
-        ReaderSourceImageQualitySettings.normalizeCopyMangaImageQuality('800'),
-        '800',
+    test('normalizes quality values using plugin options and defaults', () {
+      const snapshot = ReaderSourceImageQualitySnapshot(
+        settingKey: 'quality',
+        options: {'compact': 'Compact', 'full': 'Full'},
+        value: 'full',
       );
-      expect(
-        ReaderSourceImageQualitySettings.normalizeCopyMangaImageQuality('1200'),
-        '1200',
-      );
-      expect(
-        ReaderSourceImageQualitySettings.normalizeCopyMangaImageQuality('bad'),
-        '1500',
-      );
-      expect(
-        ReaderSourceImageQualitySettings.normalizePicacgImageQuality(
-          'original',
-        ),
-        'original',
-      );
-      expect(
-        ReaderSourceImageQualitySettings.normalizePicacgImageQuality('medium'),
-        'medium',
-      );
-      expect(
-        ReaderSourceImageQualitySettings.normalizePicacgImageQuality(null),
-        'original',
-      );
+      expect(snapshot.normalize('compact'), 'compact');
+      expect(snapshot.normalize('bad'), 'full');
+      expect(snapshot.normalize(null), 'full');
+      expect(snapshot.copyWith(value: 'compact').value, 'compact');
     });
   });
 
@@ -698,8 +681,7 @@ void main() {
               onFilterEnabledChanged: (_) {},
               onFilterColorChanged: (value) => selectedColor = value,
               onFilterStrengthChanged: (_) {},
-              onCopyMangaImageQualityChanged: (_) {},
-              onPicacgImageQualityChanged: (_) {},
+              onSourceImageQualityChanged: (_) {},
             ),
           ),
         ),

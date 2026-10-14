@@ -14,6 +14,7 @@ class SourceAccountSessionCapability {
   HazukiSourceFacade get facade => _runtimeHost.activeHandle.facade;
 
   String? get currentAccount {
+    if (!_runtimeHost.hasActiveSource) return null;
     final sourceKey = facade.sourceMeta?.key ?? facade.sourceKey;
     final displayName = facade
         .loadSourceData(sourceKey, 'display_name')
@@ -29,7 +30,8 @@ class SourceAccountSessionCapability {
     return accountData.first;
   }
 
-  bool get isLogged => facade.loadAccountDataSync() != null;
+  bool get isLogged =>
+      _runtimeHost.hasActiveSource && facade.loadAccountDataSync() != null;
 
   Future<void> login({required String account, required String password}) =>
       _loginOperations.login(account: account, password: password);
@@ -77,6 +79,9 @@ class SourceAccountSessionCapability {
   }
 
   String? currentAccountForSource(String sourceKey) {
+    if (!_runtimeHost.runtimeRegistry.isAllowedSourceKey(sourceKey)) {
+      return null;
+    }
     final handle = _runtimeHost.handleFor(sourceKey);
     final displayName = handle.session
         .loadSourceData(handle.sourceKey, 'display_name')
@@ -91,6 +96,9 @@ class SourceAccountSessionCapability {
   }
 
   bool isLoggedForSource(String sourceKey) {
+    if (!_runtimeHost.runtimeRegistry.isAllowedSourceKey(sourceKey)) {
+      return false;
+    }
     final handle = _runtimeHost.handleFor(sourceKey);
     return handle.session.loadAccountDataSync(
           handle.runtime.sourceMeta,
@@ -99,6 +107,7 @@ class SourceAccountSessionCapability {
         null;
   }
 
-  Future<String?> loadCurrentAvatarUrl() =>
-      _loginOperations.loadCurrentAvatarUrl();
+  Future<String?> loadCurrentAvatarUrl() => _runtimeHost.hasActiveSource
+      ? _loginOperations.loadCurrentAvatarUrl()
+      : Future.value(null);
 }

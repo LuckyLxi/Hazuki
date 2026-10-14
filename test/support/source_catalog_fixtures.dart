@@ -1,0 +1,123 @@
+import 'package:hazuki/services/source/source_capabilities.dart';
+
+const List<SourceCatalogEntry> hazukiAllowedSourceCatalog = [
+  SourceCatalogEntry(
+    key: "jm",
+    name: "JMComic",
+    fileName: "jm.js",
+    directUrls: [
+      "https://cdn.jsdelivr.net/gh/venera-app/venera-configs@main/jm.js",
+    ],
+    presentation: {
+      "directComicId": true,
+      "buttons": [
+        {"id": "checkIn", "location": "homeProfile"},
+        {"id": "autoCheckIn", "location": "other"},
+        {"id": "copyComicId", "location": "comicDetailInfo"},
+        {"id": "relatedComics", "location": "comicDetailTabs"},
+      ],
+      "showComicId": true,
+      "listTagGroups": ["Tag"],
+      "favoriteOrderAliases": {"-datetime_updated": "mp"},
+      "localFavoriteOrders": {"mr": "savedNewest", "mp": "updatedNewest"},
+      "dailyCheckIn": true,
+      "searchDefaultOrder": "mr",
+      "searchOrders": {
+        "mr": {"zh": "最新", "en": "Latest"},
+        "mv": {"zh": "总排行", "en": "Top overall"},
+        "mv_m": {"zh": "月排行", "en": "Top monthly"},
+        "mv_w": {"zh": "周排行", "en": "Top weekly"},
+        "mv_t": {"zh": "日排行", "en": "Top daily"},
+        "mp": {"zh": "最多图片", "en": "Most images"},
+        "tf": {"zh": "最多喜欢", "en": "Most likes"},
+      },
+      "favoriteOrders": ["mr", "mp"],
+      "favoriteDefaultOrder": "mr",
+      "favoriteOrderSetting": "favoriteOrder",
+      "actions": [
+        {"id": "refreshLines", "title": "刷新线路"},
+      ],
+    },
+  ),
+  SourceCatalogEntry(
+    key: "copy_manga",
+    name: "CopyManga",
+    fileName: "copy_manga.js",
+    directUrls: [
+      "https://cdn.jsdelivr.net/gh/venera-app/venera-configs@main/copy_manga.js",
+    ],
+    presentation: {
+      "legacyRanking": true,
+      "buttons": [
+        {
+          "id": "resetDeviceInfo",
+          "location": "advanced",
+          "action": "clearDeviceInfo",
+        },
+        {"id": "imageQuality", "location": "reading"},
+        {"id": "imageQuality", "location": "reader"},
+      ],
+      "commentReplies": true,
+      "skipPeriodicRelogin": true,
+      "showComicStatus": true,
+      "searchDefaultOrder": "-",
+      "searchOrders": {"-": "全部", "name": "名称", "author": "作者", "local": "汉化组"},
+      "favoriteOrders": [
+        "-datetime_updated",
+        "-datetime_modifier",
+        "-datetime_browse",
+      ],
+      "favoriteDefaultOrder": "-datetime_updated",
+      "favoriteOrderAliases": {
+        "mp": "-datetime_updated",
+        "mr": "-datetime_modifier",
+      },
+      "localFavoriteOrders": {
+        "-datetime_updated": "updatedNewest",
+        "-datetime_modifier": "savedNewest",
+        "-datetime_browse": "savedNewest",
+      },
+      "favoriteOrderSetting": "favorites_ordering",
+      "imageQualitySetting": "image_quality",
+      "actions": [
+        {"id": "clearDeviceInfo", "title": "重置设备信息"},
+      ],
+      "refreshCloudFavorites": true,
+      "imageQualityOptions": {"800": "低", "1200": "中", "1500": "高"},
+      "imageQualityDefault": "1500",
+    },
+  ),
+  SourceCatalogEntry(
+    key: "picacg",
+    name: "Picacg",
+    fileName: "picacg.js",
+    directUrls: [
+      "https://cdn.jsdelivr.net/gh/venera-app/venera-configs@main/picacg.js",
+    ],
+    presentation: {
+      "dailyCheckIn": true,
+      "commentReplies": true,
+      "showTags": true,
+      "listTagGroups": ["tag", "tags", "category", "categories", "标签", "分类"],
+      "enrichMissingTags": true,
+      "localFavoriteOrders": {"dd": "savedNewest", "da": "savedOldest"},
+      "buttons": [
+        {"id": "checkIn", "location": "homeProfile"},
+        {"id": "autoCheckIn", "location": "other"},
+        {"id": "imageQuality", "location": "reading"},
+        {"id": "imageQuality", "location": "reader"},
+      ],
+      "showUploader": true,
+      "showPageCount": true,
+      "searchDefaultOrder": "dd",
+      "searchOrders": {"dd": "新到旧", "da": "旧到新", "ld": "最多喜欢", "vd": "最多指名"},
+      "favoriteOrders": ["dd", "da"],
+      "favoriteDefaultOrder": "dd",
+      "favoriteOrderSetting": "favoriteSort",
+      "imageQualitySetting": "imageQuality",
+      "imageQualityOptions": {"original": "原图", "medium": "中", "low": "低"},
+      "imageQualityDefault": "original",
+      "requiresLogin": true,
+    },
+  ),
+];

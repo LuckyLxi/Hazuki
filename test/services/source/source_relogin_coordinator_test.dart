@@ -43,7 +43,7 @@ void main() {
       expect(result, 'recovered');
       expect(attempts, 2);
       expect(loginCount, 1);
-      expect(context.cookies.single.name, 'other');
+      expect(context.cookies, isEmpty);
       expect(context.lastReloginAt, isNotNull);
     },
   );
@@ -118,28 +118,24 @@ void main() {
     },
   );
 
-  test(
-    'uses the persisted CopyManga session before attempting relogin',
-    () async {
-      var loginCount = 0;
-      final coordinator = SourceReloginCoordinator(
-        loginWithStoredAccount:
-            (_, {required account, required password}) async {
-              loginCount++;
-            },
-      );
+  test('renews stored sessions using generic policy', () async {
+    var loginCount = 0;
+    final coordinator = SourceReloginCoordinator(
+      loginWithStoredAccount: (_, {required account, required password}) async {
+        loginCount++;
+      },
+    );
 
-      final ready = await coordinator.ensureFavoriteSessionReady(
-        _FakeReloginContext(
-          sourceKey: 'copy_manga',
-          accountData: const ['user', 'password'],
-        ),
-      );
+    final ready = await coordinator.ensureFavoriteSessionReady(
+      _FakeReloginContext(
+        sourceKey: 'copy_manga',
+        accountData: const ['user', 'password'],
+      ),
+    );
 
-      expect(ready, isTrue);
-      expect(loginCount, 0);
-    },
-  );
+    expect(ready, isTrue);
+    expect(loginCount, 1);
+  });
 }
 
 class _FakeReloginContext implements SourceReloginContext {

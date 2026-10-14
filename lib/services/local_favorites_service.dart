@@ -3,7 +3,9 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 import '../models/hazuki_models.dart';
-import '../shared/picacg_comic_tags.dart';
+import '../shared/source_comic_tags.dart';
+import 'package:hazuki/services/source/plugins/source_presentation_metadata.dart';
+
 import 'local_favorites/local_favorites_contracts.dart';
 import 'local_favorites/local_favorites_migration.dart';
 import 'local_favorites/local_favorites_models.dart';
@@ -16,6 +18,7 @@ class LocalFavoritesService extends ChangeNotifier
     implements LocalFavoritesRepository, LocalFavoritesSyncStore {
   factory LocalFavoritesService({
     HazukiDatabase? database,
+    SourcePresentationReader presentationFor = emptySourcePresentation,
     LocalFavoritesPreferencesStore? preferences,
     LocalFavoritesPersistence? persistence,
     LocalFavoritesSyncCodec? syncCodec,
@@ -27,6 +30,7 @@ class LocalFavoritesService extends ChangeNotifier
     final resolvedSyncCodec =
         syncCodec ?? LocalFavoritesSyncCodec(resolvedPersistence);
     return LocalFavoritesService._(
+      presentationFor: presentationFor,
       preferences:
           preferences ?? SharedPreferencesLocalFavoritesPreferencesStore(),
       persistence: resolvedPersistence,
@@ -37,15 +41,18 @@ class LocalFavoritesService extends ChangeNotifier
   }
 
   LocalFavoritesService._({
+    required SourcePresentationReader presentationFor,
     required LocalFavoritesPreferencesStore preferences,
     required LocalFavoritesPersistence persistence,
     required LocalFavoritesSyncCodec syncCodec,
     required LocalFavoritesMigration migration,
-  }) : _preferences = preferences,
+  }) : _presentationFor = presentationFor,
+       _preferences = preferences,
        _persistence = persistence,
        _syncCodec = syncCodec,
        _migration = migration;
 
+  final SourcePresentationReader _presentationFor;
   final LocalFavoritesPreferencesStore _preferences;
   final LocalFavoritesPersistence _persistence;
   final LocalFavoritesSyncCodec _syncCodec;
@@ -53,16 +60,6 @@ class LocalFavoritesService extends ChangeNotifier
   Future<void> _opQueue = Future.value();
 
   static const int _pageSize = 24;
-  static const Set<String> _supportedSortOrders = <String>{
-    'mr',
-    'mp',
-    'dd',
-    'da',
-    '-datetime_updated',
-    '-datetime_modifier',
-    '-datetime_browse',
-  };
-
   Future<T> _serialized<T>(Future<T> Function() fn) {
     final completer = Completer<T>();
     _opQueue = _opQueue.whenComplete(() async {
@@ -175,14 +172,13 @@ class LocalFavoritesService extends ChangeNotifier
         .toList();
 
     filteredEntries.sort((a, b) {
-      if (normalizedSortOrder == 'mp' ||
-          normalizedSortOrder == '-datetime_updated') {
+      if (normalizedSortOrder == 'updatedNewest') {
         final updateCompare = b.updateTime.compareTo(a.updateTime);
         if (updateCompare != 0) return updateCompare;
       }
       final aMs = a.folderSavedAtMs[normalizedFolderId] ?? 0;
       final bMs = b.folderSavedAtMs[normalizedFolderId] ?? 0;
-      return normalizedSortOrder == 'da'
+      return normalizedSortOrder == 'savedOldest'
           ? aMs.compareTo(bMs)
           : bMs.compareTo(aMs);
     });
@@ -204,7 +200,13 @@ class LocalFavoritesService extends ChangeNotifier
 
   String _normalizeSortOrder(String order) {
     final normalized = order.trim();
-    return _supportedSortOrders.contains(normalized) ? normalized : 'mr';
+    return const [
+          'savedNewest',
+          'savedOldest',
+          'updatedNewest',
+        ].contains(normalized)
+        ? normalized
+        : 'savedNewest';
   }
 
   @override
@@ -325,6 +327,8 @@ class LocalFavoritesService extends ChangeNotifier
       );
 
       if (isAdding) {
+        final presentation = _presentationFor(normalizedSourceKey);
+        final tags = sourceComicDetailTags(details, presentation);
         final storageKey = SourceScopedComicId(
           sourceKey: normalizedSourceKey,
           comicId: normalizedComicId,
@@ -342,7 +346,7 @@ class LocalFavoritesService extends ChangeNotifier
                 subTitle: details.subTitle.trim(),
                 cover: details.cover.trim(),
                 updateTime: details.updateTime.trim(),
-                tags: _picacgTags(details),
+                tags: tags,
                 folderSavedAtMs: <String, int>{},
               );
         record
@@ -350,8 +354,8 @@ class LocalFavoritesService extends ChangeNotifier
           ..subTitle = details.subTitle.trim()
           ..cover = details.cover.trim()
           ..updateTime = details.updateTime.trim()
-          ..tags = _picacgTags(details)
           ..folderSavedAtMs.putIfAbsent(normalizedFolderId, () => savedAtMs);
+        if (presentation['listTagGroups'] is List) record.tags = tags;
         if (existingIndex < 0) snapshot.entries.add(record);
       } else if (existingIndex >= 0) {
         final record = snapshot.entries[existingIndex];
@@ -380,9 +384,6 @@ class LocalFavoritesService extends ChangeNotifier
       notifyListeners();
     });
   }
-
-  List<String> _picacgTags(ComicDetailsData details) =>
-      picacgComicDetailTags(details);
 
   @override
   Future<bool> isComicFavorited(String comicId, {String sourceKey = ''}) async {

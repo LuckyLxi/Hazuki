@@ -1,3 +1,4 @@
+import '../support/source_catalog_fixtures.dart';
 import 'dart:async';
 import 'dart:typed_data';
 
@@ -10,13 +11,13 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   group('Hazuki network URL normalization', () {
-    test('strips explicit HTTPS ports only for JM known hosts', () {
+    test('preserves explicit ports regardless of source identity', () {
       expect(
         normalizeHazukiRequestUrl(
           'https://www.cdntwice.org:45176/media/path.jpg?a=1#frag',
           sourceKey: 'jm',
         ),
-        'https://www.cdntwice.org/media/path.jpg?a=1#frag',
+        'https://www.cdntwice.org:45176/media/path.jpg?a=1#frag',
       );
       expect(
         normalizeHazukiRequestUrl(
@@ -158,6 +159,7 @@ void main() {
     test('keeps JS response shape and source-scoped cookies', () async {
       final secureStorage = MemorySourceSecureSessionStorage();
       final service = SourceRuntimeAssembly(
+        initialCatalog: hazukiAllowedSourceCatalog,
         secureSessionStorage: secureStorage,
       );
       final handle = SourceRuntimeHandle(
@@ -172,7 +174,7 @@ void main() {
 
       final adapter = _FakeAdapter((options, callCount) {
         if (callCount == 1) {
-          expect(options.uri.toString(), 'https://www.cdntwice.org/path');
+          expect(options.uri.toString(), 'https://www.cdntwice.org:45176/path');
           return ResponseBody.fromString(
             'hello',
             200,

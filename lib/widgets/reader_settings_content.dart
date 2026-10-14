@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hazuki/services/source/plugins/source_plugin_buttons.dart';
 
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/shared/reading/reader_filter_color.dart';
@@ -40,12 +41,12 @@ class ReaderSettingsContent extends StatelessWidget {
     required this.onFilterEnabledChanged,
     required this.onFilterColorChanged,
     required this.onFilterStrengthChanged,
-    required this.onCopyMangaImageQualityChanged,
-    required this.onPicacgImageQualityChanged,
+    required this.onSourceImageQualityChanged,
     this.onBrightnessChangeEnd,
     this.onFilterStrengthChangeEnd,
     this.onShowWindowsShortcuts,
     this.onClose,
+    this.pageFooter,
   });
 
   final ReaderSettingsSurface surface;
@@ -80,10 +81,10 @@ class ReaderSettingsContent extends StatelessWidget {
   final ValueChanged<ReaderFilterColor> onFilterColorChanged;
   final ValueChanged<double>? onFilterStrengthChanged;
   final ValueChanged<double>? onFilterStrengthChangeEnd;
-  final ValueChanged<String?> onCopyMangaImageQualityChanged;
-  final ValueChanged<String?> onPicacgImageQualityChanged;
+  final ValueChanged<String?> onSourceImageQualityChanged;
   final VoidCallback? onShowWindowsShortcuts;
   final VoidCallback? onClose;
+  final Widget? pageFooter;
 
   @override
   Widget build(BuildContext context) {
@@ -183,17 +184,11 @@ class ReaderSettingsContent extends StatelessWidget {
             _buildFilterOptions(context, drawer: false),
           ],
         ),
-        if (sourceImageQuality.isCopyMangaSource)
-          _PageSettingsGroup(children: [_buildCopyMangaImageQualityField()]),
-        if (sourceImageQuality.isPicacgSource)
-          _PageSettingsGroup(
-            children: [
-              _buildPicacgImageQualityTile(),
-              _buildPicacgImageQualityField(),
-            ],
-          ),
+        if (sourceImageQuality.isVisibleAt(SourcePluginButtonLocation.reading))
+          _PageSettingsGroup(children: [_buildSourceImageQualityField()]),
         if (onShowWindowsShortcuts != null)
           _PageSettingsGroup(children: [_buildWindowsShortcutsTile(context)]),
+        ?pageFooter,
       ],
     );
   }
@@ -326,18 +321,10 @@ class ReaderSettingsContent extends StatelessWidget {
               _buildFilterOptions(context, drawer: true),
             ],
           ),
-          if (sourceImageQuality.isCopyMangaSource ||
-              sourceImageQuality.isPicacgSource)
+          if (sourceImageQuality.isVisibleAt(SourcePluginButtonLocation.reader))
             _DrawerSettingsGroup(
               theme: theme,
-              children: [
-                if (sourceImageQuality.isCopyMangaSource)
-                  _buildCopyMangaImageQualityField(),
-                if (sourceImageQuality.isPicacgSource) ...[
-                  _buildPicacgImageQualityTile(),
-                  _buildPicacgImageQualityField(),
-                ],
-              ],
+              children: [_buildSourceImageQualityField()],
             ),
           if (onShowWindowsShortcuts != null)
             _DrawerSettingsGroup(
@@ -568,79 +555,28 @@ class ReaderSettingsContent extends StatelessWidget {
     );
   }
 
-  Widget _buildCopyMangaImageQualityField() {
+  Widget _buildSourceImageQualityField() {
     return Builder(
       builder: (context) {
         return Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
           child: DropdownButtonFormField<String>(
-            initialValue: sourceImageQuality.copyMangaImageQuality,
+            initialValue: sourceImageQuality.value,
             decoration: InputDecoration(
               border: const OutlineInputBorder(),
-              labelText: l10n(context).otherCopyMangaImageQualityTitle,
-              helperText: l10n(context).otherCopyMangaImageQualitySubtitle,
+              labelText: sourceImageQuality.title,
+
               isDense: true,
             ),
-            items: [
-              DropdownMenuItem<String>(
-                value: '800',
-                child: Text(l10n(context).otherCopyMangaImageQualityLow),
-              ),
-              DropdownMenuItem<String>(
-                value: '1200',
-                child: Text(l10n(context).otherCopyMangaImageQualityMedium),
-              ),
-              DropdownMenuItem<String>(
-                value: '1500',
-                child: Text(l10n(context).otherCopyMangaImageQualityHigh),
-              ),
-            ],
-            onChanged: onCopyMangaImageQualityChanged,
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildPicacgImageQualityTile() {
-    return Builder(
-      builder: (context) {
-        return ListTile(
-          leading: const Icon(Icons.photo_size_select_large_outlined),
-          title: Text(l10n(context).linePicacgImageQualityTitle),
-          subtitle: Text(l10n(context).linePicacgImageQualitySubtitle),
-        );
-      },
-    );
-  }
-
-  Widget _buildPicacgImageQualityField() {
-    return Builder(
-      builder: (context) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
-          child: DropdownButtonFormField<String>(
-            initialValue: sourceImageQuality.picacgImageQuality,
-            decoration: InputDecoration(
-              border: const OutlineInputBorder(),
-              labelText: l10n(context).linePicacgImageQualityLabel,
-              isDense: true,
-            ),
-            items: [
-              DropdownMenuItem<String>(
-                value: 'original',
-                child: Text(l10n(context).linePicacgImageQualityOriginal),
-              ),
-              DropdownMenuItem<String>(
-                value: 'medium',
-                child: Text(l10n(context).linePicacgImageQualityMedium),
-              ),
-              DropdownMenuItem<String>(
-                value: 'low',
-                child: Text(l10n(context).linePicacgImageQualityLow),
-              ),
-            ],
-            onChanged: onPicacgImageQualityChanged,
+            items: sourceImageQuality.options.entries
+                .map(
+                  (entry) => DropdownMenuItem<String>(
+                    value: entry.key,
+                    child: Text(entry.value),
+                  ),
+                )
+                .toList(),
+            onChanged: onSourceImageQualityChanged,
           ),
         );
       },

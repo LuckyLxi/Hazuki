@@ -38,33 +38,20 @@ class SharedPreferencesLocalFavoritesPreferencesStore
       'favorite_selected_cloud_folder_source_v1_';
   static const String _selectedLocalFolderSourcePrefix =
       'favorite_selected_local_folder_source_v1_';
-  static const Set<String> _supportedSortOrders = <String>{
-    'mr',
-    'mp',
-    'dd',
-    'da',
-    '-datetime_updated',
-    '-datetime_modifier',
-    '-datetime_browse',
-  };
-
   final Future<SharedPreferences> Function() _preferences;
 
   @override
   Future<String> loadSortOrder() async {
     final prefs = await _preferences();
     final raw = prefs.getString(_sortOrderKey)?.trim();
-    return _supportedSortOrders.contains(raw) ? raw! : 'mr';
+    return raw ?? '';
   }
 
   @override
   Future<void> saveSortOrder(String order) async {
     final prefs = await _preferences();
     final raw = order.trim();
-    await prefs.setString(
-      _sortOrderKey,
-      _supportedSortOrders.contains(raw) ? raw : 'mr',
-    );
+    await prefs.setString(_sortOrderKey, raw);
   }
 
   @override

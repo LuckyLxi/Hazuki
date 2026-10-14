@@ -1,3 +1,4 @@
+import '../../support/source_presentation_fixtures.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -970,6 +971,7 @@ Widget _buildTestApp(Widget home) {
   return MaterialApp(
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,
+    builder: (context, child) => withTestSourcePresentation(child!),
     home: home,
   );
 }

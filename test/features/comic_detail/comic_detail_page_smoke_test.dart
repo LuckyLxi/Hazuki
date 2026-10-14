@@ -1,3 +1,4 @@
+import '../../support/source_presentation_fixtures.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -75,6 +76,52 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     await ensureTestServiceLocator();
   });
+  for (final platform in [TargetPlatform.android, TargetPlatform.windows]) {
+    testWidgets(
+      'like button follows the initialized plugin capability in $platform',
+      (tester) async {
+        tester.view.physicalSize = const Size(1200, 2200);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final facade = _CompletingLikeDetailFacade();
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData(platform: platform),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: _buildDesktopTestDetail(
+              comic: const ExploreComic(
+                id: 'like-capability',
+                sourceKey: 'copy_manga',
+                title: 'Comic',
+                subTitle: '',
+                cover: '',
+              ),
+              facade: facade,
+              shouldAnimateInitialRevealOverride: false,
+            ),
+          ),
+        );
+        await tester.pump();
+        expect(find.byIcon(Icons.thumb_up_alt_outlined), findsNothing);
+        facade.canLike = true;
+        facade.complete();
+        await tester.pumpAndSettle();
+        final like = find.byIcon(Icons.thumb_up_alt_outlined);
+        expect(like, findsOneWidget);
+        await tester.tap(like);
+        await tester.pumpAndSettle();
+        expect(facade.likeCalls, [
+          ('desktop-loading-reveal', true, 'copy_manga'),
+        ]);
+        expect(find.byIcon(Icons.thumb_up_alt_rounded), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        await tester.pump(const Duration(seconds: 4));
+        await tester.pumpAndSettle();
+      },
+    );
+  }
   for (final brightness in Brightness.values) {
     testWidgets('Windows detail adapts to resize in $brightness', (
       tester,
@@ -86,6 +133,7 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
+          builder: (context, child) => withTestSourcePresentation(child!),
           theme: ThemeData(
             platform: TargetPlatform.windows,
             brightness: brightness,
@@ -181,6 +229,7 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
+          builder: (context, child) => withTestSourcePresentation(child!),
           theme: ThemeData(platform: TargetPlatform.windows),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
@@ -258,6 +307,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
+        builder: (context, child) => withTestSourcePresentation(child!),
         theme: ThemeData(platform: TargetPlatform.windows),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
@@ -322,6 +372,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
+        builder: (context, child) => withTestSourcePresentation(child!),
         theme: ThemeData(platform: TargetPlatform.windows),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
@@ -376,6 +427,7 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
+          builder: (context, child) => withTestSourcePresentation(child!),
           theme: ThemeData(platform: TargetPlatform.windows),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
           supportedLocales: AppLocalizations.supportedLocales,
@@ -434,6 +486,7 @@ void main() {
     for (final width in [1050.0, 520.0]) {
       await tester.pumpWidget(
         MaterialApp(
+          builder: (context, child) => withTestSourcePresentation(child!),
           theme: ThemeData(platform: TargetPlatform.windows),
           home: Scaffold(
             body: Center(
@@ -499,6 +552,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
+        builder: (context, child) => withTestSourcePresentation(child!),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: ComicDetailPage(
@@ -558,6 +612,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
+        builder: (context, child) => withTestSourcePresentation(child!),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
         home: ComicDetailPage(
@@ -671,6 +726,21 @@ class _CompletingDesktopDetailFacade extends _DesktopDetailFacade {
     String sourceKey = '',
     bool forceRefresh = false,
   }) => _completer.future;
+}
+
+class _CompletingLikeDetailFacade extends _CompletingDesktopDetailFacade {
+  bool canLike = false;
+  final likeCalls = <(String, bool, String)>[];
+  @override
+  bool get supportComicLike => canLike;
+  @override
+  Future<void> toggleComicLike({
+    required String comicId,
+    required bool isLike,
+    String sourceKey = '',
+  }) async {
+    likeCalls.add((comicId, isLike, sourceKey));
+  }
 }
 
 Widget _buildDesktopTestDetail({

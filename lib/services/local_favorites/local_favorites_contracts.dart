@@ -12,7 +12,8 @@ abstract interface class LocalFavoritesRepository implements Listenable {
   Future<FavoriteComicsResult> loadFavoriteComics({
     required int page,
     required String folderId,
-    String sortOrder = 'mr',
+    // A generic local strategy; plugin order values are mapped by the loader.
+    String sortOrder = 'savedNewest',
     String sourceKey = '',
   });
   Future<void> addFavoriteFolder(String name, {String sourceKey = ''});

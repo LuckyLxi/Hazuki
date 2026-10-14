@@ -153,6 +153,7 @@ class SourceSessionStore {
     required String sourceKey,
     required String settingKey,
     required SourceMeta? sourceMeta,
+    Map<String, dynamic>? settingsDefaults,
   }) {
     if (sourceKey.isEmpty || settingKey.isEmpty) {
       return null;
@@ -163,6 +164,8 @@ class SourceSessionStore {
     if (settings is Map && settings.containsKey(settingKey)) {
       return settings[settingKey];
     }
+
+    if (settingsDefaults != null) return settingsDefaults[settingKey];
 
     if (sourceMeta?.key == sourceKey) {
       return sourceMeta?.settingsDefaults[settingKey];

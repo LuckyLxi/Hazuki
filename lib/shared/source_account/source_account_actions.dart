@@ -136,7 +136,7 @@ Future<void> showHomeSourceSwitchDialog(
                     : _HomeSourceSwitchPickerPane(
                         key: const ValueKey('source-switch-picker'),
                         sources: registry.allowedSources,
-                        activeSourceKey: registry.activeSourceKey,
+                        activeSourceKey: registry.activeSourceKey ?? '',
                         errorText: errorText,
                         onCancel: () => Navigator.of(dialogContext).pop(),
                         onSelected: switchTo,

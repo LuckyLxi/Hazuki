@@ -12,6 +12,7 @@ class DiscoverPageController extends ChangeNotifier {
     this.onSourceSwitched,
   }) : _sourceService = sourceService {
     _lastActiveSourceKey = _sourceService.activeSourceKey;
+    _lastSourceRevision = _sourceService.sourceRevision;
     _sourceService.addListener(_onSourceChanged);
   }
 
@@ -22,7 +23,9 @@ class DiscoverPageController extends ChangeNotifier {
   final SourceDiscoverGateway _sourceService;
   final DiscoverPageState _state = DiscoverPageState();
   bool _disposed = false;
-  late String _lastActiveSourceKey;
+  int _sourceGeneration = 0;
+  late String? _lastActiveSourceKey;
+  String? _lastSourceRevision;
 
   /// 源切换时的回调，由外层 View 绑定以触发刷新
   final VoidCallback? onSourceSwitched;
@@ -32,9 +35,16 @@ class DiscoverPageController extends ChangeNotifier {
 
   void _onSourceChanged() {
     final activeKey = _sourceService.activeSourceKey;
-    if (activeKey != _lastActiveSourceKey) {
+    if (activeKey != _lastActiveSourceKey ||
+        _lastSourceRevision != _sourceService.sourceRevision) {
       // 源发生了实际切换，通知 View 执行刷新
       _lastActiveSourceKey = activeKey;
+      _lastSourceRevision = _sourceService.sourceRevision;
+      _sourceGeneration++;
+      _state.sectionRevealGeneration++;
+      _state.sections = const [];
+      _state.refreshing = false;
+      _state.sectionLoadingMore.clear();
       onSourceSwitched?.call();
     }
     _notify();
@@ -49,8 +59,7 @@ class DiscoverPageController extends ChangeNotifier {
       _state.sectionLoadingMore.contains(index);
   bool sectionHasMore(int index) => !_state.sectionNoMore.contains(index);
   bool get showLoginRequired =>
-      isHazukiPicacgSourceKey(_sourceService.activeSourceKey) &&
-      !_sourceService.isLogged;
+      (_sourceService.requiresLogin == true) && !_sourceService.isLogged;
 
   Future<void> loadInitial({
     required String timeoutMessage,
@@ -65,6 +74,7 @@ class DiscoverPageController extends ChangeNotifier {
       return;
     }
 
+    final sourceGeneration = _sourceGeneration;
     List<ExploreSection>? loadedSections;
     String? error;
     try {
@@ -78,7 +88,7 @@ class DiscoverPageController extends ChangeNotifier {
           : loadFailedMessage('$e');
     }
 
-    if (_disposed) return;
+    if (_disposed || sourceGeneration != _sourceGeneration) return;
 
     _state.sectionRevealGeneration++;
     final generation = _state.sectionRevealGeneration;
@@ -125,6 +135,7 @@ class DiscoverPageController extends ChangeNotifier {
     _state.refreshing = true;
     _notify();
 
+    final sourceGeneration = _sourceGeneration;
     List<ExploreSection>? refreshedSections;
     String? error;
     try {
@@ -140,7 +151,7 @@ class DiscoverPageController extends ChangeNotifier {
           : loadFailedMessage('$e');
     }
 
-    if (_disposed) return;
+    if (_disposed || sourceGeneration != _sourceGeneration) return;
 
     final revealProgressively = _state.sections.isEmpty;
     _state.sectionRevealGeneration++;
@@ -203,13 +214,18 @@ class DiscoverPageController extends ChangeNotifier {
     _state.sectionLoadingMore.add(index);
     _notify();
 
+    final sourceGeneration = _sourceGeneration;
     final nextPage = currentPage + 1;
     try {
       final result = await _sourceService.loadCategoryComicsByViewMore(
         viewMoreUrl: viewMoreUrl,
         page: nextPage,
       );
-      if (_disposed || index >= _state.sections.length) return;
+      if (_disposed ||
+          sourceGeneration != _sourceGeneration ||
+          index >= _state.sections.length) {
+        return;
+      }
 
       final latest = _state.sections[index];
       final existingIds = latest.comics
@@ -238,7 +254,7 @@ class DiscoverPageController extends ChangeNotifier {
     } catch (_) {
       // Keep horizontal discovery passive; users can use "More" for errors.
     } finally {
-      if (!_disposed) {
+      if (!_disposed && sourceGeneration == _sourceGeneration) {
         _state.sectionLoadingMore.remove(index);
         _notify();
       }

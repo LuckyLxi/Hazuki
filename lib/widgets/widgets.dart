@@ -1,7 +1,7 @@
 export 'cached_image_widgets.dart';
 export 'chapters_panel_sheet.dart';
 export 'comic_cover_tile.dart';
-export 'picacg_comic_tags.dart';
+export 'source_comic_tags.dart';
 export 'hazuki_desktop_page_container.dart';
 export 'hazuki_frosted_app_bar.dart';
 export 'hazuki_m3e_loading_indicator.dart';

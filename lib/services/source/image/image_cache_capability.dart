@@ -33,13 +33,20 @@ class ImageCacheCapability {
 
   int get maxBytes => _policy.maxBytes;
 
-  Future<void> setMaxBytes(int value) => _policy.setMaxBytes(value);
+  Future<void> setMaxBytes(int value) async {
+    await _facade.ensurePrefs();
+    await _policy.setMaxBytes(value);
+  }
 
   String get autoCleanMode => _policy.autoCleanMode;
 
-  Future<void> setAutoCleanMode(String mode) => _policy.setAutoCleanMode(mode);
+  Future<void> setAutoCleanMode(String mode) async {
+    await _facade.ensurePrefs();
+    await _policy.setAutoCleanMode(mode);
+  }
 
   Future<Map<String, dynamic>> getStatus() async {
+    await _facade.ensurePrefs();
     final dir = await ensureCacheDir();
     final bytes = await computeSizeBytes();
     return {

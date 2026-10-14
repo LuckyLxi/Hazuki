@@ -1,0 +1,262 @@
+# Hazuki 漫画源插件 API v1
+
+Hazuki 只执行按本规范注册的 JS 插件。插件负责网站请求、签名、登录、解析和图片规则；应用负责统一的展示、收藏存储、阅读与下载。新增源不需要修改应用或添加源 ID 分支。
+
+## 仓库列表与单文件插件
+
+公开 GitHub 仓库根目录的 `plugins.json` 是插件列表：
+
+```json
+{"schemaVersion":1,"plugins":[
+  {"id":"example","name":"Example","version":"1.0.0","downloadUrl":"https://example.com/example-1.0.0.js"}
+]}
+```
+
+`downloadUrl` 指向单个 UTF-8 JS 文件，可以放在 GitHub Releases 或其他 HTTPS 服务。应用读取 JSON 展示列表；只有用户选择插件后才下载 JS。可输入 GitHub 仓库地址、tree/blob 地址，或直接输入 HTTPS JSON 地址。分支留空时查询公开仓库的默认分支；含 `/` 的分支应在分支字段显式填写。索引路径默认 `plugins.json`，可以修改。
+
+示例索引中的 `example.com` 是占位地址，发布者需要替换成实际 JS 链接。应用不提供默认仓库，也不随安装包附带漫画源。
+
+## 单个 JS 文件与发布
+
+文件直接包含插件实现，不需要特殊注释头或独立元数据：
+
+```javascript
+Hazuki.registerSource({
+  id: 'example',
+  name: 'Hazuki Example',
+  version: '1.0.0',
+  presentation: {searchDefaultOrder: 'latest', searchOrders: {latest: 'Latest'}},
+  search: {load: async (keyword, options, page) => ({comics: [], maxPage: 1})},
+  comic: {
+    loadInfo: async id => ({id, title: 'Example', chapters: {'1': 'Chapter 1'}, tags: {}}),
+    loadEp: async (comicId, chapterId) => ({images: []})
+  },
+  resources: {'about.txt': 'An embedded text resource'}
+});
+```
+
+应用执行脚本并从注册对象读取信息。id（或类式源的 key）用于账号和收藏的数据关联，使用小写字母开头，后续可用字母、数字、点、下划线、连字符，最多 64 字符；修改 ID 会创建另一份数据身份。name 可省略，默认使用 ID；version 可省略，默认 0.0.0，本地插件也可使用普通版本标签。在线发布建议使用 SemVer，以便比较更新版本。apiVersion 可省略；显式声明时当前支持 1。普通注释、BOM、前置代码不会影响导入。
+
+一个插件就是一个 `.js` 文件，不使用 ZIP、独立清单、入口路径或外部资源目录。最大文件大小为 8 MiB；不提供 npm、Node、原生模块或远程动态代码导入。实现与依赖须合并到单文件，静态数据直接定义为 JS 常量；可选文本资源通过注册对象的 `resources` 声明，用 `Hazuki.resources.readText(name)` 读取，不访问文件系统。
+
+```powershell
+dart run tool/build_source_plugin.dart plugins/example/main.js
+dart run tool/build_source_plugin.dart plugins/jm/main.js
+dart run tool/build_source_plugin.dart plugins/copy_manga/main.js
+dart run tool/build_source_plugin.dart plugins/picacg/main.js
+```
+
+工具直接复制源码，默认输出 `build/source_plugins/<源目录名>.js`（输入文件不叫 main.js 时沿用输入文件名）。本地可直接导入源码，不必执行发布工具。第二个参数可指定 JS 输出位置。发布时只上传该 JS 文件，再在列表中填写一致的 ID、版本和实际下载链接。本地导入同一 JS 文件即可。类型提示见 `plugins/hazuki-source.d.ts`，最小源码见 `plugins/example/main.js`。
+
+## 注册和数据接口
+
+入口调用一次 `Hazuki.registerSource({...})`，也支持直接声明一个继承 HazukiSource 或 ComicSource 的源类，应用自动实例化并注册。身份来自插件自身字段，注册后锁定，不能在运行时改成另一个源。需要联网或读写数据的初始化放在 init() 中；导入时只在不访问用户数据的引擎中读取身份并完成本地校验，首次使用时再初始化插件。必须提供：
+
+- `search.load(keyword, options, page)`：页码从 1 开始，返回 `{comics, maxPage}`。
+- `comic.loadInfo(id)`：返回详情，`chapters` 是章节 ID 到标题的映射；`tags` 是命名空间到标签数组的映射。
+- `comic.loadEp(comicId, chapterId)`：返回 `{images: [url, ...]}`。
+
+漫画摘要使用 `{id, title, cover, subTitle?, tags?}`。应用负责附加当前插件 ID，插件不应返回其他源的身份。可选能力的方法缺失时不提供对应操作。
+
+可选 `explore` 支持分区首页、单页多分区及分页漫画列表；`category`、`favorites`、`comic` 的评论与点赞接口沿用类型文件及三个示例项目中的统一结构。`account.login` 返回标准化的 `{token?, displayName?, avatarUrl?}`，头像必须由插件转换成可用完整 URL；应用保存用户输入的账号供重新登录使用。`account.loadProfile` 用相同字段更新资料。
+
+`account.checkIn` 返回 `{status: "success" | "alreadyCheckedIn" | "skipped", message?}`。账号能力和这些操作都作用于该插件，不能读取其他插件的凭据。
+
+## 宿主 SDK
+
+- `Hazuki.http`：通用 GET、POST 等请求，返回状态、响应头、正文和可选错误；网站状态含义由插件判断。
+- `Hazuki.html.parse(html)`：解析静态 HTML，返回支持 CSS 选择器的文档；也可使用 `new HtmlDocument(html)`。支持文本、属性、子节点、父元素及相邻元素读取，使用后调用 `dispose()` 释放文档。文档按插件引擎隔离，关闭或替换引擎时自动清理。
+- `Hazuki.cookies`：插件私有 Cookie；`Hazuki.storage`：插件私有 JSON 数据。写操作必须 `await`，特别是登录后要立即读取的 token。
+- `Hazuki.secrets`：插件作用域的安全字符串存储；现有 `account`、`token` 和 Cookie 仍使用原安全存储，便于升级关联。
+- `Hazuki.settings`：读取声明的默认值或用户设置，写入当前插件的设置。
+- `Hazuki.convert`：UTF-8、Base64、MD5、SHA、HMAC、AES-ECB；其他算法可以随单文件入口打包实现。
+- `Hazuki.resources.readText`：读取注册对象中嵌入的文本资源，不访问宿主文件系统。
+- `Hazuki.images.reverseVerticalTiles(n)`：声明图片竖向分块重排；`comic.onImageLoad` 可同时提供下载 URL、请求头和 `segments`。自定义字节解密使用 `comic.transformImageBytes`。
+- `Hazuki.log`、`delay`、`error`：日志、延时和错误。`Hazuki.error("AUTH_EXPIRED", message)` 可触发宿主的一次账号重试；更复杂的网站恢复逻辑放在插件中。
+- `Hazuki.locale`：当前应用语言（`zh_CN` 或 `en_US`），跟随应用设置及系统语言；`Hazuki.translate(text)`：解析语言映射，或按插件的 `translation` 表翻译原字符串。类式源的 `this.translate(text)` 使用相同规则。
+
+脚本在独立 QuickJS 引擎中运行，同步执行限制为 5 秒、内存限制为 64 MiB，初始化等待最多 90 秒。网络、Cookie、存储和资源均绑定已注册插件的 ID。
+
+### 获取并解析 HTML
+
+```javascript
+const response = await Hazuki.http.get('https://example.com/comics', {
+  'User-Agent': 'Mozilla/5.0'
+});
+if (response.status !== 200) throw new Error(`HTTP ${response.status}`);
+const doc = Hazuki.html.parse(response.body);
+try {
+  const comics = doc.querySelectorAll('.comic-item').map(item => {
+    const link = item.querySelector('a');
+    const image = item.querySelector('img');
+    return {
+      id: link?.attributes.href ?? '',
+      title: link?.text.trim() ?? '',
+      cover: image?.attributes.src ?? ''
+    };
+  });
+  // 按网站规则转换 ID，并将相对图片地址转换为完整 URL。
+  return {comics, maxPage: 1};
+} finally {
+  doc.dispose();
+}
+```
+
+选择器无匹配时，`querySelector()` 返回 `null`，`querySelectorAll()` 返回空数组。释放后不可继续读取文档或其元素。解析器不会执行网页脚本或加载图片、样式等资源；仅通过 JavaScript 动态生成的内容需要插件请求网站的数据接口。
+
+### 插件文案与语言切换
+
+按钮标题、设置标题、下拉选项标签和操作返回的提示支持直接写成语言映射，也兼容原字符串与翻译表：
+
+```javascript
+Hazuki.registerSource({
+  // 身份、search 和 comic 等必需字段略。
+  settings: {
+    quality: {
+      title: {zh: '图片质量', en: 'Image quality'}, type: 'select', default: 'high',
+      options: [{value: 'high', label: {zh: '高', en: 'High'}}]
+    }
+  },
+  presentation: {actions: [{id: 'refresh', title: '刷新线路', location: 'lines'}]},
+  translation: {
+    zh_CN: {'Lines refreshed': '线路已刷新'},
+    en: {'刷新线路': 'Refresh lines'}
+  },
+  actions: {refresh: async () => {
+    // 在回调执行时读取当前语言，不要在注册时提前翻译并保存标题。
+    Hazuki.log(Hazuki.locale);
+    return Hazuki.translate('Lines refreshed');
+    // 也可直接返回 {zh: '线路已刷新', en: 'Lines refreshed'}。
+  }}
+});
+```
+
+应用切换语言时，已显示的按钮、设置和选项自动刷新，不必重新加载插件。跨页面按钮使用安装时保存的翻译表，不会为了显示翻译而初始化插件。新增翻译表后，需要重新导入或更新已安装的插件。
+
+语言键支持 `zh`、`en` 以及 `zh_CN`/`zh-CN`、`en_US`/`en-US`；当前区域键优先于语言键。语言映射缺少当前语言时，依次回退到英文、首个非空字符串；翻译表没有匹配项时保留原文。控件实际保存的 `value`、用户输入、URL 和漫画内容不做自动翻译。
+
+## 设置与显示能力
+
+### 现有按钮的位置声明
+
+`presentation.buttons` 声明需要位置配置的源功能控件，每项必须显式填写 `id` 和 `location`。宿主复用原有控件、位置和动画，不通过 `jm`、`copy_manga`、`picacg` 等源 ID 决定按钮。需要重新导入或更新已安装的 JS 才能启用新声明。
+
+点赞按钮自动检测插件是否提供可调用的 `comic.likeComic(id, isLike)`，固定显示在漫画详情标题下方。插件无需声明按钮、显示开关或位置；不提供该函数时不显示点赞按钮。详情加载完成后重新检查能力，避免插件初始化前检测到“不支持”而永久隐藏按钮。旧 `comicLike` 按钮位置声明与 `showComicLike` 开关均不控制点赞按钮，已有 API v1 插件的旧位置声明会被忽略。点赞操作继续调用对应插件的 `comic.likeComic()`。
+
+| id | location | 原有位置及调用 |
+| --- | --- | --- |
+| `checkIn` | `homeProfile` | 首页个人资料区域的签到按钮，调用插件 `account.checkIn()` |
+| `autoCheckIn` | `other` | 设置 → 其他设置的自动签到开关，开启后的签到调用插件 `account.checkIn()` |
+| `copyComicId` | `comicDetailInfo` | 漫画详情 → 信息中的 ID 复制入口；ID 来自插件 `comic.loadInfo()`，系统剪贴板由宿主处理 |
+| `relatedComics` | `comicDetailTabs` | 漫画详情的相关推荐标签页，数据来自插件 `comic.loadInfo().recommend` |
+| `imageQuality` | `reading` | 设置 → 阅读设置的画质选择，使用插件的设置键、选项和 `onChanged` |
+| `imageQuality` | `reader` | 阅读器 → 阅读设置中的画质选择，使用同一插件设置 |
+| `resetDeviceInfo` | `advanced` | 设置 → 高级设置原有的设备重置位置，必须通过 `action` 指向插件 `actions[action]()` |
+
+`title`、`subtitle`、`successMessage` 可提供语言映射，用于设备重置控件的文案和完成提示。导入时检查按钮位置和对应的插件回调；相同按钮在相同位置重复声明会被拒绝。签到仍受登录状态和自动签到设置约束。`imageQuality` 需要同时声明 `imageQualitySetting/imageQualityOptions/imageQualityDefault`。实验室的漫画 ID 识别和每日推荐保持宿主原有功能，不支持将它们注册为插件按钮。
+
+```javascript
+presentation: {
+  buttons: [
+    {id: 'resetDeviceInfo', location: 'advanced', action: 'clearDeviceInfo',
+     title: {zh: '清除设备信息', en: 'Clear device info'}}
+  ]
+},
+actions: {clearDeviceInfo: async () => { /* 插件自己的设备清理逻辑 */ }}
+```
+
+三个插件当前声明的位置：
+
+- 禁漫天堂：个人资料签到、其他设置自动签到、详情 ID 复制、相关推荐；刷新线路通过 `presentation.actions` 放在线路页。插件提供 `comic.likeComic`，详情点赞自动显示。
+- 拷贝漫画：高级设置设备重置、阅读设置及阅读器画质选择；插件自身设置页也保留设备重置操作并显式填写 `location: 'plugin'`。
+- 哔咔漫画：个人资料签到、其他设置自动签到、阅读设置及阅读器画质选择。插件提供 `comic.likeComic`，详情点赞自动显示。
+
+`settings` 声明输入框、选择框和开关，字段见类型文件。设置页由应用渲染；插件不能创建 Flutter 控件。`presentation.actions` 提供 `{id,title,location?}` 列表，对应 `actions[id]()`；返回的文本由应用展示。设置改变时可提供 `settings[key].onChanged`。
+
+操作的 `location` 可选值：
+
+| 值 | 显示位置 |
+| --- | --- |
+| `plugin`（默认） | 设置 → 实验室 → 漫画源插件 → 该插件的设置 |
+| `reading` | 设置 → 阅读设置 |
+| `other` | 设置 → 其他设置 |
+| `lab` | 设置 → 实验室 |
+| `advanced` | 设置 → 高级设置 |
+| `lines` | 首页侧边栏 → 线路 |
+
+不声明 `location` 的操作只显示在该插件的设置页。其他位置的操作显示所属插件名称，来自所有已启用插件；禁用或卸载后移除入口。跨页面入口需在注册时声明，应用通过安装元数据展示，不会为了展示按钮额外初始化所属插件；点击时确保该插件初始化并执行其操作，不切换当前漫画源。各页面的扩展入口位于原有内容下方，按安装顺序和声明顺序排列。不支持设置首页、关于、隐私、存储/缓存、云同步或显示页面，未知位置在安装时会被拒绝。
+
+线路页是独立页面，支持当前漫画源的配置功能：在 `settings[key]` 中声明 `location: 'lines'`，可展示开关、下拉选项或输入框，并复用设置保存与 `onChanged` 回调。这些配置仅出现在线路页。未声明位置的配置只在插件自己的设置页显示；配置位置只支持 `plugin` 和 `lines`。已有安装不会自动替换脚本，需要重新导入或更新插件才能使用新增的位置声明。
+
+```javascript
+Hazuki.registerSource({
+  // 其他必需字段与方法略。
+  presentation: {
+    actions: [
+      {id: 'refreshLines', title: '刷新线路', location: 'lines'},
+      {id: 'checkConnection', title: '检查连接'} // 默认在该插件的设置页。
+    ]
+  },
+  settings: {
+    customHost: {
+      title: '自定义域名', type: 'input', default: '', location: 'lines',
+      onChanged: async value => { /* 应用新的配置。 */ }
+    }
+  },
+  actions: {
+    refreshLines: async () => { /* 刷新线路。 */ return '线路已刷新'; },
+    checkConnection: async () => { /* 检查连接。 */ return '连接正常'; }
+  }
+});
+```
+
+在注册对象的可选 `presentation` 中声明排序标签与默认值、是否需要登录、签到、评论回复、详情字段、画质选项和操作入口。导入时保存这些信息供应用使用，运行时也可补充。搜索排序通过 `searchOrders/searchDefaultOrder` 声明，标签支持字符串或 `{zh, en}` 语言映射；收藏排序通过 `favoriteOrders/favoriteDefaultOrder/favoriteOrderSetting` 声明；画质通过 `imageQualitySetting/imageQualityOptions/imageQualityDefault` 声明。`recreateOnStatus` 是通用的运行时重建状态列表，网站选择哪些状态放进列表。
+
+## 标签、排序与历史展示
+
+应用不再按 `jm`、`copy_manga`、`picacg` 身份设置展示与网络规则。API v1 的可选 `presentation` 字段：
+
+- `listTagGroups: string[]`：从详情 `tags` 中提取哪些分组作为列表、收藏和历史标签；分组名忽略大小写和首尾空格，标签去重。未声明时不从详情提取列表标签，已有记录标签仍保留。
+- `enrichMissingTags: boolean`：为缺少标签的列表条目调用所属插件的 `comic.loadInfo`；默认不补查。收藏和历史补查最多四个并发，切源或停用后忽略过期结果，失败不阻断列表。
+- `favoriteOrderAliases: Record<string,string>`：将旧收藏排序值映射到当前 `favoriteOrders` 中的值。已支持的值优先，否则尝试别名、插件默认值、首个选项；没有选项时返回空值。
+- `localFavoriteOrders`：把插件的排序值映射到 `savedNewest`、`savedOldest` 或 `updatedNewest`。宿主按这些通用策略排序本地收藏；缺少映射时按收藏时间新到旧排列。排序偏好存储保留插件的原始值，不再限制三源的编码。
+
+哔咔声明标签和分类分组并启用补查；禁漫只声明详情的 `Tag` 分组用于保存记录，列表展示保持原样。禁漫域名与 HTTPS 端口修正位于插件的 URL 生成和 `onImageLoad` 内；宿主 HTTP 层不再判断漫画源或域名。
+
+安装和更新成功时，注册表同时保存最后一次插件展示规则。缓存仅包含 `showComicId`、`showUploader`、`showPageCount`、`showTags`、`showComicStatus` 和 `listTagGroups`。停用或卸载后，历史记录仍可使用这些字段展示，缓存不能启用按钮、登录、补查或其他联网功能；重新安装使用新插件声明，失败更新回滚插件及缓存。旧注册表自动从现有安装清单初始化缓存；未安装过且没有缓存的源采用通用展示，不改写原始记录。
+
+三个插件当前版本为 `1.0.1`。已有安装需更新或重新导入相应 JS 才能使用新增声明，应用不会自动覆盖用户编辑的插件。旧记录缺少源标识时的禁漫归属及下载 ID 兼容仍保留；漫画 ID 识别和每日推荐保持原逻辑。
+
+## 生命周期与升级
+
+插件管理入口位于“设置 → 实验室 → 漫画源插件”。启用开关控制插件是否可用，首页的漫画源切换入口用于选择当前使用的插件。
+
+本地与在线导入共用安装校验。安装和更新先在独立目录检查脚本身份及核心方法，成功后提交注册表；失败保留原脚本。导入不执行 init()；首次使用时执行，初始化失败会报告运行错误并保留已安装的插件。不同来源的同 ID 插件不会直接覆盖，需要先卸载旧插件再导入，原数据仍保留。手动更新会提示覆盖本地编辑脚本，旧脚本保留作为备份。移除仓库不卸载插件；应用不会自动更新插件。
+
+启停和卸载更新可用源列表。当前源被移除后选择首个启用源；没有可用源时进入无源状态。卸载保留账号、设置、收藏、进度、历史和下载内容；重新安装相同 ID 后恢复关联。缺失插件时可查看本地记录和离线下载，联网请求需要重新安装插件。
+
+升级时旧 JS 文件复制到应用插件存储目录的 `legacy_backup`，不覆盖原文件，不自动执行或转换用户编辑的旧脚本。三个新源项目沿用 `jm`、`copy_manga`、`picacg` ID。上游来源与版本记录在各项目的 `UPSTREAM.md`；发布者需要遵守上游代码许可。
+
+## 验证
+
+三个插件直接使用 Hazuki API v1，接口由 `hazuki-source.d.ts` 和严格的 JS 类型检查约束。安装插件开发检查工具后运行：
+
+```powershell
+npm --prefix plugins ci
+npm --prefix plugins run check
+npm --prefix plugins run format:check
+npm --prefix plugins test
+```
+
+这些协议测试使用固定 HTTP 响应，不需要真实账号。覆盖签名、资料与头像兼容、登录失败保留 token、签到、会话重试、分页、章节映射和图片排序。拷贝的 HTTP 210 重试由插件处理，最多请求五次；评论及其他写操作不会因限流自动重复提交。哔咔资料查询兼容两种签名路径和旧客户端请求头，资料接口不可用时从 JWT 获取昵称，保留已成功完成的登录。
+
+原生 QuickJS 测试库先构建到应用测试目录：
+
+```text
+cmake -S third_party/flutter_qjs/test -B test/build -DCMAKE_BUILD_TYPE=Debug
+cmake --build test/build --config Debug --parallel
+flutter test test/services/source/source_plugins_test.dart
+flutter test test/services/source/migrated_source_plugins_test.dart
+```
+
+Windows 需要 Visual Studio C++ 工具链及 CMake；Linux 需要 CMake 和 C++ 编译器。完整检查包括格式、`flutter analyze`、完整测试，以及 Android/Windows 调试构建。

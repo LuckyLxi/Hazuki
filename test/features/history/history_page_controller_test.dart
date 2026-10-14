@@ -72,6 +72,8 @@ void main() {
       readHistoryService: service,
       sourceService: sl<SourceSelectionGateway>(),
       readerService: reader,
+      presentationFor:
+          sl<SourceRuntimeAssembly>().runtimeRegistry.presentationFor,
     );
     addTearDown(controller.dispose);
     final tagsLoaded = Completer<void>();
@@ -113,6 +115,8 @@ void main() {
       readHistoryService: service,
       sourceService: sl<SourceSelectionGateway>(),
       readerService: reader,
+      presentationFor:
+          sl<SourceRuntimeAssembly>().runtimeRegistry.presentationFor,
     );
     addTearDown(controller.dispose);
 

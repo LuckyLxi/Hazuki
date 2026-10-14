@@ -1,7 +1,4 @@
-import 'dart:convert';
-
 import 'package:flutter_test/flutter_test.dart';
-import 'package:hazuki/services/source/account/picacg_login_profile_operations.dart';
 import 'package:hazuki/services/source/account/source_login_side_data_operations.dart';
 import 'package:hazuki/services/source/models/source_contract_models.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_host.dart';
@@ -42,7 +39,8 @@ void main() {
       facade,
       sourceKey: 'copy_manga',
       result: {
-        'results': {'token': ' copy-token ', 'avatar': 'user/cover/avatar.jpg'},
+        'token': 'copy-token',
+        'avatarUrl': 'https://s3.mangafuna.xyz/user/cover/avatar.jpg',
       },
     );
 
@@ -53,43 +51,41 @@ void main() {
     );
   });
 
-  test('Picacg adapter extracts token and JWT display name', () async {
-    const profile = PicacgLoginProfileOperations();
-    final facade = host.activeHandle.facade;
-    final payload = base64Url.encode(
-      utf8.encode(jsonEncode({'name': 'Picacg User'})),
-    );
-    final token = 'header.$payload.signature';
-
-    final persisted = await profile.persist(
-      facade,
-      sourceKey: 'picacg',
-      result: {
-        'authResponses': [
-          {
-            'parsedBody': {
-              'data': {'token': token},
-            },
-          },
-        ],
-      },
-    );
-
-    expect(persisted, isTrue);
-    expect(facade.loadSourceData('picacg', 'token'), token);
-    expect(facade.loadSourceData('picacg', 'display_name'), 'Picacg User');
-  });
-
-  test('Picacg adapter rejects responses without an auth token', () async {
-    const profile = PicacgLoginProfileOperations();
-
-    expect(
-      await profile.persist(
-        host.activeHandle.facade,
+  test(
+    'persists plugin-normalized profile without site-specific parsing',
+    () async {
+      final sideData = SourceLoginSideDataOperations(runtimeHost: host);
+      final facade = host.activeHandle.facade;
+      await sideData.persistLoginSideData(
+        facade,
         sourceKey: 'picacg',
-        result: const {'authResponses': []},
-      ),
-      isFalse,
-    );
-  });
+        result: {
+          'token': 'pica-token',
+          'displayName': 'Picacg User',
+          'avatarUrl': 'https://images.example/static/avatar.jpg',
+        },
+      );
+      expect(facade.loadSourceData('picacg', 'token'), 'pica-token');
+      expect(facade.loadSourceData('picacg', 'display_name'), 'Picacg User');
+      expect(
+        facade.loadSourceData('picacg', 'avatar_url'),
+        'https://images.example/static/avatar.jpg',
+      );
+    },
+  );
+
+  test(
+    'ignores non-profile results without changing stored credentials',
+    () async {
+      final sideData = SourceLoginSideDataOperations(runtimeHost: host);
+      final facade = host.activeHandle.facade;
+      await facade.saveSourceData('picacg', 'token', 'previous-token');
+      await sideData.persistLoginSideData(
+        facade,
+        sourceKey: 'picacg',
+        result: null,
+      );
+      expect(facade.loadSourceData('picacg', 'token'), 'previous-token');
+    },
+  );
 }

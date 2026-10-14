@@ -62,6 +62,11 @@ jobs:
       - name: Analyze app source
         run: flutter analyze
 
+      - name: Build QuickJS library for source plugin tests
+        run: |
+          cmake -S third_party/flutter_qjs/test -B test/build -DCMAKE_BUILD_TYPE=Debug
+          cmake --build test/build --config Debug --parallel
+
       - name: Run app tests with coverage
         run: flutter test --coverage --reporter expanded
 

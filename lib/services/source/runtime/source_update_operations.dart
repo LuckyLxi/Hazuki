@@ -10,6 +10,7 @@ import 'source_runtime_state_controller.dart';
 import 'source_script_editing_operations.dart';
 import 'source_script_storage.dart';
 import 'source_text_downloader.dart';
+import '../plugins/source_plugin_manager.dart';
 
 /// Owns source catalog resolution, version checks, and online source updates.
 class SourceUpdateOperations {
@@ -38,8 +39,25 @@ class SourceUpdateOperations {
   final List<String> _sourceIndexUrls;
 
   Future<SourceVersionCheckResult?> checkActiveSourceVersion() {
+    if (!_runtimeHost.hasActiveSource) return Future.value(null);
+    if (_scriptStore is SourcePluginManager) return _pluginVersion();
     final handle = _runtimeHost.activeHandle;
     return handle.runOperation(() => _checkSourceVersion(handle));
+  }
+
+  Future<SourceVersionCheckResult?> _pluginVersion() async {
+    final manager = _scriptStore as SourcePluginManager;
+    final id = _runtimeHost.activeSourceKey;
+    final update = await manager.checkUpdate(id);
+    final plugin = manager.pluginFor(id);
+    if (update == null || plugin == null) return null;
+    return SourceVersionCheckResult(
+      sourceKey: id,
+      sourceName: plugin.manifest.name,
+      localVersion: plugin.manifest.version,
+      remoteVersion: update.version,
+      hasUpdate: true,
+    );
   }
 
   Future<SourceVersionCheckResult?> _checkSourceVersion(
@@ -159,10 +177,22 @@ class SourceUpdateOperations {
   Future<bool> downloadActiveSource({
     void Function(int received, int total)? onProgress,
   }) {
+    if (!_runtimeHost.hasActiveSource) return Future.value(false);
+    if (_scriptStore is SourcePluginManager) return _updatePlugin();
     final handle = _runtimeHost.activeHandle;
     return handle.runOperation(
       () => _downloadSourceAndMarkForRestart(handle, onProgress: onProgress),
     );
+  }
+
+  Future<bool> _updatePlugin() async {
+    final manager = _scriptStore as SourcePluginManager;
+    final id = _runtimeHost.activeSourceKey;
+    final update = await manager.checkUpdate(id);
+    final plugin = manager.pluginFor(id);
+    if (update == null || plugin?.repository == null) return false;
+    await manager.installFromRepository(plugin!.repository!, update);
+    return true;
   }
 
   Future<bool> _downloadSourceAndMarkForRestart(

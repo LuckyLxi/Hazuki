@@ -157,11 +157,6 @@ class ComicDetailSessionController extends ChangeNotifier {
     sourceFuture.then(
       (_) => _onDetailsFutureFinished(requestId, timeoutTimer),
       onError: (Object error, StackTrace _) {
-        if (_shouldAutomaticallyRetryAfterHttp210(error)) {
-          _hasAutomaticallyRetriedDetails = true;
-          _startDetailRetry();
-          return;
-        }
         _onDetailsFutureFinished(requestId, timeoutTimer);
       },
     );
@@ -179,16 +174,5 @@ class ComicDetailSessionController extends ChangeNotifier {
     _hasDetailsTimedOut = false;
     _isRetryingDetails = false;
     if (shouldNotify) notifyListeners();
-  }
-
-  bool _shouldAutomaticallyRetryAfterHttp210(Object error) {
-    if (_disposed ||
-        _hasAutomaticallyRetriedDetails ||
-        _sourceKey.trim() != 'copy_manga') {
-      return false;
-    }
-    return error.toString().contains(
-      'copy_manga_runtime_recovery_failed_after_http_210',
-    );
   }
 }

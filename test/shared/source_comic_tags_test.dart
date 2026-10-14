@@ -1,9 +1,9 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/shared/picacg_comic_tags.dart';
+import 'package:hazuki/shared/source_comic_tags.dart';
 
 void main() {
-  test('extracts localized Picacg tag and category values', () {
+  test('extracts only plugin-declared tag groups', () {
     const details = ComicDetailsData(
       id: 'comic',
       title: 'Comic',
@@ -23,6 +23,18 @@ void main() {
       subId: '',
     );
 
-    expect(picacgComicDetailTags(details), ['Action', 'Romance']);
+    expect(
+      sourceComicDetailTags(details, {
+        'listTagGroups': ['标签', '分类'],
+      }),
+      ['Action', 'Romance'],
+    );
+    expect(sourceComicDetailTags(details, const {}), isEmpty);
+    expect(
+      sourceComicDetailTags(details, {
+        'listTagGroups': ['作者'],
+      }),
+      ['Author'],
+    );
   });
 }

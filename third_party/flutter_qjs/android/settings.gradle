@@ -8,6 +8,8 @@ pluginManagement {
 
 plugins {
     id 'com.android.library' version '9.1.1' apply false
+    // Match the host app's built-in Kotlin compiler without applying KGP.
+    id 'org.jetbrains.kotlin.android' version '2.3.20' apply false
 }
 
 rootProject.name = 'flutter_qjs'

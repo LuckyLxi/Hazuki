@@ -364,6 +364,8 @@ class _SearchCountingRuntimeView extends ChangeNotifier
   @override
   String get activeSourceKey => _source.activeSourceKey;
   @override
+  String? get sourceRevision => activeSourceKey;
+  @override
   bool get isActiveJmSource => _source.isActiveJmSource;
   @override
   bool get isActiveCopyMangaSource => false;

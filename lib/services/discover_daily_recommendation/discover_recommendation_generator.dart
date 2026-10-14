@@ -42,10 +42,10 @@ class SourceDiscoverDailyRecommendationCandidateGenerator
     if (!_supportsActiveSource) {
       return null;
     }
-    final sourceKey = _source.activeSourceKey.trim();
+    final sourceKey = (_source.activeSourceKey ?? '').trim();
     bool hasSameActiveSource() {
       return _supportsActiveSource &&
-          _source.activeSourceKey.trim() == sourceKey;
+          (_source.activeSourceKey ?? '').trim() == sourceKey;
     }
 
     final authors = await _loadAuthors();

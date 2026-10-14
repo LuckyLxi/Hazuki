@@ -1129,6 +1129,30 @@ function ImageLoadingConfig({url, method, data, headers, onResponse, modifyImage
     this.onLoadFailed = onLoadFailed;
 }
 
+// Shared by legacy class sources and Hazuki.translate.
+function __hazukiLocalizeText(text, translation = {}, locale = APP.locale) {
+    let normalized = locale.replace(/-/g, '_');
+    const language = normalized.split('_')[0];
+    if (normalized === language) {
+        normalized = language === 'zh' ? 'zh_CN' : language === 'en' ? 'en_US' : language;
+    }
+    const keys = [normalized, normalized.replace(/_/g, '-')];
+    keys.push(language);
+    const validText = value => typeof value === 'string' && value.trim().length > 0;
+    if (text && typeof text === 'object') {
+        for (const key of [...keys, 'en_US', 'en-US', 'en']) {
+            if (validText(text[key])) return text[key];
+        }
+        return Object.values(text).find(validText) ?? '';
+    }
+    const original = text == null ? '' : String(text);
+    for (const key of keys) {
+        const value = translation?.[key]?.[original.trim()];
+        if (validText(value)) return value;
+    }
+    return original;
+}
+
 class ComicSource {
     name = ""
 
@@ -1212,8 +1236,7 @@ class ComicSource {
      * @since 1.2.5
      */
     translate(key) {
-        let locale = APP.locale;
-        return this.translation[locale]?.[key] ?? key;
+        return __hazukiLocalizeText(key, this.translation);
     }
 
     init() { }

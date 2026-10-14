@@ -45,7 +45,7 @@ CloudSyncParticipantSet createCloudSyncParticipantSet({
     reading: CloudSyncReadingParticipant(
       readHistory: readHistory,
       readingProgress: readingProgress,
-      activeSourceKey: () => source.activeSourceKey,
+      activeSourceKey: () => (source.activeSourceKey ?? ''),
     ),
     settings: CloudSyncSettingsParticipant(
       localFavorites: favoritesParticipant,

@@ -13,7 +13,7 @@ class HazukiSourceSyncAdapter implements SourceSyncGateway {
   final SourceRuntimeOperations _runtimeOperations;
 
   @override
-  String get activeSourceKey => _runtime.activeSourceKey;
+  String? get activeSourceKey => _runtime.activeSourceKey;
   @override
   Future<bool> hasCustomEditedActiveSource() =>
       _runtimeOperations.hasCustomEditedActiveSource();

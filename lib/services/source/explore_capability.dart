@@ -2,7 +2,6 @@ import 'package:flutter/foundation.dart';
 
 import '../../models/hazuki_models.dart';
 import 'common/source_json_coerce.dart';
-import 'models/source_identity.dart';
 import 'runtime/source_runtime_host.dart';
 
 typedef SourceTextTranslator = String Function(String text, {String sourceKey});
@@ -19,6 +18,7 @@ class SourceExploreCapability {
   final SourceTextTranslator _translateSourceText;
 
   Future<List<ExploreSection>> load({bool forceRefresh = false}) async {
+    if (!_runtimeHost.hasActiveSource) return const [];
     final handle = _runtimeHost.activeHandle;
     final facade = handle.facade;
     await facade.ensureInitialized();
@@ -107,8 +107,7 @@ Promise.all(
             comics: comics,
             viewMoreUrl: viewMore?.isNotEmpty == true ? viewMore : null,
             offersInitialComicsFilter:
-                isHazukiJmSourceKey(_runtimeHost.activeSourceKey) &&
-                isJmPromotionWithUnreliableViewMore(rawTitle),
+                (map['offersInitialComicsFilter'] == true),
           ),
         );
       }
@@ -170,21 +169,6 @@ Promise.all(
     if (separator < 0 || separator == raw.length - 1) return null;
     final parameter = raw.substring(separator + 1).trim();
     return parameter.isEmpty ? null : parameter;
-  }
-
-  @visibleForTesting
-  static bool isJmPromotionWithUnreliableViewMore(String title) {
-    final normalized = title.replaceAll(RegExp(r'\s+'), '');
-    return RegExp(
-          r'^C\d+.*(?:推薦本本|推荐本本)$',
-          caseSensitive: false,
-        ).hasMatch(normalized) ||
-        normalized.contains('連載更新') ||
-        normalized.contains('连载更新') ||
-        (normalized.contains('禁漫去碼') && normalized.contains('全彩化')) ||
-        (normalized.contains('禁漫去码') && normalized.contains('全彩化')) ||
-        normalized.contains('禁漫漢化組') ||
-        normalized.contains('禁漫汉化组');
   }
 
   List<ExploreSection> _parseMultiPageComicListExploreSections(

@@ -10,6 +10,7 @@ import 'explore_cache_capability.dart';
 import 'line_settings_capability.dart';
 import 'source_cache_store.dart';
 import 'source_cookie_store.dart';
+import 'source_html_bridge.dart';
 import 'source_runtime_coordinator.dart';
 import 'source_runtime_facade.dart';
 import 'source_runtime_kernel.dart';
@@ -45,11 +46,14 @@ class SourceRuntimeHandle
   @override
   final String sourceKey;
   final SourceSecureSessionStorage _secureStorage;
+  SourceSecureSessionStorage get secureStorage => _secureStorage;
+  String? pluginDirectory;
   final Future<void> Function(String sourceKey) _ensureInitialized;
   final void Function(String sourceKey) _notifyRuntimeStateChanged;
   final Dio dio = _createSourceDio();
   final AppLogStore appLogStore;
   final SourceRuntimeKernel runtime = SourceRuntimeKernel();
+  SourceHtmlBridge htmlBridge = SourceHtmlBridge();
   bool _disposed = false;
   bool _disposeRequested = false;
   bool _recreationRequested = false;
@@ -145,7 +149,8 @@ class SourceRuntimeHandle
   bool get recreationRequested => _recreationRequested;
 
   void _onResponseStatus(int statusCode) {
-    if (sourceKey == 'copy_manga' && statusCode == 210) {
+    final statuses = runtime.sourceMeta?.presentation['recreateOnStatus'];
+    if (statuses is List && statuses.contains(statusCode)) {
       _recreationRequested = true;
     }
   }
@@ -198,5 +203,6 @@ class SourceRuntimeHandle
     } catch (_) {}
     session.clearMemory();
     cache.clearMemory();
+    htmlBridge.clear();
   }
 }

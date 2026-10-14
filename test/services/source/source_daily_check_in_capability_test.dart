@@ -6,10 +6,7 @@ import 'package:hazuki/services/source/runtime/source_runtime_host.dart';
 import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
 
 void main() {
-  test('recognizes supported sources and normalizes daily check-in data', () {
-    expect(SourceDailyCheckInCapability.supportsSource('jm'), isTrue);
-    expect(SourceDailyCheckInCapability.supportsSource('picacg'), isTrue);
-    expect(SourceDailyCheckInCapability.supportsSource('copy_manga'), isFalse);
+  test('normalizes daily check-in dates and data', () {
     expect(
       SourceDailyCheckInCapability.dailyCheckInDateTag(
         DateTime(2026, 7, 14, 12),
@@ -32,32 +29,6 @@ void main() {
     expect(
       SourceDailyCheckInCapability.looksLikeAlreadyCheckedInMessage('今天已签到'),
       isTrue,
-    );
-  });
-
-  test('reads Picacg punch state variants and redacts sensitive headers', () {
-    expect(
-      SourceDailyCheckInCapability.extractPicacgIsPunched('{"isPunched":true}'),
-      isTrue,
-    );
-    expect(
-      SourceDailyCheckInCapability.extractPicacgIsPunched(
-        '{"data":{"user":{"isPunched":"false"}}}',
-      ),
-      isFalse,
-    );
-    expect(SourceDailyCheckInCapability.extractPicacgIsPunched('{}'), isNull);
-    expect(
-      SourceDailyCheckInCapability.redactPicacgHeaders({
-        'authorization': 'token',
-        'signature': 'secret',
-        'accept': 'json',
-      }),
-      {
-        'authorization': '<redacted>',
-        'signature': '<redacted>',
-        'accept': 'json',
-      },
     );
   });
 

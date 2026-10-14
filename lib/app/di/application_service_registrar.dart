@@ -1,3 +1,4 @@
+import '../../services/source/runtime/source_runtime_registry.dart';
 import 'package:get_it/get_it.dart';
 
 import '../../services/announcements/announcement_controller.dart';
@@ -77,6 +78,8 @@ void registerApplicationServices(GetIt services) {
   if (!services.isRegistered<LocalFavoritesService>()) {
     services.registerLazySingleton<LocalFavoritesService>(
       () => LocalFavoritesService(
+        presentationFor:
+            services<SourceRuntimeRegistry>().displayPresentationFor,
         preferences: services<LocalFavoritesPreferencesStore>(),
         persistence: services<LocalFavoritesPersistence>(),
         syncCodec: services<LocalFavoritesSyncCodec>(),
@@ -102,7 +105,11 @@ void registerApplicationServices(GetIt services) {
   }
   if (!services.isRegistered<ReadHistoryService>()) {
     services.registerLazySingleton<ReadHistoryService>(
-      () => ReadHistoryService(database: services<HazukiDatabase>()),
+      () => ReadHistoryService(
+        database: services<HazukiDatabase>(),
+        presentationFor:
+            services<SourceRuntimeRegistry>().displayPresentationFor,
+      ),
     );
   }
   if (!services.isRegistered<ReadingProgressService>()) {

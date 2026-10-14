@@ -1,7 +1,7 @@
+import '../../support/source_catalog_fixtures.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/models/source_meta.dart';
 import 'package:hazuki/services/source/favorites/source_favorites_policy.dart';
-import 'package:hazuki/services/source/models/source_contract_models.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_host.dart';
 import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -79,21 +79,14 @@ Future<SourceRuntimeHost> _initializedHost(String sourceKey) async {
     version: '1.0.0',
     supportsAccount: false,
     settingsDefaults: const {},
+    presentation: host.definitionFor(sourceKey).presentation,
   );
   return host;
 }
 
 SourceRuntimeHost _createHost(String defaultSourceKey) {
   return SourceRuntimeHost(
-    catalog: const [
-      SourceCatalogEntry(key: 'jm', name: 'JM', fileName: 'jm.js'),
-      SourceCatalogEntry(
-        key: 'copy_manga',
-        name: 'CopyManga',
-        fileName: 'copy_manga.js',
-      ),
-      SourceCatalogEntry(key: 'picacg', name: 'Picacg', fileName: 'picacg.js'),
-    ],
+    catalog: hazukiAllowedSourceCatalog,
     defaultSourceKey: defaultSourceKey,
     secureSessionStorage: MemorySourceSecureSessionStorage(),
     ensureSourceInitialized: (_) async {},

@@ -5,6 +5,9 @@ class SourceMeta {
     required this.version,
     required this.supportsAccount,
     required this.settingsDefaults,
+    this.presentation = const {},
+    this.settings = const {},
+    this.translation = const {},
   });
 
   final String name;
@@ -12,4 +15,7 @@ class SourceMeta {
   final String version;
   final bool supportsAccount;
   final Map<String, dynamic> settingsDefaults;
+  final Map<String, dynamic> presentation;
+  final Map<String, dynamic> settings;
+  final Map<String, dynamic> translation;
 }

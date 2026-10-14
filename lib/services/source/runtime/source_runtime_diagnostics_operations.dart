@@ -1,3 +1,4 @@
+import 'package:shared_preferences/shared_preferences.dart';
 import '../common/source_prefs_keys.dart';
 import 'source_runtime_facade.dart';
 import 'source_runtime_host.dart';
@@ -13,6 +14,7 @@ class SourceRuntimeDiagnosticsOperations {
   HazukiSourceFacade get _facade => _runtimeHost.activeHandle.facade;
 
   void logRuntimeRetryRequested(String source) {
+    if (!_runtimeHost.hasActiveSource) return;
     final facade = _facade;
     facade.addApplicationLog(
       level: 'info',
@@ -23,23 +25,23 @@ class SourceRuntimeDiagnosticsOperations {
   }
 
   Future<bool> loadSoftwareLogCaptureEnabled() async {
-    final facade = _facade;
-    final prefs = await facade.ensurePrefs();
+    final facade = _runtimeHost.optionalActiveHandle?.facade;
+    final prefs = await SharedPreferences.getInstance();
     final enabled =
         prefs.getBool(SourcePrefsKeys.softwareLogCaptureEnabled) ?? false;
-    facade.debug.softwareLogCaptureEnabled = enabled;
+    facade?.debug.softwareLogCaptureEnabled = enabled;
     await _runtimeHost.logStore.initialize(captureEnabled: enabled);
     return enabled;
   }
 
   Future<void> setSoftwareLogCaptureEnabled(bool enabled) async {
-    final facade = _facade;
-    facade.debug.softwareLogCaptureEnabled = enabled;
+    final facade = _runtimeHost.optionalActiveHandle?.facade;
+    facade?.debug.softwareLogCaptureEnabled = enabled;
     await _runtimeHost.logStore.setCaptureEnabled(enabled);
     if (!enabled) {
-      facade.clearCapturedLogs();
+      facade?.clearCapturedLogs();
     }
-    final prefs = await facade.ensurePrefs();
+    final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(SourcePrefsKeys.softwareLogCaptureEnabled, enabled);
   }
 }

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_qjs/flutter_qjs.dart';
@@ -6,8 +7,11 @@ import 'package:flutter_qjs/flutter_qjs.dart';
 import '../../../models/source_meta.dart';
 import '../common/source_json_coerce.dart';
 import '../models/source_contract_models.dart';
+import '../plugins/source_plugin_models.dart';
+import '../plugins/source_plugin_script_inspector.dart';
 import 'source_catalog_resolver.dart';
 import 'source_js_bridge_cookie_capability.dart';
+import 'source_html_bridge.dart';
 import 'source_runtime_handle.dart';
 import 'source_runtime_state_controller.dart';
 import 'source_script_storage.dart';
@@ -79,20 +83,7 @@ class SourceRuntimeLoader implements SourceRuntimeLoadClient {
   }) async {
     final local = await ensureLocalSource(handle, requireFile: false);
     if (await local.sourceFile.exists()) return local;
-
-    final sourceScript = await _downloader.sequential(
-      await _catalogResolver.resolve(handle),
-      onProgress: onProgress,
-      facade: handle.facade,
-    );
-    if (sourceScript != null && sourceScript.trim().isNotEmpty) {
-      await _scriptStore.write(handle.sourceKey, sourceScript);
-      return SourceRuntimeLoadResult(
-        sourceFile: local.sourceFile,
-        message: 'source_downloaded_on_first_launch',
-      );
-    }
-    throw Exception('source_download_failed_without_cache');
+    throw const SourcePluginException('plugin_not_installed');
   }
 
   @override
@@ -126,26 +117,38 @@ class SourceRuntimeLoader implements SourceRuntimeLoadClient {
 
     final initScript = await _loadAssetText(_bundledInitAssetPath);
     final sourceScript = await sourceFile.readAsString();
-    final className = extractSourceClassName(sourceScript);
-    final engine = FlutterQjs(hostPromiseRejectionHandler: (_) {});
+    final sdk = await _loadAssetText('assets/hazuki_plugin_sdk.js');
+    final engine = FlutterQjs(
+      timeout: 5000,
+      memoryLimit: 64 * 1024 * 1024,
+      hostPromiseRejectionHandler: (_) {},
+    );
+    final oldEngine = facade.runtime.engine;
+    final oldMeta = facade.sourceMeta;
+    final oldHtmlBridge = handle.htmlBridge;
+    final htmlBridge = SourceHtmlBridge();
     try {
       engine.dispatch();
       final setGlobal =
           engine.evaluate('(k, v) => { this[k] = v; }') as JSInvokable;
       setGlobal.invoke([
         'sendMessage',
-        (dynamic message) =>
-            _jsBridge.handleJsMessageForHandle(handle, message),
+        (dynamic message) => _jsBridge.handleJsMessageForHandle(
+          handle,
+          message,
+          htmlBridge: htmlBridge,
+        ),
       ]);
       setGlobal.invoke(['appVersion', '1.0.0']);
       setGlobal.free();
 
       engine.evaluate(initScript, name: 'init.js');
-      engine.evaluate(sourceScript, name: 'jm.js');
-      engine.evaluate(
-        'this.__hazuki_source = new $className();',
-        name: 'create_source.js',
-      );
+      engine.evaluate(sdk, name: 'hazuki_plugin_sdk.js');
+      evaluateSourcePlugin(engine, sourceScript);
+      final manifest = registeredSourcePluginManifest(engine);
+      if (manifest.id != handle.sourceKey) {
+        throw const SourcePluginException('plugin_identity_mismatch');
+      }
 
       final name = (engine.evaluate('this.__hazuki_source.name') ?? '')
           .toString();
@@ -161,12 +164,25 @@ class SourceRuntimeLoader implements SourceRuntimeLoadClient {
       }
 
       final meta = SourceMeta(
+        translation: manifest.translation,
         name: name,
         key: key,
         version: version,
         supportsAccount: supportsAccount,
         settingsDefaults: parseSourceSettingsDefaults(
           engine.evaluate('this.__hazuki_source.settings ?? {}'),
+        ),
+        presentation: jsAsMap(
+          engine.evaluate('this.__hazuki_source.presentation ?? {}'),
+        ),
+        settings: Map<String, dynamic>.from(
+          jsonDecode(
+                engine.evaluate(
+                      'JSON.stringify(this.__hazuki_source.settings ?? {})',
+                    )
+                    as String,
+              )
+              as Map,
         ),
       );
       _runtimeStateController.setBusy(
@@ -175,24 +191,56 @@ class SourceRuntimeLoader implements SourceRuntimeLoadClient {
         SourceRuntimeStep.runningSourceInit,
         debugDetail: 'running_source_init',
       );
-      final oldMeta = facade.sourceMeta;
       facade.runtime.sourceMeta = meta;
+      facade.runtime.engine = engine;
+      handle.htmlBridge = htmlBridge;
       try {
         final initResult = engine.evaluate(
           'this.__hazuki_source.init?.()',
           name: 'source_init.js',
         );
-        if (initResult is Future) await initResult;
+        if (initResult is Future) {
+          await initResult.timeout(const Duration(seconds: 90));
+        }
         if (handle.isDisposed) throw Exception('source_runtime_disposed');
       } catch (_) {
         facade.runtime.sourceMeta = oldMeta;
+        facade.runtime.engine = oldEngine;
         rethrow;
       }
-      final oldEngine = facade.runtime.engine;
       facade.runtime.engine = engine;
+      final finalMeta = SourceMeta(
+        translation: jsAsMap(
+          engine.evaluate('this.__hazuki_source.translation ?? {}'),
+        ),
+        name: name,
+        key: key,
+        version: version,
+        supportsAccount: supportsAccount,
+        presentation: meta.presentation,
+        settingsDefaults: parseSourceSettingsDefaults(
+          engine.evaluate('this.__hazuki_source.settings ?? {}'),
+        ),
+        settings: Map<String, dynamic>.from(
+          jsonDecode(
+                engine.evaluate(
+                      'JSON.stringify(this.__hazuki_source.settings ?? {})',
+                    )
+                    as String,
+              )
+              as Map,
+        ),
+      );
+      facade.runtime.sourceMeta = finalMeta;
       oldEngine?.close();
-      return meta;
+      oldHtmlBridge.clear();
+      return finalMeta;
     } catch (_) {
+      facade.runtime.engine = oldEngine;
+      facade.runtime.sourceMeta = oldMeta;
+      htmlBridge.clear();
+      handle.htmlBridge = oldHtmlBridge;
+      if (handle.isDisposed) oldHtmlBridge.clear();
       engine.close();
       rethrow;
     }

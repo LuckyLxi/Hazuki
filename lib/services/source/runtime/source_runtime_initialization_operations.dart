@@ -27,8 +27,11 @@ class SourceRuntimeInitializationOperations {
       _runtimeHost.activateSource(sourceKey);
 
   Future<void> prewarmInBackground() async {
+    if (!_runtimeHost.hasActiveSource) return;
     final handle = _runtimeHost.activeHandle;
-    if (_isHandleInitialized(handle)) return;
+    if (handle.facade.initFuture == null && _isHandleInitialized(handle)) {
+      return;
+    }
     final pending = handle.facade.initFuture;
     if (pending != null) {
       await pending;
@@ -50,6 +53,7 @@ class SourceRuntimeInitializationOperations {
     if (sourceKey != null && sourceKey.trim().isNotEmpty) {
       await activateSource(sourceKey);
     }
+    if (!_runtimeHost.hasActiveSource) return;
     await _ensureHandleInitialized(_runtimeHost.activeHandle);
   }
 
@@ -87,7 +91,9 @@ class SourceRuntimeInitializationOperations {
 
   Future<void> _ensureHandleInitialized(SourceRuntimeHandle handle) async {
     final facade = handle.facade;
-    if (_isHandleInitialized(handle)) return;
+    if (handle.facade.initFuture == null && _isHandleInitialized(handle)) {
+      return;
+    }
 
     final inFlight = facade.initFuture;
     if (inFlight == null) {
@@ -96,7 +102,9 @@ class SourceRuntimeInitializationOperations {
       await inFlight;
     }
 
-    if (_isHandleInitialized(handle)) return;
+    if (handle.facade.initFuture == null && _isHandleInitialized(handle)) {
+      return;
+    }
 
     facade.initFuture = null;
     await _initHandle(handle, prewarm: false);

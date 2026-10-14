@@ -19,7 +19,7 @@ void main() {
     );
   });
 
-  test('parses source image metadata and JM fallback segments', () {
+  test('parses source-declared image metadata', () {
     expect(
       SourceImagePreparationCapability.parseDeclaredImageSegments({
         'segments': '4',
@@ -47,36 +47,6 @@ void main() {
         'https://example.test/image.WEBP?size=2',
       ),
       'webp',
-    );
-    expect(
-      SourceImagePreparationCapability.extractJmPictureName(
-        'https://example.test/path/001.jpg?token=1',
-      ),
-      '001',
-    );
-    expect(
-      SourceImagePreparationCapability.calculateJmImageSegmentsForSource(
-        '220979',
-        'https://example.test/001.jpg',
-        sourceKey: 'jm',
-      ),
-      0,
-    );
-    expect(
-      SourceImagePreparationCapability.calculateJmImageSegmentsForSource(
-        '220980',
-        'https://example.test/001.jpg',
-        sourceKey: 'jm',
-      ),
-      10,
-    );
-    expect(
-      SourceImagePreparationCapability.calculateJmImageSegmentsForSource(
-        '500000',
-        'https://example.test/001.jpg',
-        sourceKey: 'copy_manga',
-      ),
-      0,
     );
   });
 

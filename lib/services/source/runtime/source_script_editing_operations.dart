@@ -2,6 +2,7 @@ import 'dart:io';
 
 import '../common/source_prefs_keys.dart';
 import '../models/source_identity.dart';
+import '../plugins/source_plugin_manager.dart';
 import 'source_runtime_facade.dart';
 import 'source_runtime_handle.dart';
 import 'source_runtime_host.dart';
@@ -93,13 +94,21 @@ class SourceScriptEditingOperations {
       throw StateError('source_delete_active_not_allowed');
     }
 
+    if (_storage is SourcePluginManager) {
+      // Uninstalling also replaces the catalog and releases the runtime handle.
+      // The retained script backup must keep its original edit state.
+      await _storage.delete(normalizedSourceKey);
+      return;
+    }
+
     await _storage.delete(normalizedSourceKey);
     await setCustomEditedSourceFlag(normalizedSourceKey, false);
     _runtimeHost.remove(normalizedSourceKey);
   }
 
-  Future<bool> hasCustomEditedActiveSource() =>
-      hasCustomEditedSource(_activeSourceKey);
+  Future<bool> hasCustomEditedActiveSource() => _activeSourceKey.isEmpty
+      ? Future.value(false)
+      : hasCustomEditedSource(_activeSourceKey);
 
   Future<bool> hasCustomEditedSource(String sourceKey) =>
       _storage.isCustomEdited(sourceKey);
@@ -110,10 +119,8 @@ class SourceScriptEditingOperations {
     HazukiSourceFacade? targetFacade,
   }) async {
     final normalizedSourceKey = _runtimeHost.normalize(sourceKey);
-    if (targetFacade == null) {
-      await _storage.setCustomEdited(normalizedSourceKey, value);
-      return;
-    }
+    await _storage.setCustomEdited(normalizedSourceKey, value);
+    if (targetFacade == null) return;
     final prefs = await targetFacade.ensurePrefs();
     await prefs.setBool(
       SourcePrefsKeys.customEditedSource(normalizedSourceKey),

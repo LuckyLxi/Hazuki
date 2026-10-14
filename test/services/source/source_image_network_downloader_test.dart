@@ -42,7 +42,7 @@ void main() {
     Map<String, dynamic>? requestedHeaders;
     final downloader = SourceImageNetworkDownloader(
       resolveLoadConfig: (_, _, _) async => {
-        'headers': {'cookie': 'source=cookie'},
+        'headers': {'Cookie': 'source=cookie'},
       },
       resolveCookie: (_) => 'runtime=cookie',
       requestBytes: (_, headers) async {
@@ -52,7 +52,41 @@ void main() {
     );
 
     await downloader.download('https://image.test/1.jpg');
-    expect(requestedHeaders, {'cookie': 'source=cookie'});
+    expect(requestedHeaders, {'Cookie': 'source=cookie'});
+  });
+
+  test('uses the plugin image URL and resolves cookies for its host', () async {
+    const original = 'https://image.test/1.jpg';
+    const rewritten = 'https://cdn.test/1.jpg?token=signed';
+    String? cookieUrl;
+    String? requestedUrl;
+    Map<String, dynamic>? requestedHeaders;
+    final downloader = SourceImageNetworkDownloader(
+      resolveLoadConfig: (url, _, _) async {
+        expect(url, original);
+        return {
+          'url': rewritten,
+          'headers': {'referer': 'https://source.test/'},
+        };
+      },
+      resolveCookie: (url) {
+        cookieUrl = url;
+        return url == rewritten ? 'cdn=session' : 'original=session';
+      },
+      requestBytes: (url, headers) async {
+        requestedUrl = url;
+        requestedHeaders = Map<String, dynamic>.from(headers);
+        return const SourceImageBytesResponse(statusCode: 200, data: [1]);
+      },
+    );
+
+    expect(await downloader.download(original), [1]);
+    expect(requestedUrl, rewritten);
+    expect(cookieUrl, rewritten);
+    expect(requestedHeaders, {
+      'referer': 'https://source.test/',
+      'cookie': 'cdn=session',
+    });
   });
 
   test(

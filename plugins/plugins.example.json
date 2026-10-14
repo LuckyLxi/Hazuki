@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "plugins": [
+    {"id":"jm","name":"JMComic","version":"1.0.1","downloadUrl":"https://example.com/releases/jm-1.0.1.js"},
+    {"id":"copy_manga","name":"CopyManga","version":"1.0.1","downloadUrl":"https://example.com/releases/copy_manga-1.0.1.js"},
+    {"id":"picacg","name":"Picacg","version":"1.0.1","downloadUrl":"https://example.com/releases/picacg-1.0.1.js"}
+  ]
+}

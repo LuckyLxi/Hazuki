@@ -14,9 +14,17 @@ import '../runtime/source_settings_operations.dart';
 import 'hazuki_source_adapter_base.dart';
 
 class HazukiSourceBootstrapAdapter implements SourceBootstrapGateway {
-  const HazukiSourceBootstrapAdapter(this._runtimeOperations);
+  const HazukiSourceBootstrapAdapter(this._runtimeOperations, [this._runtime]);
 
   final SourceRuntimeOperations _runtimeOperations;
+  final SourceRuntimeView? _runtime;
+  @override
+  Future<void> prepareSources() async {
+    await _runtime?.loadActiveSourcePreference();
+  }
+
+  @override
+  bool get hasActiveSource => _runtime?.activeSourceKey?.isNotEmpty ?? false;
 
   @override
   Future<bool> hasLocalJmSourceFile() =>
@@ -99,7 +107,9 @@ class HazukiSourceHomeAdapter extends HazukiSourceListenableAdapter
   final SourceFavoritesOperations _favorites;
 
   @override
-  String get activeSourceKey => runtime.activeSourceKey;
+  String? get sourceRevision => runtime.sourceRevision;
+  @override
+  String? get activeSourceKey => runtime.activeSourceKey;
   @override
   bool get isActiveCopyMangaSource => runtime.isActiveCopyMangaSource;
   @override
@@ -147,16 +157,10 @@ class HazukiSourceAdvancedAdapter extends HazukiSourceListenableAdapter
   HazukiSourceAdvancedAdapter({
     required SourceRuntimeView runtime,
     required SourceRuntimeOperations runtimeOperations,
-    required SourceSettingsOperations settings,
   }) : _runtimeOperations = runtimeOperations,
-       _settings = settings,
        super(runtime);
 
   final SourceRuntimeOperations _runtimeOperations;
-  final SourceSettingsOperations _settings;
-
-  @override
-  bool get isActiveCopyMangaSource => runtime.isActiveCopyMangaSource;
   @override
   Future<bool> hasCustomEditedActiveSource() =>
       _runtimeOperations.hasCustomEditedActiveSource();
@@ -166,9 +170,6 @@ class HazukiSourceAdvancedAdapter extends HazukiSourceListenableAdapter
   @override
   Future<void> setSoftwareLogCaptureEnabled(bool enabled) =>
       _runtimeOperations.setSoftwareLogCaptureEnabled(enabled);
-  @override
-  Future<void> clearCopyMangaDeviceInfo() =>
-      _settings.clearCopyMangaDeviceInfo();
 }
 
 class HazukiSourceAccountAdapter extends HazukiSourceListenableAdapter
@@ -185,7 +186,7 @@ class HazukiSourceAccountAdapter extends HazukiSourceListenableAdapter
   final SourceAccountOperations _account;
 
   @override
-  String get activeSourceKey => runtime.activeSourceKey;
+  String? get activeSourceKey => runtime.activeSourceKey;
   @override
   bool get isLogged => _account.isLogged;
   @override
@@ -281,20 +282,17 @@ class HazukiSourceRuntimeAdapter extends HazukiSourceListenableAdapter
     required SourceRuntimeOperations runtimeOperations,
     required SourceAccountOperations account,
     required SourceFavoritesOperations favorites,
-    required SourceSettingsOperations settings,
   }) : _runtimeOperations = runtimeOperations,
        _account = account,
        _favorites = favorites,
-       _settings = settings,
        super(runtime);
 
   final SourceRuntimeOperations _runtimeOperations;
   final SourceAccountOperations _account;
   final SourceFavoritesOperations _favorites;
-  final SourceSettingsOperations _settings;
 
   @override
-  String get activeSourceKey => runtime.activeSourceKey;
+  String? get activeSourceKey => runtime.activeSourceKey;
   @override
   bool get isActiveJmSource => runtime.isActiveJmSource;
   @override
@@ -384,9 +382,6 @@ class HazukiSourceRuntimeAdapter extends HazukiSourceListenableAdapter
   @override
   Future<void> setSoftwareLogCaptureEnabled(bool enabled) =>
       _runtimeOperations.setSoftwareLogCaptureEnabled(enabled);
-  @override
-  Future<void> clearCopyMangaDeviceInfo() =>
-      _settings.clearCopyMangaDeviceInfo();
 }
 
 class HazukiSourceSettingsAdapter implements SourceSettingsGateway {
@@ -403,7 +398,12 @@ class HazukiSourceSettingsAdapter implements SourceSettingsGateway {
   final SourceImageOperations _image;
 
   @override
-  String get activeSourceKey => _runtime.activeSourceKey;
+  Map<String, dynamic>? presentationForSource(String id) =>
+      _runtime.runtimeRegistry.isAllowedSourceKey(id)
+      ? _runtime.runtimeRegistry.definitionFor(id).presentation
+      : null;
+  @override
+  String? get activeSourceKey => _runtime.activeSourceKey;
   @override
   bool get isActiveCopyMangaSource => _runtime.isActiveCopyMangaSource;
   @override

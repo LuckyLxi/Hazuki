@@ -5,7 +5,6 @@ import '../category/source_category_capability.dart';
 import '../comic/comic_details_capability.dart';
 import '../common/source_json_coerce.dart';
 import '../explore_capability.dart';
-import '../models/source_identity.dart';
 import '../runtime/source_runtime_host.dart';
 import '../runtime/source_runtime_operations.dart';
 
@@ -207,16 +206,15 @@ class SourceContentOperationService implements SourceContentOperations {
 
   String _normalizeSearchOption(String order, String sourceKey) {
     final normalized = order.trim();
-    if (isHazukiCopyMangaSourceKey(sourceKey)) {
-      return const {'-', 'name', 'author', 'local'}.contains(normalized)
-          ? normalized
-          : '-';
-    }
-    if (isHazukiPicacgSourceKey(sourceKey)) {
-      return const {'dd', 'da', 'ld', 'vd'}.contains(normalized)
-          ? normalized
-          : 'dd';
-    }
-    return normalized.isEmpty ? 'mr' : normalized;
+    final options = _runtimeHost
+        .handleFor(sourceKey)
+        .runtime
+        .sourceMeta
+        ?.presentation;
+    final orders = options?['searchOrders'];
+    final fallback = options?['searchDefaultOrder']?.toString() ?? '';
+    return orders is Map && !orders.containsKey(normalized)
+        ? fallback
+        : normalized;
   }
 }

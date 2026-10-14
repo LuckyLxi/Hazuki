@@ -1,3 +1,4 @@
+import 'package:hazuki/shared/source_presentation.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -5,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:hazuki/shared/favorites/favorite_folders_morph_dialog.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/services/source/source_capabilities.dart';
 
 import '../support/comic_detail_scope.dart';
 import 'comic_detail_view_primitives.dart';
@@ -35,11 +35,19 @@ class ComicDetailHeaderFavoriteRow extends StatelessWidget {
     final scope = ComicDetailScope.of(context);
     final favorite = scope.favorite;
     final theme = Theme.of(context);
-    final showLikeButton = scope.supportsComicLikeAction;
+    final showLikeButton = favorite.supportComicLike;
     final detailsReady = details != null;
-    final isPicacg = isHazukiPicacgSourceKey(details?.sourceKey ?? '');
+    final isPicacg = sourceFeature(
+      details?.sourceKey ?? '',
+      'showPageCount',
+      context: context,
+    );
     final copyMangaStatusText =
-        isHazukiCopyMangaSourceKey(details?.sourceKey ?? '')
+        sourceFeature(
+          details?.sourceKey ?? '',
+          'showComicStatus',
+          context: context,
+        )
         ? _copyMangaStatusText(details)
         : '';
     final statsText = [

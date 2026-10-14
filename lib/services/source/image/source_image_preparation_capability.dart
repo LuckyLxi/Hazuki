@@ -1,8 +1,9 @@
 import 'dart:convert';
 import 'dart:ui';
 
-import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_qjs/flutter_qjs.dart';
+import '../common/source_json_coerce.dart';
 
 import '../models/source_contract_models.dart';
 import '../runtime/source_runtime_host.dart';
@@ -47,24 +48,6 @@ class SourceImagePreparationCapability {
         : normalized;
   }
 
-  int calculateJmImageSegments(
-    String epId,
-    String imageUrl, {
-    String sourceKey = '',
-  }) {
-    final resolvedSourceKey = _resolveSourceKey(sourceKey);
-    final sourceMetaKey = _runtimeHost
-        .handleFor(resolvedSourceKey)
-        .runtime
-        .sourceMeta
-        ?.key;
-    return calculateJmImageSegmentsForSource(
-      epId,
-      imageUrl,
-      sourceKey: sourceMetaKey,
-    );
-  }
-
   Future<PreparedChapterImageData> prepareChapterImageData(
     String imageUrl, {
     required String comicId,
@@ -73,7 +56,7 @@ class SourceImagePreparationCapability {
     bool priority = false,
     String sourceKey = '',
   }) async {
-    final rawBytes = await _downloadImageBytes(
+    var rawBytes = await _downloadImageBytes(
       imageUrl,
       comicId: comicId,
       epId: epId,
@@ -88,17 +71,45 @@ class SourceImagePreparationCapability {
       epId: epId,
       sourceKey: sourceKey,
     );
-    final sourceExtension = imageExtensionFromUrl(imageUrl);
-    final fallbackSegments = calculateJmImageSegments(
-      epId,
-      imageUrl,
-      sourceKey: sourceKey,
-    );
+    var sourceExtension = imageExtensionFromUrl(imageUrl);
+    var transformed = false;
+    final handle = _runtimeHost.handleFor(_resolveSourceKey(sourceKey));
+    final engine = handle.runtime.engine;
+    if (engine?.evaluate(
+          'typeof this.__hazuki_source.comic?.transformImageBytes === "function"',
+        ) ==
+        true) {
+      final invoke =
+          engine!.evaluate(
+                '(bytes,url,id,ep)=>Promise.resolve(this.__hazuki_source.comic.transformImageBytes(new Uint8Array(bytes),url,id,ep)).then(result=>{const v=result?.bytes;return ArrayBuffer.isView(v)?{...result,bytes:v.buffer.slice(v.byteOffset,v.byteOffset+v.byteLength)}:result})',
+              )
+              as JSInvokable;
+      dynamic pending;
+      try {
+        pending = invoke.invoke([rawBytes, imageUrl, comicId, epId]);
+      } finally {
+        invoke.free();
+      }
+      final result = await handle.facade.js.resolve(pending);
+      if (result is! Map || result['bytes'] == null) {
+        throw StateError('plugin_invalid_image_transform');
+      }
+      rawBytes = jsToBytes(result['bytes']);
+      if (rawBytes.isEmpty) throw StateError('plugin_empty_image_transform');
+      final extension = result['extension']?.toString();
+      if (extension != null) {
+        if (!RegExp(r'^[a-zA-Z0-9]{1,8}$').hasMatch(extension)) {
+          throw StateError('plugin_invalid_image_extension');
+        }
+        sourceExtension = extension.toLowerCase();
+      }
+      transformed = true;
+    }
     final segments = declaredSegments != null && declaredSegments > 1
         ? declaredSegments
-        : fallbackSegments;
+        : 0;
     if (segments > 1 && sourceExtension != 'gif') {
-      final fixed = await _unscrambleJmImageBytes(
+      final fixed = await _reverseVerticalImageTiles(
         rawBytes,
         segments,
         fallbackExtension: sourceExtension,
@@ -113,7 +124,7 @@ class SourceImagePreparationCapability {
     return PreparedChapterImageData(
       bytes: rawBytes,
       extension: sourceExtension,
-      wasProcessed: false,
+      wasProcessed: transformed,
     );
   }
 
@@ -144,7 +155,7 @@ class SourceImagePreparationCapability {
   }
 
   Future<({Uint8List bytes, String extension, double? aspectRatio})>
-  _unscrambleJmImageBytes(
+  _reverseVerticalImageTiles(
     Uint8List data,
     int segments, {
     required String fallbackExtension,
@@ -246,35 +257,5 @@ class SourceImagePreparationCapability {
     ).firstMatch(lastSegment);
     final extension = match?.group(1)?.toLowerCase();
     return extension == null || extension.isEmpty ? 'jpg' : extension;
-  }
-
-  @visibleForTesting
-  static String extractJmPictureName(String imageUrl) {
-    final normalizedUrl = imageUrl.trim();
-    final uri = Uri.tryParse(normalizedUrl);
-    final lastSegment = uri?.pathSegments.isNotEmpty == true
-        ? uri!.pathSegments.last
-        : normalizedUrl.split('/').last.split('?').first;
-    final dotIndex = lastSegment.lastIndexOf('.');
-    return dotIndex > 0 ? lastSegment.substring(0, dotIndex) : lastSegment;
-  }
-
-  @visibleForTesting
-  static int calculateJmImageSegmentsForSource(
-    String epId,
-    String imageUrl, {
-    String? sourceKey,
-  }) {
-    if ((sourceKey ?? '').toLowerCase() != 'jm') return 0;
-    const scrambleId = 220980;
-    final id = int.tryParse(epId) ?? 0;
-    if (id < scrambleId) return 0;
-    if (id < 268850) return 10;
-    final digest = md5
-        .convert(utf8.encode('$id${extractJmPictureName(imageUrl)}'))
-        .toString();
-    final charCode = digest.codeUnitAt(digest.length - 1);
-    final remainder = id > 421926 ? charCode % 8 : charCode % 10;
-    return remainder * 2 + 2;
   }
 }

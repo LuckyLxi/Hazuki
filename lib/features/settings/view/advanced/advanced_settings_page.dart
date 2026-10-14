@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:hazuki/shared/source_presentation.dart';
+import 'package:hazuki/services/source/plugins/source_plugin_localization.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/software_update/software_update_service.dart';
@@ -8,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'advanced_settings_content.dart';
 import '../settings_group.dart';
 import '../../support/other_settings_actions.dart';
+import '../plugins/source_plugin_action_widgets.dart';
 
 class AdvancedSettingsPage extends StatefulWidget {
   const AdvancedSettingsPage({
@@ -17,6 +20,7 @@ class AdvancedSettingsPage extends StatefulWidget {
     required this.restoreComicSource,
     required this.sourceService,
     required this.softwareUpdateService,
+    this.sourcePlugins,
   });
 
   final WidgetBuilder logsPageBuilder;
@@ -24,6 +28,7 @@ class AdvancedSettingsPage extends StatefulWidget {
   final Future<bool> Function(BuildContext context) restoreComicSource;
   final SourceAdvancedGateway sourceService;
   final SoftwareUpdateService softwareUpdateService;
+  final SourcePluginGateway? sourcePlugins;
 
   @override
   State<AdvancedSettingsPage> createState() => _AdvancedSettingsPageState();
@@ -142,14 +147,32 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
     await showHazukiPrompt(context, strings.advancedRestoreSourceSuccess);
   }
 
-  Future<void> _clearCopyMangaDeviceInfo() async {
+  Future<void> _runSourceDeviceAction(
+    String sourceKey,
+    SourcePluginButton button,
+  ) async {
     final strings = AppLocalizations.of(context)!;
     try {
-      await _sourceService.clearCopyMangaDeviceInfo();
+      final result = await widget.sourcePlugins!.runAction(
+        sourceKey,
+        button.action!,
+      );
       if (!mounted) {
         return;
       }
-      await showHazukiPrompt(context, strings.advancedCopyMangaDeviceCleared);
+      await showHazukiPrompt(
+        context,
+        localizeSourcePluginText(
+          button.successMessage ?? result ?? button.title ?? button.id,
+          Localizations.localeOf(context).toLanguageTag(),
+          translation:
+              widget.sourcePlugins!
+                  .pluginFor(sourceKey)
+                  ?.manifest
+                  .translation ??
+              const {},
+        ),
+      );
     } catch (error) {
       if (!mounted) {
         return;
@@ -165,6 +188,20 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
   @override
   Widget build(BuildContext context) {
     final strings = AppLocalizations.of(context)!;
+    final sourceKey =
+        SourcePresentationScope.read(context)?.activeSourceKey ?? '';
+    final deviceAction = activeSourceButton(
+      context,
+      'resetDeviceInfo',
+      SourcePluginButtonLocation.advanced,
+    );
+    String buttonText(Object? value) => localizeSourcePluginText(
+      value,
+      Localizations.localeOf(context).toLanguageTag(),
+      translation:
+          widget.sourcePlugins?.pluginFor(sourceKey)?.manifest.translation ??
+          const {},
+    );
     return Scaffold(
       appBar: hazukiFrostedAppBar(
         context: context,
@@ -172,6 +209,12 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
       ),
       body: HazukiSettingsPageBody(
         child: AdvancedSettingsContent(
+          footer: widget.sourcePlugins == null
+              ? null
+              : SourcePluginActionList(
+                  gateway: widget.sourcePlugins!,
+                  location: SourcePluginActionLocation.advanced,
+                ),
           loading: _loading,
           noImageMode: _noImageMode,
           softwareLogCaptureEnabled: _softwareLogCaptureEnabled,
@@ -179,7 +222,19 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
           autoSoftwareUpdateCheckEnabled: _autoSoftwareUpdateCheckEnabled,
           softwareUpdateSource: _softwareUpdateSource,
           hasCustomEditedSource: _hasCustomEditedSource,
-          showCopyMangaSettings: _sourceService.isActiveCopyMangaSource,
+          sourceDeviceAction:
+              deviceAction == null || widget.sourcePlugins == null
+              ? null
+              : ListTile(
+                  leading: const Icon(Icons.phonelink_erase_outlined),
+                  title: Text(
+                    buttonText(deviceAction.title ?? deviceAction.id),
+                  ),
+                  subtitle: deviceAction.subtitle == null
+                      ? null
+                      : Text(buttonText(deviceAction.subtitle)),
+                  onTap: () => _runSourceDeviceAction(sourceKey, deviceAction),
+                ),
           logsPageBuilder: widget.logsPageBuilder,
           onToggleNoImageMode: _toggleNoImageMode,
           onToggleSoftwareLogCaptureEnabled: _toggleSoftwareLogCaptureEnabled,
@@ -188,7 +243,6 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
           onSoftwareUpdateSourceChanged: _setSoftwareUpdateSource,
           onOpenComicSourceEditor: _openComicSourceEditor,
           onRestoreComicSource: _restoreComicSource,
-          onClearCopyMangaDeviceInfo: _clearCopyMangaDeviceInfo,
         ),
       ),
     );

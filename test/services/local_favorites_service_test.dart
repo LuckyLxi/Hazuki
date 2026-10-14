@@ -250,63 +250,66 @@ void main() {
       expect(await service.loadSortOrder(), 'da');
     });
 
-    test('sorts CopyManga local favorites by update time', () async {
-      await service.addFavoriteFolder('Copy', sourceKey: 'copy_manga');
-      final folder = (await service.loadFavoriteFolders(
-        sourceKey: 'copy_manga',
-      )).folders.single;
-
-      await service.toggleFavorite(
-        details: const ComicDetailsData(
-          id: 'newer',
+    test(
+      'sorts local favorites by the generic updatedNewest strategy',
+      () async {
+        await service.addFavoriteFolder('Copy', sourceKey: 'copy_manga');
+        final folder = (await service.loadFavoriteFolders(
           sourceKey: 'copy_manga',
-          title: 'Newer',
-          subTitle: '',
-          cover: '',
-          description: '',
-          updateTime: '2026-05-16',
-          likesCount: '',
-          chapters: {},
-          tags: {},
-          recommend: [],
-          isFavorite: false,
-          subId: '',
-        ),
-        isAdding: true,
-        folderId: folder.id,
-      );
-      await service.toggleFavorite(
-        details: const ComicDetailsData(
-          id: 'older',
+        )).folders.single;
+
+        await service.toggleFavorite(
+          details: const ComicDetailsData(
+            id: 'newer',
+            sourceKey: 'copy_manga',
+            title: 'Newer',
+            subTitle: '',
+            cover: '',
+            description: '',
+            updateTime: '2026-05-16',
+            likesCount: '',
+            chapters: {},
+            tags: {},
+            recommend: [],
+            isFavorite: false,
+            subId: '',
+          ),
+          isAdding: true,
+          folderId: folder.id,
+        );
+        await service.toggleFavorite(
+          details: const ComicDetailsData(
+            id: 'older',
+            sourceKey: 'copy_manga',
+            title: 'Older',
+            subTitle: '',
+            cover: '',
+            description: '',
+            updateTime: '2026-05-15',
+            likesCount: '',
+            chapters: {},
+            tags: {},
+            recommend: [],
+            isFavorite: false,
+            subId: '',
+          ),
+          isAdding: true,
+          folderId: folder.id,
+        );
+
+        final comics = await service.loadFavoriteComics(
+          page: 1,
+          folderId: folder.id,
+          sortOrder: 'updatedNewest',
           sourceKey: 'copy_manga',
-          title: 'Older',
-          subTitle: '',
-          cover: '',
-          description: '',
-          updateTime: '2026-05-15',
-          likesCount: '',
-          chapters: {},
-          tags: {},
-          recommend: [],
-          isFavorite: false,
-          subId: '',
-        ),
-        isAdding: true,
-        folderId: folder.id,
-      );
+        );
 
-      final comics = await service.loadFavoriteComics(
-        page: 1,
-        folderId: folder.id,
-        sortOrder: '-datetime_updated',
-        sourceKey: 'copy_manga',
-      );
-
-      expect(comics.comics.map((comic) => comic.id), <String>[
-        'newer',
-        'older',
-      ]);
-    });
+        expect(comics.comics.map((comic) => comic.id), <String>[
+          'newer',
+          'older',
+        ]);
+      },
+    );
   });
 
   group('LocalFavoritesService source-scoped entries', () {

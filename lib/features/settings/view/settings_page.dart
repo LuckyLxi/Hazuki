@@ -134,6 +134,7 @@ class _SettingsPageState extends State<SettingsPage> {
                     MaterialPageRoute<void>(
                       builder: (_) => ReadingSettingsPage(
                         sourceService: widget.coreDependencies.sourceSettings,
+                        sourcePlugins: widget.coreDependencies.sourcePlugins,
                       ),
                     ),
                   );

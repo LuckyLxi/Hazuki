@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/plugins/source_presentation_metadata.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 
 import 'favorite_cloud_flow.dart';
@@ -17,7 +18,25 @@ class FavoriteListRequest {
 }
 
 class FavoriteListLoader {
-  FavoriteListLoader({required this.cloud, required this.local});
+  FavoriteListLoader({
+    required this.cloud,
+    required this.local,
+    SourcePresentationReader presentationFor = emptySourcePresentation,
+  }) : _presentationFor = presentationFor;
+
+  final SourcePresentationReader _presentationFor;
+
+  String _localSortStrategy(String sourceKey, String order) {
+    final orders = _presentationFor(sourceKey)['localFavoriteOrders'];
+    final strategy = orders is Map ? orders[order] : null;
+    return const [
+          'savedNewest',
+          'savedOldest',
+          'updatedNewest',
+        ].contains(strategy)
+        ? strategy as String
+        : 'savedNewest';
+  }
 
   static const timeout = Duration(seconds: 90);
   final FavoriteCloudFlow cloud;
@@ -60,8 +79,8 @@ class FavoriteListLoader {
       ? local.loadPage(
           page: page,
           folderId: folderId,
-          sortOrder: sortOrder,
-          sourceKey: request.sourceKey,
+          sortOrder: _localSortStrategy(request.sourceKey, sortOrder),
+          sourceKey: '',
         )
       : cloud.loadPage(
           page: page,

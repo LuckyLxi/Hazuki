@@ -456,9 +456,6 @@ void main() {
       'lib/services/source/account/source_login_operations.dart',
       'lib/services/source/account/source_login_script_factory.dart',
       'lib/services/source/account/source_login_side_data_operations.dart',
-      'lib/services/source/account/picacg_login_profile_operations.dart',
-      'lib/services/source/account/picacg_login_profile_parser.dart',
-      'lib/services/source/account/picacg_profile_script_factory.dart',
       'lib/services/source/favorites/source_favorites_capability.dart',
       'lib/services/source/favorites/source_favorite_comics_loader.dart',
       'lib/services/source/favorites/source_favorites_policy.dart',
@@ -501,7 +498,6 @@ void main() {
     ],
     'account/account_session_capability.dart': ['dart:convert'],
     'account/source_login_operations.dart': ['dart:convert'],
-    'account/picacg_login_profile_operations.dart': ['dart:convert'],
     'favorites/source_favorites_capability.dart': ['dart:convert'],
     'image/image_cache_capability.dart': [
       'dart:async',

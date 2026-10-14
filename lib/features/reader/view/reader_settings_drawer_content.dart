@@ -39,8 +39,7 @@ class ReaderSettingsDrawerContent extends StatelessWidget {
     required this.onFilterColorChanged,
     required this.onFilterStrengthChanged,
     required this.onFilterStrengthChangeEnd,
-    required this.onCopyMangaImageQualityChanged,
-    required this.onPicacgImageQualityChanged,
+    required this.onSourceImageQualityChanged,
     required this.onShowWindowsShortcuts,
     required this.onClose,
   });
@@ -76,8 +75,7 @@ class ReaderSettingsDrawerContent extends StatelessWidget {
   final ValueChanged<ReaderFilterColor> onFilterColorChanged;
   final ValueChanged<double>? onFilterStrengthChanged;
   final ValueChanged<double>? onFilterStrengthChangeEnd;
-  final ValueChanged<String?> onCopyMangaImageQualityChanged;
-  final ValueChanged<String?> onPicacgImageQualityChanged;
+  final ValueChanged<String?> onSourceImageQualityChanged;
   final VoidCallback? onShowWindowsShortcuts;
   final VoidCallback onClose;
 
@@ -116,8 +114,7 @@ class ReaderSettingsDrawerContent extends StatelessWidget {
       onFilterColorChanged: onFilterColorChanged,
       onFilterStrengthChanged: onFilterStrengthChanged,
       onFilterStrengthChangeEnd: onFilterStrengthChangeEnd,
-      onCopyMangaImageQualityChanged: onCopyMangaImageQualityChanged,
-      onPicacgImageQualityChanged: onPicacgImageQualityChanged,
+      onSourceImageQualityChanged: onSourceImageQualityChanged,
       onShowWindowsShortcuts: onShowWindowsShortcuts,
       onClose: onClose,
     );

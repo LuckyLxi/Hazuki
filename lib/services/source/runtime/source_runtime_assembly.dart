@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import '../../../models/hazuki_models.dart';
 import '../account/account_session_capability.dart';
@@ -24,6 +25,10 @@ import '../image/source_image_operations.dart';
 import '../image/source_image_preparation_capability.dart';
 import '../models/source_contract_models.dart';
 import '../models/source_identity.dart';
+import '../plugins/source_plugin_manager.dart';
+import '../plugins/source_plugin_models.dart';
+import '../adapters/hazuki_source_plugin_adapter.dart';
+import '../gateways/source_plugin_gateway.dart';
 import 'source_js_bridge_cookie_capability.dart';
 import 'source_localization_operations.dart';
 import 'source_runtime_capability.dart';
@@ -39,7 +44,6 @@ import 'source_secure_session_storage.dart';
 import '../../logging/app_log_store.dart';
 import 'source_settings_operations.dart';
 
-export '../comments/comments_avatar_support.dart' show normalizeSourceAvatarUrl;
 export '../debug/source_debug_log_store.dart';
 export '../models/source_contract_models.dart';
 export '../models/source_identity.dart';
@@ -51,57 +55,24 @@ export 'source_runtime_kernel.dart';
 export 'source_runtime_registry.dart';
 export 'source_session_store.dart';
 
-const _jmSourceUrls = [
-  'https://cdn.jsdelivr.net/gh/venera-app/venera-configs@main/jm.js',
-];
-
-const _copyMangaSourceUrls = [
-  'https://cdn.jsdelivr.net/gh/venera-app/venera-configs@main/copy_manga.js',
-];
-
-const _picacgSourceUrls = [
-  'https://cdn.jsdelivr.net/gh/venera-app/venera-configs@main/picacg.js',
-];
-
-const _sourceIndexUrls = [
-  'https://cdn.jsdelivr.net/gh/venera-app/venera-configs@main/index.json',
-];
-
 const _bundledInitAssetPath = 'assets/init.js';
-
-const List<SourceCatalogEntry> hazukiAllowedSourceCatalog = [
-  SourceCatalogEntry(
-    key: hazukiDefaultSourceKey,
-    name: 'JMComic',
-    fileName: 'jm.js',
-    directUrls: _jmSourceUrls,
-  ),
-  SourceCatalogEntry(
-    key: 'copy_manga',
-    name: 'CopyManga',
-    fileName: 'copy_manga.js',
-    directUrls: _copyMangaSourceUrls,
-  ),
-  SourceCatalogEntry(
-    key: 'picacg',
-    name: 'Picacg',
-    fileName: 'picacg.js',
-    directUrls: _picacgSourceUrls,
-  ),
-];
+const _sourceIndexUrls = <String>[];
 
 /// Internal composition root for source runtime dependencies.
 ///
 /// Feature and application code consume the focused source gateways instead of
 /// depending on this assembly directly.
 class SourceRuntimeAssembly {
-  SourceRuntimeAssembly({SourceSecureSessionStorage? secureSessionStorage})
-    : _secureSessionStorage =
-          secureSessionStorage ?? FlutterSourceSecureSessionStorage() {
+  SourceRuntimeAssembly({
+    SourceSecureSessionStorage? secureSessionStorage,
+    List<SourceCatalogEntry> initialCatalog = const [],
+    SourcePluginManager? pluginManager,
+  }) : _secureSessionStorage =
+           secureSessionStorage ?? FlutterSourceSecureSessionStorage() {
     _logStore = AppLogStore(secureStorage: _secureSessionStorage);
     _runtimeHost = SourceRuntimeHost(
-      catalog: hazukiAllowedSourceCatalog,
-      defaultSourceKey: hazukiDefaultSourceKey,
+      catalog: initialCatalog,
+      defaultSourceKey: initialCatalog.firstOrNull?.key ?? '',
       secureSessionStorage: _secureSessionStorage,
       ensureSourceInitialized: (sourceKey) =>
           _runtimeCapability.initialization.ensureSourceInitialized(sourceKey),
@@ -110,7 +81,17 @@ class SourceRuntimeAssembly {
       isLoggedForSource: (sourceKey) =>
           _accountCapability.isLoggedForSource(sourceKey),
       logStore: _logStore,
+      onRuntimeState: (id, state) =>
+          plugins.recordRuntimeError(id, state.error),
     );
+    plugins = pluginManager ?? SourcePluginManager();
+    _runtimeHost.runtimeRegistry.historicalPresentationFor =
+        plugins.historicalPresentationFor;
+    // Installation uses local script inspection; init runs when the source is used.
+    plugins.onCatalogChanged = _runtimeHost.replaceCatalog;
+    if (initialCatalog.isEmpty) {
+      _runtimeHost.runtimeRegistry.prepareCatalog = plugins.initialize;
+    }
     _accountCapability = SourceAccountSessionCapability(
       runtimeHost: _runtimeHost,
     );
@@ -126,7 +107,7 @@ class SourceRuntimeAssembly {
     );
     _runtimeCapability = SourceRuntimeCapability(
       runtimeHost: _runtimeHost,
-      scriptStorage: _scriptStorage,
+      scriptStorage: initialCatalog.isEmpty ? plugins : _scriptStorage,
       jsBridgeCookieCapability: _jsBridgeCookieCapability,
       runtimeStateController: _runtimeStateController,
       reloginCoordinator: _reloginCoordinator,
@@ -202,6 +183,17 @@ class SourceRuntimeAssembly {
   }
 
   final SourceSecureSessionStorage _secureSessionStorage;
+  late final SourcePluginManager plugins;
+  late final SourcePluginGateway pluginGateway = HazukiSourcePluginAdapter(
+    plugins,
+    metadataLoader: (id) async {
+      await ensureSourceInitialized(id);
+      return sourceMetadata(id);
+    },
+    settingLoader: _settingsOperations.loadSourceSetting,
+    settingWriter: _settingsOperations.updateSourceSetting,
+    actionRunner: runPluginAction,
+  );
   late final AppLogStore _logStore;
   late final SourceRuntimeHost _runtimeHost;
   late final SourceAccountSessionCapability _accountCapability;
@@ -290,6 +282,21 @@ class SourceRuntimeAssembly {
       SourceRuntimeStateController();
 
   SourceRuntimeRegistry get runtimeRegistry => _runtimeHost.runtimeRegistry;
+  Future<void> ensureSourceInitialized(String id) =>
+      _runtimeOperations.ensureSourceInitialized(id);
+  SourceMeta? sourceMetadata(String id) =>
+      _runtimeHost.handleFor(id).runtime.sourceMeta;
+  Future<dynamic> runPluginAction(String id, String action) async {
+    await ensureSourceInitialized(id);
+    final handle = _runtimeHost.handleFor(id);
+    return handle.runOperation(
+      () async => handle.facade.js.resolve(
+        handle.runtime.engine!.evaluate(
+          'this.__hazuki_source.actions?.[${jsonEncode(action)}]?.()',
+        ),
+      ),
+    );
+  }
 
   @visibleForTesting
   late final SourceRuntimeTestAccess testing = SourceRuntimeTestAccess(
@@ -317,7 +324,15 @@ class SourceRuntimeAssembly {
     _cloudFavoritesChangedController.add(null);
   }
 
-  SourceRuntimeHandle get _activeHandle => _runtimeHost.activeHandle;
+  late final SourceRuntimeHandle _applicationHandle = SourceRuntimeHandle(
+    sourceKey: '__app__',
+    secureStorage: _secureSessionStorage,
+    ensureInitialized: (_) async {},
+    notifyRuntimeStateChanged: (_) {},
+    appLogStore: _logStore,
+  );
+  SourceRuntimeHandle get _activeHandle =>
+      _runtimeHost.optionalActiveHandle ?? _applicationHandle;
 
   SourceRuntimeHandle _handleFor(String sourceKey) {
     return _runtimeHost.handleFor(sourceKey);
@@ -339,12 +354,27 @@ class SourceRuntimeAssembly {
     headers,
   );
 
+  final Map<String, SourceRuntimeHandle> _retainedImageHandles = {};
   ImageCacheCapability _imageCacheForSourceRequest(String sourceKey) {
     final requested = sourceKey.trim();
     if (requested.isEmpty) {
       return _activeHandle.imageCache;
     }
-    return _handleFor(requested).imageCache;
+    if (_runtimeHost.runtimeRegistry.isAllowedSourceKey(requested)) {
+      return _handleFor(requested).imageCache;
+    }
+    final handle = _retainedImageHandles.putIfAbsent(
+      requested,
+      () => SourceRuntimeHandle(
+        sourceKey: requested,
+        secureStorage: _secureSessionStorage,
+        ensureInitialized: (_) async =>
+            throw SourcePluginException('plugin_not_installed', requested),
+        notifyRuntimeStateChanged: (_) {},
+        appLogStore: _logStore,
+      ),
+    );
+    return handle.imageCache;
   }
 
   String _normalizeAllowedSourceKey(String sourceKey) {
@@ -355,7 +385,7 @@ class SourceRuntimeAssembly {
     final requested = requestedSourceKey?.trim() ?? '';
     return requested.isNotEmpty
         ? _normalizeAllowedSourceKey(requested)
-        : _runtimeView.activeSourceKey;
+        : (_runtimeView.activeSourceKey ?? '');
   }
 
   ComicDetailsData? _getComicDetailsFromMemoryCache(
@@ -371,7 +401,7 @@ class SourceRuntimeAssembly {
 
   List<ExploreComic> _parseExploreComics(List list, {String sourceKey = ''}) {
     final resolvedSourceKey = sourceKey.trim().isEmpty
-        ? _runtimeView.activeSourceKey
+        ? (_runtimeView.activeSourceKey ?? '')
         : sourceKey.trim();
     final comics = <ExploreComic>[];
     for (final comic in list) {
@@ -395,6 +425,11 @@ class SourceRuntimeAssembly {
   }
 
   void dispose() {
+    _applicationHandle.requestDispose();
+    for (final handle in _retainedImageHandles.values) {
+      handle.requestDispose();
+    }
+    plugins.dispose();
     _runtimeHost.dispose();
     unawaited(_cloudFavoritesChangedController.close());
   }

@@ -1,3 +1,4 @@
+import '../support/source_catalog_fixtures.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/app/app_preferences.dart';
 import 'package:hazuki/features/comments/state/comments_page_controller.dart';
@@ -151,7 +152,9 @@ void main() {
       final controller = CommentsPageController(
         comicId: 'comic',
         sourceService: (() {
-          final source = SourceRuntimeAssembly();
+          final source = SourceRuntimeAssembly(
+            initialCatalog: hazukiAllowedSourceCatalog,
+          );
           return HazukiSourceCommentsAdapter(
             comments: source.testing.comments,
             debug: source.testing.debug,
@@ -190,7 +193,9 @@ void main() {
       final controller = CommentsPageController(
         comicId: 'comic',
         sourceService: (() {
-          final source = SourceRuntimeAssembly();
+          final source = SourceRuntimeAssembly(
+            initialCatalog: hazukiAllowedSourceCatalog,
+          );
           return HazukiSourceCommentsAdapter(
             comments: source.testing.comments,
             debug: source.testing.debug,

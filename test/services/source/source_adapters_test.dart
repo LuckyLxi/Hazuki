@@ -1,3 +1,4 @@
+import '../../support/source_catalog_fixtures.dart';
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -40,7 +41,9 @@ void main() {
   test(
     'gateway set shares runtime adapters and forwards view notifications',
     () {
-      final assembly = SourceRuntimeAssembly();
+      final assembly = SourceRuntimeAssembly(
+        initialCatalog: hazukiAllowedSourceCatalog,
+      );
       addTearDown(assembly.dispose);
       final gateways = assembly.gateways;
       var notifications = 0;
@@ -60,7 +63,9 @@ void main() {
   test(
     'sync gateway reads the active source through its runtime view',
     () async {
-      final assembly = SourceRuntimeAssembly();
+      final assembly = SourceRuntimeAssembly(
+        initialCatalog: hazukiAllowedSourceCatalog,
+      );
       addTearDown(assembly.dispose);
 
       expect(assembly.gateways.sync.activeSourceKey, 'jm');

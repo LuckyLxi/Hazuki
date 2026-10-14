@@ -37,6 +37,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   intl: ^0.20.2
   dio: ^5.8.0+1
+  html: ^0.15.6
   path_provider: ^2.0.15
   path: ^1.9.1
   shared_preferences: ^2.5.3
@@ -116,6 +117,7 @@ flutter:
 
   assets:
     - assets/init.js
+    - assets/hazuki_plugin_sdk.js
     - assets/data/authors.txt
     - assets/animations/
     - assets/images/

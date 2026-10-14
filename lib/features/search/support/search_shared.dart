@@ -1,7 +1,8 @@
+import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/shared/source_presentation.dart';
 import 'search_contracts.dart';
 import 'package:flutter/material.dart';
 import 'package:hazuki/shared/preferences/hazuki_preference_keys.dart';
-import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/search_history_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -24,31 +25,25 @@ Map<String, String> searchOrderLabels(
   BuildContext context, {
   String sourceKey = '',
 }) {
-  if (sourceKey.trim() == copyMangaSourceKey) {
-    return const {'-': '全部', 'name': '名称', 'author': '作者', 'local': '汉化组'};
-  }
-
-  if (sourceKey.trim() == picacgSourceKey) {
-    final locale = Localizations.localeOf(context);
-    final useChinese = locale.languageCode == 'zh';
-    return {
-      'dd': useChinese ? '新到旧' : 'New to old',
-      'da': useChinese ? '旧到新' : 'Old to new',
-      'ld': useChinese ? '最多喜欢' : 'Most likes',
-      'vd': useChinese ? '最多指名' : 'Most nominated',
-    };
-  }
-
-  final strings = AppLocalizations.of(context)!;
-  return {
-    'mr': strings.searchOrderLatest,
-    'mv': strings.searchOrderTotalRanking,
-    'mv_m': strings.searchOrderMonthlyRanking,
-    'mv_w': strings.searchOrderWeeklyRanking,
-    'mv_t': strings.searchOrderDailyRanking,
-    'mp': strings.searchOrderMostImages,
-    'tf': strings.searchOrderMostLikes,
-  };
+  final options = sourcePresentation(
+    sourceKey,
+    context: context,
+  )['searchOrders'];
+  final language = Localizations.localeOf(context).languageCode;
+  return options is Map
+      ? options.map(
+          (key, value) => MapEntry(
+            key.toString(),
+            value is Map
+                ? (value[language] ??
+                          value['en'] ??
+                          value.values.firstOrNull ??
+                          key)
+                      .toString()
+                : value.toString(),
+          ),
+        )
+      : const {};
 }
 
 String? extractBestComicId(String text) {

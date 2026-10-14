@@ -6,12 +6,18 @@ class SourceCatalogEntry {
     required this.name,
     required this.fileName,
     this.directUrls = const [],
+    this.pluginVersion,
+    this.pluginDirectory,
+    this.presentation = const {},
   });
 
   final String key;
   final String name;
   final String fileName;
   final List<String> directUrls;
+  final String? pluginVersion;
+  final String? pluginDirectory;
+  final Map<String, dynamic> presentation;
 
   String get normalizedKey => key.trim();
   String get normalizedFileName => fileName.trim();

@@ -1,3 +1,4 @@
+import 'package:hazuki/features/settings/view/plugins/source_plugins_page.dart';
 import 'package:hazuki/shared/software_update/software_update_dialog_presenter.dart';
 import 'package:hazuki/services/software_update/software_update_download_service.dart';
 import 'dart:async';
@@ -114,6 +115,7 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
     imageGateway: sl<SourceImageGateway>(),
   );
   final settingsCoreDependencies = SettingsCoreDependencies(
+    sourcePlugins: sl<SourcePluginGateway>(),
     sourceSettings: sl<SourceSettingsGateway>(),
     sourceDebug: sl<SourceDebugGateway>(),
     passwordLock: sl<PasswordLockService>(),
@@ -252,6 +254,8 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
           required onRequestLogin,
         }) {
           return DiscoverPage(
+            pluginPageBuilder: (_) =>
+                SourcePluginsPage(manager: sl<SourcePluginGateway>()),
             sourceService: sl<SourceDiscoverGateway>(),
             recommendationSource: sl<SourceRecommendationGateway>(),
             recommendationService: sl<DiscoverDailyRecommendationService>(),
@@ -368,9 +372,11 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
                 CloudSyncPage(service: settingsCoreDependencies.cloudSync),
             labSettingsPageBuilder: (_) => LabSettingsPage(
               sourceService: settingsCoreDependencies.sourceRuntime,
+              sourcePlugins: sl<SourcePluginGateway>(),
             ),
             advancedSettingsPageBuilder: (_) => AdvancedSettingsPage(
               sourceService: settingsCoreDependencies.sourceAdvanced,
+              sourcePlugins: sl<SourcePluginGateway>(),
               softwareUpdateService: settingsCoreDependencies.softwareUpdate,
               logsPageBuilder: (_) =>
                   LogsPage(debugGateway: settingsCoreDependencies.sourceDebug),
@@ -385,6 +391,7 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
           );
         },
     buildLinesPage: (_) => LineSettingsPage(
+      sourcePlugins: sl<SourcePluginGateway>(),
       sourceService: settingsCoreDependencies.sourceSettings,
     ),
     buildAnnouncementsPage: (_) =>

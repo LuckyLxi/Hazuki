@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:hazuki/l10n/l10n.dart';
 
 import 'package:flutter/material.dart';
 
@@ -36,12 +37,14 @@ class DiscoverPage extends StatefulWidget {
     this.onSearchTap,
     this.searchPageBuilder,
     this.onRequestLogin,
+    this.pluginPageBuilder,
     this.allowInitialLoad = true,
     this.hideLoadingUntilInitialLoadAllowed = false,
     this.comicCoverHeroTagBuilder = comicCoverHeroTag,
   });
 
   final SourceDiscoverGateway sourceService;
+  final WidgetBuilder? pluginPageBuilder;
   final SourceRecommendationGateway recommendationSource;
   final DiscoverDailyRecommendationService recommendationService;
   final AnnouncementController? announcementService;
@@ -295,6 +298,31 @@ class _DiscoverPageState extends State<DiscoverPage> {
 
   @override
   Widget build(BuildContext context) {
+    if ((widget.sourceService.activeSourceKey?.isEmpty ?? true)) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(l10n(context).pluginsEmpty, textAlign: TextAlign.center),
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                icon: const Icon(Icons.extension_outlined),
+                label: Text(l10n(context).pluginsTitle),
+                onPressed: widget.pluginPageBuilder == null
+                    ? null
+                    : () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: widget.pluginPageBuilder!,
+                        ),
+                      ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
     return Stack(
       children: [
         DiscoverPageBody(

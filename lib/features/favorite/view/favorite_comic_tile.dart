@@ -1,3 +1,4 @@
+import 'package:hazuki/shared/source_presentation.dart';
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/models/hazuki_models.dart';
@@ -131,10 +132,14 @@ class _FavoriteComicTileState extends State<FavoriteComicTile> {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ],
-                  if (widget.comic.sourceKey == 'picacg' &&
+                  if (sourceFeature(
+                        widget.comic.sourceKey,
+                        'showTags',
+                        context: context,
+                      ) &&
                       widget.comic.tags.isNotEmpty) ...[
                     const SizedBox(height: 6),
-                    PicacgComicTags(
+                    SourceComicTags(
                       sourceKey: widget.comic.sourceKey,
                       tags: widget.comic.tags,
                     ),

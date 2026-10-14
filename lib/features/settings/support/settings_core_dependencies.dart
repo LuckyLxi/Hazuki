@@ -23,6 +23,7 @@ class SettingsCoreDependencies {
     required this.sourceAdvanced,
     required this.sourceScript,
     required this.sourceUpdate,
+    this.sourcePlugins,
   });
 
   final SourceSettingsGateway sourceSettings;
@@ -39,4 +40,5 @@ class SettingsCoreDependencies {
   final SourceAdvancedGateway sourceAdvanced;
   final SourceScriptGateway sourceScript;
   final SourceUpdateGateway sourceUpdate;
+  final SourcePluginGateway? sourcePlugins;
 }

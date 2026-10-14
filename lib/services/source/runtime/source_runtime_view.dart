@@ -2,14 +2,14 @@ import 'package:flutter/foundation.dart';
 
 import '../../../models/hazuki_models.dart';
 import '../models/source_contract_models.dart';
-import '../models/source_identity.dart';
 import 'source_runtime_host.dart';
 import 'source_runtime_operations.dart';
 import 'source_runtime_registry.dart';
 
 abstract interface class SourceRuntimeView implements Listenable {
   SourceRuntimeRegistry get runtimeRegistry;
-  String get activeSourceKey;
+  String? get activeSourceKey;
+  String? get sourceRevision;
   bool get isActiveJmSource;
   bool get isActiveCopyMangaSource;
   bool get isActiveDailyCheckInSource;
@@ -37,34 +37,42 @@ class SourceRuntimeViewService implements SourceRuntimeView {
   @override
   SourceRuntimeRegistry get runtimeRegistry => _runtimeHost.runtimeRegistry;
   @override
-  String get activeSourceKey => _runtimeHost.activeSourceKey;
+  String? get activeSourceKey =>
+      _runtimeHost.hasActiveSource ? _runtimeHost.activeSourceKey : null;
   @override
-  bool get isActiveJmSource => isHazukiJmSourceKey(activeSourceKey);
+  String? get sourceRevision {
+    final id = activeSourceKey;
+    if (id == null) return null;
+    final entry = runtimeRegistry.definitionFor(id);
+    return '$id|${entry.pluginVersion}|${entry.pluginDirectory}';
+  }
+
   @override
-  bool get isActiveCopyMangaSource =>
-      isHazukiCopyMangaSourceKey(activeSourceKey);
+  bool get isActiveJmSource => _runtimeHost.feature('directComicId');
   @override
-  bool get isActiveDailyCheckInSource =>
-      isHazukiJmSourceKey(activeSourceKey) ||
-      isHazukiPicacgSourceKey(activeSourceKey);
+  bool get isActiveCopyMangaSource => _runtimeHost.feature('legacyRanking');
+  @override
+  bool get isActiveDailyCheckInSource => _runtimeHost.supportsDailyCheckIn;
   @override
   bool get isInitialized {
-    final runtime = _runtimeHost.activeHandle.runtime;
+    final runtime = _runtimeHost.optionalActiveHandle?.runtime;
+    if (runtime == null) return false;
     return runtime.engine != null && runtime.sourceMeta != null;
   }
 
   @override
-  SourceMeta? get sourceMeta => _runtimeHost.activeHandle.runtime.sourceMeta;
+  SourceMeta? get sourceMeta =>
+      _runtimeHost.optionalActiveHandle?.runtime.sourceMeta;
   @override
   SourceRuntimeState get sourceRuntimeState =>
-      _runtimeHost.activeHandle.runtime.runtimeState;
+      _runtimeHost.optionalActiveHandle?.runtime.runtimeState ??
+      const SourceRuntimeState.idle();
   @override
-  SourceRuntimeState get runtimeState =>
-      _runtimeHost.activeHandle.facade.runtimeState;
+  SourceRuntimeState get runtimeState => sourceRuntimeState;
 
   @override
   Future<void> loadActiveSourcePreference() =>
-      _runtimeHost.loadActiveSourcePreference();
+      runtimeRegistry.loadActiveSourcePreference();
   @override
   Future<void> activateSource(String sourceKey) =>
       _runtimeHost.activateSource(sourceKey);

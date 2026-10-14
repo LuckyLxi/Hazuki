@@ -1,10 +1,10 @@
+import 'package:hazuki/shared/source_presentation.dart';
 import 'comic_detail_destination_route.dart';
 import 'package:hazuki/shared/appearance/appearance_settings_scope.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/shared/comments/comments_widget_builder.dart';
 import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 
@@ -80,22 +80,26 @@ class _ComicDetailPageState extends State<ComicDetailPage>
   late final ComicDetailThemeController _themeController;
   late final ComicDetailActionsController _actionsController;
   late final ComicDetailFavoriteController _favoriteController;
-  late final bool _supportsJmExclusiveActions;
-  late final bool _supportsComicLikeAction;
+  late final bool _supportsRelatedTab;
 
   @override
   void initState() {
     super.initState();
     final comicSourceKey = widget.comic.sourceKey.trim().isNotEmpty
         ? widget.comic.sourceKey
-        : widget.dependencies.source.activeSourceKey;
+        : (widget.dependencies.source.activeSourceKey ?? '');
     _repository =
         widget.repository ??
         widget.dependencies.createFacade(sourceKey: comicSourceKey);
-    _supportsJmExclusiveActions = isHazukiJmSourceKey(comicSourceKey);
-    _supportsComicLikeAction =
-        isHazukiJmSourceKey(comicSourceKey) ||
-        isHazukiPicacgSourceKey(comicSourceKey);
+    _supportsRelatedTab =
+        sourceButton(
+          comicSourceKey,
+          'relatedComics',
+          SourcePluginButtonLocation.comicDetailTabs,
+          context: context,
+          listen: false,
+        ) !=
+        null;
     _initializeControllers();
     _uiStateController.initialize(initialAppBarTitle: widget.comic.title);
     _sessionController.initialize();
@@ -228,7 +232,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
       initialTabIndex: widget.initialTabIndex,
       vsync: this,
       scrollController: _scrollController,
-      includeRelatedTab: _supportsJmExclusiveActions,
+      includeRelatedTab: _supportsRelatedTab,
     );
   }
 
@@ -253,8 +257,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
       theme: _themeController,
       actions: _actionsController,
       favorite: _favoriteController,
-      supportsJmExclusiveActions: _supportsJmExclusiveActions,
-      supportsComicLikeAction: _supportsComicLikeAction,
+      supportsRelatedTab: _supportsRelatedTab,
       child: AnimatedTheme(
         data: theme,
         duration: const Duration(milliseconds: 360),

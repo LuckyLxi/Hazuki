@@ -93,7 +93,7 @@ void main() {
       ),
     ).thenAnswer((_) async {});
     when(() => preferences.loadSortOrder()).thenAnswer((_) async => 'mr');
-    when(() => local.loadFavoriteFolders(sourceKey: 'jm')).thenAnswer(
+    when(() => local.loadFavoriteFolders()).thenAnswer(
       (_) async => FavoriteFoldersResult.success(
         favoritedFolderIds: const {},
         folders: const [
@@ -109,11 +109,16 @@ void main() {
       () => local.loadFavoriteComics(
         page: 1,
         folderId: 'local',
-        sortOrder: 'mr',
-        sourceKey: 'jm',
+        sortOrder: 'savedNewest',
+        sourceKey: '',
       ),
     ).thenAnswer((_) async => FavoriteComicsResult.success([_comic('local')]));
     controller = FavoritePageController(
+      presentationFor: (key) => {
+        'refreshCloudFavorites': true,
+        'favoriteDefaultOrder': 'mr',
+        'localFavoriteOrders': {'mr': 'savedNewest', 'mp': 'updatedNewest'},
+      },
       sourceService: source,
       localFavoritesRepository: local,
       localFavoritesPreferences: preferences,
@@ -129,16 +134,14 @@ void main() {
     await controller.loadInitial(timeoutMessage: 'timeout');
     await controller.toggleMode(timeoutMessage: 'timeout');
     final pending = Completer<FavoriteFoldersResult>();
-    when(
-      () => local.loadFavoriteFolders(sourceKey: 'jm'),
-    ).thenAnswer((_) => pending.future);
+    when(() => local.loadFavoriteFolders()).thenAnswer((_) => pending.future);
     when(() => preferences.saveSortOrder('mp')).thenAnswer((_) async {});
     when(
       () => local.loadFavoriteComics(
         page: 1,
         folderId: 'local',
-        sortOrder: 'mp',
-        sourceKey: 'jm',
+        sortOrder: 'updatedNewest',
+        sourceKey: '',
       ),
     ).thenAnswer((_) async => FavoriteComicsResult.success([_comic('sorted')]));
 

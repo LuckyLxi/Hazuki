@@ -21,7 +21,7 @@ class HazukiSourceImageAdapter implements SourceImageGateway {
   final SourceRuntimeView _runtime;
 
   @override
-  String get activeSourceKey => _runtime.activeSourceKey;
+  String? get activeSourceKey => _runtime.activeSourceKey;
   @override
   Uint8List? peekImageBytesFromMemory(String url, {String sourceKey = ''}) =>
       _image.peekImageBytesFromMemory(url, sourceKey: sourceKey);
@@ -62,7 +62,7 @@ class HazukiSourceRecommendationAdapter implements SourceRecommendationGateway {
   final SourceImageOperations _image;
 
   @override
-  String get activeSourceKey => _runtime.activeSourceKey;
+  String? get activeSourceKey => _runtime.activeSourceKey;
   @override
   Uint8List? peekImageBytesFromMemory(String url, {String sourceKey = ''}) =>
       _image.peekImageBytesFromMemory(url, sourceKey: sourceKey);
@@ -144,7 +144,7 @@ class HazukiSourceDailyRecommendationAdapter
   final SourceImageOperations _image;
 
   @override
-  String get activeSourceKey => runtime.activeSourceKey;
+  String? get activeSourceKey => runtime.activeSourceKey;
   @override
   bool get isActiveJmSource => runtime.isActiveJmSource;
   @override

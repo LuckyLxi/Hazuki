@@ -13,7 +13,6 @@ class AdvancedSettingsContent extends StatelessWidget {
     required this.autoSoftwareUpdateCheckEnabled,
     required this.softwareUpdateSource,
     required this.hasCustomEditedSource,
-    required this.showCopyMangaSettings,
     required this.logsPageBuilder,
     required this.onToggleNoImageMode,
     required this.onToggleSoftwareLogCaptureEnabled,
@@ -22,7 +21,8 @@ class AdvancedSettingsContent extends StatelessWidget {
     required this.onSoftwareUpdateSourceChanged,
     required this.onOpenComicSourceEditor,
     required this.onRestoreComicSource,
-    required this.onClearCopyMangaDeviceInfo,
+    this.sourceDeviceAction,
+    this.footer,
   });
 
   final bool loading;
@@ -32,7 +32,6 @@ class AdvancedSettingsContent extends StatelessWidget {
   final bool autoSoftwareUpdateCheckEnabled;
   final SoftwareUpdateSource softwareUpdateSource;
   final bool hasCustomEditedSource;
-  final bool showCopyMangaSettings;
   final WidgetBuilder logsPageBuilder;
   final ValueChanged<bool> onToggleNoImageMode;
   final ValueChanged<bool> onToggleSoftwareLogCaptureEnabled;
@@ -41,7 +40,8 @@ class AdvancedSettingsContent extends StatelessWidget {
   final ValueChanged<SoftwareUpdateSource> onSoftwareUpdateSourceChanged;
   final Future<void> Function() onOpenComicSourceEditor;
   final Future<void> Function() onRestoreComicSource;
-  final Future<void> Function() onClearCopyMangaDeviceInfo;
+  final Widget? sourceDeviceAction;
+  final Widget? footer;
 
   @override
   Widget build(BuildContext context) {
@@ -124,13 +124,7 @@ class AdvancedSettingsContent extends StatelessWidget {
                 ],
               ),
             ),
-            if (showCopyMangaSettings)
-              ListTile(
-                leading: const Icon(Icons.phonelink_erase_outlined),
-                title: Text(strings.advancedCopyMangaClearDeviceTitle),
-                subtitle: Text(strings.advancedCopyMangaClearDeviceSubtitle),
-                onTap: onClearCopyMangaDeviceInfo,
-              ),
+            ?sourceDeviceAction,
             ListTile(
               leading: const Icon(Icons.javascript_rounded),
               title: Text(strings.advancedEditSourceTitle),
@@ -174,6 +168,7 @@ class AdvancedSettingsContent extends StatelessWidget {
             ),
           ],
         ),
+        ?footer,
       ],
     );
   }

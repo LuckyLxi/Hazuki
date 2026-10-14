@@ -4,20 +4,6 @@ const searchLoadTimeout = Duration(seconds: 25);
 const searchHistoryCollapsedMaxRows = 4;
 const searchHistoryChipSpacing = 8.0;
 const jmSearchSourceKey = 'jm';
-const searchOrderKeys = <String>{
-  'mr',
-  'mv',
-  'mv_m',
-  'mv_w',
-  'mv_t',
-  'mp',
-  'tf',
-};
-const copyMangaSourceKey = 'copy_manga';
-const copyMangaSearchModeKeys = <String>{'-', 'name', 'author', 'local'};
-const picacgSourceKey = 'picacg';
-const picacgSearchOrderKeys = <String>{'dd', 'da', 'ld', 'vd'};
-
 typedef SearchPageLoader =
     Future<SearchComicsResult> Function({
       required String keyword,

@@ -96,6 +96,7 @@ class SourceRuntimeRecoveryOperations {
   }
 
   Future<bool> refreshSourceOnNetworkRecovery() {
+    if (!_runtimeHost.hasActiveSource) return Future.value(false);
     final handle = _runtimeHost.activeHandle;
     return handle.runOperation(() => _refreshSource(handle));
   }

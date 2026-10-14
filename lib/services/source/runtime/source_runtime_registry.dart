@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../models/source_contract_models.dart';
+import '../plugins/source_presentation_metadata.dart';
 
 class SourceRuntimeRegistry extends ChangeNotifier {
   SourceRuntimeRegistry({
@@ -21,7 +22,7 @@ class SourceRuntimeRegistry extends ChangeNotifier {
        _currentAccountForSource = currentAccountForSource,
        _isLoggedForSource = isLoggedForSource;
 
-  final List<SourceCatalogEntry> _allowedSources;
+  List<SourceCatalogEntry> _allowedSources;
   final String Function() _activeSourceKey;
   final SourceCatalogEntry Function(String sourceKey) _definitionFor;
   final Future<void> Function() _loadActiveSourcePreference;
@@ -29,10 +30,32 @@ class SourceRuntimeRegistry extends ChangeNotifier {
   final Future<void> Function({String? sourceKey}) _ensureInitialized;
   final String? Function(String sourceKey) _currentAccountForSource;
   final bool Function(String sourceKey) _isLoggedForSource;
+  Future<void> Function()? prepareCatalog;
+  SourcePresentationReader historicalPresentationFor = emptySourcePresentation;
+
+  Map<String, dynamic> presentationFor(String sourceKey) =>
+      isAllowedSourceKey(sourceKey)
+      ? definitionFor(sourceKey.trim()).presentation
+      : const {};
+
+  Map<String, dynamic> displayPresentationFor(String sourceKey) =>
+      isAllowedSourceKey(sourceKey)
+      ? presentationFor(sourceKey)
+      : historicalSourcePresentation(
+          historicalPresentationFor(sourceKey.trim()),
+        );
 
   List<SourceCatalogEntry> get allowedSources => _allowedSources;
-  String get activeSourceKey => _activeSourceKey();
-  SourceCatalogEntry activeSourceDefinition() => definitionFor(activeSourceKey);
+  String? get activeSourceKey =>
+      _activeSourceKey().isEmpty ? null : _activeSourceKey();
+  bool get hasActiveSource => activeSourceKey != null;
+  void replaceCatalog(List<SourceCatalogEntry> sources, {bool notify = true}) {
+    _allowedSources = List.unmodifiable(sources);
+    if (notify) notifyListeners();
+  }
+
+  SourceCatalogEntry? activeSourceDefinition() =>
+      activeSourceKey == null ? null : definitionFor(activeSourceKey!);
   SourceCatalogEntry definitionFor(String sourceKey) =>
       _definitionFor(sourceKey);
   bool isAllowedSourceKey(String sourceKey) {
@@ -40,7 +63,11 @@ class SourceRuntimeRegistry extends ChangeNotifier {
     return allowedSources.any((entry) => entry.normalizedKey == normalized);
   }
 
-  Future<void> loadActiveSourcePreference() => _loadActiveSourcePreference();
+  Future<void> loadActiveSourcePreference() async {
+    await prepareCatalog?.call();
+    await _loadActiveSourcePreference();
+  }
+
   Future<void> activateSource(String sourceKey) => _activateSource(sourceKey);
   Future<void> ensureInitialized({String? sourceKey}) =>
       _ensureInitialized(sourceKey: sourceKey);

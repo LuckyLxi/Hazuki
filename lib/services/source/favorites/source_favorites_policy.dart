@@ -1,4 +1,3 @@
-import '../models/source_identity.dart';
 import '../runtime/source_runtime_facade.dart';
 import '../runtime/source_runtime_host.dart';
 
@@ -73,84 +72,52 @@ class SourceFavoritesPolicy {
       _evaluateActive('!!this.__hazuki_source.comic?.sendComment');
   bool get supportCommentLike =>
       _evaluateActive('!!this.__hazuki_source.comic?.likeComment');
-  bool get supportFavoriteSortOrder => _evaluateActive(
-    '!!(this.__hazuki_source.settings?.favoriteOrder || this.__hazuki_source.settings?.favorites_ordering || this.__hazuki_source.settings?.favoriteSort)',
-  );
+  bool get supportFavoriteSortOrder => favoriteSortOrders.length > 1;
 
   bool _evaluateActive(String expression) {
+    if (!_runtimeHost.hasActiveSource) return false;
     final facade = _activeFacade;
     final engine = facade.js.engine;
     return engine != null && facade.js.asBool(facade.js.evaluate(expression));
   }
 
+  Map<String, dynamic> get _options => {
+    ...(_runtimeHost.hasActiveSource
+        ? _runtimeHost.definitionFor(_runtimeHost.activeSourceKey).presentation
+        : <String, dynamic>{}),
+    ...?_runtimeHost.optionalActiveHandle?.runtime.sourceMeta?.presentation,
+  };
   String get favoriteSortOrder {
-    final facade = _activeFacade;
-    final sourceMeta = facade.sourceMeta;
-    if (sourceMeta == null) return 'mr';
-    final options = favoriteSortOrders;
-    if (isHazukiCopyMangaSourceKey(sourceMeta.key)) {
-      final value = facade
-          .loadSourceSetting(sourceMeta.key, 'favorites_ordering')
-          ?.toString()
-          .trim();
-      return options.contains(value) ? value! : '-datetime_updated';
-    }
-    if (isHazukiPicacgSourceKey(sourceMeta.key)) {
-      final value = facade
-          .loadSourceSetting(sourceMeta.key, 'favoriteSort')
-          ?.toString()
-          .trim();
-      return options.contains(value) ? value! : 'dd';
-    }
-    final value = facade
-        .loadSourceSetting(sourceMeta.key, 'favoriteOrder')
-        ?.toString()
-        .trim();
-    return value == 'mp' ? 'mp' : 'mr';
+    if (!_runtimeHost.hasActiveSource) return '';
+    final key = _options['favoriteOrderSetting']?.toString() ?? 'favoriteOrder';
+    final value =
+        _activeFacade
+            .loadSourceSetting(_activeFacade.sourceKey, key)
+            ?.toString() ??
+        '';
+    return favoriteSortOrders.contains(value)
+        ? value
+        : (_options['favoriteDefaultOrder']?.toString() ??
+              favoriteSortOrders.firstOrNull ??
+              '');
   }
 
   Future<void> setFavoriteSortOrder(String order) async {
-    final facade = _activeFacade;
-    final sourceMeta = facade.sourceMeta;
-    if (sourceMeta == null) throw Exception('source_not_initialized');
-    final requested = order.trim();
-    if (isHazukiCopyMangaSourceKey(sourceMeta.key)) {
-      await facade.saveSourceSetting(
-        sourceMeta.key,
-        'favorites_ordering',
-        favoriteSortOrders.contains(requested)
-            ? requested
-            : '-datetime_updated',
-      );
-      return;
-    }
-    if (isHazukiPicacgSourceKey(sourceMeta.key)) {
-      await facade.saveSourceSetting(
-        sourceMeta.key,
-        'favoriteSort',
-        favoriteSortOrders.contains(requested) ? requested : 'dd',
-      );
-      return;
-    }
-    await facade.saveSourceSetting(
-      sourceMeta.key,
-      'favoriteOrder',
-      requested == 'mp' ? 'mp' : 'mr',
+    final resolvedOrder = favoriteSortOrders.contains(order)
+        ? order
+        : _options['favoriteDefaultOrder']?.toString() ??
+              favoriteSortOrders.firstOrNull ??
+              '';
+    if (resolvedOrder.isEmpty) throw StateError('favorite_sort_not_supported');
+    await _activeFacade.saveSourceSetting(
+      _activeFacade.sourceKey,
+      _options['favoriteOrderSetting']?.toString() ?? 'favoriteOrder',
+      resolvedOrder,
     );
   }
 
-  List<String> get favoriteSortOrders {
-    final sourceMeta = _activeFacade.sourceMeta;
-    if (sourceMeta != null && isHazukiCopyMangaSourceKey(sourceMeta.key)) {
-      return const [
-        '-datetime_updated',
-        '-datetime_modifier',
-        '-datetime_browse',
-      ];
-    }
-    if (sourceMeta != null && isHazukiPicacgSourceKey(sourceMeta.key)) {
-      return const ['dd', 'da'];
-    }
-    return const ['mr', 'mp'];
-  }
+  List<String> get favoriteSortOrders =>
+      (_options['favoriteOrders'] as List? ?? const [])
+          .map((v) => v.toString())
+          .toList();
 }

@@ -35,6 +35,7 @@ class SourceImageNetworkDownloader {
   factory SourceImageNetworkDownloader.forFacade(HazukiSourceFacade facade) {
     return SourceImageNetworkDownloader(
       resolveLoadConfig: (url, comicId, epId) async {
+        await facade.ensureInitialized();
         final engine = facade.js.engine;
         if (engine == null) return null;
         final raw = engine.evaluate(
@@ -45,6 +46,7 @@ class SourceImageNetworkDownloader {
       },
       resolveCookie: facade.httpGateway.buildCookieHeader,
       requestBytes: (url, headers) async {
+        await facade.ensureInitialized();
         final response = await facade.httpGateway.getBytes(
           url,
           headers: headers,
@@ -68,9 +70,14 @@ class SourceImageNetworkDownloader {
     String? epId,
   }) async {
     final headers = <String, dynamic>{};
+    var requestUrl = url;
     try {
       final config = await _resolveLoadConfig(url, comicId ?? '', epId ?? '');
       if (config is Map) {
+        final configuredUrl = config['url'];
+        if (configuredUrl is String && configuredUrl.trim().isNotEmpty) {
+          requestUrl = configuredUrl;
+        }
         final rawHeaders = config['headers'];
         if (rawHeaders is Map) {
           headers.addAll(Map<String, dynamic>.from(rawHeaders));
@@ -78,12 +85,14 @@ class SourceImageNetworkDownloader {
       }
     } catch (_) {}
 
-    final cookie = _resolveCookie(url);
-    if (cookie != null && cookie.isNotEmpty && !headers.containsKey('cookie')) {
+    final cookie = _resolveCookie(requestUrl);
+    if (cookie != null &&
+        cookie.isNotEmpty &&
+        !headers.keys.any((key) => key.toLowerCase() == 'cookie')) {
       headers['cookie'] = cookie;
     }
 
-    final response = await _requestBytes(url, headers);
+    final response = await _requestBytes(requestUrl, headers);
     final data = response.data;
     if (response.statusCode != 200 || data == null || data.isEmpty) {
       throw Exception('image_download_failed:${response.statusCode ?? -1}');

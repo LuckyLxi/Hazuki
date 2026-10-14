@@ -1,6 +1,9 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
+Map<String, dynamic> jsAsMap(dynamic raw) =>
+    raw is Map ? Map<String, dynamic>.from(raw) : <String, dynamic>{};
+
 bool jsAsBool(dynamic value) {
   if (value is bool) {
     return value;

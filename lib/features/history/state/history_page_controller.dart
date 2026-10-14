@@ -4,7 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/read_history_service.dart';
-import 'package:hazuki/shared/picacg_comic_tags.dart';
+import 'package:hazuki/shared/source_comic_tags.dart';
+import 'package:hazuki/services/source/plugins/source_presentation_metadata.dart';
 
 import 'history_page_state.dart';
 
@@ -13,10 +14,17 @@ class HistoryPageController extends ChangeNotifier {
     required ReadHistoryService readHistoryService,
     required SourceSelectionGateway sourceService,
     SourceReaderGateway? readerService,
+    SourcePresentationReader presentationFor = emptySourcePresentation,
   }) : _readHistoryService = readHistoryService,
        _sourceService = sourceService,
        _readerService = readerService,
-       _activeSourceKey = _normalizeSourceKey(sourceService.activeSourceKey) {
+       _presentationFor = presentationFor,
+       _activeSourceKey = _normalizeSourceKey(
+         (sourceService.activeSourceKey ?? ''),
+       ) {
+    _lastSourceCatalog = _sourceService.allowedSources
+        .map((source) => source.key)
+        .join('|');
     _readHistoryService.addListener(_handleReadHistoryChanged);
     _sourceService.addListener(_handleSourceChanged);
   }
@@ -24,6 +32,7 @@ class HistoryPageController extends ChangeNotifier {
   final ReadHistoryService _readHistoryService;
   final SourceSelectionGateway _sourceService;
   final SourceReaderGateway? _readerService;
+  final SourcePresentationReader _presentationFor;
   final HistoryPageData _state = HistoryPageData();
 
   bool _disposed = false;
@@ -31,6 +40,7 @@ class HistoryPageController extends ChangeNotifier {
   int _autoReloadPauseDepth = 0;
   bool _hasDeferredHistoryChange = false;
   String _activeSourceKey;
+  late String _lastSourceCatalog;
 
   List<ExploreComic> get history => _state.history;
   bool get loading => _state.loading;
@@ -173,7 +183,12 @@ class HistoryPageController extends ChangeNotifier {
       notifyListeners();
     }
 
-    final history = await _readHistoryService.loadHistory(sourceKey: sourceKey);
+    final history = await _readHistoryService.loadHistory(
+      sourceKey: sourceKey,
+      availableSourceKeys: _sourceService.allowedSources
+          .map((source) => source.key)
+          .toSet(),
+    );
     if (_disposed ||
         requestVersion != _requestVersion ||
         sourceKey != _activeSourceKey) {
@@ -216,8 +231,12 @@ class HistoryPageController extends ChangeNotifier {
         List<Future<void>>.generate(end - start, (offset) async {
           final index = start + offset;
           final comic = comics[index];
-          if (comic.sourceKey.trim().toLowerCase() != 'picacg' ||
-              comic.tags.isNotEmpty) {
+          final presentation = _presentationFor(comic.sourceKey);
+          if (presentation['enrichMissingTags'] != true ||
+              comic.tags.isNotEmpty ||
+              !_sourceService.allowedSources.any(
+                (source) => source.key == comic.sourceKey,
+              )) {
             return;
           }
           try {
@@ -231,7 +250,11 @@ class HistoryPageController extends ChangeNotifier {
             )) {
               return;
             }
-            final tags = picacgComicDetailTags(details);
+            final tags = sourceComicDetailTags(details, presentation);
+            if (_presentationFor(comic.sourceKey)['enrichMissingTags'] !=
+                true) {
+              return;
+            }
             if (tags.isEmpty) return;
             comics[index] = comic.copyWith(tags: tags);
             unawaited(
@@ -275,20 +298,42 @@ class HistoryPageController extends ChangeNotifier {
     required String sourceKey,
     required List<ExploreComic> history,
   }) {
-    return _readHistoryService.replaceSourceHistory(
-      sourceKey: sourceKey,
-      history: history,
-    );
+    return Future.wait(
+      _state.history
+          .map((comic) => comic.sourceKey)
+          .toSet()
+          .map(
+            (key) => _readHistoryService.replaceSourceHistory(
+              sourceKey: key,
+              history: history
+                  .where((comic) => comic.sourceKey == key)
+                  .toList(),
+            ),
+          ),
+    ).then((_) {});
   }
 
   Future<void> _deleteSourceHistoryEntries({
     required String sourceKey,
     required Set<String> storageKeys,
   }) {
-    return _readHistoryService.deleteSourceHistoryEntries(
-      sourceKey: sourceKey,
-      storageKeys: storageKeys,
+    final selected = _state.history.where(
+      (comic) => storageKeys.contains(comic.scopedId.storageKey),
     );
+    return Future.wait(
+      selected
+          .map((comic) => comic.sourceKey)
+          .toSet()
+          .map(
+            (key) => _readHistoryService.deleteSourceHistoryEntries(
+              sourceKey: key,
+              storageKeys: selected
+                  .where((comic) => comic.sourceKey == key)
+                  .map((comic) => comic.scopedId.storageKey)
+                  .toSet(),
+            ),
+          ),
+    ).then((_) {});
   }
 
   void _handleReadHistoryChanged() {
@@ -300,10 +345,17 @@ class HistoryPageController extends ChangeNotifier {
   }
 
   void _handleSourceChanged() {
-    final nextSourceKey = _normalizeSourceKey(_sourceService.activeSourceKey);
-    if (nextSourceKey == _activeSourceKey) {
+    final nextSourceKey = _normalizeSourceKey(
+      (_sourceService.activeSourceKey ?? ''),
+    );
+    final nextCatalog = _sourceService.allowedSources
+        .map((source) => source.key)
+        .join('|');
+    if (nextSourceKey == _activeSourceKey &&
+        nextCatalog == _lastSourceCatalog) {
       return;
     }
+    _lastSourceCatalog = nextCatalog;
     _activeSourceKey = nextSourceKey;
     _state.clearSelection();
     unawaited(_loadHistory(markLoading: true));
@@ -320,5 +372,5 @@ class HistoryPageController extends ChangeNotifier {
 
 String _normalizeSourceKey(String sourceKey) {
   final normalized = sourceKey.trim();
-  return normalized.isEmpty ? hazukiDefaultSourceKey : normalized;
+  return normalized;
 }

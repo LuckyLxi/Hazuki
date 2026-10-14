@@ -11,6 +11,9 @@ import 'package:pointycastle/block/modes/ecb.dart';
 import '../common/source_json_coerce.dart';
 import 'source_runtime_facade.dart';
 import 'source_runtime_handle.dart';
+import 'source_html_bridge.dart';
+import '../plugins/source_plugin_models.dart';
+import '../plugins/source_plugin_localization.dart';
 
 /// Handles the JavaScript host bridge and its cookie operations.
 class SourceJsBridgeCookieCapability {
@@ -41,13 +44,39 @@ class SourceJsBridgeCookieCapability {
 
   dynamic handleJsMessageForHandle(
     SourceRuntimeHandle handle,
-    dynamic message,
-  ) {
+    dynamic message, {
+    SourceHtmlBridge? htmlBridge,
+  }) {
     if (message is! Map) return null;
     final map = Map<String, dynamic>.from(message);
     final method = map['method']?.toString();
     dynamic result;
+    if (handle.isDisposed) throw StateError('plugin_runtime_disposed');
     switch (method) {
+      case 'html':
+        result = (htmlBridge ?? handle.htmlBridge).handleOperation(map);
+        break;
+      case 'secret_get':
+      case 'secret_set':
+      case 'secret_delete':
+        final key = map['secret_key']?.toString() ?? '';
+        if (!RegExp(r'^[a-zA-Z0-9_.-]{1,64}$').hasMatch(key)) {
+          throw const SourcePluginException('plugin_invalid_secret_key');
+        }
+        final scoped = 'hazuki_plugin_secret_v1:${handle.sourceKey}:$key';
+        result = method == 'secret_get'
+            ? handle.secureStorage.read(scoped)
+            : method == 'secret_delete'
+            ? handle.secureStorage.delete(scoped)
+            : handle.secureStorage.write(scoped, map['value'].toString());
+        break;
+      case 'save_setting':
+        result = handle.facade.saveSourceSetting(
+          _requireScopedSourceKey(handle, map),
+          map['setting_key']?.toString() ?? '',
+          map['value'],
+        );
+        break;
       case 'http':
         result = handle.facade.httpGateway.sendJsHttpRequest(map);
         break;
@@ -74,9 +103,14 @@ class SourceJsBridgeCookieCapability {
         );
         break;
       case 'load_setting':
-        result = handle.facade.loadSourceSetting(
-          _requireScopedSourceKey(handle, map),
-          map['setting_key']?.toString() ?? '',
+        final settingKey = map['setting_key']?.toString() ?? '';
+        result = handle.session.loadSourceSetting(
+          sourceKey: _requireScopedSourceKey(handle, map),
+          settingKey: settingKey,
+          sourceMeta: handle.runtime.sourceMeta,
+          settingsDefaults: map.containsKey('default_value')
+              ? {settingKey: map['default_value']}
+              : null,
         );
         break;
       case 'isLogged':
@@ -97,7 +131,7 @@ class SourceJsBridgeCookieCapability {
         result = _convert(map);
         break;
       case 'getLocale':
-        result = 'zh_CN';
+        result = sourcePluginLocaleTag(handle.session.prefs);
         break;
       case 'getPlatform':
         final os = Platform.operatingSystem;

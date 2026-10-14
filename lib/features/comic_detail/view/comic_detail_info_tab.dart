@@ -1,10 +1,10 @@
+import 'package:hazuki/shared/source_presentation.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/services/source/source_capabilities.dart';
 
 import '../support/comic_detail_scope.dart';
 import 'comic_detail_expandable_description.dart';
@@ -39,7 +39,14 @@ class ComicDetailInfoTab extends StatelessWidget {
     final actions = ComicDetailScope.of(context).actions;
     return ComicDetailMetaSection(
       details: details,
-      showComicId: isHazukiJmSourceKey(details.sourceKey),
+      showComicId:
+          sourceButton(
+            details.sourceKey,
+            'copyComicId',
+            SourcePluginButtonLocation.comicDetailInfo,
+            context: context,
+          ) !=
+          null,
       onCopyId: (id) => unawaited(actions.copyComicId(context, id)),
       onTagValuePressed: (v) => unawaited(actions.openTagValue(context, v)),
       onMetaValueLongPress: (v) => unawaited(actions.copyMetaValue(context, v)),
@@ -88,8 +95,19 @@ class ComicDetailInfoTab extends StatelessWidget {
     if (shouldAnimate) {
       uiState.markInfoEntranceAnimated();
     }
-    final showComicId = isHazukiJmSourceKey(resolvedDetails.sourceKey);
-    final isPicacg = isHazukiPicacgSourceKey(resolvedDetails.sourceKey);
+    final showComicId =
+        sourceButton(
+          resolvedDetails.sourceKey,
+          'copyComicId',
+          SourcePluginButtonLocation.comicDetailInfo,
+          context: context,
+        ) !=
+        null;
+    final isPicacg = sourceFeature(
+      resolvedDetails.sourceKey,
+      'showUploader',
+      context: context,
+    );
     final hasVisibleMeta =
         (showComicId && resolvedDetails.id.trim().isNotEmpty) ||
         resolvedDetails.tags.isNotEmpty ||

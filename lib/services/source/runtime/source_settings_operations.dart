@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'source_runtime_host.dart';
 
 /// Active-source settings and runtime line configuration operations.
@@ -13,7 +14,8 @@ class SourceSettingsOperations {
       _runtimeHost.activeHandle.lineSettings.updateSetting(key, value);
 
   Object? loadActiveSourceSetting(String key) {
-    final handle = _runtimeHost.activeHandle;
+    final handle = _runtimeHost.optionalActiveHandle;
+    if (handle == null) return null;
     return handle.facade.loadSourceSetting(handle.sourceKey, key);
   }
 
@@ -23,6 +25,11 @@ class SourceSettingsOperations {
   }
 
   Object? loadSourceSetting(String sourceKey, String key) {
+    if (!_runtimeHost.runtimeRegistry.isAllowedSourceKey(
+      sourceKey.isEmpty ? _runtimeHost.activeSourceKey : sourceKey,
+    )) {
+      return null;
+    }
     final resolvedSourceKey = _resolveSourceKey(sourceKey);
     return _runtimeHost
         .handleFor(resolvedSourceKey)
@@ -37,29 +44,19 @@ class SourceSettingsOperations {
   ) {
     final resolvedSourceKey = _resolveSourceKey(sourceKey);
     final facade = _runtimeHost.handleFor(resolvedSourceKey).facade;
-    return facade.ensurePrefs().then(
-      (_) => facade.saveSourceSetting(resolvedSourceKey, key, value),
-    );
-  }
-
-  Future<void> clearCopyMangaDeviceInfo() async {
-    const sourceKey = 'copy_manga';
-    final handle = _runtimeHost.handleFor(sourceKey);
-    await handle.facade.deleteSourceData(sourceKey, '_deviceinfo');
-    await handle.facade.deleteSourceData(sourceKey, '_device');
-    await handle.facade.deleteSourceData(sourceKey, '_pseudoid');
-    final engine = handle.runtime.engine;
-    if (engine == null || _runtimeHost.activeSourceKey != sourceKey) return;
-    final hasRefreshAppApi = handle.facade.js.asBool(
-      engine.evaluate('!!this.__hazuki_source.refreshAppApi'),
-    );
-    if (hasRefreshAppApi) {
-      final result = engine.evaluate(
-        'this.__hazuki_source.refreshAppApi()',
-        name: 'copy_manga_refresh_app_api.js',
-      );
-      await handle.facade.js.resolve(result);
-    }
+    return facade.handle.runOperation(() async {
+      await facade.ensurePrefs();
+      await facade.saveSourceSetting(resolvedSourceKey, key, value);
+      final engine = facade.js.engine;
+      if (engine != null) {
+        await facade.js.resolve(
+          engine.evaluate(
+            'this.__hazuki_source.settings?.[${jsonEncode(key)}]?.onChanged?.(${jsonEncode(value)})',
+          ),
+        );
+      }
+      facade.cache.clearMemory();
+    });
   }
 
   Future<void> refreshLines({

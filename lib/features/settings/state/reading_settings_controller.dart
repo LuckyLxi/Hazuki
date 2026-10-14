@@ -14,7 +14,7 @@ class ReadingSettingsController extends ChangeNotifier {
        _settingsStore = settingsStore {
     sourceImageQuality = ReaderSourceImageQualitySettings.load(
       _sourceService,
-      _sourceService.activeSourceKey,
+      (_sourceService.activeSourceKey ?? ''),
     );
   }
 
@@ -49,7 +49,7 @@ class ReadingSettingsController extends ChangeNotifier {
     final settings = await _settingsStore.load();
     final sourceSettings = ReaderSourceImageQualitySettings.load(
       _sourceService,
-      _sourceService.activeSourceKey,
+      (_sourceService.activeSourceKey ?? ''),
     );
     if (_disposed) {
       return;
@@ -161,42 +161,19 @@ class ReadingSettingsController extends ChangeNotifier {
     await _settingsStore.saveLongPressToSave(value);
   }
 
-  Future<void> updateCopyMangaImageQuality(String? value) async {
+  Future<void> updateSourceImageQuality(String? value) async {
     if (value == null) {
       return;
     }
-    final normalized =
-        ReaderSourceImageQualitySettings.normalizeCopyMangaImageQuality(value);
-    if (normalized == sourceImageQuality.copyMangaImageQuality) {
+    final normalized = sourceImageQuality.normalize(value);
+    if (normalized == sourceImageQuality.value) {
       return;
     }
-    sourceImageQuality = sourceImageQuality.copyWith(
-      copyMangaImageQuality: normalized,
-    );
+    sourceImageQuality = sourceImageQuality.copyWith(value: normalized);
     _notify();
-    await ReaderSourceImageQualitySettings.updateCopyMangaImageQuality(
+    await ReaderSourceImageQualitySettings.updateImageQuality(
       _sourceService,
-      _sourceService.activeSourceKey,
-      normalized,
-    );
-  }
-
-  Future<void> updatePicacgImageQuality(String? value) async {
-    if (value == null) {
-      return;
-    }
-    final normalized =
-        ReaderSourceImageQualitySettings.normalizePicacgImageQuality(value);
-    if (normalized == sourceImageQuality.picacgImageQuality) {
-      return;
-    }
-    sourceImageQuality = sourceImageQuality.copyWith(
-      picacgImageQuality: normalized,
-    );
-    _notify();
-    await ReaderSourceImageQualitySettings.updatePicacgImageQuality(
-      _sourceService,
-      _sourceService.activeSourceKey,
+      (_sourceService.activeSourceKey ?? ''),
       normalized,
     );
   }

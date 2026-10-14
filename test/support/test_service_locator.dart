@@ -1,3 +1,4 @@
+import 'source_catalog_fixtures.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_assembly.dart';
 import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
@@ -15,6 +16,7 @@ Future<void> ensureTestServiceLocator() async {
   );
   sl.registerLazySingleton<SourceRuntimeAssembly>(
     () => SourceRuntimeAssembly(
+      initialCatalog: hazukiAllowedSourceCatalog,
       secureSessionStorage: MemorySourceSecureSessionStorage(),
     ),
   );

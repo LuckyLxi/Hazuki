@@ -1,3 +1,4 @@
+import '../support/source_catalog_fixtures.dart';
 import 'dart:async';
 import 'dart:typed_data';
 import 'dart:convert';
@@ -215,67 +216,6 @@ void main() {
     expect(registry.isAllowedSourceKey('not-allowed'), isFalse);
   });
 
-  test('CopyManga avatar path is normalized to its CDN URL', () {
-    expect(
-      normalizeSourceAvatarUrl(
-        sourceKey: 'copy_manga',
-        avatar: 'user/cover/d91eed225c6811efbb8d06be79e70c23/177130.jpg',
-      ),
-      'https://s3.mangafuna.xyz/user/cover/d91eed225c6811efbb8d06be79e70c23/177130.jpg',
-    );
-    expect(
-      normalizeSourceAvatarUrl(
-        sourceKey: 'copy_manga',
-        avatar:
-            'https://s3.mangafuna.xyz/user/cover/d91eed225c6811efbb8d06be79e70c23/177130.jpg',
-      ),
-      'https://s3.mangafuna.xyz/user/cover/d91eed225c6811efbb8d06be79e70c23/177130.jpg',
-    );
-  });
-
-  test('relative non-CopyManga avatar path uses image base when available', () {
-    expect(
-      normalizeSourceAvatarUrl(
-        sourceKey: hazukiDefaultSourceKey,
-        avatar: '/media/users/123.jpg',
-        imageBase: 'https://cdn.example.com/images/',
-      ),
-      'https://cdn.example.com/media/users/123.jpg',
-    );
-    expect(
-      normalizeSourceAvatarUrl(
-        sourceKey: hazukiDefaultSourceKey,
-        avatar: 'media/users/123.jpg',
-      ),
-      isNull,
-    );
-  });
-
-  test('Picacg avatar object uses fullUrl or fileServer static path', () {
-    expect(
-      normalizeSourceAvatarUrl(
-        sourceKey: 'picacg',
-        avatar: {
-          'fullUrl': 'https://storage-b.picacomic.com/static/tobs/avatar.jpg',
-          'path': 'ignored.jpg',
-          'fileServer': 'https://unused.example.com',
-        },
-      ),
-      'https://storage-b.picacomic.com/static/tobs/avatar.jpg',
-    );
-
-    expect(
-      normalizeSourceAvatarUrl(
-        sourceKey: 'picacg',
-        avatar: {
-          'path': 'tobs/94d06234-fe51-4194-b8fb-434e02b5dae2.jpg',
-          'fileServer': 'https://storage-b.picacomic.com',
-        },
-      ),
-      'https://storage-b.picacomic.com/static/tobs/94d06234-fe51-4194-b8fb-434e02b5dae2.jpg',
-    );
-  });
-
   test(
     'legacy source secrets migrate to secure storage on prefs init',
     () async {
@@ -298,6 +238,7 @@ void main() {
       });
       final secureStorage = MemorySourceSecureSessionStorage();
       final service = SourceRuntimeAssembly(
+        initialCatalog: hazukiAllowedSourceCatalog,
         secureSessionStorage: secureStorage,
       );
 
@@ -352,6 +293,7 @@ void main() {
       final secureStorage = MemorySourceSecureSessionStorage()
         ..failWrites = true;
       final service = SourceRuntimeAssembly(
+        initialCatalog: hazukiAllowedSourceCatalog,
         secureSessionStorage: secureStorage,
       );
 
@@ -396,6 +338,7 @@ void main() {
         },
       );
       final service = SourceRuntimeAssembly(
+        initialCatalog: hazukiAllowedSourceCatalog,
         secureSessionStorage: secureStorage,
       );
 
@@ -420,7 +363,10 @@ void main() {
       }),
     });
     final secureStorage = MemorySourceSecureSessionStorage();
-    final service = SourceRuntimeAssembly(secureSessionStorage: secureStorage);
+    final service = SourceRuntimeAssembly(
+      initialCatalog: hazukiAllowedSourceCatalog,
+      secureSessionStorage: secureStorage,
+    );
     final handle = SourceRuntimeHandle(
       sourceKey: hazukiDefaultSourceKey,
       secureStorage: secureStorage,
@@ -510,6 +456,7 @@ void main() {
       });
       final secureStorage = MemorySourceSecureSessionStorage();
       final service = SourceRuntimeAssembly(
+        initialCatalog: hazukiAllowedSourceCatalog,
         secureSessionStorage: secureStorage,
       );
       await service.testing.facade.ensurePrefs();

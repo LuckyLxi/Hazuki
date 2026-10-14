@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/plugins/source_presentation_metadata.dart';
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
@@ -20,10 +21,15 @@ class FavoritePageController extends ChangeNotifier {
   FavoritePageController({
     required SourceFavoriteGateway sourceService,
     SourceReaderGateway? readerService,
+    SourcePresentationReader presentationFor = emptySourcePresentation,
     required LocalFavoritesRepository localFavoritesRepository,
     required LocalFavoritesPreferencesStore localFavoritesPreferences,
   }) : _sourceService = sourceService,
-       _tagLoader = FavoriteComicTagLoader(readerService),
+       _sourcePolicy = FavoriteSourcePolicy(presentationFor: presentationFor),
+       _tagLoader = FavoriteComicTagLoader(
+         readerService,
+         presentationFor: presentationFor,
+       ),
        _selectionStore = FavoriteSelectionStore(localFavoritesPreferences),
        _localFavoritesRepository = localFavoritesRepository,
        _cloudFlow = FavoriteCloudFlow(sourceService),
@@ -32,7 +38,11 @@ class FavoritePageController extends ChangeNotifier {
          preferences: localFavoritesPreferences,
        ) {
     _lastActiveSourceKey = _activeSourceKey;
-    _listLoader = FavoriteListLoader(cloud: _cloudFlow, local: _localFlow);
+    _listLoader = FavoriteListLoader(
+      cloud: _cloudFlow,
+      local: _localFlow,
+      presentationFor: presentationFor,
+    );
     _changes = FavoriteChangeCoordinator(
       localChanges: _localFavoritesRepository,
       cloudChanges: _sourceService.cloudFavoritesChangedStream,
@@ -50,7 +60,7 @@ class FavoritePageController extends ChangeNotifier {
 
   final SourceFavoriteGateway _sourceService;
   final FavoriteComicTagLoader _tagLoader;
-  final FavoriteSourcePolicy _sourcePolicy = const FavoriteSourcePolicy();
+  final FavoriteSourcePolicy _sourcePolicy;
   final FavoriteCloudFlow _cloudFlow;
   final FavoriteLocalFlow _localFlow;
   final LocalFavoritesRepository _localFavoritesRepository;
@@ -117,7 +127,7 @@ class FavoritePageController extends ChangeNotifier {
       _state.mode == FavoritePageMode.cloud && !_cloudFlow.isLogged;
 
   bool get supportsFolderLoad => true;
-  String get _activeSourceKey => _sourceService.activeSourceKey;
+  String get _activeSourceKey => (_sourceService.activeSourceKey ?? '');
 
   bool get supportsFolderDelete => _state.mode == FavoritePageMode.local
       ? true
@@ -470,11 +480,7 @@ class FavoritePageController extends ChangeNotifier {
     }
 
     try {
-      await _localFlow.renameFolder(
-        folderId: normalizedFolderId,
-        name: name,
-        sourceKey: _activeSourceKey,
-      );
+      await _localFlow.renameFolder(folderId: normalizedFolderId, name: name);
       if (_disposed) {
         return null;
       }
@@ -496,6 +502,7 @@ class FavoritePageController extends ChangeNotifier {
     final normalized = _sourcePolicy.normalizeSortOrder(
       order,
       allowedOrders: allowedOrders,
+      sourceKey: _activeSourceKey,
     );
     if (normalized == _state.favoriteSortOrder) {
       return null;
@@ -575,7 +582,7 @@ class FavoritePageController extends ChangeNotifier {
 
     try {
       if (_state.mode == FavoritePageMode.local) {
-        await _localFlow.deleteFolder(currentId, sourceKey: _activeSourceKey);
+        await _localFlow.deleteFolder(currentId);
         _state.selectedLocalFolderId = '';
         await _saveSelectedFolderId(FavoritePageMode.local, '');
         await _reloadLocalFolders();
@@ -625,6 +632,7 @@ class FavoritePageController extends ChangeNotifier {
     _state.favoriteSortOrder = _sourcePolicy.normalizeSortOrder(
       _state.favoriteSortOrder,
       allowedOrders: _favoriteSortOrders,
+      sourceKey: _activeSourceKey,
     );
     unawaited(_restoreModeForActiveSource());
   }
@@ -671,6 +679,7 @@ class FavoritePageController extends ChangeNotifier {
   ) async {
     final tagsByComic = await _tagLoader.load(
       result,
+      isCurrent: () => _isCurrent(request),
       onTagsLoaded: (comic, tags) {
         if (_isCurrent(request) && request.mode == FavoritePageMode.local) {
           unawaited(
@@ -703,6 +712,7 @@ class FavoritePageController extends ChangeNotifier {
     _state.favoriteSortOrder = _sourcePolicy.normalizeSortOrder(
       sortOrder,
       allowedOrders: _favoriteSortOrders,
+      sourceKey: _activeSourceKey,
     );
     await _reloadLocalFolders(notifyChanges: notifyIntermediate);
     if (!_isCurrent(requestVersion)) return;
@@ -821,7 +831,7 @@ class FavoritePageController extends ChangeNotifier {
       _notify();
     }
 
-    final result = await _localFlow.loadFoldersForSource(request.sourceKey);
+    final result = await _localFlow.loadFolders();
     if (!_isCurrentFolderRequest(request)) {
       return;
     }

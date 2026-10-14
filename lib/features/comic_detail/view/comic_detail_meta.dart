@@ -1,7 +1,7 @@
+import 'package:hazuki/shared/source_presentation.dart';
 import 'package:flutter/material.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/services/source/source_capabilities.dart';
 
 List<String> normalizeComicMetaValues(List<String> rawValues, {String? label}) {
   final values = <String>[];
@@ -120,8 +120,16 @@ class ComicDetailMetaSection extends StatelessWidget {
     final chineseTeamLabel = strings.comicDetailChineseTeam;
     const jmWorkLabel = '\u4f5c\u54c1';
     const jmActorLabel = '\u89d2\u8272';
-    final isJm = isHazukiJmSourceKey(details.sourceKey);
-    final isPicacg = isHazukiPicacgSourceKey(details.sourceKey);
+    final isJm = sourceFeature(
+      details.sourceKey,
+      'showComicId',
+      context: context,
+    );
+    final isPicacg = sourceFeature(
+      details.sourceKey,
+      'showUploader',
+      context: context,
+    );
     final categoryValues = normalizeComicMetaValues(
       details.tags.entries
           .where((entry) => isComicCategoryKey(entry.key))

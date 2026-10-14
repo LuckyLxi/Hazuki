@@ -89,7 +89,7 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
     if (explicit.isNotEmpty) {
       return explicit;
     }
-    return gateway.activeSourceKey;
+    return (gateway.activeSourceKey ?? '');
   }
 
   String get _resolvedSourceKey => _sourceKeySnapshot;
@@ -580,7 +580,7 @@ class _HazukiCachedCircleAvatarState extends State<HazukiCachedCircleAvatar> {
   }
 
   String _resolveSourceKey(SourceImageGateway gateway) {
-    return gateway.activeSourceKey;
+    return (gateway.activeSourceKey ?? '');
   }
 
   void _resetWithoutImage() {

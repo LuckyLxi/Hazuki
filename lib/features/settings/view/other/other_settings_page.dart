@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:hazuki/shared/source_presentation.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/widgets/widgets.dart';
@@ -9,6 +10,7 @@ import 'other_settings_sections.dart';
 import '../settings_group.dart';
 import '../../support/other_settings_actions.dart';
 import '../../support/settings_core_dependencies.dart';
+import '../plugins/source_plugin_action_widgets.dart';
 
 class OtherSettingsPage extends StatefulWidget {
   const OtherSettingsPage({
@@ -147,7 +149,12 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
                     discoverDailyRecommendationEnabled:
                         _snapshot.discoverDailyRecommendationEnabled,
                     showAutoCheckInSetting:
-                        _sourceService.isActiveDailyCheckInSource,
+                        activeSourceButton(
+                          context,
+                          'autoCheckIn',
+                          SourcePluginButtonLocation.other,
+                        ) !=
+                        null,
                     showJmExclusiveSettings: _sourceService.isActiveJmSource,
                     useSystemTitleBar: _snapshot.useSystemTitleBar,
                     mangaDownloadsRootPath: _snapshot.mangaDownloadsRootPath,
@@ -162,6 +169,11 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
                         unawaited(_editMangaDownloadPath()),
                     onCommentFilter: () => unawaited(_openCommentFilter()),
                   ),
+                  if (widget.dependencies.sourcePlugins case final plugins?)
+                    SourcePluginActionList(
+                      gateway: plugins,
+                      location: SourcePluginActionLocation.other,
+                    ),
                 ],
               ),
       ),

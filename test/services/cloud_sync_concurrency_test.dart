@@ -1,3 +1,4 @@
+import '../support/source_catalog_fixtures.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -413,7 +414,9 @@ Future<_TestDevice> _createDevice(
   final database = HazukiDatabase.memory();
   final favorites = LocalFavoritesService(database: database);
   final groups = DownloadGroupsService(database: database);
-  final source = SourceRuntimeAssembly();
+  final source = SourceRuntimeAssembly(
+    initialCatalog: hazukiAllowedSourceCatalog,
+  );
   final readHistory = ReadHistoryService(database: database);
   final readingProgress = ReadingProgressService(database: database);
   final searchHistory = SearchHistoryService(database: database);

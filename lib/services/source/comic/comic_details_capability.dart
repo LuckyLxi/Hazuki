@@ -94,7 +94,7 @@ class SourceComicDetailsCapability {
     required bool Function() shouldCacheResult,
   }) async {
     var handle = initialHandle;
-    var recoveringFromHttp210 = false;
+    var recoveringRuntime = false;
     for (var attempt = 0; attempt < 2; attempt++) {
       final facade = handle.facade;
       try {
@@ -109,21 +109,19 @@ class SourceComicDetailsCapability {
         }
       } catch (error) {
         if (!handle.recreationRequested || attempt == 1) {
-          if (attempt == 1 && recoveringFromHttp210) {
-            throw Exception(
-              'copy_manga_runtime_recovery_failed_after_http_210:$error',
-            );
+          if (attempt == 1 && recoveringRuntime) {
+            throw Exception('source_runtime_recovery_failed:$error');
           }
           rethrow;
         }
       }
 
       if (attempt == 1) {
-        throw Exception('copy_manga_runtime_recovery_failed_after_http_210');
+        throw Exception('source_runtime_recovery_failed');
       }
-      recoveringFromHttp210 = true;
+      recoveringRuntime = true;
       facade.addApplicationLog(
-        title: 'Recreating source runtime after HTTP 210',
+        title: 'Recreating source runtime as requested by plugin',
         level: 'warning',
         source: 'source_runtime',
         content: {'sourceKey': sourceKey, 'comicId': normalizedComicId},
@@ -191,7 +189,9 @@ class SourceComicDetailsCapability {
       sourceKey: sourceKey,
     );
 
-    if (shouldCacheResult()) {
+    if (shouldCacheResult() &&
+        !facade.handle.isDisposed &&
+        identical(_runtimeHost.handleFor(sourceKey).facade, facade)) {
       _cache.put(
         SourceScopedComicId(
           sourceKey: details.sourceKey,
@@ -232,12 +232,10 @@ class SourceComicDetailsCapability {
       }
 
       if (attempt == 1) {
-        throw Exception(
-          'copy_manga_chapter_images_recovery_failed_after_http_210',
-        );
+        throw Exception('source_chapter_images_recovery_failed');
       }
       facade.addApplicationLog(
-        title: 'Recreating source runtime after HTTP 210',
+        title: 'Recreating source runtime as requested by plugin',
         level: 'warning',
         source: 'source_runtime',
         content: {
@@ -291,7 +289,9 @@ class SourceComicDetailsCapability {
     if (engine == null) return false;
     try {
       return jsAsBool(
-        engine.evaluate('!!this.__hazuki_source.comic?.likeComic'),
+        engine.evaluate(
+          'typeof this.__hazuki_source.comic?.likeComic === "function"',
+        ),
       );
     } catch (_) {
       return false;
@@ -299,13 +299,20 @@ class SourceComicDetailsCapability {
   }
 
   bool supportComicLikeForSource(String sourceKey) {
+    if (!_runtimeHost.runtimeRegistry.isAllowedSourceKey(
+      sourceKey.isEmpty ? _runtimeHost.activeSourceKey : sourceKey,
+    )) {
+      return false;
+    }
     final resolvedSourceKey = _resolveActiveSourceKey(sourceKey);
     final targetFacade = _runtimeHost.handleFor(resolvedSourceKey).facade;
     final engine = targetFacade.js.engine;
     if (engine == null) return false;
     try {
       return targetFacade.js.asBool(
-        engine.evaluate('!!this.__hazuki_source.comic?.likeComic'),
+        engine.evaluate(
+          'typeof this.__hazuki_source.comic?.likeComic === "function"',
+        ),
       );
     } catch (_) {
       return false;
@@ -331,7 +338,9 @@ class SourceComicDetailsCapability {
         throw Exception('source_not_initialized');
       }
       if (!jsAsBool(
-        engine.evaluate('!!this.__hazuki_source.comic?.likeComic'),
+        engine.evaluate(
+          'typeof this.__hazuki_source.comic?.likeComic === "function"',
+        ),
       )) {
         throw Exception('comic_like_not_supported');
       }

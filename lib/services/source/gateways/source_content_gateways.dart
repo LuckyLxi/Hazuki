@@ -4,7 +4,7 @@ import '../../../models/hazuki_models.dart';
 import '../models/source_contract_models.dart';
 
 abstract interface class SourceSearchGateway implements Listenable {
-  String get activeSourceKey;
+  String? get activeSourceKey;
   bool get isActiveJmSource;
   SourceRuntimeState get sourceRuntimeState;
   List<SourceCatalogEntry> get allowedSources;
@@ -23,7 +23,9 @@ abstract interface class SourceSearchGateway implements Listenable {
 }
 
 abstract interface class SourceDiscoverGateway implements Listenable {
-  String get activeSourceKey;
+  bool? get requiresLogin;
+  String? get sourceRevision;
+  String? get activeSourceKey;
   bool get isLogged;
   SourceRuntimeState get sourceRuntimeState;
 
@@ -100,7 +102,7 @@ abstract interface class SourceCommentsGateway {
 }
 
 abstract interface class SourceComicDetailGateway {
-  String get activeSourceKey;
+  String? get activeSourceKey;
   bool isLoggedForSource(String sourceKey);
   bool supportFavoriteFolderLoadForSource(String sourceKey);
   bool supportFavoriteFolderAddForSource(String sourceKey);
@@ -160,7 +162,7 @@ abstract interface class SourceComicDetailGateway {
 }
 
 abstract interface class SourceFavoriteGateway implements Listenable {
-  String get activeSourceKey;
+  String? get activeSourceKey;
   bool get isLogged;
   bool get supportFavoriteFolderDelete;
   bool get supportFavoriteFolderAdd;

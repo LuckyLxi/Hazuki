@@ -23,6 +23,9 @@ doc/api/
 *.js_
 *.js.deps
 *.js.map
+!assets/hazuki_plugin_sdk.js
+!plugins/**/main.js
+plugins/node_modules/
 
 .flutter-plugins
 .flutter-plugins-dependencies

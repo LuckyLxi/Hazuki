@@ -331,7 +331,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
   Future<void> _onSearchOrderSelected(String order) async {
     final orderLabels = searchOrderLabels(
       context,
-      sourceKey: _sourceService.activeSourceKey,
+      sourceKey: (_sourceService.activeSourceKey ?? ''),
     );
     if (!orderLabels.containsKey(order) || order == _searchOrder) {
       return;
@@ -359,7 +359,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
     final strings = AppLocalizations.of(context)!;
     return searchOrderLabels(
           context,
-          sourceKey: _sourceService.activeSourceKey,
+          sourceKey: (_sourceService.activeSourceKey ?? ''),
         )[_searchOrder] ??
         strings.searchOrderLatest;
   }
@@ -418,7 +418,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
     await _submissionCoordinator.submit(
       keyword: keyword,
       aggregate: _aggregateSearchEnabled,
-      activeSourceKey: _sourceService.activeSourceKey,
+      activeSourceKey: (_sourceService.activeSourceKey ?? ''),
       messages: searchMessages(context),
     );
   }
@@ -556,7 +556,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
       title: _buildSearchResultsAppBarTitle(),
       orderLabels: searchOrderLabels(
         context,
-        sourceKey: _sourceService.activeSourceKey,
+        sourceKey: (_sourceService.activeSourceKey ?? ''),
       ),
       currentOrderLabel: _currentSearchOrderLabel,
       searchOrder: _searchOrder,

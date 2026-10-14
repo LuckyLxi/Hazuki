@@ -11,7 +11,6 @@ export 'view/appearance/display_mode_settings_page.dart';
 
 export 'view/debug/favorites_debug_page.dart';
 export 'view/debug/lab_settings_page.dart';
-export 'view/debug/source_account_lab_page.dart';
 
 export 'view/network/cloud_sync_page.dart';
 export 'view/network/line_settings_page.dart';

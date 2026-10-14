@@ -1,3 +1,4 @@
+import '../support/source_catalog_fixtures.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:get_it/get_it.dart';
 import 'package:hazuki/app/service_locator.dart';
@@ -29,7 +30,9 @@ void main() {
 
   test('keeps composition-root overrides when registering', () async {
     final services = GetIt.asNewInstance();
-    final assembly = SourceRuntimeAssembly();
+    final assembly = SourceRuntimeAssembly(
+      initialCatalog: hazukiAllowedSourceCatalog,
+    );
     addTearDown(services.reset);
     services.registerSingleton<SourceRuntimeAssembly>(assembly);
 

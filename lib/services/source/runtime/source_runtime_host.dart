@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../common/source_prefs_keys.dart';
 import '../models/source_contract_models.dart';
+import '../plugins/source_plugin_buttons.dart';
 import 'source_runtime_coordinator.dart';
 import 'source_runtime_handle.dart';
 import 'source_runtime_registry.dart';
@@ -23,6 +24,7 @@ class SourceRuntimeHost extends ChangeNotifier {
     required String? Function(String sourceKey) currentAccountForSource,
     required bool Function(String sourceKey) isLoggedForSource,
     AppLogStore? logStore,
+    this.onRuntimeState,
   }) : _catalog = List.unmodifiable(catalog),
        logStore = logStore ?? AppLogStore(),
        _secureSessionStorage = secureSessionStorage,
@@ -48,19 +50,43 @@ class SourceRuntimeHost extends ChangeNotifier {
     );
   }
 
-  final List<SourceCatalogEntry> _catalog;
+  List<SourceCatalogEntry> _catalog;
   final SourceSecureSessionStorage _secureSessionStorage;
   final Future<void> Function(String sourceKey) _ensureSourceInitialized;
   final String? Function(String sourceKey) _currentAccountForSource;
   final bool Function(String sourceKey) _isLoggedForSource;
   final AppLogStore logStore;
+  final void Function(String, SourceRuntimeState)? onRuntimeState;
 
   late final SourceRuntimeCoordinator<SourceRuntimeHandle> _coordinator;
   late final SourceRuntimeRegistry runtimeRegistry;
+  bool _preferenceLoaded = false;
 
   List<SourceCatalogEntry> get catalog => _catalog;
   String get activeSourceKey => _coordinator.activeSourceKey;
+  bool get hasActiveSource => activeSourceKey.isNotEmpty;
+  SourceRuntimeHandle? get optionalActiveHandle =>
+      hasActiveSource ? activeHandle : null;
+  bool feature(String key) =>
+      hasActiveSource &&
+      (optionalActiveHandle?.runtime.sourceMeta?.presentation[key] ??
+              definitionFor(activeSourceKey).presentation[key]) ==
+          true;
+  bool get supportsDailyCheckIn {
+    if (!hasActiveSource) return false;
+    final buttons =
+        optionalActiveHandle?.runtime.sourceMeta?.presentation['buttons'] ??
+        definitionFor(activeSourceKey).presentation['buttons'];
+    return feature('dailyCheckIn') ||
+        SourcePluginButton.parseList(
+          buttons,
+        ).any((button) => button.id == 'checkIn' || button.id == 'autoCheckIn');
+  }
+
   SourceRuntimeHandle get activeHandle => _coordinator.activeHandle;
+  Iterable<SourceRuntimeHandle> get existingHandles => _catalog
+      .map((source) => _coordinator.existingHandle(source.key))
+      .whereType<SourceRuntimeHandle>();
 
   SourceRuntimeHandle handleFor(String sourceKey) =>
       _coordinator.handleFor(sourceKey);
@@ -69,12 +95,14 @@ class SourceRuntimeHost extends ChangeNotifier {
       _coordinator.definitionFor(sourceKey);
 
   String normalize(String sourceKey) => _coordinator.normalize(sourceKey);
+  bool isCurrentHandle(SourceRuntimeHandle handle) =>
+      identical(_coordinator.existingHandle(handle.sourceKey), handle);
 
   Future<void> loadActiveSourcePreference() async {
     SharedPreferences? loadedPreferences;
     await _coordinator.loadActiveSourcePreference(
       readSavedSourceKey: () async {
-        final prefs = await activeHandle.session.ensurePrefs();
+        final prefs = await SharedPreferences.getInstance();
         loadedPreferences = prefs;
         for (final source in _catalog) {
           final session = handleFor(source.key).session;
@@ -88,6 +116,7 @@ class SourceRuntimeHost extends ChangeNotifier {
         sourceKey,
       ),
     );
+    _preferenceLoaded = true;
   }
 
   Future<void> activateSource(String sourceKey) {
@@ -101,6 +130,16 @@ class SourceRuntimeHost extends ChangeNotifier {
         );
       },
     );
+  }
+
+  Future<void> replaceCatalog(List<SourceCatalogEntry> catalog) async {
+    _catalog = List.unmodifiable(catalog);
+    runtimeRegistry.replaceCatalog(catalog, notify: false);
+    await _coordinator.replaceCatalog(catalog);
+    if (_preferenceLoaded) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(SourcePrefsKeys.activeSourceKey, activeSourceKey);
+    }
   }
 
   SourceRuntimeHandle? remove(String sourceKey) =>
@@ -120,6 +159,10 @@ class SourceRuntimeHost extends ChangeNotifier {
 
   /// Publishes changes initiated by an active runtime handle.
   void notifyActiveRuntimeChanged(String sourceKey) {
+    final current = _coordinator.existingHandle(sourceKey);
+    if (current != null) {
+      onRuntimeState?.call(sourceKey, current.runtime.runtimeState);
+    }
     if (activeSourceKey == sourceKey) {
       _notifyChanged();
     } else {
@@ -133,7 +176,7 @@ class SourceRuntimeHost extends ChangeNotifier {
     ensureInitialized: _ensureSourceInitialized,
     notifyRuntimeStateChanged: notifyActiveRuntimeChanged,
     appLogStore: logStore,
-  );
+  )..pluginDirectory = definitionFor(sourceKey).pluginDirectory;
 
   void _notifyChanged() {
     notifyListeners();

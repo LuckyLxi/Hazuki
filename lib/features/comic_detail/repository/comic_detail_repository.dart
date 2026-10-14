@@ -24,7 +24,7 @@ class ComicDetailFeatureFacade implements FavoriteFoldersRepository {
        _readingProgress = readingProgress,
        _readHistory = readHistory,
        _sourceKey = sourceKey.trim().isEmpty
-           ? source.activeSourceKey
+           ? (source.activeSourceKey ?? '')
            : sourceKey.trim();
 
   final SourceComicDetailGateway _source;

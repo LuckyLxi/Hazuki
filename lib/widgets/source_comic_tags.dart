@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import '../shared/source_presentation.dart';
 
-class PicacgComicTags extends StatelessWidget {
-  const PicacgComicTags({
+class SourceComicTags extends StatelessWidget {
+  const SourceComicTags({
     super.key,
     required this.sourceKey,
     required this.tags,
@@ -12,7 +13,8 @@ class PicacgComicTags extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (sourceKey != 'picacg' || tags.isEmpty) {
+    if (!sourceFeature(sourceKey, 'showTags', context: context) ||
+        tags.isEmpty) {
       return const SizedBox.shrink();
     }
 

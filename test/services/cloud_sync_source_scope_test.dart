@@ -1,3 +1,4 @@
+import '../support/source_catalog_fixtures.dart';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -35,7 +36,9 @@ class _CloudSyncFixture {
 
   factory _CloudSyncFixture.create() {
     final database = HazukiDatabase.memory();
-    final source = SourceRuntimeAssembly();
+    final source = SourceRuntimeAssembly(
+      initialCatalog: hazukiAllowedSourceCatalog,
+    );
     final readHistory = ReadHistoryService(database: database);
     final readingProgress = ReadingProgressService(database: database);
     final localFavorites = LocalFavoritesService(database: database);

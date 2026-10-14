@@ -11,11 +11,17 @@ import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
 import 'settings_group.dart';
+import 'plugins/source_plugin_action_widgets.dart';
 
 class ReadingSettingsPage extends StatefulWidget {
-  const ReadingSettingsPage({super.key, required this.sourceService});
+  const ReadingSettingsPage({
+    super.key,
+    required this.sourceService,
+    this.sourcePlugins,
+  });
 
   final SourceSettingsGateway sourceService;
+  final SourcePluginGateway? sourcePlugins;
 
   @override
   State<ReadingSettingsPage> createState() => _ReadingSettingsPageState();
@@ -53,6 +59,12 @@ class _ReadingSettingsPageState extends State<ReadingSettingsPage> {
           builder: (context, _) {
             return ReaderSettingsContent(
               surface: ReaderSettingsSurface.page,
+              pageFooter: widget.sourcePlugins == null
+                  ? null
+                  : SourcePluginActionList(
+                      gateway: widget.sourcePlugins!,
+                      location: SourcePluginActionLocation.reading,
+                    ),
               readerMode: _controller.readerMode,
               doublePageMode: _controller.doublePageMode,
               tapToTurnPage: _controller.tapToTurnPage,
@@ -90,9 +102,7 @@ class _ReadingSettingsPageState extends State<ReadingSettingsPage> {
               onFilterStrengthChanged: _controller.filterEnabled
                   ? _controller.updateFilterStrength
                   : null,
-              onCopyMangaImageQualityChanged:
-                  _controller.updateCopyMangaImageQuality,
-              onPicacgImageQualityChanged: _controller.updatePicacgImageQuality,
+              onSourceImageQualityChanged: _controller.updateSourceImageQuality,
               onShowWindowsShortcuts: Platform.isWindows
                   ? () => unawaited(showReaderWindowsShortcutsDialog(context))
                   : null,

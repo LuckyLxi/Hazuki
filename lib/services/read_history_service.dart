@@ -6,14 +6,21 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../shared/preferences/hazuki_preference_keys.dart';
-import '../shared/picacg_comic_tags.dart';
+import '../shared/source_comic_tags.dart';
+import 'package:hazuki/services/source/plugins/source_presentation_metadata.dart';
+
 import '../models/hazuki_models.dart';
 import 'source/models/source_identity.dart';
 import 'storage/hazuki_database.dart';
 
 class ReadHistoryService extends ChangeNotifier {
-  ReadHistoryService({HazukiDatabase? database})
-    : _database = database ?? HazukiDatabase();
+  ReadHistoryService({
+    HazukiDatabase? database,
+    SourcePresentationReader presentationFor = emptySourcePresentation,
+  }) : _database = database ?? HazukiDatabase(),
+       _presentationFor = presentationFor;
+
+  final SourcePresentationReader _presentationFor;
 
   final HazukiDatabase _database;
   Future<void> _migration = Future.value();
@@ -50,16 +57,25 @@ class ReadHistoryService extends ChangeNotifier {
     return _migration;
   }
 
-  Future<List<ExploreComic>> loadHistory({required String sourceKey}) async {
+  Future<List<ExploreComic>> loadHistory({
+    required String sourceKey,
+    Set<String>? availableSourceKeys,
+  }) async {
     await _ensureMigrated();
-    final entries =
-        await ((_database.select(_database.readHistoryEntries)
-              ..where(
-                (entry) =>
-                    entry.sourceKey.equals(_normalizeSourceKey(sourceKey)),
-              )
-              ..orderBy([(entry) => OrderingTerm.desc(entry.timestampMs)]))
-            .get());
+    final query = _database.select(_database.readHistoryEntries);
+    if (availableSourceKeys == null) {
+      query.where(
+        (entry) => entry.sourceKey.equals(_normalizeSourceKey(sourceKey)),
+      );
+    } else if (availableSourceKeys.isNotEmpty) {
+      query.where(
+        (entry) =>
+            entry.sourceKey.equals(sourceKey.trim()) |
+            entry.sourceKey.isNotIn(availableSourceKeys),
+      );
+    }
+    query.orderBy([(entry) => OrderingTerm.desc(entry.timestampMs)]);
+    final entries = await query.get();
     return entries
         .map(
           (entry) => ExploreComic(
@@ -191,7 +207,13 @@ class ReadHistoryService extends ChangeNotifier {
                 subTitle: details.subTitle.isNotEmpty
                     ? details.subTitle
                     : comic.subTitle,
-                tagsJson: Value(jsonEncode(_tagsForHistory(comic, details))),
+                tagsJson:
+                    comic.tags.isNotEmpty ||
+                        _presentationFor(sourceKey)['listTagGroups'] is List
+                    ? Value(
+                        jsonEncode(_tagsForHistory(comic, details, sourceKey)),
+                      )
+                    : const Value.absent(),
                 timestampMs: DateTime.now().millisecondsSinceEpoch,
               ),
             );
@@ -316,9 +338,13 @@ class ReadHistoryService extends ChangeNotifier {
     return normalized.isEmpty ? hazukiDefaultSourceKey : normalized;
   }
 
-  List<String> _tagsForHistory(ExploreComic comic, ComicDetailsData details) {
+  List<String> _tagsForHistory(
+    ExploreComic comic,
+    ComicDetailsData details,
+    String sourceKey,
+  ) {
     if (comic.tags.isNotEmpty) return comic.tags;
-    return picacgComicDetailTags(details);
+    return sourceComicDetailTags(details, _presentationFor(sourceKey));
   }
 
   List<String> _tagsFromJson(String raw) {

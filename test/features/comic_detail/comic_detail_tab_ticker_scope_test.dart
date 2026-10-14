@@ -1,3 +1,4 @@
+import '../../support/source_presentation_fixtures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -12,6 +13,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
+        builder: (context, child) => withTestSourcePresentation(child!),
         home: DefaultTabController(
           length: 2,
           child: Builder(
@@ -53,6 +55,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
+        builder: (context, child) => withTestSourcePresentation(child!),
         home: DefaultTabController(
           length: 2,
           child: Builder(
@@ -107,6 +110,7 @@ void main() {
     final tabKeys = List.generate(2, (_) => GlobalKey<_KeptScrollTabState>());
     await tester.pumpWidget(
       MaterialApp(
+        builder: (context, child) => withTestSourcePresentation(child!),
         home: DefaultTabController(
           length: 2,
           child: Builder(

@@ -17,7 +17,7 @@ class SourceRuntimeCoordinator<T extends SourceRuntimeResource> {
        _onActiveSourceChanged = onActiveSourceChanged,
        _activeSourceKey = defaultSourceKey;
 
-  final List<SourceCatalogEntry> _catalog;
+  List<SourceCatalogEntry> _catalog;
   final String _defaultSourceKey;
   final T Function(String sourceKey) _createHandle;
   final void Function() _onActiveSourceChanged;
@@ -36,10 +36,10 @@ class SourceRuntimeCoordinator<T extends SourceRuntimeResource> {
 
   String normalize(String sourceKey) {
     final normalized = sourceKey.trim().isEmpty
-        ? _defaultSourceKey
+        ? (_activeSourceKey.isNotEmpty ? _activeSourceKey : _defaultSourceKey)
         : sourceKey.trim();
     if (!_catalog.any((entry) => entry.normalizedKey == normalized)) {
-      throw Exception('source_not_allowed:$normalized');
+      throw Exception('plugin_not_installed:$normalized');
     }
     return normalized;
   }
@@ -54,6 +54,8 @@ class SourceRuntimeCoordinator<T extends SourceRuntimeResource> {
     return _handles.putIfAbsent(normalized, () => _createHandle(normalized));
   }
 
+  T? existingHandle(String sourceKey) => _handles[sourceKey];
+
   Future<void> loadActiveSourcePreference({
     required Future<String?> Function() readSavedSourceKey,
     required Future<void> Function(String sourceKey) persistSourceKey,
@@ -64,8 +66,10 @@ class SourceRuntimeCoordinator<T extends SourceRuntimeResource> {
         _activeSourceKey = saved;
         return;
       }
-      _activeSourceKey = _defaultSourceKey;
-      if (saved.isNotEmpty) await persistSourceKey(_defaultSourceKey);
+      _activeSourceKey = isAllowed(_defaultSourceKey)
+          ? _defaultSourceKey
+          : (_catalog.firstOrNull?.normalizedKey ?? '');
+      if (saved.isNotEmpty) await persistSourceKey(_activeSourceKey);
     });
   }
 
@@ -94,6 +98,24 @@ class SourceRuntimeCoordinator<T extends SourceRuntimeResource> {
     removed?.requestDispose();
     return removed;
   }
+
+  Future<void> replaceCatalog(List<SourceCatalogEntry> catalog) =>
+      _serialize(() async {
+        final previous = {for (final entry in _catalog) entry.key: entry};
+        final next = {for (final entry in catalog) entry.key: entry};
+        for (final key in _handles.keys.toList()) {
+          if (!next.containsKey(key) ||
+              next[key]?.pluginDirectory != previous[key]?.pluginDirectory ||
+              next[key]?.pluginVersion != previous[key]?.pluginVersion) {
+            _handles.remove(key)?.requestDispose();
+          }
+        }
+        _catalog = List.unmodifiable(catalog);
+        if (!isAllowed(_activeSourceKey)) {
+          _activeSourceKey = _catalog.firstOrNull?.normalizedKey ?? '';
+        }
+        _onActiveSourceChanged();
+      });
 
   /// Disposes a source's current resources and creates a replacement handle.
   ///

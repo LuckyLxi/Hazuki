@@ -1,3 +1,4 @@
+import 'package:hazuki/shared/source_presentation.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -174,7 +175,9 @@ class SearchComicListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final tags = comic.sourceKey == 'picacg' ? comic.tags : const <String>[];
+    final tags = sourceFeature(comic.sourceKey, 'showTags', context: context)
+        ? comic.tags
+        : const <String>[];
     final item = Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: InkWell(
@@ -246,7 +249,7 @@ class SearchComicListItem extends StatelessWidget {
                     ],
                     if (tags.isNotEmpty) ...[
                       const SizedBox(height: 6),
-                      PicacgComicTags(sourceKey: comic.sourceKey, tags: tags),
+                      SourceComicTags(sourceKey: comic.sourceKey, tags: tags),
                     ],
                   ],
                 ),

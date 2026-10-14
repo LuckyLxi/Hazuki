@@ -60,8 +60,6 @@ class SourceRuntimeCoordinator {
   final Connectivity _connectivity = Connectivity();
   StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   bool _hasConnectivity = true;
-  bool _isCheckingSourceUpdate = false;
-  bool _isShowingSourceUpdateDialog = false;
 
   Future<void> bootstrapSourceRuntime({
     required bool Function() isMounted,
@@ -69,6 +67,14 @@ class SourceRuntimeCoordinator {
     required VoidCallback onSourceReady,
     required VoidCallback scheduleSourceUpdateDialogCheck,
   }) async {
+    await _bootstrapGateway.prepareSources();
+    if (!_bootstrapGateway.hasActiveSource) {
+      if (isMounted()) {
+        onBootstrapStateChanged(const SourceBootstrapState.idle());
+        onSourceReady();
+      }
+      return;
+    }
     final hasLocalSource = await _bootstrapGateway.hasLocalJmSourceFile();
     if (!isMounted()) {
       return;
@@ -195,23 +201,7 @@ class SourceRuntimeCoordinator {
     required Future<SourceUpdateDialogAction?> Function() showDialogIfNeeded,
     required VoidCallback onSourceDownloaded,
   }) {
-    if (_isCheckingSourceUpdate || _isShowingSourceUpdateDialog) {
-      return;
-    }
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!isMounted() ||
-          _isCheckingSourceUpdate ||
-          _isShowingSourceUpdateDialog) {
-        return;
-      }
-      unawaited(
-        _runSourceUpdateDialogCheck(
-          isMounted: isMounted,
-          showDialogIfNeeded: showDialogIfNeeded,
-          onSourceDownloaded: onSourceDownloaded,
-        ),
-      );
-    });
+    // Updates are requested explicitly from plugin management.
   }
 
   Future<void> dispose() async {
@@ -227,34 +217,5 @@ class SourceRuntimeCoordinator {
       return;
     }
     scheduleSourceUpdateDialogCheck();
-  }
-
-  Future<void> _runSourceUpdateDialogCheck({
-    required bool Function() isMounted,
-    required Future<SourceUpdateDialogAction?> Function() showDialogIfNeeded,
-    required VoidCallback onSourceDownloaded,
-  }) async {
-    if (_isCheckingSourceUpdate || _isShowingSourceUpdateDialog) {
-      return;
-    }
-
-    _isCheckingSourceUpdate = true;
-    try {
-      await Future<void>.delayed(const Duration(milliseconds: 120));
-      if (!isMounted()) {
-        return;
-      }
-      _isShowingSourceUpdateDialog = true;
-      final result = await showDialogIfNeeded();
-      if (!isMounted()) {
-        return;
-      }
-      if (result == SourceUpdateDialogAction.downloaded) {
-        onSourceDownloaded();
-      }
-    } finally {
-      _isShowingSourceUpdateDialog = false;
-      _isCheckingSourceUpdate = false;
-    }
   }
 }

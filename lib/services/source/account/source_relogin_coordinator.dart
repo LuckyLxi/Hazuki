@@ -1,6 +1,5 @@
 import '../runtime/source_cookie_store.dart';
 import '../runtime/source_runtime_facade.dart';
-import '../models/source_identity.dart';
 
 abstract interface class SourceReloginContext {
   String get sourceKey;
@@ -82,7 +81,9 @@ class SourceReloginCoordinator {
 
   Future<bool> ensureFavoriteSessionReady(SourceReloginContext context) async {
     await context.ensureInitialized();
-    if (isHazukiCopyMangaSourceKey(context.sourceKey)) {
+    if (context is SourceFacadeReloginContext &&
+        context.facade.sourceMeta?.presentation['skipPeriodicRelogin'] ==
+            true) {
       return true;
     }
     if (!context.isLogged || context.shouldSkipRelogin(_reloginInterval)) {
@@ -115,24 +116,14 @@ class SourceReloginCoordinator {
     SourceReloginContext context,
   ) async {
     final cookies = context.loadCookieStore();
-    cookies.removeWhere((cookie) {
-      final domain = cookie.domain.toLowerCase();
-      return domain.contains('jmcomic') ||
-          domain.contains('18comic') ||
-          domain.contains('jm365') ||
-          domain.contains('cdn-msp') ||
-          domain.contains('cdnhth') ||
-          domain.contains('cdntwice') ||
-          domain.contains('cdnsha') ||
-          domain.contains('cdnaspa') ||
-          domain.contains('cdnntr');
-    });
+    cookies.clear();
     await context.saveCookieStore(cookies);
   }
 
   static bool isLoginExpiredError(Object error) {
     final message = error.toString().toLowerCase();
-    return message.contains('login expired') ||
+    return message.contains('hazuki_auth_expired') ||
+        message.contains('login expired') ||
         message.contains('unauthorized') ||
         message.contains('status 401') ||
         message.contains('http 401') ||

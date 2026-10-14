@@ -4,7 +4,7 @@ import '../../../models/hazuki_models.dart';
 import '../models/source_contract_models.dart';
 
 abstract interface class SourceAccountGateway implements Listenable {
-  String get activeSourceKey;
+  String? get activeSourceKey;
   bool get isLogged;
   bool get isInitialized;
   bool get isActiveDailyCheckInSource;
@@ -21,6 +21,8 @@ abstract interface class SourceAccountGateway implements Listenable {
 }
 
 abstract interface class SourceBootstrapGateway {
+  Future<void> prepareSources();
+  bool get hasActiveSource;
   Future<bool> hasLocalJmSourceFile();
   Future<void> init({void Function(int received, int total)? onProgress});
   Future<void> ensureInitialized({String? sourceKey});
@@ -48,7 +50,7 @@ abstract interface class SourceLocalizationGateway {
 }
 
 abstract interface class SourceSelectionGateway implements Listenable {
-  String get activeSourceKey;
+  String? get activeSourceKey;
   bool get isActiveJmSource;
   bool get isActiveCopyMangaSource;
   bool get isActiveDailyCheckInSource;
@@ -64,6 +66,7 @@ abstract interface class SourceSelectionGateway implements Listenable {
 
 abstract interface class SourceHomeGateway
     implements Listenable, SourceAccountGateway {
+  String? get sourceRevision;
   bool get isActiveCopyMangaSource;
   SourceMeta? get sourceMeta;
   SourceRuntimeState get runtimeState;
@@ -73,7 +76,7 @@ abstract interface class SourceHomeGateway
 }
 
 abstract interface class SourceSwitchGateway {
-  String get activeSourceKey;
+  String? get activeSourceKey;
   List<SourceCatalogEntry> get allowedSources;
 
   Future<void> loadActiveSourcePreference();
@@ -87,12 +90,9 @@ abstract interface class SourceSwitchGateway {
 }
 
 abstract interface class SourceAdvancedGateway implements Listenable {
-  bool get isActiveCopyMangaSource;
-
   Future<bool> hasCustomEditedActiveSource();
   Future<bool> loadSoftwareLogCaptureEnabled();
   Future<void> setSoftwareLogCaptureEnabled(bool enabled);
-  Future<void> clearCopyMangaDeviceInfo();
 }
 
 abstract interface class SourceDebugGateway {
@@ -145,11 +145,11 @@ abstract interface class SourceRuntimeGateway
   });
   Future<bool> loadSoftwareLogCaptureEnabled();
   Future<void> setSoftwareLogCaptureEnabled(bool enabled);
-  Future<void> clearCopyMangaDeviceInfo();
 }
 
 abstract interface class SourceSettingsGateway {
-  String get activeSourceKey;
+  Map<String, dynamic>? presentationForSource(String id);
+  String? get activeSourceKey;
   bool get isActiveCopyMangaSource;
   int get imageCacheMaxBytes;
 

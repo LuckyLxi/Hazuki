@@ -81,8 +81,7 @@ Widget buildReaderSettingsDrawer({
   required ValueChanged<double>? onFilterStrengthChanged,
   required ValueChanged<double>? onFilterStrengthChangeEnd,
   required ReaderSourceImageQualitySnapshot sourceImageQuality,
-  required ValueChanged<String?> onCopyMangaImageQualityChanged,
-  required ValueChanged<String?> onPicacgImageQualityChanged,
+  required ValueChanged<String?> onSourceImageQualityChanged,
   required VoidCallback? onShowWindowsShortcuts,
 }) {
   final drawerWidth = math.min(MediaQuery.sizeOf(context).width * 0.88, 360.0);
@@ -138,9 +137,7 @@ Widget buildReaderSettingsDrawer({
                   onFilterStrengthChanged: onFilterStrengthChanged,
                   onFilterStrengthChangeEnd: onFilterStrengthChangeEnd,
                   sourceImageQuality: sourceImageQuality,
-                  onCopyMangaImageQualityChanged:
-                      onCopyMangaImageQualityChanged,
-                  onPicacgImageQualityChanged: onPicacgImageQualityChanged,
+                  onSourceImageQualityChanged: onSourceImageQualityChanged,
                   onShowWindowsShortcuts: onShowWindowsShortcuts,
                   onClose: () => Navigator.of(drawerContext).pop(),
                 ),

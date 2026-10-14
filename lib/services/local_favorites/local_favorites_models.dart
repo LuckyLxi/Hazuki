@@ -1,6 +1,8 @@
 import '../../models/hazuki_models.dart';
+import '../source/models/source_identity.dart';
 
-const legacyLocalFavoriteSourceKey = 'jm';
+// Historical records without a source identity belonged to the original source.
+const legacyLocalFavoriteSourceKey = hazukiDefaultSourceKey;
 
 class LocalFavoritesSnapshot {
   LocalFavoritesSnapshot({required this.folders, required this.entries});

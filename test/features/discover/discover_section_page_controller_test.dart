@@ -25,34 +25,6 @@ void main() {
   });
 
   test(
-    'recognizes JM promotion sections with unreliable view-more targets',
-    () {
-      expect(
-        SourceExploreCapability.isJmPromotionWithUnreliableViewMore(
-          'C108 & 推薦本本',
-        ),
-        isTrue,
-      );
-      expect(
-        SourceExploreCapability.isJmPromotionWithUnreliableViewMore('禁漫漢化組'),
-        isTrue,
-      );
-      expect(
-        SourceExploreCapability.isJmPromotionWithUnreliableViewMore('連載更新'),
-        isTrue,
-      );
-      expect(
-        SourceExploreCapability.isJmPromotionWithUnreliableViewMore('禁漫去碼&全彩化'),
-        isTrue,
-      );
-      expect(
-        SourceExploreCapability.isJmPromotionWithUnreliableViewMore('韓漫更新'),
-        isFalse,
-      );
-    },
-  );
-
-  test(
     'defaults to the source preview while keeping normal category results available',
     () async {
       final source = _FakeDiscoverGateway();
@@ -147,6 +119,10 @@ ExploreSection _section(String title, String viewMoreUrl) => ExploreSection(
 
 class _FakeDiscoverGateway extends ChangeNotifier
     implements SourceDiscoverGateway {
+  @override
+  bool get requiresLogin => false;
+  @override
+  String? get sourceRevision => activeSourceKey;
   int comicsRequestCount = 0;
   String remoteComicId = 'remote';
   bool throwOnOptionsLoad = false;

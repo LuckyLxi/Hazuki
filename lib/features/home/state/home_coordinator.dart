@@ -31,6 +31,7 @@ class HomeCoordinator extends ChangeNotifier {
        scaffoldKey = GlobalKey<ScaffoldState>(),
        favoriteActionsBinding = FavoritePageActionsBinding() {
     _lastSourceKey = _sourceService.activeSourceKey;
+    _lastSourceRevision = _sourceService.sourceRevision;
     _profileController.addListener(_relayChange);
     _shellController.addListener(_relayChange);
     _dailyRecommendationService.addListener(_relayChange);
@@ -53,7 +54,8 @@ class HomeCoordinator extends ChangeNotifier {
   final GlobalKey<ScaffoldState> scaffoldKey;
   final FavoritePageActionsBinding favoriteActionsBinding;
   bool _disposed = false;
-  late String _lastSourceKey;
+  late String? _lastSourceKey;
+  String? _lastSourceRevision;
   // 标记新源尚未初始化完成，需要在初始化后再次同步用户信息
   bool _awaitingSourceInit = false;
   BuildContext? _context;
@@ -204,9 +206,11 @@ class HomeCoordinator extends ChangeNotifier {
 
   void _handleSourceChanged() {
     final nextSourceKey = _sourceService.activeSourceKey;
-    if (nextSourceKey != _lastSourceKey) {
+    if (nextSourceKey != _lastSourceKey ||
+        _lastSourceRevision != _sourceService.sourceRevision) {
       // 源发生切换，记录状态并立即同步（此时新源可能未初始化）
       _lastSourceKey = nextSourceKey;
+      _lastSourceRevision = _sourceService.sourceRevision;
       _awaitingSourceInit = !_sourceService.isInitialized;
       _profileController.resetStartupCheckInAttempt();
       _profileController.markSourceChanged();

@@ -580,35 +580,14 @@ class _ReaderPageState extends State<ReaderPage>
           ? _settingsController.handleFilterStrengthChangeEnd
           : null,
       sourceImageQuality: _sourceImageQuality,
-      onCopyMangaImageQualityChanged: (value) async {
+      onSourceImageQualityChanged: (value) async {
         if (value == null) return;
-        final normalized =
-            ReaderSourceImageQualitySettings.normalizeCopyMangaImageQuality(
-              value,
-            );
-        if (normalized == _sourceImageQuality.copyMangaImageQuality) return;
+        final normalized = _sourceImageQuality.normalize(value);
+        if (normalized == _sourceImageQuality.value) return;
         setState(() {
-          _sourceImageQuality = _sourceImageQuality.copyWith(
-            copyMangaImageQuality: normalized,
-          );
+          _sourceImageQuality = _sourceImageQuality.copyWith(value: normalized);
         });
-        await ReaderSourceImageQualitySettings.updateCopyMangaImageQuality(
-          _sourceSettings,
-          widget.sourceKey,
-          normalized,
-        );
-      },
-      onPicacgImageQualityChanged: (value) async {
-        if (value == null) return;
-        final normalized =
-            ReaderSourceImageQualitySettings.normalizePicacgImageQuality(value);
-        if (normalized == _sourceImageQuality.picacgImageQuality) return;
-        setState(() {
-          _sourceImageQuality = _sourceImageQuality.copyWith(
-            picacgImageQuality: normalized,
-          );
-        });
-        await ReaderSourceImageQualitySettings.updatePicacgImageQuality(
+        await ReaderSourceImageQualitySettings.updateImageQuality(
           _sourceSettings,
           widget.sourceKey,
           normalized,
