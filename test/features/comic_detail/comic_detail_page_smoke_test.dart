@@ -2,6 +2,7 @@ import '../../support/source_presentation_fixtures.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -28,7 +29,10 @@ import 'package:hazuki/services/reading_progress_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/shared/comments/comments_widget_builder.dart';
 import 'package:hazuki/shared/comments/comments_interaction_state.dart';
+import 'package:hazuki/shared/window/window_title_bar_control.dart';
 import 'package:hazuki/widgets/cached_image_widgets.dart';
+import 'package:hazuki/widgets/chapters_panel_sheet.dart';
+import 'package:hazuki/shared/favorites/favorite_folders_morph_dialog.dart';
 import '../../support/test_service_locator.dart';
 
 Widget _buildComments({
@@ -122,6 +126,296 @@ void main() {
       },
     );
   }
+  for (final openReader in [true, false]) {
+    testWidgets('mobile detail uses horizontal routing for '
+        '${openReader ? 'reader' : 'tag search'}', (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final titleBar = _NavigationTitleBarControl();
+      addTearDown(titleBar.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(platform: TargetPlatform.android),
+          builder: (context, child) => withTestSourcePresentation(
+            HazukiWindowsTitleBarScope(controller: titleBar, child: child!),
+          ),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: ComicDetailPage(
+            comic: const ExploreComic(
+              id: 'mobile-navigation',
+              sourceKey: 'copy_manga',
+              title: 'Comic',
+              subTitle: '',
+              cover: '',
+            ),
+            dependencies: _comicDetailDependencies(),
+            repository: _NavigationDetailFacade(),
+            heroTag: 'mobile-navigation',
+            shouldAnimateInitialRevealOverride: false,
+            readerWidgetBuilder:
+                ({
+                  required title,
+                  required chapterTitle,
+                  required comicId,
+                  required epId,
+                  required chapterIndex,
+                  required images,
+                  required sourceKey,
+                  coverUrl = '',
+                  comicTheme,
+                  onFavoriteRequested,
+                }) => const Scaffold(body: Text('Reader destination')),
+            searchPageBuilder: (keyword) =>
+                Scaffold(body: Text('Search destination: $keyword')),
+            commentsWidgetBuilder: _buildComments,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      if (openReader) {
+        await tester.tap(find.byIcon(Icons.menu_book_outlined));
+      } else {
+        final author = find.text('Hazuki Studio');
+        await tester.ensureVisible(author);
+        await tester.pumpAndSettle();
+        await tester.tap(author);
+      }
+      await tester.pumpAndSettle();
+      final destination = find.text(
+        openReader ? 'Reader destination' : 'Search destination: Hazuki Studio',
+      );
+      expect(destination, findsOneWidget);
+      expect(
+        ModalRoute.of(tester.element(destination)),
+        isA<CupertinoPageRoute<void>>(),
+      );
+      Navigator.of(tester.element(destination)).pop();
+      await tester.pumpAndSettle();
+      expect(find.byType(ComicDetailPage), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('mobile first reveal fades without moving content', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final facade = _CompletingDesktopDetailFacade();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData(platform: TargetPlatform.android),
+        builder: (context, child) => withTestSourcePresentation(child!),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: _buildDesktopTestDetail(
+          comic: const ExploreComic(
+            id: 'mobile-first-reveal',
+            sourceKey: 'copy_manga',
+            title: 'Stable title',
+            subTitle: 'Stable subtitle',
+            cover: '',
+          ),
+          facade: facade,
+          shouldAnimateInitialRevealOverride: true,
+        ),
+      ),
+    );
+    await tester.pump();
+    final actions = find.byType(ComicDetailHeaderActionRow);
+    final actionSlide = find.descendant(
+      of: actions,
+      matching: find.byType(AnimatedSlide),
+    );
+    expect(tester.widget<AnimatedSlide>(actionSlide).offset, Offset.zero);
+    expect(tester.widget<AnimatedSlide>(actionSlide).duration, Duration.zero);
+    facade.complete();
+    await tester.pump();
+    await tester.pump();
+    final summary = find.byType(ComicDetailExpandableDescription);
+    final resolvedActionTop = tester.getTopLeft(actions).dy;
+    final resolvedTabTop = tester.getTopLeft(find.byType(TabBar)).dy;
+    final summaryTop = tester.getTopLeft(summary).dy;
+    final reveal = find.ancestor(
+      of: summary,
+      matching: find.byType(ComicDetailEntranceReveal),
+    );
+    final opacity = find.descendant(of: reveal, matching: find.byType(Opacity));
+    expect(tester.widget<Opacity>(opacity).opacity, 0);
+    for (final entrance in tester.widgetList<ComicDetailEntranceReveal>(
+      find.byType(ComicDetailEntranceReveal),
+    )) {
+      expect(entrance.beginOffset, Offset.zero);
+    }
+    await tester.pump(const Duration(milliseconds: 160));
+    expect(tester.widget<Opacity>(opacity).opacity, inExclusiveRange(0, 1));
+    expect(tester.getTopLeft(summary).dy, closeTo(summaryTop, 0.5));
+    expect(tester.getTopLeft(actions).dy, closeTo(resolvedActionTop, 0.5));
+    expect(
+      tester.getTopLeft(find.byType(TabBar)).dy,
+      closeTo(resolvedTabTop, 0.5),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.widget<Opacity>(opacity).opacity, 1);
+    expect(tester.getTopLeft(summary).dy, closeTo(summaryTop, 0.5));
+    expect(tester.getTopLeft(actions).dy, closeTo(resolvedActionTop, 0.5));
+    expect(
+      tester.getTopLeft(find.byType(TabBar)).dy,
+      closeTo(resolvedTabTop, 0.5),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('mobile action bar preserves favorite and chapter dialogs', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final facade = _CompletingMobileDetailFacade();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData(platform: TargetPlatform.android),
+        builder: (context, child) => withTestSourcePresentation(child!),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: _buildDesktopTestDetail(
+          comic: const ExploreComic(
+            id: 'mobile-controls',
+            sourceKey: 'copy_manga',
+            title: 'Comic',
+            subTitle: '',
+            cover: '',
+          ),
+          facade: facade,
+          shouldAnimateInitialRevealOverride: false,
+        ),
+      ),
+    );
+    await tester.pump();
+    final favorite = find.ancestor(
+      of: find.byIcon(Icons.favorite_border),
+      matching: find.byType(IconButton),
+    );
+    expect(tester.widget<IconButton>(favorite).onPressed, isNull);
+    facade.complete();
+    await tester.pumpAndSettle();
+    expect(tester.widget<IconButton>(favorite).onPressed, isNotNull);
+    await tester.tap(favorite);
+    await tester.pumpAndSettle();
+    expect(find.byType(FavoriteFoldersMorphDialog), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    tester.state<NavigatorState>(find.byType(Navigator)).pop();
+    await tester.pumpAndSettle();
+    expect(find.byType(FavoriteFoldersMorphDialog), findsNothing);
+    await tester.tap(find.byIcon(Icons.format_list_bulleted_rounded));
+    await tester.pumpAndSettle();
+    expect(find.byType(ChaptersPanelSheet), findsOneWidget);
+    expect(find.text('Chapter 1'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    tester.state<NavigatorState>(find.byType(Navigator)).pop();
+    await tester.pumpAndSettle();
+  });
+
+  for (final brightness in Brightness.values) {
+    for (final width in [320.0, 390.0, 430.0]) {
+      testWidgets('mobile detail fits $width in $brightness with large text', (
+        tester,
+      ) async {
+        tester.view.physicalSize = Size(width, 900);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData(
+              platform: TargetPlatform.android,
+              brightness: brightness,
+            ),
+            builder: (context, child) => withTestSourcePresentation(
+              MediaQuery(
+                data: MediaQuery.of(
+                  context,
+                ).copyWith(textScaler: TextScaler.linear(1.5)),
+                child: child!,
+              ),
+            ),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: _buildDesktopTestDetail(
+              comic: const ExploreComic(
+                id: 'mobile-layout',
+                sourceKey: 'copy_manga',
+                title: 'A long comic title',
+                subTitle: 'An illustrated journey',
+                cover: '',
+              ),
+              facade: _DesktopDetailFacade(),
+              shouldAnimateInitialRevealOverride: false,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        final cover = find.byType(ComicDetailHeaderCover);
+        final actions = find.byType(ComicDetailHeaderActionRow);
+        expect(tester.getSize(cover).width, inInclusiveRange(88, 135));
+        expect(
+          tester.getTopLeft(actions).dy,
+          greaterThan(tester.getBottomLeft(cover).dy),
+        );
+        expect(
+          tester.widget<ComicDetailHeaderActionRow>(actions).useMobileStyle,
+          isTrue,
+        );
+        final readerButton = find.descendant(
+          of: actions,
+          matching: find.byType(FilledButton),
+        );
+        expect(tester.getSize(readerButton).height, greaterThanOrEqualTo(48));
+        final chaptersButton = find.descendant(
+          of: actions,
+          matching: find.byIcon(Icons.format_list_bulleted_rounded),
+        );
+        final favoriteButton = find.descendant(
+          of: actions,
+          matching: find.byIcon(Icons.favorite_border),
+        );
+        expect(find.text('Hazuki Studio'), findsOneWidget);
+        expect(find.byIcon(Icons.chevron_right_rounded), findsNothing);
+        expect(
+          tester.getTopRight(readerButton).dx,
+          lessThan(tester.getTopLeft(chaptersButton).dx),
+        );
+        expect(
+          tester.getTopRight(chaptersButton).dx,
+          lessThan(tester.getTopLeft(favoriteButton).dx),
+        );
+        await tester.drag(find.byType(NestedScrollView), const Offset(0, -420));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        final metadata = find.byType(ComicDetailMetaSection);
+        expect(
+          tester.widget<ComicDetailMetaSection>(metadata).useMobileStyle,
+          isTrue,
+        );
+        final artist = find.descendant(
+          of: metadata,
+          matching: find.text('Hazuki Studio'),
+        );
+        await tester.ensureVisible(artist);
+        await tester.pumpAndSettle();
+        expect(artist.hitTestable(), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
   for (final brightness in Brightness.values) {
     testWidgets('Windows detail adapts to resize in $brightness', (
       tester,
@@ -183,6 +477,14 @@ void main() {
         greaterThan(tester.getTopRight(cover).dx),
       );
       expect(tester.getSize(actions).width, lessThanOrEqualTo(420));
+      expect(
+        tester.widget<ComicDetailHeaderActionRow>(actions).useMobileStyle,
+        isFalse,
+      );
+      expect(
+        tester.widget<ComicDetailMetaSection>(metadata).useMobileStyle,
+        isFalse,
+      );
       final favoriteButton = find.widgetWithIcon(
         OutlinedButton,
         Icons.favorite_border,
@@ -728,6 +1030,25 @@ class _CompletingDesktopDetailFacade extends _DesktopDetailFacade {
   }) => _completer.future;
 }
 
+class _NavigationDetailFacade extends _DesktopDetailFacade {
+  @override
+  Future<List<CategoryTagGroup>> loadCategoryTagGroups() async => [];
+}
+
+class _NavigationTitleBarControl extends ChangeNotifier
+    implements WindowTitleBarControl {
+  @override
+  bool get useSystemTitleBar => true;
+  @override
+  bool get shouldShowCustomTitleBar => false;
+  @override
+  void suppressCustomTitleBar(Object owner) {}
+  @override
+  void releaseCustomTitleBarSuppression(Object owner) {}
+  @override
+  Future<void> updateUseSystemTitleBar(bool value) async {}
+}
+
 class _CompletingLikeDetailFacade extends _CompletingDesktopDetailFacade {
   bool canLike = false;
   final likeCalls = <(String, bool, String)>[];
@@ -741,6 +1062,18 @@ class _CompletingLikeDetailFacade extends _CompletingDesktopDetailFacade {
   }) async {
     likeCalls.add((comicId, isLike, sourceKey));
   }
+}
+
+class _CompletingMobileDetailFacade extends _CompletingDesktopDetailFacade {
+  @override
+  bool get isLogged => false;
+
+  @override
+  Future<FavoriteFoldersResult> loadLocalFavoriteFolders({
+    required String comicId,
+    String sourceKey = '',
+  }) async =>
+      const FavoriteFoldersResult.success(folders: [], favoritedFolderIds: {});
 }
 
 Widget _buildDesktopTestDetail({

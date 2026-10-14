@@ -1,5 +1,6 @@
 import '../../support/source_presentation_fixtures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:hazuki/features/comic_detail/view/comic_detail_meta.dart';
@@ -8,6 +9,144 @@ import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 
 void main() {
+  testWidgets('mobile ID precedes authors and copies only on long press', (
+    tester,
+  ) async {
+    final copiedIds = <String>[];
+    final pressedTags = <String>[];
+    final haptics = <Object?>[];
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, (call) async {
+          if (call.method == 'HapticFeedback.vibrate') {
+            haptics.add(call.arguments);
+          }
+          return null;
+        });
+    addTearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(SystemChannels.platform, null);
+    });
+    const details = ComicDetailsData(
+      id: '1433951',
+      sourceKey: 'jm',
+      title: 'Hazuki',
+      subTitle: '',
+      cover: '',
+      description: '',
+      updateTime: '',
+      likesCount: '',
+      chapters: {},
+      tags: {
+        'author': ['Artist'],
+        'tags': ['Action'],
+        'views': ['10'],
+      },
+      recommend: [],
+      isFavorite: false,
+      subId: '',
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        builder: (context, child) => withTestSourcePresentation(child!),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: ComicDetailMetaSection(
+            details: details,
+            useMobileStyle: true,
+            onCopyId: copiedIds.add,
+            onTagValuePressed: pressedTags.add,
+            onMetaValueLongPress: (_) {},
+          ),
+        ),
+      ),
+    );
+    final id = find.text('ID: 1433951');
+    expect(id, findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(ComicDetailIdRow),
+        matching: find.byType(Chip),
+      ),
+      findsOneWidget,
+    );
+    expect(find.byIcon(Icons.copy_all_outlined), findsNothing);
+    expect(
+      tester.getBottomLeft(find.byType(ComicDetailIdRow)).dy,
+      lessThan(tester.getTopLeft(find.text('Artist')).dy),
+    );
+    await tester.tap(id);
+    await tester.pumpAndSettle();
+    expect(copiedIds, isEmpty);
+    expect(pressedTags, isEmpty);
+    expect(haptics, isEmpty);
+    await tester.longPress(id);
+    await tester.pumpAndSettle();
+    expect(copiedIds, ['1433951']);
+    expect(pressedTags, isEmpty);
+    expect(haptics, ['HapticFeedbackType.lightImpact']);
+    await tester.tap(find.text('Artist'));
+    expect(pressedTags, ['Artist']);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('desktop ID retains its copy button', (tester) async {
+    var copies = 0;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: ComicDetailIdRow(id: '123', onCopy: () => copies++),
+        ),
+      ),
+    );
+    await tester.tap(find.text('ID: 123'));
+    expect(copies, 0);
+    await tester.tap(find.byIcon(Icons.copy_all_outlined));
+    expect(copies, 1);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('mobile metadata fits long tags and preserves tap and copy', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 640);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    const longTag =
+        'A very long comic category that should fit within a narrow phone';
+    final pressed = <String>[];
+    final copied = <String>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: MediaQuery(
+            data: const MediaQueryData(textScaler: TextScaler.linear(1.5)),
+            child: Padding(
+              padding: const EdgeInsets.all(36),
+              child: ComicDetailMetaRow(
+                useMobileStyle: true,
+                label: 'Tags',
+                values: const [longTag, 'Adventure'],
+                onValuePressed: pressed.add,
+                onValueLongPress: copied.add,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    expect(tester.takeException(), isNull);
+    final tag = find.text(longTag);
+    expect(tester.getSize(tag).width, lessThanOrEqualTo(248));
+    await tester.tap(tag);
+    await tester.longPress(tag);
+    await tester.pumpAndSettle();
+    expect(pressed, [longTag]);
+    expect(copied, [longTag]);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('detail authors and tags use category-aware tag callback', (
     tester,
   ) async {

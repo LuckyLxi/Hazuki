@@ -147,7 +147,8 @@ class _ComicDetailPageState extends State<ComicDetailPage>
       detailsFutureGetter: () => _sessionController.future,
     );
     _actionsController = ComicDetailActionsController(
-      destinationRouteBuilder: buildComicDetailDestinationRoute,
+      destinationRouteBuilder: (builder) =>
+          buildComicDetailDestinationRoute(context, builder),
       repository: _repository,
       comic: widget.comic,
       heroTag: widget.heroTag,

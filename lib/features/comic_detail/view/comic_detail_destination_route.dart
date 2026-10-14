@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:hazuki/shared/navigation/snapshotting_page_route.dart';
 import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 
-Route<void> buildComicDetailDestinationRoute(WidgetBuilder builder) {
-  return useWindowsComicDetailPanel
+Route<void> buildComicDetailDestinationRoute(
+  BuildContext context,
+  WidgetBuilder builder,
+) {
+  return useWindowsComicDetailPanel &&
+          Theme.of(context).platform == TargetPlatform.windows
       ? PageRouteBuilder<void>(
           transitionDuration: windowsComicDetailPanelAnimationDuration,
           reverseTransitionDuration: const Duration(milliseconds: 280),
@@ -23,5 +28,5 @@ Route<void> buildComicDetailDestinationRoute(WidgetBuilder builder) {
             return SlideTransition(position: position, child: child);
           },
         )
-      : MaterialPageRoute<void>(builder: builder);
+      : buildSnapshottingPageRoute<void>(builder: builder);
 }

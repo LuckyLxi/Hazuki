@@ -7,6 +7,7 @@ import 'package:hazuki/models/hazuki_models.dart';
 
 import '../support/comic_detail_scope.dart';
 import '../support/comic_detail_session_controller.dart';
+import 'comic_detail_favorite_button.dart';
 
 class ComicDetailHeaderActionRow extends StatelessWidget {
   const ComicDetailHeaderActionRow({
@@ -14,11 +15,13 @@ class ComicDetailHeaderActionRow extends StatelessWidget {
     required this.details,
     required this.actionButtonsKey,
     required this.shouldAnimateInitialDetailReveal,
+    this.useMobileStyle = false,
   });
 
   final ComicDetailsData? details;
   final GlobalKey actionButtonsKey;
   final bool shouldAnimateInitialDetailReveal;
+  final bool useMobileStyle;
 
   @override
   Widget build(BuildContext context) {
@@ -26,47 +29,81 @@ class ComicDetailHeaderActionRow extends StatelessWidget {
     final actions = scope.actions;
     final session = scope.session;
     final detailsReady = details != null;
+    final animateSlide = !useMobileStyle && shouldAnimateInitialDetailReveal;
+    final colors = Theme.of(context).colorScheme;
+    final chaptersButton = AbsorbPointer(
+      absorbing: !detailsReady,
+      child: IconButton(
+        tooltip: l10n(context).comicDetailChapters,
+        style: useMobileStyle
+            ? IconButton.styleFrom(
+                fixedSize: const Size(48, 48),
+                backgroundColor: colors.primary.withValues(alpha: 0.08),
+                foregroundColor: colors.primary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(15),
+                ),
+              )
+            : null,
+        onPressed: () {
+          if (detailsReady) actions.showChaptersPanel(context, details!);
+        },
+        icon: const Icon(Icons.format_list_bulleted_rounded),
+      ),
+    );
+    final readerButton = Expanded(
+      child: AbsorbPointer(
+        absorbing: !detailsReady,
+        child: FilledButton.icon(
+          style: useMobileStyle
+              ? FilledButton.styleFrom(
+                  minimumSize: const Size(0, 48),
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                )
+              : null,
+          onPressed: () {
+            if (detailsReady) unawaited(actions.openReader(context, details!));
+          },
+          icon: Icon(
+            Icons.menu_book_outlined,
+            size: useMobileStyle ? 20 : null,
+          ),
+          label: Text(
+            _buildReaderButtonLabel(context, session),
+            maxLines: useMobileStyle ? 1 : null,
+            overflow: useMobileStyle ? TextOverflow.ellipsis : null,
+          ),
+        ),
+      ),
+    );
 
     return SizedBox(
       key: actionButtonsKey,
       height: 48,
       child: AnimatedSlide(
-        offset: shouldAnimateInitialDetailReveal
+        offset: animateSlide
             ? (detailsReady ? Offset.zero : const Offset(0, -0.08))
             : Offset.zero,
-        duration: shouldAnimateInitialDetailReveal
+        duration: animateSlide
             ? const Duration(milliseconds: 320)
             : Duration.zero,
         curve: Curves.easeOutCubic,
         child: Row(
           children: [
-            AbsorbPointer(
-              absorbing: !detailsReady,
-              child: IconButton(
-                tooltip: l10n(context).comicDetailChapters,
-                onPressed: () {
-                  if (detailsReady) {
-                    actions.showChaptersPanel(context, details!);
-                  }
-                },
-                icon: const Icon(Icons.format_list_bulleted_rounded),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: AbsorbPointer(
-                absorbing: !detailsReady,
-                child: FilledButton.icon(
-                  onPressed: () {
-                    if (detailsReady) {
-                      unawaited(actions.openReader(context, details!));
-                    }
-                  },
-                  icon: const Icon(Icons.menu_book_outlined),
-                  label: Text(_buildReaderButtonLabel(context, session)),
-                ),
-              ),
-            ),
+            if (useMobileStyle) ...[
+              readerButton,
+              const SizedBox(width: 8),
+              chaptersButton,
+              const SizedBox(width: 8),
+              ComicDetailFavoriteButton(details: details),
+            ] else ...[
+              chaptersButton,
+              const SizedBox(width: 8),
+              readerButton,
+            ],
           ],
         ),
       ),

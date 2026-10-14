@@ -110,12 +110,12 @@ class ComicDetailBody extends StatelessWidget {
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: EdgeInsets.fromLTRB(
-                        isDesktop ? 24 : 16,
-                        isDesktop ? 28 : 16,
-                        isDesktop ? 24 : 16,
+                        isDesktop ? 24 : 23,
+                        isDesktop ? 28 : 12,
+                        isDesktop ? 24 : 23,
                         0,
                       ),
-                      child: shouldAnimateInitialDetailReveal
+                      child: isDesktop && shouldAnimateInitialDetailReveal
                           ? AnimatedSize(
                               duration: const Duration(milliseconds: 320),
                               curve: Curves.easeOutCubic,
@@ -138,18 +138,40 @@ class ComicDetailBody extends StatelessWidget {
                           onTap: (_) =>
                               FocusManager.instance.primaryFocus?.unfocus(),
                           isScrollable: true,
-                          tabAlignment: isDesktop
-                              ? TabAlignment.start
-                              : TabAlignment.center,
+                          tabAlignment: TabAlignment.start,
                           padding: isDesktop
                               ? const EdgeInsets.symmetric(horizontal: 24)
-                              : EdgeInsets.zero,
-                          labelPadding: const EdgeInsets.symmetric(
-                            horizontal: 18,
-                          ),
+                              : const EdgeInsets.symmetric(horizontal: 23),
+                          labelPadding: isDesktop
+                              ? const EdgeInsets.symmetric(horizontal: 18)
+                              : const EdgeInsets.only(right: 28),
+                          labelStyle: isDesktop
+                              ? null
+                              : Theme.of(context).textTheme.labelLarge
+                                    ?.copyWith(fontWeight: FontWeight.w600),
+                          unselectedLabelColor: isDesktop
+                              ? null
+                              : Theme.of(context).colorScheme.onSurfaceVariant,
+                          indicator: isDesktop
+                              ? null
+                              : UnderlineTabIndicator(
+                                  borderSide: BorderSide(
+                                    width: 3,
+                                    color: Theme.of(
+                                      context,
+                                    ).colorScheme.primary,
+                                  ),
+                                  borderRadius: BorderRadius.circular(3),
+                                  insets: const EdgeInsets.symmetric(
+                                    horizontal: 4,
+                                  ),
+                                ),
                           indicatorSize: TabBarIndicatorSize.label,
                           indicatorWeight: 3,
-                          dividerColor: Colors.transparent,
+                          dividerColor: isDesktop
+                              ? Colors.transparent
+                              : Theme.of(context).colorScheme.outlineVariant
+                                    .withValues(alpha: 0.45),
                           tabs: [
                             Tab(
                               height: 44,
@@ -169,7 +191,7 @@ class ComicDetailBody extends StatelessWidget {
                         surface,
                         detailsReady: details != null,
                         shouldAnimateInitialDetailReveal:
-                            shouldAnimateInitialDetailReveal,
+                            isDesktop && shouldAnimateInitialDetailReveal,
                       ),
                     ),
                   ),

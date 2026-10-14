@@ -39,6 +39,7 @@ class ComicDetailInfoTab extends StatelessWidget {
     final actions = ComicDetailScope.of(context).actions;
     return ComicDetailMetaSection(
       details: details,
+      useMobileStyle: !isDesktop,
       showComicId:
           sourceButton(
             details.sourceKey,
@@ -119,33 +120,17 @@ class ComicDetailInfoTab extends StatelessWidget {
       slivers: [
         SliverOverlapInjector(handle: overlapHandle),
         SliverPadding(
-          padding: EdgeInsets.all(isDesktop ? 24 : 16),
+          padding: isDesktop
+              ? const EdgeInsets.all(24)
+              : const EdgeInsets.fromLTRB(23, 22, 23, 24),
           sliver: SliverToBoxAdapter(
             child: ComicDetailEntranceReveal(
               key: ValueKey<String>('comic-detail-info-${resolvedDetails.id}'),
-              beginOffset: const Offset(0, 20),
+              beginOffset: isDesktop ? const Offset(0, 20) : Offset.zero,
               enabled: shouldAnimate,
               child: isDesktop
                   ? _buildDesktopInfo(context, resolvedDetails, hasVisibleMeta)
-                  : Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (resolvedDetails.description.isNotEmpty) ...[
-                          Text(
-                            l10n(context).comicDetailSummary,
-                            style: Theme.of(context).textTheme.titleMedium,
-                          ),
-                          const SizedBox(height: 6),
-                          ComicDetailExpandableDescription(
-                            text: resolvedDetails.description,
-                          ),
-                        ],
-                        if (hasVisibleMeta) ...[
-                          const SizedBox(height: 12),
-                          _buildMetaSection(context, resolvedDetails),
-                        ],
-                      ],
-                    ),
+                  : _buildMobileInfo(context, resolvedDetails, hasVisibleMeta),
             ),
           ),
         ),
@@ -153,6 +138,45 @@ class ComicDetailInfoTab extends StatelessWidget {
           hasScrollBody: false,
           child: SizedBox.shrink(),
         ),
+      ],
+    );
+  }
+
+  Widget _buildMobileInfo(
+    BuildContext context,
+    ComicDetailsData details,
+    bool hasVisibleMeta,
+  ) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (details.description.isNotEmpty) ...[
+          Text(
+            l10n(context).comicDetailSummary,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 12),
+          DefaultTextStyle.merge(
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontSize: 13,
+              color: theme.colorScheme.onSurfaceVariant,
+              height: 1.9,
+            ),
+            child: ComicDetailExpandableDescription(text: details.description),
+          ),
+        ],
+        if (details.description.isNotEmpty && hasVisibleMeta)
+          Padding(
+            padding: const EdgeInsets.only(top: 22, bottom: 4),
+            child: Divider(
+              height: 1,
+              color: theme.colorScheme.outlineVariant.withValues(alpha: 0.45),
+            ),
+          ),
+        if (hasVisibleMeta) _buildMetaSection(context, details),
       ],
     );
   }

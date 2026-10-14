@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:hazuki/shared/source_presentation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 
@@ -99,6 +102,7 @@ class ComicDetailMetaSection extends StatelessWidget {
     super.key,
     required this.details,
     this.showComicId = true,
+    this.useMobileStyle = false,
     required this.onCopyId,
     required this.onTagValuePressed,
     required this.onMetaValueLongPress,
@@ -106,6 +110,7 @@ class ComicDetailMetaSection extends StatelessWidget {
 
   final ComicDetailsData details;
   final bool showComicId;
+  final bool useMobileStyle;
   final ValueChanged<String> onCopyId;
   final ValueChanged<String> onTagValuePressed;
   final ValueChanged<String> onMetaValueLongPress;
@@ -197,8 +202,13 @@ class ComicDetailMetaSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (showComicId)
-          ComicDetailIdRow(id: details.id, onCopy: () => onCopyId(details.id)),
+          ComicDetailIdRow(
+            id: details.id,
+            onCopy: () => onCopyId(details.id),
+            useMobileStyle: useMobileStyle,
+          ),
         ComicDetailMetaRow(
+          useMobileStyle: useMobileStyle,
           label: authorLabel,
           values: normalizeComicMetaValues(
             details.tags.keys
@@ -212,12 +222,14 @@ class ComicDetailMetaSection extends StatelessWidget {
         ),
         if (showCategories)
           ComicDetailMetaRow(
+            useMobileStyle: useMobileStyle,
             label: categoryLabel,
             values: categoryValues,
             onValuePressed: onTagValuePressed,
             onValueLongPress: onMetaValueLongPress,
           ),
         ComicDetailMetaRow(
+          useMobileStyle: useMobileStyle,
           label: tagLabel,
           values: tagValues,
           onValuePressed: onTagValuePressed,
@@ -225,6 +237,7 @@ class ComicDetailMetaSection extends StatelessWidget {
         ),
         if (isJm)
           ComicDetailMetaRow(
+            useMobileStyle: useMobileStyle,
             label: jmWorkLabel,
             values: workValues,
             onValuePressed: onTagValuePressed,
@@ -232,6 +245,7 @@ class ComicDetailMetaSection extends StatelessWidget {
           ),
         if (isJm)
           ComicDetailMetaRow(
+            useMobileStyle: useMobileStyle,
             label: jmActorLabel,
             values: actorValues,
             onValuePressed: onTagValuePressed,
@@ -239,6 +253,7 @@ class ComicDetailMetaSection extends StatelessWidget {
           ),
         if (showUploader)
           ComicDetailMetaRow(
+            useMobileStyle: useMobileStyle,
             label: uploaderLabel,
             values: normalizeComicMetaValues([details.uploader]),
             onValuePressed: onTagValuePressed,
@@ -246,6 +261,7 @@ class ComicDetailMetaSection extends StatelessWidget {
           ),
         if (showChineseTeam)
           ComicDetailMetaRow(
+            useMobileStyle: useMobileStyle,
             label: chineseTeamLabel,
             values: chineseTeamValues,
             onValuePressed: onTagValuePressed,
@@ -257,16 +273,57 @@ class ComicDetailMetaSection extends StatelessWidget {
 }
 
 class ComicDetailIdRow extends StatelessWidget {
-  const ComicDetailIdRow({super.key, required this.id, required this.onCopy});
+  const ComicDetailIdRow({
+    super.key,
+    required this.id,
+    required this.onCopy,
+    this.useMobileStyle = false,
+  });
 
   final String id;
   final VoidCallback onCopy;
+  final bool useMobileStyle;
 
   @override
   Widget build(BuildContext context) {
     final trimmedId = id.trim();
     if (trimmedId.isEmpty) {
       return const SizedBox.shrink();
+    }
+
+    if (useMobileStyle) {
+      final theme = Theme.of(context);
+      final colors = theme.colorScheme;
+      return Padding(
+        padding: const EdgeInsets.only(top: 16),
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onLongPress: () {
+            unawaited(HapticFeedback.lightImpact());
+            onCopy();
+          },
+          child: Chip(
+            visualDensity: VisualDensity.compact,
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            backgroundColor: colors.primary.withValues(alpha: 0.08),
+            side: BorderSide.none,
+            labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+            padding: EdgeInsets.zero,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(7),
+            ),
+            label: Text(
+              'ID: $trimmedId',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colors.onSurfaceVariant,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ),
+      );
     }
 
     return Padding(
@@ -299,12 +356,14 @@ class ComicDetailMetaRow extends StatelessWidget {
     required this.values,
     required this.onValuePressed,
     required this.onValueLongPress,
+    this.useMobileStyle = false,
   });
 
   final String label;
   final List<String> values;
   final ValueChanged<String> onValuePressed;
   final ValueChanged<String> onValueLongPress;
+  final bool useMobileStyle;
 
   @override
   Widget build(BuildContext context) {
@@ -315,7 +374,7 @@ class ComicDetailMetaRow extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final valueStyle = theme.textTheme.bodySmall?.copyWith(
-      color: cs.onSecondaryContainer,
+      color: useMobileStyle ? cs.onSurfaceVariant : cs.onSecondaryContainer,
       fontWeight: FontWeight.w500,
     );
     final chips = values
@@ -327,13 +386,27 @@ class ComicDetailMetaRow extends StatelessWidget {
               child: ActionChip(
                 visualDensity: VisualDensity.compact,
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                backgroundColor: cs.secondaryContainer,
-                side: BorderSide(
-                  color: cs.outlineVariant.withValues(alpha: 0.2),
-                ),
+                backgroundColor: useMobileStyle
+                    ? cs.primary.withValues(alpha: 0.08)
+                    : cs.secondaryContainer,
+                side: useMobileStyle
+                    ? BorderSide.none
+                    : BorderSide(
+                        color: cs.outlineVariant.withValues(alpha: 0.2),
+                      ),
                 labelPadding: const EdgeInsets.symmetric(horizontal: 4),
                 padding: EdgeInsets.zero,
-                label: Text(value.trim(), style: valueStyle),
+                shape: useMobileStyle
+                    ? RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(7),
+                      )
+                    : null,
+                label: Text(
+                  value.trim(),
+                  style: valueStyle,
+                  maxLines: useMobileStyle ? 1 : null,
+                  overflow: useMobileStyle ? TextOverflow.ellipsis : null,
+                ),
                 onPressed: () => onValuePressed(value.trim()),
               ),
             ),
@@ -342,11 +415,25 @@ class ComicDetailMetaRow extends StatelessWidget {
         .toList();
 
     return Padding(
-      padding: const EdgeInsets.only(top: 8),
+      padding: EdgeInsets.only(top: useMobileStyle ? 16 : 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('$label: ', style: theme.textTheme.bodyMedium),
+          if (useMobileStyle)
+            SizedBox(
+              width: 56,
+              child: Padding(
+                padding: const EdgeInsets.only(top: 5, right: 8),
+                child: Text(
+                  label,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            )
+          else
+            Text('$label: ', style: theme.textTheme.bodyMedium),
           Expanded(child: Wrap(spacing: 6, runSpacing: 6, children: chips)),
         ],
       ),

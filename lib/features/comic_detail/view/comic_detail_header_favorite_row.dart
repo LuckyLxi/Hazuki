@@ -18,7 +18,6 @@ class ComicDetailHeaderFavoriteRow extends StatelessWidget {
     required this.skeletonColor,
     required this.viewsText,
     required this.shouldAnimateInitialDetailReveal,
-    required this.favoriteButtonWidth,
     this.isDesktop = false,
   });
 
@@ -27,7 +26,6 @@ class ComicDetailHeaderFavoriteRow extends StatelessWidget {
   final Color skeletonColor;
   final String viewsText;
   final bool shouldAnimateInitialDetailReveal;
-  final double favoriteButtonWidth;
   final bool isDesktop;
 
   @override
@@ -155,149 +153,74 @@ class ComicDetailHeaderFavoriteRow extends StatelessWidget {
       );
     }
 
+    final mobileStatsText = [
+      if (!showLikeButton && (details?.likesCount.isNotEmpty ?? false))
+        l10n(context).comicDetailLikesCount(details!.likesCount),
+      if (showPageCount && (details?.pageCount.isNotEmpty ?? false))
+        l10n(context).comicDetailPagesCount(details!.pageCount)
+      else if (viewsText.isNotEmpty && comicStatusText.isEmpty)
+        l10n(context).comicDetailViewsCount(viewsText),
+    ].join(' · ');
+    final statsStyle = theme.textTheme.bodySmall?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+    );
     return Padding(
       key: favoriteRowKey,
-      padding: const EdgeInsets.symmetric(vertical: 4.0),
-      child: SizedBox(
-        height: 48,
-        child: AnimatedSlide(
-          offset: shouldAnimateInitialDetailReveal
-              ? (detailsReady ? Offset.zero : const Offset(0, -0.08))
-              : Offset.zero,
-          duration: shouldAnimateInitialDetailReveal
-              ? const Duration(milliseconds: 320)
-              : Duration.zero,
-          curve: Curves.easeOutCubic,
-          child: Row(
-            children: [
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.only(right: 12),
-                  child: detailsReady
-                      ? Align(
-                          alignment: Alignment.centerLeft,
-                          child: ComicDetailEntranceReveal(
-                            key: const ValueKey('comic-detail-stats'),
-                            beginOffset: const Offset(0, 12),
-                            enabled: shouldAnimateInitialDetailReveal,
-                            child: Text(
-                              statsText,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: theme.colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ),
-                        )
-                      : Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            ComicDetailSkeletonBlock(
-                              color: skeletonColor,
-                              width: 112,
-                              height: 12,
-                            ),
-                            const SizedBox(height: 8),
-                            ComicDetailSkeletonBlock(
-                              color: skeletonColor,
-                              width: 84,
-                              height: 12,
-                            ),
-                          ],
-                        ),
-                ),
-              ),
-              SizedBox(
-                width: favoriteButtonWidth,
-                child: Row(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: AnimatedSlide(
+        offset: Offset.zero,
+        duration: Duration.zero,
+        curve: Curves.easeOutCubic,
+        child: detailsReady
+            ? ComicDetailEntranceReveal(
+                key: const ValueKey('comic-detail-stats'),
+                beginOffset: Offset.zero,
+                enabled: shouldAnimateInitialDetailReveal,
+                child: Wrap(
+                  spacing: 14,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    if (showLikeButton) ...[
-                      SizedBox(
-                        width: 48,
-                        child: Tooltip(
-                          message: likedActive
+                    if (showLikeButton)
+                      TextButton.icon(
+                        onPressed: !favorite.isLikeBusy
+                            ? () => unawaited(
+                                favorite.toggleLike(context, details!),
+                              )
+                            : null,
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          foregroundColor: likedActive
+                              ? theme.colorScheme.primary
+                              : theme.colorScheme.onSurfaceVariant,
+                          textStyle: statsStyle,
+                        ),
+                        icon: Icon(
+                          likedActive
+                              ? Icons.thumb_up_alt_rounded
+                              : Icons.thumb_up_alt_outlined,
+                          size: 16,
+                        ),
+                        label: Text(
+                          details!.likesCount.isNotEmpty
+                              ? l10n(
+                                  context,
+                                ).comicDetailLikesCount(details!.likesCount)
+                              : likedActive
                               ? l10n(context).comicDetailUnlike
                               : l10n(context).comicDetailLike,
-                          child: FilledButton(
-                            onPressed: detailsReady && !favorite.isLikeBusy
-                                ? () => unawaited(
-                                    favorite.toggleLike(context, details!),
-                                  )
-                                : null,
-                            style: FilledButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              minimumSize: const Size(48, 40),
-                              fixedSize: const Size(48, 40),
-                              backgroundColor: likedActive
-                                  ? theme.colorScheme.primaryContainer
-                                  : null,
-                              foregroundColor: likedActive
-                                  ? theme.colorScheme.onPrimaryContainer
-                                  : null,
-                            ),
-                            child: Icon(
-                              likedActive
-                                  ? Icons.thumb_up_alt_rounded
-                                  : Icons.thumb_up_alt_outlined,
-                            ),
-                          ),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                    ],
-                    Expanded(
-                      child: AbsorbPointer(
-                        absorbing: !detailsReady || favorite.isBusy,
-                        child: FilledButton.icon(
-                          onPressed: () {
-                            if (detailsReady) {
-                              unawaited(
-                                favorite.showFoldersDialog(context, details!, (
-                                  vm,
-                                ) {
-                                  final themedData = scope.theme
-                                      .buildDetailTheme(Theme.of(context));
-                                  return Theme(
-                                    data: themedData,
-                                    child: FavoriteFoldersMorphDialog(
-                                      viewModel: vm,
-                                    ),
-                                  );
-                                }),
-                              );
-                            }
-                          },
-                          icon: Icon(
-                            favoriteActive
-                                ? Icons.favorite
-                                : Icons.favorite_border,
-                          ),
-                          label: FittedBox(
-                            fit: BoxFit.scaleDown,
-                            child: Text(
-                              favoriteActive
-                                  ? l10n(context).comicDetailUnfavorite
-                                  : l10n(context).comicDetailFavorite,
-                            ),
-                          ),
-                          style: FilledButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(horizontal: 12),
-                            backgroundColor: favoriteActive
-                                ? theme.colorScheme.primaryContainer
-                                : null,
-                            foregroundColor: favoriteActive
-                                ? theme.colorScheme.onPrimaryContainer
-                                : null,
-                          ),
-                        ),
-                      ),
-                    ),
+                    if (mobileStatsText.isNotEmpty)
+                      Text(mobileStatsText, style: statsStyle),
                   ],
                 ),
+              )
+            : ComicDetailSkeletonBlock(
+                color: skeletonColor,
+                width: 160,
+                height: 16,
               ),
-            ],
-          ),
-        ),
       ),
     );
   }
