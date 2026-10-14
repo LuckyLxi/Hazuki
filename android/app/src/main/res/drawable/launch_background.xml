@@ -2,11 +2,26 @@
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:drawable="?android:colorBackground" />
     <item
-        android:width="120dp"
-        android:height="120dp"
+        android:width="160dp"
+        android:height="160dp"
         android:gravity="center">
         <bitmap
             android:gravity="fill"
             android:src="@mipmap/ic_launcher" />
+    </item>
+    <!-- Cover the icon corners with the launch theme's background color. -->
+    <item
+        android:width="160dp"
+        android:height="160dp"
+        android:gravity="center">
+        <vector
+            android:width="160dp"
+            android:height="160dp"
+            android:viewportWidth="160"
+            android:viewportHeight="160">
+            <path
+                android:fillColor="?android:colorBackground"
+                android:pathData="M0,0 H32 A32,32 0,0 0,0 32 Z M128,0 H160 V32 A32,32 0,0 0,128 0 Z M160,128 V160 H128 A32,32 0,0 0,160 128 Z M32,160 H0 V128 A32,32 0,0 0,32 160 Z" />
+        </vector>
     </item>
 </layer-list>
