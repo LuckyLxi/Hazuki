@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../../../models/source_meta.dart';
+import '../../../shared/preferences/software_update_source.dart';
 import '../gateways/source_plugin_gateway.dart';
 import '../plugins/source_plugin_manager.dart';
 import '../plugins/source_plugin_models.dart';
@@ -24,12 +25,25 @@ class HazukiSourcePluginAdapter implements SourcePluginGateway {
   @override
   Map<String, String> get errors => manager.errors;
   @override
+  bool get checkingIndex => manager.checkingIndex;
+  @override
+  String? get indexError => manager.indexError;
+  @override
+  List<SourcePluginUpdate> get availableUpdates => manager.availableUpdates;
+  @override
   List<SourcePluginIndexEntry> entriesFor(String repo) =>
       manager.entriesFor(repo);
   @override
   InstalledSourcePlugin? pluginFor(String id) => manager.pluginFor(id);
   @override
   Future<void> initialize() => manager.initialize();
+  @override
+  Future<void> checkStartupUpdates() => manager.checkStartupUpdates();
+  @override
+  Future<SoftwareUpdateSource> loadUpdateSource() => manager.loadUpdateSource();
+  @override
+  Future<void> setUpdateSource(SoftwareUpdateSource source) =>
+      manager.setUpdateSource(source);
   @override
   Future<String> addRepository(
     String address, {

@@ -99,7 +99,7 @@ Hazuki.registerSource({
     for (final id in ['example', 'jm', 'copy_manga', 'picacg']) {
       expect(
         (await SourcePluginScriptInspector().inspect(
-          await File('plugins/$id/main.js').readAsString(),
+          await File('test/fixtures/source_plugins/$id/main.js').readAsString(),
         )).id,
         id,
       );

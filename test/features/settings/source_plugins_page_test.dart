@@ -9,18 +9,23 @@ import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/source/adapters/hazuki_source_plugin_adapter.dart';
 import 'package:hazuki/services/source/plugins/source_plugin_manager.dart';
 import 'package:hazuki/services/source/plugins/source_plugin_models.dart';
+import 'package:hazuki/services/source/plugins/source_plugin_repository.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
-  setUp(() => SharedPreferences.setMockInitialValues({}));
+  setUp(
+    () => SharedPreferences.setMockInitialValues({
+      'advanced_software_update_source': 'github',
+    }),
+  );
 
   for (final useUpdate in [false, true]) {
     for (final confirm in [false, true]) {
       testWidgets(
         '${useUpdate ? 'update' : 'repository install'} confirms edited replacement (confirm: $confirm)',
         (tester) async {
-          const repository = 'https://plugins.fixture.example/plugins.json';
-          final nextVersion = useUpdate ? '1.1.0' : '1.0.0';
+          const repository = sourcePluginsRepositoryUrl;
+          const nextVersion = '1.1.0';
           String script(String version) =>
               "Hazuki.registerSource({id:'edited_example',name:'Edited example',version:'$version',search:{load:async()=>({comics:[]})},comic:{loadInfo:async()=>({}),loadEp:async()=>({images:[]})}});";
           var packageDownloads = 0;
@@ -88,34 +93,41 @@ void main() {
             settingWriter: (_, _, _) async {},
             actionRunner: (_, _) async => null,
           );
-          await tester.pumpWidget(
-            MaterialApp(
-              locale: const Locale('en'),
-              localizationsDelegates: AppLocalizations.localizationsDelegates,
-              supportedLocales: AppLocalizations.supportedLocales,
-              home: SourcePluginsPage(manager: gateway),
-            ),
-          );
-          await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+          await tester.runAsync(() async {
+            await tester.pumpWidget(
+              MaterialApp(
+                locale: const Locale('en'),
+                localizationsDelegates: AppLocalizations.localizationsDelegates,
+                supportedLocales: AppLocalizations.supportedLocales,
+                home: SourcePluginsPage(manager: gateway),
+              ),
+            );
+            await manager.refreshRepository(repository);
+          });
           await tester.pumpAndSettle();
           final s = AppLocalizations.of(
             tester.element(find.byType(SourcePluginsPage)),
           )!;
 
           if (useUpdate) {
-            await tester.ensureVisible(find.text(s.pluginsCheckUpdate));
-            await tester.runAsync(
-              () => tester.tap(find.text(s.pluginsCheckUpdate)),
+            await tester.scrollUntilVisible(
+              find.text(s.pluginsUpdate),
+              250,
+              scrollable: find
+                  .descendant(
+                    of: find.byType(ListView).hitTestable(),
+                    matching: find.byType(Scrollable),
+                  )
+                  .first,
             );
-          } else {
-            await tester.ensureVisible(find.byType(ExpansionTile));
-            await tester.runAsync(() => tester.tap(find.byType(ExpansionTile)));
-            await tester.runAsync(() => Future<void>.delayed(Duration.zero));
             await tester.pumpAndSettle();
-            await tester.ensureVisible(find.text(s.pluginsInstall));
-            await tester.runAsync(
-              () => tester.tap(find.text(s.pluginsInstall)),
-            );
+            await tester.runAsync(() => tester.tap(find.text(s.pluginsUpdate)));
+          } else {
+            await tester.tap(find.widgetWithText(Tab, s.pluginsAvailable));
+            await tester.pumpAndSettle();
+            await tester.ensureVisible(find.text(s.pluginsUpdate));
+            await tester.pumpAndSettle();
+            await tester.runAsync(() => tester.tap(find.text(s.pluginsUpdate)));
           }
           // The page's progress indicator remains animated while confirmation
           // is pending, so settle only the dialog's entrance transition.
@@ -189,6 +201,7 @@ void main() {
       manager = SourcePluginManager(
         directory: () async => directory,
         legacyDirectories: [],
+        download: (_) async => utf8.encode('{"schemaVersion":1,"plugins":[]}'),
       );
       await manager.initialize();
     });
@@ -199,25 +212,50 @@ void main() {
       settingWriter: (_, _, _) async {},
       actionRunner: (_, _) async => null,
     );
-    await tester.pumpWidget(
-      MaterialApp(
-        locale: const Locale('en'),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: SourcePluginsPage(manager: gateway),
-      ),
-    );
-    await tester.runAsync(() => Future<void>.delayed(Duration.zero));
+    await tester.runAsync(() async {
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('en'),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: SourcePluginsPage(manager: gateway),
+        ),
+      );
+      await manager.refreshRepository(sourcePluginsRepositoryUrl);
+    });
     await tester.pumpAndSettle();
     final context = tester.element(find.byType(SourcePluginsPage));
     final s = AppLocalizations.of(context)!;
-    expect(find.text(s.pluginsEmpty), findsOneWidget);
     expect(find.text(s.pluginsImportLocal), findsOneWidget);
-    expect(find.text(s.pluginsAddRepository), findsOneWidget);
+    expect(find.text(s.pluginsAddRepository), findsNothing);
+    expect(find.text(s.pluginsRemoveRepository), findsNothing);
+    await tester.scrollUntilVisible(
+      find.text(s.pluginsEmpty),
+      250,
+      scrollable: find
+          .descendant(
+            of: find.byType(ListView).hitTestable(),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text(s.pluginsEmpty), findsOneWidget);
 
     const script =
         "Hazuki.registerSource({id:'widget_example',name:'Widget example',version:'1.0.0',search:{load:async()=>({comics:[]})},comic:{loadInfo:async()=>({}),loadEp:async()=>({images:[]})}});";
     await tester.runAsync(() => manager.importPackage(utf8.encode(script)));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byType(Switch),
+      -250,
+      scrollable: find
+          .descendant(
+            of: find.byType(ListView).hitTestable(),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
     await tester.pumpAndSettle();
     expect(find.text('Widget example'), findsOneWidget);
     expect(find.text(s.pluginsEmpty), findsNothing);

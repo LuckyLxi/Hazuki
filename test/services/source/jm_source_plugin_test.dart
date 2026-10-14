@@ -211,7 +211,9 @@ void main() {
     engine.evaluate(
       'Network=undefined;Convert=undefined;Comic=undefined;ComicDetails=undefined;Comment=undefined;HazukiSource=undefined;',
     );
-    engine.evaluate(await File('plugins/jm/main.js').readAsString());
+    engine.evaluate(
+      await File('test/fixtures/source_plugins/jm/main.js').readAsString(),
+    );
     handle.runtime.sourceMeta = SourceMeta(
       name: 'JMComic',
       key: 'jm',
@@ -340,7 +342,7 @@ void main() {
     'registration is local and retains the JM identity and settings',
     () async {
       final manifest = await SourcePluginScriptInspector().inspect(
-        await File('plugins/jm/main.js').readAsString(),
+        await File('test/fixtures/source_plugins/jm/main.js').readAsString(),
       );
       expect(manifest.id, 'jm');
       expect(fixtures.requests, isEmpty);

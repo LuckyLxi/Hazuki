@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/services/source/plugins/source_plugin_manager.dart';
 import 'package:hazuki/services/source/plugins/source_plugin_models.dart';
+import 'package:hazuki/services/source/plugins/source_plugin_repository.dart';
 import 'package:hazuki/services/source/plugins/source_plugin_script_inspector.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_assembly.dart';
 import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
@@ -369,7 +370,7 @@ Hazuki.registerSource({
     test(
       'imports the $id source file directly without a metadata header',
       () async {
-        final script = File('plugins/$id/main.js');
+        final script = File('test/fixtures/source_plugins/$id/main.js');
         expect(await script.readAsString(), isNot(contains('@hazuki-plugin')));
         await manager.importPackage(await script.readAsBytes());
         final manifest = manager.installed.single.manifest;
@@ -538,7 +539,7 @@ Hazuki.registerSource({
         manager.addRepository('https://example.com/missing.json'),
         throwsStateError,
       );
-      expect(manager.repositories, isEmpty);
+      expect(manager.repositories, [sourcePluginsRepositoryUrl]);
     },
   );
 

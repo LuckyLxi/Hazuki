@@ -12,9 +12,13 @@ Hazuki 只执行按本规范注册的 JS 插件。插件负责网站请求、签
 ]}
 ```
 
-`downloadUrl` 指向单个 UTF-8 JS 文件，可以放在 GitHub Releases 或其他 HTTPS 服务。应用读取 JSON 展示列表；只有用户选择插件后才下载 JS。可输入 GitHub 仓库地址、tree/blob 地址，或直接输入 HTTPS JSON 地址。分支留空时查询公开仓库的默认分支；含 `/` 的分支应在分支字段显式填写。索引路径默认 `plugins.json`，可以修改。
+`downloadUrl` 指向单个 UTF-8 JS 文件，可以放在 GitHub Releases 或其他 HTTPS 服务。应用读取 JSON 展示列表；只有用户选择插件后才下载 JS。插件页面使用内置索引 `https://raw.githubusercontent.com/LuckyLxi/Sources/main/plugins.json`，不提供添加或移除仓库入口；本地 JS 导入仍然可用。
 
-示例索引中的 `example.com` 是占位地址，发布者需要替换成实际 JS 链接。应用不提供默认仓库，也不随安装包附带漫画源。
+示例索引中的 `example.com` 是占位地址，发布者需要替换成实际 JS 链接。应用内置索引地址，不随安装包附带漫画源脚本。每次启动应用只下载一次索引，保存为插件存储目录中的 `plugins.json`，并与本地已安装插件的 ID、版本号对比；发现较新版本时显示插件更新弹窗，由用户选择更新。未安装的插件、相同或较旧的版本不触发提示，停用插件仍参与比较。
+
+安装成功后，所有插件的信息统一保存在插件存储目录的 `installed_plugins.json` 中，`plugins` 列表记录各插件的 `id` 和 `version`，同一文件同时保存恢复安装状态所需的元数据。安装、更新、卸载使用临时文件写入后原子替换；失败不会替换已提交记录。旧版 `registry-*.json` 记录在首次加载时迁移，并保留原文件。进入插件页面或左右滑动切换“已安装插件”“可安装插件”只读取共享索引，不重复下载；点击“刷新列表”才主动重新下载。网络失败保留已安装记录及上次缓存的列表，可以在高级设置切换线路后手动重试。
+
+漫画源插件源码独立维护在 [LuckyLxi/Sources](https://github.com/LuckyLxi/Sources)，根目录包含 `jm.js`、`copy_manga.js`、`picacg.js` 和内置索引对应的 `plugins.json` 列表。“更新链接线路”仅在高级设置中提供，支持 jsDelivr、GitHub 原始文件和 ghproxy；线路切换仅作用于内置索引的刷新和更新检查，插件安装与更新始终原样使用索引中的 `downloadUrl`。切换线路不改变插件来源身份，也不会丢失账号、收藏或本地编辑备份。类型声明、Node 测试、示例和开发文档集中在本地 `HazukiSources/dev/` 中，该目录由 Git 忽略，不上传 GitHub。本文档提供公开的宿主 API 规范。
 
 ## 单个 JS 文件与发布
 
@@ -40,13 +44,15 @@ Hazuki.registerSource({
 一个插件就是一个 `.js` 文件，不使用 ZIP、独立清单、入口路径或外部资源目录。最大文件大小为 8 MiB；不提供 npm、Node、原生模块或远程动态代码导入。实现与依赖须合并到单文件，静态数据直接定义为 JS 常量；可选文本资源通过注册对象的 `resources` 声明，用 `Hazuki.resources.readText(name)` 读取，不访问文件系统。
 
 ```powershell
-dart run tool/build_source_plugin.dart plugins/example/main.js
-dart run tool/build_source_plugin.dart plugins/jm/main.js
-dart run tool/build_source_plugin.dart plugins/copy_manga/main.js
-dart run tool/build_source_plugin.dart plugins/picacg/main.js
+dart run tool/build_source_plugin.dart ../HazukiSources/dev/example.js
+dart run tool/build_source_plugin.dart ../HazukiSources/jm.js
+dart run tool/build_source_plugin.dart ../HazukiSources/copy_manga.js
+dart run tool/build_source_plugin.dart ../HazukiSources/picacg.js
 ```
 
-工具直接复制源码，默认输出 `build/source_plugins/<源目录名>.js`（输入文件不叫 main.js 时沿用输入文件名）。本地可直接导入源码，不必执行发布工具。第二个参数可指定 JS 输出位置。发布时只上传该 JS 文件，再在列表中填写一致的 ID、版本和实际下载链接。本地导入同一 JS 文件即可。类型提示见 `plugins/hazuki-source.d.ts`，最小源码见 `plugins/example/main.js`。
+以上命令假定插件仓库检出到与 Hazuki 同级的 `HazukiSources` 目录，其中 `dev/example.js` 仅在本地开发资料中提供。工具直接复制源码，默认输出 `build/source_plugins/<输入文件名>`。本地可直接导入源码，不必执行发布工具。第二个参数可指定 JS 输出位置。发布时只上传该 JS 文件，再在列表中填写一致的 ID、版本和实际下载链接。本地导入同一 JS 文件即可。类型提示见本地 `HazukiSources/dev/hazuki-source.d.ts`，最小源码见 `dev/example.js`。
+
+Hazuki 的 `test/fixtures/source_plugins/` 仅保留宿主回归测试使用的插件快照，不作为发布源码。主项目测试无需检出 Sources 仓库；更新快照时需保留对应 `UPSTREAM.md` 并运行相关 Flutter 测试。插件日常修改和 Node 测试应在 Sources 仓库中进行。
 
 ## 注册和数据接口
 
@@ -239,13 +245,13 @@ Hazuki.registerSource({
 
 ## 验证
 
-三个插件直接使用 Hazuki API v1，接口由 `hazuki-source.d.ts` 和严格的 JS 类型检查约束。安装插件开发检查工具后运行：
+三个插件直接使用 Hazuki API v1，接口由本地 Sources 开发目录中的 `hazuki-source.d.ts` 和严格的 JS 类型检查约束。以下命令从 Hazuki 主仓库运行，假定同级 `HazukiSources/dev/` 中保留开发资料；该目录不上传 GitHub：
 
 ```powershell
-npm --prefix plugins ci
-npm --prefix plugins run check
-npm --prefix plugins run format:check
-npm --prefix plugins test
+npm --prefix ../HazukiSources/dev ci
+npm --prefix ../HazukiSources/dev run check
+npm --prefix ../HazukiSources/dev run format:check
+npm --prefix ../HazukiSources/dev test
 ```
 
 这些协议测试使用固定 HTTP 响应，不需要真实账号。覆盖签名、资料与头像兼容、登录失败保留 token、签到、会话重试、分页、章节映射和图片排序。拷贝的 HTTP 210 重试由插件处理，最多请求五次；评论及其他写操作不会因限流自动重复提交。哔咔资料查询兼容两种签名路径和旧客户端请求头，资料接口不可用时从 JWT 获取昵称，保留已成功完成的登录。

@@ -8,6 +8,7 @@ import 'software_update/software_update_dialog_support.dart';
 import 'source_runtime/source_runtime_coordinator.dart';
 import 'source_runtime/source_runtime_widgets.dart';
 import 'source_runtime/source_update_dialog_support.dart';
+import 'source_runtime/source_plugin_update_dialog_support.dart';
 import 'windows/windows_adaptation_notice_dialog_support.dart';
 
 class HazukiAppStartupCoordinator extends ChangeNotifier {
@@ -16,6 +17,8 @@ class HazukiAppStartupCoordinator extends ChangeNotifier {
     required SourceRuntimeCoordinator sourceRuntimeCoordinator,
     required SourceUpdateDialogSupport sourceUpdateDialogSupport,
     required SoftwareUpdateDialogSupport softwareUpdateDialogSupport,
+    SourcePluginUpdateDialogSupport sourcePluginUpdateDialogSupport =
+        const SourcePluginUpdateDialogSupport(),
     WindowsAdaptationNoticeDialogSupport windowsAdaptationNoticeDialogSupport =
         const WindowsAdaptationNoticeDialogSupport(),
     required bool Function() isMounted,
@@ -23,6 +26,7 @@ class HazukiAppStartupCoordinator extends ChangeNotifier {
        _sourceRuntimeCoordinator = sourceRuntimeCoordinator,
        _sourceUpdateDialogSupport = sourceUpdateDialogSupport,
        _softwareUpdateDialogSupport = softwareUpdateDialogSupport,
+       _sourcePluginUpdateDialogSupport = sourcePluginUpdateDialogSupport,
        _windowsAdaptationNoticeDialogSupport =
            windowsAdaptationNoticeDialogSupport,
        _isMounted = isMounted;
@@ -34,6 +38,8 @@ class HazukiAppStartupCoordinator extends ChangeNotifier {
   final SourceRuntimeCoordinator _sourceRuntimeCoordinator;
   final SourceUpdateDialogSupport _sourceUpdateDialogSupport;
   final SoftwareUpdateDialogSupport _softwareUpdateDialogSupport;
+  final SourcePluginUpdateDialogSupport _sourcePluginUpdateDialogSupport;
+  Future<void>? _pluginUpdateDialog;
   final WindowsAdaptationNoticeDialogSupport
   _windowsAdaptationNoticeDialogSupport;
   final bool Function() _isMounted;
@@ -61,6 +67,12 @@ class HazukiAppStartupCoordinator extends ChangeNotifier {
       if (!_isMounted()) {
         return;
       }
+      _pluginUpdateDialog = _sourcePluginUpdateDialogSupport.showIfNeeded(
+        navigatorKey: _navigatorKey,
+        isMounted: _isMounted,
+        onUpdated: refreshHome,
+      );
+      unawaited(_pluginUpdateDialog);
       unawaited(
         _sourceRuntimeCoordinator.bootstrapSourceRuntime(
           isMounted: _isMounted,
@@ -174,6 +186,8 @@ class HazukiAppStartupCoordinator extends ChangeNotifier {
   }
 
   Future<void> _showWindowsAdaptationNoticeThenCheckSoftwareUpdate() async {
+    await _pluginUpdateDialog;
+    if (!_isMounted()) return;
     await _windowsAdaptationNoticeDialogSupport.showIfNeeded(
       navigatorKey: _navigatorKey,
       isMounted: _isMounted,

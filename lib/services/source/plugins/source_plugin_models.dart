@@ -269,6 +269,18 @@ List<SourcePluginIndexEntry> parsePluginIndex(String content) {
       .toList(growable: false);
 }
 
+class SourcePluginUpdate {
+  const SourcePluginUpdate({
+    required this.plugin,
+    required this.entry,
+    required this.localVersion,
+  });
+
+  final InstalledSourcePlugin plugin;
+  final SourcePluginIndexEntry entry;
+  final String localVersion;
+}
+
 class InstalledSourcePlugin {
   const InstalledSourcePlugin({
     required this.manifest,

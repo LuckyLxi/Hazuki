@@ -38,7 +38,9 @@ Future<SourceRuntimeHandle> _loadPlugin(
   setter.free();
   engine.evaluate(await File('assets/init.js').readAsString());
   engine.evaluate(await File('assets/hazuki_plugin_sdk.js').readAsString());
-  engine.evaluate(await File('plugins/$id/main.js').readAsString());
+  engine.evaluate(
+    await File('test/fixtures/source_plugins/$id/main.js').readAsString(),
+  );
   final manifest = registeredSourcePluginManifest(engine).toJson();
   handle.runtime.sourceMeta = SourceMeta(
     name: manifest['name'] as String,

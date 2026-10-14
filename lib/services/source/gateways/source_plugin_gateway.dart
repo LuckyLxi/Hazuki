@@ -1,14 +1,21 @@
 import 'package:flutter/foundation.dart';
 import '../../../models/source_meta.dart';
+import '../../../shared/preferences/software_update_source.dart';
 import '../plugins/source_plugin_models.dart';
 
 abstract interface class SourcePluginGateway implements Listenable {
   List<InstalledSourcePlugin> get installed;
   List<String> get repositories;
   Map<String, String> get errors;
+  bool get checkingIndex;
+  String? get indexError;
+  List<SourcePluginUpdate> get availableUpdates;
   List<SourcePluginIndexEntry> entriesFor(String repository);
   InstalledSourcePlugin? pluginFor(String id);
   Future<void> initialize();
+  Future<void> checkStartupUpdates();
+  Future<SoftwareUpdateSource> loadUpdateSource();
+  Future<void> setUpdateSource(SoftwareUpdateSource source);
   Future<String> addRepository(
     String address, {
     String? branch,

@@ -3,8 +3,12 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
+import 'package:hazuki/services/source/plugins/source_plugin_repository.dart';
+
 import 'package:hazuki/widgets/widgets.dart';
 import 'source_plugin_settings_page.dart';
+
+part 'source_plugins_widgets.dart';
 
 class SourcePluginsPage extends StatefulWidget {
   const SourcePluginsPage({super.key, required this.manager});
@@ -17,6 +21,7 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
   late final SourcePluginGateway _manager;
   bool _busy = false;
   String? _error;
+
   @override
   void initState() {
     super.initState();
@@ -48,65 +53,6 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
     if (file != null) await _manager.importPackage(await file.readAsBytes());
   }
 
-  Future<void> _addRepository() async {
-    final address = TextEditingController();
-    final branch = TextEditingController();
-    final path = TextEditingController(text: 'plugins.json');
-    try {
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (context) {
-          final s = l10n(context);
-          return AlertDialog(
-            title: Text(s.pluginsAddRepository),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: address,
-                    decoration: InputDecoration(
-                      labelText: s.pluginsRepositoryUrl,
-                    ),
-                  ),
-                  TextField(
-                    controller: branch,
-                    decoration: InputDecoration(labelText: s.pluginsBranch),
-                  ),
-                  TextField(
-                    controller: path,
-                    decoration: InputDecoration(labelText: s.pluginsIndexPath),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: Text(s.commonCancel),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: Text(s.commonConfirm),
-              ),
-            ],
-          );
-        },
-      );
-      if (confirmed == true) {
-        await _manager.addRepository(
-          address.text,
-          branch: branch.text.trim().isEmpty ? null : branch.text.trim(),
-          path: path.text.trim(),
-        );
-      }
-    } finally {
-      address.dispose();
-      branch.dispose();
-      path.dispose();
-    }
-  }
-
   Future<void> _update(String id) async {
     final update = await _manager.checkUpdate(id);
     if (update == null) {
@@ -118,7 +64,10 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
       return;
     }
     final plugin = _manager.pluginFor(id)!;
-    await _installFromRepository(plugin.repository!, update);
+    await _installFromRepository(
+      plugin.repository ?? sourcePluginsRepositoryUrl,
+      update,
+    );
   }
 
   Future<void> _installFromRepository(
@@ -151,16 +100,145 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
   @override
   Widget build(BuildContext context) {
     final s = l10n(context);
-    return Scaffold(
-      appBar: hazukiFrostedAppBar(
-        context: context,
-        title: Text(s.pluginsTitle),
+    return DefaultTabController(
+      length: 2,
+      child: Scaffold(
+        appBar: hazukiFrostedAppBar(
+          context: context,
+          title: Text(s.pluginsTitle),
+          bottom: TabBar(
+            isScrollable: true,
+            tabAlignment: TabAlignment.start,
+            tabs: [
+              Tab(text: s.pluginsInstalled),
+              Tab(text: s.pluginsAvailable),
+            ],
+          ),
+        ),
+        body: SafeArea(
+          top: false,
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1040),
+              child: AnimatedBuilder(
+                animation: _manager,
+                builder: (context, _) => TabBarView(
+                  children: [
+                    ListView(
+                      key: const PageStorageKey('installed-plugins'),
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+                      children: [
+                        _overview(context),
+                        if (_busy)
+                          const Padding(
+                            padding: EdgeInsets.only(top: 16),
+                            child: LinearProgressIndicator(),
+                          ),
+                        if (_error != null) ...[
+                          const SizedBox(height: 16),
+                          _PluginError(message: _error!),
+                        ],
+                        const SizedBox(height: 28),
+                        _PluginSectionHeader(
+                          title: s.pluginsInstalled,
+                          count: _manager.installed.length,
+                        ),
+                        const SizedBox(height: 12),
+                        if (_manager.installed.isEmpty)
+                          _PluginEmptyState(
+                            icon: Icons.extension_outlined,
+                            message: s.pluginsEmpty,
+                          )
+                        else
+                          LayoutBuilder(
+                            builder: (context, constraints) {
+                              final width = constraints.maxWidth >= 800
+                                  ? (constraints.maxWidth - 16) / 2
+                                  : constraints.maxWidth;
+                              return Wrap(
+                                spacing: 16,
+                                runSpacing: 16,
+                                children: [
+                                  for (final plugin in _manager.installed)
+                                    SizedBox(
+                                      width: width,
+                                      child: _installedCard(context, plugin),
+                                    ),
+                                ],
+                              );
+                            },
+                          ),
+                      ],
+                    ),
+                    ListView(
+                      key: const PageStorageKey('available-plugins'),
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+                      children: [
+                        if (_busy || _manager.checkingIndex) ...[
+                          const LinearProgressIndicator(),
+                          const SizedBox(height: 12),
+                        ],
+                        if (_error ?? _manager.indexError
+                            case final error?) ...[
+                          _PluginError(message: error),
+                          const SizedBox(height: 12),
+                        ],
+                        _repositoryCard(context, sourcePluginsRepositoryUrl),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
-      body: AnimatedBuilder(
-        animation: _manager,
-        builder: (context, _) => ListView(
-          padding: const EdgeInsets.all(24),
+    );
+  }
+
+  Widget _overview(BuildContext context) {
+    final s = l10n(context);
+    final theme = Theme.of(context);
+    return _PluginSurface(
+      color: theme.colorScheme.primaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            Icon(
+              Icons.extension_rounded,
+              size: 32,
+              color: theme.colorScheme.onPrimaryContainer,
+            ),
+            const SizedBox(height: 12),
+            Text(
+              s.pluginsSubtitle,
+              style: theme.textTheme.titleLarge?.copyWith(
+                color: theme.colorScheme.onPrimaryContainer,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _PluginBadge(
+                  label: '${s.pluginsInstalled} · ${_manager.installed.length}',
+                ),
+                _PluginBadge(
+                  label:
+                      '${s.pluginsEnabled} · ${_manager.installed.where((plugin) => plugin.enabled).length}',
+                ),
+                _PluginBadge(
+                  label:
+                      '${s.pluginsAvailable} · ${_manager.entriesFor(sourcePluginsRepositoryUrl).length}',
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
             Wrap(
               spacing: 12,
               runSpacing: 8,
@@ -170,152 +248,237 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
                   icon: const Icon(Icons.file_open_outlined),
                   label: Text(s.pluginsImportLocal),
                 ),
-                OutlinedButton.icon(
-                  onPressed: _busy ? null : () => _run(_addRepository),
-                  icon: const Icon(Icons.add_link),
-                  label: Text(s.pluginsAddRepository),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _installedCard(BuildContext context, InstalledSourcePlugin plugin) {
+    final s = l10n(context);
+    final theme = Theme.of(context);
+    return _PluginSurface(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                _PluginIcon(
+                  icon: Icons.extension_outlined,
+                  highlighted: plugin.enabled,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        plugin.manifest.name,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        plugin.manifest.id,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Semantics(
+                  label: plugin.manifest.name,
+                  child: Switch(
+                    value: plugin.enabled,
+                    onChanged: _busy
+                        ? null
+                        : (value) => _run(
+                            () =>
+                                _manager.setEnabled(plugin.manifest.id, value),
+                          ),
+                  ),
                 ),
               ],
             ),
-            if (_busy)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 16),
-                child: LinearProgressIndicator(),
-              ),
-            if (_error != null)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                child: SelectableText(
-                  _error!,
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _PluginBadge(label: plugin.manifest.version),
+                _PluginBadge(
+                  label: plugin.enabled ? s.pluginsEnabled : s.pluginsDisabled,
+                  highlighted: plugin.enabled,
                 ),
-              ),
-            const SizedBox(height: 24),
-            Text(
-              s.pluginsInstalled,
-              style: Theme.of(context).textTheme.titleLarge,
+                if (plugin.customEdited)
+                  _PluginBadge(label: s.pluginsLocallyEdited),
+              ],
             ),
-            if (_manager.installed.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                child: Text(s.pluginsEmpty),
-              ),
-            for (final plugin in _manager.installed)
-              Card(
-                child: Column(
-                  children: [
-                    SwitchListTile(
-                      title: Text(plugin.manifest.name),
-                      subtitle: Text(
-                        '${plugin.manifest.version} · ${plugin.manifest.id}\n${plugin.repository ?? s.pluginsLocalPackage}',
-                      ),
-                      value: plugin.enabled,
-                      onChanged: _busy
-                          ? null
-                          : (value) => _run(
-                              () => _manager.setEnabled(
-                                plugin.manifest.id,
-                                value,
-                              ),
+            const SizedBox(height: 12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  plugin.repository == null
+                      ? Icons.insert_drive_file_outlined
+                      : Icons.link,
+                  size: 18,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    plugin.repository ?? s.pluginsLocalPackage,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            if (_manager.errors[plugin.manifest.id] case final error?) ...[
+              const SizedBox(height: 12),
+              _PluginError(message: error),
+            ],
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Divider(height: 1),
+            ),
+            Wrap(
+              spacing: 4,
+              runSpacing: 4,
+              children: [
+                TextButton.icon(
+                  onPressed: _busy || !plugin.enabled
+                      ? null
+                      : () => Navigator.push(
+                          context,
+                          MaterialPageRoute<void>(
+                            builder: (_) => SourcePluginSettingsPage(
+                              gateway: _manager,
+                              id: plugin.manifest.id,
                             ),
-                    ),
-                    if (_manager.errors[plugin.manifest.id] case final error?)
-                      Padding(
-                        padding: const EdgeInsets.all(12),
-                        child: Text(error),
-                      ),
-                    Wrap(
-                      spacing: 12,
-                      children: [
-                        if (plugin.repository != null)
-                          TextButton(
-                            onPressed: _busy
-                                ? null
-                                : () => _run(() => _update(plugin.manifest.id)),
-                            child: Text(s.pluginsCheckUpdate),
                           ),
-                        TextButton(
-                          onPressed: _busy
-                              ? null
-                              : () => _run(
-                                  () => _manager.uninstall(plugin.manifest.id),
-                                ),
-                          child: Text(s.pluginsUninstall),
                         ),
-                        TextButton(
-                          onPressed: _busy || !plugin.enabled
-                              ? null
-                              : () => Navigator.push(
-                                  context,
-                                  MaterialPageRoute<void>(
-                                    builder: (_) => SourcePluginSettingsPage(
-                                      gateway: _manager,
-                                      id: plugin.manifest.id,
-                                    ),
-                                  ),
-                                ),
-                          child: Text(s.settingsTitle),
-                        ),
-                      ],
-                    ),
-                  ],
+                  icon: const Icon(Icons.tune, size: 18),
+                  label: Text(s.settingsTitle),
                 ),
-              ),
-            const SizedBox(height: 24),
-            Text(
-              s.pluginsRepositories,
-              style: Theme.of(context).textTheme.titleLarge,
+                if (plugin.repository == null ||
+                    plugin.repository == sourcePluginsRepositoryUrl ||
+                    _manager.repositories.contains(plugin.repository))
+                  TextButton.icon(
+                    onPressed: _busy
+                        ? null
+                        : () => _run(() => _update(plugin.manifest.id)),
+                    icon: const Icon(Icons.update, size: 18),
+                    label: Text(
+                      _manager.availableUpdates.any(
+                            (update) => update.entry.id == plugin.manifest.id,
+                          )
+                          ? s.pluginsUpdate
+                          : s.pluginsCheckUpdate,
+                    ),
+                  ),
+                TextButton.icon(
+                  style: TextButton.styleFrom(
+                    foregroundColor: theme.colorScheme.error,
+                  ),
+                  onPressed: _busy
+                      ? null
+                      : () =>
+                            _run(() => _manager.uninstall(plugin.manifest.id)),
+                  icon: const Icon(Icons.delete_outline, size: 18),
+                  label: Text(s.pluginsUninstall),
+                ),
+              ],
             ),
-            for (final repository in _manager.repositories)
-              Card(
-                child: ExpansionTile(
-                  title: Text(repository),
-                  onExpansionChanged: (expanded) {
-                    if (expanded && !_busy) {
-                      unawaited(
-                        _run(() => _manager.refreshRepository(repository)),
-                      );
-                    }
-                  },
-                  children: [
-                    Wrap(
-                      spacing: 12,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _repositoryCard(BuildContext context, String repository) {
+    final s = l10n(context);
+    final theme = Theme.of(context);
+    final entries = _manager.entriesFor(repository);
+    return _PluginSurface(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              sourcePluginsRepositoryName,
+              style: theme.textTheme.titleMedium,
+            ),
+            const SizedBox(height: 12),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: TextButton.icon(
+                onPressed: _busy || _manager.checkingIndex
+                    ? null
+                    : () => _run(() => _manager.refreshRepository(repository)),
+                icon: const Icon(Icons.refresh, size: 18),
+                label: Text(s.pluginsRefresh),
+              ),
+            ),
+            if (entries.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 24),
+                child: Text(
+                  s.pluginsRepositoryEmpty,
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            for (final entry in entries) ...[
+              const Divider(height: 24),
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        TextButton(
-                          onPressed: _busy
-                              ? null
-                              : () => _run(
-                                  () => _manager.refreshRepository(repository),
-                                ),
-                          child: Text(s.pluginsRefresh),
-                        ),
-                        TextButton(
-                          onPressed: _busy
-                              ? null
-                              : () => _run(
-                                  () => _manager.removeRepository(repository),
-                                ),
-                          child: Text(s.pluginsRemoveRepository),
+                        Text(entry.name, style: theme.textTheme.titleSmall),
+                        Text(
+                          '${entry.version} · ${entry.id}',
+                          style: theme.textTheme.bodySmall,
                         ),
                       ],
                     ),
-                    for (final entry in _manager.entriesFor(repository))
-                      ListTile(
-                        title: Text(entry.name),
-                        subtitle: Text(entry.version),
-                        trailing: TextButton(
-                          onPressed: _busy
-                              ? null
-                              : () => _run(
-                                  () =>
-                                      _installFromRepository(repository, entry),
-                                ),
-                          child: Text(s.pluginsInstall),
-                        ),
-                      ),
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 12),
+                  FilledButton.tonal(
+                    onPressed:
+                        _busy ||
+                            _manager.checkingIndex ||
+                            (_manager.pluginFor(entry.id) != null &&
+                                !_manager.availableUpdates.any(
+                                  (update) => update.entry.id == entry.id,
+                                ))
+                        ? null
+                        : () => _run(
+                            () => _installFromRepository(repository, entry),
+                          ),
+                    child: Text(
+                      _manager.pluginFor(entry.id) == null
+                          ? s.pluginsInstall
+                          : _manager.availableUpdates.any(
+                              (update) => update.entry.id == entry.id,
+                            )
+                          ? s.pluginsUpdate
+                          : s.pluginsAlreadyInstalled,
+                    ),
+                  ),
+                ],
               ),
+            ],
           ],
         ),
       ),

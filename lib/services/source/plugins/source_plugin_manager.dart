@@ -7,35 +7,45 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../shared/preferences/hazuki_preference_keys.dart';
+import '../../../shared/preferences/software_update_source.dart';
 import '../models/source_contract_models.dart';
 import '../runtime/source_script_storage.dart';
 import 'source_plugin_models.dart';
 import 'source_presentation_metadata.dart';
 import 'source_plugin_script_inspector.dart';
+import 'source_plugin_repository.dart';
 
 typedef PluginPackageValidator =
     Future<void> Function(SourcePluginManifest manifest, Directory directory);
 
-/// Owns installed packages. A journal commits complete generations; interrupted
-/// installs never replace the last committed registry or overwrite user data.
+/// Owns installed packages. Atomic registry replacement commits complete
+/// generations; interrupted installs never overwrite committed user data.
 class SourcePluginManager extends ChangeNotifier implements SourceScriptStore {
   SourcePluginManager({
     Future<Directory> Function()? directory,
     Future<List<int>> Function(Uri url)? download,
     List<Directory>? legacyDirectories,
+    Future<SoftwareUpdateSource> Function()? loadUpdateSource,
     this.validatePackage,
     this.onCatalogChanged,
   }) : _directory = directory ?? _defaultDirectory,
        _download = download ?? _downloadBytes,
+       _loadUpdateSource =
+           loadUpdateSource ?? loadSoftwareUpdateSourcePreference,
        _legacyDirectories = legacyDirectories;
 
   final Future<Directory> Function() _directory;
   final Future<List<int>> Function(Uri url) _download;
+  final Future<SoftwareUpdateSource> Function() _loadUpdateSource;
   final List<Directory>? _legacyDirectories;
   PluginPackageValidator? validatePackage;
   Future<void> Function(List<SourceCatalogEntry>)? onCatalogChanged;
   final Map<String, InstalledSourcePlugin> _installed = {};
+  final Map<String, String> _installedVersions = {};
+  static const installedPluginsFileName = 'installed_plugins.json';
   final Map<String, Map<String, dynamic>> _historicalPresentations = {};
 
   Map<String, dynamic> historicalPresentationFor(String id) =>
@@ -59,6 +69,9 @@ class SourcePluginManager extends ChangeNotifier implements SourceScriptStore {
   }
 
   Future<void>? _initializing;
+  Future<void>? _startupUpdateCheck;
+  bool _checkingIndex = false;
+  String? _indexError;
   Future<void> _tail = Future.value();
   Directory? _root;
   bool _disposed = false;
@@ -69,6 +82,54 @@ class SourcePluginManager extends ChangeNotifier implements SourceScriptStore {
   List<SourcePluginIndexEntry> entriesFor(String repository) =>
       List.unmodifiable(_indexes[repository] ?? const []);
   InstalledSourcePlugin? pluginFor(String id) => _installed[id];
+  bool get checkingIndex => _checkingIndex;
+  String? get indexError => _indexError;
+  List<SourcePluginUpdate> get availableUpdates => List.unmodifiable([
+    for (final entry in entriesFor(sourcePluginsRepositoryUrl))
+      if (_installed[entry.id] case final plugin?)
+        if (plugin.repository == null ||
+            plugin.repository == sourcePluginsRepositoryUrl)
+          if (_installedVersions[entry.id] case final version?)
+            if (_isNewer(entry.version, version))
+              SourcePluginUpdate(
+                plugin: plugin,
+                entry: entry,
+                localVersion: version,
+              ),
+  ]);
+
+  bool _isNewer(String remote, String local) => isPluginVersion(local)
+      ? comparePluginVersions(remote, local) > 0
+      : remote != local;
+
+  /// Shared by startup and its dialog; a page visit never starts another fetch.
+  Future<void> checkStartupUpdates() =>
+      _startupUpdateCheck ??= _checkStartupUpdates();
+
+  Future<void> _checkStartupUpdates() async {
+    try {
+      await refreshRepository(sourcePluginsRepositoryUrl);
+    } catch (error) {
+      _indexError = error.toString();
+      _notify();
+    }
+  }
+
+  Future<SoftwareUpdateSource> loadUpdateSource() => _loadUpdateSource();
+
+  Future<void> setUpdateSource(SoftwareUpdateSource source) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!await prefs.setString(
+      hazukiSoftwareUpdateSourcePreferenceKey,
+      source.preferenceValue,
+    )) {
+      throw StateError('plugin_update_source_not_saved');
+    }
+    _notify();
+  }
+
+  Future<List<int>> _downloadPluginIndexBytes(Uri url) async =>
+      _download(resolveSourcePluginIndexUrl(url, await _loadUpdateSource()));
 
   List<SourceCatalogEntry> get catalog => _installed.values
       .where(
@@ -121,6 +182,7 @@ class SourcePluginManager extends ChangeNotifier implements SourceScriptStore {
   Future<void> _initialize() async {
     _root = await _directory();
     await _root!.create(recursive: true);
+    final versionFile = File(p.join(_root!.path, installedPluginsFileName));
     final records = await _root!
         .list()
         .where(
@@ -132,8 +194,14 @@ class SourcePluginManager extends ChangeNotifier implements SourceScriptStore {
         .cast<File>()
         .toList();
     records.sort((a, b) => b.path.compareTo(a.path));
-    if (records.isNotEmpty) {
-      final state = jsonDecode(await records.first.readAsString()) as Map;
+    final hasVersionFile = await versionFile.exists();
+    if (hasVersionFile || records.isNotEmpty) {
+      final state =
+          jsonDecode(
+                await (hasVersionFile ? versionFile : records.first)
+                    .readAsString(),
+              )
+              as Map;
       if (state['schemaVersion'] != 1) {
         throw const SourcePluginException('plugin_invalid_store');
       }
@@ -148,10 +216,13 @@ class SourcePluginManager extends ChangeNotifier implements SourceScriptStore {
         }
       }
       for (final raw in state['installed'] as List) {
-        final plugin = InstalledSourcePlugin.fromJson(
-          Map<String, dynamic>.from(raw as Map),
-        );
+        final record = Map<String, dynamic>.from(raw as Map);
+        if (record['repository'] case final String repository) {
+          record['repository'] = canonicalSourcePluginUrl(repository);
+        }
+        final plugin = InstalledSourcePlugin.fromJson(record);
         _installed[plugin.manifest.id] = plugin;
+        _installedVersions[plugin.manifest.id] = plugin.manifest.version;
         _historicalPresentations[plugin.manifest.id] =
             historicalSourcePresentation(plugin.manifest.presentation);
         if (!await File(
@@ -160,10 +231,38 @@ class SourcePluginManager extends ChangeNotifier implements SourceScriptStore {
           _fileErrors[plugin.manifest.id] = 'plugin_entry_missing';
         }
       }
-      _repositories.addAll((state['repositories'] as List).cast<String>());
+      _repositories.addAll(
+        (state['repositories'] as List)
+            .cast<String>()
+            .map(canonicalSourcePluginUrl)
+            .toSet(),
+      );
+      if (state['plugins'] case final List versions) {
+        for (final record in versions.whereType<Map>()) {
+          if (record['id'] case final String id) {
+            if (record['version'] case final String version) {
+              if (_installed.containsKey(id)) _installedVersions[id] = version;
+            }
+          }
+        }
+      }
+    }
+    if (!_repositories.contains(sourcePluginsRepositoryUrl)) {
+      _repositories.insert(0, sourcePluginsRepositoryUrl);
     }
     await _backupLegacyScripts();
     await onCatalogChanged?.call(catalog);
+    if (!hasVersionFile && _installed.isNotEmpty) await _commit();
+    final cachedIndex = File(p.join(_root!.path, 'plugins.json'));
+    if (await cachedIndex.exists()) {
+      try {
+        _indexes[sourcePluginsRepositoryUrl] = parsePluginIndex(
+          await cachedIndex.readAsString(),
+        );
+      } catch (_) {
+        // A stale or damaged index can be replaced by the startup fetch.
+      }
+    }
     _notify();
   }
 
@@ -220,11 +319,15 @@ class SourcePluginManager extends ChangeNotifier implements SourceScriptStore {
       '${DateTime.now().microsecondsSinceEpoch.toString().padLeft(20, '0')}-${Random.secure().nextInt(0x7fffffff)}';
 
   Future<void> _commit() async {
-    final file = File(p.join(_root!.path, 'registry-${_generation()}.json'));
+    final file = File(p.join(_root!.path, installedPluginsFileName));
     final pending = File('${file.path}.pending');
     await pending.writeAsString(
       jsonEncode({
         'schemaVersion': 1,
+        'plugins': [
+          for (final plugin in _installed.values)
+            {'id': plugin.manifest.id, 'version': plugin.manifest.version},
+        ],
         'historicalPresentations': _historicalPresentations,
         'repositories': _repositories,
         'installed': _installed.values.map((item) => item.toJson()).toList(),
@@ -232,6 +335,13 @@ class SourcePluginManager extends ChangeNotifier implements SourceScriptStore {
       flush: true,
     );
     await pending.rename(file.path);
+    _installedVersions
+      ..clear()
+      ..addEntries(
+        _installed.values.map(
+          (plugin) => MapEntry(plugin.manifest.id, plugin.manifest.version),
+        ),
+      );
   }
 
   /// Resolve a public GitHub repo, a tree/blob URL, or an HTTPS JSON URL.
@@ -293,7 +403,7 @@ class SourcePluginManager extends ChangeNotifier implements SourceScriptStore {
   }) => _serialize(() async {
     final url = await resolveRepository(address, branch: branch, path: path);
     final index = await _readIndex(url);
-    final key = url.toString();
+    final key = canonicalSourcePluginUrl(url.toString());
     if (!_repositories.contains(key)) {
       _repositories.add(key);
       try {
@@ -309,19 +419,44 @@ class SourcePluginManager extends ChangeNotifier implements SourceScriptStore {
   });
 
   Future<List<SourcePluginIndexEntry>> _readIndex(Uri uri) async {
-    final data = await _download(uri);
+    final data = await _downloadPluginIndexBytes(uri);
     if (data.length > 2 * 1024 * 1024) {
       throw const SourcePluginException('plugin_index_too_large');
     }
-    return parsePluginIndex(utf8.decode(data));
+    final content = utf8.decode(data);
+    final entries = parsePluginIndex(content);
+    if (canonicalSourcePluginUrl(uri.toString()) ==
+        sourcePluginsRepositoryUrl) {
+      final file = File(p.join(_root!.path, 'plugins.json'));
+      final pending = File('${file.path}.pending');
+      await pending.writeAsString(content, flush: true);
+      await pending.rename(file.path);
+    }
+    return entries;
   }
 
   Future<void> refreshRepository(String repository) => _serialize(() async {
-    _indexes[repository] = await _readIndex(Uri.parse(repository));
-    _notify();
+    final builtin = repository == sourcePluginsRepositoryUrl;
+    if (builtin) {
+      _checkingIndex = true;
+      _indexError = null;
+      _notify();
+    }
+    try {
+      _indexes[repository] = await _readIndex(Uri.parse(repository));
+    } catch (error) {
+      if (builtin) _indexError = error.toString();
+      rethrow;
+    } finally {
+      if (builtin) _checkingIndex = false;
+      _notify();
+    }
   });
 
   Future<void> removeRepository(String repository) => _serialize(() async {
+    if (repository == sourcePluginsRepositoryUrl) {
+      throw const SourcePluginException('plugin_builtin_repository');
+    }
     final previous = List<String>.of(_repositories);
     _repositories.remove(repository);
     try {
@@ -345,7 +480,12 @@ class SourcePluginManager extends ChangeNotifier implements SourceScriptStore {
     }
     await _install(
       await _download(entry.downloadUrl),
-      repository: repository,
+      repository:
+          repository == sourcePluginsRepositoryUrl &&
+              _installed[entry.id]?.repository == null &&
+              _installed.containsKey(entry.id)
+          ? null
+          : repository,
       expected: entry,
     );
   });
@@ -468,17 +608,19 @@ class SourcePluginManager extends ChangeNotifier implements SourceScriptStore {
   Future<SourcePluginIndexEntry?> checkUpdate(String id) async {
     await initialize();
     final plugin = _requirePlugin(id);
-    if (plugin.repository == null) return null;
-    final entries = await _readIndex(Uri.parse(plugin.repository!));
+    final builtin =
+        plugin.repository == null ||
+        plugin.repository == sourcePluginsRepositoryUrl;
+    if (builtin && _startupUpdateCheck != null) await _startupUpdateCheck;
+    final entries = builtin
+        ? entriesFor(sourcePluginsRepositoryUrl)
+        : await _readIndex(Uri.parse(plugin.repository!));
     final entry = entries.where((entry) => entry.id == id).firstOrNull;
     return entry != null &&
-            (isPluginVersion(plugin.manifest.version)
-                ? comparePluginVersions(
-                        entry.version,
-                        plugin.manifest.version,
-                      ) >
-                      0
-                : entry.version != plugin.manifest.version)
+            _isNewer(
+              entry.version,
+              _installedVersions[id] ?? plugin.manifest.version,
+            )
         ? entry
         : null;
   }
