@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
@@ -38,12 +41,18 @@ class _SourceEditorContentState extends State<SourceEditorContent>
   static const Duration _searchHighlightDuration = Duration(seconds: 5);
 
   final TextEditingController _searchController = TextEditingController();
+  final SourceEditorToolbarController _toolbarController =
+      SourceEditorToolbarController();
 
   late final AnimationController _highlightAnimationController;
   late final Animation<double> _highlightOpacity;
   late final SourceSearchHighlightCodeLineController _editorController;
   SourceSearchHighlight? _activeHighlight;
   bool _controllerRebuildScheduled = false;
+  Timer? _longPressFeedbackTimer;
+  PointerDownEvent? _editorPress;
+  bool _longPressFeedbackReady = false;
+  bool _longPressFeedbackSent = false;
 
   SourceCodeEditingController get _controller => widget.controller;
   AppLocalizations get _strings => widget.strings;
@@ -91,6 +100,12 @@ class _SourceEditorContentState extends State<SourceEditorContent>
 
   @override
   void dispose() {
+    _resetEditorPress();
+    // Overlay removal must wait until the current widget teardown has finished.
+    final toolbarContext = context;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _toolbarController.hide(toolbarContext);
+    });
     _controller.removeListener(_handleControllerChanged);
     _highlightAnimationController
       ..removeListener(_handleHighlightAnimationTick)
@@ -104,6 +119,7 @@ class _SourceEditorContentState extends State<SourceEditorContent>
     if (!mounted) {
       return;
     }
+    _provideLongPressFeedback();
     if (SchedulerBinding.instance.schedulerPhase ==
         SchedulerPhase.persistentCallbacks) {
       if (_controllerRebuildScheduled) {
@@ -119,6 +135,54 @@ class _SourceEditorContentState extends State<SourceEditorContent>
       return;
     }
     setState(() {});
+  }
+
+  void _handleEditorPointerDown(PointerDownEvent event) {
+    if (Theme.of(context).platform != TargetPlatform.android ||
+        event.kind != PointerDeviceKind.touch ||
+        _editorPress != null) {
+      return;
+    }
+    _editorPress = event;
+    // Observe the editor's gesture without competing with text selection.
+    _longPressFeedbackTimer = Timer(kLongPressTimeout, () {
+      _longPressFeedbackReady = true;
+      _provideLongPressFeedback();
+    });
+  }
+
+  void _handleEditorPointerMove(PointerMoveEvent event) {
+    final press = _editorPress;
+    if (press != null &&
+        event.pointer == press.pointer &&
+        (event.position - press.position).distance > kTouchSlop) {
+      _resetEditorPress();
+    }
+  }
+
+  void _handleEditorPointerEnd(PointerEvent event) {
+    if (event.pointer == _editorPress?.pointer) {
+      _resetEditorPress();
+    }
+  }
+
+  void _resetEditorPress() {
+    _longPressFeedbackTimer?.cancel();
+    _longPressFeedbackTimer = null;
+    _editorPress = null;
+    _longPressFeedbackReady = false;
+    _longPressFeedbackSent = false;
+  }
+
+  void _provideLongPressFeedback() {
+    if (_editorPress == null ||
+        !_longPressFeedbackReady ||
+        _longPressFeedbackSent ||
+        _controller.selection.isCollapsed) {
+      return;
+    }
+    _longPressFeedbackSent = true;
+    Feedback.forLongPress(context);
   }
 
   void _handleHighlightAnimationTick() {
@@ -319,44 +383,66 @@ class _SourceEditorContentState extends State<SourceEditorContent>
           ],
           const SizedBox(height: 12),
           Expanded(
-            child: RepaintBoundary(
-              child: CodeEditor(
-                controller: _editorController,
-                autofocus: false,
-                readOnly: widget.saving,
-                wordWrap: false,
-                autocompleteSymbols: false,
-                showCursorWhenReadOnly: false,
-                clipBehavior: Clip.antiAlias,
-                chunkAnalyzer: const NonCodeChunkAnalyzer(),
-                border: Border.all(
-                  color: colorScheme.outlineVariant.withValues(alpha: 0.52),
+            child: NotificationListener<ScrollStartNotification>(
+              onNotification: (notification) {
+                if (notification.dragDetails != null &&
+                    !_controller.selection.isCollapsed) {
+                  _controller.selection = CodeLineSelection.fromPosition(
+                    position: _controller.selection.extent,
+                  );
+                }
+                return false;
+              },
+              child: Listener(
+                onPointerDown: _handleEditorPointerDown,
+                onPointerMove: _handleEditorPointerMove,
+                onPointerUp: _handleEditorPointerEnd,
+                onPointerCancel: _handleEditorPointerEnd,
+                child: RepaintBoundary(
+                  child: CodeEditor(
+                    controller: _editorController,
+                    autofocus: false,
+                    readOnly: widget.saving,
+                    wordWrap: false,
+                    autocompleteSymbols: false,
+                    showCursorWhenReadOnly: false,
+                    clipBehavior: Clip.antiAlias,
+                    chunkAnalyzer: const NonCodeChunkAnalyzer(),
+                    border: Border.all(
+                      color: colorScheme.outlineVariant.withValues(alpha: 0.52),
+                    ),
+                    borderRadius: BorderRadius.circular(20),
+                    padding: const EdgeInsets.fromLTRB(14, 10, 18, 12),
+                    style: editorStyle,
+                    indicatorBuilder:
+                        (
+                          context,
+                          editingController,
+                          chunkController,
+                          notifier,
+                        ) {
+                          return Container(
+                            color: colorScheme.surfaceContainerHigh.withValues(
+                              alpha: 0.72,
+                            ),
+                            padding: const EdgeInsets.only(right: 8),
+                            child: DefaultCodeLineNumber(
+                              controller: editingController,
+                              notifier: notifier,
+                              minNumberCount: 2,
+                              textStyle: lineNumberStyle,
+                              focusedTextStyle: focusedLineNumberStyle,
+                            ),
+                          );
+                        },
+                    sperator: Container(
+                      width: 1,
+                      color: colorScheme.outlineVariant.withValues(alpha: 0.28),
+                    ),
+                    toolbarController: _toolbarController,
+                    shortcutOverrideActions: shortcutOverrideActions,
+                  ),
                 ),
-                borderRadius: BorderRadius.circular(20),
-                padding: const EdgeInsets.fromLTRB(14, 10, 18, 12),
-                style: editorStyle,
-                indicatorBuilder:
-                    (context, editingController, chunkController, notifier) {
-                      return Container(
-                        color: colorScheme.surfaceContainerHigh.withValues(
-                          alpha: 0.72,
-                        ),
-                        padding: const EdgeInsets.only(right: 8),
-                        child: DefaultCodeLineNumber(
-                          controller: editingController,
-                          notifier: notifier,
-                          minNumberCount: 2,
-                          textStyle: lineNumberStyle,
-                          focusedTextStyle: focusedLineNumberStyle,
-                        ),
-                      );
-                    },
-                sperator: Container(
-                  width: 1,
-                  color: colorScheme.outlineVariant.withValues(alpha: 0.28),
-                ),
-                toolbarController: const SourceEditorToolbarController(),
-                shortcutOverrideActions: shortcutOverrideActions,
               ),
             ),
           ),
