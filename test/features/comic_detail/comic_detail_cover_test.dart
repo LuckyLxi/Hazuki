@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_cover.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
+import 'package:hazuki/shared/navigation/snapshotting_page_route.dart';
 import 'package:hazuki/widgets/source_image_gateway_scope.dart';
 
 import '../../support/test_service_locator.dart';
@@ -99,6 +100,64 @@ void main() {
     );
     expect(tester.widget<AnimatedOpacity>(backgroundOpacity).opacity, 1);
     expect(gateway.downloadCount, 1);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('routed background fades in and reuses the cover on reentry', (
+    tester,
+  ) async {
+    const url = 'https://example.test/routed-background.png';
+    final gateway = _CoverImageGateway();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => Scaffold(
+            body: TextButton(
+              onPressed: () => Navigator.of(context).push<void>(
+                buildSnapshottingPageRoute<void>(
+                  allowSnapshotting: false,
+                  builder: (_) => Scaffold(
+                    body: ComicBlurredCoverBackground(
+                      coverUrl: url,
+                      sourceKey: 'copy_manga',
+                      imageGateway: gateway,
+                    ),
+                  ),
+                ),
+              ),
+              child: const Text('Open detail'),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    final background = find.byKey(const ValueKey('static-cover-blur-$url'));
+    for (var visit = 0; visit < 2; visit++) {
+      await tester.tap(find.text('Open detail'));
+      await tester.pump();
+      await tester.pump();
+      await tester.pump();
+      final route = ModalRoute.of(tester.element(background))!;
+      expect(route.transitionDuration, const Duration(milliseconds: 500));
+      expect((route as PageRoute<void>).allowSnapshotting, isFalse);
+      expect(
+        find.ancestor(of: background, matching: find.byType(SnapshotWidget)),
+        findsNothing,
+      );
+      await tester.pump(const Duration(milliseconds: 160));
+      final fade = tester.widget<FadeTransition>(
+        find.descendant(of: background, matching: find.byType(FadeTransition)),
+      );
+      expect(fade.opacity.value, greaterThan(0));
+      expect(fade.opacity.value, lessThan(1));
+      expect(route.animation!.isCompleted, isFalse);
+      await tester.pumpAndSettle();
+      expect(fade.opacity.value, 1);
+      expect(gateway.downloadCount, 1);
+      Navigator.of(tester.element(background)).pop();
+      await tester.pumpAndSettle();
+    }
     expect(tester.takeException(), isNull);
   });
 }

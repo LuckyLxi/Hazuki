@@ -1,0 +1,321 @@
+
+
+
+<!DOCTYPE html>
+<html lang="zh-hant">
+
+<head>
+  <meta charset="UTF-8">
+  <link rel="icon" href="https://s3.mangafunb.fun/static/favicon.ico" type="image/x-icon" />
+  <link rel="shortcut icon" href="https://s3.mangafunb.fun/static/favicon.ico" type="image/x-icon" />
+
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1">
+
+  <meta name="description"
+    content="熱辣漫畫 Hotmangas，為全球華人提供高質量 中文 全本漫畫，同人志。海賊王，火影忍者，哥布林殺手，進擊的巨人，龍珠，Magi魔笛，妖精尾巴，最新更新盡在熱辣漫畫。Fate/grand order，艦隊收集 艦娘，Granblue Fantasy 碧藍幻想，東方project，偶像大師，Love Live 同人志 18禁本子 全彩 應有盡有。" />
+  <meta itemprop="keywords" content="熱辣漫畫_海賊王,哥布林殺手,漫畫,FGO,東方,艦娘,同人志,本子,更新">
+  <meta name="keywords" content="熱辣漫畫_海賊王,哥布林殺手,漫畫,FGO,東方,艦娘,同人志,本子,更新">
+  <meta itemprop="website" content="HotMangas">
+  
+<meta itemprop="page" content="漫畫閲讀">
+
+
+  <link rel="dns-prefetch" href="https://cdn.bootcdn.net/" />
+  <link rel="preconnect" href="//www.google-analytics.com" />
+  <link rel="preconnect" href="//www.googletagmanager.com" />
+  <link rel="preconnect" href="//stats.g.doubleclick.net" />
+
+  <link href="https://s3.mangafunb.fun/static/cdn/bootstrap.4.3.1.min.css" media="none" onload="this.media='all'" rel="stylesheet">
+  <link rel="stylesheet" type="text/css" href="https://s3.mangafunb.fun/static/websiteV2/css/public20260520.css" media="none"
+    onload="this.media='all'" />
+  <script src="https://s3.mangafunb.fun/static/cdn/jquery.3.6.0.slim.min.js"></script>
+  <script src="https://s3.mangafunb.fun/static/websiteV2/js20190704/http_request.js"></script>
+  <script src="https://s3.mangafunb.fun/static/websiteV2/js20190704/public20251212.js"></script>
+  <script src="https://s3.mangafunb.fun/static/cdn/lazysizes.5.3.2.min.js"></script>
+  <script src="https://s3.mangafunb.fun/static/cdn/bootstrap.4.3.1.min.js"></script>
+  <script async src="https://s3.mangafunb.fun/static/websiteV2/js20190704/seek_util.js"></script>
+  
+<script>
+  const URL_LOADING = "https://s3.mangafunb.fun/static/websiteV2/jpg/loading.png";
+  var cct = '0p0zzpvv.nmn.oop';
+  var contentKey = 'znCXOEKe3bc2ZfVN7a3d582ecbcac8c876c9718e3969fdbcc52a4bdab2e2afc60ab5d5126404d93eda462affe9cb69f5a957c42a11d7703bf42e1715fd524b1e3e0f9bbbbb188e21df6ac2b45d183d2f029c14d4e8d1895baa85434ff98febe121c241bde1dc979fd58b6c736c161ea8e6c2aa5699b9390f3c17cd5fee33b31f512441f39b25cb6732367a8d92f82c128c75be2af42190dadfef9c58a25c0b3c7f5940f5e18b76a3405836318830dfc398952c2e3a2b95e910f54d8c3b48c423939fc7122aa3f471a80ccd3c993faac7cdcdef2b8d57feaf06d0380604e2486eefc703b0d576425ef5224cd0c94445cd1ab687312dc72920e90c1c459f93ad46e2ff6d83249f05305ff86db9b87e1220992723ea9dc9567ae3ba3d4c3af4034140334aa3be08425e05400134e904722085d617bb6b4359de70afd68d31a76fc5466b58ede65abf385de6adb1ed2317c57cd8b62e893ad2c69e8c9b70a3c8cd6d71a352032c32dd0bc5304b6f4c1ea57d41a1eb20bdbf193b848dd4b4339734a9149229aaf25d8ddb4d3a34c77a488e362ded97c3094e21306114d8745fe03444a928aa6e8e34b19f274670f5cb066b610f38e0de36ccb4a931b638e8c24bed261505b8b8e2d40ce2d5019620b3cd48362da37e3ee049aadd80cd1b73921a970be5ebe7e22632cab790c77080bd7ee7e40314326824a27fb04c85179794c706e91a3aa31a2255e27a265dbf84b21e354d2958f4c31a8bc0a22dd3cdb55fa5a8af1bc4230ffd119739';
+</script>
+<script async src="https://s3.mangafunb.fun/static/websiteV2/js20190704/image_util.js"></script>
+<script async src="https://s3.mangafunb.fun/static/websiteV2/js20190704/bundle202002131913.js"></script>
+<script async src="https://s3.mangafunb.fun/static/websiteV2/js20190704/comic_content_pass20251121.js"></script>
+
+  <script defer>
+    $(".loginOut").click(function () {
+      var token = "";
+      var strCookie = document.cookie; //將多cookie切割爲多個名/值對
+      var arrCookie = strCookie.split("; ");
+      for (var i = 0; i < arrCookie.length; i++) {
+        var arr = arrCookie[i].split("=");
+        if ("token" == arr[0]) {
+          token = arr[1];
+          break;
+        }
+      }
+      request({
+        type: "POST",
+        timeout: 10000, // 超時時間 10 秒
+        headers: {
+          "Authorization": "Token " + token
+        },
+        url: API_URL + "/api/v1/logout",
+        success: function (res) {
+          window.location.reload(true);
+        },
+        error: function (err) {
+          document.cookie = "name;expires=" + new Date(0).toUTCString() + ";domain=" + _host;
+          document.cookie = "token;expires=" + new Date(0).toUTCString() + ";domain=" + _host;
+          document.cookie = "uuid;expires=" + new Date(0).toUTCString() + ";domain=" + _host;
+          document.cookie = "avatar;expires=" + new Date(0).toUTCString() + ";domain=" + _host;
+          document.cookie = "create;expires=" + new Date(0).toUTCString() + ";domain=" + _host;
+          document.cookie = "vip;expires=" + new Date(0).toUTCString() + ";domain=" + _host;
+          document.cookie = "email;expires=" + new Date(0).toUTCString() + ";domain=" + _host;
+        }
+      });
+    });
+
+    function setWebp() {
+      var expires = new Date();
+      var expiresDate = new Date(expires.setTime(expires.getTime() + 9999999 * 60 * 60 * 1000));
+      let img = new Image();
+      let dataUrl = "data:image/webp;base64,UklGRjwAAABXRUJQVlA4IDAAAADwAQCdASoFAAUAAUAmJaACdLoB+AAETAAA/u9RL/5SrwWN0ef/hTXwpr4U1/wgQAA=";
+      img.src = dataUrl;
+      img.onload = function () {
+        document.cookie = `webp=1;path=/;expires=${expiresDate}`;
+      };
+      img.onerror = function () {
+        document.cookie = `webp=0;path=/;expires=${expiresDate}`;
+      };
+    }
+
+    setWebp();
+  </script>
+   
+  
+<link rel="stylesheet" href="https://s3.mangafunb.fun/static/websiteV2/css/comic_content202511211812.css">
+
+  <style>
+    .allIcon {
+      background-image: url("https://s3.mangafunb.fun/static/websiteV2/jpg/allMAX.png") !important;
+    }
+
+    .loadingIcon {
+      background-image: url("https://s3.mangafunb.fun/static/websiteV2/jpg/loading.png") !important;
+    }
+
+    .loadingSwiperIcon {
+      background-image: url("https://s3.mangafunb.fun/static/websiteV2/jpg/loading_swiper.png") !important;
+    }
+
+    .cartoonIcon {
+      background-image: url("https://s3.mangafunb.fun/static/websiteV2/jpg/play_cartoon_icon.png") !important;
+    }
+  </style>
+
+
+  <title>裙子下面是野獸 - 单行本附录漫画 - 熱辣漫畫 热辣漫画</title>
+</head>
+
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-JPMLWJXFP2"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag() { dataLayer.push(arguments); }
+  gtag("js", new Date());
+  gtag("config", "G-JPMLWJXFP2");
+</script>
+
+<body>
+  
+<h4 class="header">裙子下面是野獸/单行本附录漫画</h4>
+<div
+  style="width: 80px;padding:10px 0;background: rgba(0,0,0,0.5);position: fixed;top:30px;color: #fff;display: flex;justify-content: center;right: 0;">
+  <span class="comicIndex">1</span>
+  /
+  <span class="comicCount">0</span>
+</div>
+<div class="container-fluid comicContent">
+  <div class="container comic-size-3">
+    <ul class="comicContent-list comic-size-3">
+    </ul>
+    
+    <div class="upMember">
+      <div class="upMember-left"></div>
+      <span class="upMember-right"></span>
+      <div class="upMember-txt">以上為試看全部內容如想繼續瀏覽您可以</div>
+      <div class="upMember-button up"><a href="/web/login" target="_blank">登录</a></div>
+      <div class="upMember-button try"><a href="/web/login" target="_blank">注册</a></div>
+    </div>
+    
+    <div class="comicContent-recommend">
+      <div class="comicContent-recommend-txt">
+        <p>爲你推薦</p>
+      </div>
+      <div class="row">
+        
+        
+        <div class="col-auto">
+          <a href="/comic/skirtnonakawakedamonodeshita" target="_blank">
+            <div class="comicContent-recommend-img-all loadingIcon">
+              <img src="https://ss.mangafunb.fun/s/skirtnonakawakedamonodeshita/cover/1651424233.png.328x422.jpg" alt="">
+            </div>
+            <div class="comicContent-recommend-img-txt">
+              <p title="裙子下面是野獸"><a href="/comic/skirtnonakawakedamonodeshita"
+                  target="_blank">裙子下面是野獸</a></p>
+              <p>作者：
+                
+                
+                
+                <a href="/author/hanamareo" target="_blank">ハナマルオ</a>
+                
+                
+                
+                
+              </p>
+            </div>
+          </a>
+        </div>
+        
+        <div class="col-auto">
+          <a href="/comic/wulianggonghui" target="_blank">
+            <div class="comicContent-recommend-img-all loadingIcon">
+              <img src="https://sw.mangafunb.fun/w/wulianggonghui/cover/1666453671.jpg.328x422.jpg" alt="">
+            </div>
+            <div class="comicContent-recommend-img-txt">
+              <p title="無良公會"><a href="/comic/wulianggonghui"
+                  target="_blank">無良公會</a></p>
+              <p>作者：
+                
+                
+                
+                <a href="/author/hetiantaiyi" target="_blank">河添太一</a>
+                
+                
+                
+                
+              </p>
+            </div>
+          </a>
+        </div>
+        
+        <div class="col-auto">
+          <a href="/comic/doujinshi_1072264" target="_blank">
+            <div class="comicContent-recommend-img-all loadingIcon">
+              <img src="https://sd.mangafunb.fun/d/doujinshi_1072264/cover/1651420860.jpg.328x422.jpg" alt="">
+            </div>
+            <div class="comicContent-recommend-img-txt">
+              <p title="(C90) [けんじゃたいむ (Zutta)] BAD END CATHARSIS Vol.4 (グランブルーファンタジー) [中国翻訳]"><a href="/comic/doujinshi_1072264"
+                  target="_blank">(C90) [けんじゃたいむ (Zutta)] BAD END CATHARSIS Vol.4 (グランブルーファンタジー) [中国翻訳]</a></p>
+              <p>作者：
+                
+                
+                
+                <a href="/author/zutta" target="_blank">Zutta</a>
+                
+                
+                
+                
+              </p>
+            </div>
+          </a>
+        </div>
+        
+        <div class="col-auto">
+          <a href="/comic/doujinshi_1168504" target="_blank">
+            <div class="comicContent-recommend-img-all loadingIcon">
+              <img src="https://sd.mangafunb.fun/d/doujinshi_1168504/cover/1651420730.jpg.328x422.jpg" alt="">
+            </div>
+            <div class="comicContent-recommend-img-txt">
+              <p title="(C92) [はよしねま (越山弱衰)] 春裏麗 (ストリートファイター) [中国翻訳]"><a href="/comic/doujinshi_1168504"
+                  target="_blank">(C92) [はよしねま (越山弱衰)] 春裏麗 (ストリートファイター) [中国翻訳]</a></p>
+              <p>作者：
+                
+                
+                
+                <a href="/author/etuzan_jakusui" target="_blank">越山弱衰</a>
+                
+                
+                
+                
+              </p>
+            </div>
+          </a>
+        </div>
+        
+        <div class="col-auto">
+          <a href="/comic/doujinshi_1169429" target="_blank">
+            <div class="comicContent-recommend-img-all loadingIcon">
+              <img src="https://sd.mangafunb.fun/d/doujinshi_1169429/cover/1651420626.jpg.328x422.jpg" alt="">
+            </div>
+            <div class="comicContent-recommend-img-txt">
+              <p title="(C93) [JACK-POT (じゅら)] 監獄の女 (監獄学園) [中国翻訳]"><a href="/comic/doujinshi_1169429"
+                  target="_blank">(C93) [JACK-POT (じゅら)] 監獄の女 (監獄学園) [中国翻訳]</a></p>
+              <p>作者：
+                
+                
+                
+                <a href="/author/jyura" target="_blank">じゅら</a>
+                
+                
+                
+                
+              </p>
+            </div>
+          </a>
+        </div>
+        
+        <div class="col-auto">
+          <a href="/comic/doujinshi_1167222" target="_blank">
+            <div class="comicContent-recommend-img-all loadingIcon">
+              <img src="https://sd.mangafunb.fun/d/doujinshi_1167222/cover/1651420586.jpg.328x422.jpg" alt="">
+            </div>
+            <div class="comicContent-recommend-img-txt">
+              <p title="(C93) [ピアニッシモ (ピジャ)] 鷺沢文香はよくモテる (アイドルマスターシンデレラガールズ) [中国翻訳]"><a href="/comic/doujinshi_1167222"
+                  target="_blank">(C93) [ピアニッシモ (ピジャ)] 鷺沢文香はよくモテる (アイドルマスターシンデレラガールズ) [中国翻訳]</a></p>
+              <p>作者：
+                
+                
+                
+                <a href="/author/Kousai" target="_blank">ピジャ</a>
+                
+                
+                
+                
+              </p>
+            </div>
+          </a>
+        </div>
+        
+      </div>
+    </div>
+  </div>
+</div>
+<div class="disData" contentKey="93bfgViUk7Z5GDqdcaa5028a08ac49101491db2e8b569e79401ff770a237adb15dbea5c54c944d4f9e4f129ecb6adfd76339f2d9857d153b179fa9b78fe3d95d1a2dfd400c36f60afbc86afbb634ca42d263591a8e49fe9a77ab717dbed095106e5ed019a57eecdd1ccd68b8e4cdf9166ea23e5530d68e34aa1f9c172968e08498599556d1897351c4c4192c1a0b643e408eb4180c17ce777cfe01d1eeff26a032e0b24c5dc337095d2ee58f6ec3033c9d0cb44ae9ec158af38f8c2538edfada2d31a96bf5ca381a66fde5476e1b65e6fdb2626a0cee0f60e9fc10290f117f17846458f912a3255342feb230ed6aad8f6917c3a2a11e33607c9e3760f02c77f7a73a807ef0d2473ce37769c663c70c9781bb25a87164f7632fb83e624e0ce852d083b2e42293dc8c0fc5af05031d5f3a3dcfcd6406f5e93476045918c25af5c20c09e5f2016b83a3787f71e87fd90fafb3d79030f379cf93f3e31a182a57d877a25b2fa0e279c54462a20e5d0b4e9a37c5da98676b0a3785073e37382501f888bf7fdae47cc79ade62ee1e8764b97e573dee514c60455a024bda5433acf9989ca98021003c6a265f0860927bf1dcccfab56115a524ba7955b964137a7ff40b131ca7911c0ec9febb93924a4485e19d302e08f74ab65815b4d67b76b27c6c0658450b50a76e2f1e024fc29f1f5470c51539552c97397119d7f3896a7224f6b51f48e235bafccb31c46f95685b48c5abfa9fdddc5e46d71fa288367448f3648730ae0a7cde98edeb3d"></div>
+<div class="disPass" contentKey="0p0zzpvv.nmn.oop"></div>
+<div class="disUrlPrefix" contentKey=""></div>
+<div class="disUrlSuffix" contentKey=""></div>
+
+<div class="footer">
+  <div class="comicContent-prev index"><a href="/">首页</a></div>
+  
+  <div class="comicContent-prev"><a href="" class="prev-null">上一話</a></div>
+  
+  <div class="comicContent-footer-txt">
+    <span>第1&nbsp;/&nbsp;39話</span>
+  </div>
+  
+  <div class="comicContent-next">
+    <a href="/comic/skirtnonakawakedamonodeshita/chapter/fdc30756-1bdf-11e9-89fa-024352452ce0">下一話</a>
+  </div>
+  
+  <div class="comicContent-prev list"><a href="/comic/skirtnonakawakedamonodeshita">目录</a></div>
+</div>
+
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4bc70e2c01a94c73b74392e4234840661791215815920" integrity="sha512-L0ha0OXavK/8okipN9F8BtP84dg9DUhPERbBXzwI6dgTA55d2+yweo3pn5CSFYs45/r8md2+xvUPtTdvTNRfjA==" data-cf-beacon='{"version":"2024.11.0","token":"55c6ec9c1e6c49fc8f718a03099fa9fa","r":1,"spa":2}' crossorigin="anonymous"></script>
+</body>
+
+</html>

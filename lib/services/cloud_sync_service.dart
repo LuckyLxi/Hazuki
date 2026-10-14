@@ -9,17 +9,11 @@ import 'cloud_sync/cloud_sync_participant_set.dart';
 import 'cloud_sync/cloud_sync_remote_client.dart';
 import 'cloud_sync/cloud_sync_restore_applier.dart';
 import 'cloud_sync/cloud_sync_snapshot_codec.dart';
-import 'comment_filter_service.dart';
-import 'local_favorites/local_favorites_contracts.dart';
-import 'download_groups_service.dart';
 
 export 'cloud_sync/cloud_sync_models.dart';
 
 class CloudSyncService {
   CloudSyncService({
-    required LocalFavoritesRepository localFavorites,
-    required CommentFilterService commentFilter,
-    required DownloadGroupsService downloadGroups,
     required CloudSyncParticipantSet participants,
     CloudSyncRemoteClient Function(
       CloudSyncConfig config,
@@ -28,10 +22,7 @@ class CloudSyncService {
     remoteClientFactory,
     Duration syncLockStaleAfter = const Duration(minutes: 2),
     Duration syncLockRenewInterval = const Duration(seconds: 30),
-  }) : _localFavorites = localFavorites,
-       _commentFilter = commentFilter,
-       _downloadGroups = downloadGroups,
-       _participants = participants,
+  }) : _participants = participants,
        _syncLockStaleAfter = syncLockStaleAfter,
        _syncLockRenewInterval = syncLockRenewInterval,
        _remoteClientFactory =
@@ -39,9 +30,6 @@ class CloudSyncService {
            ((config, configStore) =>
                CloudSyncRemoteClient(config, configStore: configStore));
 
-  final LocalFavoritesRepository _localFavorites;
-  final CommentFilterService _commentFilter;
-  final DownloadGroupsService _downloadGroups;
   final CloudSyncParticipantSet _participants;
   final Duration _syncLockStaleAfter;
   final Duration _syncLockRenewInterval;
@@ -150,9 +138,6 @@ class CloudSyncService {
             client,
             applyRemoteSettings: remoteUpdatedAtMs > lastSyncedRemoteTs,
           );
-          _localFavorites.onExternalDataChanged();
-          await _commentFilter.load(notify: true);
-          await _downloadGroups.reload();
         }
       }
 
@@ -316,7 +301,6 @@ class CloudSyncService {
     final settingsResult = await _restoreApplier.applySettingsJson(
       settingsText,
     );
-    await _commentFilter.load(notify: true);
     await _restoreApplier.applyReadingSnapshot(readingText);
     await _restoreApplier.applySearchHistoryJsonl(searchHistoryText);
 

@@ -2,10 +2,13 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:hazuki/shared/preferences/hazuki_preference_keys.dart';
+import 'comment_filter/comment_filter_sync_store.dart';
 
 enum CommentFilterMode { collapse, hide }
 
-class CommentFilterService with ChangeNotifier {
+class CommentFilterService
+    with ChangeNotifier
+    implements CommentFilterSyncStore {
   CommentFilterService();
 
   List<String> _userKeywords = [];
@@ -49,6 +52,63 @@ class CommentFilterService with ChangeNotifier {
     await prefs.setString(hazukiCommentFilterModeKey, mode.name);
     notifyListeners();
   }
+
+  @override
+  Future<CommentFilterMergeSnapshot> captureMergeSnapshot() async {
+    final prefs = await SharedPreferences.getInstance();
+    return CommentFilterMergeSnapshot(
+      keywords: prefs.getStringList(hazukiCommentFilterKeywordsKey) ?? const [],
+      updatedAtMs: prefs.getInt(hazukiCommentFilterKeywordsUpdatedAtKey) ?? 0,
+    );
+  }
+
+  @override
+  Future<void> applyMergedKeywords(CommentFilterMergeSnapshot snapshot) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(
+      hazukiCommentFilterKeywordsKey,
+      snapshot.keywords,
+    );
+    if (snapshot.updatedAtMs > 0) {
+      await prefs.setInt(
+        hazukiCommentFilterKeywordsUpdatedAtKey,
+        snapshot.updatedAtMs,
+      );
+    } else {
+      await prefs.remove(hazukiCommentFilterKeywordsUpdatedAtKey);
+    }
+  }
+
+  @override
+  Future<void> applySyncedPreferences(
+    Map<String, Object?> values, {
+    bool stringifyUnknown = false,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    for (final entry in values.entries) {
+      final key = entry.key;
+      if (!commentFilterSyncPreferenceKeys.contains(key)) continue;
+      final value = entry.value;
+      if (value == null) {
+        await prefs.remove(key);
+      } else if (value is bool) {
+        await prefs.setBool(key, value);
+      } else if (value is int) {
+        await prefs.setInt(key, value);
+      } else if (value is double) {
+        await prefs.setDouble(key, value);
+      } else if (value is String) {
+        await prefs.setString(key, value);
+      } else if (value is List) {
+        await prefs.setStringList(key, value.map((entry) => '$entry').toList());
+      } else if (stringifyUnknown) {
+        await prefs.setString(key, value.toString());
+      }
+    }
+  }
+
+  @override
+  Future<void> reloadAfterExternalChange() => load(notify: true);
 
   // Spammers insert zero-width / invisible Unicode chars between characters
   // (e.g. 做[U+200B]爱) so that "做爱" keyword matching fails.

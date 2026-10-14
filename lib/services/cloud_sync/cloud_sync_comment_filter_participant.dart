@@ -1,27 +1,25 @@
-import 'package:shared_preferences/shared_preferences.dart';
-
 import '../../shared/preferences/hazuki_preference_keys.dart';
+import '../comment_filter/comment_filter_sync_store.dart';
 
-class CommentFilterMergeSnapshot {
-  const CommentFilterMergeSnapshot({
-    required this.keywords,
-    required this.updatedAtMs,
-  });
-
-  final List<String> keywords;
-  final int updatedAtMs;
-}
+export '../comment_filter/comment_filter_sync_store.dart'
+    show CommentFilterMergeSnapshot;
 
 class CommentFilterSyncParticipant {
-  const CommentFilterSyncParticipant();
+  const CommentFilterSyncParticipant(this._store);
 
-  Future<CommentFilterMergeSnapshot> captureMergeSnapshot() async {
-    final prefs = await SharedPreferences.getInstance();
-    return CommentFilterMergeSnapshot(
-      keywords: prefs.getStringList(hazukiCommentFilterKeywordsKey) ?? const [],
-      updatedAtMs: prefs.getInt(hazukiCommentFilterKeywordsUpdatedAtKey) ?? 0,
-    );
-  }
+  final CommentFilterSyncStore _store;
+
+  Future<CommentFilterMergeSnapshot> captureMergeSnapshot() =>
+      _store.captureMergeSnapshot();
+
+  Future<void> applySyncedPreferences(
+    Map<String, Object?> values, {
+    bool stringifyUnknown = false,
+  }) =>
+      _store.applySyncedPreferences(values, stringifyUnknown: stringifyUnknown);
+
+  Future<void> reloadAfterExternalChange() =>
+      _store.reloadAfterExternalChange();
 
   Future<void> mergeRemote(
     Map<dynamic, dynamic> remoteData,
@@ -62,15 +60,11 @@ class CommentFilterSyncParticipant {
         normalized.add(keyword);
       }
     }
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList(hazukiCommentFilterKeywordsKey, normalized);
-    if (resolvedUpdatedAtMs > 0) {
-      await prefs.setInt(
-        hazukiCommentFilterKeywordsUpdatedAtKey,
-        resolvedUpdatedAtMs,
-      );
-    } else {
-      await prefs.remove(hazukiCommentFilterKeywordsUpdatedAtKey);
-    }
+    await _store.applyMergedKeywords(
+      CommentFilterMergeSnapshot(
+        keywords: normalized,
+        updatedAtMs: resolvedUpdatedAtMs,
+      ),
+    );
   }
 }

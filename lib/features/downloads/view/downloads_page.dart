@@ -6,7 +6,11 @@ import 'package:hazuki/services/download_groups/download_groups_repository.dart'
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/widgets/windows_comic_detail_host.dart';
 import 'package:hazuki/widgets/widgets.dart';
-import '../downloads.dart';
+import '../state/downloads_page_controller.dart';
+import '../support/downloads_shared.dart';
+import 'downloaded_comic_detail_page.dart';
+import 'downloads_shell_widgets.dart';
+import 'downloads_tab_widgets.dart';
 import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 import '../support/downloads_group_actions.dart';
 

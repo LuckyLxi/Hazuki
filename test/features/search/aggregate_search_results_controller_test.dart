@@ -10,7 +10,7 @@ import 'package:hazuki/features/search/view/search_aggregate_results.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_assembly.dart';
-import 'package:hazuki/services/source/source_capabilities.dart';
+import 'package:hazuki/services/source/adapters/hazuki_source_content_adapters.dart';
 
 void main() {
   testWidgets('keeps successful source results when another source fails', (

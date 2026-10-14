@@ -1,7 +1,7 @@
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 
-import '../state/favorite_page_state.dart';
+import '../state/favorite_folder_state.dart' show defaultCloudFavoriteFolder;
 
 class FavoriteCloudFlow {
   const FavoriteCloudFlow(this.sourceService);

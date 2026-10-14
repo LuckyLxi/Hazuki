@@ -245,6 +245,82 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('repository refresh only shows progress on the available tab', (
+    tester,
+  ) async {
+    final pending = Completer<void>();
+    when(
+      () => gateway.refreshRepository(_repository),
+    ).thenAnswer((_) => pending.future);
+    await tester.pumpWidget(_app(gateway));
+    await tester.pumpAndSettle();
+    final s = AppLocalizations.of(
+      tester.element(find.byType(SourcePluginsPage)),
+    )!;
+    await tester.tap(find.widgetWithText(Tab, s.pluginsAvailable));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text(s.pluginsRefresh));
+    await tester.pump();
+    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+    await tester.tap(find.widgetWithText(Tab, s.pluginsInstalled));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+    await tester.tap(find.widgetWithText(Tab, s.pluginsAvailable));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(find.byType(LinearProgressIndicator), findsOneWidget);
+    pending.complete();
+    await tester.pumpAndSettle();
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'update check stays on installed tab and uses the shared prompt',
+    (tester) async {
+      final pending = Completer<SourcePluginIndexEntry?>();
+      when(
+        () => gateway.checkUpdate('local_source'),
+      ).thenAnswer((_) => pending.future);
+      await tester.pumpWidget(_app(gateway));
+      await tester.pumpAndSettle();
+      final s = AppLocalizations.of(
+        tester.element(find.byType(SourcePluginsPage)),
+      )!;
+      final checkUpdate = find
+          .widgetWithText(TextButton, s.pluginsCheckUpdate)
+          .first;
+      await _scrollTo(tester, checkUpdate);
+      await tester.tap(checkUpdate);
+      await tester.pump();
+      await tester.drag(
+        find.byKey(const PageStorageKey('installed-plugins')),
+        const Offset(0, 1000),
+      );
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(
+        find.descendant(
+          of: find.byKey(const PageStorageKey('installed-plugins')),
+          matching: find.byType(LinearProgressIndicator),
+        ),
+        findsOneWidget,
+      );
+      await tester.tap(find.widgetWithText(Tab, s.pluginsAvailable));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+      pending.complete(null);
+      await tester.pumpAndSettle();
+      expect(find.text(s.pluginsNoUpdate), findsOneWidget);
+      expect(find.byIcon(Icons.tips_and_updates_rounded), findsOneWidget);
+      expect(find.byType(SnackBar), findsNothing);
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('initialization disables actions and reports failure', (
     tester,
   ) async {
@@ -274,6 +350,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byType(LinearProgressIndicator), findsNothing);
     expect(find.textContaining('Unable to load plugins'), findsOneWidget);
+    expect(find.byIcon(Icons.tips_and_updates_rounded), findsOneWidget);
+    expect(find.byType(SnackBar), findsNothing);
     expect(
       tester
           .widget<FilledButton>(
@@ -282,6 +360,8 @@ void main() {
           .onPressed,
       isNotNull,
     );
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
   });
 }

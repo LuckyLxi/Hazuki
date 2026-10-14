@@ -82,6 +82,67 @@ void main() {
         onUpdated: () => refreshes++,
       );
 
+  for (final dismissal in ['cancel', 'barrier', 'back']) {
+    testWidgets('dialog animates opening and $dismissal dismissal', (
+      tester,
+    ) async {
+      plugins.updates = [_update('a')];
+      await pumpApp(tester);
+      final pending = showUpdates();
+      await tester.pump();
+
+      final dialog = find.byType(SourcePluginUpdateDialog);
+      final fade = find.ancestor(
+        of: dialog,
+        matching: find.byType(FadeTransition),
+      );
+      final scale = find.ancestor(
+        of: dialog,
+        matching: find.byType(ScaleTransition),
+      );
+      final slide = find.ancestor(
+        of: dialog,
+        matching: find.byType(SlideTransition),
+      );
+      double opacity() => tester.widget<FadeTransition>(fade).opacity.value;
+      double size() => tester.widget<ScaleTransition>(scale).scale.value;
+      double offset() =>
+          tester.widget<SlideTransition>(slide).position.value.dy;
+
+      expect(opacity(), 0);
+      expect(size(), closeTo(0.98, 0.001));
+      expect(offset(), closeTo(0.02, 0.001));
+      await tester.pump(const Duration(milliseconds: 140));
+      expect(opacity(), inExclusiveRange(0, 1));
+      expect(size(), inExclusiveRange(0.98, 1));
+      expect(offset(), inExclusiveRange(0, 0.02));
+      await tester.pumpAndSettle();
+      expect(opacity(), 1);
+      expect(size(), 1);
+      expect(offset(), 0);
+
+      switch (dismissal) {
+        case 'cancel':
+          await tester.tap(find.text('Cancel'));
+        case 'barrier':
+          await tester.tapAt(const Offset(5, 5));
+        case 'back':
+          await tester.binding.handlePopRoute();
+      }
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 140));
+      expect(dialog, findsOneWidget);
+      expect(opacity(), inExclusiveRange(0, 1));
+      expect(size(), inExclusiveRange(0.98, 1));
+      expect(offset(), inExclusiveRange(0, 0.02));
+      await tester.pumpAndSettle();
+      await pending;
+      expect(dialog, findsNothing);
+      expect(plugins.installedUpdates, isEmpty);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets(
     'startup dialog lists all installed updates and cancellation never installs',
     (tester) async {

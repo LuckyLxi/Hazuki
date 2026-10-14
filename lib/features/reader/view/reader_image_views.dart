@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 
-import 'package:hazuki/features/reader/reader.dart';
+import 'package:hazuki/shared/reading/reader_mode.dart';
 import 'package:hazuki/features/reader/state/reader_image_pipeline_state.dart';
 import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
 import 'package:hazuki/features/reader/support/reader_image_pipeline_controller.dart';

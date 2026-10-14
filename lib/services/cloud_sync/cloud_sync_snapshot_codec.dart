@@ -44,6 +44,7 @@ class CloudSyncSnapshotCodec {
         applyRemoteSettings: applyRemoteSettings,
       );
     }
+    await _participants.commentFilter.reloadAfterExternalChange();
   }
 
   Future<CloudSyncLocalSnapshot> buildLocalSnapshotFiles() async {

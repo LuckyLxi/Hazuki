@@ -166,6 +166,32 @@ void main() {
     expect(controller.comics.single.id, 'sorted');
   });
 
+  test('empty local directory refresh clears the live comic list', () async {
+    await controller.loadInitial(timeoutMessage: 'timeout');
+    await controller.toggleMode(timeoutMessage: 'timeout');
+    expect(controller.comics, isNotEmpty);
+    when(local.loadFavoriteFolders).thenAnswer(
+      (_) async => const FavoriteFoldersResult.success(
+        folders: [],
+        favoritedFolderIds: {},
+      ),
+    );
+    when(
+      () => preferences.saveSelectedFavoriteFolderId(
+        FavoritePageMode.local,
+        '',
+        sourceKey: 'jm',
+      ),
+    ).thenAnswer((_) async {});
+    await controller.reloadFolders();
+    expect(controller.folders, isEmpty);
+    expect(controller.selectedFolderId, '');
+    expect(controller.comics, isEmpty);
+    expect(controller.errorMessage, isNull);
+    expect(controller.hasMore, isFalse);
+    expect(controller.loadingFolders, isFalse);
+  });
+
   test('older folder refresh cannot overwrite the latest folders', () async {
     await controller.loadInitial(timeoutMessage: 'timeout');
     final pending = Completer<FavoriteFoldersResult>();

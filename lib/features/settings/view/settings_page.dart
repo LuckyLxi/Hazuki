@@ -6,7 +6,13 @@ import 'package:hazuki/shared/window/window_title_bar_control.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:hazuki/widgets/windows_comic_detail_host.dart';
-import '../settings.dart';
+import 'about_page.dart';
+import 'appearance/appearance_settings_page.dart';
+import 'cache_settings_page.dart';
+import 'other/other_settings_page.dart';
+import 'reading_settings_page.dart';
+import 'security/privacy_settings_page.dart';
+import 'settings_group.dart';
 import '../support/settings_core_dependencies.dart';
 
 class SettingsPage extends StatefulWidget {

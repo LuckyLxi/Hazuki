@@ -4,7 +4,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:hazuki/features/favorite/favorite.dart';
+import 'package:hazuki/shared/favorites/favorite_app_bar_actions_state.dart';
+import 'package:hazuki/shared/favorites/favorite_page_actions.dart';
 import 'package:hazuki/features/favorite/state/favorite_page_controller.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
@@ -17,6 +18,9 @@ import 'package:hazuki/widgets/widgets.dart';
 import 'package:hazuki/widgets/windows_comic_detail_host.dart';
 import 'favorite_page_content.dart';
 import 'favorite_view_support.dart';
+import '../support/favorite_dialogs.dart';
+import 'favorite_folder_header.dart';
+import 'favorite_login_required_view.dart';
 
 typedef FavoriteComicTapHandler =
     Future<void> Function(ExploreComic comic, String heroTag);

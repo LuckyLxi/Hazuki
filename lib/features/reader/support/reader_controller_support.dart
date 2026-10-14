@@ -10,3 +10,9 @@ typedef ReaderLogPayloadBuilder =
 typedef ReaderVisiblePageLogger =
     void Function({required int index, required String trigger});
 typedef ReaderResetZoom = void Function({String reason});
+
+typedef ReaderSyncPositionToImageIndex =
+    void Function(int targetImageIndex, {required String trigger});
+
+typedef ReaderSyncPositionAfterPinchToggle =
+    Future<void> Function(int targetImageIndex);

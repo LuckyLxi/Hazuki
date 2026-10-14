@@ -9,6 +9,7 @@ import 'package:hazuki/services/cloud_sync/cloud_sync_participant.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_reading_participant.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_settings_participant.dart';
 import 'package:hazuki/services/download_groups_service.dart';
+import 'package:hazuki/services/comment_filter_service.dart';
 import 'package:hazuki/services/local_favorites_service.dart';
 import 'package:hazuki/services/read_history_service.dart';
 import 'package:hazuki/services/reading_progress_service.dart';
@@ -129,7 +130,7 @@ void main() {
           LocalFavoritesService(database: database),
         ),
         downloadGroups: DownloadGroupsSyncParticipant(groups),
-        commentFilter: const CommentFilterSyncParticipant(),
+        commentFilter: CommentFilterSyncParticipant(CommentFilterService()),
       );
 
       final exported = jsonDecode(await participant.exportSnapshot()) as Map;
@@ -186,7 +187,7 @@ void main() {
           LocalFavoritesService(database: database),
         ),
         downloadGroups: DownloadGroupsSyncParticipant(groups),
-        commentFilter: const CommentFilterSyncParticipant(),
+        commentFilter: CommentFilterSyncParticipant(CommentFilterService()),
       );
 
       final exported = jsonDecode(await participant.exportSnapshot()) as Map;
@@ -232,7 +233,7 @@ void main() {
           LocalFavoritesService(database: database),
         ),
         downloadGroups: DownloadGroupsSyncParticipant(groups),
-        commentFilter: const CommentFilterSyncParticipant(),
+        commentFilter: CommentFilterSyncParticipant(CommentFilterService()),
       );
 
       final exported = jsonDecode(await participant.exportSnapshot()) as Map;
@@ -293,7 +294,7 @@ void main() {
         LocalFavoritesService(database: database),
       ),
       downloadGroups: DownloadGroupsSyncParticipant(groups),
-      commentFilter: const CommentFilterSyncParticipant(),
+      commentFilter: CommentFilterSyncParticipant(CommentFilterService()),
     );
 
     final exported = jsonDecode(await participant.exportSnapshot()) as Map;

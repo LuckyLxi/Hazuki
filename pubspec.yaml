@@ -83,6 +83,9 @@ dev_dependencies:
   flutter_lints: ^6.0.0
 
 dependency_overrides:
+  # Keep mobile long-press selection from opening the software keyboard.
+  re_editor:
+    path: third_party/pub_overrides/re_editor
   # Keep the selected indicator anchored to its press origin on initial drag.
   liquid_glass_widgets:
     path: third_party/pub_overrides/liquid_glass_widgets
@@ -116,6 +119,7 @@ flutter:
         - asset: assets/fonts/NotoSansSC-VF.otf
 
   assets:
+    - assets/branding/app_icon.png
     - assets/init.js
     - assets/hazuki_plugin_sdk.js
     - assets/data/authors.txt

@@ -5,6 +5,8 @@ import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/services/announcements/announcement_controller.dart';
 import 'package:hazuki/services/announcements/announcement_service.dart';
 import 'package:hazuki/services/cloud_sync_service.dart';
+import 'package:hazuki/services/comment_filter/comment_filter_sync_store.dart';
+import 'package:hazuki/services/comment_filter_service.dart';
 import 'package:hazuki/services/local_favorites/local_favorites_contracts.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_assembly.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
@@ -20,6 +22,10 @@ void main() {
     expect(services.isRegistered<SourceSearchGateway>(), isTrue);
     expect(services.isRegistered<LocalFavoritesRepository>(), isTrue);
     expect(services.isRegistered<CloudSyncService>(), isTrue);
+    expect(
+      services<CommentFilterSyncStore>(),
+      same(services<CommentFilterService>()),
+    );
     expect(services.isRegistered<AnnouncementController>(), isTrue);
     expect(
       services<AnnouncementController>(),

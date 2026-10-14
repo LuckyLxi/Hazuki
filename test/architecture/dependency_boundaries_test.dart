@@ -3,6 +3,124 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  group('file-level dependency boundaries', () {
+    late Map<Uri, String> sources;
+
+    setUpAll(() {
+      sources = {
+        for (final file in _dartFilesUnder('lib'))
+          file.absolute.uri: file.readAsStringSync(),
+      };
+    });
+
+    test('application libraries do not form import/export cycles', () {
+      final cycle = _findDependencyCycle(_libraryDependencyGraph(sources));
+      final root = Directory('lib').absolute.uri.toString();
+      expect(
+        cycle,
+        isNull,
+        reason:
+            'Library dependency cycle: '
+            '${cycle?.map((uri) => uri.toString().substring(root.length)).join(' -> ')}',
+      );
+    });
+
+    test('source public exports do not expose implementations', () {
+      final exports = _libraryDependencyGraph(sources, exportsOnly: true);
+      final entry = File(
+        'lib/services/source/source_capabilities.dart',
+      ).absolute.uri;
+      final violations = _reachableDependencies(exports, entry).where(
+        (uri) =>
+            uri.path.contains('/services/source/adapters/') ||
+            uri.path.contains('/services/source/runtime/') ||
+            uri.path.endsWith('/gateways/source_gateway_set.dart'),
+      );
+      expect(violations, isEmpty, reason: 'Source implementation exports');
+    });
+  });
+
+  test('library graph resolves package imports and relative exports', () {
+    final page = File('lib/features/example/view/page.dart').absolute.uri;
+    final entry = File('lib/features/example/example.dart').absolute.uri;
+    final graph = _libraryDependencyGraph({
+      page: "import 'package:hazuki/features/example/example.dart';",
+      entry: "export 'view/page.dart';",
+    });
+    expect(graph[page], {entry});
+    expect(graph[entry], {page});
+    expect(_findDependencyCycle(graph), [page, entry, page]);
+  });
+
+  test('library graph excludes generated code and part files', () {
+    final owner = File('lib/example.dart').absolute.uri;
+    final generated = File('lib/example.g.dart').absolute.uri;
+    final part = File('lib/example_part.dart').absolute.uri;
+    final localization = File('lib/l10n/app_localizations.dart').absolute.uri;
+    final graph = _libraryDependencyGraph({
+      owner:
+          "part 'example.g.dart';\n"
+          "part 'example_part.dart';\n"
+          "import 'l10n/app_localizations.dart';",
+      generated: "import 'example.dart';",
+      part: "part of 'example.dart';",
+      localization: "import '../example.dart';",
+    });
+    expect(graph, {owner: <Uri>{}});
+    expect(_findDependencyCycle(graph), isNull);
+  });
+
+  test(
+    'cycle detection accepts shared dependencies and reports self imports',
+    () {
+      final entry = Uri.file('/entry.dart');
+      final left = Uri.file('/left.dart');
+      final right = Uri.file('/right.dart');
+      final shared = Uri.file('/shared.dart');
+      expect(
+        _findDependencyCycle({
+          entry: {left, right},
+          left: {shared},
+          right: {shared},
+          shared: <Uri>{},
+        }),
+        isNull,
+      );
+      expect(
+        _findDependencyCycle({
+          entry: {entry},
+        }),
+        [entry, entry],
+      );
+    },
+  );
+
+  test('export traversal follows re-exports without exposing imports', () {
+    final entry = File('lib/example.dart').absolute.uri;
+    final contract = File('lib/contract.dart').absolute.uri;
+    final implementation = File('lib/implementation.dart').absolute.uri;
+    final sources = {
+      entry: "export 'contract.dart';",
+      contract: "import 'implementation.dart';",
+      implementation: '',
+    };
+    expect(
+      _reachableDependencies(
+        _libraryDependencyGraph(sources, exportsOnly: true),
+        entry,
+      ),
+      {contract},
+    );
+    sources[contract] = "export 'implementation.dart';";
+    expect(
+      _reachableDependencies(
+        _libraryDependencyGraph(sources, exportsOnly: true),
+        entry,
+      ),
+      {contract, implementation},
+    );
+  });
+
   test('features use shared contracts instead of app controllers', () {
     final violations = <String>[];
     for (final file in _dartFilesUnder('lib/features')) {
@@ -563,9 +681,15 @@ Iterable<File> _dartFilesUnder(String path) sync* {
   }
 }
 
-Iterable<Uri> _dependencyUris(String source, Uri fileUri) sync* {
+Iterable<Uri> _dependencyUris(
+  String source,
+  Uri fileUri, {
+  bool exportsOnly = false,
+}) sync* {
   final directives = RegExp(
-    r"""^\s*(?:import|export)\s+['"]([^'"]+)['"]""",
+    exportsOnly
+        ? r"""^\s*export\s+['"]([^'"]+)['"]"""
+        : r"""^\s*(?:import|export)\s+['"]([^'"]+)['"]""",
     multiLine: true,
   );
   for (final match in directives.allMatches(source)) {
@@ -578,4 +702,69 @@ Iterable<Uri> _dependencyUris(String source, Uri fileUri) sync* {
       yield fileUri.resolve(value);
     }
   }
+}
+
+Map<Uri, Set<Uri>> _libraryDependencyGraph(
+  Map<Uri, String> sources, {
+  bool exportsOnly = false,
+}) {
+  final partDirective = RegExp(r'^\s*part\s+of\b', multiLine: true);
+  // Flutter's generated localization files do not have a generated-code header.
+  final localizationFile = RegExp(r'/l10n/app_localizations(?:_[^/]+)?\.dart$');
+  final libraries = Map<Uri, String>.fromEntries(
+    sources.entries.where(
+      (entry) =>
+          !entry.key.path.endsWith('.g.dart') &&
+          !entry.key.path.endsWith('.freezed.dart') &&
+          !localizationFile.hasMatch(entry.key.path) &&
+          !partDirective.hasMatch(entry.value),
+    ),
+  );
+  return {
+    for (final entry in libraries.entries)
+      entry.key: _dependencyUris(
+        entry.value,
+        entry.key,
+        exportsOnly: exportsOnly,
+      ).where(libraries.containsKey).toSet(),
+  };
+}
+
+List<Uri>? _findDependencyCycle(Map<Uri, Set<Uri>> graph) {
+  final visited = <Uri>{};
+  final visiting = <Uri>{};
+  final stack = <Uri>[];
+
+  List<Uri>? visit(Uri node) {
+    if (visiting.contains(node)) {
+      return [...stack.sublist(stack.indexOf(node)), node];
+    }
+    if (!visited.add(node)) return null;
+    visiting.add(node);
+    stack.add(node);
+    for (final next in graph[node] ?? const <Uri>{}) {
+      final cycle = visit(next);
+      if (cycle != null) return cycle;
+    }
+    stack.removeLast();
+    visiting.remove(node);
+    return null;
+  }
+
+  for (final node in graph.keys) {
+    final cycle = visit(node);
+    if (cycle != null) return cycle;
+  }
+  return null;
+}
+
+Set<Uri> _reachableDependencies(Map<Uri, Set<Uri>> graph, Uri entry) {
+  final visited = <Uri>{entry};
+  final pending = <Uri>[entry];
+  while (pending.isNotEmpty) {
+    for (final dependency in graph[pending.removeLast()] ?? const <Uri>{}) {
+      if (visited.add(dependency)) pending.add(dependency);
+    }
+  }
+  return visited..remove(entry);
 }

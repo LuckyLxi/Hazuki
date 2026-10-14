@@ -6,6 +6,7 @@ import 'package:hazuki/services/cloud_sync/cloud_sync_config_store.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_participant_set.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_snapshot_codec.dart';
 import 'package:hazuki/services/download_groups_service.dart';
+import 'package:hazuki/services/comment_filter_service.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_assembly.dart';
 import 'package:hazuki/services/local_favorites_service.dart';
 import 'package:hazuki/services/read_history_service.dart';
@@ -39,6 +40,7 @@ void main() {
         localFavorites: LocalFavoritesService(database: database),
         downloadGroups: groups,
         searchHistory: SearchHistoryService(database: database),
+        commentFilter: CommentFilterService(),
       );
       final snapshot = await CloudSyncSnapshotCodec(
         participants: participants,

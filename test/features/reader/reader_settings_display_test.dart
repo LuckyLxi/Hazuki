@@ -1,17 +1,10 @@
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
 import 'package:hazuki/features/reader/support/reader_display_session.dart';
-import 'package:hazuki/features/reader/support/reader_navigation_controller.dart';
 import 'package:hazuki/features/reader/support/reader_settings_controller.dart';
-import 'package:hazuki/features/reader/support/reader_zoom_controller.dart';
 import 'package:hazuki/shared/reading/reader_settings_store.dart';
-
-class _Navigation extends Mock implements ReaderNavigationController {}
-
-class _Zoom extends Mock implements ReaderZoomController {}
 
 class _Display extends ReaderDisplayController {
   _Display() : super(const MethodChannel('test/settings-display'));
@@ -65,8 +58,9 @@ void main() {
     settings = ReaderSettingsController(
       runtimeState: runtime,
       settingsStore: const ReaderSettingsStore(),
-      navigationController: _Navigation(),
-      zoomController: _Zoom(),
+      syncPositionToImageIndex: (_, {required trigger}) {},
+      syncPositionAfterPinchToggle: (_) async {},
+      resetZoomImmediately: ({reason = 'unspecified'}) {},
       displaySession: session,
       updateState: (update) => update(),
       logEvent: (_, {level = 'info', source = 'reader_ui', content}) {},

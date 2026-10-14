@@ -46,6 +46,56 @@ Future<void> selectWord(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets('long press selects without opening a closed keyboard', (
+    tester,
+  ) async {
+    final controller = CodeLineEditingController.fromText('const example = 1;');
+    addTearDown(controller.dispose);
+    await pumpEditor(tester, controller);
+    expect(tester.testTextInput.isVisible, isFalse);
+
+    await selectWord(tester);
+    expect(controller.selectedText, 'const');
+    expect(menuItems(), findsNWidgets(4));
+    expect(tester.testTextInput.isVisible, isFalse);
+
+    // A normal tap must still open the keyboard for editing.
+    await tester.tap(find.byType(TextField));
+    await tester.pumpAndSettle();
+    final rect = tester.getRect(find.byType(CodeEditor));
+    await tester.tapAt(rect.topLeft + const Offset(90, 20));
+    await tester.pumpAndSettle();
+    expect(tester.testTextInput.isVisible, isTrue);
+
+    // Closing the keyboard leaves editor focus intact on Android.
+    tester.testTextInput.hide();
+    await tester.pumpAndSettle();
+    await selectWord(tester);
+    expect(controller.selectedText, 'const');
+    expect(tester.testTextInput.isVisible, isFalse);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+  }, variant: TargetPlatformVariant.only(TargetPlatform.android));
+
+  testWidgets('long press preserves an already open keyboard', (tester) async {
+    final controller = CodeLineEditingController.fromText('const example = 1;');
+    addTearDown(controller.dispose);
+    await pumpEditor(tester, controller);
+    final rect = tester.getRect(find.byType(CodeEditor));
+    await tester.tapAt(rect.topLeft + const Offset(90, 20));
+    await tester.pumpAndSettle();
+    expect(tester.testTextInput.isVisible, isTrue);
+
+    await selectWord(tester);
+    expect(controller.selectedText, 'const');
+    expect(menuItems(), findsNWidgets(4));
+    expect(tester.testTextInput.isVisible, isTrue);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+  }, variant: TargetPlatformVariant.only(TargetPlatform.android));
+
   testWidgets(
     'tap, scroll and cancelled press do not trigger long press feedback',
     (tester) async {

@@ -7,8 +7,10 @@ class CloudSyncRestoreApplier {
 
   final CloudSyncParticipantSet _participants;
 
-  Future<CloudSyncApplySettingsResult> applySettingsJson(String content) {
-    return _participants.settings.restoreSnapshot(content);
+  Future<CloudSyncApplySettingsResult> applySettingsJson(String content) async {
+    final result = await _participants.settings.restoreSnapshot(content);
+    await _participants.commentFilter.reloadAfterExternalChange();
+    return result;
   }
 
   Future<void> applyReadingSnapshot(String content) {

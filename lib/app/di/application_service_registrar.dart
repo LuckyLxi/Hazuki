@@ -7,6 +7,7 @@ import '../../services/announcements/announcement_service.dart';
 import '../../services/announcements/announcement_store.dart';
 import '../../services/cloud_sync/cloud_sync_participant_set.dart';
 import '../../services/cloud_sync_service.dart';
+import '../../services/comment_filter/comment_filter_sync_store.dart';
 import '../../services/comment_filter_service.dart';
 import '../../services/discover_daily_recommendation_service.dart';
 import '../../services/download_groups_service.dart';
@@ -51,6 +52,11 @@ void registerApplicationServices(GetIt services) {
   if (!services.isRegistered<CommentFilterService>()) {
     services.registerLazySingleton<CommentFilterService>(
       CommentFilterService.new,
+    );
+  }
+  if (!services.isRegistered<CommentFilterSyncStore>()) {
+    services.registerLazySingleton<CommentFilterSyncStore>(
+      () => services<CommentFilterService>(),
     );
   }
   if (!services.isRegistered<LocalFavoritesPreferencesStore>()) {
@@ -158,17 +164,13 @@ void registerApplicationServices(GetIt services) {
         localFavorites: services<LocalFavoritesSyncStore>(),
         downloadGroups: services<DownloadGroupsService>(),
         searchHistory: services<SearchHistoryService>(),
+        commentFilter: services<CommentFilterSyncStore>(),
       ),
     );
   }
   if (!services.isRegistered<CloudSyncService>()) {
     services.registerLazySingleton<CloudSyncService>(
-      () => CloudSyncService(
-        localFavorites: services<LocalFavoritesRepository>(),
-        commentFilter: services<CommentFilterService>(),
-        downloadGroups: services<DownloadGroupsService>(),
-        participants: services<CloudSyncParticipantSet>(),
-      ),
+      () => CloudSyncService(participants: services<CloudSyncParticipantSet>()),
     );
   }
 }

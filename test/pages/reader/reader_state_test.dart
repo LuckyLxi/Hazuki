@@ -340,9 +340,12 @@ void main() {
         final controller = ReaderSettingsController(
           runtimeState: runtimeState,
           settingsStore: settingsStore,
-          navigationController: navigationController,
+          syncPositionToImageIndex:
+              navigationController.syncPositionToImageIndex,
+          syncPositionAfterPinchToggle:
+              navigationController.syncPositionAfterPinchToggle,
           displaySession: displaySession,
-          zoomController: zoomController,
+          resetZoomImmediately: zoomController.resetZoomImmediately,
           updateState: (update) => update(),
           logEvent: (title, {level = 'info', source = 'reader_ui', content}) {
             logEvents.add(title);

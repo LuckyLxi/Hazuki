@@ -3,6 +3,7 @@ import 'cloud_sync_favorites_participant.dart';
 import 'cloud_sync_comment_filter_participant.dart';
 import 'cloud_sync_reading_participant.dart';
 import 'cloud_sync_settings_participant.dart';
+import '../comment_filter/comment_filter_sync_store.dart';
 import '../download_groups_service.dart';
 import '../source/source_capabilities.dart';
 import '../local_favorites/local_favorites_contracts.dart';
@@ -35,12 +36,13 @@ CloudSyncParticipantSet createCloudSyncParticipantSet({
   required LocalFavoritesSyncStore localFavorites,
   required DownloadGroupsService downloadGroups,
   required SearchHistoryService searchHistory,
+  required CommentFilterSyncStore commentFilter,
 }) {
   final favoritesParticipant = LocalFavoritesSyncParticipant(localFavorites);
   final downloadGroupsParticipant = DownloadGroupsSyncParticipant(
     downloadGroups,
   );
-  const commentFilterParticipant = CommentFilterSyncParticipant();
+  final commentFilterParticipant = CommentFilterSyncParticipant(commentFilter);
   return CloudSyncParticipantSet(
     reading: CloudSyncReadingParticipant(
       readHistory: readHistory,

@@ -7,14 +7,14 @@ import 'package:hazuki/features/reader/support/reader_controller_support.dart';
 import 'package:hazuki/features/reader/support/reader_diagnostics_support.dart';
 import 'package:hazuki/features/reader/state/reader_image_pipeline_state.dart';
 import 'package:hazuki/shared/reading/reader_mode.dart';
-import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
+import 'package:hazuki/features/reader/state/reader_image_content_state.dart';
 
 import 'reader_image_loader.dart';
 import 'reader_image_prefetch_scheduler.dart';
 
 class ReaderImagePipelineController {
   ReaderImagePipelineController({
-    required ReaderRuntimeState runtimeState,
+    required ReaderImageContentState runtimeState,
     required ReaderImagePipelineState pipelineState,
     required ReaderDiagnosticsState diagnosticsState,
     required TransformationController zoomController,
@@ -134,7 +134,7 @@ class ReaderImagePipelineController {
   static const double readerListCacheExtentMin = 1600;
   static const double readerListCacheExtentMax = 5200;
 
-  final ReaderRuntimeState _runtimeState;
+  final ReaderImageContentState _runtimeState;
   final ReaderImagePipelineState _pipelineState;
   final ReaderDiagnosticsState _diagnosticsState;
   final TransformationController _zoomController;

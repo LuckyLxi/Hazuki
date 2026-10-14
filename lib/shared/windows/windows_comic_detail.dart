@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../../models/hazuki_models.dart';
+import '../navigation/snapshotting_page_route.dart';
 
 bool get useWindowsComicDetailPanel => Platform.isWindows;
 const windowsComicDetailPanelAnimationDuration = Duration(milliseconds: 320);
@@ -213,7 +214,9 @@ Future<void> openComicDetail(
   }
 
   final navigator = Navigator.of(context);
-  final route = MaterialPageRoute<void>(
+  final route = buildSnapshottingPageRoute<void>(
+    // Keep the background reveal visible during the route transition.
+    allowSnapshotting: false,
     builder: (_) => pageBuilder(comic, heroTag),
   );
 

@@ -2,37 +2,38 @@ import 'dart:async';
 
 import 'package:hazuki/shared/reading/reader_mode.dart';
 import 'package:hazuki/shared/reading/reader_filter_color.dart';
-import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
+import 'package:hazuki/features/reader/state/reader_settings_state.dart';
 import 'package:hazuki/shared/reading/reader_settings_store.dart';
 import 'package:hazuki/features/reader/support/reader_controller_support.dart';
-import 'package:hazuki/features/reader/support/reader_navigation_controller.dart';
 import 'package:hazuki/features/reader/support/reader_display_session.dart';
-import 'package:hazuki/features/reader/support/reader_zoom_controller.dart';
 
 class ReaderSettingsController {
   ReaderSettingsController({
-    required ReaderRuntimeState runtimeState,
+    required ReaderSettingsState runtimeState,
     required ReaderSettingsStore settingsStore,
-    required ReaderNavigationController navigationController,
+    required ReaderSyncPositionToImageIndex syncPositionToImageIndex,
+    required ReaderSyncPositionAfterPinchToggle syncPositionAfterPinchToggle,
     required ReaderDisplaySession displaySession,
-    required ReaderZoomController zoomController,
+    required ReaderResetZoom resetZoomImmediately,
     required ReaderStateUpdate updateState,
     required ReaderLogEvent logEvent,
     required ReaderLogPayloadBuilder logPayload,
   }) : _runtimeState = runtimeState,
        _settingsStore = settingsStore,
-       _navigationController = navigationController,
+       _syncPositionToImageIndex = syncPositionToImageIndex,
+       _syncPositionAfterPinchToggle = syncPositionAfterPinchToggle,
        _displaySession = displaySession,
-       _zoomController = zoomController,
+       _resetZoomImmediately = resetZoomImmediately,
        _updateState = updateState,
        _logEvent = logEvent,
        _logPayload = logPayload;
 
-  final ReaderRuntimeState _runtimeState;
+  final ReaderSettingsState _runtimeState;
   final ReaderSettingsStore _settingsStore;
-  final ReaderNavigationController _navigationController;
+  final ReaderSyncPositionToImageIndex _syncPositionToImageIndex;
+  final ReaderSyncPositionAfterPinchToggle _syncPositionAfterPinchToggle;
   final ReaderDisplaySession _displaySession;
-  final ReaderZoomController _zoomController;
+  final ReaderResetZoom _resetZoomImmediately;
   final ReaderStateUpdate _updateState;
   final ReaderLogEvent _logEvent;
   final ReaderLogPayloadBuilder _logPayload;
@@ -60,11 +61,8 @@ class ReaderSettingsController {
       }),
     );
     if (changed) {
-      _zoomController.resetZoomImmediately(reason: 'reading_mode_changed');
-      _navigationController.syncPositionToImageIndex(
-        targetImageIndex,
-        trigger: 'mode_changed_sync',
-      );
+      _resetZoomImmediately(reason: 'reading_mode_changed');
+      _syncPositionToImageIndex(targetImageIndex, trigger: 'mode_changed_sync');
     }
   }
 
@@ -89,8 +87,8 @@ class ReaderSettingsController {
       }),
     );
     if (previousValue != value) {
-      _zoomController.resetZoomImmediately(reason: 'double_page_mode_changed');
-      _navigationController.syncPositionToImageIndex(
+      _resetZoomImmediately(reason: 'double_page_mode_changed');
+      _syncPositionToImageIndex(
         targetImageIndex,
         trigger: 'double_page_mode_changed_sync',
       );
@@ -235,11 +233,11 @@ class ReaderSettingsController {
 
   Future<void> togglePinchToZoom(bool value) async {
     final previousValue = _runtimeState.pinchToZoom;
-    final targetImageIndex = _runtimeState.images.isEmpty
+    final targetImageIndex = _runtimeState.imageCount == 0
         ? 0
         : _runtimeState.spreadStartIndex(_runtimeState.pageIndexNotifier.value);
     if (!value) {
-      _zoomController.resetZoomImmediately(reason: 'pinch_to_zoom_disabled');
+      _resetZoomImmediately(reason: 'pinch_to_zoom_disabled');
     }
     _updateState(() {
       _runtimeState.updateSettings(pinchToZoom: value);
@@ -251,9 +249,7 @@ class ReaderSettingsController {
       content: _logPayload({'setting': 'pinch_to_zoom', 'value': value}),
     );
     if (previousValue != value) {
-      unawaited(
-        _navigationController.syncPositionAfterPinchToggle(targetImageIndex),
-      );
+      unawaited(_syncPositionAfterPinchToggle(targetImageIndex));
     }
   }
 

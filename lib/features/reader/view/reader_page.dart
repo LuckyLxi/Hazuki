@@ -9,7 +9,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'package:hazuki/shared/window/window_title_bar_control.dart';
-import 'package:hazuki/features/reader/reader.dart';
+import 'package:hazuki/features/reader/support/reader_dependencies.dart';
+import 'package:hazuki/shared/comments/comments_widget_builder.dart';
+import 'package:hazuki/shared/reading/reader_filter_color.dart';
+import 'package:hazuki/shared/reading/reader_mode.dart';
 import 'package:hazuki/features/reader/state/reader_image_pipeline_state.dart';
 import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
 import 'package:hazuki/shared/reading/reader_settings_store.dart';
@@ -230,9 +233,12 @@ class _ReaderPageState extends State<ReaderPage>
       ReaderSettingsController(
         runtimeState: _runtimeState,
         settingsStore: _readerSettingsStore,
-        navigationController: _navigationController,
+        syncPositionToImageIndex:
+            _navigationController.syncPositionToImageIndex,
+        syncPositionAfterPinchToggle:
+            _navigationController.syncPositionAfterPinchToggle,
         displaySession: _displaySession,
-        zoomController: _readerZoomController,
+        resetZoomImmediately: _readerZoomController.resetZoomImmediately,
         updateState: _updateReaderState,
         logEvent: _logReaderEvent,
         logPayload: _readerLogPayload,

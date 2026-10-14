@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/shared/navigation_tags.dart';
-import 'package:hazuki/widgets/widgets.dart';
+import 'cached_image_widgets.dart';
 
 /// Shared comic cover tile used by feature result lists and grids.
 class ComicCoverTile extends StatelessWidget {

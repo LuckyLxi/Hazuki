@@ -25,10 +25,51 @@ class SourcePluginUpdateDialogSupport {
     final context = navigatorKey.currentState?.overlay?.context;
     if (context == null) return;
     if (!context.mounted) return;
-    await showDialog<void>(
-      context: context,
-      builder: (_) =>
-          SourcePluginUpdateDialog(gateway: plugins, onUpdated: onUpdated),
+    await Navigator.of(context, rootNavigator: true).push<void>(
+      _SourcePluginUpdateDialogRoute(
+        context: context,
+        builder: (_) =>
+            SourcePluginUpdateDialog(gateway: plugins, onUpdated: onUpdated),
+      ),
+    );
+  }
+}
+
+class _SourcePluginUpdateDialogRoute extends DialogRoute<void> {
+  _SourcePluginUpdateDialogRoute({
+    required super.context,
+    required super.builder,
+  });
+
+  @override
+  Duration get transitionDuration => const Duration(milliseconds: 280);
+
+  @override
+  Widget buildTransitions(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    final curved = animation.drive(
+      CurveTween(
+        curve: animation.status == AnimationStatus.reverse
+            ? Curves.easeInCubic
+            : Curves.easeOutCubic,
+      ),
+    );
+    return FadeTransition(
+      opacity: curved,
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0, 0.02),
+          end: Offset.zero,
+        ).animate(curved),
+        child: ScaleTransition(
+          scale: Tween<double>(begin: 0.98, end: 1).animate(curved),
+          child: child,
+        ),
+      ),
     );
   }
 }

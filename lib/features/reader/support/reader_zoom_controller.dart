@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 
 import 'package:hazuki/features/reader/support/reader_controller_support.dart';
 import 'package:hazuki/features/reader/support/reader_diagnostics_support.dart';
-import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
+import 'package:hazuki/features/reader/state/reader_zoom_state.dart';
 
 class ReaderZoomController {
   ReaderZoomController({
     required TransformationController transformationController,
     required AnimationController resetAnimController,
-    required ReaderRuntimeState runtimeState,
+    required ReaderZoomState runtimeState,
     required ReaderIsMounted isMounted,
     required ReaderStateUpdate updateState,
     required ReaderLogEvent logEvent,
@@ -23,7 +23,7 @@ class ReaderZoomController {
 
   final TransformationController _transformationController;
   final AnimationController _resetAnimController;
-  final ReaderRuntimeState _runtimeState;
+  final ReaderZoomState _runtimeState;
   final ReaderIsMounted _isMounted;
   final ReaderStateUpdate _updateState;
   final ReaderLogEvent _logEvent;

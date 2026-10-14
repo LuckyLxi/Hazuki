@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
+import 'package:hazuki/shared/navigation/snapshotting_page_route.dart';
 import 'package:hazuki/shared/comments/comments_loading_view.dart';
 import 'package:hazuki/shared/comments/comments_widget_builder.dart';
 
@@ -248,7 +249,8 @@ class ComicDetailBody extends StatelessWidget {
                                 }
                                 unawaited(
                                   Navigator.of(context).push(
-                                    MaterialPageRoute<void>(
+                                    buildSnapshottingPageRoute<void>(
+                                      allowSnapshotting: false,
                                       builder: (_) =>
                                           buildComicDetailPage(comic, heroTag),
                                     ),

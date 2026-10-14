@@ -11,6 +11,8 @@ import '../support/favorite_source_policy.dart';
 import '../support/favorite_list_loader.dart';
 import '../support/favorite_selection_store.dart';
 import '../support/favorite_change_coordinator.dart';
+import '../support/favorite_folder_coordinator.dart';
+import '../support/favorite_sort_flow.dart';
 
 import 'favorite_app_bar_actions_state.dart';
 import 'favorite_page_state.dart';
@@ -43,6 +45,28 @@ class FavoritePageController extends ChangeNotifier {
       local: _localFlow,
       presentationFor: presentationFor,
     );
+    _folders = FavoriteFolderCoordinator(
+      state: _state,
+      cloudFlow: _cloudFlow,
+      localFlow: _localFlow,
+      selectionStore: _selectionStore,
+      readSourceKey: () => _activeSourceKey,
+      isDisposed: () => _disposed,
+      notify: _notify,
+      selectFolder: selectFolder,
+    );
+    _sortFlow = FavoriteSortFlow(
+      state: _state,
+      cloudFlow: _cloudFlow,
+      localFlow: _localFlow,
+      sourcePolicy: _sourcePolicy,
+      readSourceKey: () => _activeSourceKey,
+      readFavoriteSortOrders: () => _favoriteSortOrders,
+      isDisposed: () => _disposed,
+      reloadLocalComicsAfterSort: _reloadLocalComicsAfterSort,
+      resetForReload: resetForReload,
+      loadInitial: loadInitial,
+    );
     _changes = FavoriteChangeCoordinator(
       localChanges: _localFavoritesRepository,
       cloudChanges: _sourceService.cloudFavoritesChangedStream,
@@ -69,25 +93,13 @@ class FavoritePageController extends ChangeNotifier {
   bool _disposed = false;
   late final FavoriteListLoader _listLoader;
   late final FavoriteChangeCoordinator _changes;
+  late final FavoriteFolderCoordinator _folders;
+  late final FavoriteSortFlow _sortFlow;
   final FavoriteSelectionStore _selectionStore;
-  int _folderRequestVersion = 0;
-
-  FavoriteListRequest _captureFolderRequest() => FavoriteListRequest(
-    generation: ++_folderRequestVersion,
-    sourceKey: _activeSourceKey,
-    mode: _state.mode,
-  );
-
-  bool _isCurrentFolderRequest(FavoriteListRequest request) =>
-      !_disposed &&
-      request.generation == _folderRequestVersion &&
-      request.sourceKey == _activeSourceKey &&
-      request.mode == _state.mode;
 
   void _invalidateRequests() {
     _listLoader.invalidate();
-    _folderRequestVersion++;
-    _state.loadingFolders = false;
+    _folders.invalidate();
   }
 
   FavoriteListRequest _captureRequest({bool replace = false}) =>
@@ -258,55 +270,8 @@ class FavoritePageController extends ChangeNotifier {
     );
   }
 
-  Future<void> reloadFolders({ValueChanged<String>? onError}) async {
-    if (_state.mode == FavoritePageMode.local) {
-      await _reloadLocalFolders();
-      return;
-    }
-
-    final request = _captureFolderRequest();
-    if (!_cloudFlow.supportsFolderLoad) {
-      _state.folders = const <FavoriteFolder>[defaultCloudFavoriteFolder];
-      _state.selectedCloudFolderId = '0';
-      await _saveSelectedFolderId(FavoritePageMode.cloud, '0');
-      if (!_isCurrentFolderRequest(request)) return;
-      _state.loadingFolders = false;
-      _notify();
-      return;
-    }
-
-    _state.loadingFolders = true;
-    _notify();
-
-    final result = await _cloudFlow.loadFolders();
-    if (!_isCurrentFolderRequest(request)) {
-      return;
-    }
-
-    if (result.errorMessage != null) {
-      _state.loadingFolders = false;
-      _notify();
-      onError?.call(result.errorMessage!);
-      return;
-    }
-
-    final folders = _cloudFlow.normalizeFolders(result);
-    final selectedExists = folders.any(
-      (folder) => folder.id == _state.selectedCloudFolderId,
-    );
-
-    _state.folders = folders;
-    if (!selectedExists) {
-      _state.selectedCloudFolderId = folders.first.id;
-      await _saveSelectedFolderId(
-        FavoritePageMode.cloud,
-        _state.selectedCloudFolderId,
-      );
-    }
-    if (!_isCurrentFolderRequest(request)) return;
-    _state.loadingFolders = false;
-    _notify();
-  }
+  Future<void> reloadFolders({ValueChanged<String>? onError}) =>
+      _folders.reloadFolders(onError: onError);
 
   Future<String?> loadMore({required String timeoutMessage}) async {
     if (_state.initialLoading ||
@@ -445,94 +410,24 @@ class FavoritePageController extends ChangeNotifier {
     String name, {
     required String timeoutMessage,
     ValueChanged<String>? onFolderLoadError,
-  }) async {
-    try {
-      if (_state.mode == FavoritePageMode.local) {
-        await _localFlow.addFolder(name, sourceKey: _activeSourceKey);
-        await _reloadLocalFolders();
-      } else {
-        await _cloudFlow.addFolder(name);
-        await reloadFolders(onError: onFolderLoadError);
-      }
-      if (_disposed) {
-        return null;
-      }
-      final created = _state.folders
-          .where((folder) => folder.name == name)
-          .toList();
-      if (created.isNotEmpty) {
-        await selectFolder(created.first.id, timeoutMessage: timeoutMessage);
-      }
-      return null;
-    } catch (e) {
-      return '$e';
-    }
-  }
+  }) => _folders.createFolder(
+    name,
+    timeoutMessage: timeoutMessage,
+    onFolderLoadError: onFolderLoadError,
+  );
 
-  Future<String?> renameLocalFolder(String folderId, String name) async {
-    if (_state.mode != FavoritePageMode.local) {
-      return null;
-    }
-
-    final normalizedFolderId = folderId.trim();
-    if (normalizedFolderId.isEmpty) {
-      return null;
-    }
-
-    try {
-      await _localFlow.renameFolder(folderId: normalizedFolderId, name: name);
-      if (_disposed) {
-        return null;
-      }
-      await _reloadLocalFolders();
-      return null;
-    } catch (e) {
-      return '$e';
-    }
-  }
+  Future<String?> renameLocalFolder(String folderId, String name) =>
+      _folders.renameLocalFolder(folderId, name);
 
   Future<String?> changeSortOrder(
     String order, {
     required String timeoutMessage,
     ValueChanged<String>? onFolderLoadError,
-  }) async {
-    final allowedOrders = _state.mode == FavoritePageMode.local
-        ? _favoriteSortOrders
-        : _cloudFlow.sortOrders;
-    final normalized = _sourcePolicy.normalizeSortOrder(
-      order,
-      allowedOrders: allowedOrders,
-      sourceKey: _activeSourceKey,
-    );
-    if (normalized == _state.favoriteSortOrder) {
-      return null;
-    }
-
-    try {
-      if (_state.mode == FavoritePageMode.local) {
-        await _localFlow.saveSortOrder(normalized);
-        if (_disposed) {
-          return null;
-        }
-        _state.favoriteSortOrder = normalized;
-        return await _reloadLocalComicsAfterSort();
-      } else {
-        await _cloudFlow.setSortOrder(normalized);
-      }
-      if (_disposed) {
-        return null;
-      }
-      _state.favoriteSortOrder = normalized;
-      resetForReload();
-      await loadInitial(
-        timeoutMessage: timeoutMessage,
-        onFolderLoadError: onFolderLoadError,
-      );
-      return null;
-    } catch (e) {
-      return '$e';
-    }
-  }
+  }) => _sortFlow.changeSortOrder(
+    order,
+    timeoutMessage: timeoutMessage,
+    onFolderLoadError: onFolderLoadError,
+  );
 
   Future<String?> _reloadLocalComicsAfterSort() async {
     final requestVersion = _captureRequest(replace: true);
@@ -571,46 +466,8 @@ class FavoritePageController extends ChangeNotifier {
     return result.errorMessage;
   }
 
-  Future<String?> deleteCurrentFolder({required String timeoutMessage}) async {
-    final currentId = selectedFolderId;
-    if (_state.mode == FavoritePageMode.local && currentId.isEmpty) {
-      return null;
-    }
-    if (_state.mode == FavoritePageMode.cloud && currentId == '0') {
-      return null;
-    }
-
-    try {
-      if (_state.mode == FavoritePageMode.local) {
-        await _localFlow.deleteFolder(currentId);
-        _state.selectedLocalFolderId = '';
-        await _saveSelectedFolderId(FavoritePageMode.local, '');
-        await _reloadLocalFolders();
-      } else {
-        await _cloudFlow.deleteFolder(currentId);
-        final updatedFolders = _state.folders
-            .where((folder) => folder.id != currentId)
-            .toList();
-        _state.folders = updatedFolders.isEmpty
-            ? const [defaultCloudFavoriteFolder]
-            : updatedFolders;
-        _state.selectedCloudFolderId = '0';
-        await _saveSelectedFolderId(FavoritePageMode.cloud, '0');
-        _notify();
-        unawaited(reloadFolders());
-      }
-
-      await selectFolder(
-        _state.mode == FavoritePageMode.local
-            ? _state.selectedLocalFolderId
-            : '0',
-        timeoutMessage: timeoutMessage,
-      );
-      return null;
-    } catch (e) {
-      return '$e';
-    }
-  }
+  Future<String?> deleteCurrentFolder({required String timeoutMessage}) =>
+      _folders.deleteCurrentFolder(timeoutMessage: timeoutMessage);
 
   @override
   void dispose() {
@@ -824,42 +681,8 @@ class FavoritePageController extends ChangeNotifier {
     }
   }
 
-  Future<void> _reloadLocalFolders({bool notifyChanges = true}) async {
-    final request = _captureFolderRequest();
-    _state.loadingFolders = true;
-    if (notifyChanges) {
-      _notify();
-    }
-
-    final result = await _localFlow.loadFolders();
-    if (!_isCurrentFolderRequest(request)) {
-      return;
-    }
-
-    final folders = result.folders;
-    final selectedExists = folders.any(
-      (folder) => folder.id == _state.selectedLocalFolderId,
-    );
-    _state.folders = folders;
-    if (!selectedExists) {
-      _state.selectedLocalFolderId = folders.isEmpty ? '' : folders.first.id;
-      await _saveSelectedFolderId(
-        FavoritePageMode.local,
-        _state.selectedLocalFolderId,
-      );
-    }
-    if (!_isCurrentFolderRequest(request)) return;
-    if (folders.isEmpty) {
-      _state.comics = const <ExploreComic>[];
-      _state.errorMessage = null;
-      _state.currentPage = 1;
-      _state.hasMore = false;
-    }
-    _state.loadingFolders = false;
-    if (notifyChanges) {
-      _notify();
-    }
-  }
+  Future<void> _reloadLocalFolders({bool notifyChanges = true}) =>
+      _folders.reloadLocalFolders(notifyChanges: notifyChanges);
 
   void _notify() {
     if (!_disposed) {
@@ -871,6 +694,6 @@ class FavoritePageController extends ChangeNotifier {
     FavoritePageMode mode,
     String folderId,
   ) async {
-    await _selectionStore.saveFolder(mode, folderId, _activeSourceKey);
+    await _folders.saveSelectedFolderId(mode, folderId);
   }
 }

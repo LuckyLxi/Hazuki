@@ -205,7 +205,9 @@
       "version": {}
     }
   },
-  "aboutDescription": "A third-party JMComic client",
+  "aboutDescription": "An open-source comic reader",
+  "aboutCommunityTitle": "Community",
+  "aboutLegalTitle": "Usage & licenses",
   "aboutProjectTitle": "Project",
   "aboutProjectSubtitle": "GitHub (https://github.com/LuckyLxi/Hazuki)",
   "aboutCheckUpdateTitle": "Check for updates",
@@ -249,7 +251,7 @@
   "aboutOpenFeedbackFailed": "Unable to open the feedback link",
   "aboutDisclaimerTitle": "Disclaimer",
   "aboutDisclaimerSubtitle": "Please read before use",
-  "aboutDisclaimerContent": "This software is open source under the GPL-3.0 license and is provided free of charge, solely for personal learning and technical exchange.\n\nThis software is a third-party client and does not create, upload, or operate any comic content. All content displayed by the app comes from third-party platforms, and the copyright belongs to the original creators and respective rights holders. This software is not affiliated with, partnered with, or authorized by the relevant third-party platforms.\n\nThis software may display adult content or other material unsuitable for minors. Users who have not reached the legal age of adulthood in their jurisdiction must not use this software.\n\nPlease use this software in compliance with the laws and regulations of your jurisdiction and the terms of service of the relevant platforms. Users are solely responsible for any consequences arising from improper use.",
+  "aboutDisclaimerContent": "Hazuki is a free, open-source comic reader released under the GPL-3.0 license. Use, modification, and distribution of the software must comply with that license.\n\nHazuki accesses third-party platforms through comic source plugins and does not provide or operate comic content services. Rights to comics, images, and related materials belong to their respective rights holders; the software's open-source license does not grant rights to that content. Hazuki is not affiliated with, partnered with, or authorized by the third-party platforms it accesses.\n\nComply with the laws of your jurisdiction and the relevant platforms' terms of service. Read, download, and use content only as legally permitted, and do not use this software to infringe others' rights. Please support creators and authorized releases.\n\nThird-party content may include adult material or other content unsuitable for minors. Users below the legal age of adulthood in their jurisdiction must not use this software. Adult users must also comply with local restrictions on accessing such content.\n\nSource plugins, content, and services are provided by third parties. Their security, accuracy, and continued availability are outside Hazuki's control. Choose plugin sources carefully, protect your account information, and back up important data.\n\nThis software is provided as is. To the extent permitted by applicable law, the developers make no guarantees regarding its suitability, stability, or error-free operation and accept no liability for losses arising from its use. The GPL-3.0 license governs the specific warranty disclaimers and limitations of liability. This statement does not exclude or limit any liability that cannot legally be excluded or limited.",
   "commonConfirm": "OK",
   "commonCancel": "Cancel",
   "commonClose": "Close",

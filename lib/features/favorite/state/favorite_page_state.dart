@@ -1,34 +1,47 @@
 import 'package:hazuki/models/hazuki_models.dart';
 
 import 'favorite_app_bar_actions_state.dart';
+import 'favorite_folder_state.dart';
+import 'favorite_sort_state.dart';
 
-const defaultCloudFavoriteFolder = FavoriteFolder(
-  id: '0',
-  name: '__favorite_all__',
-  source: FavoriteFolderSource.cloud,
-);
+export 'favorite_folder_state.dart' show defaultCloudFavoriteFolder;
 
-class FavoritePageData {
+class FavoritePageData implements FavoriteFolderState, FavoriteSortState {
   bool isFirstLoad = true;
+  @override
   FavoritePageMode mode = FavoritePageMode.cloud;
   List<ExploreComic> comics = const <ExploreComic>[];
+  @override
   List<FavoriteFolder> folders = const <FavoriteFolder>[
     defaultCloudFavoriteFolder,
   ];
+  @override
   String selectedCloudFolderId = '0';
+  @override
   String selectedLocalFolderId = '';
   String? errorMessage;
   bool initialLoading = true;
   bool refreshing = false;
   bool loadingMore = false;
   bool hasMore = true;
+  @override
   bool loadingFolders = false;
   int currentPage = 1;
+  @override
   String favoriteSortOrder = 'mr';
 
+  @override
   String get selectedFolderId => mode == FavoritePageMode.local
       ? selectedLocalFolderId
       : selectedCloudFolderId;
+
+  @override
+  void clearComicsForEmptyFolders() {
+    comics = const <ExploreComic>[];
+    errorMessage = null;
+    currentPage = 1;
+    hasMore = false;
+  }
 
   void setMode(FavoritePageMode value) {
     mode = value;

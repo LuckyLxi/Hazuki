@@ -13,6 +13,7 @@ import 'package:hazuki/services/cloud_sync/cloud_sync_restore_applier.dart';
 import 'package:hazuki/services/cloud_sync/cloud_sync_snapshot_codec.dart';
 import 'package:hazuki/services/local_favorites_service.dart';
 import 'package:hazuki/services/download_groups_service.dart';
+import 'package:hazuki/services/comment_filter_service.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_assembly.dart';
 import 'package:hazuki/services/reading_progress_service.dart';
 import 'package:hazuki/services/read_history_service.dart';
@@ -59,6 +60,7 @@ class _CloudSyncFixture {
         localFavorites: localFavorites,
         downloadGroups: downloadGroups,
         searchHistory: searchHistory,
+        commentFilter: CommentFilterService(),
       ),
     );
   }

@@ -10,6 +10,8 @@ import 'source_plugin_settings_page.dart';
 
 part 'source_plugins_widgets.dart';
 
+enum _PluginOperationPage { installed, available }
+
 class SourcePluginsPage extends StatefulWidget {
   const SourcePluginsPage({super.key, required this.manager});
   final SourcePluginGateway manager;
@@ -19,8 +21,10 @@ class SourcePluginsPage extends StatefulWidget {
 
 class _SourcePluginsPageState extends State<SourcePluginsPage> {
   late final SourcePluginGateway _manager;
-  bool _busy = false;
-  String? _error;
+  _PluginOperationPage? _busyPage;
+  bool get _busy => _busyPage != null;
+  final Set<String> _installing = {};
+  bool get _hasOperations => _busy || _installing.isNotEmpty;
 
   @override
   void initState() {
@@ -29,18 +33,40 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
     unawaited(_run(_manager.initialize));
   }
 
-  Future<void> _run(Future<void> Function() action) async {
-    if (_busy) return;
+  Future<void> _run(
+    Future<void> Function() action, {
+    String? pluginId,
+    _PluginOperationPage page = _PluginOperationPage.installed,
+  }) async {
+    if (_busy ||
+        (pluginId == null
+            ? _installing.isNotEmpty
+            : _installing.contains(pluginId))) {
+      return;
+    }
     setState(() {
-      _busy = true;
-      _error = null;
+      if (pluginId == null) {
+        _busyPage = page;
+      } else {
+        _installing.add(pluginId);
+      }
     });
     try {
       await action();
     } catch (error) {
-      if (mounted) setState(() => _error = error.toString());
+      if (mounted) {
+        unawaited(showHazukiPrompt(context, error.toString(), isError: true));
+      }
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() {
+          if (pluginId == null) {
+            _busyPage = null;
+          } else {
+            _installing.remove(pluginId);
+          }
+        });
+      }
     }
   }
 
@@ -57,9 +83,7 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
     final update = await _manager.checkUpdate(id);
     if (update == null) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text(l10n(context).pluginsNoUpdate)));
+        unawaited(showHazukiPrompt(context, l10n(context).pluginsNoUpdate));
       }
       return;
     }
@@ -130,15 +154,11 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
                       padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
                       children: [
                         _overview(context),
-                        if (_busy)
+                        if (_busyPage == _PluginOperationPage.installed)
                           const Padding(
                             padding: EdgeInsets.only(top: 16),
                             child: LinearProgressIndicator(),
                           ),
-                        if (_error != null) ...[
-                          const SizedBox(height: 16),
-                          _PluginError(message: _error!),
-                        ],
                         const SizedBox(height: 28),
                         _PluginSectionHeader(
                           title: s.pluginsInstalled,
@@ -175,12 +195,13 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
                       key: const PageStorageKey('available-plugins'),
                       padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
                       children: [
-                        if (_busy || _manager.checkingIndex) ...[
+                        if (_busyPage == _PluginOperationPage.available ||
+                            _installing.isNotEmpty ||
+                            _manager.checkingIndex) ...[
                           const LinearProgressIndicator(),
                           const SizedBox(height: 12),
                         ],
-                        if (_error ?? _manager.indexError
-                            case final error?) ...[
+                        if (_manager.indexError case final error?) ...[
                           _PluginError(message: error),
                           const SizedBox(height: 12),
                         ],
@@ -244,7 +265,7 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
               runSpacing: 8,
               children: [
                 FilledButton.icon(
-                  onPressed: _busy ? null : () => _run(_import),
+                  onPressed: _hasOperations ? null : () => _run(_import),
                   icon: const Icon(Icons.file_open_outlined),
                   label: Text(s.pluginsImportLocal),
                 ),
@@ -296,7 +317,7 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
                   label: plugin.manifest.name,
                   child: Switch(
                     value: plugin.enabled,
-                    onChanged: _busy
+                    onChanged: _hasOperations
                         ? null
                         : (value) => _run(
                             () =>
@@ -355,7 +376,7 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
               runSpacing: 4,
               children: [
                 TextButton.icon(
-                  onPressed: _busy || !plugin.enabled
+                  onPressed: _hasOperations || !plugin.enabled
                       ? null
                       : () => Navigator.push(
                           context,
@@ -373,7 +394,7 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
                     plugin.repository == sourcePluginsRepositoryUrl ||
                     _manager.repositories.contains(plugin.repository))
                   TextButton.icon(
-                    onPressed: _busy
+                    onPressed: _hasOperations
                         ? null
                         : () => _run(() => _update(plugin.manifest.id)),
                     icon: const Icon(Icons.update, size: 18),
@@ -389,7 +410,7 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
                   style: TextButton.styleFrom(
                     foregroundColor: theme.colorScheme.error,
                   ),
-                  onPressed: _busy
+                  onPressed: _hasOperations
                       ? null
                       : () =>
                             _run(() => _manager.uninstall(plugin.manifest.id)),
@@ -422,9 +443,12 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
             Align(
               alignment: AlignmentDirectional.centerStart,
               child: TextButton.icon(
-                onPressed: _busy || _manager.checkingIndex
+                onPressed: _hasOperations || _manager.checkingIndex
                     ? null
-                    : () => _run(() => _manager.refreshRepository(repository)),
+                    : () => _run(
+                        () => _manager.refreshRepository(repository),
+                        page: _PluginOperationPage.available,
+                      ),
                 icon: const Icon(Icons.refresh, size: 18),
                 label: Text(s.pluginsRefresh),
               ),
@@ -457,6 +481,7 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
                   FilledButton.tonal(
                     onPressed:
                         _busy ||
+                            _installing.contains(entry.id) ||
                             _manager.checkingIndex ||
                             (_manager.pluginFor(entry.id) != null &&
                                 !_manager.availableUpdates.any(
@@ -465,6 +490,7 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
                         ? null
                         : () => _run(
                             () => _installFromRepository(repository, entry),
+                            pluginId: entry.id,
                           ),
                     child: Text(
                       _manager.pluginFor(entry.id) == null

@@ -1,4 +1,7 @@
 import 'reader_navigation_state.dart';
+import 'reader_settings_state.dart';
+import 'reader_zoom_state.dart';
+import 'reader_image_content_state.dart';
 import 'dart:collection';
 import 'dart:math' as math;
 
@@ -10,7 +13,12 @@ import 'package:hazuki/shared/reading/reader_mode.dart';
 import 'package:hazuki/shared/reading/reader_settings_store.dart';
 
 /// Owns reader state transitions. Controllers retain Flutter effects and timing.
-class ReaderRuntimeState implements ReaderNavigationState {
+class ReaderRuntimeState
+    implements
+        ReaderNavigationState,
+        ReaderSettingsState,
+        ReaderZoomState,
+        ReaderImageContentState {
   int _currentPageIndex = 0;
   @override
   int get currentPageIndex => _currentPageIndex;
@@ -31,6 +39,7 @@ class ReaderRuntimeState implements ReaderNavigationState {
   DateTime? get lastSliderHapticAt => _lastSliderHapticAt;
 
   List<String> _images = const <String>[];
+  @override
   List<String> get images => _images;
   @override
   int get imageCount => _images.length;
@@ -46,6 +55,7 @@ class ReaderRuntimeState implements ReaderNavigationState {
   bool get isZoomed => _isZoomed;
 
   bool _zoomInteracting = false;
+  @override
   bool get zoomInteracting => _zoomInteracting;
 
   int _activePointerCount = 0;
@@ -71,6 +81,7 @@ class ReaderRuntimeState implements ReaderNavigationState {
   ReaderSettingsSnapshot get settings => _settings;
   @override
   ReaderMode get readerMode => _settings.readerMode;
+  @override
   bool get doublePageMode => _settings.doublePageMode;
   @override
   bool get tapToTurnPage => _settings.tapToTurnPage;
@@ -84,10 +95,12 @@ class ReaderRuntimeState implements ReaderNavigationState {
   ReaderFilterColor get filterColor => _settings.filterColor;
   double get filterStrength => _settings.filterStrength;
   bool get pageIndicator => _settings.pageIndicator;
+  @override
   bool get pinchToZoom => _settings.pinchToZoom;
   bool get longPressToSave => _settings.longPressToSave;
 
   final ValueNotifier<int> _pageIndexNotifier = ValueNotifier<int>(0);
+  @override
   ValueListenable<int> get pageIndexNotifier => _pageIndexNotifier;
   final List<GlobalKey> _itemKeys = [];
   late final List<GlobalKey> _readOnlyItemKeys = UnmodifiableListView(
@@ -101,6 +114,7 @@ class ReaderRuntimeState implements ReaderNavigationState {
     _rebuildSpreadItemKeys();
   }
 
+  @override
   void updateSettings({
     ReaderMode? readerMode,
     bool? doublePageMode,
@@ -167,23 +181,30 @@ class ReaderRuntimeState implements ReaderNavigationState {
     _lastSliderHapticAt = timestamp;
   }
 
+  @override
   void pointerDown() => _activePointerCount++;
+  @override
   void pointerUp() =>
       _activePointerCount = math.max(0, _activePointerCount - 1);
+  @override
   void setZoomed(bool zoomed) => _isZoomed = zoomed;
+  @override
   void beginZoomInteraction() => _zoomInteracting = true;
 
+  @override
   void finishZoomInteraction({required bool zoomed}) {
     _zoomInteracting = _activePointerCount > 1;
     _isZoomed = zoomed;
   }
 
+  @override
   void resetZoom({bool resetPointers = true}) {
     _isZoomed = false;
     _zoomInteracting = false;
     if (resetPointers) _activePointerCount = 0;
   }
 
+  @override
   void applyImages(List<String> nextImages) {
     _images = List.unmodifiable(nextImages);
     _loadingImages = false;
@@ -203,6 +224,7 @@ class ReaderRuntimeState implements ReaderNavigationState {
     _loadImagesError = null;
   }
 
+  @override
   void markLoadImagesFailed(String message) {
     _loadingImages = false;
     _loadImagesError = message;
@@ -242,6 +264,7 @@ class ReaderRuntimeState implements ReaderNavigationState {
     return normalizeSpreadIndex(spreadIndex) * readerSpreadSize;
   }
 
+  @override
   List<int> spreadImageIndices(int spreadIndex) {
     if (_images.isEmpty) {
       return const <int>[];

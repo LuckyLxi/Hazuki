@@ -5,8 +5,9 @@ import 'package:hazuki/features/comments/state/comments_page_controller.dart';
 import 'package:hazuki/features/comments/support/comments_content_support.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/comment_filter_service.dart';
+import 'package:hazuki/services/comment_filter/comment_filter_sync_store.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_assembly.dart';
-import 'package:hazuki/services/source/source_capabilities.dart';
+import 'package:hazuki/services/source/adapters/hazuki_source_content_adapters.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
@@ -138,6 +139,105 @@ void main() {
       await service.save(userKeywords: ['x'], mode: CommentFilterMode.collapse);
       expect(() => service.userKeywords.add('y'), throwsUnsupportedError);
     });
+  });
+
+  group('CommentFilterService sync persistence', () {
+    late CommentFilterService service;
+
+    setUp(() async {
+      SharedPreferences.setMockInitialValues({
+        hazukiCommentFilterKeywordsKey: ['local'],
+        hazukiCommentFilterKeywordsUpdatedAtKey: 100,
+        hazukiCommentFilterModeKey: 'hide',
+      });
+      service = CommentFilterService();
+      addTearDown(service.dispose);
+      await service.load();
+    });
+
+    test(
+      'captures stored edits rather than stale in-memory keywords',
+      () async {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setStringList(hazukiCommentFilterKeywordsKey, ['external']);
+        await prefs.setInt(hazukiCommentFilterKeywordsUpdatedAtKey, 200);
+        final snapshot = await service.captureMergeSnapshot();
+        expect(snapshot.keywords, ['external']);
+        expect(snapshot.updatedAtMs, 200);
+        expect(service.userKeywords, ['local']);
+      },
+    );
+
+    test('keeps merged timestamp and notifies only after reloading', () async {
+      final observed = <(List<String>, CommentFilterMode)>[];
+      service.addListener(
+        () => observed.add((service.userKeywords, service.mode)),
+      );
+      await service.applyMergedKeywords(
+        const CommentFilterMergeSnapshot(
+          keywords: ['remote'],
+          updatedAtMs: 200,
+        ),
+      );
+      await service.applySyncedPreferences({
+        hazukiCommentFilterModeKey: 'collapse',
+      });
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getInt(hazukiCommentFilterKeywordsUpdatedAtKey), 200);
+      expect(service.userKeywords, ['local']);
+      expect(observed, isEmpty);
+      await service.reloadAfterExternalChange();
+      expect(observed, hasLength(1));
+      expect(observed.single.$1, ['remote']);
+      expect(observed.single.$2, CommentFilterMode.collapse);
+    });
+
+    test('legacy merge removes the timestamp and preserves mode', () async {
+      await service.applyMergedKeywords(
+        const CommentFilterMergeSnapshot(keywords: [], updatedAtMs: 0),
+      );
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getStringList(hazukiCommentFilterKeywordsKey), isEmpty);
+      expect(
+        prefs.containsKey(hazukiCommentFilterKeywordsUpdatedAtKey),
+        isFalse,
+      );
+      expect(prefs.getString(hazukiCommentFilterModeKey), 'hide');
+    });
+
+    test('patch preserves absent keys and removes explicit nulls', () async {
+      await service.applySyncedPreferences({hazukiCommentFilterModeKey: null});
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getStringList(hazukiCommentFilterKeywordsKey), ['local']);
+      expect(prefs.getInt(hazukiCommentFilterKeywordsUpdatedAtKey), 100);
+      expect(prefs.containsKey(hazukiCommentFilterModeKey), isFalse);
+    });
+
+    test(
+      'patch keeps preference conversions and ignores unrelated keys',
+      () async {
+        final prefs = await SharedPreferences.getInstance();
+        await service.applySyncedPreferences({
+          hazukiCommentFilterKeywordsKey: [1, true, 'remote'],
+          'unrelated_setting': 'ignored',
+        });
+        expect(prefs.getStringList(hazukiCommentFilterKeywordsKey), [
+          '1',
+          'true',
+          'remote',
+        ]);
+        expect(prefs.containsKey('unrelated_setting'), isFalse);
+        final unknown = {'mode': 'custom'};
+        await service.applySyncedPreferences({
+          hazukiCommentFilterModeKey: unknown,
+        });
+        expect(prefs.getString(hazukiCommentFilterModeKey), 'hide');
+        await service.applySyncedPreferences({
+          hazukiCommentFilterModeKey: unknown,
+        }, stringifyUnknown: true);
+        expect(prefs.getString(hazukiCommentFilterModeKey), unknown.toString());
+      },
+    );
   });
 
   group('CommentsPageController filtering', () {

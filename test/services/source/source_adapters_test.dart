@@ -12,6 +12,10 @@ import 'package:hazuki/services/source/runtime/source_runtime_assembly.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_operations.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_view.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
+import 'package:hazuki/services/source/adapters/hazuki_source_content_adapters.dart';
+import 'package:hazuki/services/source/adapters/hazuki_source_image_adapters.dart';
+import 'package:hazuki/services/source/adapters/hazuki_source_runtime_adapters.dart';
+import 'package:hazuki/services/source/adapters/hazuki_source_sync_adapter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../support/test_service_locator.dart';

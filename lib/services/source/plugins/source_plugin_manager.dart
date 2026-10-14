@@ -474,21 +474,31 @@ class SourcePluginManager extends ChangeNotifier implements SourceScriptStore {
   Future<void> installFromRepository(
     String repository,
     SourcePluginIndexEntry entry,
-  ) => _serialize(() async {
+  ) async {
+    await initialize();
+    if (_disposed) throw StateError('plugin_manager_disposed');
     if (!_repositories.contains(repository)) {
       throw const SourcePluginException('plugin_repository_not_added');
     }
-    await _install(
-      await _download(entry.downloadUrl),
-      repository:
-          repository == sourcePluginsRepositoryUrl &&
-              _installed[entry.id]?.repository == null &&
-              _installed.containsKey(entry.id)
-          ? null
-          : repository,
-      expected: entry,
-    );
-  });
+    // Downloads are independent; catalog changes and registry writes must
+    // still commit one at a time.
+    final bytes = await _download(entry.downloadUrl);
+    await _serialize(() async {
+      if (!_repositories.contains(repository)) {
+        throw const SourcePluginException('plugin_repository_not_added');
+      }
+      await _install(
+        bytes,
+        repository:
+            repository == sourcePluginsRepositoryUrl &&
+                _installed[entry.id]?.repository == null &&
+                _installed.containsKey(entry.id)
+            ? null
+            : repository,
+        expected: entry,
+      );
+    });
+  }
 
   Future<void> importPackage(List<int> bytes) =>
       _serialize(() => _install(bytes));

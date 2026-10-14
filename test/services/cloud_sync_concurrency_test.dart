@@ -427,11 +427,9 @@ Future<_TestDevice> _createDevice(
     localFavorites: favorites,
     downloadGroups: groups,
     searchHistory: searchHistory,
+    commentFilter: CommentFilterService(),
   );
   final service = CloudSyncService(
-    localFavorites: favorites,
-    commentFilter: CommentFilterService(),
-    downloadGroups: groups,
     participants: participants,
     remoteClientFactory: (_, _) => _FakeLockedRemoteClient(remote),
     syncLockStaleAfter: syncLockStaleAfter,

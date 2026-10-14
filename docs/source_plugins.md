@@ -18,7 +18,7 @@ Hazuki 只执行按本规范注册的 JS 插件。插件负责网站请求、签
 
 安装成功后，所有插件的信息统一保存在插件存储目录的 `installed_plugins.json` 中，`plugins` 列表记录各插件的 `id` 和 `version`，同一文件同时保存恢复安装状态所需的元数据。安装、更新、卸载使用临时文件写入后原子替换；失败不会替换已提交记录。旧版 `registry-*.json` 记录在首次加载时迁移，并保留原文件。进入插件页面或左右滑动切换“已安装插件”“可安装插件”只读取共享索引，不重复下载；点击“刷新列表”才主动重新下载。网络失败保留已安装记录及上次缓存的列表，可以在高级设置切换线路后手动重试。
 
-漫画源插件源码独立维护在 [LuckyLxi/Sources](https://github.com/LuckyLxi/Sources)，根目录包含 `jm.js`、`copy_manga.js`、`picacg.js` 和内置索引对应的 `plugins.json` 列表。“更新链接线路”仅在高级设置中提供，支持 jsDelivr、GitHub 原始文件和 ghproxy；线路切换仅作用于内置索引的刷新和更新检查，插件安装与更新始终原样使用索引中的 `downloadUrl`。切换线路不改变插件来源身份，也不会丢失账号、收藏或本地编辑备份。类型声明、Node 测试、示例和开发文档集中在本地 `HazukiSources/dev/` 中，该目录由 Git 忽略，不上传 GitHub。本文档提供公开的宿主 API 规范。
+漫画源插件源码独立维护在 [LuckyLxi/Sources](https://github.com/LuckyLxi/Sources)，根目录包含 `jm.js`、`copy_manga.js`、`picacg.js`、`relamanhua.js` 和内置索引对应的 `plugins.json` 列表。“更新链接线路”仅在高级设置中提供，支持 jsDelivr、GitHub 原始文件和 ghproxy；线路切换仅作用于内置索引的刷新和更新检查，插件安装与更新始终原样使用索引中的 `downloadUrl`。切换线路不改变插件来源身份，也不会丢失账号、收藏或本地编辑备份。类型声明、Node 测试、示例和开发文档集中在 Sources 仓库的 `dev/` 中，随源码纳入版本管理；依赖和构建输出仍被忽略。本文档与 `dev/API.md` 提供相同的宿主 API 规范，调整契约时应同步更新。
 
 ## 单个 JS 文件与发布
 
@@ -48,9 +48,10 @@ dart run tool/build_source_plugin.dart ../HazukiSources/dev/example.js
 dart run tool/build_source_plugin.dart ../HazukiSources/jm.js
 dart run tool/build_source_plugin.dart ../HazukiSources/copy_manga.js
 dart run tool/build_source_plugin.dart ../HazukiSources/picacg.js
+dart run tool/build_source_plugin.dart ../HazukiSources/relamanhua.js
 ```
 
-以上命令假定插件仓库检出到与 Hazuki 同级的 `HazukiSources` 目录，其中 `dev/example.js` 仅在本地开发资料中提供。工具直接复制源码，默认输出 `build/source_plugins/<输入文件名>`。本地可直接导入源码，不必执行发布工具。第二个参数可指定 JS 输出位置。发布时只上传该 JS 文件，再在列表中填写一致的 ID、版本和实际下载链接。本地导入同一 JS 文件即可。类型提示见本地 `HazukiSources/dev/hazuki-source.d.ts`，最小源码见 `dev/example.js`。
+以上命令从 Hazuki 主仓库运行，假定插件仓库检出到同级的 `HazukiSources` 目录。工具直接复制源码，默认输出 `build/source_plugins/<输入文件名>`。本地可直接导入源码，不必执行发布工具。第二个参数可指定 JS 输出位置。发布时只上传该 JS 文件，再在列表中填写一致的 ID、版本和实际下载链接。本地导入同一 JS 文件即可。类型提示见 Sources 仓库的 `dev/hazuki-source.d.ts`，最小源码见 `dev/example.js`。
 
 Hazuki 的 `test/fixtures/source_plugins/` 仅保留宿主回归测试使用的插件快照，不作为发布源码。主项目测试无需检出 Sources 仓库；更新快照时需保留对应 `UPSTREAM.md` 并运行相关 Flutter 测试。插件日常修改和 Node 测试应在 Sources 仓库中进行。
 
@@ -64,7 +65,7 @@ Hazuki 的 `test/fixtures/source_plugins/` 仅保留宿主回归测试使用的�
 
 漫画摘要使用 `{id, title, cover, subTitle?, tags?}`。应用负责附加当前插件 ID，插件不应返回其他源的身份。可选能力的方法缺失时不提供对应操作。
 
-可选 `explore` 支持分区首页、单页多分区及分页漫画列表；`category`、`favorites`、`comic` 的评论与点赞接口沿用类型文件及三个示例项目中的统一结构。`account.login` 返回标准化的 `{token?, displayName?, avatarUrl?}`，头像必须由插件转换成可用完整 URL；应用保存用户输入的账号供重新登录使用。`account.loadProfile` 用相同字段更新资料。
+可选 `explore` 支持分区首页、单页多分区及分页漫画列表；`category`、`favorites`、`comic` 的评论与点赞接口使用类型声明中的统一结构。`account.login` 返回标准化的 `{token?, displayName?, avatarUrl?}`，头像必须由插件转换成可用完整 URL；应用保存用户输入的账号供重新登录使用。`account.loadProfile` 用相同字段更新资料。
 
 `account.checkIn` 返回 `{status: "success" | "alreadyCheckedIn" | "skipped", message?}`。账号能力和这些操作都作用于该插件，不能读取其他插件的凭据。
 
@@ -171,11 +172,12 @@ presentation: {
 actions: {clearDeviceInfo: async () => { /* 插件自己的设备清理逻辑 */ }}
 ```
 
-三个插件当前声明的位置：
+四个插件当前声明的位置：
 
 - 禁漫天堂：个人资料签到、其他设置自动签到、详情 ID 复制、相关推荐；刷新线路通过 `presentation.actions` 放在线路页。插件提供 `comic.likeComic`，详情点赞自动显示。
 - 拷贝漫画：高级设置设备重置、阅读设置及阅读器画质选择；插件自身设置页也保留设备重置操作并显式填写 `location: 'plugin'`。
 - 哔咔漫画：个人资料签到、其他设置自动签到、阅读设置及阅读器画质选择。插件提供 `comic.likeComic`，详情点赞自动显示。
+- 热辣漫画：阅读设置及阅读器画质选择；自定义域名和画质配置位于插件设置页。
 
 `settings` 声明输入框、选择框和开关，字段见类型文件。设置页由应用渲染；插件不能创建 Flutter 控件。`presentation.actions` 提供 `{id,title,location?}` 列表，对应 `actions[id]()`；返回的文本由应用展示。设置改变时可提供 `settings[key].onChanged`。
 
@@ -262,15 +264,15 @@ presentation: {
 
 插件管理入口位于“设置 → 实验室 → 漫画源插件”。启用开关控制插件是否可用，首页的漫画源切换入口用于选择当前使用的插件。
 
-本地与在线导入共用安装校验。安装和更新先在独立目录检查脚本身份及核心方法，成功后提交注册表；失败保留原脚本。导入不执行 init()；首次使用时执行，初始化失败会报告运行错误并保留已安装的插件。不同来源的同 ID 插件不会直接覆盖，需要先卸载旧插件再导入，原数据仍保留。手动更新会提示覆盖本地编辑脚本，旧脚本保留作为备份。移除仓库不卸载插件；应用不会自动更新插件。
+本地与在线导入共用安装校验。安装和更新先在独立目录检查脚本身份及核心方法，成功后提交注册表；失败保留原脚本。导入不执行 init()；首次使用时执行，初始化失败会报告运行错误并保留已安装的插件。不同来源的同 ID 插件不会直接覆盖，需要先卸载旧插件再导入，原数据仍保留。手动更新会提示覆盖本地编辑脚本，旧脚本保留作为备份。应用启动检查内置索引并提示可用更新，由用户选择安装，不会自动覆盖插件。当前插件页面不提供添加或移除仓库入口。
 
 启停和卸载更新可用源列表。当前源被移除后选择首个启用源；没有可用源时进入无源状态。卸载保留账号、设置、收藏、进度、历史和下载内容；重新安装相同 ID 后恢复关联。缺失插件时可查看本地记录和离线下载，联网请求需要重新安装插件。
 
-升级时旧 JS 文件复制到应用插件存储目录的 `legacy_backup`，不覆盖原文件，不自动执行或转换用户编辑的旧脚本。三个新源项目沿用 `jm`、`copy_manga`、`picacg` ID。上游来源与版本记录在各项目的 `UPSTREAM.md`；发布者需要遵守上游代码许可。
+升级时旧 JS 文件复制到应用插件存储目录的 `legacy_backup`，不覆盖原文件，不自动执行或转换用户编辑的旧脚本。三个新源项目沿用 `jm`、`copy_manga`、`picacg` ID。上游来源与版本记录在脚本头部注释及 Sources 的 `dev/upstream/<插件 ID>/UPSTREAM.md` 中；热辣为原创插件，其来源说明保留在脚本头部及宿主快照中；发布者需要遵守上游代码许可。
 
 ## 验证
 
-三个插件直接使用 Hazuki API v1，接口由本地 Sources 开发目录中的 `hazuki-source.d.ts` 和严格的 JS 类型检查约束。以下命令从 Hazuki 主仓库运行，假定同级 `HazukiSources/dev/` 中保留开发资料；该目录不上传 GitHub：
+四个插件直接使用 Hazuki API v1，接口由 Sources 仓库的 `dev/hazuki-source.d.ts` 和严格的 JS 类型检查约束。以下命令从 Hazuki 主仓库运行，假定同级检出了 `HazukiSources`（包括受版本管理的 `dev/`）：
 
 ```powershell
 npm --prefix ../HazukiSources/dev ci
@@ -281,6 +283,8 @@ npm --prefix ../HazukiSources/dev test
 
 这些协议测试使用固定 HTTP 响应，不需要真实账号。覆盖签名、资料与头像兼容、登录失败保留 token、签到、会话重试、分页、章节映射和图片排序。拷贝的 HTTP 210 重试由插件处理，最多请求五次；评论及其他写操作不会因限流自动重复提交。哔咔资料查询兼容两种签名路径和旧客户端请求头，资料接口不可用时从 JWT 获取昵称，保留已成功完成的登录。
 
+热辣的 Node 测试使用离线 HTML/JSON 样本和独立 AES 解密结果；宿主回归测试通过实际 QuickJS、HTML 桥接和应用接口验证导入、搜索、详情、章节解密、画质及账号收藏流程。账号和收藏响应为模拟数据，未使用真实账号，也不保证当前网站可用。宿主快照自包含，不需要检出 Sources。
+
 原生 QuickJS 测试库先构建到应用测试目录：
 
 ```text
@@ -288,6 +292,7 @@ cmake -S third_party/flutter_qjs/test -B test/build -DCMAKE_BUILD_TYPE=Debug
 cmake --build test/build --config Debug --parallel
 flutter test test/services/source/source_plugins_test.dart
 flutter test test/services/source/migrated_source_plugins_test.dart
+flutter test test/services/source/relamanhua_source_plugin_test.dart
 ```
 
 Windows 需要 Visual Studio C++ 工具链及 CMake；Linux 需要 CMake 和 C++ 编译器。完整检查包括格式、`flutter analyze`、完整测试，以及 Android/Windows 调试构建。

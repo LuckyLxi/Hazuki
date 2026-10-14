@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../shared/preferences/hazuki_preference_keys.dart';
+import '../comment_filter/comment_filter_sync_store.dart'
+    show commentFilterSyncPreferenceKeys;
 import 'cloud_sync_config_store.dart';
 import 'cloud_sync_comment_filter_participant.dart';
 import 'cloud_sync_models.dart';
@@ -181,7 +183,11 @@ class CloudSyncSettingsParticipant {
           CloudSyncConfigStore.androidOnlySettings.contains(key)) {
         continue;
       }
-      await prefs.remove(key);
+      if (commentFilterSyncPreferenceKeys.contains(key)) {
+        await _commentFilter.applySyncedPreferences({key: null});
+      } else {
+        await prefs.remove(key);
+      }
     }
 
     for (final entry in remoteData.entries) {
@@ -289,6 +295,12 @@ class CloudSyncSettingsParticipant {
     dynamic value, {
     bool stringifyUnknown = false,
   }) async {
+    if (commentFilterSyncPreferenceKeys.contains(key)) {
+      await _commentFilter.applySyncedPreferences({
+        key: value,
+      }, stringifyUnknown: stringifyUnknown);
+      return;
+    }
     if (value == null) {
       await prefs.remove(key);
     } else if (value is bool) {

@@ -1,12 +1,20 @@
 import 'package:flutter/cupertino.dart';
 
-Route<T> buildSnapshottingPageRoute<T>({required WidgetBuilder builder}) {
-  return _SnapshottingCupertinoPageRoute<T>(builder: builder);
+Route<T> buildSnapshottingPageRoute<T>({
+  required WidgetBuilder builder,
+  bool allowSnapshotting = true,
+}) {
+  return _SnapshottingCupertinoPageRoute<T>(
+    builder: builder,
+    allowSnapshotting: allowSnapshotting,
+  );
 }
 
 class _SnapshottingCupertinoPageRoute<T> extends CupertinoPageRoute<T> {
-  _SnapshottingCupertinoPageRoute({required super.builder})
-    : super(requestFocus: false);
+  _SnapshottingCupertinoPageRoute({
+    required super.builder,
+    required super.allowSnapshotting,
+  }) : super(requestFocus: false);
 
   @override
   Widget buildTransitions(
@@ -19,7 +27,9 @@ class _SnapshottingCupertinoPageRoute<T> extends CupertinoPageRoute<T> {
       context,
       animation,
       secondaryAnimation,
-      _TransitionSnapshot(animation: animation, child: child),
+      allowSnapshotting
+          ? _TransitionSnapshot(animation: animation, child: child)
+          : child,
     );
   }
 }
