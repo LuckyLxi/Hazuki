@@ -1,3 +1,4 @@
+import '../plugins/source_search_capabilities.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../../models/hazuki_models.dart';
@@ -146,9 +147,17 @@ class HazukiSourceDailyRecommendationAdapter
   @override
   String? get activeSourceKey => runtime.activeSourceKey;
   @override
-  bool get isActiveJmSource => runtime.isActiveJmSource;
+  bool get supportsDirectComicId => runtime.supportsDirectComicId;
+  @override
+  DirectComicIdRules? directComicIdRulesForSource(String sourceKey) =>
+      runtime.directComicIdRulesForSource(sourceKey);
   @override
   bool get isInitialized => runtime.isInitialized;
+  @override
+  bool get supportsDailyRecommendation => runtime.supportsDailyRecommendation;
+  @override
+  DailyRecommendationConfig? dailyRecommendationForSource(String sourceKey) =>
+      runtime.dailyRecommendationForSource(sourceKey);
   @override
   SourceRuntimeState get sourceRuntimeState => runtime.sourceRuntimeState;
   @override

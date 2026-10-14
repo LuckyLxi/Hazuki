@@ -122,6 +122,76 @@ search:{load:async()=>({comics:[]})},comic:{loadInfo:async()=>({title:'',chapter
   );
 
   test(
+    'invalid ID rules reject imports and leave installed updates intact',
+    () async {
+      for (final rule in [r'(?:\d+)', '(']) {
+        final script =
+            "Hazuki.registerSource({presentation:{directComicIdRules:{patterns:[${jsonEncode(rule)}],extractDigits:true}},search:{load:async()=>({comics:[]})},comic:{loadInfo:async()=>({}),loadEp:async()=>({images:[]})}});";
+        await expectLater(
+          manager.importPackage(package(script: script)),
+          throwsA(isA<SourcePluginException>()),
+        );
+        expect(manager.installed, isEmpty);
+      }
+      await manager.importPackage(package());
+      final original = await (await manager.sourceFileFor(
+        'independent',
+      )).readAsString();
+      await expectLater(
+        manager.importPackage(
+          package(
+            version: '2.0.0',
+            script:
+                "Hazuki.registerSource({presentation:{directComicIdRules:{patterns:['no_capture'],extractDigits:true}},search:{load:async()=>({comics:[]})},comic:{loadInfo:async()=>({}),loadEp:async()=>({images:[]})}});",
+          ),
+        ),
+        throwsA(isA<SourcePluginException>()),
+      );
+      expect(manager.installed.single.manifest.version, '1.0.0');
+      expect(
+        await (await manager.sourceFileFor('independent')).readAsString(),
+        original,
+      );
+    },
+  );
+
+  test('runtime reads new capabilities independently of plugin identity', () async {
+    final assembly = SourceRuntimeAssembly(
+      pluginManager: manager,
+      secureSessionStorage: MemorySourceSecureSessionStorage(),
+    );
+    addTearDown(assembly.dispose);
+    await assembly.runtimeRegistry.loadActiveSourcePreference();
+    await manager.importPackage(
+      package(
+        script:
+            r"Hazuki.registerSource({presentation:{directComicIdRules:{patterns:['^book-(\\d+)$'],extractDigits:true},dailyRecommendation:{searchOrder:'recent'}},search:{load:async()=>({comics:[]})},comic:{loadInfo:async()=>({}),loadEp:async()=>({images:[]})}});",
+      ),
+    );
+    final search = assembly.gateways.search;
+    final recommendation = assembly.gateways.dailyRecommendation;
+    expect(search.supportsDirectComicId, isTrue);
+    expect(
+      search.directComicIdRulesForSource('independent')!.match('BOOK-123'),
+      '123',
+    );
+    expect(recommendation.supportsDailyRecommendation, isTrue);
+    expect(
+      recommendation.dailyRecommendationForSource('independent')!.searchOrder,
+      'recent',
+    );
+    await manager.importPackage(
+      package(
+        version: '2.0.0',
+        script:
+            "Hazuki.registerSource({presentation:{directComicId:true},search:{load:async()=>({comics:[]})},comic:{loadInfo:async()=>({}),loadEp:async()=>({images:[]})}});",
+      ),
+    );
+    expect(search.supportsDirectComicId, isFalse);
+    expect(recommendation.supportsDailyRecommendation, isFalse);
+  });
+
+  test(
     'accepts BOM, ordinary comments and code without a metadata header',
     () async {
       final script = utf8.decode(package());
@@ -375,7 +445,11 @@ Hazuki.registerSource({
         await manager.importPackage(await script.readAsBytes());
         final manifest = manager.installed.single.manifest;
         expect(manifest.id, id);
-        expect(manifest.version, id == 'example' ? '1.0.0' : '1.0.1');
+        expect(manifest.version, switch (id) {
+          'example' => '1.0.0',
+          'jm' || 'picacg' => '1.0.2',
+          _ => '1.0.1',
+        });
         expect(manifest.presentation['searchDefaultOrder'], isNotEmpty);
       },
     );

@@ -1,3 +1,4 @@
+import 'source_search_capabilities.dart';
 import 'dart:convert';
 import 'source_plugin_buttons.dart';
 import 'source_plugin_exception.dart';
@@ -90,6 +91,20 @@ class SourcePluginManifest {
     final presentation = json['presentation'] is Map
         ? Map<String, dynamic>.from(json['presentation'] as Map)
         : const <String, dynamic>{};
+    DirectComicIdRules.parse(presentation['directComicIdRules']);
+    DailyRecommendationConfig.parse(presentation['dailyRecommendation']);
+    for (final key in const ['showCategories', 'showChineseTeam']) {
+      if (presentation.containsKey(key) && presentation[key] is! bool) {
+        throw const SourcePluginException('plugin_invalid_manifest');
+      }
+    }
+    if (presentation.containsKey('detailTagGroups')) {
+      final groups = presentation['detailTagGroups'];
+      if (groups is! List ||
+          groups.any((value) => value is! String || value.trim().isEmpty)) {
+        throw const SourcePluginException('plugin_invalid_manifest');
+      }
+    }
     final groups = presentation['listTagGroups'];
     final enrich = presentation['enrichMissingTags'];
     final aliases = presentation['favoriteOrderAliases'];

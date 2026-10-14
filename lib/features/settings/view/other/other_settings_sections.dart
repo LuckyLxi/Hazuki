@@ -10,7 +10,7 @@ class OtherSettingsGeneralSection extends StatelessWidget {
     required this.aggregateSearchEnabled,
     required this.discoverDailyRecommendationEnabled,
     required this.showAutoCheckInSetting,
-    required this.showJmExclusiveSettings,
+    required this.showDailyRecommendationSetting,
     required this.useSystemTitleBar,
     required this.mangaDownloadsRootPath,
     required this.showWindowsTitleBarToggle,
@@ -26,7 +26,7 @@ class OtherSettingsGeneralSection extends StatelessWidget {
   final bool aggregateSearchEnabled;
   final bool discoverDailyRecommendationEnabled;
   final bool showAutoCheckInSetting;
-  final bool showJmExclusiveSettings;
+  final bool showDailyRecommendationSetting;
   final bool useSystemTitleBar;
   final String mangaDownloadsRootPath;
   final bool showWindowsTitleBarToggle;
@@ -58,7 +58,7 @@ class OtherSettingsGeneralSection extends StatelessWidget {
           value: aggregateSearchEnabled,
           onChanged: onAggregateSearchChanged,
         ),
-        if (showJmExclusiveSettings)
+        if (showDailyRecommendationSetting)
           SwitchListTile(
             secondary: const Icon(Icons.auto_awesome_outlined),
             title: Text(strings.otherDiscoverDailyRecommendationTitle),

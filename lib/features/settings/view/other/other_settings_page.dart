@@ -155,7 +155,8 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
                           SourcePluginButtonLocation.other,
                         ) !=
                         null,
-                    showJmExclusiveSettings: _sourceService.isActiveJmSource,
+                    showDailyRecommendationSetting:
+                        _sourceService.supportsDailyRecommendation,
                     useSystemTitleBar: _snapshot.useSystemTitleBar,
                     mangaDownloadsRootPath: _snapshot.mangaDownloadsRootPath,
                     showWindowsTitleBarToggle:

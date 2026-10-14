@@ -80,7 +80,7 @@ class _LabSettingsPageState extends State<LabSettingsPage> {
                 children: [
                   SettingsGroup(
                     children: [
-                      if (_sourceService.isActiveJmSource)
+                      if (_sourceService.supportsDirectComicId)
                         SwitchListTile(
                           secondary: const Icon(Icons.tag_outlined),
                           title: Text(strings.advancedComicIdSearchTitle),

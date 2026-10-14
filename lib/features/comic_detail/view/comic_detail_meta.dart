@@ -125,11 +125,31 @@ class ComicDetailMetaSection extends StatelessWidget {
       'showComicId',
       context: context,
     );
-    final isPicacg = sourceFeature(
+    final showUploader = sourceFeature(
       details.sourceKey,
       'showUploader',
       context: context,
     );
+    final showCategories = sourceFeature(
+      details.sourceKey,
+      'showCategories',
+      context: context,
+    );
+    final showChineseTeam = sourceFeature(
+      details.sourceKey,
+      'showChineseTeam',
+      context: context,
+    );
+    final detailTagGroups = sourcePresentation(
+      details.sourceKey,
+      context: context,
+    )['detailTagGroups'];
+    final tagGroups = detailTagGroups is List
+        ? detailTagGroups
+              .whereType<String>()
+              .map((group) => group.trim().toLowerCase())
+              .toSet()
+        : null;
     final categoryValues = normalizeComicMetaValues(
       details.tags.entries
           .where((entry) => isComicCategoryKey(entry.key))
@@ -140,8 +160,8 @@ class ComicDetailMetaSection extends StatelessWidget {
     final tagValues = normalizeComicMetaValues(
       details.tags.entries
           .where(
-            (entry) => isPicacg
-                ? isComicTagKey(entry.key)
+            (entry) => tagGroups != null
+                ? tagGroups.contains(entry.key.trim().toLowerCase())
                 : !isComicAuthorKey(entry.key) &&
                       !(isJm && isComicWorkKey(entry.key)) &&
                       !(isJm && isComicActorKey(entry.key)) &&
@@ -190,7 +210,7 @@ class ComicDetailMetaSection extends StatelessWidget {
           onValuePressed: onTagValuePressed,
           onValueLongPress: onMetaValueLongPress,
         ),
-        if (isPicacg)
+        if (showCategories)
           ComicDetailMetaRow(
             label: categoryLabel,
             values: categoryValues,
@@ -217,14 +237,14 @@ class ComicDetailMetaSection extends StatelessWidget {
             onValuePressed: onTagValuePressed,
             onValueLongPress: onMetaValueLongPress,
           ),
-        if (isPicacg)
+        if (showUploader)
           ComicDetailMetaRow(
             label: uploaderLabel,
             values: normalizeComicMetaValues([details.uploader]),
             onValuePressed: onTagValuePressed,
             onValueLongPress: onMetaValueLongPress,
           ),
-        if (isPicacg)
+        if (showChineseTeam)
           ComicDetailMetaRow(
             label: chineseTeamLabel,
             values: chineseTeamValues,

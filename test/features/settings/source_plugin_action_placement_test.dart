@@ -363,12 +363,13 @@ void main() {
       tester,
     ) async {
       final runtime = _MockRuntime();
-      when(() => runtime.isActiveJmSource).thenReturn(false);
+      when(() => runtime.supportsDirectComicId).thenReturn(false);
       final settings = _MockSettings();
       when(() => settings.activeSourceKey).thenReturn('fixture');
       when(() => settings.presentationForSource('fixture')).thenReturn({});
       final selection = _MockSelection();
-      when(() => selection.isActiveJmSource).thenReturn(false);
+      when(() => selection.supportsDirectComicId).thenReturn(false);
+      when(() => selection.supportsDailyRecommendation).thenReturn(false);
       when(() => selection.isActiveDailyCheckInSource).thenReturn(false);
       final dependencies = _MockDependencies();
       when(() => dependencies.sourceSelection).thenReturn(selection);

@@ -1,3 +1,4 @@
+import '../plugins/source_search_capabilities.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../../models/hazuki_models.dart';
@@ -10,8 +11,11 @@ abstract interface class SourceRuntimeView implements Listenable {
   SourceRuntimeRegistry get runtimeRegistry;
   String? get activeSourceKey;
   String? get sourceRevision;
-  bool get isActiveJmSource;
-  bool get isActiveCopyMangaSource;
+  bool get supportsDirectComicId;
+  bool get supportsDailyRecommendation;
+  DirectComicIdRules? directComicIdRulesForSource(String sourceKey);
+  DailyRecommendationConfig? dailyRecommendationForSource(String sourceKey);
+  bool get supportsLegacyRanking;
   bool get isActiveDailyCheckInSource;
   bool get isInitialized;
   SourceMeta? get sourceMeta;
@@ -48,9 +52,32 @@ class SourceRuntimeViewService implements SourceRuntimeView {
   }
 
   @override
-  bool get isActiveJmSource => _runtimeHost.feature('directComicId');
+  bool get supportsDirectComicId =>
+      directComicIdRulesForSource(activeSourceKey ?? '') != null;
   @override
-  bool get isActiveCopyMangaSource => _runtimeHost.feature('legacyRanking');
+  bool get supportsDailyRecommendation =>
+      dailyRecommendationForSource(activeSourceKey ?? '') != null;
+  Map<String, dynamic> _presentationFor(String sourceKey) {
+    final entry = runtimeRegistry.allowedSources
+        .where((entry) => entry.key == sourceKey)
+        .firstOrNull;
+    if (entry == null) return const {};
+    return _runtimeHost.handleFor(sourceKey).runtime.sourceMeta?.presentation ??
+        entry.presentation;
+  }
+
+  @override
+  DirectComicIdRules? directComicIdRulesForSource(String sourceKey) =>
+      DirectComicIdRules.parse(
+        _presentationFor(sourceKey)['directComicIdRules'],
+      );
+  @override
+  DailyRecommendationConfig? dailyRecommendationForSource(String sourceKey) =>
+      DailyRecommendationConfig.parse(
+        _presentationFor(sourceKey)['dailyRecommendation'],
+      );
+  @override
+  bool get supportsLegacyRanking => _runtimeHost.feature('legacyRanking');
   @override
   bool get isActiveDailyCheckInSource => _runtimeHost.supportsDailyCheckIn;
   @override

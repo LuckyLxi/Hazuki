@@ -855,7 +855,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
-    expect(requestedSourceKey, jmSearchSourceKey);
+    expect(requestedSourceKey, 'jm');
     expect(find.byKey(const ValueKey('search-loading')), findsOneWidget);
     expect(find.byKey(const ValueKey('empty')), findsNothing);
 
@@ -873,7 +873,7 @@ void main() {
         recommend: [],
         isFavorite: false,
         subId: '',
-        sourceKey: jmSearchSourceKey,
+        sourceKey: 'jm',
       ),
     );
     await _pumpSearchSettled(tester);

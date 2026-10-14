@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_registry.dart';
 import 'package:hazuki/services/source/plugins/source_plugin_buttons.dart';
+import 'package:hazuki/services/source/plugins/source_presentation_metadata.dart';
 
 export 'package:hazuki/services/source/plugins/source_plugin_buttons.dart';
 
@@ -26,7 +27,9 @@ Map<String, dynamic> sourcePresentation(
   final registry = context == null
       ? null
       : SourcePresentationScope.maybeOf(context);
-  return registry?.displayPresentationFor(sourceKey.trim()) ?? const {};
+  return comicDetailPresentation(
+    registry?.displayPresentationFor(sourceKey.trim()) ?? const {},
+  );
 }
 
 bool sourceFeature(String sourceKey, String feature, {BuildContext? context}) =>

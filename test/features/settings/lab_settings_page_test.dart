@@ -18,10 +18,12 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     final runtime = _MockSourceRuntimeGateway();
     final plugins = _MockSourcePluginGateway();
-    when(() => runtime.isActiveJmSource).thenReturn(true);
+    when(() => runtime.supportsDirectComicId).thenReturn(true);
     when(plugins.initialize).thenAnswer((_) async {});
     when(() => plugins.installed).thenReturn([]);
     when(() => plugins.repositories).thenReturn([]);
+    when(() => plugins.entriesFor(any())).thenReturn([]);
+    when(() => plugins.checkingIndex).thenReturn(false);
     when(() => plugins.errors).thenReturn({});
 
     await tester.pumpWidget(

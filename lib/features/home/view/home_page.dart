@@ -149,7 +149,7 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
           onLocaleChanged: widget.onLocaleChanged,
           featureEntrypoints: widget.featureEntrypoints,
           useLegacyRankingSection:
-              _coordinator.sourceService.isActiveCopyMangaSource,
+              _coordinator.sourceService.supportsLegacyRanking,
           comicDetailPageBuilder: (comic, heroTag) =>
               _buildComicDetailPage(comic, heroTag),
           downloadsReaderPageBuilder: (comic, chapter) =>

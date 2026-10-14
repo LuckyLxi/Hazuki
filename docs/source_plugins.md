@@ -226,12 +226,37 @@ Hazuki.registerSource({
 - `enrichMissingTags: boolean`：为缺少标签的列表条目调用所属插件的 `comic.loadInfo`；默认不补查。收藏和历史补查最多四个并发，切源或停用后忽略过期结果，失败不阻断列表。
 - `favoriteOrderAliases: Record<string,string>`：将旧收藏排序值映射到当前 `favoriteOrders` 中的值。已支持的值优先，否则尝试别名、插件默认值、首个选项；没有选项时返回空值。
 - `localFavoriteOrders`：把插件的排序值映射到 `savedNewest`、`savedOldest` 或 `updatedNewest`。宿主按这些通用策略排序本地收藏；缺少映射时按收藏时间新到旧排列。排序偏好存储保留插件的原始值，不再限制三源的编码。
+- `showUploader`、`showCategories`、`showChineseTeam`：分别控制详情上传者、分类和汉化组行。新字段必须为布尔值，各行保持现有样式和位置；只有对应数据非空时才显示。
+- `detailTagGroups: string[]`：详情“标签”行使用的分组，忽略分组名大小写和首尾空白；与列表／历史用的 `listTagGroups` 分开。允许空数组，用于隐藏标签行。声明后不再从其他分组混合提取详情标签。
+
+为保持旧插件和历史记录的展示，旧 `showUploader: true` 在未填写新字段时兼容为 `showCategories: true`、`showChineseTeam: true` 和 `detailTagGroups: ['tag', 'tags', '标签']`。这是按旧声明进行的通用兼容，不判断插件 ID；显式的新字段优先，包括 `false` 和空数组。未声明 `detailTagGroups` 且没有旧声明兼容时，保持原有通用标签筛选方式。哔咔测试插件及 Sources 中的正式源码已显式声明这三个新字段。
 
 哔咔声明标签和分类分组并启用补查；禁漫只声明详情的 `Tag` 分组用于保存记录，列表展示保持原样。禁漫域名与 HTTPS 端口修正位于插件的 URL 生成和 `onImageLoad` 内；宿主 HTTP 层不再判断漫画源或域名。
 
-安装和更新成功时，注册表同时保存最后一次插件展示规则。缓存仅包含 `showComicId`、`showUploader`、`showPageCount`、`showTags`、`showComicStatus` 和 `listTagGroups`。停用或卸载后，历史记录仍可使用这些字段展示，缓存不能启用按钮、登录、补查或其他联网功能；重新安装使用新插件声明，失败更新回滚插件及缓存。旧注册表自动从现有安装清单初始化缓存；未安装过且没有缓存的源采用通用展示，不改写原始记录。
+安装和更新成功时，注册表同时保存最后一次插件展示规则。缓存仅包含 `showComicId`、`showUploader`、`showCategories`、`showChineseTeam`、`showPageCount`、`showTags`、`showComicStatus`、`listTagGroups` 和 `detailTagGroups`。停用或卸载后，历史记录仍可使用这些字段展示，缓存不能启用按钮、登录、补查或其他联网功能；重新安装使用新插件声明，失败更新回滚插件及缓存。旧注册表自动从现有安装清单初始化缓存；未安装过且没有缓存的源采用通用展示，不改写原始记录。
 
-三个插件当前版本为 `1.0.1`。已有安装需更新或重新导入相应 JS 才能使用新增声明，应用不会自动覆盖用户编辑的插件。旧记录缺少源标识时的禁漫归属及下载 ID 兼容仍保留；漫画 ID 识别和每日推荐保持原逻辑。
+旧记录缺少源标识时的禁漫归属、下载 ID、旧 `jm.js` 文件和编辑状态兼容仍保留。站点协议适配（例如禁漫图片还原、HTTPS 端口修正，以及拷贝设备信息和限流恢复）继续由插件负责。
+
+## 漫画 ID 与每日推荐能力
+
+API v1 新增两个可选的 `presentation` 声明，宿主按能力判断，不比较源 ID：
+
+```js
+presentation: {
+  directComicIdRules: {
+    patterns: ['^(?:jm)?(\\d{2,})$'],
+    extractDigits: true,
+  },
+  dailyRecommendation: { searchOrder: 'mr' },
+}
+```
+
+- `directComicIdRules.patterns` 是非空字符串数组。每条规则必须是有效的 Dart/ECMAScript 正则并至少包含一个捕获组；导入和更新时校验，失败保留旧插件。宿主忽略大小写、去除输入首尾空白并要求完整匹配，按声明顺序取首个非空的第一捕获组作为漫画 ID。规则由插件提供，上例的 JM 前缀不会写入宿主。
+- `directComicIdRules.extractDigits` 必须是布尔值。为 `true` 且用户开启漫画 ID 搜索增强时，现有输入提示会从混合文本中提取至少三位数字；纯数字输入不显示提取提示。为 `false` 时不启用提取，仍可直接匹配 ID。
+- 单源搜索只使用当前插件的规则；聚合搜索使用参与搜索的可用插件。仅一个插件匹配时直达详情，没有匹配或多个插件匹配时执行普通关键词搜索；详情加载失败也回退普通搜索。切源或新搜索后丢弃旧请求结果。
+- `dailyRecommendation.searchOrder` 必须是非空字符串，应填写插件支持的搜索排序值。该配置独立启用每日推荐，不能由 ID 能力推导；宿主保留现有作者资源和推荐算法，使用声明的排序。缺少配置时不生成或展示缓存推荐，切源后丢弃过期结果。
+
+旧 `directComicId: true` 不再启用 ID 搜索增强、直接搜 ID 或每日推荐。缺少新声明的插件仍可普通搜索和阅读。需要更新或重新导入带有新声明的 JS，应用不会自动覆盖用户安装或编辑的插件。正式插件由独立源仓库维护：Sources 中的 JM 与哔咔源码及索引已同步为 `1.0.2`，CopyManga 仍为 `1.0.1`。源码修改不代表已经发布，也不会自动升级已安装插件。
 
 ## 生命周期与升级
 

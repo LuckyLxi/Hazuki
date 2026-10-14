@@ -1,3 +1,4 @@
+import '../plugins/source_search_capabilities.dart';
 import 'package:flutter/foundation.dart';
 
 import 'source_content_gateways.dart';
@@ -24,4 +25,6 @@ abstract interface class SourceRecommendationGateway
 abstract interface class SourceDailyRecommendationGateway
     implements SourceSearchGateway, SourceImageGateway {
   bool get isInitialized;
+  bool get supportsDailyRecommendation;
+  DailyRecommendationConfig? dailyRecommendationForSource(String sourceKey);
 }

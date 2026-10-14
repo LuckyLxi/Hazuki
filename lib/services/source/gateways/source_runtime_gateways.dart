@@ -51,8 +51,9 @@ abstract interface class SourceLocalizationGateway {
 
 abstract interface class SourceSelectionGateway implements Listenable {
   String? get activeSourceKey;
-  bool get isActiveJmSource;
-  bool get isActiveCopyMangaSource;
+  bool get supportsDirectComicId;
+  bool get supportsDailyRecommendation;
+  bool get supportsLegacyRanking;
   bool get isActiveDailyCheckInSource;
   bool get isInitialized;
   SourceMeta? get sourceMeta;
@@ -67,7 +68,7 @@ abstract interface class SourceSelectionGateway implements Listenable {
 abstract interface class SourceHomeGateway
     implements Listenable, SourceAccountGateway {
   String? get sourceRevision;
-  bool get isActiveCopyMangaSource;
+  bool get supportsLegacyRanking;
   SourceMeta? get sourceMeta;
   SourceRuntimeState get runtimeState;
 
@@ -119,8 +120,9 @@ abstract interface class SourceDebugGateway {
 
 abstract interface class SourceRuntimeGateway
     implements Listenable, SourceAccountGateway {
-  bool get isActiveJmSource;
-  bool get isActiveCopyMangaSource;
+  bool get supportsDirectComicId;
+  bool get supportsDailyRecommendation;
+  bool get supportsLegacyRanking;
   SourceMeta? get sourceMeta;
   SourceRuntimeState get runtimeState;
   List<SourceCatalogEntry> get allowedSources;
@@ -150,7 +152,7 @@ abstract interface class SourceRuntimeGateway
 abstract interface class SourceSettingsGateway {
   Map<String, dynamic>? presentationForSource(String id);
   String? get activeSourceKey;
-  bool get isActiveCopyMangaSource;
+  bool get supportsLegacyRanking;
   int get imageCacheMaxBytes;
 
   Object? loadSourceSetting(String sourceKey, String key);

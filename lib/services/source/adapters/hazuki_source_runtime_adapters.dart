@@ -111,7 +111,7 @@ class HazukiSourceHomeAdapter extends HazukiSourceListenableAdapter
   @override
   String? get activeSourceKey => runtime.activeSourceKey;
   @override
-  bool get isActiveCopyMangaSource => runtime.isActiveCopyMangaSource;
+  bool get supportsLegacyRanking => runtime.supportsLegacyRanking;
   @override
   bool get isLogged => _account.isLogged;
   @override
@@ -294,9 +294,11 @@ class HazukiSourceRuntimeAdapter extends HazukiSourceListenableAdapter
   @override
   String? get activeSourceKey => runtime.activeSourceKey;
   @override
-  bool get isActiveJmSource => runtime.isActiveJmSource;
+  bool get supportsDirectComicId => runtime.supportsDirectComicId;
   @override
-  bool get isActiveCopyMangaSource => runtime.isActiveCopyMangaSource;
+  bool get supportsDailyRecommendation => runtime.supportsDailyRecommendation;
+  @override
+  bool get supportsLegacyRanking => runtime.supportsLegacyRanking;
   @override
   bool get isLogged => _account.isLogged;
   @override
@@ -405,7 +407,7 @@ class HazukiSourceSettingsAdapter implements SourceSettingsGateway {
   @override
   String? get activeSourceKey => _runtime.activeSourceKey;
   @override
-  bool get isActiveCopyMangaSource => _runtime.isActiveCopyMangaSource;
+  bool get supportsLegacyRanking => _runtime.supportsLegacyRanking;
   @override
   int get imageCacheMaxBytes => _image.imageCacheMaxBytes;
   @override

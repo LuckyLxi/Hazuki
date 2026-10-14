@@ -311,7 +311,7 @@ class _SearchCountingSource extends SourceRuntimeAssembly {
 
   String get activeSourceKey => _activeSourceKey;
 
-  bool get isActiveJmSource => _activeSourceKey == 'jm';
+  bool get supportsDailyRecommendation => _activeSourceKey == 'jm';
 
   bool get isInitialized => true;
 
@@ -366,9 +366,18 @@ class _SearchCountingRuntimeView extends ChangeNotifier
   @override
   String? get sourceRevision => activeSourceKey;
   @override
-  bool get isActiveJmSource => _source.isActiveJmSource;
+  bool get supportsDirectComicId => false;
   @override
-  bool get isActiveCopyMangaSource => false;
+  bool get supportsDailyRecommendation => _source.supportsDailyRecommendation;
+  @override
+  DirectComicIdRules? directComicIdRulesForSource(String sourceKey) => null;
+  @override
+  DailyRecommendationConfig? dailyRecommendationForSource(String sourceKey) =>
+      sourceKey == 'jm'
+      ? const DailyRecommendationConfig(searchOrder: 'mr')
+      : null;
+  @override
+  bool get supportsLegacyRanking => false;
   @override
   bool get isActiveDailyCheckInSource => false;
   @override

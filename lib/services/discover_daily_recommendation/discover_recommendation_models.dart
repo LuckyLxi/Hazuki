@@ -23,7 +23,10 @@ class DiscoverDailyRecommendationEntry {
     };
   }
 
-  static DiscoverDailyRecommendationEntry? fromJson(Object? raw) {
+  static DiscoverDailyRecommendationEntry? fromJson(
+    Object? raw, {
+    String fallbackSourceKey = '',
+  }) {
     if (raw is! Map) {
       return null;
     }
@@ -34,9 +37,12 @@ class DiscoverDailyRecommendationEntry {
     }
     final comicMap = Map<String, dynamic>.from(comicRaw);
     final author = (map['author'] ?? '').toString().trim();
+    final declaredSourceKey = (comicMap['sourceKey'] ?? '').toString().trim();
     final comic = ExploreComic(
       id: (comicMap['id'] ?? '').toString(),
-      sourceKey: (comicMap['sourceKey'] ?? '').toString(),
+      sourceKey: declaredSourceKey.isEmpty
+          ? fallbackSourceKey
+          : declaredSourceKey,
       title: (comicMap['title'] ?? '').toString(),
       subTitle: (comicMap['subTitle'] ?? '').toString(),
       cover: (comicMap['cover'] ?? '').toString(),

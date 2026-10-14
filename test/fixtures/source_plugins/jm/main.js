@@ -263,7 +263,7 @@ function jmProfile(profile, uid, fallbackName = '') {
 const source = {
   id: 'jm',
   name: 'JMComic',
-  version: '1.0.1',
+  version: '1.0.2',
   apiVersion: 1,
 
   async init() {
@@ -736,7 +736,8 @@ const source = {
       { id: 'copyComicId', location: 'comicDetailInfo' },
       { id: 'relatedComics', location: 'comicDetailTabs' },
     ],
-    directComicId: true,
+    directComicIdRules: { patterns: ['^(?:jm)?(\\d{2,})$'], extractDigits: true },
+    dailyRecommendation: { searchOrder: 'mr' },
     showComicId: true,
     listTagGroups: ['Tag'],
     favoriteOrderAliases: { '-datetime_updated': 'mp' },

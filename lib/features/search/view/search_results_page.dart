@@ -60,6 +60,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
   late final SearchSubmissionCoordinator _submissionCoordinator =
       SearchSubmissionCoordinator(
         results: _resultsController,
+        sourceService: _sourceService,
         aggregateResults: _aggregateResultsController,
         recordHistory: (keyword) =>
             addSearchHistory(widget.historyService, keyword),

@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_meta.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 
 void main() {
   testWidgets('detail authors and tags use category-aware tag callback', (
@@ -160,4 +161,138 @@ void main() {
 
     expect(pressedValues, <String>['Action', 'Original', 'Heroine']);
   });
+
+  for (final spec in [
+    (
+      name: 'uploader does not enable other explicitly disabled fields',
+      presentation: <String, dynamic>{
+        'showUploader': true,
+        'showCategories': false,
+        'showChineseTeam': false,
+        'detailTagGroups': ['Genre'],
+      },
+      categories: false,
+      team: false,
+      uploader: true,
+      tags: <String>['Fantasy'],
+    ),
+    (
+      name: 'categories and team work without uploader',
+      presentation: <String, dynamic>{
+        'showUploader': false,
+        'showCategories': true,
+        'showChineseTeam': true,
+        'detailTagGroups': ['tags'],
+      },
+      categories: true,
+      team: true,
+      uploader: false,
+      tags: <String>['Action'],
+    ),
+    (
+      name: 'empty tag groups hide tags with uploader enabled',
+      presentation: <String, dynamic>{
+        'showUploader': true,
+        'showCategories': false,
+        'showChineseTeam': false,
+        'detailTagGroups': <String>[],
+      },
+      categories: false,
+      team: false,
+      uploader: true,
+      tags: <String>[],
+    ),
+    (
+      name: 'legacy declarations preserve existing metadata rows',
+      presentation: <String, dynamic>{'showUploader': true},
+      categories: true,
+      team: true,
+      uploader: true,
+      tags: <String>['Action'],
+    ),
+    (
+      name: 'detail tag groups ignore whitespace and case',
+      presentation: <String, dynamic>{
+        'showCategories': false,
+        'showChineseTeam': false,
+        'detailTagGroups': [' GENRE '],
+      },
+      categories: false,
+      team: false,
+      uploader: false,
+      tags: <String>['Fantasy'],
+    ),
+  ]) {
+    testWidgets(spec.name, (tester) async {
+      const details = ComicDetailsData(
+        id: 'custom-id',
+        title: 'Comic',
+        subTitle: '',
+        cover: '',
+        description: '',
+        updateTime: '',
+        likesCount: '',
+        chapters: {},
+        tags: {
+          'Author': ['Artist'],
+          'Categories': ['Webtoon'],
+          'Tags': ['Action'],
+          'Chinese Team': ['Team A'],
+          'Genre': ['Fantasy'],
+          'Views': ['10'],
+        },
+        recommend: [],
+        isFavorite: false,
+        subId: '',
+        uploader: 'Uploader',
+        sourceKey: 'arbitrary',
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: const Locale('en'),
+          builder: (context, child) => withTestSourcePresentation(
+            child!,
+            activeSourceKey: 'arbitrary',
+            catalog: [
+              SourceCatalogEntry(
+                key: 'arbitrary',
+                name: 'Custom',
+                fileName: 'main.js',
+                presentation: spec.presentation,
+              ),
+            ],
+          ),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: ComicDetailMetaSection(
+              details: details,
+              showComicId: false,
+              onCopyId: (_) {},
+              onTagValuePressed: (_) {},
+              onMetaValueLongPress: (_) {},
+            ),
+          ),
+        ),
+      );
+      expect(
+        find.text('Categories: '),
+        spec.categories ? findsOneWidget : findsNothing,
+      );
+      expect(
+        find.text('Chinese team: '),
+        spec.team ? findsOneWidget : findsNothing,
+      );
+      expect(
+        find.text('Uploader: '),
+        spec.uploader ? findsOneWidget : findsNothing,
+      );
+      final tags = tester
+          .widgetList<ComicDetailMetaRow>(find.byType(ComicDetailMetaRow))
+          .singleWhere((row) => row.label == 'Tags');
+      expect(tags.values, spec.tags);
+      expect(find.textContaining('ID:'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
 }

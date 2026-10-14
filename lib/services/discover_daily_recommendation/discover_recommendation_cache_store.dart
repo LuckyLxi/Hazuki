@@ -62,7 +62,8 @@ class SharedPreferencesDiscoverDailyRecommendationCacheStore
     required String activeSourceKey,
   }) async {
     final prefs = await SharedPreferences.getInstance();
-    final hasActiveSourceKey = activeSourceKey.trim().isNotEmpty;
+    final normalizedActiveSourceKey = activeSourceKey.trim();
+    final hasActiveSourceKey = normalizedActiveSourceKey.isNotEmpty;
     final candidates = <String>[
       if (hasActiveSourceKey) _sourceCachePayloadKey(activeSourceKey),
       _discoverDailyRecommendationCachePayloadKey,
@@ -82,11 +83,20 @@ class SharedPreferencesDiscoverDailyRecommendationCacheStore
 
     DiscoverDailyRecommendationSnapshot? newestFallback;
     for (final key in candidates) {
+      final scopedSourceKey = key == _discoverDailyRecommendationCachePayloadKey
+          ? null
+          : key.substring(
+              _discoverDailyRecommendationCachePayloadKey.length + 1,
+            );
       final snapshot = _parseCachePayload(
         prefs.getString(key),
-        activeSourceKey: activeSourceKey,
+        // The original global cache contained only JM recommendations.
+        fallbackSourceKey: scopedSourceKey ?? 'jm',
       );
-      if (snapshot == null) {
+      if (snapshot == null ||
+          (scopedSourceKey != null && snapshot.sourceKey != scopedSourceKey) ||
+          (hasActiveSourceKey &&
+              snapshot.sourceKey != normalizedActiveSourceKey)) {
         continue;
       }
       if (hasActiveSourceKey) {
@@ -111,7 +121,7 @@ class SharedPreferencesDiscoverDailyRecommendationCacheStore
 
   static DiscoverDailyRecommendationSnapshot? _parseCachePayload(
     String? raw, {
-    required String activeSourceKey,
+    required String fallbackSourceKey,
   }) {
     if (raw == null || raw.trim().isEmpty) {
       return null;
@@ -123,7 +133,10 @@ class SharedPreferencesDiscoverDailyRecommendationCacheStore
       }
       final map = Map<String, dynamic>.from(decoded);
       final version = map['version'] is int ? map['version'] as int : 1;
-      final sourceKey = (map['sourceKey'] ?? activeSourceKey).toString().trim();
+      final declaredSourceKey = (map['sourceKey'] ?? '').toString().trim();
+      final sourceKey = declaredSourceKey.isEmpty
+          ? fallbackSourceKey
+          : declaredSourceKey;
       final generatedAt = DateTime.tryParse(
         (map['generatedAt'] ?? '').toString(),
       )?.toLocal();
@@ -131,14 +144,21 @@ class SharedPreferencesDiscoverDailyRecommendationCacheStore
       final entriesRaw = map['entries'];
       final entries = entriesRaw is List
           ? entriesRaw
-                .map(DiscoverDailyRecommendationEntry.fromJson)
+                .map(
+                  (entry) => DiscoverDailyRecommendationEntry.fromJson(
+                    entry,
+                    fallbackSourceKey: sourceKey,
+                  ),
+                )
                 .whereType<DiscoverDailyRecommendationEntry>()
                 .toList(growable: false)
           : const <DiscoverDailyRecommendationEntry>[];
-      if (generatedAt == null ||
+      if (sourceKey.isEmpty ||
+          generatedAt == null ||
           selectedAuthor.isEmpty ||
           entries.length !=
-              DiscoverDailyRecommendationConfig.recommendationCount) {
+              DiscoverDailyRecommendationConfig.recommendationCount ||
+          entries.any((entry) => entry.comic.sourceKey != sourceKey)) {
         return null;
       }
       return DiscoverDailyRecommendationSnapshot(

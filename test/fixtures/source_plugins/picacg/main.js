@@ -274,7 +274,7 @@ function picacgComment(comment) {
 const source = {
   id: "picacg",
   name: "Picacg",
-  version: "1.0.1",
+  version: "1.0.2",
   apiVersion: 1,
   account: {
     login: picacgLogin,
@@ -648,6 +648,9 @@ const source = {
     enrichMissingTags: true,
     localFavoriteOrders: { dd: "savedNewest", da: "savedOldest" },
     showUploader: true,
+    showCategories: true,
+    showChineseTeam: true,
+    detailTagGroups: ["tag", "tags", "标签"],
     showPageCount: true,
     searchDefaultOrder: "dd",
     searchOrders: {

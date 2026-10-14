@@ -37,26 +37,26 @@ class ComicDetailHeaderFavoriteRow extends StatelessWidget {
     final theme = Theme.of(context);
     final showLikeButton = favorite.supportComicLike;
     final detailsReady = details != null;
-    final isPicacg = sourceFeature(
+    final showPageCount = sourceFeature(
       details?.sourceKey ?? '',
       'showPageCount',
       context: context,
     );
-    final copyMangaStatusText =
+    final comicStatusText =
         sourceFeature(
           details?.sourceKey ?? '',
           'showComicStatus',
           context: context,
         )
-        ? _copyMangaStatusText(details)
+        ? _comicStatusText(details)
         : '';
     final statsText = [
-      if (copyMangaStatusText.isNotEmpty) copyMangaStatusText,
+      if (comicStatusText.isNotEmpty) comicStatusText,
       if (details?.likesCount.isNotEmpty ?? false)
         l10n(context).comicDetailLikesCount(details!.likesCount),
-      if (isPicacg && (details?.pageCount.isNotEmpty ?? false))
+      if (showPageCount && (details?.pageCount.isNotEmpty ?? false))
         l10n(context).comicDetailPagesCount(details!.pageCount)
-      else if (viewsText.isNotEmpty && copyMangaStatusText.isEmpty)
+      else if (viewsText.isNotEmpty && comicStatusText.isEmpty)
         l10n(context).comicDetailViewsCount(viewsText),
     ].join(' / ');
     final favoriteActive =
@@ -303,7 +303,7 @@ class ComicDetailHeaderFavoriteRow extends StatelessWidget {
   }
 }
 
-String _copyMangaStatusText(ComicDetailsData? details) {
+String _comicStatusText(ComicDetailsData? details) {
   if (details == null) {
     return '';
   }

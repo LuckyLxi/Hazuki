@@ -38,7 +38,7 @@ class SearchIdExtractController extends ChangeNotifier {
     if (!_canUpdate) {
       return;
     }
-    _enabled = enabled && _sourceService.isActiveJmSource;
+    _enabled = enabled && _sourceService.supportsDirectComicId;
     _setExtractedId(_extractFromFocusedInput(_currentText()));
   }
 
@@ -83,14 +83,16 @@ class SearchIdExtractController extends ChangeNotifier {
     if (!_enabled || !_isInputFocused()) {
       return null;
     }
-    return extractBestComicId(value);
+    return _sourceService
+        .directComicIdRulesForSource(_sourceService.activeSourceKey ?? '')
+        ?.extract(value);
   }
 
   void _handleSourceChanged() {
     if (!_canUpdate) {
       return;
     }
-    if (!_sourceService.isActiveJmSource) {
+    if (!_sourceService.supportsDirectComicId) {
       _enabled = false;
       _setExtractedId(null);
       return;

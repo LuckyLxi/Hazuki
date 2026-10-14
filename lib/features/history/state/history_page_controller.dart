@@ -204,7 +204,7 @@ class HistoryPageController extends ChangeNotifier {
     }
     notifyListeners();
     unawaited(
-      _backfillPicacgTags(
+      _backfillMissingTags(
         history,
         requestVersion: requestVersion,
         sourceKey: sourceKey,
@@ -212,7 +212,7 @@ class HistoryPageController extends ChangeNotifier {
     );
   }
 
-  Future<void> _backfillPicacgTags(
+  Future<void> _backfillMissingTags(
     List<ExploreComic> history, {
     required int requestVersion,
     required String sourceKey,

@@ -1,3 +1,4 @@
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 
 import '../state/aggregate_search_results_controller.dart';
@@ -8,6 +9,7 @@ import 'search_contracts.dart';
 class SearchSubmissionCoordinator {
   SearchSubmissionCoordinator({
     required this.results,
+    required this.sourceService,
     required this.aggregateResults,
     required this.recordHistory,
     required this.openComic,
@@ -15,6 +17,7 @@ class SearchSubmissionCoordinator {
   });
 
   final SearchResultsController results;
+  final SourceSearchGateway sourceService;
   final AggregateSearchResultsController aggregateResults;
   final Future<void> Function(String keyword) recordHistory;
   final Future<void> Function(ExploreComic comic) openComic;
@@ -30,19 +33,24 @@ class SearchSubmissionCoordinator {
     required SearchMessages messages,
   }) async {
     final generation = ++_generation;
-    final sourceKey = directComicIdSourceKey(
-      aggregateSearchEnabled: aggregate,
-      activeSourceKey: activeSourceKey,
-    );
-    final comicId = sourceKey == null
-        ? null
-        : normalizeDirectComicIdKeyword(keyword);
+    final matches = <({String sourceKey, String comicId})>[];
+    final candidates = aggregate
+        ? aggregateResults.sections.map((section) => section.source.key)
+        : [activeSourceKey];
+    for (final key in candidates) {
+      final id = sourceService.directComicIdRulesForSource(key)?.match(keyword);
+      if (id != null) matches.add((sourceKey: key, comicId: id));
+    }
+    final lookup = matches.length == 1 ? matches.single : null;
+    final comicId = lookup?.comicId;
+    final sourceKey = lookup?.sourceKey;
     final token = comicId == null
         ? null
         : results.prepareDirectIdLookup(keyword);
     bool current() =>
         isActive() &&
         generation == _generation &&
+        (sourceService.activeSourceKey ?? '') == activeSourceKey &&
         (token == null || results.isCurrentRequest(token));
 
     if (comicId != null) {

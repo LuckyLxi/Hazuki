@@ -46,14 +46,6 @@ Map<String, String> searchOrderLabels(
       : const {};
 }
 
-String? extractBestComicId(String text) {
-  final trimmed = text.trim();
-  if (trimmed.isEmpty) return null;
-  final digitsOnly = trimmed.replaceAll(RegExp(r'[^\d]'), '');
-  if (digitsOnly.length > 2 && digitsOnly != trimmed) return digitsOnly;
-  return null;
-}
-
 Future<bool> isComicIdSearchEnhanceEnabled() async {
   final prefs = await SharedPreferences.getInstance();
   return prefs.getBool(hazukiComicIdSearchEnhancePreferenceKey) == true;

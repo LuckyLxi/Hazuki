@@ -33,7 +33,7 @@ class SourceDiscoverDailyRecommendationCandidateGenerator
   final Future<List<String>> Function() _loadAuthors;
   final DateTime Function() _now;
 
-  bool get _supportsActiveSource => _source.isActiveJmSource;
+  bool get _supportsActiveSource => _source.supportsDailyRecommendation;
 
   @override
   Future<DiscoverDailyRecommendationSnapshot?> generate({
@@ -43,9 +43,13 @@ class SourceDiscoverDailyRecommendationCandidateGenerator
       return null;
     }
     final sourceKey = (_source.activeSourceKey ?? '').trim();
+    final config = _source.dailyRecommendationForSource(sourceKey);
+    if (config == null) return null;
     bool hasSameActiveSource() {
       return _supportsActiveSource &&
-          (_source.activeSourceKey ?? '').trim() == sourceKey;
+          (_source.activeSourceKey ?? '').trim() == sourceKey &&
+          _source.dailyRecommendationForSource(sourceKey)?.searchOrder ==
+              config.searchOrder;
     }
 
     final authors = await _loadAuthors();
@@ -75,7 +79,7 @@ class SourceDiscoverDailyRecommendationCandidateGenerator
         result = await _source.searchComics(
           keyword: author,
           page: 1,
-          order: 'mr',
+          order: config.searchOrder,
           sourceKey: sourceKey,
         );
       } catch (_) {

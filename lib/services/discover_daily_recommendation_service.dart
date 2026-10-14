@@ -30,6 +30,10 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
           random: math.Random(),
           now: _now,
         );
+    _stateSourceKey = (_source.activeSourceKey ?? '').trim();
+    _stateSearchOrder = _source
+        .dailyRecommendationForSource(_stateSourceKey)
+        ?.searchOrder;
     _source.addListener(_handleSourceChanged);
   }
 
@@ -51,14 +55,25 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
   DiscoverDailyRecommendationState _state =
       const DiscoverDailyRecommendationState.disabled();
   Future<void>? _refreshInFlight;
+  int _generation = 0;
+  bool _disposed = false;
+  late String _stateSourceKey;
+  String? _stateSearchOrder;
+
+  bool _isCurrent(int generation, String sourceKey) =>
+      !_disposed &&
+      generation == _generation &&
+      _supportsActiveSource &&
+      (_source.activeSourceKey ?? '').trim() == sourceKey;
 
   DiscoverDailyRecommendationState get state => _state;
 
-  bool get _supportsActiveSource => _source.isActiveJmSource;
+  bool get _supportsActiveSource => _source.supportsDailyRecommendation;
 
   Future<void> setEnabled(bool enabled) async {
     await _cacheStore.setEnabled(enabled);
     if (!enabled) {
+      _generation++;
       _setState(const DiscoverDailyRecommendationState.disabled());
       return;
     }
@@ -77,8 +92,16 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
     required bool enabled,
   }) async {
     if (!enabled || !_supportsActiveSource) {
+      _generation++;
       _setState(const DiscoverDailyRecommendationState.disabled());
       return _state;
+    }
+
+    final generation = _generation;
+    final sourceKey = (_source.activeSourceKey ?? '').trim();
+    if (_stateSourceKey != sourceKey) {
+      _stateSourceKey = sourceKey;
+      _setState(const DiscoverDailyRecommendationState.disabled());
     }
 
     if (_state.isPendingReady && _state.hasPendingRecommendations) {
@@ -94,10 +117,13 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
       return _state;
     }
 
-    final cached = await _cacheStore.readSnapshot(
-      activeSourceKey: (_source.activeSourceKey ?? ''),
-    );
-    if (cached != null) {
+    final cached = await _cacheStore.readSnapshot(activeSourceKey: sourceKey);
+    if (!_isCurrent(generation, sourceKey)) return _state;
+    if (cached != null &&
+        cached.sourceKey.trim() == sourceKey &&
+        cached.recommendations.every(
+          (entry) => entry.comic.sourceKey.trim() == sourceKey,
+        )) {
       _setState(_snapshotToDisplayedState(cached));
       if (!_isCacheFresh(cached)) {
         unawaited(_refreshPendingRecommendations());
@@ -111,12 +137,14 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
     }
 
     final generated = await _generateRecommendations();
+    if (!_isCurrent(generation, sourceKey)) return _state;
     if (generated == null) {
       _setState(const DiscoverDailyRecommendationState(enabled: true));
       return _state;
     }
 
     await _cacheStore.persistSnapshot(generated);
+    if (!_isCurrent(generation, sourceKey)) return _state;
     _setState(_snapshotToDisplayedState(generated));
     return _state;
   }
@@ -180,24 +208,30 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
       return;
     }
 
+    final generation = _generation;
+    final sourceKey = (_source.activeSourceKey ?? '').trim();
     final completer = Completer<void>();
     _refreshInFlight = completer.future;
     _setState(_state.copyWith(isRefreshing: true));
 
     try {
       final generated = await _generateRecommendations();
-      if (generated == null || !_state.enabled || !_supportsActiveSource) {
+      if (generated == null ||
+          !_state.enabled ||
+          !_isCurrent(generation, sourceKey)) {
         return;
       }
 
       final preloaded = await _preloadRecommendationImages(
         generated.recommendations,
+        sourceKey: sourceKey,
       );
-      if (!preloaded || !_state.enabled || !_supportsActiveSource) {
+      if (!preloaded || !_state.enabled || !_isCurrent(generation, sourceKey)) {
         return;
       }
 
       await _cacheStore.persistSnapshot(generated);
+      if (!_isCurrent(generation, sourceKey)) return;
       _setState(
         _state.copyWith(
           pendingRecommendations: generated.recommendations,
@@ -208,8 +242,10 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
         ),
       );
     } finally {
-      _refreshInFlight = null;
-      if (!_state.isPendingReady) {
+      if (identical(_refreshInFlight, completer.future)) {
+        _refreshInFlight = null;
+      }
+      if (_isCurrent(generation, sourceKey) && !_state.isPendingReady) {
         _setState(_state.copyWith(isRefreshing: false));
       }
       if (!completer.isCompleted) {
@@ -219,8 +255,9 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
   }
 
   Future<bool> _preloadRecommendationImages(
-    List<DiscoverDailyRecommendationEntry> recommendations,
-  ) async {
+    List<DiscoverDailyRecommendationEntry> recommendations, {
+    required String sourceKey,
+  }) async {
     final imageUrls = recommendations
         .map((entry) => entry.comic.cover.trim())
         .where((url) => url.isNotEmpty)
@@ -234,6 +271,7 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
           final bytes = await _source.downloadImageBytes(
             url,
             keepInMemory: true,
+            sourceKey: sourceKey,
           );
           if (bytes.isEmpty) {
             throw Exception('recommendation_cover_empty');
@@ -273,6 +311,17 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
   }
 
   void _handleSourceChanged() {
+    final sourceKey = (_source.activeSourceKey ?? '').trim();
+    final searchOrder = _source
+        .dailyRecommendationForSource(sourceKey)
+        ?.searchOrder;
+    if (sourceKey != _stateSourceKey || searchOrder != _stateSearchOrder) {
+      _generation++;
+      _stateSourceKey = sourceKey;
+      _stateSearchOrder = searchOrder;
+      _refreshInFlight = null;
+      _setState(const DiscoverDailyRecommendationState.disabled());
+    }
     if (!_supportsActiveSource) {
       _setState(const DiscoverDailyRecommendationState.disabled());
       return;
@@ -281,12 +330,17 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
   }
 
   Future<void> _restoreForActiveSource() async {
+    final generation = _generation;
+    final sourceKey = (_source.activeSourceKey ?? '').trim();
     final enabled = await loadEnabled();
+    if (!_isCurrent(generation, sourceKey)) return;
     await ensurePrepared(enabled: enabled);
   }
 
   @override
   void dispose() {
+    _disposed = true;
+    _generation++;
     _source.removeListener(_handleSourceChanged);
     super.dispose();
   }

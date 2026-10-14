@@ -8,9 +8,13 @@ import 'package:hazuki/services/source/runtime/source_runtime_assembly.dart';
 import 'package:hazuki/services/source/runtime/source_secure_session_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-List<int> _plugin(String version, {bool showTags = true}) => utf8.encode('''
+List<int> _plugin(
+  String version, {
+  bool showTags = true,
+  Map<String, dynamic> detailMetadata = const {},
+}) => utf8.encode('''
 Hazuki.registerSource({id:'custom_metadata',name:'Custom',version:'$version',apiVersion:1,
-presentation:{showTags:$showTags,listTagGroups:['Genre'],enrichMissingTags:true,
+presentation:{...${jsonEncode(detailMetadata)},showTags:$showTags,listTagGroups:['Genre'],enrichMissingTags:true,
 refreshCloudFavorites:true,requiresLogin:true,searchOrders:{new:'New'},
 buttons:[{id:'copyComicId',location:'comicDetailInfo'}]},
 search:{load:async()=>({comics:[]})},
@@ -156,12 +160,48 @@ void main() {
     },
   );
 
+  test(
+    'new detail fields survive uninstall and restart without enabling operations',
+    () async {
+      const detailMetadata = {
+        'showUploader': false,
+        'showCategories': true,
+        'showChineseTeam': true,
+        'detailTagGroups': ['Genre'],
+      };
+      await manager.importPackage(
+        _plugin('1.0.0', detailMetadata: detailMetadata),
+      );
+      await manager.uninstall('custom_metadata');
+      manager.dispose();
+      manager = createManager();
+      await manager.initialize();
+      expect(manager.historicalPresentationFor('custom_metadata'), {
+        ...detailMetadata,
+        'showTags': true,
+        'listTagGroups': ['Genre'],
+      });
+      expect(manager.installed, isEmpty);
+      expect(manager.catalog, isEmpty);
+    },
+  );
+
   test('new presentation fields reject invalid values', () {
     for (final value in [
       {
         'listTagGroups': [123],
       },
       {'enrichMissingTags': 'true'},
+      {'showCategories': 'true'},
+      {'showCategories': null},
+      {'showChineseTeam': 1},
+      {'detailTagGroups': 'Tags'},
+      {
+        'detailTagGroups': [123],
+      },
+      {
+        'detailTagGroups': [' '],
+      },
       {
         'favoriteOrderAliases': {'old': 1},
       },

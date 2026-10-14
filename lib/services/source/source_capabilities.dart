@@ -11,3 +11,4 @@ export 'gateways/source_image_gateways.dart';
 export 'gateways/source_gateway_set.dart';
 export 'gateways/source_runtime_gateways.dart';
 export 'gateways/source_sync_gateway.dart';
+export 'plugins/source_search_capabilities.dart';

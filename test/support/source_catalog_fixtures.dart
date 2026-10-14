@@ -9,7 +9,11 @@ const List<SourceCatalogEntry> hazukiAllowedSourceCatalog = [
       "https://cdn.jsdelivr.net/gh/venera-app/venera-configs@main/jm.js",
     ],
     presentation: {
-      "directComicId": true,
+      "directComicIdRules": {
+        "patterns": [r'^(?:jm)?(\d{2,})$'],
+        "extractDigits": true,
+      },
+      "dailyRecommendation": {"searchOrder": "mr"},
       "buttons": [
         {"id": "checkIn", "location": "homeProfile"},
         {"id": "autoCheckIn", "location": "other"},
@@ -108,6 +112,9 @@ const List<SourceCatalogEntry> hazukiAllowedSourceCatalog = [
         {"id": "imageQuality", "location": "reader"},
       ],
       "showUploader": true,
+      "showCategories": true,
+      "showChineseTeam": true,
+      "detailTagGroups": ["tag", "tags", "标签"],
       "showPageCount": true,
       "searchDefaultOrder": "dd",
       "searchOrders": {"dd": "新到旧", "da": "旧到新", "ld": "最多喜欢", "vd": "最多指名"},

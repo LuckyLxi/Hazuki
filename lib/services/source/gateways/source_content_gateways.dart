@@ -1,3 +1,4 @@
+import '../plugins/source_search_capabilities.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../../models/hazuki_models.dart';
@@ -5,7 +6,8 @@ import '../models/source_contract_models.dart';
 
 abstract interface class SourceSearchGateway implements Listenable {
   String? get activeSourceKey;
-  bool get isActiveJmSource;
+  bool get supportsDirectComicId;
+  DirectComicIdRules? directComicIdRulesForSource(String sourceKey);
   SourceRuntimeState get sourceRuntimeState;
   List<SourceCatalogEntry> get allowedSources;
 
