@@ -22,7 +22,7 @@ class HomeBottomNavigation extends StatefulWidget {
   static const double floatingBarHeight =
       HazukiLiquidGlass.navigationControlHeight;
   static const double floatingVerticalPadding = 6;
-  static const double fallbackBarHeight = 48;
+  static const double fallbackBarHeight = floatingBarHeight;
   static const double bottomSpacing = 10;
   static const double promptGap = 10;
   static const double promptBottomPadding =
@@ -191,11 +191,9 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
                 builder: (context, constraints) {
                   final extraWidth =
                       (8 + HazukiLiquidGlass.navigationControlHeight) * scale;
-                  final navigationWidth =
-                      (constraints.maxWidth - extraWidth - 24 * scale).clamp(
-                        0.0,
-                        240 * scale,
-                      );
+                  final navigationWidth = _navigationWidth(
+                    constraints.maxWidth,
+                  );
                   final combinedWidth = navigationWidth + extraWidth;
                   // Keep the destinations centred where space allows, and
                   // reserve room for the merging action on narrow screens.
@@ -344,51 +342,67 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
       padding: EdgeInsets.only(
         bottom: HomeBottomNavigation.bottomSpacing * scale + bottomPadding,
       ),
-      child: Center(
-        heightFactor: 1.0,
-        child: Transform.scale(
-          key: const ValueKey('home-bottom-navigation-fallback-scale'),
-          scale: scale,
-          alignment: Alignment.bottomCenter,
-          child: UnconstrainedBox(
-            child: _buildNavigationSurface(
-              colorScheme: colorScheme,
-              isDark: isDark,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTapDown: (details) {
-                    final box =
-                        _barKey.currentContext!.findRenderObject()!
-                            as RenderBox;
-                    final localX = box.globalToLocal(details.globalPosition).dx;
-                    widget.onDestinationSelected(
-                      localX < box.size.width / 2 ? 0 : 1,
-                    );
-                  },
-                  child: Row(
-                    key: _barKey,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _buildItem(
-                        index: 0,
-                        icon: Icons.explore_outlined,
-                        selectedIcon: Icons.explore,
-                        label: widget.discoverLabel,
-                        colorScheme: colorScheme,
-                        labelOnRight: true,
+      child: LayoutBuilder(
+        builder: (context, constraints) => Center(
+          heightFactor: 1.0,
+          child: Transform.scale(
+            key: const ValueKey('home-bottom-navigation-fallback-scale'),
+            scale: scale,
+            alignment: Alignment.bottomCenter,
+            child: UnconstrainedBox(
+              child: SizedBox(
+                // The glass layout reserves 12 pixels on each side of its pill.
+                width: (_navigationWidth(constraints.maxWidth) / scale - 24)
+                    .clamp(0.0, double.infinity),
+                height: HomeBottomNavigation.fallbackBarHeight,
+                child: _buildNavigationSurface(
+                  colorScheme: colorScheme,
+                  isDark: isDark,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 4,
+                    ),
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTapDown: (details) {
+                        final box =
+                            _barKey.currentContext!.findRenderObject()!
+                                as RenderBox;
+                        final localX = box
+                            .globalToLocal(details.globalPosition)
+                            .dx;
+                        widget.onDestinationSelected(
+                          localX < box.size.width / 2 ? 0 : 1,
+                        );
+                      },
+                      child: Row(
+                        key: _barKey,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Expanded(
+                            child: _buildItem(
+                              index: 0,
+                              icon: Icons.explore_outlined,
+                              selectedIcon: Icons.explore,
+                              label: widget.discoverLabel,
+                              colorScheme: colorScheme,
+                              labelOnRight: true,
+                            ),
+                          ),
+                          Expanded(
+                            child: _buildItem(
+                              index: 1,
+                              icon: Icons.favorite_border,
+                              selectedIcon: Icons.favorite,
+                              label: widget.favoriteLabel,
+                              colorScheme: colorScheme,
+                              labelOnRight: false,
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 44),
-                      _buildItem(
-                        index: 1,
-                        icon: Icons.favorite_border,
-                        selectedIcon: Icons.favorite,
-                        label: widget.favoriteLabel,
-                        colorScheme: colorScheme,
-                        labelOnRight: false,
-                      ),
-                    ],
+                    ),
                   ),
                 ),
               ),
@@ -399,12 +413,19 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
     );
   }
 
+  double _navigationWidth(double availableWidth) {
+    final scale = widget.layoutScale;
+    final extraWidth = (8 + HazukiLiquidGlass.navigationControlHeight) * scale;
+    return (availableWidth - extraWidth - 24 * scale).clamp(0.0, 240 * scale);
+  }
+
   Widget _buildNavigationSurface({
     required ColorScheme colorScheme,
     required bool isDark,
     required Widget child,
   }) {
     return ClipRRect(
+      key: const ValueKey('home-bottom-navigation-fallback-surface'),
       borderRadius: BorderRadius.circular(36),
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
@@ -467,7 +488,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
     final labelWidget = SizeTransition(
       sizeFactor: _labelAnims[index],
       axis: Axis.horizontal,
-      alignment: AlignmentDirectional(labelOnRight ? -1.0 : 1.0, -1.0),
+      alignment: AlignmentDirectional(labelOnRight ? -1.0 : 1.0, 0),
       child: SlideTransition(
         position: _labelSlideAnims[index],
         child: FadeTransition(
@@ -478,6 +499,8 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
                 : const EdgeInsets.only(right: 5),
             child: Text(
               label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
@@ -515,9 +538,10 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
             padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 14),
             child: Row(
               mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: labelOnRight
-                  ? [iconWidget, labelWidget]
-                  : [labelWidget, iconWidget],
+                  ? [iconWidget, Flexible(child: labelWidget)]
+                  : [Flexible(child: labelWidget), iconWidget],
             ),
           ),
         ],

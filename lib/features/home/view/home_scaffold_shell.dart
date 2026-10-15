@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show OverflowBoxFit;
 import 'package:flutter/scheduler.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
@@ -40,6 +41,41 @@ Offset resolveHomeNavigationDrawerOffset({
     18 * progress + (1 - scale) * viewportSize.width / 2,
     -(1 - scale) * viewportSize.height / 2,
   );
+}
+
+class HomeNavigationDrawerLayout extends StatelessWidget {
+  const HomeNavigationDrawerLayout({
+    super.key,
+    required this.viewportWidth,
+    required this.progress,
+    required this.child,
+  });
+
+  final double viewportWidth;
+  final double progress;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final scale = 1 - 0.035 * progress;
+    final scaledWidth = viewportWidth * scale;
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 18 * progress + viewportWidth * (1 - scale),
+      ),
+      // Scale the entire layout width with the foreground. Reducing it by
+      // the translation instead makes the glass bar recalculate its action
+      // reservation and shift independently on narrow screens. Use layout
+      // coordinates so the glass shader samples without a paint transform.
+      child: OverflowBox(
+        alignment: Alignment.bottomLeft,
+        fit: OverflowBoxFit.deferToChild,
+        minWidth: scaledWidth,
+        maxWidth: scaledWidth,
+        child: child,
+      ),
+    );
+  }
 }
 
 @visibleForTesting
@@ -431,30 +467,35 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
                   viewportSize: constraints.biggest,
                   progress: drawerProgress,
                 );
-                final navigation = Padding(
-                  // Match the drawer's foreground movement in layout space so
-                  // the glass shader keeps sampling untransformed coordinates.
-                  padding: EdgeInsets.only(left: navigationOffset.dx * 2),
-                  child: RepaintBoundary(
-                    key: const ValueKey(
-                      'home-bottom-navigation-repaint-boundary',
-                    ),
-                    child: HomeBottomNavigation(
-                      currentIndex: currentIndex,
-                      onDestinationSelected: onDestinationSelected,
-                      discoverLabel: l10n(context).homeTabDiscover,
-                      favoriteLabel: l10n(context).homeTabFavorite,
-                      backToTopLabel: l10n(context).favoriteBackToTop,
-                      layoutScale: navigationScale,
-                      showBackToTop: currentIndex == 0
-                          ? _showDiscoverBackToTop
-                          : currentIndex == 1 && widget.showFavoriteBackToTop,
-                      onBackToTopPressed: currentIndex == 0
-                          ? _onDiscoverBackToTopPressed
-                          : widget.onFavoriteBackToTopPressed,
-                    ),
+                final navigationContent = RepaintBoundary(
+                  key: const ValueKey(
+                    'home-bottom-navigation-repaint-boundary',
+                  ),
+                  child: HomeBottomNavigation(
+                    currentIndex: currentIndex,
+                    onDestinationSelected: onDestinationSelected,
+                    discoverLabel: l10n(context).homeTabDiscover,
+                    favoriteLabel: l10n(context).homeTabFavorite,
+                    backToTopLabel: l10n(context).favoriteBackToTop,
+                    layoutScale: navigationScale,
+                    showBackToTop: currentIndex == 0
+                        ? _showDiscoverBackToTop
+                        : currentIndex == 1 && widget.showFavoriteBackToTop,
+                    onBackToTopPressed: currentIndex == 0
+                        ? _onDiscoverBackToTopPressed
+                        : widget.onFavoriteBackToTopPressed,
                   ),
                 );
+                final navigation = HazukiLiquidGlass.isAvailable
+                    ? HomeNavigationDrawerLayout(
+                        viewportWidth: constraints.maxWidth,
+                        progress: drawerProgress,
+                        child: navigationContent,
+                      )
+                    : Padding(
+                        padding: EdgeInsets.only(left: navigationOffset.dx * 2),
+                        child: navigationContent,
+                      );
                 if (HazukiLiquidGlass.isAvailable) {
                   return GlassScaffold(
                     backgroundColor: Theme.of(context).colorScheme.surface,

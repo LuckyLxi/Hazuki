@@ -33,6 +33,7 @@ void main() {
   testWidgets(
     'fallback scales with drawer layout and uses its own prompt height',
     (tester) async {
+      await HazukiLiquidGlass.setEnabled(false);
       await tester.pumpWidget(
         const MaterialApp(
           home: Scaffold(
@@ -67,6 +68,82 @@ void main() {
       );
     },
   );
+
+  for (final width in [320.0, 360.0, 800.0]) {
+    for (final scale in [1.0, 0.8]) {
+      testWidgets(
+        'fallback matches glass dimensions at width $width and scale $scale',
+        (tester) async {
+          await tester.runAsync(HazukiLiquidGlass.initialize);
+          await tester.binding.setSurfaceSize(Size(width, 760));
+          addTearDown(() => tester.binding.setSurfaceSize(null));
+          addTearDown(() => HazukiLiquidGlass.setEnabled(true));
+          var selectedIndex = 0;
+
+          Widget buildNavigation() => HazukiLiquidGlass.wrap(
+            child: MaterialApp(
+              home: Scaffold(
+                bottomNavigationBar: StatefulBuilder(
+                  builder: (context, setState) => HomeBottomNavigation(
+                    currentIndex: selectedIndex,
+                    onDestinationSelected: (index) =>
+                        setState(() => selectedIndex = index),
+                    discoverLabel: 'Discover',
+                    favoriteLabel: 'Favorites',
+                    layoutScale: scale,
+                  ),
+                ),
+              ),
+            ),
+          );
+
+          await tester.pumpWidget(buildNavigation());
+          final glassBar = tester.widget<GlassTabBar>(find.byType(GlassTabBar));
+          final glassSize = Size(glassBar.tabWidth! * 2, glassBar.barHeight);
+
+          await HazukiLiquidGlass.setEnabled(false);
+          await tester.pumpWidget(buildNavigation());
+          await tester.pumpAndSettle();
+
+          final surface = find.byKey(
+            const ValueKey('home-bottom-navigation-fallback-surface'),
+          );
+          void expectMatchingSize() {
+            final size = tester.getRect(surface).size;
+            expect(size.width, closeTo(glassSize.width, 0.001));
+            expect(size.height, closeTo(glassSize.height, 0.001));
+          }
+
+          void expectCenteredLabel(String label, IconData icon) {
+            final labelCenter = tester.getRect(find.text(label)).center.dy;
+            expect(
+              labelCenter,
+              closeTo(tester.getRect(surface).center.dy, 0.001),
+            );
+            expect(
+              labelCenter,
+              closeTo(tester.getRect(find.byIcon(icon)).center.dy, 0.001),
+            );
+          }
+
+          expect(find.byType(GlassTabBar), findsNothing);
+          expectMatchingSize();
+          expectCenteredLabel('Discover', Icons.explore);
+          await tester.tap(find.byIcon(Icons.favorite_border));
+          await tester.pumpAndSettle();
+          expect(selectedIndex, 1);
+          expectMatchingSize();
+          expectCenteredLabel('Favorites', Icons.favorite);
+          await tester.tap(find.byIcon(Icons.explore_outlined));
+          await tester.pumpAndSettle();
+          expect(selectedIndex, 0);
+          expectMatchingSize();
+          expectCenteredLabel('Discover', Icons.explore);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
 
   testWidgets('uses liquid glass surface and preserves destination taps', (
     tester,
