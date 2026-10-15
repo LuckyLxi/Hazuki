@@ -1,6 +1,6 @@
 // ignore_for_file: public_member_api_docs
 // ignore_for_file: deprecated_member_use
-// Shared internal widgets for GlassBottomBar and GlassSearchableBottomBar.
+// Shared internal sub-widgets for GlassTabBar.bottom and GlassTabBar.searchable.
 //
 // NOT part of the public API — do not export from liquid_glass_widgets.dart.
 library;
@@ -18,19 +18,22 @@ import '../../../utils/draggable_indicator_physics.dart';
 import 'tab_bar_drag_gesture_mixin.dart';
 import '../../../utils/glass_spring.dart';
 import '../../../widgets/interactive/glass_button.dart';
+import '../../../widgets/overlays/glass_menu.dart' show GlassMenu;
 import '../../../widgets/shared/adaptive_glass.dart';
 import '../../../widgets/shared/animated_glass_indicator.dart';
 import '../../../widgets/shared/inherited_liquid_glass.dart';
-import '../../../widgets/surfaces/glass_bottom_bar.dart'
-    show GlassTabBarExtraButton, MaskingQuality, JellyClipper;
+import '../../../widgets/surfaces/shared/tab_bar_extra_button.dart'
+    show GlassTabBarExtraButton;
+import '../../../widgets/surfaces/shared/tab_bar_types.dart'
+    show MaskingQuality, JellyClipper;
 import '../../../widgets/surfaces/glass_tab_bar.dart' show GlassTab;
 
 // =============================================================================
 // kBottomBarGlassDefaults — shared glass preset
 // =============================================================================
 
-/// Default [LiquidGlassSettings] for both [GlassBottomBar] and
-/// [GlassSearchableBottomBar].
+/// Default [LiquidGlassSettings] for both [GlassTabBar.bottom] and
+/// [GlassTabBar.searchable].
 ///
 /// Centralised here so that both bars are guaranteed to produce visually
 /// identical glass when placed on the same screen — there is no risk of
@@ -127,7 +130,7 @@ List<Shadow>? buildIconShadows({
 // BottomBarTabItem — shared tab item widget
 // =============================================================================
 
-/// Renders a single tab item for [GlassBottomBar] and [GlassSearchableBottomBar].
+/// Renders a single tab item for [GlassTabBar.bottom] and [GlassTabBar.searchable].
 ///
 /// Previously duplicated as `_BottomBarTab` and `_TabItem`. Single source of truth.
 class BottomBarTabItem extends StatelessWidget {
@@ -150,6 +153,7 @@ class BottomBarTabItem extends StatelessWidget {
     required this.glowSpreadRadius,
     required this.glowOpacity,
     required this.onTap,
+    this.semanticOnTap,
     super.key,
   });
 
@@ -185,6 +189,20 @@ class BottomBarTabItem extends StatelessWidget {
   // Pass null in contexts where the outer TabIndicator owns selection via
   // onTapDown, and accessibility is handled by the indicator's own Semantics.
   final VoidCallback? onTap;
+
+  /// Activation for assistive technology and the keyboard, independent of the
+  /// pointer path.
+  ///
+  /// The bottom and searchable bars own selection on the indicator's own
+  /// `onTapDown`, so every tab is built with a null [onTap] and the
+  /// [GestureDetector] here is excluded from semantics. Without this the tab's
+  /// node is a button with a selected state and no [SemanticsAction.tap]:
+  /// TalkBack and VoiceOver read every destination and can activate none, and
+  /// a focused tab does not answer Enter or Space either.
+  ///
+  /// The layout passes `() => onTabSelected(i)`. It never takes pointer input,
+  /// so the bar's own drag gesture is untouched.
+  final VoidCallback? semanticOnTap;
 
   @override
   Widget build(BuildContext context) {
@@ -225,7 +243,10 @@ class BottomBarTabItem extends StatelessWidget {
       tracksSelection: true,
       isSelected: semanticsSelected ?? selected,
       semanticLabel: tab.semanticLabel ?? tab.label ?? 'Tab',
-      onKeyboardActivate: onTap,
+      onKeyboardActivate: onTap ?? semanticOnTap,
+      // The GestureDetector below is excluded from semantics, so the tap
+      // action has to be declared here or the node carries none at all.
+      semanticOnTap: onTap ?? semanticOnTap,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: GestureDetector(
         // onTap may be null when selection is owned by the outer TabIndicator
@@ -379,20 +400,44 @@ class BottomBarExtraBtn extends StatelessWidget {
             ? LiquidRoundedRectangle(borderRadius: config.size / 2)
             : const LiquidOval());
 
-    final button = GlassButton(
-      icon: config.icon,
-      onTap: config.onTap,
-      label: config.label,
-      width: config.size,
-      height: config.size,
-      quality: quality,
-      iconColor: iconColor,
-      glowOpacity: config.glowOpacity,
-      useOwnLayer: !enableBlend, // When blending, share the parent's layer
-      shape: effectiveShape,
-      platformViewBackdrop: platformViewBackdrop,
-      stretch: platformViewBackdrop ? 0.0 : 0.5,
-    );
+    Widget buildButton(VoidCallback onTap) {
+      return GlassButton(
+        icon: config.icon,
+        onTap: onTap,
+        label: config.label,
+        width: config.size,
+        height: config.size,
+        quality: quality,
+        iconColor: iconColor,
+        glowOpacity: config.glowOpacity,
+        useOwnLayer: !enableBlend, // When blending, share the parent's layer
+        shape: effectiveShape,
+        platformViewBackdrop: platformViewBackdrop,
+        stretch: platformViewBackdrop ? 0.0 : 0.5,
+        // The extra button is anchored inside the compound bar and does not
+        // animate its layout bounds at rest. Marking it stationary lets
+        // AdaptiveGlass retain the BackdropFilter blur in GlassQuality.minimal,
+        // so it matches the frosted appearance of the main tab bar surface.
+        // See: https://github.com/sdegenaar/liquid_glass_widgets/issues/203
+        isStationary:
+            config.transformOffset == Offset.zero && config.transformScale == 1,
+        enabled: config.enabled,
+      );
+    }
+
+    final Widget button;
+    if (config.isMenu) {
+      button = GlassMenu(
+        menuAlignment: config.menuAlignment,
+        menuWidth: config.menuWidth,
+        menuHeight: config.menuHeight,
+        autoAdjustToScreen: true,
+        items: config.menuItems!,
+        triggerBuilder: (context, toggleMenu) => buildButton(toggleMenu),
+      );
+    } else {
+      button = buildButton(config.onTap);
+    }
 
     return ExcludeFocus(
       excluding: config.ignorePointer,
@@ -416,7 +461,7 @@ class BottomBarExtraBtn extends StatelessWidget {
 
 /// Internal widget that manages the draggable indicator with physics.
 ///
-/// Extracted from [GlassBottomBar] to keep the public widget focused on layout
+/// Extracted from [GlassTabBar.bottom] to keep the public widget focused on layout
 /// and configuration, while this widget owns all gesture, animation, and
 /// rendering logic for the tab indicator pill.
 ///
@@ -435,6 +480,7 @@ class TabIndicator extends StatefulWidget {
     required this.visible,
     required this.indicatorColor,
     required this.quality,
+    this.backgroundQuality,
     required this.barHeight,
     required this.barBorderRadius,
     this.indicatorBorderRadius,
@@ -466,6 +512,7 @@ class TabIndicator extends StatefulWidget {
   final LiquidGlassSettings? indicatorSettings;
   final ValueChanged<int> onTabChanged;
   final GlassQuality quality;
+  final GlassQuality? backgroundQuality;
   final double barHeight;
   final double barBorderRadius;
   final double? indicatorBorderRadius;
@@ -521,10 +568,6 @@ class TabIndicatorState extends State<TabIndicator>
   @override
   void notifyTabChanged(int index) => widget.onTabChanged(index);
 
-  // Cache fallback indicator color to avoid allocations
-  static const _fallbackIndicatorColor =
-      Color(0x1AFFFFFF); // white.withValues(alpha: 0.1)
-
   final GlobalKey _iconLayerKey = GlobalKey();
 
   // Cached shape to avoid recreation on every animation frame
@@ -544,17 +587,18 @@ class TabIndicatorState extends State<TabIndicator>
 
   @override
   Widget build(BuildContext context) {
-    final theme = CupertinoTheme.of(context);
+    final brightness = GlassTheme.brightnessOf(context);
     final indicatorColor = widget.indicatorColor ??
-        theme.textTheme.textStyle.color?.withValues(alpha: .1) ??
-        _fallbackIndicatorColor;
+        (brightness == Brightness.dark
+            ? CupertinoColors.white.withValues(alpha: .1)
+            : CupertinoColors.black.withValues(alpha: .1));
     final targetAlignment = computeTabAlignment(widget.tabIndex);
 
     // Nested-arc default: if the outer bar is a capsule sentinel (≥ 9999),
     // the indicator is also passed 9999 directly, so the glass shader clamps to
     // a true capsule even during jelly-bloom expansion (where the pill canvas
     // grows beyond its rest size and a finite radius would appear boxy).
-    // For custom radii (e.g. GlassBottomBar default 32), the indicator subtracts
+    // For custom radii (e.g. GlassTabBar.bottom default 32), the indicator subtracts
     // the padding inset (4 px) to produce concentric nested arcs (32 − 4 = 28).
     // An explicit indicatorBorderRadius always takes priority.
     const indicatorPadding = 4.0;
@@ -593,6 +637,7 @@ class TabIndicatorState extends State<TabIndicator>
               child: GestureDetector(
                 key: ValueKey(gestureEpoch),
                 behavior: HitTestBehavior.opaque,
+                excludeFromSemantics: true,
                 onHorizontalDragDown: onBarDragDown,
                 onHorizontalDragStart: onBarDragStart,
                 onHorizontalDragUpdate: onBarDragUpdate,
@@ -647,7 +692,8 @@ class TabIndicatorState extends State<TabIndicator>
                               shape: _barShape,
                             ),
                             child: AdaptiveGlass.grouped(
-                              quality: widget.quality,
+                              quality:
+                                  widget.backgroundQuality ?? widget.quality,
                               platformViewBackdrop: widget.platformViewBackdrop,
                               shape: _barShape,
                               child: Container(
@@ -723,7 +769,8 @@ class TabIndicatorState extends State<TabIndicator>
         clipper: _InverseBarClipper(_barShape),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(widget.barBorderRadius),
+            borderRadius:
+                GlassDefaults.safeBorderRadius(widget.barBorderRadius),
             boxShadow: shadows,
           ),
         ),
@@ -775,7 +822,7 @@ class TabIndicatorState extends State<TabIndicator>
                   Positioned.fill(
                     child: RepaintBoundary(
                       child: AdaptiveGlass.grouped(
-                        quality: widget.quality,
+                        quality: widget.backgroundQuality ?? widget.quality,
                         platformViewBackdrop: widget.platformViewBackdrop,
                         shape: _barShape,
                         child: const SizedBox.expand(),
@@ -866,7 +913,7 @@ class TabIndicatorState extends State<TabIndicator>
                   Positioned.fill(
                     child: RepaintBoundary(
                       child: AdaptiveGlass.grouped(
-                        quality: widget.quality,
+                        quality: widget.backgroundQuality ?? widget.quality,
                         platformViewBackdrop: widget.platformViewBackdrop,
                         shape: _barShape,
                         child: const SizedBox.expand(),

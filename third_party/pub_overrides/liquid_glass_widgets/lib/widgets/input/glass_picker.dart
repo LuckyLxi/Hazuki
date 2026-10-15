@@ -25,6 +25,7 @@ class GlassPicker extends StatelessWidget {
     this.useOwnLayer = false,
     this.quality,
     this.shape = const LiquidRoundedRectangle(borderRadius: 10),
+    this.semanticLabel,
   });
 
   /// The currently selected text value.
@@ -40,6 +41,9 @@ class GlassPicker extends StatelessWidget {
   final VoidCallback? onTap;
 
   /// Height of the picker field.
+  ///
+  /// This is the field's minimum height: with a large system text size the
+  /// field grows to fit the text instead of clipping it.
   final double height;
 
   /// Optional width.
@@ -66,6 +70,12 @@ class GlassPicker extends StatelessWidget {
   /// Shape of the container.
   final LiquidShape shape;
 
+  /// What the picker chooses, announced by screen readers (for example
+  /// "Size"), with the current [value] read as the value.
+  ///
+  /// When null, the visible text ([value] or [placeholder]) is the label.
+  final String? semanticLabel;
+
   @override
   Widget build(BuildContext context) {
     // Inherit quality from parent layer if not explicitly set
@@ -83,8 +93,10 @@ class GlassPicker extends StatelessWidget {
     final effectivePlaceholderStyle =
         TextStyle(fontSize: 16, color: secondaryColor).merge(placeholderStyle);
 
+    // A minimum height rather than a fixed one, so the value survives a
+    // large system text size (SC 1.4.4); at the default scale it is the same.
     final child = Container(
-      height: height,
+      constraints: BoxConstraints(minHeight: height),
       width: width,
       padding: padding,
       child: Row(
@@ -116,10 +128,23 @@ class GlassPicker extends StatelessWidget {
       child: child,
     );
 
-    return GestureDetector(
+    final shownText = value ?? placeholder;
+    // One node for the whole field: a button named by [semanticLabel] (or the
+    // visible text) whose value is the current selection. The text below is
+    // excluded so it is not read a second time.
+    return Semantics(
+      container: true,
+      button: true,
+      enabled: onTap != null,
+      label: semanticLabel ?? shownText,
+      value: semanticLabel != null ? shownText : null,
       onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: glassWidget,
+      excludeSemantics: true,
+      child: GestureDetector(
+        onTap: onTap,
+        behavior: HitTestBehavior.opaque,
+        child: glassWidget,
+      ),
     );
   }
 
@@ -142,7 +167,8 @@ class GlassPicker extends StatelessWidget {
           children: [
             if (title != null)
               Container(
-                height: 50,
+                // Minimum, not fixed, so a scaled-up title is not clipped.
+                constraints: const BoxConstraints(minHeight: 50),
                 alignment: Alignment.center,
                 child: Text(title,
                     style: const TextStyle(fontWeight: FontWeight.bold)),

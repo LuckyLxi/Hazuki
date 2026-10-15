@@ -4,6 +4,7 @@ import '../../src/renderer/liquid_glass_renderer.dart';
 
 import '../../types/glass_quality.dart';
 import '../interactive/glass_button.dart';
+import '../../src/utils/glass_localizations.dart';
 import 'glass_text_field.dart';
 
 /// A glass morphism search bar following Apple's iOS 26 design patterns.
@@ -115,6 +116,8 @@ class GlassSearchBar extends StatefulWidget {
     this.settings,
     this.useOwnLayer = false,
     this.quality,
+    this.clearButtonSemanticLabel,
+    this.cancelButtonSemanticLabel,
   });
 
   // ===========================================================================
@@ -207,6 +210,16 @@ class GlassSearchBar extends StatefulWidget {
   ///
   /// Defaults to `24`, matching the visual weight of the search and clear icons.
   final double cancelIconSize;
+
+  /// Screen reader label of the clear (×) button inside the field.
+  ///
+  /// Defaults to the app's [CupertinoLocalizations.clearButtonLabel].
+  final String? clearButtonSemanticLabel;
+
+  /// Screen reader label of the cancel button beside the field.
+  ///
+  /// Defaults to the app's [CupertinoLocalizations.cancelButtonLabel].
+  final String? cancelButtonSemanticLabel;
 
   /// The style of the search text.
   final TextStyle? textStyle;
@@ -365,6 +378,8 @@ class _GlassSearchBarState extends State<GlassSearchBar> {
               ),
             ),
             onSuffixTap: _hasText ? _handleClear : null,
+            suffixSemanticLabel: widget.clearButtonSemanticLabel ??
+                glassCupertinoLocalizationsOf(context).clearButtonLabel,
             onChanged: widget.onChanged,
             onSubmitted: widget.onSubmitted,
             autofocus: widget.autofocus,
@@ -383,7 +398,7 @@ class _GlassSearchBarState extends State<GlassSearchBar> {
         ),
 
         // Cancel button — text style (iOS Spotlight / Messages pattern).
-        // Note: GlassSearchableBottomBar uses a glass ×‑icon button instead;
+        // Note: GlassTabBar.searchable uses a glass ×‑icon button instead;
         // the two patterns are intentionally different — each matches the iOS
         // convention for its context (standalone screen vs. bottom bar).
         AnimatedSize(
@@ -397,6 +412,9 @@ class _GlassSearchBarState extends State<GlassSearchBar> {
                     padding: const EdgeInsetsDirectional.only(start: 10),
                     child: GlassButton(
                       onTap: _handleCancel,
+                      label: widget.cancelButtonSemanticLabel ??
+                          glassCupertinoLocalizationsOf(context)
+                              .cancelButtonLabel,
                       width: widget.height,
                       height: widget.height,
                       shape: const LiquidOval(),

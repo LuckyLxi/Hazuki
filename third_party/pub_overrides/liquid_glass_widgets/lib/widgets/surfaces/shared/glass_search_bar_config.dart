@@ -1,14 +1,14 @@
 import 'package:flutter/cupertino.dart';
 
-/// Configuration for the morphing search bar in [GlassSearchableBottomBar].
+/// Configuration for the morphing search bar in [GlassTabBar.searchable].
 ///
 /// When the user taps the collapsed search pill, [onSearchToggle] is called
-/// with `true`. Set [GlassSearchableBottomBar.isSearchActive] to `true` to
+/// with `true`. Set `isSearchActive` to `true` to
 /// expand the search bar and collapse the tab pill.
 ///
 /// ## Example
 /// ```dart
-/// GlassSearchableBottomBar(
+/// GlassTabBar.searchable(
 ///   tabs: [...],
 ///   selectedIndex: _tab,
 ///   onTabSelected: (i) => setState(() => _tab = i),
@@ -46,6 +46,7 @@ class GlassSearchBarConfig {
     this.onTapOutside,
     this.autoFocusOnExpand = false,
     this.expandWhenActive = true,
+    this.showPill = true,
     this.showsCancelButton = true,
     this.cancelButtonColor,
     this.cancelIcon,
@@ -53,6 +54,9 @@ class GlassSearchBarConfig {
     this.onSearchFocusChanged,
     this.onSearchFieldTap,
     this.onCancelTap,
+    this.clearButtonSemanticLabel,
+    this.micButtonSemanticLabel,
+    this.cancelButtonSemanticLabel,
   });
 
   /// Called with `true` when search is activated, `false` when dismissed.
@@ -63,7 +67,7 @@ class GlassSearchBarConfig {
 
   /// Width of the collapsed tab pill when search is active.
   ///
-  /// If omitted, defaults to matching the [GlassSearchableBottomBar.searchBarHeight]
+  /// If omitted, defaults to matching the `searchBarHeight`
   /// to ensure the collapsed indicator perfectly shrinks proportionately into a circle.
   final double? collapsedTabWidth;
 
@@ -72,8 +76,8 @@ class GlassSearchBarConfig {
   /// Optional builder for a custom logo/icon shown on the collapsed tab pill
   /// when search is fully active.
   ///
-  /// If omitted, this defaults to displaying the [GlassBottomBarTab.activeIcon] (or fallback
-  /// [GlassBottomBarTab.icon]) of the currently selected [GlassBottomBarTab], matching the native
+  /// If omitted, this defaults to displaying the [GlassTab.activeIcon] (or fallback
+  /// [GlassTab.icon]) of the currently selected [GlassTab], matching the native
   /// iOS Apple News behavior.
   final WidgetBuilder? collapsedLogoBuilder;
 
@@ -100,6 +104,12 @@ class GlassSearchBarConfig {
   final Color? micIconColor;
 
   /// Text style for the hint text. Uses a sensible default when null.
+  ///
+  /// Its font size, weight and family are shared with the typed text, so the
+  /// field does not change metrics as the user starts typing. Its colour is
+  /// the hint's; typed text takes [textColor] instead, and falls back to this
+  /// colour only when [textColor] is null. To mute the hint while keeping the
+  /// typed text strong, set both.
   final TextStyle? hintStyle;
 
   /// Optional controller for the search text field.
@@ -142,8 +152,18 @@ class GlassSearchBarConfig {
   /// is provided (the builder is responsible for its own tap handling).
   final VoidCallback? onMicTap;
 
-  /// Color of the typed text. Defaults to `CupertinoColors.label`
-  /// (adapts to light/dark mode).
+  /// Color of the typed text in the expanded search field.
+  ///
+  /// When `null` (the default), the colour is resolved from
+  /// `CupertinoColors.label` using the **app's** active ThemeMode via
+  /// `GlassTheme.brightnessOf` — the package's single brightness authority.
+  /// This ensures the text is always legible against the glass pill regardless
+  /// of whether the device OS is in dark mode, matching the iOS 26 behaviour
+  /// where `UIUserInterfaceStyle` overrides propagate to every sub-view.
+  ///
+  /// Pass an explicit colour (including a [CupertinoDynamicColor]) to override.
+  /// An explicit colour always wins for typed text, including over a colour
+  /// set on [hintStyle], which then applies to the hint alone.
   final Color? textColor;
 
   /// Color of the text cursor (blinking caret) in the expanded
@@ -249,6 +269,23 @@ class GlassSearchBarConfig {
   /// active, creating an empty gap in the center of the bar.
   final bool expandWhenActive;
 
+  /// Whether the compact search pill exists on the bar.
+  ///
+  /// Defaults to `true` — the pill is present in both states, the original
+  /// layout. `false` removes it entirely: the tab pill takes over the
+  /// reclaimed width, and the pill is genuinely absent rather than
+  /// invisible — it contributes no glass shape to the blend layer, so
+  /// nothing fuses with the tab pill's trailing edge. In iPhone Duo's
+  /// vertical bar strip the capsule likewise ends at the last tab, with no
+  /// search slot.
+  ///
+  /// The value may change at runtime: the pill spring-scales in and out in
+  /// place at its slot, on the same spring the pill morphs use. That is the
+  /// building block for app-driven policies — a bar that wants the pill
+  /// only while search is active simply flips this together with
+  /// `isSearchActive`.
+  final bool showPill;
+
   /// Whether to show a cancel/dismiss button when the search bar is focused.
   ///
   /// Defaults to `true`, providing an intuitive escape hatch for users to dismiss
@@ -316,4 +353,23 @@ class GlassSearchBarConfig {
   ///
   /// When null (the default), the standard dismiss behaviour runs unchanged.
   final VoidCallback? onCancelTap;
+
+  // ── Accessibility ───────────────────────────────────────────────────────────
+
+  /// Screen reader label of the clear (×) button inside the expanded field.
+  ///
+  /// Defaults to the app's [CupertinoLocalizations.clearButtonLabel].
+  final String? clearButtonSemanticLabel;
+
+  /// Screen reader label of the microphone button (for example "Dictate").
+  ///
+  /// The button is exposed whenever [onMicTap] is set. Flutter has no
+  /// localized string for dictation, so without this label it is announced
+  /// by its role alone.
+  final String? micButtonSemanticLabel;
+
+  /// Screen reader label of the dismiss (×) pill beside the search field.
+  ///
+  /// Defaults to the app's [CupertinoLocalizations.cancelButtonLabel].
+  final String? cancelButtonSemanticLabel;
 }

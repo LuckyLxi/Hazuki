@@ -63,9 +63,7 @@ jobs:
         run: flutter analyze
 
       - name: Build QuickJS library for source plugin tests
-        run: |
-          cmake -S third_party/flutter_qjs/test -B test/build -DCMAKE_BUILD_TYPE=Debug
-          cmake --build test/build --config Debug --parallel
+        run: dart run tool/build_quickjs_test_library.dart
 
       - name: Run app tests with coverage
         run: flutter test --coverage --reporter expanded
@@ -78,14 +76,10 @@ jobs:
           path: coverage/lcov.info
           if-no-files-found: warn
 
-  flutter-qjs-quality:
-    name: flutter_qjs quality / Windows
+  source-runtime-quality:
+    name: Source runtime / Windows
     runs-on: windows-latest
     timeout-minutes: 30
-
-    defaults:
-      run:
-        working-directory: third_party/flutter_qjs
 
     steps:
       - name: Checkout
@@ -97,26 +91,32 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Show tool versions
-        shell: bash
-        run: |
-          flutter --version
-          dart --version
-
-      - name: Install flutter_qjs dependencies
+      - name: Install app dependencies
         run: flutter pub get
 
-      - name: Format flutter_qjs code
-        run: dart format lib test
+      - name: Build QuickJS library for source plugin tests
+        run: dart run tool/build_quickjs_test_library.dart
 
-      - name: Check flutter_qjs formatting
-        run: dart format --output=none --set-exit-if-changed lib test
+      - name: Install patched QuickJS dependencies
+        working-directory: third_party/pub_overrides/quickjs_engine
+        run: flutter pub get
 
-      - name: Analyze flutter_qjs
+      - name: Check patched QuickJS formatting
+        working-directory: third_party/pub_overrides/quickjs_engine
+        run: dart format --output=none --set-exit-if-changed lib/quickjs/ffi.dart lib/quickjs/quickjs_runtime2.dart test/runtime_lifecycle_test.dart
+
+      - name: Analyze patched QuickJS
+        working-directory: third_party/pub_overrides/quickjs_engine
         run: flutter analyze
 
-      - name: Run flutter_qjs tests
+      - name: Test patched QuickJS
+        working-directory: third_party/pub_overrides/quickjs_engine
+        env:
+          LIBQUICKJSC_TEST_PATH: ${{ github.workspace }}/packages/quickjs_engine/native/build/quickjs_c_bridge_plugin.dll
         run: flutter test --reporter expanded
+
+      - name: Run source runtime tests
+        run: flutter test test/services/source --reporter expanded
 
   android-smoke-build:
     name: Android debug smoke build
@@ -165,7 +165,7 @@ jobs:
     timeout-minutes: 40
     needs:
       - app-quality
-      - flutter-qjs-quality
+      - source-runtime-quality
 
     steps:
       - name: Checkout

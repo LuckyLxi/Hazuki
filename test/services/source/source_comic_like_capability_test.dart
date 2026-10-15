@@ -1,4 +1,4 @@
-import 'package:flutter_qjs/flutter_qjs.dart';
+import 'package:hazuki/services/source/runtime/source_script_engine.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/services/source/account/source_relogin_coordinator.dart';
 import 'package:hazuki/services/source/comic/comic_details_capability.dart';
@@ -48,10 +48,9 @@ void main() {
     addTearDown(host.dispose);
   });
 
-  FlutterQjs engineFor(String key) {
-    final engine = FlutterQjs(hostPromiseRejectionHandler: (_) {});
+  SourceScriptEngine engineFor(String key) {
+    final engine = SourceScriptEngine(hostPromiseRejectionHandler: (_) {});
     host.handleFor(key).runtime.engine = engine;
-    engine.dispatch();
     return engine;
   }
 

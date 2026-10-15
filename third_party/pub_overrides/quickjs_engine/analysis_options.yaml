@@ -1,0 +1,52 @@
+include: package:flutter_lints/flutter.yaml
+
+# This package is forked from flutter_js (~280 pre-existing lint issues:
+# unnecessary_this, constant_identifier_names, prefer_final_fields, etc.).
+# We follow upstream style — don't try to rewrite the whole package to
+# match our project's conventions. New code we add (e.g. _virtPathTable
+# in svg_js_bridge.dart) doesn't live here.
+analyzer:
+  errors:
+    # Upstream style: legacy SCREAMING_SNAKE_CASE consts, unnecessary `this.`,
+    # mutable instance fields preferring `final`, etc.
+    unnecessary_this: ignore
+    constant_identifier_names: ignore
+    prefer_final_fields: ignore
+    library_prefixes: ignore
+    library_private_types_in_public_api: ignore
+    prefer_collection_literals: ignore
+    prefer_conditional_assignment: ignore
+    no_leading_underscores_for_local_identifiers: ignore
+    type_literal_in_constant_pattern: ignore
+    unintended_html_in_doc_comment: ignore
+    annotate_overrides: ignore
+    prefer_typing_uninitialized_variables: ignore
+    prefer_interpolation_to_compose_strings: ignore
+    prefer_initializing_formals: ignore
+    prefer_generic_function_type_aliases: ignore
+    avoid_function_literals_in_foreach_calls: ignore
+    avoid_single_cascade_in_expression_statements: ignore
+    empty_catches: ignore
+    unnecessary_new: ignore
+    unnecessary_null_comparison: ignore
+    prefer_const_constructors: ignore
+    dangling_library_doc_comments: ignore
+    use_super_parameters: ignore
+    prefer_adjacent_string_concatenation: ignore
+    prefer_is_empty: ignore
+    prefer_const_declarations: ignore
+    curly_braces_in_flow_control_structures: ignore
+    avoid_print: ignore
+    # `dart:ffi`-style `external` calls and JSC bindings sometimes look
+    # deprecated to the analyzer even though they're the only API available.
+    deprecated_member_use: ignore
+    unused_import: ignore
+    unused_element: ignore
+    unused_field: ignore
+  exclude:
+    - build/**
+    - android/**
+    - ios/**
+    - windows/**
+    - macos/**
+    - linux/**

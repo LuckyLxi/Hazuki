@@ -1,3 +1,15 @@
+## 13.3.0
+
+ - **FIX**(device_info_plus): Apply KGP unless built-in Kotlin is enabled ([#3947](https://github.com/fluttercommunity/plus_plugins/issues/3947)). ([36414d4c](https://github.com/fluttercommunity/plus_plugins/commit/36414d4c7c1a8c019ee81af2b3d325c9fad28afe))
+ - **FEAT**(device_info_plus): Add iOS device identifiers for iPhone 18 Pro and iPhone 18 Pro Max ([#3993](https://github.com/fluttercommunity/plus_plugins/issues/3993)). ([59f6543b](https://github.com/fluttercommunity/plus_plugins/commit/59f6543b8ff58ca4e5f9a5de7ff4c2d0210b8ce6))
+ - **FEAT**(device_info_plus): Add build timestamp to Android device info ([#3969](https://github.com/fluttercommunity/plus_plugins/issues/3969)). ([31518393](https://github.com/fluttercommunity/plus_plugins/commit/315183934f4f2692392857643daf0fe927211e00))
+
+## 13.2.0
+
+ - **REFACTOR**(device_info_plus): Change Android Gradle from Groovy to Kotlin ([#3859](https://github.com/fluttercommunity/plus_plugins/issues/3859)). ([ac0daa67](https://github.com/fluttercommunity/plus_plugins/commit/ac0daa671c29215c0b9bf4fb3b8a059698174647))
+ - **FEAT**(device_info_plus): Add support of built-in Kotlin ([#3889](https://github.com/fluttercommunity/plus_plugins/issues/3889)). ([872d8cc0](https://github.com/fluttercommunity/plus_plugins/commit/872d8cc0f32112bb21ce4cdcc09c93802cd8c7e6))
+ - **FEAT**(device_info_plus): Updated Swift Package Manager setup for Flutter 3.44 ([#3891](https://github.com/fluttercommunity/plus_plugins/issues/3891)). ([92272bde](https://github.com/fluttercommunity/plus_plugins/commit/92272bdea79b1b0cc1c534a9e045a575aae090c2))
+
 ## 13.1.0
 
  - **FEAT**(device_info_plus): Lower requirements to Dart 3.10 and Flutter 3.38.1 ([#3803](https://github.com/fluttercommunity/plus_plugins/issues/3803)). ([6d73e0d1](https://github.com/fluttercommunity/plus_plugins/commit/6d73e0d1035dd2c6b7fa6691dce4fca31c2a14f6))

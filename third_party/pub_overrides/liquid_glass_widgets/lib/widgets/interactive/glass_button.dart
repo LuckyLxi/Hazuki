@@ -1,6 +1,10 @@
+import 'dart:math' as math;
+
 import 'package:flutter/cupertino.dart';
+import '../../constants/glass_defaults.dart';
 import '../../src/renderer/liquid_glass_renderer.dart';
 
+import '../../theme/glass_theme.dart';
 import '../../theme/glass_theme_data.dart';
 import '../../types/glass_quality.dart';
 import '../../types/glass_button_style.dart';
@@ -14,7 +18,7 @@ import '../surfaces/glass_app_bar.dart';
 ///
 /// This button provides a complete liquid glass experience with:
 /// - Liquid glass visual effect with customizable settings
-/// - Scale animation (squash & stretch) when pressed
+/// - Spring inflation when pressed, with a subtle squash & stretch on drag
 /// - Touch-responsive glow effect on interaction (Impeller) or shader-based
 ///   glow (Skia)
 /// - Full control over all animation and visual properties
@@ -67,7 +71,7 @@ import '../surfaces/glass_app_bar.dart';
 /// GlassButton(
 ///   icon: Icon(CupertinoIcons.star),
 ///   onTap: () {},
-///   interactionScale: 1.1,  // Grow 10% when pressed
+///   interactionScale: 1.15, // A fixed 15% instead of the native sizing
 ///   stretch: 0.8,           // More dramatic stretch
 ///   resistance: 0.15,       // Higher drag resistance
 /// )
@@ -140,13 +144,16 @@ class GlassButton extends StatefulWidget {
     this.focusNode,
     this.autofocus = false,
     // LiquidStretch properties
-    this.interactionScale = 1.05,
+    this.interactionScale,
     this.stretch = 0.5,
     this.resistance = 0.01,
     this.stretchHitTestBehavior = HitTestBehavior.opaque,
     // GlassGlow properties
     this.glowColor,
-    this.glowRadius = 1.0,
+    this.glowRadius,
+    // null → native iOS 26 shape-clipped specular (wide 1.6 radius, sigma-16 blur, soft sheen).
+    // 0.0  → opt out; pure ambient lift only.
+    // > 0  → custom explicit radius.
     this.glowBlurRadius,
     this.glowSpreadRadius,
     this.glowOpacity,
@@ -155,12 +162,13 @@ class GlassButton extends StatefulWidget {
     this.style = GlassButtonStyle.filled,
     this.persistPressOnDrag = true,
     this.anchorStretch = true,
-    this.anchorStretchSettings = const AnchorStretchSettings(),
+    this.anchorStretchSettings,
     this.alignment = Alignment.center,
-    this.ambientBaseLight = 0.08,
+    this.ambientBaseLight,
     this.platformViewBackdrop = false,
     this.canRequestFocus = true,
     this.excludeFromSemantics = false,
+    this.isStationary = false,
   }) : child = null;
 
   /// Creates a glass button with custom content.
@@ -198,13 +206,16 @@ class GlassButton extends StatefulWidget {
     this.focusNode,
     this.autofocus = false,
     // LiquidStretch properties
-    this.interactionScale = 1.05,
+    this.interactionScale,
     this.stretch = 0.5,
     this.resistance = 0.01,
     this.stretchHitTestBehavior = HitTestBehavior.opaque,
     // GlassGlow properties
     this.glowColor,
-    this.glowRadius = 1.0,
+    this.glowRadius,
+    // null → native iOS 26 shape-clipped specular (wide 1.6 radius, sigma-16 blur, soft sheen).
+    // 0.0  → opt out; pure ambient lift only.
+    // > 0  → custom explicit radius.
     this.glowBlurRadius,
     this.glowSpreadRadius,
     this.glowOpacity,
@@ -213,12 +224,13 @@ class GlassButton extends StatefulWidget {
     this.style = GlassButtonStyle.filled,
     this.persistPressOnDrag = true,
     this.anchorStretch = true,
-    this.anchorStretchSettings = const AnchorStretchSettings(),
+    this.anchorStretchSettings,
     this.alignment = Alignment.center,
-    this.ambientBaseLight = 0.08,
+    this.ambientBaseLight,
     this.platformViewBackdrop = false,
     this.canRequestFocus = true,
     this.excludeFromSemantics = false,
+    this.isStationary = false,
   })  : icon = null,
         iconSize = 24.0,
         iconColor = null;
@@ -369,14 +381,15 @@ class GlassButton extends StatefulWidget {
 
   /// The scale factor to apply when the user is interacting with the button.
   ///
+  /// - null (default): sized as iOS 26 does — the longest side grows by about
+  ///   17 pt whatever the button's size, so a 56 pt circle inflates ~1.3× and
+  ///   a 132 pt pill ~1.13×, on a snappy spring with a small undershoot on
+  ///   release. The inflation is the tactile cue; the drag stretch is only a
+  ///   tremor on top of it.
   /// - 1.0 means no scaling
-  /// - Greater than 1.0 means the button will grow (e.g., 1.05 = 5% larger)
+  /// - Greater than 1.0 means the button will grow by a fixed factor
   /// - Less than 1.0 means the button will shrink
-  ///
-  /// This creates a satisfying "press down" effect when the button is touched.
-  ///
-  /// Defaults to 1.05.
-  final double interactionScale;
+  final double? interactionScale;
 
   /// The factor to multiply the drag offset by to determine the stretch amount.
   ///
@@ -431,16 +444,31 @@ class GlassButton extends StatefulWidget {
   /// Defaults to null (uses theme).
   final Color? glowColor;
 
-  /// The radius of the glow effect relative to the layer's shortest side.
+  /// Radius of the directional specular sheen as a fraction of the button's
+  /// shortest side.
   ///
-  /// - 1.0 (default): Glow radius equals the shortest dimension of the button
-  /// - 0.5: Glow radius is half the shortest dimension
-  /// - 2.0: Glow radius is twice the shortest dimension
+  /// This controls the shape-clipped, touch-tracking highlight that follows
+  /// the finger across the glass surface — iOS 26's `.glassEffect(.interactive())`
+  /// behaviour applied at the button level.
   ///
-  /// Larger values create a more diffuse, spread-out glow.
+  /// - `null` (default): Native iOS 26 mode. Resolves to a wide, calibrated
+  ///   1.6 radius with a soft sigma-16 Gaussian blur and subtle specular alpha,
+  ///   clipped strictly to [shape] via [ShapeBorderClipper]. The light washes
+  ///   smoothly across the button surface without producing a concentrated,
+  ///   pointy hotspot, matching Apple's touch-reactive glass reflection.
+  /// - `0.0`: Opt out. No directional sheen — the press brightens the whole
+  ///   surface evenly through [ambientBaseLight] only.
+  /// - `> 0.0`: Custom explicit radius. The glow is still clipped to [shape]
+  ///   but uses the supplied radius instead of the native default.
   ///
-  /// Defaults to 1.0.
-  final double glowRadius;
+  /// **Note:** The specular sheen is geometrically bounded by the button's
+  /// [shape] and can never escape the glass boundary. For grouped buttons,
+  /// use [GlassButtonGroup] — the whole platter shares one glow layer, so
+  /// dragging across buttons sweeps the highlight seamlessly from button to
+  /// button, matching iOS 26 `GlassEffectContainer` behaviour.
+  ///
+  /// Defaults to `null` (native iOS 26 specular).
+  final double? glowRadius;
 
   /// Additional Gaussian blur sigma applied to the glow halo.
   ///
@@ -496,12 +524,17 @@ class GlassButton extends StatefulWidget {
 
   /// Fine-tuning for the anchor stretch effect.
   ///
-  /// Controls intensity, squash, translation damping, and bounciness.
-  /// Most developers won’t need to change these — the defaults match
-  /// iOS 26 button behaviour.
+  /// Controls intensity, squash, translation damping, and bounciness. When
+  /// `null` (the default) the theme's settings apply, or failing that the
+  /// tremor a native button shows on a long drag: `intensity: 0.1`,
+  /// `squashFactor: 0.1`, `translationDamping: 0.1`, `bounciness: 0.0` — no
+  /// more than ~5 % of elongation, matching squash, a few points of travel,
+  /// and no rebound of its own, since the release bounce is in the press
+  /// scale. `AnchorStretchSettings()` gives the jelly stretch other glass
+  /// widgets use.
   ///
   /// See [AnchorStretchSettings] for details.
-  final AnchorStretchSettings anchorStretchSettings;
+  final AnchorStretchSettings? anchorStretchSettings;
 
   /// How to align the child content within the button bounds.
   ///
@@ -511,22 +544,38 @@ class GlassButton extends StatefulWidget {
 
   /// Opacity of the ambient base light when the button is pressed.
   ///
-  /// iOS 26 buttons maintain a subtle overall surface brightness when active,
-  /// in addition to the directional glow that follows the finger. This
-  /// prevents the button from going dark when the finger drags the directional
-  /// highlight off-edge.
+  /// A pressed iOS 26 button brightens evenly across its whole surface for as
+  /// long as the finger is down, on the same timescale as its inflation, and
+  /// wherever the finger goes. This is that brightening — the whole pressed
+  /// highlight, since [glowRadius] defaults to `0`.
   ///
-  /// - 0.0: No ambient base light (button goes dark off-edge)
-  /// - 0.08 (default): Subtle surface luminosity matching iOS 26
-  /// - 0.15: Noticeably brighter surface
+  /// - null (default): [GlassDefaults.ambientBaseLight] — the even lift of a
+  ///   pressed iOS 26 surface, measured at about +15 luma with the refraction
+  ///   still showing through — halved to [GlassDefaults.ambientBaseLightDark]
+  ///   in dark mode, where the same overlay reads as a flash
+  /// - 0.0: No ambient base light
+  /// - 0.6: Near-white, closer to a frosted highlight
   ///
-  /// Set to 0.0 to disable.
-  final double ambientBaseLight;
+  /// An explicit value is honoured unchanged in both brightness modes.
+  final double? ambientBaseLight;
 
   /// When true (typically for iOS PlatformViews), forces the BackdropFilter
   /// fallback render path instead of the Impeller-native shader. Forwarded to
   /// the underlying [AdaptiveGlass].
   final bool platformViewBackdrop;
+
+  /// When true, signals that this button does not animate its layout bounds
+  /// during normal display (i.e. it is stationary at rest, like an extra
+  /// button anchored inside a compound tab bar).
+  ///
+  /// Stationary buttons retain their [BackdropFilter] blur even under
+  /// [GlassQuality.minimal], matching the visual appearance of the surrounding
+  /// bar surface. Generic interactive buttons default to `false`, which omits
+  /// the blur in minimal mode to avoid compositor flicker caused by
+  /// continuously changing spring-animated bounds.
+  ///
+  /// Defaults to `false` — existing behaviour is preserved.
+  final bool isStationary;
 
   // ===========================================================================
   // Focus / Keyboard Properties
@@ -567,7 +616,7 @@ class GlassButton extends StatefulWidget {
 class _GlassButtonState extends State<GlassButton>
     with SingleTickerProviderStateMixin {
   late final AnimationController _saturationController;
-  late final Animation<double> _saturationAnimation;
+  late final CurvedAnimation _saturationAnimation;
   final ValueNotifier<bool> _isHovered = ValueNotifier(false);
   final ValueNotifier<bool> _isFocused = ValueNotifier(false);
 
@@ -575,7 +624,10 @@ class _GlassButtonState extends State<GlassButton>
   void initState() {
     super.initState();
     _saturationController = AnimationController(
-      duration: const Duration(milliseconds: 50), // Fast, instant response
+      // Brightens over the press inflation and collapses on release, as the
+      // native highlight does (~150 ms up, gone within ~60 ms of lift-off).
+      duration: GlassDefaults.ambientLiftDuration,
+      reverseDuration: GlassDefaults.ambientLiftReverseDuration,
       vsync: this,
     );
     _saturationAnimation = CurvedAnimation(
@@ -599,13 +651,14 @@ class _GlassButtonState extends State<GlassButton>
     if (!reduceMotion) _saturationController.forward();
     widget.onTap();
     if (!reduceMotion) {
-      await Future.delayed(const Duration(milliseconds: 100));
+      await Future.delayed(_saturationController.duration!);
       if (mounted) _saturationController.reverse();
     }
   }
 
   @override
   void dispose() {
+    _saturationAnimation.dispose();
     _saturationController.dispose();
     _isHovered.dispose();
     _isFocused.dispose();
@@ -661,6 +714,17 @@ class _GlassButtonState extends State<GlassButton>
     _saturationController.reverse();
   }
 
+  /// Texture headroom for the press inflation: half the growth of the longest
+  /// side, plus room for the overshoot and the drag stretch. A fixed factor on
+  /// an unsized button is budgeted for one up to 480 px wide.
+  double _pressHeadroom(double? interactionScale) {
+    final growth = interactionScale == null
+        ? LiquidStretch.nativePressGrowth
+        : math.max(widget.width ?? 480, widget.height ?? 480) *
+            (interactionScale - 1.0);
+    return (growth / 2 + 8).ceilToDouble();
+  }
+
   @override
   Widget build(BuildContext context) {
     // Resolve quality and theme — hoisted here so stretchWidget can branch on quality
@@ -669,15 +733,23 @@ class _GlassButtonState extends State<GlassButton>
       widgetQuality: widget.quality,
     );
 
+    // Resolve interaction settings: explicit widget param > theme > default
+    final themeInteraction = GlassThemeData.of(context).interaction;
+    final effectiveInteractionScale =
+        widget.interactionScale ?? themeInteraction.interactionScale;
+
     final resolvedGlowColors =
         GlassThemeData.of(context).glowColorsFor(context);
+    final isNativeGlow = widget.glowRadius == null;
+    final isDark = GlassTheme.brightnessOf(context) == Brightness.dark;
+    // Native specular sheen is subtle (~10% alpha in light mode, ~7% in dark mode)
+    // to provide a delicate specular highlight on top of ambientBaseLight
+    // without creating a dense, opaque white fog circle.
+    final nativeGlowColor =
+        isDark ? const Color(0x12FFFFFF) : const Color(0x1AFFFFFF);
+
     final effectiveGlowColor = widget.glowColor ??
-        resolvedGlowColors.primary ??
-        CupertinoTheme.of(context)
-            .textTheme
-            .textStyle
-            .color
-            ?.withValues(alpha: 0.24) ??
+        (isNativeGlow ? nativeGlowColor : resolvedGlowColors.primary) ??
         CupertinoColors.white.withValues(alpha: 0.24);
     final effectiveGlowBlurRadius =
         widget.glowBlurRadius ?? resolvedGlowColors.glowBlurRadius;
@@ -714,14 +786,23 @@ class _GlassButtonState extends State<GlassButton>
 
     // 2. Build the inner content (Ambient base + Glow + Icon/Child)
     //
-    // The ambient base light provides a subtle surface brightness when pressed,
-    // matching iOS 26 where active buttons never go completely dark even when
-    // the directional glow follows the finger off-edge.
+    // The ambient base light is the even surface brightening a pressed iOS 26
+    // button keeps for as long as the finger is down, wherever it goes. A
+    // directional glow would hotspot the centre — a pill's glow radius is its
+    // short side — so it is off by default and this carries the highlight.
+    // The default lift is halved in dark mode, where the resting surface is
+    // darker and the same overlay reads as a flash; an explicit value is
+    // honoured unchanged.
+    final double effectiveAmbientBaseLight = widget.ambientBaseLight ??
+        (GlassTheme.brightnessOf(context) == Brightness.dark
+            ? GlassDefaults.ambientBaseLightDark
+            : GlassDefaults.ambientBaseLight);
+
     final ambientOverlay = AnimatedBuilder(
       animation:
           Listenable.merge([_saturationAnimation, _isHovered, _isFocused]),
       builder: (context, _) {
-        double opacity = _saturationAnimation.value * widget.ambientBaseLight;
+        double opacity = _saturationAnimation.value * effectiveAmbientBaseLight;
         if (_isFocused.value) {
           opacity += 0.15;
         } else if (_isHovered.value) {
@@ -739,19 +820,39 @@ class _GlassButtonState extends State<GlassButton>
       },
     );
 
+    // The overlay sits under the content so the icon or label stays crisp
+    // while the surface behind it brightens, as it does natively.
     final contentWithAmbient = Stack(
       alignment: widget.alignment,
       children: [
-        contentWidget,
         ambientOverlay,
+        contentWidget,
       ],
     );
 
-    // This part is static relative to the glass saturation pulse
+    // Resolve effective glow radius:
+    //   null → native iOS 26 calibrated 1.6 (wide spread spanning across the
+    //          button surface, giving a smooth, subtle gradient rather than a
+    //          concentrated flashlight hotspot; clipped safely by ShapeBorderClipper).
+    //   0.0  → explicitly disabled.
+    //   > 0  → caller's explicit override.
+    final effectiveGlowRadius = widget.glowRadius ?? 1.6;
+
+    // Resolve effective blur: null falls through to 16.0 for a creamy organic falloff.
+    final nativeGlowBlurRadius =
+        widget.glowRadius == null ? 16.0 : effectiveGlowBlurRadius;
+
+    // This part is static relative to the glass saturation pulse.
+    // clipper is passed directly to GlassGlow (not to AdaptiveGlass) so the
+    // spotlight is bounded by the button's shape geometry. This is the same
+    // pattern GlassTabBar uses — the 2D radial gradient is clipped inside
+    // GlassGlowLayer.paint(), leaving the Impeller shader and its texture
+    // headroom completely untouched.
     final glowContent = GlassGlow(
+      clipper: ShapeBorderClipper(shape: widget.shape),
       glowColor: effectiveGlowColor,
-      glowRadius: widget.glowRadius,
-      glowBlurRadius: effectiveGlowBlurRadius,
+      glowRadius: effectiveGlowRadius,
+      glowBlurRadius: nativeGlowBlurRadius,
       glowSpreadRadius: effectiveGlowSpreadRadius,
       glowOpacity: effectiveGlowOpacity,
       hitTestBehavior: widget.glowHitTestBehavior,
@@ -806,16 +907,22 @@ class _GlassButtonState extends State<GlassButton>
           quality: effectiveQuality,
           useOwnLayer: widget.useOwnLayer,
           glowIntensity: _saturationAnimation.value, // 0.0-1.0 animation
-          isInteractive: true, // Buttons manage their own RepaintBoundary
+          // isStationary: true → pass isInteractive:false so _FrostedFallback
+          // keeps its BackdropFilter blur in GlassQuality.minimal (the guard
+          // only bites on the minimal path; standard/premium are unaffected).
+          isInteractive: !widget.isStationary,
           platformViewBackdrop: widget.platformViewBackdrop,
           // Give the RepaintBoundary texture extra headroom for the press scale
           // animation. When useOwnLayer: true, the glass layer creates its own
           // Impeller texture; without this margin, Transform.scale in LiquidStretch
           // clips at the original texture edge (the "top-cut" artefact on nav buttons).
-          // 12 px covers a 5% scale on buttons up to 480 px wide with no GPU cost
-          // at rest. Grouped buttons don't need this — they share the parent layer.
-          clipExpansion: widget.useOwnLayer && widget.interactionScale > 1.0
-              ? const EdgeInsets.all(12.0)
+          // Sized from the scale, so a 56 px button at 1.3 reserves 17 px; texture
+          // only, no GPU cost at rest. Grouped buttons don't need this — they
+          // share the parent layer.
+          clipExpansion: widget.useOwnLayer &&
+                  (effectiveInteractionScale == null ||
+                      effectiveInteractionScale > 1.0)
+              ? EdgeInsets.all(_pressHeadroom(effectiveInteractionScale))
               : EdgeInsets.zero,
           child: child!,
         );
@@ -845,13 +952,12 @@ class _GlassButtonState extends State<GlassButton>
     final bool skipBoundary = effectiveQuality == GlassQuality.minimal ||
         (effectiveQuality == GlassQuality.premium && hasStretch);
 
-    // Resolve interaction settings: explicit widget param > theme > default
-    final themeInteraction = GlassThemeData.of(context).interaction;
-
     final stretchContent = LiquidStretch(
-      interactionScale: widget.interactionScale != 1.05
-          ? widget.interactionScale
-          : themeInteraction.interactionScale ?? widget.interactionScale,
+      // A fixed factor when one is given; otherwise the native sizing.
+      interactionScale: effectiveInteractionScale ?? 1.0,
+      pressGrowth: effectiveInteractionScale == null
+          ? LiquidStretch.nativePressGrowth
+          : null,
       stretch: widget.stretch != 0.5
           ? widget.stretch
           : themeInteraction.stretch ?? widget.stretch,
@@ -862,11 +968,9 @@ class _GlassButtonState extends State<GlassButton>
       anchorStretch: widget.anchorStretch != true
           ? widget.anchorStretch
           : themeInteraction.anchorStretch ?? widget.anchorStretch,
-      anchorStretchSettings: !identical(
-              widget.anchorStretchSettings, const AnchorStretchSettings())
-          ? widget.anchorStretchSettings
-          : themeInteraction.anchorStretchSettings ??
-              widget.anchorStretchSettings,
+      anchorStretchSettings: widget.anchorStretchSettings ??
+          themeInteraction.anchorStretchSettings ??
+          AnchorStretchSettings.nativeTremor,
       child: glassWidget,
     );
 
@@ -891,8 +995,17 @@ class _GlassButtonState extends State<GlassButton>
       focusNode: widget.focusNode,
       canRequestFocus: widget.canRequestFocus,
       autofocus: widget.autofocus,
-      semanticLabel: widget.label.isNotEmpty ? widget.label : null,
+      semanticLabel: (!widget.excludeFromSemantics && widget.label.isNotEmpty)
+          ? widget.label
+          : null,
       isButton: !widget.excludeFromSemantics,
+      // Route the tap through the Semantics node that carries the label so
+      // that label, button role, and tap action all live on the same node.
+      // The GestureDetectors below are excluded from semantics to prevent
+      // them from registering a competing tap on a different node.
+      semanticOnTap: (!widget.excludeFromSemantics && widget.enabled)
+          ? widget.onTap
+          : null,
       shape: widget.shape,
       isFocusedNotifier: _isFocused,
       isHoveredNotifier: _isHovered,
@@ -922,7 +1035,11 @@ class _GlassButtonState extends State<GlassButton>
         child: GestureDetector(
           onTap: widget.enabled ? widget.onTap : null,
           behavior: HitTestBehavior.opaque,
-          excludeFromSemantics: widget.excludeFromSemantics,
+          // Semantics live on the GlassFocusRegion node (via semanticOnTap).
+          // Exclude the GestureDetector so its tap doesn't create a second,
+          // unlabelled action node. When excludeFromSemantics is true, both
+          // the region node and this detector are silent — consistent.
+          excludeFromSemantics: true,
           child: focusableWidget,
         ),
       );
@@ -935,7 +1052,8 @@ class _GlassButtonState extends State<GlassButton>
       onTapUp: _handleTapUp,
       onTapCancel: _handleTapCancel,
       behavior: HitTestBehavior.opaque,
-      excludeFromSemantics: widget.excludeFromSemantics,
+      // Same rationale as above: semantics are owned by GlassFocusRegion.
+      excludeFromSemantics: true,
       child: focusableWidget,
     );
   }

@@ -1,0 +1,66 @@
+// This plugin intentionally does not apply the Kotlin Gradle Plugin (KGP).
+// The Android plugin class is Java and the JS engine is native code reached
+// through dart:ffi, so the same build works on AGP 8 apps and on AGP 9 apps
+// with built-in Kotlin enabled or disabled. See issue #52 and
+// https://docs.flutter.dev/release/breaking-changes/migrate-to-built-in-kotlin/for-plugin-authors
+
+group = 'io.quickjs_engine'
+version = '0.1.0'
+
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        // Only used when this Gradle project is opened on its own. Inside a
+        // Flutter app the app's own AGP version is used instead.
+        classpath 'com.android.tools.build:gradle:8.13.1'
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+apply plugin: 'com.android.library'
+
+android {
+    namespace = 'io.quickjs_engine'
+
+    // Follow the app's Flutter default (35 on Flutter 3.32, 36 on 3.35+) so
+    // the plugin never asks apps to raise their compileSdk. The Flutter Gradle
+    // plugin adds the `flutter` extension to plugin projects; fall back to 36
+    // if it is missing.
+    compileSdk = project.extensions.findByName('flutter')?.compileSdkVersion ?: 36
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    defaultConfig {
+        minSdk = 21
+        externalNativeBuild {
+            cmake {
+                cppFlags '-std=c++17', '-DCONFIG_VERSION=\\"ng-0.14.0\\"'
+                cFlags '-std=c11', '-DCONFIG_VERSION=\\"ng-0.14.0\\"',
+                        '-Wno-unused-function', '-Wno-unused-variable',
+                        '-Wno-unused-parameter', '-Wno-unused-but-set-variable'
+                arguments '-DANDROID_STL=c++_static'
+            }
+        }
+        ndk {
+            abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path = file('../native/CMakeLists.txt')
+        }
+    }
+}

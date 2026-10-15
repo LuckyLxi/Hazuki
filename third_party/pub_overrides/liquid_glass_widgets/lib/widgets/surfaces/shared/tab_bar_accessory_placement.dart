@@ -16,6 +16,34 @@ enum GlassTabBarAccessoryPlacement {
   inline,
 }
 
+/// Resolves the placement an accessory should actually render at.
+///
+/// An [explicit] value always wins. When it is null the placement follows the
+/// bar: a minimized [GlassTabBar.minimizable] pulls its accessory [inline],
+/// matching how iOS 26 animates a `tabViewBottomAccessory` down into the bar
+/// as it minimizes.
+///
+/// Only the minimizable placement auto-resolves. `GlassTabBar.searchable`
+/// keeps its accessory [expanded] while the search field is open — a search
+/// bar expanding is not the bar minimizing, and auto-collapsing on search was
+/// removed deliberately in 0.x because it hid the mini-player behind the
+/// search capsule.
+///
+/// This is the single authoritative resolution, and both callers must use it:
+/// [GlassTabBar.preferredSize], which tells the scaffold how tall the bar is,
+/// and the searchable layout engine, which renders it. If those two ever
+/// disagree the scaffold's body inset desyncs from what is actually drawn.
+GlassTabBarAccessoryPlacement resolveAccessoryPlacement({
+  required GlassTabBarAccessoryPlacement? explicit,
+  required bool minimized,
+  required bool isMinimizablePlacement,
+}) {
+  if (explicit != null) return explicit;
+  return isMinimizablePlacement && minimized
+      ? GlassTabBarAccessoryPlacement.inline
+      : GlassTabBarAccessoryPlacement.expanded;
+}
+
 /// Provides the current [GlassTabBarAccessoryPlacement] to the widget tree.
 ///
 /// This is the Flutter equivalent of SwiftUI's

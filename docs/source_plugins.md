@@ -285,14 +285,16 @@ npm --prefix ../HazukiSources/dev test
 
 热辣的 Node 测试使用离线 HTML/JSON 样本和独立 AES 解密结果；宿主回归测试通过实际 QuickJS、HTML 桥接和应用接口验证导入、搜索、详情、章节解密、画质及账号收藏流程。账号和收藏响应为模拟数据，未使用真实账号，也不保证当前网站可用。宿主快照自包含，不需要检出 Sources。
 
-原生 QuickJS 测试库先构建到应用测试目录：
+先通过当前依赖配置构建 quickjs_engine 的原生测试库（输出位于 packages/quickjs_engine/native/build）：
 
 ```text
-cmake -S third_party/flutter_qjs/test -B test/build -DCMAKE_BUILD_TYPE=Debug
-cmake --build test/build --config Debug --parallel
+dart run tool/build_quickjs_test_library.dart
+flutter test test/services/source/source_script_engine_test.dart
 flutter test test/services/source/source_plugins_test.dart
 flutter test test/services/source/migrated_source_plugins_test.dart
 flutter test test/services/source/relamanhua_source_plugin_test.dart
 ```
+
+应用通过 SourceScriptEngine 适配 quickjs_engine 0.1.6。third_party/pub_overrides/quickjs_engine 保留脚本执行超时保护和运行时释放补丁，详见该目录的 HAZUKI_NOTES.md。
 
 Windows 需要 Visual Studio C++ 工具链及 CMake；Linux 需要 CMake 和 C++ 编译器。完整检查包括格式、`flutter analyze`、完整测试，以及 Android/Windows 调试构建。

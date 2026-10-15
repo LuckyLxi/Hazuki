@@ -105,9 +105,11 @@ class GlassMorphController extends ChangeNotifier {
   /// [TickerProviderStateMixin].
   GlassMorphController({
     required TickerProvider vsync,
-    this.speed = MorphSpeed.normal,
+    MorphSpeed speed = MorphSpeed.normal,
     this.style = MorphStyle.teardrop,
-  }) : _animationController = AnimationController.unbounded(vsync: vsync) {
+    this.preserveLegacyMotion = false,
+  })  : _speed = speed,
+        _animationController = AnimationController.unbounded(vsync: vsync) {
     _animationController.addListener(_onTick);
     _animationController.addStatusListener(_onStatusChange);
   }
@@ -117,14 +119,29 @@ class GlassMorphController extends ChangeNotifier {
   /// Speed profile for the morph animation.
   ///
   /// Maps to a tuned spring description that preserves the 0.73 underdamped
-  /// ratio. Change this to control the overall feel without touching raw
-  /// spring constants.
-  final MorphSpeed speed;
+  /// ratio. Use [setSpeed] to update this after construction.
+  MorphSpeed get speed => _speed;
+  MorphSpeed _speed;
+
+  /// Updates the speed profile on a live controller.
+  ///
+  /// Safe to call at any time, including while an animation is running. The
+  /// new spring profile takes effect on the *next* [open] or [close] call —
+  /// the current simulation is not interrupted.
+  void setSpeed(MorphSpeed speed) {
+    _speed = speed;
+  }
 
   /// Visual shape style of the morph transition.
   ///
   /// Currently only [MorphStyle.teardrop] is fully implemented.
   final MorphStyle style;
+
+  /// Retains the v0.29.5 springs, closing velocity, curves and settling behavior.
+  ///
+  /// Hazuki enables this for its existing back-to-top morph when upgrading the
+  /// package. Other surfaces keep the current motion profile by default.
+  final bool preserveLegacyMotion;
 
   // ─── Internal state ───────────────────────────────────────────────────────
 
@@ -222,7 +239,21 @@ class GlassMorphController extends ChangeNotifier {
   /// spring toward zero with momentum, creating the satisfying "snap-back" feel.
   void close() {
     _isClosing = true;
-    _runSpring(0.0, velocityHint: LiquidMorphPhysics.closeVelocityHint);
+    _runSpring(
+      0.0,
+      velocityHint:
+          preserveLegacyMotion ? -2.5 : LiquidMorphPhysics.closeVelocityHint,
+    );
+  }
+
+  /// Immediately resets the controller to its resting closed state (value = 0.0,
+  /// velocity = 0.0) without running an animation.
+  void reset() {
+    _animationController.stop();
+    _isClosing = false;
+    _hasHandedOff = false;
+    _animationController.value = 0.0;
+    notifyListeners();
   }
 
   // ─── Physics computation ──────────────────────────────────────────────────
@@ -236,11 +267,21 @@ class GlassMorphController extends ChangeNotifier {
   ///   menu center, in logical pixels.
   /// - [horizontalOffset] / [verticalOffset] — screen-edge clamping
   ///   corrections from the menu positioning logic.
+  /// - [scaleDelta] — geometric scale ratio (see [LiquidMorphPhysics.computeScaleDelta]).
+  ///   Values > 1.5 engage adaptive damping. Defaults to `1.0` (unchanged
+  ///   baseline behaviour) for backward compatibility.
+  /// - [adaptiveDamping] — explicit override; when `null` (default), inferred
+  ///   from [scaleDelta].
+  /// - [isClosing] — explicit override; when `null` (default), inferred from
+  ///   this controller's own [_isClosing] state.
   LiquidMorphState computeState({
     required double finalDx,
     required double finalDy,
     double horizontalOffset = 0.0,
     double verticalOffset = 0.0,
+    double scaleDelta = 1.0,
+    bool? adaptiveDamping,
+    bool? isClosing,
   }) {
     return LiquidMorphPhysics.compute(
       rawValue: _animationController.value,
@@ -248,6 +289,9 @@ class GlassMorphController extends ChangeNotifier {
       finalDy: finalDy,
       horizontalOffset: horizontalOffset,
       verticalOffset: verticalOffset,
+      scaleDelta: scaleDelta,
+      adaptiveDamping: adaptiveDamping,
+      isClosing: isClosing ?? (_isClosing && !preserveLegacyMotion),
     );
   }
 
@@ -276,18 +320,29 @@ class GlassMorphController extends ChangeNotifier {
       return const SpringDescription(
           mass: 1.0, stiffness: 500.0, damping: 32.4);
     }
-    switch (speed) {
+    final useClosingSpring = _isClosing && !preserveLegacyMotion;
+    switch (_speed) {
       case MorphSpeed.slow:
-        // ω₀ ≈ 7.7 rad/s, ζ ≈ 0.73
-        return const SpringDescription(
-            mass: 1.0, stiffness: 60.0, damping: 11.3);
+        // ω₀ ≈ 7.7 rad/s open, ω₀ ≈ 10.0 rad/s close
+        return useClosingSpring
+            ? const SpringDescription(
+                mass: 1.0, stiffness: 100.0, damping: 14.6)
+            : const SpringDescription(
+                mass: 1.0, stiffness: 60.0, damping: 11.3);
       case MorphSpeed.normal:
-        // ω₀ ≈ 11 rad/s, ζ ≈ 0.73 — iOS 26 native parity
-        return LiquidMorphPhysics.openSpring;
+        // iOS 26 native asymmetric springs:
+        // Open: ω₀ ≈ 11.0 rad/s, ζ ≈ 0.73 — buoyant, lush fluid expansion (~350 ms)
+        // Close: ω₀ ≈ 14.1 rad/s, ζ ≈ 0.74 — snappy, crisp magnetic retraction (~240 ms)
+        return useClosingSpring
+            ? LiquidMorphPhysics.closeSpring
+            : LiquidMorphPhysics.openSpring;
       case MorphSpeed.fast:
-        // ω₀ ≈ 14 rad/s, ζ ≈ 0.73
-        return const SpringDescription(
-            mass: 1.0, stiffness: 200.0, damping: 20.5);
+        // ω₀ ≈ 14.1 rad/s open, ω₀ ≈ 17.3 rad/s close
+        return useClosingSpring
+            ? const SpringDescription(
+                mass: 1.0, stiffness: 300.0, damping: 25.1)
+            : const SpringDescription(
+                mass: 1.0, stiffness: 200.0, damping: 20.5);
       case MorphSpeed.instant:
         // ω₀ ≈ 22 rad/s, ζ ≈ 0.73 — very stiff, near-instant
         return const SpringDescription(
@@ -295,14 +350,34 @@ class GlassMorphController extends ChangeNotifier {
     }
   }
 
+  /// When a morph counts as settled.
+  ///
+  /// The value spans the whole change in size, so a distance of 0.001 is at
+  /// most half a pixel on a 500 px surface, and 0.05 a second moves it by well
+  /// under a pixel a frame. The default [Tolerance] (0.001 a second) kept the
+  /// controller ticking, and the surface repainting, for about half a second
+  /// after anything visibly moved: an open settled after 1.2 s, a close after
+  /// 0.93 s, while the motion ended at 0.72 s and 0.53 s.
+  static const Tolerance _settleTolerance =
+      Tolerance(distance: 0.001, velocity: 0.05);
+
   void _runSpring(double target, {required double velocityHint}) {
-    final sim = SpringSimulation(
-      _effectiveSpring,
-      _animationController.value,
-      target,
-      velocityHint,
+    _animationController.animateWith(
+      SpringSimulation(
+        _effectiveSpring,
+        _animationController.value,
+        target,
+        velocityHint,
+        // The spring is "done" within [_settleTolerance] of its target, not on
+        // it. snapToEnd reports the exact target on that final tick, so the
+        // controller lands on 1.0 / 0.0 in the same tick it completes and its
+        // AnimationStatus goes forward -> completed as usual.
+        snapToEnd: !preserveLegacyMotion,
+        tolerance: preserveLegacyMotion
+            ? Tolerance.defaultTolerance
+            : _settleTolerance,
+      ),
     );
-    _animationController.animateWith(sim);
   }
 
   void _onTick() {

@@ -58,7 +58,11 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
   @override
   void initState() {
     super.initState();
-    _backToTopMorph = GlassMorphController(vsync: this, speed: MorphSpeed.slow);
+    _backToTopMorph = GlassMorphController(
+      vsync: this,
+      speed: MorphSpeed.slow,
+      preserveLegacyMotion: true,
+    );
     if (widget.showBackToTop) {
       _backToTopMorph.open();
     }

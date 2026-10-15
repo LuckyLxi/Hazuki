@@ -48,6 +48,8 @@
 //   [base+5] cornerRadius     (top corners; or symmetric)
 //   [base+6] bottomCornerRadius (bottom corners; equals [base+5] for symmetric)
 
+#include "gles_compat.glsl"
+
 #ifndef MAX_SHAPES
 #define MAX_SHAPES 16
 #endif
@@ -133,6 +135,11 @@ float sdfSquircle(in vec2 p, in vec2 b, in float r) {
 }
 
 float sdfSquircleAsym(in vec2 p, in vec2 b, in float rTop, in float rBottom) {
+    // Most shapes round all four corners alike, and then both halves below
+    // are the same squircle: evaluate it once.
+    if (rTop == rBottom) {
+        return sdfSquircle(p, b, rTop);
+    }
     float boxShort = min(b.x, b.y);
     rTop    = min(rTop,    boxShort);
     rBottom = min(rBottom, boxShort);
@@ -204,6 +211,7 @@ float sdf4(vec2 p)  { return SDF_SHAPE_N(28);  }
 float sdf5(vec2 p)  { return SDF_SHAPE_N(35);  }
 float sdf6(vec2 p)  { return SDF_SHAPE_N(42);  }
 float sdf7(vec2 p)  { return SDF_SHAPE_N(49);  }
+#ifndef LGR_OPENGLES_CAP_SHAPES
 float sdf8(vec2 p)  { return SDF_SHAPE_N(56);  }
 float sdf9(vec2 p)  { return SDF_SHAPE_N(63);  }
 float sdf10(vec2 p) { return SDF_SHAPE_N(70);  }
@@ -212,6 +220,7 @@ float sdf12(vec2 p) { return SDF_SHAPE_N(84);  }
 float sdf13(vec2 p) { return SDF_SHAPE_N(91);  }
 float sdf14(vec2 p) { return SDF_SHAPE_N(98);  }
 float sdf15(vec2 p) { return SDF_SHAPE_N(105); }
+#endif
 
 // ── sceneSDF — fully unrolled, no loops, no dynamic indices ──────────────────
 //
@@ -321,6 +330,12 @@ float sceneSDF(vec2 p, int n, float k) {
     bwd       = smoothUnion(b8f, s0, k);
     if (n == 8) return mix(fwd, bwd, 0.5);
 
+#ifdef LGR_OPENGLES_CAP_SHAPES
+    // On OpenGL ES / ANGLE (Windows and Android GLES), clamp evaluation to 8
+    // shapes maximum to avoid AST node explosion in runtime JIT compilers
+    // (e.g. Intel Arc ANGLE / PowerVR GE8320).
+    return mix(fwd, bwd, 0.5);
+#else
     // ── n = 9 ────────────────────────────────────────────────────────────────
     float s8  = sdf8(p);
     fwd = smoothUnion(fwd, s8, k);
@@ -452,4 +467,5 @@ float sceneSDF(vec2 p, int n, float k) {
     float b16n  = smoothUnion(b16m, s1, k);
     bwd         = smoothUnion(b16n, s0, k);
     return mix(fwd, bwd, 0.5);
+#endif
 }

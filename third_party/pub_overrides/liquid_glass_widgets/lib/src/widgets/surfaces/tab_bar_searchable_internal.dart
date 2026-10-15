@@ -1,9 +1,9 @@
 // ignore_for_file: public_member_api_docs
-// Internal sub-widgets for GlassSearchableBottomBar.
+// Internal sub-widgets for GlassTabBar.searchable.
 //
-// Extracted from glass_searchable_bottom_bar.dart to keep that file focused on
+// Extracted from glass_tab_bar.dart to keep that file focused on
 // the public API and layout orchestration. Mirrors the pattern established by
-// bottom_bar_internal.dart for GlassBottomBar.
+// tab_bar_bottom_internal.dart for GlassTabBar.bottom.
 //
 // None of these widgets are part of the public API.
 // ignore_for_file: deprecated_member_use
@@ -14,13 +14,14 @@ import '../../../constants/glass_defaults.dart';
 import '../../renderer/liquid_glass_renderer.dart';
 import '../../../types/glass_quality.dart';
 import '../../../utils/draggable_indicator_physics.dart';
+import '../../utils/glass_localizations.dart';
 import '../../../utils/glass_spring.dart';
 import '../../../theme/glass_theme.dart';
 import '../../../widgets/interactive/glass_button.dart';
 import '../../../widgets/shared/adaptive_glass.dart';
 import '../../../widgets/shared/animated_glass_indicator.dart';
 import '../../../widgets/shared/inherited_liquid_glass.dart';
-import '../../../widgets/surfaces/glass_bottom_bar.dart'
+import '../../../widgets/surfaces/shared/tab_bar_types.dart'
     show MaskingQuality, JellyClipper;
 import '../../../widgets/surfaces/shared/glass_search_bar_config.dart';
 import 'tab_bar_drag_gesture_mixin.dart';
@@ -48,6 +49,7 @@ class DismissPill extends StatelessWidget {
     this.cancelIconSize = 24,
     this.indicatorColor,
     this.settings,
+    this.semanticLabel,
     super.key,
   });
 
@@ -61,6 +63,9 @@ class DismissPill extends StatelessWidget {
   final Color? indicatorColor;
   final LiquidGlassSettings? settings;
 
+  /// Screen reader label; defaults to the app's Cupertino "Cancel".
+  final String? semanticLabel;
+
   @override
   Widget build(BuildContext context) {
     final safeColor = indicatorColor;
@@ -69,6 +74,8 @@ class DismissPill extends StatelessWidget {
         isDark ? const Color(0xE6FFFFFF) : const Color(0xE6000000);
     return GlassButton(
       onTap: onTap,
+      label: semanticLabel ??
+          glassCupertinoLocalizationsOf(context).cancelButtonLabel,
       width: pillSize,
       height: pillSize,
       quality: quality,
@@ -96,10 +103,10 @@ class DismissPill extends StatelessWidget {
 // SearchableTabIndicator
 // =============================================================================
 
-/// Draggable glass indicator for [GlassSearchableBottomBar].
+/// Draggable glass indicator for [GlassTabBar.searchable].
 ///
-/// Uses identical spring physics and masking to [GlassBottomBar]'s internal
-/// `_TabIndicator`. When [isSearchActive] is `true`, it collapses to show only
+/// Uses identical spring physics and masking to [GlassTabBar.bottom]'s internal
+/// `_TabIndicator`. When `isSearchActive` is `true`, it collapses to show only
 /// the [collapsedLogoBuilder] and a tap dismisses search.
 class SearchableTabIndicator extends StatefulWidget {
   const SearchableTabIndicator({
@@ -110,6 +117,7 @@ class SearchableTabIndicator extends StatefulWidget {
     required this.onTabChanged,
     required this.visible,
     required this.quality,
+    this.backgroundQuality,
     required this.barHeight,
     required this.barBorderRadius,
     this.indicatorBorderRadius,
@@ -117,6 +125,7 @@ class SearchableTabIndicator extends StatefulWidget {
     required this.magnification,
     required this.innerBlur,
     required this.maskingQuality,
+    this.passthroughOverPlatformView = false,
     required this.isSearchActive,
     required this.onDismissSearch,
     this.indicatorColor,
@@ -127,6 +136,7 @@ class SearchableTabIndicator extends StatefulWidget {
     this.indicatorExpansion =
         const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
     this.interactionGlowColor,
+    this.nativePressHighlight = false,
     this.interactionGlowRadius = 1.5,
     this.interactionGlowBlurRadius = 0,
     this.interactionGlowSpreadRadius = 0,
@@ -134,6 +144,7 @@ class SearchableTabIndicator extends StatefulWidget {
     required this.enableBackgroundAnimation,
     required this.backgroundPressScale,
     this.platformViewBackdrop = false,
+    this.collapsedSemanticLabel,
     super.key,
   });
 
@@ -149,6 +160,7 @@ class SearchableTabIndicator extends StatefulWidget {
   final double indicatorPinchStrength;
   final ValueChanged<int> onTabChanged;
   final GlassQuality quality;
+  final GlassQuality? backgroundQuality;
   final double barHeight;
   final double barBorderRadius;
   final double? indicatorBorderRadius;
@@ -156,10 +168,26 @@ class SearchableTabIndicator extends StatefulWidget {
   final double magnification;
   final double innerBlur;
   final MaskingQuality maskingQuality;
+
+  /// The glass sits over a platform view whose pixels cannot be captured, so
+  /// its body is transparent rather than an invented fill colour.
+  ///
+  /// The indicator refracts the bar's own icon layer in that situation, and
+  /// that layer is also drawn on screen - with a see-through body the crisp
+  /// copy shows next to the refracted one, i.e. every label appears twice.
+  /// So when this is set the selected content is lifted OUT of the refracted
+  /// icon layer and drawn ABOVE the glass instead: the layer under the pill
+  /// holds nothing, the glass still refracts what surrounds it, and each
+  /// label exists exactly once.
+  final bool passthroughOverPlatformView;
   final GlobalKey? backgroundKey;
   final bool isSearchActive;
   final VoidCallback onDismissSearch;
   final WidgetBuilder? collapsedLogoBuilder;
+
+  /// Screen reader label of the collapsed circle that leaves search and
+  /// returns to the tabs: the current tab's name.
+  final String? collapsedSemanticLabel;
 
   /// How far the jelly indicator's leading and trailing edges expand
   /// past the tab boundary as the indicator translates. Higher values
@@ -169,12 +197,13 @@ class SearchableTabIndicator extends StatefulWidget {
   final EdgeInsetsGeometry indicatorExpansion;
 
   final Color? interactionGlowColor;
+  final bool nativePressHighlight;
   final double interactionGlowRadius;
   final double interactionGlowBlurRadius;
   final double interactionGlowSpreadRadius;
   final double interactionGlowOpacity;
   final bool enableBackgroundAnimation;
-  final double backgroundPressScale;
+  final double? backgroundPressScale;
 
   /// When true (bar over an iOS PlatformView): the bar background renders via
   /// live BackdropFilter, and the premium indicator refracts the bar's own icon
@@ -196,8 +225,6 @@ class SearchableTabIndicatorState extends State<SearchableTabIndicator>
   bool get isPlatformViewBackdrop => widget.platformViewBackdrop;
   @override
   void notifyTabChanged(int index) => widget.onTabChanged(index);
-
-  static const _fallbackIndicatorColor = Color(0x1AFFFFFF);
 
   /// RepaintBoundary key for the merged icon layer, so the premium indicator can
   /// refract the icons (capturable) over a PlatformView.
@@ -230,32 +257,53 @@ class SearchableTabIndicatorState extends State<SearchableTabIndicator>
               (constraints.maxWidth - constraints.maxHeight).abs() < 2;
           final currentShape = isSquare ? const LiquidOval() : _barShape;
 
+          final nativePress = _pressesNatively(
+              widget.enableBackgroundAnimation, widget.backgroundPressScale);
+          final content = widget.collapsedLogoBuilder != null
+              ? AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 220),
+                  transitionBuilder: (c, a) =>
+                      FadeTransition(opacity: a, child: c),
+                  child: SizedBox.expand(
+                    key: const ValueKey('logo'),
+                    child: widget.collapsedLogoBuilder!(context),
+                  ),
+                )
+              : const SizedBox.shrink(key: ValueKey('empty'));
+
           return LiquidStretch(
             interactionScale: widget.enableBackgroundAnimation
-                ? widget.backgroundPressScale
+                ? (widget.backgroundPressScale ?? 1.0)
                 : 1.0,
-            stretch: 0.5,
+            // The collapsed circle presses like a native button (#272):
+            // a null pressScale resolves to the ~17 pt growth with the
+            // tremor stretch on top; a number stays a fixed factor, as
+            // on GlassButton.
+            pressGrowth: nativePress ? LiquidStretch.nativePressGrowth : null,
+            anchorStretchSettings: nativePress
+                ? AnchorStretchSettings.nativeTremor
+                : const AnchorStretchSettings(),
+            stretch: widget.platformViewBackdrop ? 0.0 : 0.5,
             resistance: 0.01,
             anchorStretch: true,
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
+            // The collapsed circle is the way back to the tabs: a button
+            // named after the current tab. The logo inside is decoration.
+            child: Semantics(
+              container: true,
+              button: true,
+              label: widget.collapsedSemanticLabel,
               onTap: widget.onDismissSearch,
-              child: AdaptiveGlass.grouped(
-                quality: widget.quality,
-                platformViewBackdrop: widget.platformViewBackdrop,
-                shape: currentShape,
-                child: _wrapWithGlow(
-                  child: widget.collapsedLogoBuilder != null
-                      ? AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 220),
-                          transitionBuilder: (c, a) =>
-                              FadeTransition(opacity: a, child: c),
-                          child: SizedBox.expand(
-                            key: const ValueKey('logo'),
-                            child: widget.collapsedLogoBuilder!(context),
-                          ),
-                        )
-                      : const SizedBox.shrink(key: ValueKey('empty')),
+              excludeSemantics: widget.collapsedSemanticLabel != null,
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: widget.onDismissSearch,
+                child: AdaptiveGlass.grouped(
+                  quality: widget.backgroundQuality ?? widget.quality,
+                  platformViewBackdrop: widget.platformViewBackdrop,
+                  shape: currentShape,
+                  child: (nativePress && widget.nativePressHighlight)
+                      ? PressAmbientLift(child: content)
+                      : _wrapWithGlow(child: content),
                 ),
               ),
             ),
@@ -264,11 +312,12 @@ class SearchableTabIndicatorState extends State<SearchableTabIndicator>
       );
     }
 
-    // ── Normal draggable tab bar — identical logic to GlassBottomBar ─────────
-    final theme = CupertinoTheme.of(context);
+    // ── Normal draggable tab bar — identical logic to GlassTabBar.bottom ─────
+    final brightness = GlassTheme.brightnessOf(context);
     final indicatorColor = widget.indicatorColor ??
-        theme.textTheme.textStyle.color?.withValues(alpha: .1) ??
-        _fallbackIndicatorColor;
+        (brightness == Brightness.dark
+            ? CupertinoColors.white.withValues(alpha: .1)
+            : CupertinoColors.black.withValues(alpha: .1));
     final targetAlignment = computeTabAlignment(widget.tabIndex);
     // Nested-arc default: if the outer bar is a capsule sentinel (≥ 9999),
     // the indicator is also passed 9999 directly, so the glass shader clamps to
@@ -298,7 +347,7 @@ class SearchableTabIndicatorState extends State<SearchableTabIndicator>
           offset: Offset(swayValue, 0),
           child: LiquidStretch(
             interactionScale: widget.enableBackgroundAnimation
-                ? widget.backgroundPressScale
+                ? (widget.backgroundPressScale ?? 1.04)
                 : 1.0,
             stretch:
                 0.0, // stretch disabled on platformViewBackdrop to prevent BackdropFilter pixel-snap jitter
@@ -311,6 +360,7 @@ class SearchableTabIndicatorState extends State<SearchableTabIndicator>
               child: GestureDetector(
                 key: ValueKey(gestureEpoch),
                 behavior: HitTestBehavior.opaque,
+                excludeFromSemantics: true,
                 onHorizontalDragDown: onBarDragDown,
                 onHorizontalDragStart: onBarDragStart,
                 onHorizontalDragUpdate: onBarDragUpdate,
@@ -346,7 +396,8 @@ class SearchableTabIndicatorState extends State<SearchableTabIndicator>
                             height: widget.barHeight,
                             decoration: ShapeDecoration(shape: _barShape),
                             child: AdaptiveGlass.grouped(
-                              quality: widget.quality,
+                              quality:
+                                  widget.backgroundQuality ?? widget.quality,
                               platformViewBackdrop: widget.platformViewBackdrop,
                               shape: _barShape,
                               child: Container(
@@ -415,7 +466,8 @@ class SearchableTabIndicatorState extends State<SearchableTabIndicator>
         clipper: _InverseSearchBarClipper(_barShape),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(widget.barBorderRadius),
+            borderRadius:
+                GlassDefaults.safeBorderRadius(widget.barBorderRadius),
             boxShadow: shadows,
           ),
         ),
@@ -464,7 +516,7 @@ class SearchableTabIndicatorState extends State<SearchableTabIndicator>
                   Positioned.fill(
                     child: RepaintBoundary(
                       child: AdaptiveGlass.grouped(
-                        quality: widget.quality,
+                        quality: widget.backgroundQuality ?? widget.quality,
                         platformViewBackdrop: widget.platformViewBackdrop,
                         shape: _barShape,
                         child: const SizedBox.expand(),
@@ -548,7 +600,7 @@ class SearchableTabIndicatorState extends State<SearchableTabIndicator>
                   Positioned.fill(
                     child: RepaintBoundary(
                       child: AdaptiveGlass.grouped(
-                        quality: widget.quality,
+                        quality: widget.backgroundQuality ?? widget.quality,
                         platformViewBackdrop: widget.platformViewBackdrop,
                         shape: _barShape,
                         child: const SizedBox.expand(),
@@ -617,24 +669,25 @@ class SearchableTabIndicatorState extends State<SearchableTabIndicator>
                                     child: widget.childUnselected,
                                   ),
                                 ),
-                                ClipPath(
-                                  clipBehavior: Clip.antiAliasWithSaveLayer,
-                                  clipper: JellyClipper(
-                                    itemCount: widget.tabCount,
-                                    alignment: alignment,
-                                    thickness: thickness,
-                                    expansion: widget.indicatorExpansion
-                                        .resolve(Directionality.of(context)),
-                                    transform: jellyTransform,
-                                    borderRadius: effRadius * 2,
+                                if (!widget.passthroughOverPlatformView)
+                                  ClipPath(
+                                    clipBehavior: Clip.antiAliasWithSaveLayer,
+                                    clipper: JellyClipper(
+                                      itemCount: widget.tabCount,
+                                      alignment: alignment,
+                                      thickness: thickness,
+                                      expansion: widget.indicatorExpansion
+                                          .resolve(Directionality.of(context)),
+                                      transform: jellyTransform,
+                                      borderRadius: effRadius * 2,
+                                    ),
+                                    child: Container(
+                                      padding: widget.tabPadding,
+                                      height: widget.barHeight,
+                                      child: widget.selectedTabBuilder(
+                                          context, thickness, alignment),
+                                    ),
                                   ),
-                                  child: Container(
-                                    padding: widget.tabPadding,
-                                    height: widget.barHeight,
-                                    child: widget.selectedTabBuilder(
-                                        context, thickness, alignment),
-                                  ),
-                                ),
                               ],
                             ),
                           ),
@@ -673,6 +726,33 @@ class SearchableTabIndicatorState extends State<SearchableTabIndicator>
                 ? _iconLayerKey
                 : widget.backgroundKey,
           ),
+
+          // 4. The selected content, lifted above the glass. Only in
+          // passthrough: the pill's body is see-through there, so this copy
+          // cannot live under it (see [passthroughOverPlatformView]).
+          if (widget.passthroughOverPlatformView)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: ClipPath(
+                  clipBehavior: Clip.antiAliasWithSaveLayer,
+                  clipper: JellyClipper(
+                    itemCount: widget.tabCount,
+                    alignment: alignment,
+                    thickness: thickness,
+                    expansion: widget.indicatorExpansion
+                        .resolve(Directionality.of(context)),
+                    transform: jellyTransform,
+                    borderRadius: indicatorRadius * 2,
+                  ),
+                  child: Container(
+                    padding: widget.tabPadding,
+                    height: widget.barHeight,
+                    child: widget.selectedTabBuilder(
+                        context, thickness, alignment),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -686,6 +766,12 @@ class SearchableTabIndicatorState extends State<SearchableTabIndicator>
 /// The morphing search pill. Collapses to a square icon; expands to a
 /// real [TextField] with autofocus. Lives inside the parent
 /// [AdaptiveLiquidGlassLayer] so its glass rendering blends with the tab pill.
+/// Whether a surface presses with the native button sizing: background
+/// animation on and no customised press scale — null means native, a number
+/// a fixed factor, as on [GlassButton.interactionScale].
+bool _pressesNatively(bool enableBackgroundAnimation, double? pressScale) =>
+    enableBackgroundAnimation && pressScale == null;
+
 class SearchPill extends StatefulWidget {
   const SearchPill({
     super.key,
@@ -697,6 +783,7 @@ class SearchPill extends StatefulWidget {
     required this.backgroundPressScale,
     this.onFocusChanged,
     this.interactionGlowColor,
+    this.nativePressHighlight = false,
     this.interactionGlowRadius = 1.5,
     this.interactionGlowBlurRadius = 0,
     this.interactionGlowSpreadRadius = 0,
@@ -710,7 +797,7 @@ class SearchPill extends StatefulWidget {
   final double barBorderRadius;
   final GlassQuality quality;
   final bool enableBackgroundAnimation;
-  final double backgroundPressScale;
+  final double? backgroundPressScale;
   final Color? iconColor;
 
   /// Render the pill's glass via the live BackdropFilter path so it composites
@@ -723,6 +810,11 @@ class SearchPill extends StatefulWidget {
 
   /// The color of the directional glow effect when interacting with the pill.
   final Color? interactionGlowColor;
+
+  /// Whether a default-configured press renders the even GlassButton lift
+  /// instead of the directional glow — set by the layout when the app has
+  /// not customised the glow colour.
+  final bool nativePressHighlight;
 
   /// The radius spread of the directional glow effect when interacting with the pill.
   final double interactionGlowRadius;
@@ -839,6 +931,18 @@ class SearchPillState extends State<SearchPill> {
     );
   }
 
+  /// Whether the collapsed circle presses with the native button sizing.
+  bool get _nativePress => _pressesNatively(
+      widget.enableBackgroundAnimation, widget.backgroundPressScale);
+
+  /// The pressed highlight: a native press brightens the whole surface and
+  /// holds it wherever the finger goes, so the default renders the even lift
+  /// a [GlassButton] has; a customised glow colour keeps the directional glow.
+  Widget _pressHighlight({required Widget child}) =>
+      _nativePress && widget.nativePressHighlight
+          ? PressAmbientLift(child: child)
+          : _wrapWithGlow(child: child);
+
   /// Builds a standalone shadow widget for the search pill.
   ///
   /// Rendered as a SIBLING in the parent Stack, BELOW the glass pill,
@@ -858,7 +962,8 @@ class SearchPillState extends State<SearchPill> {
         clipper: _InverseSearchBarClipper(pillShape),
         child: DecoratedBox(
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(widget.barBorderRadius),
+            borderRadius:
+                GlassDefaults.safeBorderRadius(widget.barBorderRadius),
             boxShadow: shadows,
           ),
         ),
@@ -902,45 +1007,60 @@ class SearchPillState extends State<SearchPill> {
 
         if (!widget.isActive || w < kExpandThreshold) {
           final isOval = (w - constraints.maxHeight).abs() < 2;
-          final currentShape = isOval
-              ? (widget.platformViewBackdrop
-                  ? LiquidRoundedRectangle(borderRadius: w / 2)
-                  : LiquidRoundedRectangle(borderRadius: w / 2))
-              : shape;
+          // LiquidOval, not a rounded rectangle at w / 2: the press growth
+          // scales the painted rect, and a layout-time radius squares the
+          // corners off as it grows. An oval's radius rides the rect.
+          final currentShape = isOval ? const LiquidOval() : shape;
 
           return Stack(
             fit: StackFit.expand,
             children: [
               LiquidStretch(
                 interactionScale: widget.enableBackgroundAnimation
-                    ? widget.backgroundPressScale
+                    ? (widget.backgroundPressScale ?? 1.0)
                     : 1.0,
+                // The collapsed circle presses like a native button (#272):
+                // a null pressScale resolves to the ~17 pt growth with the
+                // tremor stretch on top; a number stays a fixed factor, as
+                // on GlassButton.
+                pressGrowth:
+                    _nativePress ? LiquidStretch.nativePressGrowth : null,
+                anchorStretchSettings: _nativePress
+                    ? AnchorStretchSettings.nativeTremor
+                    : const AnchorStretchSettings(),
                 stretch: widget.platformViewBackdrop ? 0.0 : 0.5,
                 resistance: 0.01,
                 anchorStretch:
                     true, // Matches GlassButton default (keeps it attached so it morphs)
-                child: GestureDetector(
-                  key: const ValueKey('pill-collapsed'),
-                  behavior: HitTestBehavior.opaque,
-                  onTap: (widget.isActive && widget.config.expandWhenActive)
-                      ? () {}
-                      : () => widget.config.onSearchToggle(true),
-                  child: AdaptiveGlass.grouped(
-                    shape: currentShape,
-                    // Over a PlatformView AdaptiveGlass routes to the frost veil
-                    // automatically (platformViewBackdrop), so the requested
-                    // quality passes through unchanged here.
-                    quality: widget.quality,
-                    platformViewBackdrop: widget.platformViewBackdrop,
-                    child: _wrapWithGlow(
-                      child: Center(
-                        // IconTheme ensures custom searchIcon widgets inherit
-                        // the resolved color. The fallback Icon also sets
-                        // color: explicitly for belt-and-braces safety.
-                        child: IconTheme(
-                          data: IconThemeData(color: iconColor),
-                          child: widget.config.searchIcon ??
-                              Icon(CupertinoIcons.search, color: iconColor),
+                // The collapsed circle opens search: a button named by the
+                // field's own hint text, which the app already localizes.
+                child: Semantics(
+                  container: true,
+                  button: true,
+                  label: widget.config.hintText,
+                  child: GestureDetector(
+                    key: const ValueKey('pill-collapsed'),
+                    behavior: HitTestBehavior.opaque,
+                    onTap: (widget.isActive && widget.config.expandWhenActive)
+                        ? () {}
+                        : () => widget.config.onSearchToggle(true),
+                    child: AdaptiveGlass.grouped(
+                      shape: currentShape,
+                      // Over a PlatformView AdaptiveGlass routes to the frost veil
+                      // automatically (platformViewBackdrop), so the requested
+                      // quality passes through unchanged here.
+                      quality: widget.quality,
+                      platformViewBackdrop: widget.platformViewBackdrop,
+                      child: _pressHighlight(
+                        child: Center(
+                          // IconTheme ensures custom searchIcon widgets inherit
+                          // the resolved color. The fallback Icon also sets
+                          // color: explicitly for belt-and-braces safety.
+                          child: IconTheme(
+                            data: IconThemeData(color: iconColor),
+                            child: widget.config.searchIcon ??
+                                Icon(CupertinoIcons.search, color: iconColor),
+                          ),
                         ),
                       ),
                     ),
@@ -966,17 +1086,34 @@ class SearchPillState extends State<SearchPill> {
         // iOS 26: wrapped in GlassGlowLayer so GlassGlow inside can report
         // touch position and paint a soft directional highlight on the surface.
         // iOS 26: directional glow on press (GlassGlowLayer + GlassGlow).
-        // No scale animation here — the pill is spring-positioned alongside
-        // the dismiss button so any visual overflow causes overlap.
-        return LiquidStretch(
+        // The expanded field answers a drag per axis, measured off Photos:
+        // along its length a gentle jelly-follow that saturates near ~7 pt
+        // of travel however far the finger goes (stretch 0.22 / resistance
+        // 0.03), necking into the separate dismiss button; vertically no
+        // follow at all, just a couple of points of stretch from the far
+        // edge. The vertical part is a second, axis-constrained
+        // [LiquidStretch] because the jelly normalises each axis by its own
+        // dimension — sized off the field's height, its vertical response
+        // would dwarf the native one. A customised pressScale or a platform-
+        // view backdrop keeps the still field, like every stretch on these
+        // surfaces.
+        final fieldStretches = _nativePress && !widget.platformViewBackdrop;
+        final Widget field = LiquidStretch(
+          // The field keeps its subtle press inflation on a plain hold; only
+          // the collapsed circles trade the factor for the native growth.
           interactionScale: widget.enableBackgroundAnimation
-              ? widget.backgroundPressScale
+              ? (widget.backgroundPressScale ?? 1.04)
               : 1.0,
-          stretch: 0.0,
-          resistance: 0.08,
+          stretch: fieldStretches ? 0.22 : 0.0,
+          resistance: fieldStretches ? 0.03 : 0.08,
+          allowPositiveY: fieldStretches ? false : null,
+          allowNegativeY: fieldStretches ? false : null,
           anchorStretch: false, // Search pill uses jelly-follow, not anchored
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
+            // Only widens the pointer target to the padding; the text field
+            // inside is the control screen readers use.
+            excludeFromSemantics: true,
             onTap: _focusNode.requestFocus,
             child: AdaptiveGlass.grouped(
               shape: shape,
@@ -988,6 +1125,14 @@ class SearchPillState extends State<SearchPill> {
             ),
           ), // GestureDetector
         ); // LiquidStretch
+        return LiquidStretch(
+          interactionScale: 1.0, // the scale lives on the inner layer
+          stretch: fieldStretches ? 0.09 : 0.0,
+          resistance: 0.03,
+          axis: Axis.vertical,
+          anchorStretch: false,
+          child: field,
+        );
       },
     );
   }
@@ -999,8 +1144,43 @@ class SearchPillState extends State<SearchPill> {
 
   Widget _buildExpanded(Color iconColor, Color micColor) {
     final config = widget.config;
-    final textColor =
-        config.textColor ?? CupertinoColors.label.resolveFrom(context);
+    // Eagerly resolve any CupertinoDynamicColor against the glass brightness
+    // cascade. CupertinoColors.label.resolveFrom calls
+    // CupertinoTheme.brightnessOf, which falls through to
+    // MediaQuery.platformBrightness (OS brightness) when no explicit Cupertino
+    // theme overrides it. That produces white text on a light-mode pill when
+    // the device OS is dark but the app is forced to light. Furthermore, any
+    // caller-provided CupertinoDynamicColor passed via config.textColor or
+    // config.hintStyle must also be flattened here, otherwise CupertinoTextField
+    // will re-resolve it against OS brightness during its own build.
+    final glassBrightness = GlassTheme.brightnessOf(context);
+    Color resolveDynamicColor(Color c) {
+      if (c is CupertinoDynamicColor) {
+        return glassBrightness == Brightness.dark ? c.darkColor : c.color;
+      }
+      return c;
+    }
+
+    // Typed text: an explicit config.textColor wins. hintStyle's colour is the
+    // fallback only when no textColor was given, so a caller can mute the
+    // placeholder without muting what the user types.
+    final hintColor = config.hintStyle?.color;
+    final effectiveTextColor = resolveDynamicColor(
+      config.textColor ?? hintColor ?? CupertinoColors.label,
+    );
+
+    final effectiveTextStyle = (config.hintStyle ?? const TextStyle()).copyWith(
+      color: effectiveTextColor,
+      fontSize: config.hintStyle?.fontSize ?? 17,
+      fontWeight: config.hintStyle?.fontWeight ?? FontWeight.w400,
+    );
+
+    final placeholderColor =
+        hintColor != null ? resolveDynamicColor(hintColor) : iconColor;
+
+    final effectivePlaceholderStyle = (config.hintStyle ??
+            const TextStyle(fontSize: 17, fontWeight: FontWeight.w400))
+        .copyWith(color: placeholderColor);
 
     // Trailing slot priority:
     //   1. trailingBuilder — caller has full control.
@@ -1020,27 +1200,40 @@ class SearchPillState extends State<SearchPill> {
           child: ScaleTransition(scale: animation, child: child),
         ),
         child: _hasText
-            ? GestureDetector(
+            ? Semantics(
                 key: const ValueKey('clear'),
-                behavior: HitTestBehavior.opaque,
-                onTap: _handleClear,
-                child: Icon(
-                  CupertinoIcons.clear_circled_solid,
-                  color: iconColor,
-                  size: 18,
+                container: true,
+                button: true,
+                label: config.clearButtonSemanticLabel ??
+                    glassCupertinoLocalizationsOf(context).clearButtonLabel,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: _handleClear,
+                  child: Icon(
+                    CupertinoIcons.clear_circled_solid,
+                    color: iconColor,
+                    size: 18,
+                  ),
                 ),
               )
-            : GestureDetector(
+            : Semantics(
                 key: const ValueKey('mic'),
-                behavior: HitTestBehavior.opaque,
-                onTap: config.onMicTap,
-                child: config.onMicTap != null
-                    ? Icon(
-                        CupertinoIcons.mic_fill,
-                        color: micColor,
-                        size: 18,
-                      )
-                    : const SizedBox.shrink(),
+                container: config.onMicTap != null,
+                button: config.onMicTap != null ? true : null,
+                label: config.onMicTap != null
+                    ? config.micButtonSemanticLabel
+                    : null,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: config.onMicTap,
+                  child: config.onMicTap != null
+                      ? Icon(
+                          CupertinoIcons.mic_fill,
+                          color: micColor,
+                          size: 18,
+                        )
+                      : const SizedBox.shrink(),
+                ),
               ),
       );
     }
@@ -1066,12 +1259,7 @@ class SearchPillState extends State<SearchPill> {
               keyboardType: config.keyboardType,
               autocorrect: config.autocorrect,
               enableSuggestions: config.enableSuggestions,
-              style: config.hintStyle ??
-                  TextStyle(
-                    color: textColor,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w400,
-                  ),
+              style: effectiveTextStyle,
               // When null, Flutter's standard cursor-color resolution
               // kicks in (textSelectionTheme → Cupertino primaryColor
               // on iOS → colorScheme.primary). Callers wanting the
@@ -1079,10 +1267,7 @@ class SearchPillState extends State<SearchPill> {
               // `cursorColor: textColor` explicitly via [config].
               cursorColor: config.cursorColor,
               placeholder: config.hintText,
-              placeholderStyle: (config.hintStyle ??
-                      const TextStyle(
-                          fontSize: 17, fontWeight: FontWeight.w400))
-                  .copyWith(color: iconColor),
+              placeholderStyle: effectivePlaceholderStyle,
               padding: EdgeInsets.zero,
               decoration: null,
             ),
@@ -1113,4 +1298,184 @@ class _InverseSearchBarClipper extends CustomClipper<Path> {
   @override
   bool shouldReclip(_InverseSearchBarClipper oldClipper) =>
       oldClipper.shape != shape;
+}
+
+/// A lightweight trailing action pill for [GlassTabBar.minimizable].
+///
+/// Renders the action button's icon and handles taps without allocating the
+/// search text field, focus node, or clear-button machinery that [SearchPill]
+/// requires.
+class MinimizableTrailingPill extends StatelessWidget {
+  const MinimizableTrailingPill({
+    super.key,
+    required this.icon,
+    required this.onTap,
+    required this.quality,
+    required this.barBorderRadius,
+    required this.enableBackgroundAnimation,
+    required this.backgroundPressScale,
+    this.interactionGlowColor,
+    this.nativePressHighlight = false,
+    this.interactionGlowRadius = 1.5,
+    this.interactionGlowBlurRadius = 0,
+    this.interactionGlowSpreadRadius = 0,
+    this.interactionGlowOpacity = 1,
+    this.platformViewBackdrop = false,
+    this.iconColor,
+    this.label,
+  });
+
+  final Widget? icon;
+  final VoidCallback? onTap;
+  final String? label;
+  final double barBorderRadius;
+  final GlassQuality quality;
+  final bool enableBackgroundAnimation;
+  final double? backgroundPressScale;
+  final Color? iconColor;
+  final bool platformViewBackdrop;
+  final Color? interactionGlowColor;
+
+  /// See [SearchPill.nativePressHighlight].
+  final bool nativePressHighlight;
+  final double interactionGlowRadius;
+  final double interactionGlowBlurRadius;
+  final double interactionGlowSpreadRadius;
+  final double interactionGlowOpacity;
+
+  Widget _wrapWithGlow({required Widget child}) {
+    final effectiveColor = interactionGlowColor ?? const Color(0x1FFFFFFF);
+    if (effectiveColor.a == 0) return child;
+    return GlassGlow(
+      glowColor: effectiveColor,
+      glowRadius: interactionGlowRadius,
+      glowBlurRadius: interactionGlowBlurRadius,
+      glowSpreadRadius: interactionGlowSpreadRadius,
+      glowOpacity: interactionGlowOpacity,
+      child: child,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final brightness = GlassTheme.brightnessOf(context);
+    Color resolveIconColor(Color c) {
+      if (c is CupertinoDynamicColor) {
+        return brightness == Brightness.dark ? c.darkColor : c.color;
+      }
+      return c;
+    }
+
+    final rawIconColor = iconColor ?? CupertinoColors.label;
+    final resolvedIconColor = resolveIconColor(rawIconColor);
+    final shape = LiquidRoundedRectangle(borderRadius: barBorderRadius);
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final w = constraints.maxWidth;
+        final isOval = (w - constraints.maxHeight).abs() < 2;
+        // LiquidOval so the corners ride the press growth — see SearchPill.
+        final currentShape = isOval ? const LiquidOval() : shape;
+
+        final nativePress =
+            _pressesNatively(enableBackgroundAnimation, backgroundPressScale);
+        final content = Center(
+          child: IconTheme(
+            data: IconThemeData(color: resolvedIconColor),
+            child: icon ?? const SizedBox.shrink(),
+          ),
+        );
+        return LiquidStretch(
+          interactionScale:
+              enableBackgroundAnimation ? (backgroundPressScale ?? 1.0) : 1.0,
+          // Presses like a native button (#272), as the search circle does.
+          pressGrowth: nativePress ? LiquidStretch.nativePressGrowth : null,
+          anchorStretchSettings: nativePress
+              ? AnchorStretchSettings.nativeTremor
+              : const AnchorStretchSettings(),
+          stretch: platformViewBackdrop ? 0.0 : 0.5,
+          resistance: 0.01,
+          anchorStretch: true,
+          child: GestureDetector(
+            key: const ValueKey('pill-collapsed'),
+            behavior: HitTestBehavior.opaque,
+            onTap: onTap,
+            child: Semantics(
+              button: true,
+              label: label,
+              enabled: onTap != null,
+              child: AdaptiveGlass.grouped(
+                shape: currentShape,
+                quality: quality,
+                platformViewBackdrop: platformViewBackdrop,
+                child: nativePress && nativePressHighlight
+                    ? PressAmbientLift(child: content)
+                    : _wrapWithGlow(child: content),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// The even, whole-surface brightening a pressed native button holds for as
+/// long as the finger is down, wherever it goes — [GlassButton]'s
+/// `ambientBaseLight` lift for circles that are not GlassButtons (the
+/// collapsed search and trailing pills). Drawn under [child] so the glyph
+/// stays crisp.
+class PressAmbientLift extends StatefulWidget {
+  /// Creates the lift around the pressed content.
+  const PressAmbientLift({required this.child, super.key});
+
+  /// The pill content the lift sits beneath.
+  final Widget child;
+
+  @override
+  State<PressAmbientLift> createState() => _PressAmbientLiftState();
+}
+
+class _PressAmbientLiftState extends State<PressAmbientLift>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    // Ramps over the press inflation, collapses on release, as the native
+    // highlight does — the timings GlassButton uses.
+    duration: GlassDefaults.ambientLiftDuration,
+    reverseDuration: GlassDefaults.ambientLiftReverseDuration,
+    vsync: this,
+  );
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // GlassButton's ambientBaseLight defaults: measured against a native
+    // light-mode press, halved in dark mode.
+    final target = GlassTheme.brightnessOf(context) == Brightness.dark
+        ? GlassDefaults.ambientBaseLightDark
+        : GlassDefaults.ambientBaseLight;
+    return Listener(
+      behavior: HitTestBehavior.translucent,
+      onPointerDown: (_) => _controller.forward(),
+      onPointerUp: (_) => _controller.reverse(),
+      onPointerCancel: (_) => _controller.reverse(),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          FadeTransition(
+            opacity: _controller.drive(Tween(begin: 0.0, end: target)),
+            child: const IgnorePointer(
+              child: ColoredBox(color: Color(0xFFFFFFFF)),
+            ),
+          ),
+          widget.child,
+        ],
+      ),
+    );
+  }
 }

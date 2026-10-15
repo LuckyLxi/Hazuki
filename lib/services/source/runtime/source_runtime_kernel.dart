@@ -1,10 +1,10 @@
-import 'package:flutter_qjs/flutter_qjs.dart';
+import 'source_script_engine.dart';
 
 import '../../../models/source_meta.dart';
 import '../models/source_contract_models.dart';
 
 class SourceRuntimeKernel {
-  FlutterQjs? engine;
+  SourceScriptEngine? engine;
   Future<void>? initFuture;
   String statusText = 'source_idle';
   SourceRuntimeState runtimeState = const SourceRuntimeState.idle();

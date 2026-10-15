@@ -1,6 +1,6 @@
 import 'dart:io';
 
-import 'package:flutter_qjs/flutter_qjs.dart';
+import 'source_script_engine.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../models/source_meta.dart';
@@ -37,7 +37,7 @@ class SourceJsBridge {
   final SourceRuntimeKernel _runtime;
   final SourceRuntimeHandleView _handle;
 
-  FlutterQjs? get engine => _runtime.engine;
+  SourceScriptEngine? get engine => _runtime.engine;
 
   dynamic evaluate(String code, {String? name}) {
     return engine?.evaluate(code, name: name);

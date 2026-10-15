@@ -3,7 +3,7 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
-import 'package:flutter_qjs/flutter_qjs.dart';
+import 'package:hazuki/services/source/runtime/source_script_engine.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/services/source/plugins/source_plugin_manager.dart';
 import 'package:hazuki/services/source/runtime/source_catalog_resolver.dart';
@@ -29,19 +29,15 @@ Future<SourceRuntimeHandle> _createRuntime(String id) async {
   );
   addTearDown(handle.requestDispose);
   final bridge = SourceJsBridgeCookieCapability(activeHandle: () => handle);
-  final engine = FlutterQjs(timeout: 5000, hostPromiseRejectionHandler: (_) {});
+  final engine = SourceScriptEngine(
+    timeout: 5000,
+    hostPromiseRejectionHandler: (_) {},
+  );
   handle.runtime.engine = engine;
-  engine.dispatch();
-  final setter = engine.evaluate('(k,v)=>{globalThis[k]=v}') as JSInvokable;
-  try {
-    setter.invoke([
-      'sendMessage',
-      (dynamic request) => bridge.handleJsMessageForHandle(handle, request),
-    ]);
-    setter.invoke(['fixtureHtml', _html]);
-  } finally {
-    setter.free();
-  }
+  engine.setMessageHandler(
+    (dynamic request) => bridge.handleJsMessageForHandle(handle, request),
+  );
+  engine.setGlobal('fixtureHtml', _html);
   engine.evaluate(await File('assets/init.js').readAsString());
   engine.evaluate(await File('assets/hazuki_plugin_sdk.js').readAsString());
   return handle;

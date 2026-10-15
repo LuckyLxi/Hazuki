@@ -38,6 +38,8 @@ class GlassPasswordField extends StatefulWidget {
     this.glowColor,
     this.glowRadius = 1.5,
     this.onTapOutside,
+    this.showPasswordSemanticLabel = 'Show password',
+    this.hidePasswordSemanticLabel = 'Hide password',
   });
 
   /// Controls the text being edited.
@@ -114,6 +116,16 @@ class GlassPasswordField extends StatefulWidget {
   /// Called when user taps outside. Mirrors [GlassTextField.onTapOutside].
   final TapRegionCallback? onTapOutside;
 
+  /// Screen reader label of the eye button while the password is hidden.
+  ///
+  /// Pass a localized string; the default is English.
+  final String showPasswordSemanticLabel;
+
+  /// Screen reader label of the eye button while the password is shown.
+  ///
+  /// Pass a localized string; the default is English.
+  final String hidePasswordSemanticLabel;
+
   @override
   State<GlassPasswordField> createState() => _GlassPasswordFieldState();
 }
@@ -147,17 +159,16 @@ class _GlassPasswordFieldState extends State<GlassPasswordField> {
         size: 20,
         color: CupertinoColors.secondaryLabel.resolveFrom(context),
       ),
-      suffixIcon: Semantics(
-        label: _obscureText ? 'Show password' : 'Hide password',
-        button: true,
-        child: Icon(
-          _obscureText
-              ? CupertinoIcons.eye_slash_fill
-              : CupertinoIcons.eye_fill,
-          size: 20,
-          color: CupertinoColors.secondaryLabel.resolveFrom(context),
-        ),
+      suffixIcon: Icon(
+        _obscureText ? CupertinoIcons.eye_slash_fill : CupertinoIcons.eye_fill,
+        size: 20,
+        color: CupertinoColors.secondaryLabel.resolveFrom(context),
       ),
+      // GlassTextField makes the tappable suffix a button node; naming it
+      // there keeps one node instead of a button nested in a button.
+      suffixSemanticLabel: _obscureText
+          ? widget.showPasswordSemanticLabel
+          : widget.hidePasswordSemanticLabel,
       onSuffixTap: () {
         setState(() {
           _obscureText = !_obscureText;

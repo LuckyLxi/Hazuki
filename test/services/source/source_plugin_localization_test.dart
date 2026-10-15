@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' show Locale;
 
-import 'package:flutter_qjs/flutter_qjs.dart';
+import 'package:hazuki/services/source/runtime/source_script_engine.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/services/source/plugins/source_plugin_localization.dart';
 import 'package:hazuki/services/source/plugins/source_plugin_models.dart';
@@ -35,21 +35,17 @@ SourceRuntimeHandle _handle() {
   return handle;
 }
 
-Future<FlutterQjs> _installRuntime(SourceRuntimeHandle handle) async {
+Future<SourceScriptEngine> _installRuntime(SourceRuntimeHandle handle) async {
   await handle.session.ensurePrefs();
   final bridge = SourceJsBridgeCookieCapability(activeHandle: () => handle);
-  final engine = FlutterQjs(timeout: 5000, hostPromiseRejectionHandler: (_) {});
+  final engine = SourceScriptEngine(
+    timeout: 5000,
+    hostPromiseRejectionHandler: (_) {},
+  );
   handle.runtime.engine = engine;
-  engine.dispatch();
-  final setter = engine.evaluate('(k,v)=>{globalThis[k]=v}') as JSInvokable;
-  try {
-    setter.invoke([
-      'sendMessage',
-      (dynamic message) => bridge.handleJsMessageForHandle(handle, message),
-    ]);
-  } finally {
-    setter.free();
-  }
+  engine.setMessageHandler(
+    (dynamic message) => bridge.handleJsMessageForHandle(handle, message),
+  );
   engine.evaluate(await File('assets/init.js').readAsString());
   engine.evaluate(await File('assets/hazuki_plugin_sdk.js').readAsString());
   engine.evaluate('''

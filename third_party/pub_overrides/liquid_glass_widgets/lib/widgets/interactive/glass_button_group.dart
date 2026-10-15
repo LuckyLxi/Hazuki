@@ -66,7 +66,8 @@ class GlassButtonGroupItem {
     this.enabled = true,
   })  : menuItems = null,
         menuAlignment = null,
-        menuWidth = 200;
+        menuWidth = 200,
+        menuHeight = null;
 
   /// Creates a group item that opens a [GlassMenu] pull-down when tapped.
   ///
@@ -81,11 +82,14 @@ class GlassButtonGroupItem {
   /// Defaults to auto-detection based on screen position.
   ///
   /// [menuWidth] is the width of the expanded menu panel. Defaults to 200.
+  ///
+  /// [menuHeight] is an optional fixed height for the expanded menu panel.
   const GlassButtonGroupItem.menu({
     required this.icon,
     required List<Widget> this.menuItems,
     this.menuAlignment,
     this.menuWidth = 200,
+    this.menuHeight,
     this.label,
   })  : onTap = _noOp,
         enabled = true;
@@ -127,6 +131,9 @@ class GlassButtonGroupItem {
   ///
   /// Defaults to 200. Set via [GlassButtonGroupItem.menu].
   final double menuWidth;
+
+  /// Optional fixed height for the expanded menu panel in logical pixels.
+  final double? menuHeight;
 }
 
 // =============================================================================
@@ -337,6 +344,7 @@ class GlassButtonGroup extends StatelessWidget {
         return GlassMenu(
           menuAlignment: menuItem.menuAlignment,
           menuWidth: menuItem.menuWidth,
+          menuHeight: menuItem.menuHeight,
           items: menuItem.menuItems!,
           triggerBuilder: (context, toggleMenu) =>
               buildPill(menuToggle: toggleMenu),
@@ -489,6 +497,8 @@ class _GlassGroupItemWidgetState extends State<_GlassGroupItemWidget>
             ? (widget.onTapOverride ?? widget.item.onTap)
             : null,
         behavior: HitTestBehavior.opaque,
+        // Semantics (label, role, tap) live on the GlassFocusRegion node.
+        excludeFromSemantics: true,
         child: ValueListenableBuilder<bool>(
           valueListenable: isHovered,
           builder: (context, isHov, child) {

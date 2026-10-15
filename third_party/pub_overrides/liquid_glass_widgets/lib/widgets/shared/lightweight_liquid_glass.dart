@@ -7,7 +7,7 @@ import 'package:flutter/foundation.dart' show debugPrint, kIsWeb;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
-import '../../src/renderer/internal/transform_tracking_repaint_boundary_mixin.dart';
+import '../../src/engine/internal/transform_tracking_repaint_boundary_mixin.dart';
 import '../../src/renderer/liquid_glass_renderer.dart';
 import '../../theme/glass_theme.dart';
 
@@ -126,8 +126,22 @@ class LightweightLiquidGlass extends StatefulWidget {
   // On web: Each widget needs its own instance (CanvasKit requirement)
   static ui.FragmentShader? _sharedShader; // Native only
 
-  // Dummy 1x1 transparent image for when no background is captured
+  // Dummy 1x1 transparent image for when no background is captured.
+  // Lazily allocated on first paint to guarantee zero GPU raster work
+  // during preWarm() or initialize() before runApp().
   static ui.Image? _dummyImage;
+
+  /// Returns the cached 1×1 transparent dummy image, creating it lazily on demand.
+  static ui.Image get dummyImage => _dummyImage ??= _createDummyImage();
+
+  static ui.Image _createDummyImage() {
+    final recorder = ui.PictureRecorder();
+    ui.Canvas(recorder);
+    final picture = recorder.endRecording();
+    final image = picture.toImageSync(1, 1);
+    picture.dispose();
+    return image;
+  }
 
   /// Resets static shader state for testing. Call between tests to ensure
   /// each test gets the fallback rendering (no cached shader).
@@ -155,11 +169,6 @@ class LightweightLiquidGlass extends StatefulWidget {
         // Fallback for unit tests where package prefix may not be resolved
         program = await ui.FragmentProgram.fromAsset(testPath);
       }
-      // Allocate the dummy image only after program load succeeds — avoids
-      // leaking a GPU allocation when the shader fails to compile.
-      final recorder = ui.PictureRecorder();
-      ui.Canvas(recorder);
-      _dummyImage = recorder.endRecording().toImageSync(1, 1);
       _cachedProgram = program;
 
       // On native platforms, create the shared shader instance
@@ -460,48 +469,6 @@ class _LightweightLiquidGlassState extends State<LightweightLiquidGlass>
     // instead of the full glass effect — visually identical to the old fallback
     // but with a stable Element identity.
 
-    // clipShape drives both the ClipPath fallback and the fast-path
-    // ClipRRect / ClipRSuperellipse wrappers below.
-    // - LiquidRoundedRectangle    → RoundedRectangleBorder  → ClipRRect
-    // - LiquidRoundedSuperellipse → RoundedSuperellipseBorder → ClipRSuperellipse
-    // - Everything else           → widget.shape             → ClipPath
-    //
-    // ClipRRect/ClipRSuperellipse are preferred over ClipPath because Flutter
-    // PR #177551 (3.41+) forwards these clip types to the iOS PlatformView
-    // mutator stack, letting BackdropFilter clip correctly over PlatformViews.
-    final ShapeBorder clipShape;
-    if (widget.shape is LiquidVerticalRoundedSuperellipse) {
-      final s = widget.shape as LiquidVerticalRoundedSuperellipse;
-      clipShape = RoundedSuperellipseBorder(
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(s.topRadius),
-          bottom: Radius.circular(s.bottomRadius),
-        ),
-      );
-    } else if (widget.shape is LiquidRoundedSuperellipse) {
-      final s = widget.shape as LiquidRoundedSuperellipse;
-      clipShape = RoundedSuperellipseBorder(
-        borderRadius: BorderRadius.all(Radius.circular(s.borderRadius)),
-      );
-    } else if (widget.shape is LiquidRoundedRectangle) {
-      final s = widget.shape as LiquidRoundedRectangle;
-      clipShape = RoundedRectangleBorder(
-        borderRadius: BorderRadius.all(Radius.circular(s.borderRadius)),
-      );
-    } else {
-      clipShape = widget.shape;
-    }
-
-    final BorderRadius? roundedRectRadius =
-        (clipShape is RoundedRectangleBorder &&
-                clipShape.borderRadius is BorderRadius)
-            ? clipShape.borderRadius as BorderRadius
-            : null;
-    final BorderRadius? superellipseRadius =
-        (clipShape is RoundedSuperellipseBorder &&
-                clipShape.borderRadius is BorderRadius)
-            ? clipShape.borderRadius as BorderRadius
-            : null;
     final Widget effect = _LightweightGlassEffect(
       shader: shader,
       settings: settings,
@@ -515,14 +482,19 @@ class _LightweightLiquidGlassState extends State<LightweightLiquidGlass>
       backgroundKey: widget.backgroundKey,
       child: widget.child,
     );
-    if (roundedRectRadius != null) {
-      return ClipRRect(borderRadius: roundedRectRadius, child: effect);
-    }
-    if (superellipseRadius != null) {
-      return ClipRSuperellipse(borderRadius: superellipseRadius, child: effect);
+
+    // ClipRRect/ClipRSuperellipse are preferred over ClipPath because Flutter
+    // PR #177551 (3.41+) forwards these clip types to the iOS PlatformView
+    // mutator stack, letting BackdropFilter clip correctly over PlatformViews.
+    final shapeRadius = widget.shape.toBorderRadius();
+    if (shapeRadius != null) {
+      if (widget.shape.isSuperellipse) {
+        return ClipRSuperellipse(borderRadius: shapeRadius, child: effect);
+      }
+      return ClipRRect(borderRadius: shapeRadius, child: effect);
     }
     return ClipPath(
-      clipper: ShapeBorderClipper(shape: clipShape),
+      clipper: ShapeBorderClipper(shape: widget.shape.toOutlinedBorder()),
       child: effect,
     );
   }
@@ -750,7 +722,7 @@ class _RenderLightweightGlass extends RenderProxyBox
       return _cachedBlurFilter!;
     }
 
-    // Standard saturation ColorFilter matrix (ITU-R BT.601 luminance weights).
+    // Standard saturation ColorFilter matrix (ITU-R BT.709 luminance weights).
     const double rw = 0.2126, gw = 0.7152, bw = 0.0722;
     final ui.ColorFilter satFilter = ui.ColorFilter.matrix(<double>[
       rw + (1 - rw) * sat,
@@ -873,10 +845,10 @@ class _RenderLightweightGlass extends RenderProxyBox
         _backgroundImage!,
         filterQuality: FilterQuality.medium, // coverage:ignore-line
       );
-    } else if (LightweightLiquidGlass._dummyImage != null) {
+    } else {
       _shader!.setImageSampler(
         0,
-        LightweightLiquidGlass._dummyImage!,
+        LightweightLiquidGlass.dummyImage,
         filterQuality: FilterQuality.medium, // coverage:ignore-line
       );
     }
@@ -919,7 +891,7 @@ class _RenderLightweightGlass extends RenderProxyBox
     // apply. The gain calibrates the veil so a single whitenStrength value
     // reads close to the Premium path's gated whiten at the same value.
     final double whitenStrength =
-        _settings.whitenStrength.clamp(0.0, 1.0).toDouble();
+        _settings.effectiveWhitenStrength.clamp(0.0, 1.0).toDouble();
     const double kWhitenVeilGain = 1.5;
     final double whitenVeil =
         (whitenStrength * kWhitenVeilGain).clamp(0.0, 1.0).toDouble();
@@ -968,7 +940,8 @@ class _RenderLightweightGlass extends RenderProxyBox
     // This only affects the Skia/Web lightweight shader path.
     // Impeller uses a different physical model and is completely unaffected.
     final gc = _settings.effectiveGlassColor;
-    final glassLuminance = 0.299 * gc.r + 0.587 * gc.g + 0.114 * gc.b;
+    final glassLuminance =
+        0.2126 * gc.r + 0.7152 * gc.g + 0.0722 * gc.b; // ITU-R Rec.709
     final brightnessIntent = gc.a * glassLuminance * 0.6;
     final effectiveAmbient = math.max(
       _settings.effectiveAmbientStrength,
@@ -1054,5 +1027,18 @@ class _RenderLightweightGlass extends RenderProxyBox
     shader.setFloat(index++, bgOrigin.dy);
     shader.setFloat(index++, bgSize.width);
     shader.setFloat(index++, bgSize.height);
+
+    // 32: uEdgeAbsorption — Beer-Lambert meniscus rim darkening [0..1].
+    // Passed directly — what the caller sets is what the shader gets.
+    shader.setFloat(index++, _settings.edgeAbsorption.clamp(0.0, 1.0));
+
+    // 33: uFresnelStrength — grazing-angle Fresnel rim scale [0..∞].
+    // Matches the uniform wired in liquid_glass_render.frag via uEdgeConfig.y.
+    // Default 1.0 = calibrated iOS 26 baseline (0.10 * adaptiveStrength in shader).
+    shader.setFloat(index++, _settings.fresnelStrength.clamp(0.0, 4.0));
+
+    // 34: uBodyMode — 0.0 = adaptive, 1.0 = clear.
+    shader.setFloat(
+        index++, _settings.bodyMode == GlassBodyMode.clear ? 1.0 : 0.0);
   }
 }

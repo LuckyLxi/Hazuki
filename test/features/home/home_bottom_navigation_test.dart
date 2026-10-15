@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/physics.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:liquid_glass_widgets/utils/draggable_indicator_physics.dart';
@@ -204,7 +205,43 @@ void main() {
     button.onTap();
     expect(backToTopPressed, isTrue);
 
+    final morphBuilder = tester.widget<AnimatedBuilder>(
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is AnimatedBuilder &&
+            widget.animation is GlassMorphController,
+      ),
+    );
+    final morph = morphBuilder.animation as GlassMorphController;
+    // Retain the pre-upgrade trajectory as well as the final hidden position.
+    final closing = SpringSimulation(
+      const SpringDescription(mass: 1, stiffness: 60, damping: 11.3),
+      morph.value,
+      0,
+      -2.5,
+    );
     setNavigationState(() => showBackToTop = false);
+    await tester.pump();
+    await tester.pump();
+    for (var frame = 1; frame <= 4; frame++) {
+      await tester.pump(const Duration(milliseconds: 100));
+      final raw = closing.x(frame / 10);
+      final clamped = raw.clamp(0.0, 1.0);
+      final undershoot = raw < 0 ? raw : 0.0;
+      final t = clamped - 1;
+      final path = t * t * (3.5 * t + 2.5) + 1 + undershoot;
+      final size = Curves.linearToEaseOut.transform(clamped) + undershoot;
+      button = tester
+          .widget<GlassTabBar>(find.byType(GlassTabBar))
+          .extraButton!;
+      expect(morph.value, closeTo(raw, 0.000001));
+      expect(button.transformOffset.dx, closeTo(91 * path - 91, 0.000001));
+      expect(button.transformScale, closeTo(size.clamp(0.0, 1.0), 0.000001));
+      expect(
+        tester.widget<GlassTabBar>(find.byType(GlassTabBar)).blendAmount,
+        closeTo(10 + ((path - size).abs() * 150).clamp(0.0, 28.0), 0.000001),
+      );
+    }
     await tester.pumpAndSettle();
 
     tabBar = tester.widget<GlassTabBar>(find.byType(GlassTabBar));

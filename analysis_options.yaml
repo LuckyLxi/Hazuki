@@ -11,9 +11,6 @@ include: package:flutter_lints/flutter.yaml
 
 analyzer:
   exclude:
-    - third_party/flutter_qjs/example/**
-    - third_party/flutter_qjs/lib/**
-    - third_party/flutter_qjs/test/**
     - third_party/pub_overrides/**
     - build/**
     - android/**

@@ -148,11 +148,7 @@ class SourceJsBridgeCookieCapability {
       default:
         throw UnsupportedError('Unsupported JS bridge method: $method');
     }
-    return result is Future
-        ? result.whenComplete(
-            () => handle.runtime.engine?.port.sendPort.send(null),
-          )
-        : result;
+    return result;
   }
 
   void configureDioCookieBridge([SourceRuntimeHandle? handle]) =>

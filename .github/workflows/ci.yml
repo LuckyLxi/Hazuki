@@ -16,8 +16,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  flutter-qjs-windows:
-    name: flutter_qjs / Windows
+  source-runtime-windows:
+    name: Source runtime / Windows
     runs-on: windows-latest
 
     steps:
@@ -30,17 +30,14 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Get flutter_qjs dependencies
-        working-directory: third_party/flutter_qjs
+      - name: Get dependencies
         run: flutter pub get
 
-      - name: Analyze flutter_qjs
-        working-directory: third_party/flutter_qjs
-        run: flutter analyze
+      - name: Build QuickJS library for source plugin tests
+        run: dart run tool/build_quickjs_test_library.dart
 
-      - name: Test flutter_qjs
-        working-directory: third_party/flutter_qjs
-        run: flutter test
+      - name: Test source runtime
+        run: flutter test test/services/source --reporter expanded
 
   windows-debug:
     name: Windows Debug Build

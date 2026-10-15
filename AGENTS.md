@@ -4,7 +4,7 @@
 
 Hazuki is a Flutter comics application. Application code lives in `lib/`: startup and dependency registration are under `lib/app/`, feature modules under `lib/features/<feature>/`, reusable UI under `lib/widgets/`, services under `lib/services/`, and shared models/helpers under `lib/models/` and `lib/shared/`. Tests mirror this layout in `test/`. Static resources and the JavaScript source bridge live in `assets/`. Platform projects are in `android/`, `windows/`, and the other Flutter platform directories.
 
-`third_party/flutter_qjs` is a separate Flutter package. Run its dependency, format, analysis, and test commands from that directory when modifying it.
+`third_party/pub_overrides/quickjs_engine` is a separate Flutter package. Run its dependency, format, analysis, and test commands from that directory when modifying it.
 
 ## Build, Test, and Development Commands
 

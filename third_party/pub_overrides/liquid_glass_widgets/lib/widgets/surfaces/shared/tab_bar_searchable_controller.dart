@@ -1,4 +1,4 @@
-// Extracted layout state machine for GlassSearchableBottomBar.
+// Extracted layout state machine for GlassTabBar.searchable.
 //
 // This file is intentionally free of Flutter widget dependencies
 // (no BuildContext, no TickerProvider, no setState) so the layout
@@ -10,8 +10,8 @@ import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/physics.dart';
 
-import '../../surfaces/glass_bottom_bar.dart'
-    show GlassExtraButtonPosition, GlassTabPillAnchor;
+import 'tab_bar_extra_button.dart' show GlassExtraButtonPosition;
+import 'tab_bar_types.dart' show GlassTabPillAnchor;
 import '../../../src/widgets/surfaces/tab_bar_layout_utils.dart';
 
 // =============================================================================
@@ -128,7 +128,7 @@ class SpringRetarget {
 // SearchableBottomBarController
 // =============================================================================
 
-/// Manages the layout state machine for [GlassSearchableBottomBar].
+/// Manages the layout state machine for [GlassTabBar.searchable].
 ///
 /// Owns the spring target computation, change-detection cache, and focus
 /// state so that this logic can be unit tested without a widget tree.
@@ -148,7 +148,7 @@ class SpringRetarget {
 ///
 /// Pass to the widget:
 /// ```dart
-/// GlassSearchableBottomBar(
+/// GlassTabBar.searchable(
 ///   controller: _searchController,
 ///   ...
 /// )
@@ -160,7 +160,7 @@ class SpringRetarget {
 /// _searchController.closeSearch(); // collapses back to tabs
 /// ```
 ///
-/// Or by driving [GlassSearchableBottomBar.isSearchActive] directly from
+/// Or by driving `isSearchActive` on [GlassTabBar.searchable] directly from
 /// your own state — both approaches work and are interchangeable.
 class SearchableBottomBarController extends ChangeNotifier {
   // ── Focus state ──────────────────────────────────────────────────────────
@@ -188,7 +188,7 @@ class SearchableBottomBarController extends ChangeNotifier {
   /// Whether the search bar is currently open (expanded).
   ///
   /// Set programmatically via [openSearch] / [closeSearch], or kept in sync
-  /// with [GlassSearchableBottomBar.isSearchActive] via [syncSearchActive].
+  /// with `isSearchActive` on [GlassTabBar.searchable] via [syncSearchActive].
   bool get isSearchOpen => _isSearchOpen;
 
   /// Expands the search bar.
@@ -249,7 +249,7 @@ class SearchableBottomBarController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Called from `didUpdateWidget` when [GlassSearchableBottomBar.isSearchActive] changes.
+  /// Called from `didUpdateWidget` when `isSearchActive` changes on [GlassTabBar.searchable].
   ///
   /// Clears [searchFocused] when search is deactivated externally.
   void onSearchActiveChanged({
@@ -308,6 +308,12 @@ class SearchableBottomBarController extends ChangeNotifier {
   ///                           null means the tab pill fills all available space.
   /// [tabCount]             — number of tabs; used with [perTabWidth] to compute
   ///                           natural pill width.
+  /// [showPill]             — whether the search pill exists. An absent pill
+  ///                           stops reserving tab-pill width; its own
+  ///                           position/size targets stay unchanged either
+  ///                           way, because hiding is the layout's job (the
+  ///                           pill is unmounted and scaled in place), never
+  ///                           a zero-width morph.
   SearchablePillLayout computeLayout({
     required double totalW,
     required bool searching,
@@ -326,6 +332,7 @@ class SearchableBottomBarController extends ChangeNotifier {
     required double keyboardH,
     required int tabCount,
     required double? perTabWidth,
+    bool showPill = true,
   }) {
     final targetH = searching ? searchBarHeight : barHeight;
 
@@ -361,12 +368,13 @@ class SearchableBottomBarController extends ChangeNotifier {
 
     // maxTabW: maximum space the tab pill can ever occupy (when fully expanded).
     // Uses FULL (non-collapsed) extra widths for stability across states.
-    final maxTabW =
-        totalW - targetCompactW - spacing - extraFullWLeft - extraFullWRight;
+    // An absent pill reserves nothing — the tab pill takes the whole bar.
+    final pillReserve = showPill ? targetCompactW + spacing : 0.0;
+    final maxTabW = totalW - pillReserve - extraFullWLeft - extraFullWRight;
 
     // naturalTabW: intrinsic width when perTabWidth is specified.
     // Delegates to the shared resolveTabPillWidth function, which is also
-    // used by GlassBottomBar — single source of truth for this calculation.
+    // used by GlassTabBar.bottom — single source of truth for this calculation.
     final naturalTabW = resolveTabPillWidth(
       tabWidth: perTabWidth,
       tabCount: tabCount,
@@ -433,10 +441,18 @@ class SearchableBottomBarController extends ChangeNotifier {
   // ── Convenience spring factory ────────────────────────────────────────────
 
   /// Creates a [SpringSimulation] from [from] → [to] using [spring].
+  ///
+  /// [velocity] carries the in-flight speed of the axis being retargeted.
+  /// Passing it matters whenever a morph reverses before it settles — which
+  /// scroll-driven minimizing makes routine, since scrolling down and straight
+  /// back up is an ordinary gesture. Relaunching from rest in that case reads
+  /// as a stall followed by a restart. Defaults to 0.0, which is what an idle
+  /// [AnimationController] reports, so a first-launch spring is unchanged.
   static SpringSimulation makeSpring({
     required SpringDescription spring,
     required double from,
     required double to,
+    double velocity = 0.0,
   }) =>
-      SpringSimulation(spring, from, to, 0.0);
+      SpringSimulation(spring, from, to, velocity);
 }

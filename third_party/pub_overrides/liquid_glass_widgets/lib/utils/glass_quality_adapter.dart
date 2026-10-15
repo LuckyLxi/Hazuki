@@ -113,14 +113,28 @@ class GlassQualityAdapter {
     this.warmupStandardThresholdMs = 28.0,
     void Function(GlassQuality settled, double p75Ms, int frames)?
         onWarmupComplete,
+    this.frostStep = false,
+    void Function(bool frostEnabled)? onFrostChanged,
   })  : _onQualityChanged = onQualityChanged,
         _onWarmupComplete = onWarmupComplete,
+        _onFrostChanged = onFrostChanged,
         _currentQuality = maxQuality;
 
   // ── Configuration ──────────────────────────────────────────────────────────
 
   /// The lowest quality tier the adapter may step down to.
   final GlassQuality minQuality;
+
+  /// Whether premium steps through premium without frost on its way to and
+  /// from standard.
+  ///
+  /// The iOS 27 frost ([LiquidGlassSettings.frost]) is the most expensive
+  /// part of premium glass. With this on, the first step down from premium
+  /// only switches the frost off ([frostEnabled] turns `false`) and keeps
+  /// the premium shader, rim and lens; the next one goes to standard. On the
+  /// way back up, standard steps to premium without frost first. Surfaces
+  /// without frost look the same in both premium steps.
+  final bool frostStep;
 
   /// The highest quality tier the adapter may step up to.
   final GlassQuality maxQuality;
@@ -331,6 +345,12 @@ class GlassQualityAdapter {
   /// The currently effective quality this adapter has decided on.
   GlassQuality get currentQuality => _currentQuality;
 
+  /// Whether premium glass may draw its frost. Only ever `false` with
+  /// [frostStep]; see there.
+  bool get frostEnabled => _frostEnabled;
+  bool _frostEnabled = true;
+  final void Function(bool frostEnabled)? _onFrostChanged;
+
   /// The current internal phase (probe → warmup → runtime).
   AdaptivePhase get phase => _phase;
 
@@ -472,8 +492,13 @@ class GlassQualityAdapter {
       return GlassQuality.minimal;
     }
 
-    // On web, the Impeller/premium path is unavailable. Cap at standard.
-    if (kIsWeb) {
+    // On web, Windows, and Linux: Impeller uses WebGL / ANGLE (OpenGLESSDF)
+    // where runtime GLSL compilation of complex multi-pass SDFs can block the
+    // raster thread. Cap at standard so apps open instantly at 60/120fps with
+    // crisp 2D liquid glass.
+    if (kIsWeb ||
+        defaultTargetPlatform == TargetPlatform.windows ||
+        defaultTargetPlatform == TargetPlatform.linux) {
       final capped = _capQuality(maxQuality, GlassQuality.standard);
       return capped == maxQuality ? null : capped;
     }
@@ -597,9 +622,23 @@ class GlassQualityAdapter {
       _underBudgetWindowCount++;
       _overBudgetWindowCount = 0;
     } else {
-      // In the acceptable range — no change signal
+      // In the acceptable range — no change signal.
+      //
+      // A neutral window is not evidence of jank, so it must not erase
+      // progress toward recovery. Resetting here made the step-up
+      // unreachable in practice: recovery needs [upgradeWindowCount]
+      // CONSECUTIVE under-budget windows, and because the measure is P95 —
+      // a tail statistic — an ordinary scrolling list drifts into this band
+      // often enough to zero the counter before it ever gets there. The
+      // result was a one-way ratchet: a single transient cost (opening a
+      // map, a heavy platform view, a route with a big image) demoted
+      // quality for the rest of the session with no path back.
+      //
+      // Decaying leaves degradation exactly as responsive as before — an
+      // over-budget window still zeroes this counter on the branch above —
+      // while letting a mostly-good stretch accumulate toward recovery.
       _overBudgetWindowCount = 0;
-      _underBudgetWindowCount = 0;
+      if (_underBudgetWindowCount > 0) _underBudgetWindowCount--;
     }
 
     if (_overBudgetWindowCount >= degradeWindowCount) {
@@ -613,6 +652,14 @@ class GlassQualityAdapter {
 
   void _tryStepDown() {
     if (!_canChange()) return;
+    if (frostStep && _currentQuality == GlassQuality.premium && _frostEnabled) {
+      _lastChangeReason = GlassQualityChangeReason.thermalDegradation;
+      _lastP75Ms = null;
+      _lastP95Ms = _lastComputedP95Ms;
+      _lastFramesMeasured = windowSize;
+      _setFrostEnabled(false);
+      return;
+    }
     final next = _stepDown(_currentQuality);
     if (next == _currentQuality) return; // already at minQuality
     _lastChangeReason = GlassQualityChangeReason.thermalDegradation;
@@ -624,13 +671,32 @@ class GlassQualityAdapter {
 
   void _tryStepUp() {
     if (!_canChange()) return;
+    if (frostStep &&
+        _currentQuality == GlassQuality.premium &&
+        !_frostEnabled) {
+      _lastChangeReason = GlassQualityChangeReason.thermalRecovery;
+      _lastP75Ms = null;
+      _lastP95Ms = _lastComputedP95Ms;
+      _lastFramesMeasured = windowSize;
+      _setFrostEnabled(true);
+      return;
+    }
     final next = _stepUp(_currentQuality);
     if (next == _currentQuality) return; // already at maxQuality
     _lastChangeReason = GlassQualityChangeReason.thermalRecovery;
     _lastP75Ms = null;
     _lastP95Ms = _lastComputedP95Ms;
     _lastFramesMeasured = windowSize;
+    // Back to premium without the frost first; it returns one step later.
+    if (frostStep && next == GlassQuality.premium) _frostEnabled = false;
     _applyQuality(next);
+  }
+
+  void _setFrostEnabled(bool enabled) {
+    if (_frostEnabled == enabled) return;
+    _frostEnabled = enabled;
+    _lastChangeAt = DateTime.now();
+    _onFrostChanged?.call(enabled);
   }
 
   bool _canChange() {
@@ -732,7 +798,7 @@ class GlassQualityAdapter {
   // ── Percentile math ───────────────────────────────────────────────────────
 
   /// Computes the [percentile]-th percentile (0–100) from a list of integer
-  /// values. The list is not modified; a sorted copy is made internally.
+  /// values. The list is not modified.
   ///
   /// Uses the "nearest rank" definition — appropriate for frame timing data
   /// where we care about real observed samples, not interpolated values.
@@ -742,23 +808,63 @@ class GlassQualityAdapter {
     assert(data.isNotEmpty);
     assert(percentile >= 0 && percentile <= 100);
     if (data.length == 1) return data.first;
-    final sorted = List<int>.from(data)..sort();
-    // Nearest-rank formula: ceil(p/100 * n) − 1 (0-indexed)
-    final rank = ((percentile / 100.0) * sorted.length).ceil();
-    final index = (rank - 1).clamp(0, sorted.length - 1);
-    return sorted[index];
+    final rank = ((percentile / 100.0) * data.length).ceil();
+    final index = (rank - 1).clamp(0, data.length - 1);
+    final copy = List<int>.from(data, growable: false);
+    return _quickSelect(copy, index);
   }
 
-  /// In-place variant of [_percentile] — sorts [data] directly, avoiding a
-  /// heap allocation. Used by Phase 3 runtime with a pre-allocated sort buffer
+  /// In-place variant of [_percentile] — runs Quickselect on [data] directly in
+  /// O(N) average time, avoiding heap allocations and O(N log N) sorting.
+  /// Used by Phase 3 runtime with a pre-allocated sort buffer
   /// to eliminate GC pressure on the frame timing callback path.
   static int _percentileInPlace(List<int> data, int percentile) {
     assert(data.isNotEmpty);
     assert(percentile >= 0 && percentile <= 100);
     if (data.length == 1) return data.first;
-    data.sort();
     final rank = ((percentile / 100.0) * data.length).ceil();
     final index = (rank - 1).clamp(0, data.length - 1);
-    return data[index];
+    return _quickSelect(data, index);
   }
+
+  /// O(N) Quickselect algorithm to find the element that would be at [k] if sorted.
+  static int _quickSelect(List<int> a, int k) {
+    int left = 0, right = a.length - 1;
+    while (left < right) {
+      final pivot = a[(left + right) >> 1];
+      int i = left, j = right;
+      while (i <= j) {
+        while (a[i] < pivot) {
+          i++;
+        }
+        while (a[j] > pivot) {
+          j--;
+        }
+        if (i <= j) {
+          final tmp = a[i];
+          a[i] = a[j];
+          a[j] = tmp;
+          i++;
+          j--;
+        }
+      }
+      if (k <= j) {
+        right = j;
+      } else if (k >= i) {
+        left = i;
+      } else {
+        break;
+      }
+    }
+    return a[k];
+  }
+
+  /// Visible for testing only: computes percentile using Quickselect.
+  @visibleForTesting
+  static int percentileForTesting(List<int> data, int percentile) =>
+      _percentile(data, percentile);
+
+  /// Visible for testing only: finds k-th smallest element using Quickselect.
+  @visibleForTesting
+  static int quickSelectForTesting(List<int> a, int k) => _quickSelect(a, k);
 }

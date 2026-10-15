@@ -1,11 +1,7 @@
 // ignore_for_file: public_member_api_docs
-// ignore_for_file: deprecated_member_use
 // Internal layout engine for [GlassTabBar] searchable placement.
 //
-// Extracted from the old _GlassSearchableBottomBarState so that [GlassTabBar]
-// is the single owner of all rendering logic. The deprecated
-// [GlassSearchableBottomBar] shim simply calls [GlassTabBar.searchable()]
-// which dispatches here.
+// Extracted so that [GlassTabBar] is the single owner of all rendering logic.
 //
 // Do NOT import this file directly — use [GlassTabBar.searchable()] instead.
 
@@ -13,21 +9,23 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart' show ValueListenable;
+import '../../renderer/glass_backdrop_group.dart';
 import '../../renderer/liquid_glass_renderer.dart';
 import '../../types/glass_interaction_behavior.dart';
 import '../../../types/glass_quality.dart';
 import '../../../widgets/shared/adaptive_liquid_glass_layer.dart';
+import '../../../widgets/shared/glass_accessibility_scope.dart';
 import '../../../widgets/shared/glass_content_aware_scope.dart';
 import '../../../theme/glass_theme_data.dart';
 import '../../../theme/glass_theme.dart';
 import '../../../theme/glass_theme_helpers.dart';
-import '../../../widgets/surfaces/glass_bottom_bar.dart'
-    show
-        GlassExtraButtonPosition,
-        GlassTabBarExtraButton,
-        GlassTabPillAnchor,
-        MaskingQuality;
-import '../../../widgets/surfaces/glass_tab_bar.dart' show GlassTab;
+import '../../../widgets/surfaces/shared/tab_bar_extra_button.dart'
+    show GlassExtraButtonPosition, GlassTabBarExtraButton;
+import '../../../widgets/surfaces/shared/tab_bar_types.dart'
+    show GlassTabPillAnchor, MaskingQuality;
+import '../../../widgets/surfaces/glass_tab_bar.dart'
+    show GlassTab, GlassTabBarTrailingButton;
+import '../../../widgets/overlays/glass_menu.dart' show GlassMenu;
 import 'tab_bar_bottom_internal.dart'
     show
         BottomBarExtraBtn,
@@ -37,8 +35,14 @@ import 'tab_bar_bottom_internal.dart'
 import '../../../widgets/surfaces/shared/glass_search_bar_config.dart';
 import '../../../widgets/surfaces/shared/tab_bar_searchable_controller.dart';
 import 'tab_bar_searchable_internal.dart'
-    show DismissPill, SearchPill, SearchableTabIndicator;
+    show
+        DismissPill,
+        MinimizableTrailingPill,
+        SearchPill,
+        SearchableTabIndicator;
 import '../../../widgets/surfaces/shared/tab_bar_accessory_placement.dart';
+import '../../../widgets/surfaces/shared/tab_bar_minimize_controller.dart';
+import 'tab_bar_layout_utils.dart';
 
 /// Internal [StatefulWidget] that owns the searchable-placement rendering engine.
 ///
@@ -49,10 +53,14 @@ class TabBarSearchableLayout extends StatefulWidget {
     required this.tabs,
     required this.selectedIndex,
     required this.onTabSelected,
-    required this.searchConfig,
+    this.searchConfig,
+    this.trailingButton,
+    this.onMinimizedTabTap,
     super.key,
     this.controller,
     this.isSearchActive = false,
+    this.minimizeController,
+    this.isMinimizablePlacement = false,
     this.extraButton,
     this.bottomAccessoryPlacement,
     this.bottomAccessory,
@@ -88,17 +96,19 @@ class TabBarSearchableLayout extends StatefulWidget {
     this.glowSpreadRadius = 8,
     this.glowOpacity = 0.6,
     this.interactionGlowColor,
-    this.interactionGlowRadius = 1.5,
+    this.interactionGlowRadius,
     this.quality,
+    this.backgroundQuality,
     this.magnification = 1.15,
     this.innerBlur = 0.0,
     this.platformViewBackdrop = false,
+    this.passthroughOverPlatformView = false,
     this.maskingQuality = MaskingQuality.high,
     this.backgroundKey,
     this.springDescription,
     this.tabPillAnchor = GlassTabPillAnchor.start,
     this.interactionBehavior = GlassInteractionBehavior.full,
-    this.pressScale = 1.04,
+    this.pressScale,
     this.tabWidth,
     this.indicatorBorderRadius,
     this.indicatorExpansion =
@@ -111,7 +121,12 @@ class TabBarSearchableLayout extends StatefulWidget {
     this.adaptiveBrightness = false,
     this.onBrightnessChanged,
     this.brightnessOverride,
-  });
+  }) : assert(
+          searchConfig == null || trailingButton == null,
+          'TabBarSearchableLayout: searchConfig and trailingButton are mutually '
+          'exclusive. Use searchConfig for GlassTabBar.searchable and '
+          'trailingButton for GlassTabBar.minimizable.',
+        );
 
   static const double _kDefaultBorderRadius = 32.0;
 
@@ -122,9 +137,21 @@ class TabBarSearchableLayout extends StatefulWidget {
   final List<GlassTab> tabs;
   final int selectedIndex;
   final ValueChanged<int> onTabSelected;
-  final GlassSearchBarConfig searchConfig;
+  final GlassSearchBarConfig? searchConfig;
+  final GlassTabBarTrailingButton? trailingButton;
+  final VoidCallback? onMinimizedTabTap;
   final SearchableBottomBarController? controller;
   final bool isSearchActive;
+
+  /// Drives the minimize from scrolling. This engine only attaches it to
+  /// [scrollController] — the resulting state arrives through
+  /// [isSearchActive], which [GlassTabBar] resolves.
+  final GlassTabBarMinimizeController? minimizeController;
+
+  /// Whether the host is [GlassTabBar.minimizable] rather than
+  /// [GlassTabBar.searchable]. Only the former pulls its bottom accessory
+  /// inline as the bar shrinks.
+  final bool isMinimizablePlacement;
   final GlassTabBarExtraButton? extraButton;
   final GlassTabBarAccessoryPlacement? bottomAccessoryPlacement;
   final Widget? bottomAccessory;
@@ -160,17 +187,27 @@ class TabBarSearchableLayout extends StatefulWidget {
   final double glowSpreadRadius;
   final double glowOpacity;
   final Color? interactionGlowColor;
-  final double interactionGlowRadius;
+
+  /// Radius of the interaction glow, as a fraction of the layer's shortest
+  /// side. Null asks for the iOS 26 calibration — see
+  /// [resolveTabBarInteractionGlow].
+  final double? interactionGlowRadius;
   final GlassQuality? quality;
+  final GlassQuality? backgroundQuality;
   final double magnification;
   final double innerBlur;
   final bool platformViewBackdrop;
+
+  /// See [SearchableTabIndicator.passthroughOverPlatformView]. Set this when
+  /// the bar floats over a map, camera preview or other platform view and its
+  /// glass is configured to stay transparent instead of painting a body.
+  final bool passthroughOverPlatformView;
   final MaskingQuality maskingQuality;
   final GlobalKey? backgroundKey;
   final SpringDescription? springDescription;
   final GlassTabPillAnchor tabPillAnchor;
   final GlassInteractionBehavior interactionBehavior;
-  final double pressScale;
+  final double? pressScale;
   final double? tabWidth;
   final double? indicatorBorderRadius;
   final EdgeInsetsGeometry indicatorExpansion;
@@ -202,6 +239,19 @@ class _TabBarSearchableLayoutState extends State<TabBarSearchableLayout>
   // AdaptiveLiquidGlassLayer wrapper's quality-path reparenting.
   final GlobalKey _indicatorKey = GlobalKey();
 
+  /// Lays out the tab [Row] in physical (LTR) order regardless of the ambient
+  /// direction, so the first child is on the left — matching the indicator and
+  /// gesture coordinate space. RTL ordering is carried by the reversed tab data
+  /// in [_buildBar], not by the ambient direction of these Rows. Scoping the
+  /// pin to the Rows keeps `Directionality.of(context)` intact for the rest of
+  /// the subtree (notably [indicatorExpansion] / [tabPadding] resolution).
+  static Widget _ltrTabRow({required List<Widget> children}) {
+    return Directionality(
+      textDirection: TextDirection.ltr,
+      child: Row(children: children),
+    );
+  }
+
   void _onControllerChanged() => setState(() {});
 
   // D1: whitenBoostCtrl still uses setState — it fires at most once per scroll-to-bottom
@@ -216,15 +266,41 @@ class _TabBarSearchableLayoutState extends State<TabBarSearchableLayout>
   late AnimationController _whitenBoostCtrl;
   double _whitenTarget = 0.0;
 
+  // Appear/disappear scale for the search pill — 1 present, 0 gone.
+  late AnimationController _pillScaleCtrl;
+
+  GlassTabBarTrailingButton? _lastTrailingButton;
+
+  /// Whether the trailing action or search pill exists.
+  bool get _pillShown {
+    if (widget.searchConfig != null) {
+      return widget.searchConfig!.showPill;
+    }
+    return widget.trailingButton != null;
+  }
+
   // D1: hoisted — avoids allocating a new _MergedListenable on every LayoutBuilder call.
   late Listenable _searchPillListenable;
 
   @override
   void initState() {
     super.initState();
+    if (widget.trailingButton != null) {
+      _lastTrailingButton = widget.trailingButton;
+    }
+    // searchConfig and trailingButton are mutually exclusive rendering paths:
+    // searchConfig → SearchPill (text field, focus machinery, cancel pill)
+    // trailingButton → MinimizableTrailingPill (icon-only, no search machinery)
+    // Passing both is a misconfiguration — trailingButton would be silently ignored.
     assert(
-      widget.searchConfig.collapsedTabWidth == null ||
-          widget.searchConfig.collapsedTabWidth! > 0,
+      widget.searchConfig == null || widget.trailingButton == null,
+      'TabBarSearchableLayout: searchConfig and trailingButton are mutually '
+      'exclusive. Use searchConfig for GlassTabBar.searchable and '
+      'trailingButton for GlassTabBar.minimizable.',
+    );
+    assert(
+      widget.searchConfig?.collapsedTabWidth == null ||
+          widget.searchConfig!.collapsedTabWidth! > 0,
       'GlassSearchBarConfig.collapsedTabWidth must be positive',
     );
     if (widget.controller != null) {
@@ -256,9 +332,19 @@ class _TabBarSearchableLayoutState extends State<TabBarSearchableLayout>
     );
     _whitenBoostCtrl = AnimationController(vsync: this)
       ..addListener(_onWhitenTick);
+    // Starts settled — a pill that should be absent right now was never on
+    // screen to animate away.
+    _pillScaleCtrl = AnimationController(
+      vsync: this,
+      lowerBound: double.negativeInfinity,
+      upperBound: double.infinity,
+      value: _pillShown ? 1.0 : 0.0,
+    );
     // D1: create once — the controllers never change after initState.
-    _searchPillListenable = Listenable.merge([_searchLeftCtrl, _searchWCtrl]);
+    _searchPillListenable =
+        Listenable.merge([_searchLeftCtrl, _searchWCtrl, _pillScaleCtrl]);
     widget.scrollController?.addListener(_onScrollMaybeWhiten);
+    widget.minimizeController?.attach(widget.scrollController);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _onScrollMaybeWhiten();
     });
@@ -284,13 +370,40 @@ class _TabBarSearchableLayoutState extends State<TabBarSearchableLayout>
       widget.scrollController?.addListener(_onScrollMaybeWhiten);
       _onScrollMaybeWhiten();
     }
-    if (widget.whitenAtBottom != old.whitenAtBottom) {
-      _onScrollMaybeWhiten();
+    // Both controllers can change independently. Handle the minimize
+    // controller swap first so a re-attach uses the CURRENT scroll controller;
+    // attach() itself is idempotent on identity and re-baselines either way.
+    if (widget.minimizeController != old.minimizeController) {
+      old.minimizeController?.detach();
+      widget.minimizeController?.attach(widget.scrollController);
+    } else if (widget.scrollController != old.scrollController) {
+      widget.minimizeController?.attach(widget.scrollController);
+    }
+    if (widget.trailingButton != null) {
+      _lastTrailingButton = widget.trailingButton;
     }
     _controller.onSearchActiveChanged(
       wasActive: old.isSearchActive,
       isActive: widget.isSearchActive,
     );
+    // Spring the pill's appear/disappear scale when its presence changes.
+    final oldPillShown = old.searchConfig != null
+        ? old.searchConfig!.showPill
+        : old.trailingButton != null;
+    if (oldPillShown != _pillShown) {
+      // Reduce Motion: the pill appears and goes without the spring.
+      if (GlassAccessibilityData.of(context).reduceMotion) {
+        _pillScaleCtrl.value = _pillShown ? 1.0 : 0.0;
+        return;
+      }
+      _pillScaleCtrl.animateWith(
+        SearchableBottomBarController.makeSpring(
+          spring: widget.springDescription ?? TabBarSearchableLayout._kSpring,
+          from: _pillScaleCtrl.value,
+          to: _pillShown ? 1.0 : 0.0,
+        ),
+      );
+    }
   }
 
   @override
@@ -298,7 +411,10 @@ class _TabBarSearchableLayoutState extends State<TabBarSearchableLayout>
     _tabWCtrl.dispose();
     _searchLeftCtrl.dispose();
     _searchWCtrl.dispose();
+    _pillScaleCtrl.dispose();
     widget.scrollController?.removeListener(_onScrollMaybeWhiten);
+    // Detach, never dispose — the minimize controller belongs to the app.
+    widget.minimizeController?.detach();
     _whitenBoostCtrl.dispose();
     _controller.removeListener(_onControllerChanged);
     if (_ownsController) _controller.dispose();
@@ -309,12 +425,18 @@ class _TabBarSearchableLayoutState extends State<TabBarSearchableLayout>
 
   void _onScrollMaybeWhiten() {
     final c = widget.scrollController;
+    // hasClients alone is not enough: ScrollController.position asserts when
+    // more than one scroll view is attached, which happens for a few hundred
+    // milliseconds whenever two of them share a controller across an
+    // AnimatedSwitcher cross-fade or a Navigator transition. Skip those frames
+    // rather than crashing — GlassScaffold guards its header fade the same way.
+    final p = (c != null && c.hasClients && c.positions.length == 1)
+        ? c.positions.single
+        : null;
     final atBottom = widget.whitenAtBottom &&
-        c != null &&
-        c.hasClients &&
-        c.position.maxScrollExtent > 0 &&
-        (c.position.maxScrollExtent - c.position.pixels) <=
-            widget.whitenBottomThreshold;
+        p != null &&
+        p.maxScrollExtent > 0 &&
+        (p.maxScrollExtent - p.pixels) <= widget.whitenBottomThreshold;
     final target = atBottom ? 1.0 : 0.0;
     if (_whitenTarget != target) {
       _whitenTarget = target;
@@ -351,19 +473,39 @@ class _TabBarSearchableLayoutState extends State<TabBarSearchableLayout>
       widgetQuality: widget.quality,
       fallback: GlassQuality.premium,
     );
+    final effectiveBackgroundQuality = GlassThemeHelpers.resolveQuality(
+      context,
+      widgetQuality: widget.backgroundQuality ?? widget.quality,
+      fallback: GlassQuality.premium,
+    );
 
     final resolvedGlowColors =
         GlassThemeData.of(context).glowColorsFor(context);
-    final effectiveInteractionGlowColor =
-        widget.interactionGlowColor ?? resolvedGlowColors.primary;
+    // A null radius asks for native mode — the same resolution the bottom bar
+    // runs, through the same helper, so the two cannot drift apart again.
+    final glow = resolveTabBarInteractionGlow(
+      interactionGlowRadius: widget.interactionGlowRadius,
+      interactionGlowColor: widget.interactionGlowColor,
+      themeGlowColor: resolvedGlowColors.primary,
+      themeGlowBlurRadius: resolvedGlowColors.glowBlurRadius,
+      isDark: GlassTheme.brightnessOf(context) == Brightness.dark,
+    );
+    final effectiveInteractionGlowColor = glow.color;
 
     final dynamicLabelColor = resolveBarLabelColor(context, darkAmount);
     final resolvedSelectedIconColor =
         widget.selectedIconColor ?? dynamicLabelColor;
     final resolvedUnselectedIconColor =
         widget.unselectedIconColor ?? dynamicLabelColor;
+    // A minimized bar still shows its selected tab; a searching one shows the
+    // tab search was opened from, which the search has since replaced.
+    final resolvedCollapsedIconColor = widget.isMinimizablePlacement
+        ? resolvedSelectedIconColor
+        : resolvedUnselectedIconColor;
 
-    final effectiveGlowBlurRadius = resolvedGlowColors.glowBlurRadius;
+    // Native mode owns the blur: the radius and the falloff are one
+    // calibration. Everything else stays the theme's.
+    final effectiveGlowBlurRadius = glow.blurRadius;
     final effectiveGlowSpreadRadius = resolvedGlowColors.glowSpreadRadius;
     final effectiveGlowOpacity = resolvedGlowColors.glowOpacity;
 
@@ -371,6 +513,39 @@ class _TabBarSearchableLayoutState extends State<TabBarSearchableLayout>
     final effectiveSettings =
         _applyWhiten(widget.settings ?? _defaultGlassSettings, isLight);
     final searching = widget.isSearchActive;
+
+    // RTL support.
+    //
+    // The indicator/gesture coordinate system and the [AnimatedGlassIndicator]
+    // position both operate in physical, left-anchored alignment space (x == -1
+    // is always the left edge), and the gesture math is derived from the render
+    // box geometry — all direction-independent. The only direction-sensitive
+    // part is the two tab [Row]s, which honour the ambient [Directionality] and
+    // visually reverse under RTL. That reversal is what disagrees with the
+    // physical coordinate space, so the pill — and the tap/drag hit-testing —
+    // land on the mirror-image tab.
+    //
+    // Normalise by reversing the tab data and mirroring the selected index and
+    // the tap callback, then pin *only* the tab Rows to LTR (see [_ltrTabRow])
+    // so their physical order matches the coordinate space. Net effect under
+    // RTL: correct ordering (the first tab sits on the trailing/right edge)
+    // with the pill and hit-testing aligned to it. In LTR everything is a
+    // no-op.
+    final isRtl = Directionality.of(context) == TextDirection.rtl;
+    final tabs = isRtl ? widget.tabs.reversed.toList() : widget.tabs;
+    final selectedIndex = isRtl
+        ? widget.tabs.length - 1 - widget.selectedIndex
+        : widget.selectedIndex;
+    final onTabSelected = isRtl
+        ? (int i) => widget.onTabSelected(widget.tabs.length - 1 - i)
+        : widget.onTabSelected;
+    // The interactive buttons/pills render the even GlassButton press lift
+    // unless the glow was customised — per widget or through the theme's glowColors.
+    final themeGlowPrimary =
+        GlassThemeData.of(context).variantFor(context).glowColors?.primary;
+    final nativePressHighlight = widget.interactionGlowColor == null &&
+        themeGlowPrimary == null &&
+        widget.interactionBehavior.hasGlow;
 
     Widget barContent = TweenAnimationBuilder<double>(
       tween: Tween<double>(
@@ -394,30 +569,32 @@ class _TabBarSearchableLayoutState extends State<TabBarSearchableLayout>
 
                 final keyboardH = MediaQuery.viewInsetsOf(context).bottom;
                 final keyboardPresent = keyboardH > 0;
-                final hasDismiss = widget.searchConfig.showsCancelButton;
                 final isKeyboardActive =
                     _controller.searchFocused && keyboardPresent;
-                final dismissVisible = searching &&
-                    _controller.searchFocused &&
-                    hasDismiss &&
-                    keyboardPresent;
 
                 final extraPos = widget.extraButton?.position ??
                     GlassExtraButtonPosition.beforeSearch;
                 final extraFullW = widget.extraButton?.size ?? 0.0;
                 final extraCollapsesOnSearch =
                     widget.extraButton?.collapseOnSearchFocus ?? true;
+                final hasDismiss =
+                    widget.searchConfig?.showsCancelButton ?? false;
+                final dismissVisible = searching &&
+                    _controller.searchFocused &&
+                    hasDismiss &&
+                    keyboardPresent;
 
                 final layout = _controller.computeLayout(
                   totalW: totalW,
                   searching: widget.isSearchActive,
-                  expandWhenActive: widget.searchConfig.expandWhenActive,
+                  expandWhenActive:
+                      widget.searchConfig?.expandWhenActive ?? false,
                   barHeight: widget.barHeight,
                   searchBarHeight: widget.searchBarHeight,
                   spacing: widget.spacing,
                   hasDismiss: hasDismiss,
                   dismissVisible: dismissVisible,
-                  collapsedTabWidth: widget.searchConfig.collapsedTabWidth,
+                  collapsedTabWidth: widget.searchConfig?.collapsedTabWidth,
                   tabPillAnchor: widget.tabPillAnchor,
                   extraFullW: extraFullW,
                   extraPos: extraPos,
@@ -426,6 +603,7 @@ class _TabBarSearchableLayoutState extends State<TabBarSearchableLayout>
                   keyboardH: keyboardH,
                   tabCount: widget.tabs.length,
                   perTabWidth: widget.tabWidth,
+                  showPill: _pillShown,
                 );
 
                 final targetTabW = layout.targetTabW;
@@ -443,9 +621,9 @@ class _TabBarSearchableLayoutState extends State<TabBarSearchableLayout>
                 final targetDismissReserve = layout.dismissReserve;
                 final centeredTab =
                     widget.tabPillAnchor == GlassTabPillAnchor.center;
+                // Mirrors computeLayout — an absent pill reserves nothing.
                 final maxTabW = totalW -
-                    targetH -
-                    widget.spacing -
+                    (_pillShown ? targetH + widget.spacing : 0.0) -
                     (extraFullW > 0 &&
                             extraPos == GlassExtraButtonPosition.beforeSearch
                         ? extraFullW + widget.spacing
@@ -472,33 +650,56 @@ class _TabBarSearchableLayoutState extends State<TabBarSearchableLayout>
                 } else if (_controller.pillsInitialized) {
                   final retarget = _controller.checkRetarget(layout);
                   if (retarget.any) {
-                    final fromTabW = _tabWCtrl.value;
-                    final fromLeft = _searchLeftCtrl.value;
-                    final fromSearchW = _searchWCtrl.value;
                     final toTabW = targetTabW;
                     final toLeft = targetSearchLeft;
                     final toSearchW = targetSearchW;
+                    // Read during build: the callback below runs after the
+                    // frame, where an inherited lookup no longer belongs.
+                    final reduceMotion =
+                        GlassAccessibilityData.of(context).reduceMotion;
 
                     WidgetsBinding.instance.addPostFrameCallback((_) {
                       if (!mounted) return;
+                      // Reduce Motion: the pills take their new widths and
+                      // positions at once instead of springing across.
+                      if (reduceMotion) {
+                        if (retarget.tabW) _tabWCtrl.value = toTabW;
+                        if (retarget.searchLeft) {
+                          _searchLeftCtrl.value = toLeft;
+                        }
+                        if (retarget.searchW) _searchWCtrl.value = toSearchW;
+                        return;
+                      }
                       final spring = widget.springDescription ??
                           TabBarSearchableLayout._kSpring;
+                      // Read `from` and the in-flight velocity HERE, not during
+                      // build: any still-running simulation ticks once more
+                      // between the two, so a value captured in build would
+                      // start the new spring a frame behind — visible when a
+                      // morph reverses at peak speed.
                       if (retarget.tabW) {
                         _tabWCtrl.animateWith(
                             SearchableBottomBarController.makeSpring(
-                                spring: spring, from: fromTabW, to: toTabW));
+                                spring: spring,
+                                from: _tabWCtrl.value,
+                                to: toTabW,
+                                velocity: _tabWCtrl.velocity));
                       }
                       if (retarget.searchLeft) {
                         _searchLeftCtrl.animateWith(
                             SearchableBottomBarController.makeSpring(
-                                spring: spring, from: fromLeft, to: toLeft));
+                                spring: spring,
+                                from: _searchLeftCtrl.value,
+                                to: toLeft,
+                                velocity: _searchLeftCtrl.velocity));
                       }
                       if (retarget.searchW) {
                         _searchWCtrl.animateWith(
                             SearchableBottomBarController.makeSpring(
                                 spring: spring,
-                                from: fromSearchW,
-                                to: toSearchW));
+                                from: _searchWCtrl.value,
+                                to: toSearchW,
+                                velocity: _searchWCtrl.velocity));
                       }
                     });
                   }
@@ -521,10 +722,15 @@ class _TabBarSearchableLayoutState extends State<TabBarSearchableLayout>
                   child: Stack(
                     clipBehavior: Clip.none,
                     children: [
-                      // 1. Search pill — D1: rebuilt only when position/width tick.
+                      // 1. Search pill / Trailing Action Pill — D1: left/width track spring controllers.
                       ListenableBuilder(
                         listenable: _searchPillListenable,
                         builder: (context, _) {
+                          final pillScale =
+                              _pillScaleCtrl.value.clamp(0.0, 1.25).toDouble();
+                          if (pillScale < 0.02) {
+                            return const SizedBox.shrink();
+                          }
                           final curSearchLeft = (_controller.pillsInitialized
                                   ? _searchLeftCtrl.value
                                   : targetSearchLeft)
@@ -533,16 +739,17 @@ class _TabBarSearchableLayoutState extends State<TabBarSearchableLayout>
                                   ? _searchWCtrl.value
                                   : targetSearchW)
                               .clamp(0.0, totalW);
-                          return Positioned(
-                            left: curSearchLeft,
-                            bottom: floatY,
-                            width: math.max(0.01, curSearchW),
-                            height: animH,
-                            child: SearchPill(
-                              config: widget.searchConfig,
+
+                          final Widget pillChild;
+                          if (widget.searchConfig != null) {
+                            pillChild = SearchPill(
+                              config: widget.searchConfig!,
+                              nativePressHighlight: nativePressHighlight,
                               isActive: searching,
                               barBorderRadius: widget.barBorderRadius,
-                              quality: effectiveQuality,
+                              // Chrome-plane peer: matches the track background,
+                              // not the indicator pill (effectiveQuality).
+                              quality: effectiveBackgroundQuality,
                               platformViewBackdrop: widget.platformViewBackdrop,
                               enableBackgroundAnimation:
                                   widget.interactionBehavior.hasScale,
@@ -552,8 +759,7 @@ class _TabBarSearchableLayoutState extends State<TabBarSearchableLayout>
                                   widget.interactionBehavior.hasGlow
                                       ? effectiveInteractionGlowColor
                                       : const Color(0x00000000),
-                              interactionGlowRadius:
-                                  widget.interactionGlowRadius,
+                              interactionGlowRadius: glow.radius,
                               interactionGlowBlurRadius:
                                   effectiveGlowBlurRadius,
                               interactionGlowSpreadRadius:
@@ -565,9 +771,85 @@ class _TabBarSearchableLayoutState extends State<TabBarSearchableLayout>
                                 } else {
                                   _onFocusLost();
                                 }
-                                widget.searchConfig.onSearchFocusChanged
+                                widget.searchConfig?.onSearchFocusChanged
                                     ?.call(focused);
                               },
+                            );
+                          } else {
+                            final renderedTrailing =
+                                widget.trailingButton ?? _lastTrailingButton;
+
+                            Widget buildTrailingPill({VoidCallback? onTap}) {
+                              return MinimizableTrailingPill(
+                                icon: renderedTrailing?.icon,
+                                nativePressHighlight: nativePressHighlight,
+                                onTap: onTap,
+                                label: renderedTrailing?.label,
+                                barBorderRadius: widget.barBorderRadius,
+                                // Chrome-plane peer: matches the track background,
+                                // not the indicator pill (effectiveQuality).
+                                quality: effectiveBackgroundQuality,
+                                platformViewBackdrop:
+                                    widget.platformViewBackdrop,
+                                enableBackgroundAnimation:
+                                    widget.interactionBehavior.hasScale,
+                                backgroundPressScale: widget.pressScale,
+                                iconColor: resolvedUnselectedIconColor,
+                                interactionGlowColor:
+                                    widget.interactionBehavior.hasGlow
+                                        ? effectiveInteractionGlowColor
+                                        : const Color(0x00000000),
+                                interactionGlowRadius: glow.radius,
+                                interactionGlowBlurRadius:
+                                    effectiveGlowBlurRadius,
+                                interactionGlowSpreadRadius:
+                                    effectiveGlowSpreadRadius,
+                                interactionGlowOpacity: effectiveGlowOpacity,
+                              );
+                            }
+
+                            if (renderedTrailing?.isMenu == true) {
+                              pillChild = GlassMenu(
+                                menuAlignment: renderedTrailing!.menuAlignment,
+                                menuWidth: renderedTrailing.menuWidth,
+                                menuHeight: renderedTrailing.menuHeight,
+                                autoAdjustToScreen: true,
+                                items: renderedTrailing.menuItems!,
+                                triggerBuilder: (context, toggleMenu) =>
+                                    buildTrailingPill(
+                                  onTap: renderedTrailing.enabled
+                                      ? toggleMenu
+                                      : null,
+                                ),
+                              );
+                            } else {
+                              pillChild = buildTrailingPill(
+                                onTap: (renderedTrailing?.enabled == true)
+                                    ? widget.trailingButton?.onTap
+                                    : null,
+                              );
+                            }
+                          }
+
+                          return Positioned(
+                            left: curSearchLeft,
+                            bottom: floatY,
+                            width: math.max(0.01, curSearchW),
+                            height: animH,
+                            child: IgnorePointer(
+                              ignoring: !_pillShown,
+                              child: Transform.scale(
+                                scale: pillScale,
+                                // While the keyboard is up or moving, the
+                                // pill spans the bar and rides above the tab
+                                // pill, which paints after it: glass over
+                                // glass, so it leaves the bar's group.
+                                child: GlassBackdropGroup(
+                                  enabled: !_controller.searchFocused &&
+                                      !keyboardPresent,
+                                  child: pillChild,
+                                ),
+                              ),
                             ),
                           );
                         },
@@ -611,7 +893,9 @@ class _TabBarSearchableLayoutState extends State<TabBarSearchableLayout>
                                     alignment: Alignment.center,
                                     child: BottomBarExtraBtn(
                                       config: widget.extraButton!,
-                                      quality: effectiveQuality,
+                                      // Chrome-plane peer: matches the track background,
+                                      // not the indicator pill (effectiveQuality).
+                                      quality: effectiveBackgroundQuality,
                                       iconColor:
                                           widget.extraButton!.iconColor ??
                                               resolvedUnselectedIconColor,
@@ -637,6 +921,9 @@ class _TabBarSearchableLayoutState extends State<TabBarSearchableLayout>
                       ListenableBuilder(
                         listenable: _tabWCtrl,
                         child: _buildTabRow(
+                          tabs: tabs,
+                          selectedIndex: selectedIndex,
+                          onTabSelected: onTabSelected,
                           selected: false,
                           resolvedSelectedIconColor: resolvedSelectedIconColor,
                           resolvedUnselectedIconColor:
@@ -658,10 +945,11 @@ class _TabBarSearchableLayoutState extends State<TabBarSearchableLayout>
                             child: SearchableTabIndicator(
                               key: _indicatorKey,
                               quality: effectiveQuality,
+                              backgroundQuality: effectiveBackgroundQuality,
                               visible: widget.showIndicator && !searching,
-                              tabIndex: widget.selectedIndex,
-                              tabCount: widget.tabs.length,
-                              onTabChanged: widget.onTabSelected,
+                              tabIndex: selectedIndex,
+                              tabCount: tabs.length,
+                              onTabChanged: onTabSelected,
                               barHeight: animH,
                               barBorderRadius: widget.barBorderRadius,
                               indicatorBorderRadius:
@@ -677,13 +965,18 @@ class _TabBarSearchableLayoutState extends State<TabBarSearchableLayout>
                                   widget.indicatorPinchStrength,
                               backgroundKey: widget.backgroundKey,
                               platformViewBackdrop: widget.platformViewBackdrop,
+                              passthroughOverPlatformView:
+                                  widget.passthroughOverPlatformView,
                               isSearchActive: searching,
+                              collapsedSemanticLabel:
+                                  tabs[selectedIndex].semanticLabel ??
+                                      tabs[selectedIndex].label,
+                              nativePressHighlight: nativePressHighlight,
                               interactionGlowColor:
                                   widget.interactionBehavior.hasGlow
                                       ? effectiveInteractionGlowColor
                                       : const Color(0x00000000),
-                              interactionGlowRadius:
-                                  widget.interactionGlowRadius,
+                              interactionGlowRadius: glow.radius,
                               interactionGlowBlurRadius:
                                   effectiveGlowBlurRadius,
                               interactionGlowSpreadRadius:
@@ -693,14 +986,13 @@ class _TabBarSearchableLayoutState extends State<TabBarSearchableLayout>
                                   widget.interactionBehavior.hasScale,
                               backgroundPressScale: widget.pressScale,
                               collapsedLogoBuilder:
-                                  widget.searchConfig.collapsedLogoBuilder ??
+                                  widget.searchConfig?.collapsedLogoBuilder ??
                                       (context) {
-                                        final currentTab =
-                                            widget.tabs[widget.selectedIndex];
+                                        final currentTab = tabs[selectedIndex];
                                         return Center(
                                           child: IconTheme(
                                             data: IconThemeData(
-                                              color: widget.unselectedIconColor,
+                                              color: resolvedCollapsedIconColor,
                                               size: widget.iconSize,
                                             ),
                                             child: currentTab.activeIcon ??
@@ -709,11 +1001,19 @@ class _TabBarSearchableLayoutState extends State<TabBarSearchableLayout>
                                           ),
                                         );
                                       },
-                              onDismissSearch: () =>
-                                  widget.searchConfig.onSearchToggle(false),
+                              onDismissSearch: () {
+                                if (widget.onMinimizedTabTap != null) {
+                                  widget.onMinimizedTabTap!();
+                                } else {
+                                  widget.searchConfig?.onSearchToggle(false);
+                                }
+                              },
                               childUnselected: child!,
                               selectedTabBuilder: (ctx, intensity, alignment) =>
                                   _buildTabRow(
+                                tabs: tabs,
+                                selectedIndex: selectedIndex,
+                                onTabSelected: onTabSelected,
                                 selected: true,
                                 intensity: intensity,
                                 alignment: alignment,
@@ -728,7 +1028,9 @@ class _TabBarSearchableLayoutState extends State<TabBarSearchableLayout>
                       ),
 
                       // 4. Dismiss × pill
-                      if (hasDismiss && dismissVisible)
+                      if (hasDismiss &&
+                          dismissVisible &&
+                          widget.searchConfig != null)
                         Positioned(
                           right: 0,
                           bottom: floatY,
@@ -736,18 +1038,22 @@ class _TabBarSearchableLayoutState extends State<TabBarSearchableLayout>
                           height: animH,
                           child: DismissPill(
                             onTap: () {
-                              widget.searchConfig.onCancelTap?.call();
+                              widget.searchConfig?.onCancelTap?.call();
                               FocusManager.instance.primaryFocus?.unfocus();
                             },
                             pillSize: animH,
                             barBorderRadius: widget.barBorderRadius,
-                            quality: effectiveQuality,
+                            // Chrome-plane peer: matches the track background,
+                            // not the indicator pill (effectiveQuality).
+                            quality: effectiveBackgroundQuality,
                             indicatorColor: widget.indicatorColor,
                             settings: widget.settings,
                             cancelButtonColor:
-                                widget.searchConfig.cancelButtonColor,
-                            cancelIcon: widget.searchConfig.cancelIcon,
-                            cancelIconSize: widget.searchConfig.cancelIconSize,
+                                widget.searchConfig!.cancelButtonColor,
+                            cancelIcon: widget.searchConfig!.cancelIcon,
+                            cancelIconSize: widget.searchConfig!.cancelIconSize,
+                            semanticLabel:
+                                widget.searchConfig!.cancelButtonSemanticLabel,
                           ),
                         ),
                     ],
@@ -788,13 +1094,16 @@ class _TabBarSearchableLayoutState extends State<TabBarSearchableLayout>
       // When inline, the accessory sits exactly between the collapsed tab pill (left)
       // and the collapsed search capsule (right).
       final collapsedTabW =
-          widget.searchConfig.collapsedTabWidth ?? widget.searchBarHeight;
+          widget.searchConfig?.collapsedTabWidth ?? widget.searchBarHeight;
       final inlineAccessoryLeft = widget.horizontalPadding +
           collapsedTabW +
           widget.bottomAccessorySpacing;
-      final inlineAccessoryRight = widget.horizontalPadding +
-          widget.searchBarHeight +
-          widget.bottomAccessorySpacing;
+      // Only reserve the trailing capsule's slot when there is one to reserve.
+      final inlineAccessoryRight = _pillShown
+          ? widget.horizontalPadding +
+              widget.searchBarHeight +
+              widget.bottomAccessorySpacing
+          : widget.horizontalPadding;
 
       // Total height of the combined widget.
       // Jumps instantly with `searching` to match `preferredSize` changes.
@@ -807,7 +1116,13 @@ class _TabBarSearchableLayoutState extends State<TabBarSearchableLayout>
 
       final innerBarContent = barContent;
 
-      final accessoryInline = widget.bottomAccessoryPlacement ==
+      // Must resolve identically to GlassTabBar.preferredSize's call, or the
+      // scaffold reserves a height this engine does not draw.
+      final accessoryInline = resolveAccessoryPlacement(
+            explicit: widget.bottomAccessoryPlacement,
+            minimized: searching,
+            isMinimizablePlacement: widget.isMinimizablePlacement,
+          ) ==
           GlassTabBarAccessoryPlacement.inline;
 
       barContent = GlassTabBarAccessoryPlacementScope(
@@ -878,7 +1193,12 @@ class _TabBarSearchableLayoutState extends State<TabBarSearchableLayout>
                           duration: const Duration(milliseconds: 200),
                           curve: Curves.easeOut,
                           opacity: widget.bottomAccessoryEnabled ? 1.0 : 0.0,
-                          child: widget.bottomAccessory,
+                          // The accessory overlaps the pill's top edge, so
+                          // glass in it stays out of the bar's group.
+                          child: GlassBackdropGroup(
+                            enabled: false,
+                            child: widget.bottomAccessory!,
+                          ),
                         ),
                       );
                     },
@@ -910,6 +1230,9 @@ class _TabBarSearchableLayoutState extends State<TabBarSearchableLayout>
   }
 
   Widget _buildTabRow({
+    required List<GlassTab> tabs,
+    required int selectedIndex,
+    required ValueChanged<int> onTabSelected,
     required bool selected,
     required Color resolvedSelectedIconColor,
     required Color resolvedUnselectedIconColor,
@@ -918,22 +1241,20 @@ class _TabBarSearchableLayoutState extends State<TabBarSearchableLayout>
   }) {
     if (selected) {
       final scale = ui.lerpDouble(1.0, widget.magnification, intensity) ?? 1.0;
-      final currentTabFloat = ((alignment.x + 1) / 2) * widget.tabs.length;
-      final aStart =
-          (currentTabFloat - 1).floor().clamp(0, widget.tabs.length - 1);
-      final aEnd =
-          (currentTabFloat + 1).ceil().clamp(0, widget.tabs.length - 1);
+      final currentTabFloat = ((alignment.x + 1) / 2) * tabs.length;
+      final aStart = (currentTabFloat - 1).floor().clamp(0, tabs.length - 1);
+      final aEnd = (currentTabFloat + 1).ceil().clamp(0, tabs.length - 1);
 
       return ExcludeSemantics(
-        child: Row(
+        child: _ltrTabRow(
           children: [
-            for (var i = 0; i < widget.tabs.length; i++)
+            for (var i = 0; i < tabs.length; i++)
               Expanded(
                 child: (i >= aStart && i <= aEnd)
                     ? Transform.scale(
                         scale: scale,
                         child: BottomBarTabItem(
-                          tab: widget.tabs[i],
+                          tab: tabs[i],
                           selected: true,
                           selectedIconColor: resolvedSelectedIconColor,
                           unselectedIconColor: resolvedUnselectedIconColor,
@@ -959,14 +1280,14 @@ class _TabBarSearchableLayoutState extends State<TabBarSearchableLayout>
       );
     }
 
-    return Row(
+    return _ltrTabRow(
       children: [
-        for (var i = 0; i < widget.tabs.length; i++)
+        for (var i = 0; i < tabs.length; i++)
           Expanded(
             child: BottomBarTabItem(
-              tab: widget.tabs[i],
+              tab: tabs[i],
               selected: false,
-              semanticsSelected: i == widget.selectedIndex,
+              semanticsSelected: i == selectedIndex,
               selectedIconColor: resolvedSelectedIconColor,
               unselectedIconColor: resolvedUnselectedIconColor,
               selectedLabelColor: widget.selectedLabelColor,
@@ -982,6 +1303,9 @@ class _TabBarSearchableLayoutState extends State<TabBarSearchableLayout>
               glowSpreadRadius: widget.glowSpreadRadius,
               glowOpacity: widget.glowOpacity,
               onTap: null,
+              // Pointer selection stays with the indicator; this is the tap
+              // action a screen reader and the keyboard activate.
+              semanticOnTap: () => onTabSelected(i),
             ),
           ),
       ],

@@ -74,6 +74,7 @@ class GlassTextField extends StatefulWidget {
     this.prefixIcon,
     this.suffixIcon,
     this.onSuffixTap,
+    this.suffixSemanticLabel,
     this.obscureText = false,
     this.keyboardType,
     this.textInputAction,
@@ -123,6 +124,7 @@ class GlassTextField extends StatefulWidget {
     this.prefixIcon,
     this.suffixIcon,
     this.onSuffixTap,
+    this.suffixSemanticLabel,
     this.enabled = true,
     this.readOnly = false,
     this.autofocus = false,
@@ -180,6 +182,14 @@ class GlassTextField extends StatefulWidget {
 
   /// Callback when suffix icon is tapped.
   final VoidCallback? onSuffixTap;
+
+  /// What tapping the suffix icon does, announced by screen readers (for
+  /// example "Clear text").
+  ///
+  /// Used only when [onSuffixTap] is set: the suffix is then exposed as a
+  /// button of its own. An icon has no text, so without a label the button is
+  /// announced by its role alone.
+  final String? suffixSemanticLabel;
 
   /// Whether to obscure the text (for passwords).
   final bool obscureText;
@@ -369,7 +379,7 @@ class GlassTextField extends StatefulWidget {
 
   /// Controls which press-interaction effects are active on this field.
   ///
-  /// Mirrors the API on [GlassBottomBar] and [GlassSearchableBottomBar] for
+  /// Mirrors the API on [GlassTabBar] for
   /// a consistent developer experience across all glass surfaces:
   ///
   /// | Value | Glow | Scale-on-focus |
@@ -662,9 +672,20 @@ class _GlassTextFieldState extends State<GlassTextField> {
         // Suffix icon
         if (widget.suffixIcon != null) ...[
           SizedBox(width: widget.iconSpacing),
-          GestureDetector(
-            onTap: widget.onSuffixTap,
-            child: widget.suffixIcon,
+          // Its own button node while tappable, so the tap is not merged
+          // into the field and a screen reader can reach it. A Semantics
+          // inside the icon (as GlassPasswordField sets) merges into it. The
+          // wrapper stays in the tree when the tap goes away so a suffix that
+          // animates (GlassSearchBar's clear button) is not remounted.
+          Semantics(
+            container: widget.onSuffixTap != null,
+            button: widget.onSuffixTap != null ? true : null,
+            label:
+                widget.onSuffixTap != null ? widget.suffixSemanticLabel : null,
+            child: GestureDetector(
+              onTap: widget.onSuffixTap,
+              child: widget.suffixIcon,
+            ),
           ),
         ],
       ],
@@ -711,7 +732,7 @@ class _GlassTextFieldState extends State<GlassTextField> {
     // Apply glass effect
     // iOS 26: wrap in GlassGlow only when interactionBehavior includes glow.
     // _wrapWithGlow skips the widget entirely when glow is suppressed,
-    // saving 3 widget/render-object allocations — same pattern as GlassBottomBar.
+    // saving 3 widget/render-object allocations — same pattern as GlassTabBar.bottom.
     Widget glassWidget = AdaptiveGlass(
       shape: widget.shape,
       settings: GlassThemeHelpers.resolveSettings(
@@ -749,15 +770,9 @@ class _GlassTextFieldState extends State<GlassTextField> {
     // the ring without creating a FocusableActionDetector — preserving
     // CupertinoTextField's full ownership of the focus lifecycle.
     //
-    // The shape for the ring comes from widget.shape. LiquidRoundedRectangle
-    // only exposes borderRadius, so we approximate with a standard
-    // RoundedRectangleBorder — visually identical at this scale.
-    final ShapeBorder ringShape = widget.shape is LiquidRoundedRectangle
-        ? RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(
-              (widget.shape as LiquidRoundedRectangle).borderRadius,
-            ),
-          )
+    final shapeRadius = widget.shape.toBorderRadius();
+    final ShapeBorder ringShape = shapeRadius != null
+        ? RoundedRectangleBorder(borderRadius: shapeRadius)
         : RoundedRectangleBorder(borderRadius: BorderRadius.circular(22));
 
     // Semantics: declare as a text field so screen readers announce correctly.

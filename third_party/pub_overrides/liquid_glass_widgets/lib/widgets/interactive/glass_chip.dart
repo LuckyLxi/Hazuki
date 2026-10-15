@@ -107,6 +107,7 @@ class GlassChip extends StatelessWidget {
     this.settings,
     this.useOwnLayer = false,
     this.quality,
+    this.platformViewBackdrop = false,
     // GlassButton properties
     this.interactionScale = 1.03,
     this.stretch = 0.3,
@@ -116,6 +117,7 @@ class GlassChip extends StatelessWidget {
     this.focusNode,
     this.autofocus = false,
     this.semanticLabel,
+    this.deleteSemanticLabel,
   }) : deleteIcon = deleteIcon ?? const Icon(CupertinoIcons.xmark_circle_fill);
 
   // ===========================================================================
@@ -133,6 +135,13 @@ class GlassChip extends StatelessWidget {
 
   /// Semantic label for screen readers. Defaults to [label].
   final String? semanticLabel;
+
+  /// Screen reader label of the delete button.
+  ///
+  /// The delete button is always its own button node, so it can be reached
+  /// apart from the chip; this names it. Defaults to "Remove" followed by
+  /// [semanticLabel] (or [label]), e.g. "Remove Flutter".
+  final String? deleteSemanticLabel;
 
   /// Optional leading icon widget.
   final Widget? icon;
@@ -222,6 +231,16 @@ class GlassChip extends StatelessWidget {
   /// Use [GlassQuality.premium] for shader-based glass in static layouts only.
   final GlassQuality? quality;
 
+  /// Render the backdrop through a live [BackdropFilter] instead of the
+  /// shader's captured backdrop.
+  ///
+  /// Set this when the chip floats over a platform view (a map, a camera
+  /// preview, a video). The premium and standard shaders read their backdrop
+  /// from a capture, which cannot see a platform view, so over one they
+  /// render inert. [GlassButton] already exposes this; without it here a chip
+  /// has no correct rendering path above a platform view.
+  final bool platformViewBackdrop;
+
   // ===========================================================================
   // Interaction Properties (from GlassButton)
   // ===========================================================================
@@ -290,23 +309,33 @@ class GlassChip extends StatelessWidget {
             SizedBox(width: spacing),
           ],
 
-          // Label
+          // Label. The chip is named here rather than through
+          // GlassButton.label: an explicit button label replaces ALL of its
+          // content's semantics, which would also hide the delete button.
           Text(
             label,
+            semanticsLabel: semanticLabel ?? label,
             style: effectiveLabelStyle,
           ),
 
           // Delete button
           if (onDeleted != null) ...[
             SizedBox(width: spacing),
-            GestureDetector(
-              onTap: onDeleted,
-              child: IconTheme(
-                data: IconThemeData(
-                  color: effectiveIconColor,
-                  size: deleteIconSize,
+            // A node of its own: without it the delete tap merged into the
+            // chip's text node, so activating the chip's name could delete it.
+            Semantics(
+              container: true,
+              button: true,
+              label: deleteSemanticLabel ?? 'Remove ${semanticLabel ?? label}',
+              child: GestureDetector(
+                onTap: onDeleted,
+                child: IconTheme(
+                  data: IconThemeData(
+                    color: effectiveIconColor,
+                    size: deleteIconSize,
+                  ),
+                  child: deleteIcon,
                 ),
-                child: deleteIcon,
               ),
             ),
           ],
@@ -352,6 +381,7 @@ class GlassChip extends StatelessWidget {
           settings: settings,
           useOwnLayer: useOwnLayer,
           quality: quality ?? GlassQuality.standard,
+          platformViewBackdrop: platformViewBackdrop,
           interactionScale: effectiveInteractionScale,
           stretch: effectiveStretch,
           glowRadius: glowRadius,
@@ -363,7 +393,7 @@ class GlassChip extends StatelessWidget {
           anchorStretchSettings: effectiveAnchorStretchSettings,
           focusNode: focusNode,
           autofocus: autofocus,
-          label: semanticLabel ?? label,
+          // No `label:` — the Text above names the chip (see comment there).
           width: double.infinity, // Expand to intrinsic width
           height: double.infinity, // Expand to intrinsic height
           child: contentWithSelection,

@@ -13,7 +13,7 @@
 //      segments) rather than a single global-position→index mapping.
 //   2. Drag-end snapping uses DraggableIndicatorPhysics.computeTargetIndex
 //      (floor-based bin selection, consistent with tab_bar_internal.dart),
-//      whereas the mixin uses a round-based formula tuned for GlassBottomBar.
+//      whereas the mixin uses a round-based formula tuned for GlassTabBar.
 // Both the tab bar and segmented control already share the right abstractions:
 // DraggableIndicatorPhysics, AnimatedGlassIndicator, and GlassSpring.
 
@@ -74,7 +74,7 @@ class SegmentedControlContent extends StatefulWidget {
   /// Maximum concave lens pinch strength. Forwarded to [AnimatedGlassIndicator].
   final double indicatorPinchStrength;
 
-  /// Expansion padding applied to the pill during drag — mirrors [GlassBottomBar].
+  /// Expansion padding applied to the pill during drag — mirrors [GlassTabBar.bottom].
   final EdgeInsetsGeometry indicatorExpansion;
   final double borderRadius;
   final double? indicatorBorderRadius;
@@ -302,6 +302,7 @@ class SegmentedControlContentState extends State<SegmentedControlContent> {
         if (!_isDragging) setState(() => _isDown = false);
       },
       child: GestureDetector(
+        excludeFromSemantics: true,
         onHorizontalDragDown:
             widget.direction == Axis.horizontal ? _onDragDown : null,
         onHorizontalDragUpdate:
@@ -369,8 +370,7 @@ class SegmentedControlContentState extends State<SegmentedControlContent> {
                     child!,
                     // Pass 2 (premium only) — glass-only pass rendered ABOVE
                     // the labels so the shader samples and refracts them,
-                    // matching the iOS 26 refraction seen in GlassTabBar /
-                    // GlassBottomBar.
+                    // matching the iOS 26 refraction seen in GlassTabBar.
                     if (isPremiumQuality)
                       AnimatedGlassIndicator(
                         velocity: velocity,
@@ -414,8 +414,7 @@ class SegmentedControlContentState extends State<SegmentedControlContent> {
                             tracksSelection: true,
                             isSelected: widget.selectedIndex == i,
                             semanticLabel: widget.segments[i].semanticLabel ??
-                                widget.segments[i].label ??
-                                '',
+                                widget.segments[i].label,
                             onKeyboardActivate: () => _onSegmentTap(i),
                             semanticOnTap: () => _onSegmentTap(i),
                             isFocusedNotifier: _focusNotifiers[i],

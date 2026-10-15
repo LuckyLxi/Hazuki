@@ -266,34 +266,36 @@ class _GlassListTileState extends State<GlassListTile>
         isButton: true,
         onKeyboardActivate: widget.onTap,
         semanticOnTap: widget.onTap,
-        child: Semantics(
-          button: true,
-          child: GestureDetector(
-            onTap: widget.onTap,
-            onLongPress: widget.onLongPress,
-            onTapDown: (_) => isPressed.value = true,
-            onTapUp: (_) => isPressed.value = false,
-            onTapCancel: () => isPressed.value = false,
-            behavior: HitTestBehavior.opaque,
-            child: ListenableBuilder(
-              listenable: pressedAndFocused,
-              builder: (context, child) {
-                final bool showHighlight = isPressed.value || isFocused.value;
-                return AnimatedContainer(
-                  duration: isPressed.value
-                      ? Duration.zero
-                      : const Duration(milliseconds: 150),
-                  curve: Curves.easeOutCubic,
-                  color: showHighlight
-                      ? (GlassTheme.brightnessOf(context) == Brightness.light
-                          ? CupertinoColors.black.withValues(alpha: 0.08)
-                          : CupertinoColors.white.withValues(alpha: 0.08))
-                      : const Color(0x00000000),
-                  child: child,
-                );
-              },
-              child: tile,
-            ),
+        semanticOnLongPress: widget.onLongPress,
+        // Role, tap and long press all live on the region's node. A button
+        // Semantics or detector semantics in here would conflict with it and
+        // split the tile into two nodes, one of them unlabelled (#381).
+        child: GestureDetector(
+          excludeFromSemantics: true,
+          onTap: widget.onTap,
+          onLongPress: widget.onLongPress,
+          onTapDown: (_) => isPressed.value = true,
+          onTapUp: (_) => isPressed.value = false,
+          onTapCancel: () => isPressed.value = false,
+          behavior: HitTestBehavior.opaque,
+          child: ListenableBuilder(
+            listenable: pressedAndFocused,
+            builder: (context, child) {
+              final bool showHighlight = isPressed.value || isFocused.value;
+              return AnimatedContainer(
+                duration: isPressed.value
+                    ? Duration.zero
+                    : const Duration(milliseconds: 150),
+                curve: Curves.easeOutCubic,
+                color: showHighlight
+                    ? (GlassTheme.brightnessOf(context) == Brightness.light
+                        ? CupertinoColors.black.withValues(alpha: 0.08)
+                        : CupertinoColors.white.withValues(alpha: 0.08))
+                    : const Color(0x00000000),
+                child: child,
+              );
+            },
+            child: tile,
           ),
         ),
       );

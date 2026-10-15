@@ -1,3 +1,26 @@
+## 0.5.2+11
+
+* Fixes a crash when the content provider returns no stream for a selected
+  file; the pick now completes with an error instead.
+
+## 0.5.2+10
+
+* Updates pigeon dev_dependency to ^27.3.2 for analyzer 14 compatibility.
+
+## 0.5.2+9
+
+* Fixes a crash when a selected file cannot be copied to a readable location (for
+  example, on a `SecurityException`).
+
+## 0.5.2+8
+
+* Bumps the androidx group across 10 directories with 1 update.
+
+## 0.5.2+7
+
+* Migrates to Built-in Kotlin to support AGP 9.
+* Updates minimum supported SDK version to Flutter 3.44/Dart 3.12.
+
 ## 0.5.2+6
 
 * Updates internal implementation to use Kotlin Pigeon.

@@ -21,7 +21,9 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 version: 1.1.9+20
 
 environment:
+  # Keep the existing Dart language/formatting version; Flutter supplies Dart 3.13.
   sdk: ^3.11.1
+  flutter: '>=3.47.0'
 
 # Dependencies specify other packages that your package needs in order to work.
 # To automatically upgrade your package dependencies to the latest versions
@@ -34,46 +36,45 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
-  cupertino_icons: ^1.0.8
-  intl: ^0.20.2
-  dio: ^5.8.0+1
-  html: ^0.15.6
-  path_provider: ^2.0.15
+  cupertino_icons: ^2.0.0
+  intl: ^0.20.3
+  dio: ^5.11.1
+  html: ^0.15.7
+  path_provider: ^2.1.6
   path: ^1.9.1
-  shared_preferences: ^2.5.3
-  drift: ^2.26.1
-  sqlite3_flutter_libs: ^0.5.32
-  crypto: ^3.0.6
+  shared_preferences: ^2.5.6
+  drift: ^2.35.2
+  sqlite3: ^3.7.1
+  crypto: ^3.0.7
   pointycastle: ^4.0.0
-  dynamic_color: ^1.7.0
-  liquid_glass_widgets: ^0.29.5
-  flutter_qjs:
-    path: third_party/flutter_qjs
+  dynamic_color: ^1.8.1
+  liquid_glass_widgets: ^1.13.0
+  quickjs_engine: ^0.1.6
   flutter_displaymode: ^0.7.0
-  connectivity_plus: ^7.1.1
-  url_launcher: ^6.3.2
-  lottie: ^3.3.3
+  connectivity_plus: ^7.3.2
+  url_launcher: ^6.3.3
+  lottie: ^3.6.1
   re_editor:
     git:
       url: https://github.com/Kindness-Kismet/re-editor.git
       ref: main
   re_highlight: ^0.0.3
-  package_info_plus: ^10.0.0
-  device_info_plus: ^13.0.0
+  package_info_plus: ^10.2.2
+  device_info_plus: ^13.3.0
   file_selector: ^1.1.0
-  window_manager: ^0.5.1
+  window_manager: ^0.5.2
   loading_indicator_m3e: ^0.1.1
   material_new_shapes: ^1.0.0
-  get_it: ^9.2.1
-  flutter_secure_storage: ^10.2.0
+  get_it: ^9.3.0
+  flutter_secure_storage: ^10.3.4
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  build_runner: ^2.4.15
-  drift_dev: ^2.26.1
-  mocktail: ^1.0.4
-  sqlite3: ^3.1.5
+  # build_runner 2.17 requires build 5; drift_dev currently requires build <5.
+  build_runner: ^2.16.2
+  drift_dev: ^2.35.1
+  mocktail: ^1.0.5
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
@@ -83,10 +84,13 @@ dev_dependencies:
   flutter_lints: ^6.0.0
 
 dependency_overrides:
+  # Preserve native script timeouts and runtime cleanup with QuickJS-NG.
+  quickjs_engine:
+    path: third_party/pub_overrides/quickjs_engine
   # Keep mobile long-press selection from opening the software keyboard.
   re_editor:
     path: third_party/pub_overrides/re_editor
-  # Keep the selected indicator anchored to its press origin on initial drag.
+  # Preserve indicator drag origins and the back-to-top button morph.
   liquid_glass_widgets:
     path: third_party/pub_overrides/liquid_glass_widgets
   device_info_plus:

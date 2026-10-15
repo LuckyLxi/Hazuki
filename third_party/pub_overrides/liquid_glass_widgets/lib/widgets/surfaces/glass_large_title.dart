@@ -1,4 +1,15 @@
+import 'dart:math' as math;
+
 import 'package:flutter/cupertino.dart';
+
+import '../../src/renderer/liquid_glass_renderer.dart';
+import '../../src/widgets/surfaces/vertical_bar_reservation.dart';
+import '../../src/widgets/surfaces/vertical_bar_title_row.dart';
+import '../../types/glass_quality.dart';
+import '../interactive/glass_button.dart';
+import '../shared/glass_isolation_scope.dart';
+import 'glass_app_bar.dart';
+import 'glass_vertical_bar.dart';
 
 // =============================================================================
 // GlassLargeTitleController
@@ -82,6 +93,8 @@ class GlassLargeTitleController extends ChangeNotifier {
   // Raw offset for overscroll rubber-band stretch. May be negative on iOS.
   double _rawScrollOffset = 0.0;
 
+  bool _searchPresented = false;
+
   /// The [ScrollController] to attach to your [CustomScrollView].
   ScrollController get scrollController => _scrollController;
 
@@ -117,6 +130,25 @@ class GlassLargeTitleController extends ChangeNotifier {
       _collapseTitleHeight = height;
       _updateState();
     }
+  }
+
+  /// Whether [GlassLargeTitle]'s search field is open in iPhone Duo's vertical
+  /// bar strip.
+  ///
+  /// In the strip the search bar leaves the scroll view for a magnifier at the
+  /// bottom of the strip, and opening it hides the navigation bar — the title
+  /// row and the pinned chrome — for as long as it is open, as `searchable`
+  /// does natively. Always false outside the strip.
+  bool get isSearchPresented => _searchPresented;
+
+  /// Records whether the search field is open in the vertical bar strip.
+  ///
+  /// Called by [GlassLargeTitle] as its magnifier and ✕ are tapped. You do not
+  /// normally need to call this yourself.
+  void reportSearchPresented(bool presented) {
+    if (presented == _searchPresented) return;
+    _searchPresented = presented;
+    notifyListeners();
   }
 
   /// Calibrates the search bar collapse distance to the actual rendered height.
@@ -195,6 +227,12 @@ class GlassLargeTitleController extends ChangeNotifier {
 ///   matching iOS 26's `UINavigationBar` large-title elastic stretch.
 /// - **Self-measuring:** Reports rendered heights to the controller after
 ///   first layout — correct collapse timing under all Dynamic Type settings.
+/// - **iPhone Duo:** In the vertical bar strip ([GlassVerticalBar]) the title
+///   leaves the scroll view for the title row at the top of the content, at
+///   28pt in its large weight, where the [GlassAppBar.pinned] sharing the
+///   [controller] draws it. This sliver keeps its place, so the content below starts where
+///   it does natively, and the row scrolls away with it. A [searchBar] becomes
+///   a magnifier at the bottom of the strip; see [searchBar].
 ///
 /// ## Basic usage — title only
 ///
@@ -262,6 +300,14 @@ class GlassLargeTitle extends StatefulWidget {
   /// Typically a [GlassSearchBar]. When provided, the widget collapses in
   /// **Phase 2** — after the large title has fully scrolled away — matching
   /// iOS 26's two-phase UINavigationBar search collapse behaviour.
+  ///
+  /// In iPhone Duo's vertical bar strip it leaves the scroll view, as
+  /// `searchable` does natively: a magnifier sits at the bottom of the strip,
+  /// and a tap on it opens this widget along the bottom of the content, with a
+  /// ✕ in the strip that closes it again. The navigation bar hides while it is
+  /// open ([GlassLargeTitleController.isSearchPresented]), and the field takes
+  /// focus. The strip's field is 48pt tall, so a [GlassSearchBar] there
+  /// should set its `height` to match.
   final Widget? searchBar;
 
   /// Font size of the large title. Defaults to `34.0` (iOS 26 spec).
@@ -311,6 +357,30 @@ class _GlassTitleSliverState extends State<GlassLargeTitle> {
   final _searchBarKey = GlobalKey();
   bool _pendingMeasure = false;
 
+  /// Height of the search field the strip's magnifier opens, and of its ✕.
+  static const double _stripSearchHeight =
+      GlassVerticalBarMetrics.controlExtent;
+
+  /// Width the open search field is capped at in a regular width, where
+  /// natively it ends at the strip rather than spanning the content.
+  static const double _stripSearchMaxWidth = 372.0;
+
+  /// Sizes of the magnifier and ✕ glyphs, at which [CupertinoIcons.search]
+  /// and [CupertinoIcons.xmark] span the native glyphs' 21pt and 17pt.
+  static const double _stripSearchIconSize = 27.0;
+  static const double _stripCloseIconSize = 25.5;
+
+  /// Shows the strip's magnifier and search field in the route's overlay.
+  final OverlayPortalController _stripSearch = OverlayPortalController()
+    ..show();
+
+  /// The field the strip's magnifier opens, focused as it opens.
+  final FocusScopeNode _stripFieldScope =
+      FocusScopeNode(debugLabel: 'GlassLargeTitle strip search');
+
+  /// The strip, or null where the bars are horizontal.
+  GlassVerticalBarData? _bar;
+
   @override
   void initState() {
     super.initState();
@@ -334,8 +404,28 @@ class _GlassTitleSliverState extends State<GlassLargeTitle> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final bar = GlassVerticalBar.maybeOf(context);
+    if (bar == _bar) return;
+    // Moving in or out of the strip changes what the collapse measures, and
+    // leaves any search the strip had open behind — closed after the frame,
+    // as the controller's listeners rebuild.
+    if ((bar == null) != (_bar == null)) {
+      if (widget.controller.isSearchPresented) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) widget.controller.reportSearchPresented(false);
+        });
+      }
+      _scheduleMeasure();
+    }
+    _bar = bar;
+  }
+
+  @override
   void dispose() {
     widget.controller.removeListener(_onProgressChanged);
+    _stripFieldScope.dispose();
     super.dispose();
   }
 
@@ -353,6 +443,15 @@ class _GlassTitleSliverState extends State<GlassLargeTitle> {
   }
 
   void _measureAndReport() {
+    if (!mounted) return;
+    // In the strip the collapse is the row scrolling away, whatever the title
+    // measures.
+    if (_bar != null) {
+      widget.controller
+          .reportMeasuredHeight(VerticalBarTitleRow.collapseExtent);
+      return;
+    }
+
     // Measure title row height.
     final titleBox = _titleKey.currentContext?.findRenderObject() as RenderBox?;
     if (titleBox != null && titleBox.hasSize) {
@@ -371,8 +470,128 @@ class _GlassTitleSliverState extends State<GlassLargeTitle> {
     }
   }
 
+  void _openStripSearch() {
+    widget.controller.reportSearchPresented(true);
+    // The field is only built once the overlay rebuilds; focus it after.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !widget.controller.isSearchPresented) return;
+      _stripFieldScope.requestFocus();
+      _stripFieldScope.nextFocus();
+    });
+  }
+
+  void _closeStripSearch() {
+    _stripFieldScope.unfocus();
+    widget.controller.reportSearchPresented(false);
+  }
+
+  /// The sliver in iPhone Duo's vertical bar strip.
+  ///
+  /// The title is drawn by the [GlassAppBar] in the row at the top of the
+  /// content, so this keeps only its place: enough height that the content
+  /// after it starts [VerticalBarTitleRow.contentTop] below the strip's
+  /// [GlassVerticalBarData.rowTop] margin, however much the app has put above
+  /// it.
+  Widget _buildVertical(BuildContext context, GlassVerticalBarData bar) {
+    final searchBar = widget.searchBar;
+    return SliverLayoutBuilder(
+      builder: (context, constraints) {
+        // While the search is open the navigation bar is hidden, and the
+        // content moves up into the row's place, as natively.
+        final top = widget.controller.isSearchPresented
+            ? bar.rowTop
+            : bar.rowTop +
+                VerticalBarTitleRow.contentTop -
+                GlassVerticalBarMetrics.edgeMargin;
+        Widget place = AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeInOut,
+          height: math.max(0.0, top - constraints.precedingScrollExtent),
+        );
+        if (searchBar != null) {
+          place = OverlayPortal(
+            controller: _stripSearch,
+            overlayChildBuilder: (context) => ListenableBuilder(
+              listenable: widget.controller,
+              builder: (context, _) =>
+                  _buildStripSearch(context, bar, searchBar),
+            ),
+            child: place,
+          );
+        }
+        return SliverToBoxAdapter(child: place);
+      },
+    );
+  }
+
+  /// The magnifier at the bottom of the strip, or the field it opens along
+  /// the bottom of the content with a ✕ in its place.
+  Widget _buildStripSearch(
+    BuildContext context,
+    GlassVerticalBarData bar,
+    Widget searchBar,
+  ) {
+    const extent = _stripSearchHeight;
+    final presented = widget.controller.isSearchPresented;
+    final trailingStrip = bar.edge == GlassVerticalBarEdge.trailing;
+    final outerInset = bar.width - GlassVerticalBarMetrics.inset - extent;
+    final label = CupertinoColors.label.resolveFrom(context);
+    final regular = VerticalBarTitleRow.regularWidth(context);
+    // Isolated and premium, as the bars are: the overlay sits outside the
+    // scaffold's bar scopes, and the iOS 27 material only renders at premium.
+    return Positioned.fill(
+      child: GlassIsolationScope(
+        isolated: true,
+        defaultQuality: GlassQuality.premium,
+        child: Stack(
+          children: [
+            if (presented)
+              PositionedDirectional(
+                start: trailingStrip
+                    ? (regular ? null : GlassVerticalBarMetrics.titleInset)
+                    : bar.width,
+                end: trailingStrip
+                    ? bar.width
+                    : (regular ? null : GlassVerticalBarMetrics.titleInset),
+                width: regular ? _stripSearchMaxWidth : null,
+                bottom: bar.bottom,
+                height: extent,
+                child: FocusScope(
+                  node: _stripFieldScope,
+                  child: Center(child: searchBar),
+                ),
+              ),
+            PositionedDirectional(
+              start: trailingStrip ? null : outerInset,
+              end: trailingStrip ? outerInset : null,
+              bottom: bar.bottom,
+              child: VerticalBarBottomReservation(
+                child: GlassButton(
+                  onTap: presented ? _closeStripSearch : _openStripSearch,
+                  label: presented ? 'Cancel' : 'Search',
+                  width: extent,
+                  height: extent,
+                  shape: const LiquidOval(),
+                  iconSize:
+                      presented ? _stripCloseIconSize : _stripSearchIconSize,
+                  icon: Icon(
+                    presented ? CupertinoIcons.xmark : CupertinoIcons.search,
+                    color: label,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final bar = _bar;
+    if (bar != null) return _buildVertical(context, bar);
+
     final progress = widget.controller.collapseProgress;
     final searchProgress = widget.controller.searchBarCollapseProgress;
     final rawOffset = widget.controller.rawScrollOffset;

@@ -1,5 +1,3 @@
-import 'dart:ui' as ui;
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'theme/glass_theme.dart';
@@ -9,9 +7,9 @@ import 'utils/accessibility_config.dart' as glass_config;
 import 'utils/glass_brightness.dart' show glassExternalBrightnessResolver;
 import 'utils/glass_performance_monitor.dart';
 import 'src/renderer/liquid_glass_renderer.dart';
-import 'src/renderer/shaders.dart';
+import 'src/engine/shaders.dart';
 
-import 'src/renderer/internal/multi_shader_builder.dart';
+import 'src/engine/multi_shader_builder.dart';
 import 'widgets/shared/glass_adaptive_scope.dart';
 import 'widgets/shared/glass_effect.dart';
 import 'widgets/shared/glass_accessibility_scope.dart';
@@ -54,16 +52,6 @@ class LiquidGlassWidgets {
       glass_config.respectSystemAccessibility;
   static set respectSystemAccessibility(bool value) =>
       glass_config.respectSystemAccessibility = value;
-
-  /// Deprecated — use [respectSystemAccessibility] instead.
-  ///
-  /// Retained for discoverability (the two-word form reads naturally as a
-  /// boolean predicate). Will be removed in v1.0.
-  @Deprecated('Use respectSystemAccessibility instead.')
-  static bool get respectsAccessibility => respectSystemAccessibility;
-  @Deprecated('Use respectSystemAccessibility instead.')
-  static set respectsAccessibility(bool value) =>
-      respectSystemAccessibility = value;
 
   /// Global [LiquidGlassSettings] override for the entire application.
   ///
@@ -111,56 +99,57 @@ class LiquidGlassWidgets {
   /// | `lightweight_glass.frag` | Minimal glass layer |
   /// | `interactive_indicator.frag` | Custom refraction effect |
   /// | `liquid_glass_geometry_blended.frag` | Geometry / SDF pass |
-  /// | `liquid_glass_final_render.frag` | Final composite pass |
-  /// | `progressive_blur.frag` | Graduated backdrop blur ([ProgressiveBlur]) |
+  /// | `liquid_glass_render.frag` | Final composite pass |
+  /// Controls shader preloading and warm-up behaviour during [initialize].
   static Future<void> initialize({
     bool enablePerformanceMonitor = true,
-    bool warmUpImpellerPipeline = true,
+    GlassWarmUpMode warmUpMode = GlassWarmUpMode.auto,
   }) async {
     debugPrint('[LiquidGlass] Initializing library...');
 
-    // 1. Pre-warm shader programs in parallel — prevents first-frame jank /
-    //    "white flash" when glass widgets first appear.
-    //
-    //    Shader asset disk-loads are always performed (fast, I/O only, safe on
-    //    all platforms). The GPU warm-up step is conditionally skipped via
-    //    [warmUpImpellerPipeline].
-    await Future.wait([
+    // 1. Pre-warm shader programs in parallel — fast, async disk I/O only.
+    // Loads FragmentProgram objects into RAM so widgets render without
+    // placeholder frames / white flash.
+    final precacheFutures = <Future<void>>[
       LightweightLiquidGlass.preWarm(),
       GlassEffect.preWarm(),
-      MultiShaderBuilder.precacheShaders([
-        ShaderKeys.blendedGeometry,
-        ShaderKeys.liquidGlassRender,
-      ]),
-      // ProgressiveBlur's graduated-blur shader — warmed here too so consumers
-      // never need a separate preload call (it degrades to a uniform blur if the
-      // shader can't load, so this never throws).
       ProgressiveBlur.preload(),
-    ]);
+    ];
 
-    // 2. GPU pipeline warm-up — Android only, sequential after step 1.
-    //
-    //    Must run after precacheShaders so the cached FragmentProgram objects
-    //    are available for the toImage() draw call.
-    //
-    //    On Android GLES, glCompileShader + glLinkProgram is synchronous on the
-    //    raster thread (100–800 ms on mid-range SoCs). Running this before
-    //    runApp ensures compilation completes behind the native splash screen,
-    //    eliminating the nativeSurfaceChanged race condition that causes ANRs
-    //    (see GitHub issue #187).
-    //
-    //    iOS / macOS use precompiled Metal shaders (zero runtime compilation
-    //    cost) and skip this step entirely.
-    if (warmUpImpellerPipeline) {
-      await _warmUpImpellerPipeline();
+    // On platforms that support premium glass rendering (iOS Metal, macOS Metal,
+    // Android Vulkan/GLES), preload the multi-pass shaders as well.
+    // Web, Windows, and Linux skip premium preload by default as they are
+    // capped at standard quality by the GlassAdaptiveScope static probe.
+    final bool shouldPreloadPremium = warmUpMode == GlassWarmUpMode.always ||
+        (warmUpMode == GlassWarmUpMode.auto && !_shouldSkipPremiumPreload());
+
+    if (shouldPreloadPremium) {
+      precacheFutures.add(
+        MultiShaderBuilder.precacheShaders([
+          ShaderKeys.blendedGeometry,
+          ShaderKeys.liquidGlassRender,
+        ]),
+      );
     }
 
-    // 3. Register the debug performance monitor (no-op in release builds).
+    await Future.wait(precacheFutures);
+
+    // 2. Register the debug performance monitor (no-op in release builds).
     if (enablePerformanceMonitor && !kReleaseMode) {
       GlassPerformanceMonitor.start();
     }
 
     debugPrint('[LiquidGlass] Initialization complete.');
+  }
+
+  /// Returns `true` if the current platform is statically capped at standard
+  /// quality by [GlassAdaptiveScope] and does not need multi-pass premium shaders
+  /// preloaded during startup.
+  static bool _shouldSkipPremiumPreload() {
+    if (kIsWeb) return true;
+    if (defaultTargetPlatform == TargetPlatform.windows) return true;
+    if (defaultTargetPlatform == TargetPlatform.linux) return true;
+    return false;
   }
 
   // ── wrap() ─────────────────────────────────────────────────────────────────
@@ -302,6 +291,9 @@ class LiquidGlassWidgets {
         initialQuality: config.initialQuality,
         targetFrameMs: config.targetFrameMs,
         allowStepUp: config.allowStepUp,
+        warmupPremiumThresholdMs: config.warmupPremiumThresholdMs,
+        warmupStandardThresholdMs: config.warmupStandardThresholdMs,
+        frostStep: config.frostStep,
         onQualityChanged: config.onQualityChanged,
         onDiagnostic: config.onDiagnostic,
         debugLogDiagnostics: config.debugLogDiagnostics,
@@ -313,109 +305,18 @@ class LiquidGlassWidgets {
   }
 
   // ── Private helpers ────────────────────────────────────────────────────────
+}
 
-  /// Performs a true asynchronous GPU pipeline warm-up for Android.
-  ///
-  /// ## Why Android only?
-  ///
-  /// iOS and macOS use Impeller with Metal, whose shaders are precompiled at
-  /// build time into a `.metallib` archive. There is no runtime compilation
-  /// step, so no warm-up is needed and this method returns immediately on
-  /// those platforms.
-  ///
-  /// On Android, Impeller may use:
-  /// - **Vulkan** — PSO creation from precompiled SPIR-V is fast (~1–2 ms).
-  /// - **GLES fallback** — `glCompileShader` + `glLinkProgram` compiles GLSL
-  ///   source text at runtime on the raster thread (100–800 ms on mid-range
-  ///   SoCs). If this occurs during the first UI frame it races with Android's
-  ///   `FlutterJNI.nativeSurfaceChanged`, potentially triggering an ANR
-  ///   ("Input dispatching timed out"; see GitHub issue #187).
-  ///
-  /// ## Mechanism
-  ///
-  /// Draws both premium glass shaders to a 1×1 off-screen surface and awaits
-  /// `Picture.toImage()`. This submits a rasterization job to the Flutter
-  /// raster thread, which forces Impeller to compile and link the shader
-  /// programs before the first real UI frame is requested.
-  ///
-  /// Because [initialize] is `await`ed in `main()` before `runApp`, this
-  /// compilation happens entirely behind the native splash screen — the ANR
-  /// window cannot open.
-  ///
-  /// ## Pipeline coverage note
-  ///
-  /// The warm-up draw call uses a simple `drawRect`, which may produce a
-  /// slightly different Impeller pipeline descriptor than the full
-  /// [LiquidGlassLayer] rendering path (different vertex attributes, blend
-  /// state). On GLES, however, once `glCompileShader` has executed for a
-  /// fragment shader, any subsequent `glLinkProgram` for a different
-  /// vertex/blend combination is significantly cheaper (~20–50 ms), well
-  /// within Android's 5-second ANR threshold.
-  ///
-  /// Called by [initialize] only when [warmUpImpellerPipeline] is `true`.
-  static Future<void> _warmUpImpellerPipeline() async {
-    // iOS / macOS: Metal uses precompiled shaders — zero runtime cost.
-    // Web / Skia: Impeller is not active — isShaderFilterSupported == false.
-    if (defaultTargetPlatform != TargetPlatform.android) return;
-    if (!ui.ImageFilter.isShaderFilterSupported) return;
+/// Controls shader preloading and warm-up behaviour during [LiquidGlassWidgets.initialize].
+enum GlassWarmUpMode {
+  /// Automatic selection: preloads all shaders on iOS, macOS, and Android (including Vulkan),
+  /// while skipping unused premium multi-pass shaders on Web, Windows, and Linux
+  /// where quality is statically capped at standard.
+  auto,
 
-    // Retrieve the FragmentProgram objects already cached by step 1 of
-    // initialize(). Reusing cached instances avoids creating duplicate GPU
-    // objects. If either program is missing (precacheShaders failed),
-    // we skip silently — the app will still run, with possible first-frame
-    // stutter on GLES.
-    final blendedGeometry =
-        MultiShaderBuilder.cachedProgram(ShaderKeys.blendedGeometry);
-    final finalRender =
-        MultiShaderBuilder.cachedProgram(ShaderKeys.liquidGlassRender);
+  /// Force preloading of all shaders on all platforms.
+  always,
 
-    if (blendedGeometry == null || finalRender == null) {
-      debugPrint(
-        '[LiquidGlass] Skipping GPU warm-up: shader programs not in cache '
-        '(precacheShaders may have failed).',
-      );
-      return;
-    }
-
-    try {
-      // Create a 1x1 dummy image to satisfy the fragment shader samplers.
-      // If we don't bind samplers, Impeller throws "missing sampler".
-      final dummyRecorder = ui.PictureRecorder();
-      final dummyCanvas = ui.Canvas(dummyRecorder);
-      dummyCanvas.drawColor(const ui.Color(0x00000000), ui.BlendMode.clear);
-      final dummyImage = await dummyRecorder.endRecording().toImage(1, 1);
-
-      // Draw both shaders to a 1×1 surface. On GLES this forces
-      // glCompileShader + glLinkProgram on the raster thread.
-      // On Vulkan this completes in ~1–2 ms.
-      final recorder = ui.PictureRecorder();
-      final canvas = ui.Canvas(recorder);
-
-      for (final program in [blendedGeometry, finalRender]) {
-        final shader = program.fragmentShader();
-
-        if (program == finalRender) {
-          shader.setImageSampler(0, dummyImage);
-          shader.setImageSampler(1, dummyImage);
-        }
-
-        canvas.drawRect(
-          const ui.Rect.fromLTWH(0, 0, 1, 1),
-          ui.Paint()..shader = shader,
-        );
-        shader.dispose();
-      }
-
-      final image = await recorder.endRecording().toImage(1, 1);
-
-      dummyImage.dispose();
-      image.dispose();
-
-      debugPrint('[LiquidGlass] ✓ Android GPU pipeline warm-up complete.');
-    } catch (e) {
-      // Non-fatal: log and continue. The app will launch normally; the first
-      // glass frame may stutter on GLES but will not crash.
-      debugPrint('[LiquidGlass] GPU warm-up failed (non-critical): $e');
-    }
-  }
+  /// Skip preloading heavy multi-pass shaders, loading them on demand when rendered.
+  never,
 }

@@ -4,7 +4,7 @@ Hazuki 是一个基于 Flutter 开发的跨平台漫画阅读应用，其核心�
 
 ## 核心技术栈
 - **框架**: [Flutter](https://flutter.dev/) (Dart)
-- **JS 引擎**: `flutter_qjs` (用于执行漫画源脚本)
+- **JS 引擎**: `quickjs_engine` (用于执行漫画源脚本)
 - **网络**: `dio`
 - **存储**: `shared_preferences`, `path_provider`
 - **UI 增强**: `dynamic_color` (Material You), `lottie` (动画), `re_editor` (编辑器)
@@ -18,7 +18,7 @@ Hazuki 是一个基于 Flutter 开发的跨平台漫画阅读应用，其核心�
 - `lib/pages/`: 通用 UI 页面实现。
 - `lib/widgets/`: 可复用的 UI 组件。
 - `lib/models/`: 数据模型定义。
-- `third_party/`: 包含本地修改过的第三方库 (`flutter_qjs`)。
+- `third_party/`: 包含本地修改过的第三方库 (`quickjs_engine`)。
 
 ## 构建与运行
 

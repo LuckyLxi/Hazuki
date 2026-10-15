@@ -379,6 +379,8 @@ class _ActionSheetButtonState extends State<_ActionSheetButton>
         onTapUp: (_) => isPressed.value = false,
         onTapCancel: () => isPressed.value = false,
         behavior: HitTestBehavior.opaque,
+        // Semantics (label, role, tap) live on the GlassFocusRegion node.
+        excludeFromSemantics: true,
         child: ListenableBuilder(
           listenable: pressedAndFocused,
           builder: (context, child) {

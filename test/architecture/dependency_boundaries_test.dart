@@ -611,7 +611,7 @@ void main() {
   for (final rule in <String, List<String>>{
     'runtime/source_runtime_capability.dart': [
       'package:dio/',
-      'package:flutter_qjs/',
+      'package:quickjs_engine/',
       'package:flutter/services.dart',
     ],
     'account/account_session_capability.dart': ['dart:convert'],

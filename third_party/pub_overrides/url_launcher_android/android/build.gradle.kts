@@ -1,7 +1,16 @@
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-
 group = "io.flutter.plugins.urllauncher"
 version = "1.0-SNAPSHOT"
+
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+
+    dependencies {
+        classpath("com.android.tools.build:gradle:9.1.1")
+    }
+}
 
 allprojects {
     repositories {
@@ -16,7 +25,7 @@ plugins {
 
 kotlin {
     compilerOptions {
-        jvmTarget = JvmTarget.fromTarget(JavaVersion.VERSION_17.toString())
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
     }
 }
 
@@ -62,7 +71,7 @@ android {
 dependencies {
     // Java language implementation
     implementation("androidx.core:core:1.17.0")
-    implementation("androidx.annotation:annotation:1.9.1")
+    implementation("androidx.annotation:annotation:1.10.0")
     implementation("androidx.browser:browser:1.9.0")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.mockito:mockito-core:5.23.0")

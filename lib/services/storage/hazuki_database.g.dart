@@ -5162,7 +5162,18 @@ class $$ReadHistoryEntriesTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<$ReadHistoryEntriesTable, ReadHistoryEntry>(
+                    table,
+                  ),
+                  BaseReferences<
+                    _$HazukiDatabase,
+                    $ReadHistoryEntriesTable,
+                    ReadHistoryEntry
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -5444,7 +5455,19 @@ class $$ReadingProgressEntriesTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<
+                    $ReadingProgressEntriesTable,
+                    ReadingProgressEntry
+                  >(table),
+                  BaseReferences<
+                    _$HazukiDatabase,
+                    $ReadingProgressEntriesTable,
+                    ReadingProgressEntry
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -5624,7 +5647,18 @@ class $$SearchHistoryEntriesTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<$SearchHistoryEntriesTable, SearchHistoryEntry>(
+                    table,
+                  ),
+                  BaseReferences<
+                    _$HazukiDatabase,
+                    $SearchHistoryEntriesTable,
+                    SearchHistoryEntry
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -5788,7 +5822,19 @@ class $$SearchHistoryTombstonesTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<
+                    $SearchHistoryTombstonesTable,
+                    SearchHistoryTombstone
+                  >(table),
+                  BaseReferences<
+                    _$HazukiDatabase,
+                    $SearchHistoryTombstonesTable,
+                    SearchHistoryTombstone
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -5952,7 +5998,19 @@ class $$SearchHistoryClearStatesTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<
+                    $SearchHistoryClearStatesTable,
+                    SearchHistoryClearState
+                  >(table),
+                  BaseReferences<
+                    _$HazukiDatabase,
+                    $SearchHistoryClearStatesTable,
+                    SearchHistoryClearState
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -6151,7 +6209,18 @@ class $$LocalFavoriteFoldersTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<$LocalFavoriteFoldersTable, LocalFavoriteFolder>(
+                    table,
+                  ),
+                  BaseReferences<
+                    _$HazukiDatabase,
+                    $LocalFavoriteFoldersTable,
+                    LocalFavoriteFolder
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -6428,7 +6497,18 @@ class $$LocalFavoriteComicsTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<$LocalFavoriteComicsTable, LocalFavoriteComic>(
+                    table,
+                  ),
+                  BaseReferences<
+                    _$HazukiDatabase,
+                    $LocalFavoriteComicsTable,
+                    LocalFavoriteComic
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -6611,7 +6691,19 @@ class $$LocalFavoriteComicFoldersTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<
+                    $LocalFavoriteComicFoldersTable,
+                    LocalFavoriteComicFolder
+                  >(table),
+                  BaseReferences<
+                    _$HazukiDatabase,
+                    $LocalFavoriteComicFoldersTable,
+                    LocalFavoriteComicFolder
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -6775,7 +6867,19 @@ class $$LocalFavoriteFolderTombstonesTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<
+                    $LocalFavoriteFolderTombstonesTable,
+                    LocalFavoriteFolderTombstone
+                  >(table),
+                  BaseReferences<
+                    _$HazukiDatabase,
+                    $LocalFavoriteFolderTombstonesTable,
+                    LocalFavoriteFolderTombstone
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -6979,7 +7083,19 @@ class $$LocalFavoriteEntryTombstonesTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<
+                    $LocalFavoriteEntryTombstonesTable,
+                    LocalFavoriteEntryTombstone
+                  >(table),
+                  BaseReferences<
+                    _$HazukiDatabase,
+                    $LocalFavoriteEntryTombstonesTable,
+                    LocalFavoriteEntryTombstone
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -7167,7 +7283,19 @@ class $$LocalFavoriteComicFolderTombstonesTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<
+                    $LocalFavoriteComicFolderTombstonesTable,
+                    LocalFavoriteComicFolderTombstone
+                  >(table),
+                  BaseReferences<
+                    _$HazukiDatabase,
+                    $LocalFavoriteComicFolderTombstonesTable,
+                    LocalFavoriteComicFolderTombstone
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -7360,7 +7488,16 @@ class $$DownloadGroupsTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<$DownloadGroupsTable, DownloadGroup>(table),
+                  BaseReferences<
+                    _$HazukiDatabase,
+                    $DownloadGroupsTable,
+                    DownloadGroup
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -7536,7 +7673,18 @@ class $$DownloadGroupComicsTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<$DownloadGroupComicsTable, DownloadGroupComic>(
+                    table,
+                  ),
+                  BaseReferences<
+                    _$HazukiDatabase,
+                    $DownloadGroupComicsTable,
+                    DownloadGroupComic
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -7700,7 +7848,19 @@ class $$DownloadGroupTombstonesTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<
+                    $DownloadGroupTombstonesTable,
+                    DownloadGroupTombstone
+                  >(table),
+                  BaseReferences<
+                    _$HazukiDatabase,
+                    $DownloadGroupTombstonesTable,
+                    DownloadGroupTombstone
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),
@@ -7885,7 +8045,19 @@ class $$DownloadGroupComicTombstonesTableTableManager
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
-              .map((e) => (e.readTable(table), BaseReferences(db, table, e)))
+              .map(
+                (e) => (
+                  e.readTable<
+                    $DownloadGroupComicTombstonesTable,
+                    DownloadGroupComicTombstone
+                  >(table),
+                  BaseReferences<
+                    _$HazukiDatabase,
+                    $DownloadGroupComicTombstonesTable,
+                    DownloadGroupComicTombstone
+                  >(db, table, e),
+                ),
+              )
               .toList(),
           prefetchHooksCallback: null,
         ),

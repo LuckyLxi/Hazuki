@@ -8,13 +8,17 @@ library;
 export 'src/renderer/liquid_glass_renderer.dart'
     show
         AnchorStretchSettings,
+        GlassBodyMode,
+        GlassLensModel,
         LiquidGlassSettings,
+        PlatformViewGlassMode,
         LiquidGlassLayer,
         LiquidGlassBlendGroup,
         GlassGlow,
         debugPaintLiquidGlassGeometry;
-export 'src/renderer/liquid_shape.dart'; // all shapes are public
-export 'src/renderer/internal/interaction_notification.dart'; // public for Smart Silence support
+export 'src/renderer/glass_backdrop_group.dart'; // GlassBackdropGroup
+export 'src/engine/liquid_shape.dart'; // all shapes are public
+export 'types/interaction_notification.dart'; // public for Smart Silence support
 export 'types/glass_specular_sharpness.dart'; // GlassSpecularSharpness enum
 
 // Setup and Configuration
@@ -42,7 +46,6 @@ export 'widgets/shared/animated_glass_indicator.dart'
     show AnimatedGlassIndicator; // baseIndicatorSettings for partial overrides
 export 'widgets/shared/glass_accessibility_scope.dart'; // GlassAccessibilityScope + GlassAccessibilityData
 export 'widgets/shared/glass_adaptive_scope.dart'; // GlassAdaptiveScope + GlassAdaptiveScopeData + GlassAdaptiveDiagnostic
-export 'widgets/shared/glass_backdrop_scope.dart'; // GlassBackdropScope — per-screen backdrop isolation
 export 'widgets/shared/glass_content_aware_scope.dart'; // GlassContentAwareScope + GlassContentAwareContent + GlassContentAwareBrightness
 export 'widgets/shared/glass_page.dart' show GlassPage, GlassStatusBarStyle;
 export 'widgets/shared/glass_motion_scope.dart';
@@ -84,7 +87,7 @@ export 'widgets/interactive/glass_icon_button.dart';
 export 'widgets/interactive/glass_page_control.dart';
 export 'widgets/interactive/glass_segmented_control.dart';
 export 'widgets/interactive/liquid_glass_scope.dart'
-    show LiquidGlassScope, GlassBackgroundSource, GlassRefractionSource;
+    show LiquidGlassScope, GlassBackgroundSource;
 export 'widgets/interactive/glass_slider.dart';
 export 'widgets/interactive/glass_switch.dart';
 export 'widgets/interactive/glass_pull_down_button.dart';
@@ -104,8 +107,11 @@ export 'widgets/overlays/glass_modal_sheet.dart'
         GlassSheetState,
         GlassSheetMode,
         GlassSheetDetent, // the `detents` set on GlassModalSheet / .show()
+        GlassSheetPlacement, // the `placement` on GlassModalSheet / .show()
         GlassFillTransition,
         GlassModalSheetController,
+        GlassMorphTrigger, // wraps a trigger a sheet morphs out of
+        GlassMorphAnchor, // the token GlassMorphTrigger hands its builder
         GlassModalSheetScaffold, // used directly for maps-style hit-through layouts
         GlassModalSheetStateProvider, // read sheet state from descendants
         SheetStateInfo, // value type from GlassModalSheetStateProvider.of()
@@ -113,16 +119,25 @@ export 'widgets/overlays/glass_modal_sheet.dart'
 export 'widgets/overlays/glass_toast.dart';
 export 'widgets/overlays/glass_popover.dart';
 // Widgets - Effects
+export 'widgets/effects/glass_materialize.dart';
 export 'widgets/effects/progressive_blur.dart';
 // Widgets - Surfaces
 export 'widgets/surfaces/glass_app_bar.dart';
+export 'widgets/surfaces/glass_bar_item.dart';
+export 'widgets/surfaces/glass_navigation_shell.dart'
+    show
+        GlassNavigationShell,
+        GlassNavigationShellState,
+        GlassNavBarRegistration;
+// Geometry a bar that is not a GlassAppBar aligns its in-route chrome to.
+export 'widgets/surfaces/shared/glass_nav_pinned_host.dart'
+    show GlassNavPinnedMetrics;
+export 'widgets/surfaces/glass_pinned_bar_chrome.dart';
 export 'widgets/surfaces/glass_large_title.dart';
 export 'widgets/shared/glass_isolation_scope.dart';
 export 'widgets/surfaces/glass_scaffold.dart';
-export 'widgets/surfaces/glass_bottom_bar.dart';
-export 'widgets/surfaces/glass_searchable_bottom_bar.dart';
 export 'widgets/surfaces/shared/glass_search_bar_config.dart';
 export 'widgets/surfaces/shared/tab_bar_searchable_controller.dart';
-
 export 'widgets/surfaces/glass_tab_bar.dart';
 export 'widgets/surfaces/glass_toolbar.dart';
+export 'widgets/surfaces/glass_vertical_bar.dart';

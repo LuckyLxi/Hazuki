@@ -4,7 +4,7 @@ import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
-import 'package:flutter_qjs/flutter_qjs.dart';
+import 'package:hazuki/services/source/runtime/source_script_engine.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/models/source_meta.dart';
 import 'package:hazuki/services/source/account/source_daily_check_in_capability.dart';
@@ -169,7 +169,7 @@ void main() {
   late SourceRuntimeHost host;
   late SourceRuntimeHandle handle;
   late _JmFixtures fixtures;
-  late FlutterQjs engine;
+  late SourceScriptEngine engine;
   Future<dynamic> run(String code) =>
       handle.facade.js.resolve(engine.evaluate(code));
 
@@ -196,15 +196,14 @@ void main() {
     await handle.session.ensurePrefs();
     final bridge = SourceJsBridgeCookieCapability(activeHandle: () => handle);
     bridge.configureDioCookieBridge(handle);
-    engine = FlutterQjs(timeout: 5000, hostPromiseRejectionHandler: (_) {});
+    engine = SourceScriptEngine(
+      timeout: 5000,
+      hostPromiseRejectionHandler: (_) {},
+    );
     handle.runtime.engine = engine;
-    engine.dispatch();
-    final setter = engine.evaluate('(k,v)=>{globalThis[k]=v}') as JSInvokable;
-    setter.invoke([
-      'sendMessage',
+    engine.setMessageHandler(
       (dynamic message) => bridge.handleJsMessageForHandle(handle, message),
-    ]);
-    setter.free();
+    );
     engine.evaluate(await File('assets/init.js').readAsString());
     engine.evaluate(await File('assets/hazuki_plugin_sdk.js').readAsString());
     // Prove the plugin uses only documented SDK APIs, without legacy globals.

@@ -173,6 +173,15 @@ class DraggableIndicatorPhysics {
   /// - [context]: Build context to find the render box
   /// - [itemCount]: Total number of items
   /// - [direction]: Axis whose coordinate and extent drive the mapping
+  /// - [mirrorForRtl]: Whether to mirror the horizontal fraction under an RTL
+  ///   [Directionality]. Leave `true` for consumers that position the indicator
+  ///   with [AlignmentDirectional] (the segmented controls), where the
+  ///   framework does not re-apply the flip. Pass `false` for consumers working
+  ///   in physical alignment space: the bottom and searchable tab bars paint
+  ///   with [Alignment] and carry RTL in their tab data, so mirroring here
+  ///   flips a second time and runs the drag backwards. It would also disagree
+  ///   with [tabIndexFromGlobalPosition], which never mirrors — which is why a
+  ///   press landed on the right tab and the slide then ran the wrong way.
   ///
   /// Returns: Alignment value with rubber band resistance applied.
   static double getAlignmentFromGlobalPosition(
@@ -180,6 +189,7 @@ class DraggableIndicatorPhysics {
     BuildContext context,
     int itemCount, {
     Axis direction = Axis.horizontal,
+    bool mirrorForRtl = true,
   }) {
     final box = context.findRenderObject()! as RenderBox;
     final localPosition = box.globalToLocal(globalPosition);
@@ -196,7 +206,8 @@ class DraggableIndicatorPhysics {
         direction == Axis.horizontal ? box.size.width : box.size.height;
     var rawRelativeX = (mainPosition / mainExtent).clamp(0.0, 1.0);
 
-    if (direction == Axis.horizontal &&
+    if (mirrorForRtl &&
+        direction == Axis.horizontal &&
         Directionality.of(context) == TextDirection.rtl) {
       rawRelativeX = 1.0 - rawRelativeX;
     }

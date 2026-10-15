@@ -1,7 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/services.dart';
-import 'package:flutter_qjs/flutter_qjs.dart';
+import '../runtime/source_script_engine.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../runtime/source_js_bridge_cookie_capability.dart';
@@ -27,7 +27,7 @@ class SourcePluginScriptInspector {
       notifyRuntimeStateChanged: (_) {},
     );
     final bridge = SourceJsBridgeCookieCapability(activeHandle: () => handle);
-    final engine = FlutterQjs(
+    final engine = SourceScriptEngine(
       timeout: 5000,
       memoryLimit: 64 * 1024 * 1024,
       hostPromiseRejectionHandler: (_) {},
@@ -36,39 +36,28 @@ class SourcePluginScriptInspector {
     try {
       // Expose only the app locale; private plugin data remains unavailable below.
       handle.session.prefs = await SharedPreferences.getInstance();
-      engine.dispatch();
-      final setter = engine.evaluate('(k,v)=>{globalThis[k]=v}') as JSInvokable;
-      try {
-        setter.invoke([
-          'sendMessage',
-          (dynamic message) {
-            final method = message is Map ? message['method'] : null;
-            if (method == 'load_data' ||
-                method == 'load_setting' ||
-                method == 'secret_get') {
-              return null;
-            }
-            if (method == 'isLogged') return false;
-            if (const {
-              'html',
-              'convert',
-              'random',
-              'uuid',
-              'getLocale',
-              'getPlatform',
-              'log',
-            }.contains(method)) {
-              return bridge.handleJsMessageForHandle(handle, message);
-            }
-            throw const SourcePluginException(
-              'plugin_host_call_during_inspection',
-            );
-          },
-        ]);
-        setter.invoke(['appVersion', '1.0.0']);
-      } finally {
-        setter.free();
-      }
+      engine.setMessageHandler((dynamic message) {
+        final method = message is Map ? message['method'] : null;
+        if (method == 'load_data' ||
+            method == 'load_setting' ||
+            method == 'secret_get') {
+          return null;
+        }
+        if (method == 'isLogged') return false;
+        if (const {
+          'html',
+          'convert',
+          'random',
+          'uuid',
+          'getLocale',
+          'getPlatform',
+          'log',
+        }.contains(method)) {
+          return bridge.handleJsMessageForHandle(handle, message);
+        }
+        throw const SourcePluginException('plugin_host_call_during_inspection');
+      });
+      engine.setGlobal('appVersion', '1.0.0');
       engine.evaluate(init, name: 'init.js');
       engine.evaluate(sdk, name: 'hazuki_plugin_sdk.js');
       evaluateSourcePlugin(engine, script);
@@ -79,7 +68,7 @@ class SourcePluginScriptInspector {
   }
 }
 
-void evaluateSourcePlugin(FlutterQjs engine, String script) {
+void evaluateSourcePlugin(SourceScriptEngine engine, String script) {
   engine.evaluate(script, name: 'main.js');
   if (engine.evaluate('!!globalThis.__hazuki_source') == true) return;
   final sourceClass = RegExp(
@@ -91,7 +80,7 @@ void evaluateSourcePlugin(FlutterQjs engine, String script) {
   engine.evaluate('Hazuki.registerSource(new $sourceClass())');
 }
 
-SourcePluginManifest registeredSourcePluginManifest(FlutterQjs engine) {
+SourcePluginManifest registeredSourcePluginManifest(SourceScriptEngine engine) {
   final manifest = SourcePluginManifest.fromJson({
     ...Map<String, dynamic>.from(
       jsonDecode(

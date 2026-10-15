@@ -4,6 +4,11 @@ part of '../glass_modal_sheet.dart';
 // Sheet States & Modes
 // ===========================================================================
 
+/// Progress toward the topmost detent past which the sheet counts as being at
+/// it. The content's physics unlock here, and the gesture handover uses the
+/// same line so the two can never disagree about who owns a drag.
+const double _kTopDetentThreshold = 0.95;
+
 /// The discrete snap positions a [GlassModalSheet] can occupy.
 enum GlassSheetState {
   /// Sheet is fully offscreen — invisible and not interactable.
@@ -62,6 +67,113 @@ enum GlassSheetMode {
   /// peek is the minimum state, cannot be hidden.
   /// Swiping down from half returns to peek, not hidden.
   persistent,
+}
+
+/// Where a sheet sits across a screen with room on either side of it.
+///
+/// Mirrors SwiftUI's `presentationPlacement(_:)`. Only iPhone Duo's inner
+/// display has that room today: in its vertical bar strip layout
+/// ([GlassVerticalBar]) a sheet in a regular width is a card as wide as the
+/// display's shorter side less its margins — 653pt on the inner display in
+/// landscape — and this decides where the card sits. Everywhere else a sheet
+/// spans the width, the outer display in landscape included, and this is not
+/// read.
+enum GlassSheetPlacement {
+  /// The system decides: the card is centred, as natively.
+  automatic,
+
+  /// The card is centred on the screen.
+  center,
+
+  /// The card sits against the leading edge.
+  leading,
+
+  /// The card sits against the trailing edge.
+  ///
+  /// Where the strip is on that side the card covers it, and the sheet's own
+  /// bar moves into the strip — the one placement on the inner display whose
+  /// toolbar goes vertical, as natively.
+  trailing,
+}
+
+/// The sheet's insets from the left and right edges of the screen in iPhone
+/// Duo's vertical bar strip layout.
+///
+/// Natively a sheet there keeps [margin] from each side, 8pt. In a
+/// [regularWidth] it is no wider than the display's shorter side less those
+/// margins, and [placement] positions it across whatever width is left; in a
+/// compact one it spans the width.
+EdgeInsets _stripSheetInsets({
+  required Size screenSize,
+  required bool regularWidth,
+  required double margin,
+  required GlassSheetPlacement placement,
+  required TextDirection textDirection,
+}) {
+  final spare = regularWidth
+      ? math.max(0.0, screenSize.width - screenSize.shortestSide)
+      : 0.0;
+  final leadingShare = switch (placement) {
+    GlassSheetPlacement.automatic || GlassSheetPlacement.center => 0.5,
+    GlassSheetPlacement.leading => 0.0,
+    GlassSheetPlacement.trailing => 1.0,
+  };
+  final left = spare *
+      (textDirection == TextDirection.ltr ? leadingShare : 1.0 - leadingShare);
+  return EdgeInsets.only(left: margin + left, right: margin + spare - left);
+}
+
+/// Distance from the top of the screen to a sheet's top edge at its large
+/// detent in iPhone Duo's vertical bar strip layout.
+///
+/// The status bar is in the strip there, so natively the sheet rises to 8pt
+/// from the top rather than stopping below the status bar.
+const double _kStripSheetTop = 8.0;
+
+/// Distance from a sheet's top and leading edges to the title row of its own
+/// bar in iPhone Duo's vertical bar strip layout, as natively.
+const double _kStripSheetRowInset = 16.0;
+
+/// The strip a sheet's own bar lays out in, or null where its bar stays
+/// horizontal.
+///
+/// Natively a sheet takes the strip's place when it covers the strip: on the
+/// outer display always, and on the inner display at
+/// [GlassSheetPlacement.trailing]. Its bar then stacks down the sheet's own
+/// strip, which lies over the screen's, and keeps its title in a row at the
+/// sheet's top-leading corner. The first control stays clear of the status
+/// cluster at the top of the screen's strip, and otherwise starts level with
+/// the title row — at a medium detent, say. A centred or leading card keeps a
+/// horizontal bar.
+///
+/// [frame] is the sheet at rest, in screen coordinates.
+GlassVerticalBarData? _sheetVerticalBar({
+  required GlassVerticalBarData? bar,
+  required Rect frame,
+  required Size screenSize,
+  required TextDirection textDirection,
+}) {
+  if (bar == null) return null;
+  final stripOnRight = (bar.edge == GlassVerticalBarEdge.trailing) ==
+      (textDirection == TextDirection.ltr);
+  // The sheet's edge on the strip's side, as a distance from the strip's
+  // inner edge.
+  final reach = stripOnRight
+      ? frame.right - (screenSize.width - bar.width)
+      : bar.width - frame.left;
+  if (reach <
+      GlassVerticalBarMetrics.inset + GlassVerticalBarMetrics.controlExtent) {
+    return null;
+  }
+  return GlassVerticalBarData(
+    edge: bar.edge,
+    width: reach,
+    top: math.max(bar.top - frame.top, _kStripSheetRowInset),
+    bottom: bar.bottom,
+    collapsesTabBar: bar.collapsesTabBar,
+    rowTop: _kStripSheetRowInset,
+    titleInset: _kStripSheetRowInset,
+  );
 }
 
 /// Controls how the sheet transitions from its glass look to a solid color
@@ -180,24 +292,19 @@ class SheetGeometry {
     this.dismissible = true,
   });
 
-  /// Resolve whether the peek floor is active, from the public API's three
-  /// inputs. Pure and static so the precedence is testable and reviewable in
-  /// one place instead of inline in the widget's state.
+  /// Resolve whether the peek floor is active, from the public API's detents
+  /// and mode.
   ///
-  /// Precedence:
-  ///   1. [enablePeek] when set explicitly — deprecated, but an existing
-  ///      caller's intent must keep winning.
-  ///   2. [GlassSheetDetent.small] in [detents] — the current way.
-  ///   3. [GlassSheetMode.persistent], which is DEFINED by resting on a floor
-  ///      instead of dismissing, so it keeps peek under the default detents.
+  /// The peek floor is active when:
+  ///   1. [GlassSheetDetent.small] is in [detents].
+  ///   2. [GlassSheetMode.persistent] is active (a persistent sheet is DEFINED
+  ///      by resting on a floor instead of dismissing).
   static bool resolvePeek({
-    required bool? enablePeek,
     required Set<GlassSheetDetent> detents,
     required GlassSheetMode mode,
   }) =>
-      enablePeek ??
-      (detents.contains(GlassSheetDetent.small) ||
-          mode == GlassSheetMode.persistent);
+      detents.contains(GlassSheetDetent.small) ||
+      mode == GlassSheetMode.persistent;
 
   /// The rest states this sheet can occupy, ordered low → high. This is the
   /// single source of truth for the state machine — snapping, min/max bounds,
@@ -446,6 +553,15 @@ class GlassModalSheetController {
   /// Notifies on every sheet position change — drag and snap animation alike.
   /// Null until the sheet is mounted; read [progress] from inside the listener.
   Listenable? get progressListenable => _state?._progressNotifier;
+
+  /// The sheet's live position, straight off its animation controller, or null
+  /// while no sheet is attached.
+  ///
+  /// [value] reads the same position (it is refreshed on every controller
+  /// tick, before [progressListenable] fires, so a listener sees where the
+  /// sheet is, not where it was a frame ago); the null case distinguishes
+  /// "not mounted yet" from a sheet genuinely sitting at 0.0.
+  double? get _livePosition => _state?._animationController.value;
 }
 
 // ===========================================================================
@@ -488,6 +604,14 @@ class GestureArena {
   /// Whether the disambiguated gesture direction is vertical.
   bool isVerticalGesture = false;
 
+  /// Pointer y at the previous move, giving the instantaneous drag direction.
+  ///
+  /// Travel measured from [dragStartY] cannot serve the mid-gesture handovers:
+  /// a drag that grew the sheet is still net-upward at the moment it turns
+  /// around, so cumulative travel would report the wrong direction exactly when
+  /// ownership needs to change.
+  double lastMoveY = 0.0;
+
   /// Tracks pointer samples to compute a fling velocity at gesture end.
   VelocityTracker velocityTracker =
       VelocityTracker.withKind(PointerDeviceKind.touch);
@@ -496,12 +620,14 @@ class GestureArena {
   void reset() {
     phase = GesturePhase.idle;
     isVerticalGesture = false;
+    lastMoveY = 0.0;
   }
 
   /// Called when a pointer-down event lands in the sheet's handle zone.
   void beginHandleDrag(double y, double sheetPosition) {
     phase = GesturePhase.handleDrag;
     dragStartY = y;
+    lastMoveY = y;
     dragStartSheetPosition = sheetPosition;
   }
 
@@ -510,6 +636,7 @@ class GestureArena {
       double y, double x, double sheetPosition, PointerDeviceKind kind) {
     phase = GesturePhase.idle;
     dragStartY = y;
+    lastMoveY = y;
     dragStartX = x;
     dragStartSheetPosition = sheetPosition;
     isVerticalGesture = false;
@@ -517,6 +644,15 @@ class GestureArena {
   }
 
   /// Returns true if gesture should be claimed by sheet (not scroll).
+  ///
+  /// The decision is not final. A sheet that reaches its topmost detent part-way
+  /// through an upward drag hands the rest of that pointer to the content, so
+  /// growing the sheet and scrolling its content are one continuous gesture.
+  ///
+  /// [atTopDetent] reports measured travel, and the handovers use it rather than
+  /// `currentState == maxState`: [currentState] carries the drag's *predicted*
+  /// target mid-gesture, so keying off it would stand the sheet down while it
+  /// was still travelling, stranding it short of the detent it was predicting.
   bool evaluateMove(
     double y,
     double x,
@@ -525,9 +661,43 @@ class GestureArena {
     double threshold, {
     required bool canScrollListUp,
     required bool hasScrollClients,
+    required bool atTopDetent,
   }) {
-    if (phase == GesturePhase.contentDrag) return true;
-    if (phase == GesturePhase.scrolling) return false;
+    final double previousY = lastMoveY;
+    lastMoveY = y;
+    final bool draggingUp = y < previousY;
+    final bool draggingDown = y > previousY;
+
+    if (phase == GesturePhase.contentDrag) {
+      // Re-evaluated on every move rather than only at the decision moment: a
+      // drag that began below the top detent stops being the sheet's the
+      // instant the sheet tops out. Standing down here lets the same finger
+      // carry on as a content scroll, instead of rubber-banding a sheet that
+      // cannot grow any further.
+      if (atTopDetent && draggingUp && hasScrollClients) {
+        phase = GesturePhase.scrolling;
+        isVerticalGesture = true;
+        return false;
+      }
+      return true;
+    }
+
+    if (phase == GesturePhase.scrolling) {
+      // The reverse handover. Content pulled back to its top gives the rest of
+      // a downward drag to the sheet, so returning to the top and collapsing
+      // are one gesture rather than two. Gated on a vertical gesture: a
+      // horizontal swipe also rests in this phase and must never wake the
+      // sheet.
+      if (isVerticalGesture &&
+          atTopDetent &&
+          draggingDown &&
+          !canScrollListUp) {
+        phase = GesturePhase.contentDrag;
+        return true;
+      }
+      return false;
+    }
+
     if (phase == GesturePhase.handleDrag) return true;
 
     final dy = (y - dragStartY).abs();
@@ -572,6 +742,7 @@ class GestureArena {
           // Swiping UP
           if (hasScrollClients) {
             phase = GesturePhase.scrolling;
+            isVerticalGesture = true;
             return false;
           } else {
             phase = GesturePhase.contentDrag;
@@ -582,6 +753,7 @@ class GestureArena {
           // Swiping DOWN
           if (canScrollListUp) {
             phase = GesturePhase.scrolling;
+            isVerticalGesture = true;
             return false;
           } else {
             phase = GesturePhase.contentDrag;

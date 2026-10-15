@@ -2,13 +2,23 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/services.dart';
 
+import '../../theme/glass_theme.dart';
+
 import '../../src/renderer/liquid_glass_renderer.dart';
+import '../../src/widgets/surfaces/dynamic_preferred_size.dart';
+import '../../src/widgets/surfaces/vertical_bar_background.dart';
+import '../../src/widgets/surfaces/vertical_bar_title_row.dart';
 import '../../types/glass_quality.dart';
 import '../../theme/glass_theme_data.dart';
+import '../shared/glass_accessibility_scope.dart';
 import '../shared/glass_content_aware_scope.dart';
 import '../shared/glass_isolation_scope.dart';
 import '../shared/glass_page.dart';
 import '../shared/glass_scroll_edge_effect.dart';
+import 'glass_app_bar.dart';
+import 'glass_tab_bar.dart';
+import 'glass_toolbar.dart';
+import 'glass_vertical_bar.dart';
 
 /// A one-stop-shop scaffold that replaces the manual assembly of [GlassPage],
 /// [Scaffold], [GlassScrollEdgeEffect], and a [Stack] for proper z-ordering.
@@ -125,9 +135,11 @@ class GlassScaffold extends StatelessWidget {
     this.edgeFade = true,
     this.topEdgeFade,
     this.bottomEdgeFade,
+    this.edgeFadeAbsorbsPointers = false,
     this.topEdgeFadeExtent = 20.0,
     this.bottomEdgeFadeExtent = 20.0,
     this.edgeStyle = GlassScrollEdgeStyle.soft,
+    this.maxSigma = 18.0,
     this.extendBody = true,
     this.appBarHeight = 44.0,
     this.bottomBarHeight,
@@ -166,7 +178,7 @@ class GlassScaffold extends StatelessWidget {
 
   /// An optional bottom bar placed at the bottom, always above the body.
   ///
-  /// Typically a [GlassBottomBar], [GlassSearchableBottomBar], or any widget.
+  /// Typically a [GlassTabBar.bottom], [GlassTabBar.searchable], or any widget.
   /// When provided, bottom edge fading is auto-calculated to cover the bar
   /// area plus safe zone.
   final Widget? bottomBar;
@@ -186,10 +198,22 @@ class GlassScaffold extends StatelessWidget {
   /// background: Container(color: myColor)
   /// ```
   /// When both [background] and [backgroundColor] are provided, [background]
-  /// takes precedence.
+  /// takes precedence and [backgroundColor] has no effect as a solid fill.
   ///
-  /// When neither is set the Scaffold inherits `Theme.scaffoldBackgroundColor`
-  /// as normal — the inner Scaffold is **not** forced transparent.
+  /// **Scroll edge fade colour:** [backgroundColor] is also used as the target
+  /// colour for the `GlassScrollEdgeEffect` overlay (the fade at the top/bottom
+  /// of the body). When `background` is set, this is its *only* visible role.
+  /// If left null the fade defaults to `CupertinoTheme.scaffoldBackgroundColor`
+  /// (near-black in dark mode), which can produce an unexpected dark wash.
+  /// Set this explicitly whenever you use a `background` widget and the edge
+  /// fade colour matters.
+  ///
+  /// When neither [background] nor [backgroundColor] is set, the scaffold
+  /// background colour is resolved from the glass brightness cascade (see
+  /// [GlassTheme.brightnessOf]) so that it correctly follows Material
+  /// [ThemeMode] — including [ThemeMode.dark] — rather than relying on
+  /// [CupertinoTheme], which does not read Material's [Theme] in a
+  /// [MaterialApp] (issue #289).
   final Color? backgroundColor;
 
   /// Glass settings for the page's rendering layer. See [GlassPage.settings].
@@ -226,20 +250,52 @@ class GlassScaffold extends StatelessWidget {
   /// [edgeFade]. Automatically set to `true` when [bottomBar] is provided.
   final bool? bottomEdgeFade;
 
+  /// Whether the edge fades absorb pointer events. Defaults to `false`.
+  ///
+  /// When enabled, taps and gestures are blocked across each visible fade
+  /// zone, including content that is still visible beneath the fade.
+  final bool edgeFadeAbsorbsPointers;
+
   /// Extra fade height beyond the auto-calculated app bar area.
   ///
   /// The total top fade height = safe area top + [appBarHeight] +
   /// [topEdgeFadeExtent]. Defaults to 20.0.
+  ///
+  /// Negative values (e.g. `-20.0`) are valid and retract the fade boundary
+  /// inside the app bar area — especially useful with [GlassScrollEdgeStyle.blur]
+  /// to keep content sharp until it passes directly beneath the bar.
   final double topEdgeFadeExtent;
 
   /// Extra fade height beyond the auto-calculated bottom bar area.
   ///
   /// The total bottom fade height = [bottomBarHeight] + safe area bottom +
   /// [bottomEdgeFadeExtent]. Defaults to 20.0.
+  ///
+  /// Negative values (e.g. `-20.0` or `-30.0`) are valid and retract the fade
+  /// boundary inside the bottom bar area — ideal for floating tab bars and
+  /// [GlassScrollEdgeStyle.blur] so content stays 100% sharp until it is
+  /// physically beneath the glass capsule.
   final double bottomEdgeFadeExtent;
 
-  /// The edge fade style. See [GlassScrollEdgeStyle].
+  /// The edge fade style applied at the top and bottom of the scroll body.
+  /// See [GlassScrollEdgeStyle].
+  ///
+  /// Defaults to [GlassScrollEdgeStyle.soft], which matches iOS 26's
+  /// `.scrollEdgeEffectStyle(.soft)` — a diffused gradient fade.
+  ///
+  /// Set to [GlassScrollEdgeStyle.blur] for a stronger hardware-accelerated
+  /// progressive Gaussian frost. This is a design enhancement beyond the
+  /// iOS 26 system default — opt in explicitly when you want a more aggressive
+  /// frosted-glass edge look. Note it adds a [BackdropFilterLayer] per edge.
+  ///
+  /// Set to [GlassScrollEdgeStyle.hard] for a crisp cutoff, matching iOS 26's
+  /// `.scrollEdgeEffectStyle(.hard)`.
   final GlassScrollEdgeStyle edgeStyle;
+
+  /// Maximum blur sigma for [GlassScrollEdgeStyle.blur].
+  ///
+  /// Defaults to 18.0.
+  final double maxSigma;
 
   // ===========================================================================
   // Layout
@@ -294,7 +350,7 @@ class GlassScaffold extends StatelessWidget {
   ///       child: PlayBarPill(),
   ///     ),
   ///   ],
-  ///   bottomBar: GlassSearchableBottomBar(...),
+  ///   bottomBar: GlassTabBar.searchable(...),
   ///   body: scrollContent,
   /// )
   /// ```
@@ -347,7 +403,7 @@ class GlassScaffold extends StatelessWidget {
   /// ```dart
   /// GlassScaffold(
   ///   contentAwareBrightness: true,
-  ///   bottomBar: GlassBottomBar(
+  ///   bottomBar: GlassTabBar.bottom(
   ///     adaptiveBrightness: true,
   ///     ...
   ///   ),
@@ -362,23 +418,60 @@ class GlassScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Some bars change height from their own internal state — a tab bar
+    // minimizing on scroll — without the widget instance being replaced.
+    // Their preferredSize is read below, so the scaffold has to know when it
+    // has changed; nothing else would mark this build dirty.
+    //
+    // Only build() re-runs. `body` is the same Widget instance every time, so
+    // the element for the app's content is re-parented rather than rebuilt.
+    final bar = bottomBar;
+    final barResize =
+        bar is GlassDynamicPreferredSize ? bar.preferredSizeListenable : null;
+    if (barResize != null) {
+      return ListenableBuilder(
+        listenable: barResize,
+        builder: _buildContent,
+      );
+    }
+    return _buildContent(context, null);
+  }
+
+  Widget _buildContent(BuildContext context, Widget? _) {
     final mediaQuery = MediaQuery.of(context);
     final topPad = mediaQuery.padding.top;
     final botPad = mediaQuery.padding.bottom;
 
+    // In iPhone Duo's vertical bar strip a pinned app bar keeps only its
+    // title row, and the package's bottom bars leave the bottom edge for the
+    // strip — so neither covers what its preferred size says it does.
+    final verticalBar = GlassVerticalBar.maybeOf(context);
+    final bar = appBar;
+    final appBarInStrip =
+        verticalBar != null && bar is GlassAppBar && bar.pinnedActions != null;
+    final bottom = bottomBar;
+    final bottomBarInStrip = verticalBar != null &&
+        (bottom is GlassToolbar ||
+            (bottom is GlassTabBar && bottom.followsVerticalBar));
+
     // Resolve effective bar heights.
     // If appBar implements PreferredSizeWidget, use its preferred height;
     // otherwise fall back to the explicit appBarHeight parameter.
-    final effectiveAppBarHeight = appBar is PreferredSizeWidget
-        ? (appBar! as PreferredSizeWidget).preferredSize.height
-        : appBarHeight;
-    final effectiveBottomBarHeight = bottomBar is PreferredSizeWidget
-        ? (bottomBar as PreferredSizeWidget).preferredSize.height
-        : (bottomBar != null ? (bottomBarHeight ?? 60.0) : 0.0);
+    final effectiveAppBarHeight = appBarInStrip
+        ? verticalBar.rowTop + GlassVerticalBarMetrics.rowHeight
+        : appBar is PreferredSizeWidget
+            ? (appBar! as PreferredSizeWidget).preferredSize.height
+            : appBarHeight;
+    final effectiveBottomBarHeight = bottomBarInStrip
+        ? 0.0
+        : bottomBar is PreferredSizeWidget
+            ? (bottomBar as PreferredSizeWidget).preferredSize.height
+            : (bottomBar != null ? (bottomBarHeight ?? 60.0) : 0.0);
 
     // Resolve edge fade toggles.
     final doFadeTop = topEdgeFade ?? (edgeFade && appBar != null);
-    final doFadeBottom = bottomEdgeFade ?? (edgeFade && bottomBar != null);
+    final doFadeBottom =
+        bottomEdgeFade ?? (edgeFade && bottomBar != null && !bottomBarInStrip);
 
     // Calculate fade heights.
     // Only include appBarHeight when an appBar is present — without one, the
@@ -394,16 +487,39 @@ class GlassScaffold extends StatelessWidget {
 
     // Wrap with edge fading if enabled.
     if (extendBody && (doFadeTop || doFadeBottom)) {
-      bodyContent = GlassScrollEdgeEffect(
-        topFadeHeight: topFadeHeight,
-        bottomFadeHeight: bottomFadeHeight,
-        fadeTop: doFadeTop,
-        fadeBottom: doFadeBottom,
-        style: edgeStyle,
-        // Pass the explicit background colour so the async-capture fallback
-        // gradient uses the correct colour in dark mode instead of defaulting
-        // to CupertinoTheme.scaffoldBackgroundColor (which is near-black).
-        fadeColor: backgroundColor,
+      Widget edgeEffect(double topFadeHeight, Widget child) =>
+          GlassScrollEdgeEffect(
+            topFadeHeight: topFadeHeight,
+            bottomFadeHeight: bottomFadeHeight,
+            fadeTop: doFadeTop,
+            fadeBottom: doFadeBottom,
+            absorbPointer: edgeFadeAbsorbsPointers,
+            style: edgeStyle,
+            maxSigma: maxSigma,
+            // Pass the explicit background colour so the async-capture
+            // fallback gradient uses the correct colour in dark mode instead
+            // of defaulting to CupertinoTheme.scaffoldBackgroundColor (which
+            // is near-black).
+            fadeColor: backgroundColor,
+            child: child,
+          );
+
+      // In the strip a large title's row scrolls away, and hides while its
+      // search is open, so the fade under it goes with it. Built the same way
+      // either side of a posture change, so the body is never remounted.
+      final largeTitle = appBarInStrip ? bar.largeTitleController : null;
+      bodyContent = ListenableBuilder(
+        listenable: Listenable.merge([largeTitle]),
+        builder: (context, child) => edgeEffect(
+          largeTitle == null
+              ? topFadeHeight
+              : topFadeHeight -
+                  VerticalBarTitleRow.collapseExtent *
+                      (largeTitle.isSearchPresented
+                          ? 1.0
+                          : largeTitle.collapseProgress),
+          child!,
+        ),
         child: bodyContent,
       );
     }
@@ -434,6 +550,19 @@ class GlassScaffold extends StatelessWidget {
 
       // 2. Body overlays (between body and bars — e.g. floating play pill).
       if (bodyOverlays != null) ...bodyOverlays!,
+
+      // 2a. Under Reduce Transparency, the strip and the title row turn
+      // opaque behind the bars in iPhone Duo's vertical bar strip.
+      if ((appBarInStrip || bottomBarInStrip) &&
+          GlassAccessibilityData.of(context).reduceTransparency)
+        Positioned.fill(
+          key: const ValueKey('glass_scaffold_vertical_bar_background'),
+          child: VerticalBarBackground(
+            bar: verticalBar,
+            titleRow: appBarInStrip,
+            controller: appBarInStrip ? bar.largeTitleController : null,
+          ),
+        ),
 
       // 2b. Fixed header — fades on scroll (e.g. "Listen Now" in Apple Music).
       // IgnorePointer is only active when opacity == 0 (fully faded) so that
@@ -501,9 +630,14 @@ class GlassScaffold extends StatelessWidget {
       // 3. Bottom bar (above body — painted after body in Stack).
       // SafeArea ensures the bar is never obscured by the Android system
       // navigation bar or the iOS home indicator on any device.
+      //
+      // A bar in iPhone Duo's vertical bar strip gets the full height: it
+      // aligns itself to the bottom of the strip, and a searchable tab bar
+      // opens its field at the top of the content.
       if (bottomBar != null)
         Positioned(
           key: const ValueKey('glass_scaffold_bottom_bar'),
+          top: bottomBarInStrip ? 0 : null,
           left: 0,
           right: 0,
           bottom: 0,
@@ -525,6 +659,12 @@ class GlassScaffold extends StatelessWidget {
         ),
     ];
 
+    // Resolve brightness from the glass brightness cascade (issue #289):
+    // themeOverride.brightness → GlassThemeData.brightness → Cupertino pin →
+    // Material ThemeMode (via glassExternalBrightnessResolver) → system OS.
+    final Brightness resolvedBrightness =
+        themeOverride?.brightness ?? GlassTheme.brightnessOf(context);
+
     // Resolve the system UI overlay style for the AnnotatedRegion.
     // This ensures the status bar icons are correctly styled even on routes
     // pushed via CupertinoPageRoute (which manages its own AnnotatedRegion).
@@ -534,8 +674,9 @@ class GlassScaffold extends StatelessWidget {
     final bool useLightIcons = switch (statusBarStyle) {
       GlassStatusBarStyle.light => true,
       GlassStatusBarStyle.dark => false,
-      GlassStatusBarStyle.auto =>
-        MediaQuery.platformBrightnessOf(context) == Brightness.dark,
+      // Use the glass brightness cascade (issue #289): honours Material
+      // ThemeMode via the external resolver, not just the OS platform setting.
+      GlassStatusBarStyle.auto => resolvedBrightness == Brightness.dark,
       GlassStatusBarStyle.none => true, // doesn't matter — no region
     };
 
@@ -551,7 +692,7 @@ class GlassScaffold extends StatelessWidget {
     }
 
     // Resolve effective background: explicit widget > backgroundColor colour >
-    // null (Scaffold inherits Theme.scaffoldBackgroundColor).
+    // null.
     final Widget? effectiveBackground = background ??
         (backgroundColor != null
             ? SizedBox.expand(
@@ -559,15 +700,26 @@ class GlassScaffold extends StatelessWidget {
               )
             : null);
 
-    Widget scaffold = CupertinoPageScaffold(
-      // Only force transparent when GlassPage will render a background widget
-      // behind the scaffold. When no background is provided, null lets
-      // CupertinoPageScaffold use the CupertinoTheme default (opaque) so the
-      // page is not see-through during route transitions (issue #177).
-      backgroundColor:
-          effectiveBackground != null ? const Color(0x00000000) : null,
-      resizeToAvoidBottomInset: resizeToAvoidBottomInset ?? true,
-      child: stackWidget,
+    // Wrap in CupertinoTheme with resolved brightness so CupertinoPageScaffold
+    // and all child Cupertino widgets (GlassAppBar title, etc.) resolve their
+    // dynamic colours (like CupertinoColors.systemBackground) to the correct
+    // brightness in MaterialApp (issue #289).
+    // When no explicit background is provided, passing null for backgroundColor
+    // allows CupertinoPageScaffold to inherit CupertinoTheme.scaffoldBackgroundColor
+    // as an opaque background, preserving route transition opacity (issue #177)
+    // while adapting correctly to dark/light mode.
+    final CupertinoThemeData currentCupertinoTheme = CupertinoTheme.of(context);
+
+    Widget scaffold = CupertinoTheme(
+      data: currentCupertinoTheme.copyWith(
+        brightness: resolvedBrightness,
+      ),
+      child: CupertinoPageScaffold(
+        backgroundColor:
+            effectiveBackground != null ? const Color(0x00000000) : null,
+        resizeToAvoidBottomInset: resizeToAvoidBottomInset ?? true,
+        child: stackWidget,
+      ),
     );
 
     // Wrap in AnnotatedRegion so the status bar style sticks even on

@@ -2,7 +2,7 @@ import 'dart:io';
 import 'dart:convert';
 
 import 'package:flutter/services.dart';
-import 'package:flutter_qjs/flutter_qjs.dart';
+import 'source_script_engine.dart';
 
 import '../../../models/source_meta.dart';
 import '../common/source_json_coerce.dart';
@@ -118,7 +118,7 @@ class SourceRuntimeLoader implements SourceRuntimeLoadClient {
     final initScript = await _loadAssetText(_bundledInitAssetPath);
     final sourceScript = await sourceFile.readAsString();
     final sdk = await _loadAssetText('assets/hazuki_plugin_sdk.js');
-    final engine = FlutterQjs(
+    final engine = SourceScriptEngine(
       timeout: 5000,
       memoryLimit: 64 * 1024 * 1024,
       hostPromiseRejectionHandler: (_) {},
@@ -128,19 +128,14 @@ class SourceRuntimeLoader implements SourceRuntimeLoadClient {
     final oldHtmlBridge = handle.htmlBridge;
     final htmlBridge = SourceHtmlBridge();
     try {
-      engine.dispatch();
-      final setGlobal =
-          engine.evaluate('(k, v) => { this[k] = v; }') as JSInvokable;
-      setGlobal.invoke([
-        'sendMessage',
+      engine.setMessageHandler(
         (dynamic message) => _jsBridge.handleJsMessageForHandle(
           handle,
           message,
           htmlBridge: htmlBridge,
         ),
-      ]);
-      setGlobal.invoke(['appVersion', '1.0.0']);
-      setGlobal.free();
+      );
+      engine.setGlobal('appVersion', '1.0.0');
 
       engine.evaluate(initScript, name: 'init.js');
       engine.evaluate(sdk, name: 'hazuki_plugin_sdk.js');

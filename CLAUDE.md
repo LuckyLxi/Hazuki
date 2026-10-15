@@ -26,7 +26,7 @@ dart run build_runner build --delete-conflicting-outputs
 dart format --output=none --set-exit-if-changed lib test
 ```
 
-`third_party/flutter_qjs` and each package under `third_party/pub_overrides/` are **separate packages** — run their `flutter pub get` / `dart format` / `flutter analyze` / `flutter test` from that directory, not the repo root. Do not overwrite the local `dependency_overrides` in `pubspec.yaml` (they patch upstream bugs).
+`third_party/pub_overrides/quickjs_engine` and each package under `third_party/pub_overrides/` are **separate packages** — run their `flutter pub get` / `dart format` / `flutter analyze` / `flutter test` from that directory, not the repo root. Do not overwrite the local `dependency_overrides` in `pubspec.yaml` (they patch upstream bugs).
 
 ## Architecture
 
@@ -34,7 +34,7 @@ Hazuki is a Flutter manga reader targeting Android. It fetches and renders manga
 
 ### JS source runtime
 
-All manga data (browse, search, favorites, chapters, images) flows through a JavaScript runtime powered by `flutter_qjs` (QuickJS, at `third_party/flutter_qjs`). The JS source script is downloaded at first launch and stored locally. `assets/init.js` is the bridge library injected into the runtime before the source script (provides `sendMessage`, `Convert`, `Network`, etc.).
+All manga data (browse, search, favorites, chapters, images) flows through a JavaScript runtime powered by `quickjs_engine` (QuickJS, at `third_party/pub_overrides/quickjs_engine`). The JS source script is downloaded at first launch and stored locally. `assets/init.js` is the bridge library injected into the runtime before the source script (provides `sendMessage`, `Convert`, `Network`, etc.).
 
 The source service is a decomposed subsystem under `lib/services/source/`, layered as:
 

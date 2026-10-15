@@ -102,7 +102,7 @@ class GlassIconButton extends StatelessWidget {
     this.quality,
     this.persistPressOnDrag = true,
     this.anchorStretch = true,
-    this.anchorStretchSettings = const AnchorStretchSettings(),
+    this.anchorStretchSettings,
     this.platformViewBackdrop = false,
     this.focusNode,
     this.autofocus = false,
@@ -218,8 +218,8 @@ class GlassIconButton extends StatelessWidget {
 
   /// Fine-tuning for the anchor stretch effect.
   ///
-  /// See [AnchorStretchSettings] for details.
-  final AnchorStretchSettings anchorStretchSettings;
+  /// Defaults to `null`. See [GlassButton.anchorStretchSettings].
+  final AnchorStretchSettings? anchorStretchSettings;
 
   /// When true (typically for iOS PlatformViews), forces the BackdropFilter
   /// fallback render path instead of the Impeller-native shader. Forwarded to

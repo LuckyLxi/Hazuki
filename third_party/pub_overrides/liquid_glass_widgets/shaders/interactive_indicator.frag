@@ -6,6 +6,7 @@
 // indicators (segmented controls, pills). Fully original implementation.
 
 #include <flutter/runtime_effect.glsl>
+#include "gles_compat.glsl"
 
 precision highp float;
 
@@ -44,6 +45,8 @@ uniform vec4 uData4; // 16..19 (cornerRadius, scale.x, scale.y, glowIntensity)
 uniform vec4 uData5; // 20..23 (densityFactor, interactionIntensity, bgOrigin.x, bgOrigin.y)
 uniform vec4 uData6; // 24..27 (bgSize.width, bgSize.height, hasBackground, ambientRim)
 uniform vec4 uData7; // 28..31 (baseAlphaMultiplier, edgeAlphaMultiplier, rimThickness, rimSmoothing)
+// 32:  uDpr (float)  — device pixel ratio for textureBilinear()
+// 33:  uEdgeAbsorption — Beer-Lambert meniscus rim darkening strength [0..1]
 
 uniform sampler2D uTexture;         // Captured background image
 
@@ -51,6 +54,13 @@ uniform sampler2D uTexture;         // Captured background image
 // The background texture is now captured at full DPR resolution, so the
 // physical texel size = logical uBackgroundSize * uDpr.
 uniform float uDpr;
+
+// 33: Meniscus rim darkening — Beer-Lambert absorption at the pill boundary.
+// Applied before specular highlights (physical ordering: light is absorbed
+// first, then reflected). Same formula as liquid_glass_render.frag.
+// Range: 0.0 (flat, no absorption) → 1.0 (fully dark rim).
+// iOS 26 reference calibrated at ~0.15.
+uniform float uEdgeAbsorption;
 
 out vec4 fragColor;
 
@@ -215,10 +225,12 @@ void main() {
   vec2 edgeOffsetUV = edgeOffsetLogical / uBackgroundSize;
   
   // Apply refraction offset along the surface normal.
-  // On OpenGL ES the background texture is stored with a bottom-left Y origin,
-  // so edgeOffsetLogical.y (computed in Flutter's Y-down space) must be
+  // On pre-3.46 OpenGL ES the background texture is stored with a bottom-left Y
+  // origin, so edgeOffsetLogical.y (computed in Flutter's Y-down space) must be
   // negated to sample in the correct outward direction in the Y-up UV space.
-  #ifdef IMPELLER_TARGET_OPENGLES
+  // Flutter 3.46+ stores it top-down on every backend (see gles_compat.glsl),
+  // where negating would invert the refraction instead of correcting it.
+  #ifdef LGR_GLES_FLIP_SAMPLE_Y
     vec2 localRefracted = posInBg + vec2(edgeOffsetLogical.x, -edgeOffsetLogical.y);
   #else
     vec2 localRefracted = posInBg - edgeOffsetLogical;
@@ -328,9 +340,6 @@ void main() {
   // ==========================================================================
   
   // Start with background — glass transmits and adds luminosity, not darkness.
-  // bgBoost boosts the background texture (if present) based on saturation.
-  // In synthetic mode, we just use the un-boosted bg color so it matches exactly
-  // what the user passed as the indicatorColor, preserving its brightness.
   float bgBoost = uSaturation;
   vec3 finalColor = (uHasBackground > 0.5) ? (bg * bgBoost) : bg;
   
@@ -340,17 +349,63 @@ void main() {
   finalColor += rimColor * borderMask * 1.5;
 
   // Add fresnel glow — uGlowIntensity controls how visible the glass-edge luminosity is.
-  // Default: glowIntensity=0.75 matches previous hardcoded value.
-  finalColor += vec3(1.0) * fresnel * uGlowIntensity; // TUNE via LiquidGlassSettings.glowIntensity
+  finalColor += vec3(1.0) * fresnel * uGlowIntensity;
   
   // Interior light lift — matches Premium Impeller's internal SDF specular glow.
-  // uAmbientStrength directly controls this lift value.
-  // Ambient strength is already normalized (0.25x) in the Dart layout pass.
-  finalColor += vec3(uAmbientStrength); // TUNE via LiquidGlassSettings.ambientStrength
+  finalColor += vec3(uAmbientStrength);
   
   // Apply glass tint color
   finalColor = mix(finalColor, finalColor + uGlassColor.rgb * 0.2, uGlassColor.a);
-  
+
+  // ==========================================================================
+  // MENISCUS RIM DARKENING (Beer-Lambert absorption) — applied LAST
+  // ==========================================================================
+  // Three physics improvements over a naive isotropic absorption:
+  //
+  // [1] HEMISPHERE LENS PROFILE
+  //     A glass pill cross-section is a circular arc — thickest at the rim,
+  //     thinning toward the interior following a hemisphere curve:
+  //         thickness(r) = sqrt(1 - r²)  where r = distFromEdge / edgeZone
+  //     This gives a physically correct onset: slow in the middle of the zone,
+  //     sharper right at the boundary — matching a real curved glass edge.
+  //     Previously: sqrt(edgeInfluence) which is a polynomial convenience, not
+  //     a lens shape.
+  //
+  // [2] LIGHT-MODULATED ABSORPTION STRENGTH
+  //     The meniscus absorbs the same amount on all sides (Beer-Lambert), but
+  //     the PERCEIVED darkness differs by quadrant:
+  //       • Lit side:    specular highlight partially compensates → rim appears
+  //                      bright, absorption is perceptually hidden.
+  //       • Shadow side: no specular compensation → dark band fully exposed.
+  //     iOS 26 reference: the shadow-side meniscus is clearly darker than the
+  //     lit-side meniscus, not because more absorption occurs, but because the
+  //     specular energy on the lit side "fills in" the absorbed darkness.
+  //     We replicate this by weakening absorption on the lit side, where it is
+  //     masked anyway, and strengthening it on the shadow side, where it is the
+  //     dominant visual term.
+  //       dot(surfaceNormal, uLightDirection) = +1  → full facing light → litness=1
+  //       dot(surfaceNormal, uLightDirection) = -1  → shadow side      → litness=0
+  //     absorption scale: [0.6 × strength (lit)] … [1.4 × strength (shadow)]
+  //
+  // [3] CHROMATIC ABERRATION AT THE RIM
+  //     Already implemented in the background sampling section above (line ~246):
+  //       vec2 distort = surfaceNormal * edgeInfluence * uChromaticAberration;
+  //     edgeInfluence concentrates the RGB split at the SDF boundary. No change
+  //     needed here — this shader already has edge-weighted dispersion.
+
+  // [1] Hemisphere lens thickness profile
+  float r_norm = clamp(distFromEdge / edgeZone, 0.0, 1.0);
+  float lensThickness = sqrt(max(0.0, 1.0 - r_norm * r_norm)); // hemisphere arc
+
+  // [2] Light-modulated strength: weaker on lit side (0.6×), stronger on shadow (1.4×)
+  float litness = dot(surfaceNormal, uLightDirection); // [-1, +1]
+  float dirScale = mix(1.4, 0.6, litness * 0.5 + 0.5); // shadow → lit
+  float modulatedAbsorption = uEdgeAbsorption * dirScale;
+
+  // Combined: hemisphere profile × light-modulated strength
+  float absorption = 1.0 - lensThickness * modulatedAbsorption;
+  finalColor *= max(0.0, absorption);
+
   // Clamp to prevent over-bright pixels
   finalColor = min(finalColor, vec3(1.2));
   

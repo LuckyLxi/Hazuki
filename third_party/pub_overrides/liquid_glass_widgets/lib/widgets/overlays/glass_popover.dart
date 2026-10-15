@@ -1,8 +1,11 @@
 import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/scheduler.dart';
+import '../../src/utils/glass_localizations.dart';
 import '../../utils/glass_morph_controller.dart';
 import '../../src/renderer/liquid_glass_renderer.dart';
+import '../../src/widgets/surfaces/vertical_bar_presentation.dart';
 
 import '../../constants/glass_defaults.dart';
 import '../../types/glass_quality.dart';
@@ -11,6 +14,7 @@ import '../shared/inherited_liquid_glass.dart';
 import 'glass_menu.dart' show GlassMenuAlignment;
 import '../../theme/glass_theme_helpers.dart';
 import '../../theme/glass_theme.dart';
+import '../shared/glass_accessibility_scope.dart';
 
 part 'shared/glass_popover_internal.dart';
 
@@ -122,6 +126,7 @@ class GlassPopover extends StatefulWidget {
     this.barrierDismissible = true,
     this.blurRampDuration = const Duration(milliseconds: 260),
     this.blurRampCurve = Curves.easeOut,
+    this.semanticLabel,
   }) : assert(trigger != null || triggerBuilder != null,
             'Either trigger or triggerBuilder must be provided');
 
@@ -133,6 +138,14 @@ class GlassPopover extends StatefulWidget {
   /// If your trigger is interactive (like a [GlassButton]), use
   /// [triggerBuilder] instead to manually handle the tap event.
   final Widget? trigger;
+
+  /// What the [trigger] opens, announced by screen readers (for example
+  /// "More actions").
+  ///
+  /// The [trigger] is exposed as a button. A text trigger names itself, so
+  /// this matters most for an icon. Not used with [triggerBuilder], whose
+  /// widget carries its own semantics.
+  final String? semanticLabel;
 
   /// A builder for the trigger widget that provides access to the popover
   /// toggle callback.

@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter_qjs/flutter_qjs.dart';
 import '../common/source_json_coerce.dart';
 
 import '../models/source_contract_models.dart';
@@ -79,17 +78,10 @@ class SourceImagePreparationCapability {
           'typeof this.__hazuki_source.comic?.transformImageBytes === "function"',
         ) ==
         true) {
-      final invoke =
-          engine!.evaluate(
-                '(bytes,url,id,ep)=>Promise.resolve(this.__hazuki_source.comic.transformImageBytes(new Uint8Array(bytes),url,id,ep)).then(result=>{const v=result?.bytes;return ArrayBuffer.isView(v)?{...result,bytes:v.buffer.slice(v.byteOffset,v.byteOffset+v.byteLength)}:result})',
-              )
-              as JSInvokable;
-      dynamic pending;
-      try {
-        pending = invoke.invoke([rawBytes, imageUrl, comicId, epId]);
-      } finally {
-        invoke.free();
-      }
+      final pending = engine!.invoke(
+        '(bytes,url,id,ep)=>Promise.resolve(this.__hazuki_source.comic.transformImageBytes(new Uint8Array(bytes),url,id,ep)).then(result=>{const v=result?.bytes;return ArrayBuffer.isView(v)?{...result,bytes:v.buffer.slice(v.byteOffset,v.byteOffset+v.byteLength)}:result})',
+        [rawBytes, imageUrl, comicId, epId],
+      );
       final result = await handle.facade.js.resolve(pending);
       if (result is! Map || result['bytes'] == null) {
         throw StateError('plugin_invalid_image_transform');

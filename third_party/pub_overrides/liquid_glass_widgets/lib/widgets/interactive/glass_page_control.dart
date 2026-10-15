@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 
 import '../../src/renderer/liquid_glass_renderer.dart';
 import '../../types/glass_quality.dart';
+import '../shared/glass_accessibility_scope.dart';
 import 'glass_button.dart';
 
 /// A glass morphism page control following iOS 26's `UIPageControl` design.
@@ -183,7 +184,7 @@ class GlassPageControl extends StatefulWidget {
 class _GlassPageControlState extends State<GlassPageControl>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
-  late Animation<double> _animation;
+  late CurvedAnimation _animation;
   int _previousPage = 0;
 
   // Active/inactive dot colors are resolved at build time from
@@ -209,15 +210,24 @@ class _GlassPageControlState extends State<GlassPageControl>
     super.didUpdateWidget(oldWidget);
     if (oldWidget.currentPage != widget.currentPage) {
       _previousPage = oldWidget.currentPage;
-      _controller.forward(from: 0.0);
+      // Reduce Motion: the active dot moves at once.
+      if (GlassAccessibilityData.of(context).reduceMotion) {
+        _controller.value = 1.0;
+      } else {
+        _controller.forward(from: 0.0);
+      }
     }
     if (oldWidget.animationDuration != widget.animationDuration) {
       _controller.duration = widget.animationDuration;
+    }
+    if (oldWidget.animationCurve != widget.animationCurve) {
+      _animation.curve = widget.animationCurve;
     }
   }
 
   @override
   void dispose() {
+    _animation.dispose();
     _controller.dispose();
     super.dispose();
   }

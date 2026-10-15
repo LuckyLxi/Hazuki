@@ -26,7 +26,7 @@ import '../src/renderer/liquid_glass_renderer.dart';
 ///   data: GlassThemeData(
 ///     interaction: GlassInteractionSettings(
 ///       stretch: 0.2,        // subtler stretch globally
-///       interactionScale: 1.03, // less scale-up on press
+///       interactionScale: 1.15, // less inflation on press
 ///     ),
 ///   ),
 ///   child: child!,
@@ -85,10 +85,13 @@ class GlassInteractionSettings {
   /// The scale factor applied when the user presses the widget.
   ///
   /// - `1.0` = no scaling
-  /// - `1.05` (widget default) = 5% grow on press
-  /// - `1.1` = 10% grow on press
+  /// - `1.15` = a fixed 15% grow on press
+  /// - `1.3` = a fixed 30% grow on press
   ///
-  /// When `null`, each widget uses its own default (typically `1.05`).
+  /// When `null`, each widget uses its own default — [GlassButton] sizes the
+  /// press as iOS 26 does, growing its longest side by ~17 pt (1.3× for a
+  /// 56 pt circle, 1.13× for a 132 pt pill); chips, sheets and menus use
+  /// small fixed factors.
   final double? interactionScale;
 
   /// The resistance factor applied to the drag offset.
@@ -112,8 +115,9 @@ class GlassInteractionSettings {
   ///
   /// Controls intensity, squash, translation damping, and bounciness.
   ///
-  /// When `null`, each widget uses its own default
-  /// (`AnchorStretchSettings()` with iOS 26 defaults).
+  /// When `null`, [GlassButton] uses a native tremor default — very gentle
+  /// (intensity 0.1, squash 0.1, no bounce), matching the ≤5% elongation
+  /// measured on iOS 26 glass. Other widgets fall back to their own defaults.
   final AnchorStretchSettings? anchorStretchSettings;
 
   /// Creates a copy with overridden values.

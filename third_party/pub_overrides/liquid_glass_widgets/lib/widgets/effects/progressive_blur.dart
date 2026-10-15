@@ -1,5 +1,6 @@
 import 'dart:ui' as ui;
 
+import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 
 /// The edge a [ProgressiveBlur] is *strongest* at; it eases to perfectly sharp
@@ -180,48 +181,218 @@ class _ProgressiveBlurState extends State<ProgressiveBlur> {
     }
 
     // The bound texture (and thus uSize, float indices 0,1) is the WHOLE
-    // backdrop, not this widget — so we pass the widget's own device-pixel
-    // rectangle to normalise the gradient over the bar (see the .frag header).
-    // The bar is anchored at the top-left of the backdrop layer (true for top
-    // app bars), so its origin is (0,0); LayoutBuilder gives its size.
+    // backdrop, not this widget — so the shader needs this widget's own
+    // device-pixel rectangle to normalise the gradient over. Both halves of
+    // that rectangle are resolved at PAINT time; see [_RenderProgressiveBlur].
+    //
+    // The ClipRect bounds what the filter WRITES — a backdrop filter otherwise
+    // reaches up to the nearest ancestor clip, and the shader clamps its
+    // gradient at the region's edges rather than stopping there, so an
+    // unclipped band frosted the whole backdrop width. Under a Cupertino pop
+    // that is the route being revealed, which is translated, not clipped
+    // (#278).
     // coverage:ignore-start
     // Requires a compiled FragmentProgram; the headless test VM never provides
     // one. The fallback path above is tested.
-    final dpr = MediaQuery.devicePixelRatioOf(context);
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final wPx = constraints.maxWidth * dpr;
-        final hPx = constraints.maxHeight * dpr;
-        void configure(ui.FragmentShader s, double axis) {
-          s
-            ..setFloat(2, widget.maxSigma * dpr)
-            ..setFloat(3, widget.falloff)
-            ..setFloat(4, widget.direction._uniform)
-            ..setFloat(5, axis) // 0 = horizontal, 1 = vertical
-            ..setFloat(6, 0) // region origin x (device px)
-            ..setFloat(7, 0) // region origin y (device px)
-            ..setFloat(8, wPx) // region width (device px)
-            ..setFloat(9, hPx); // region height (device px)
-        }
-
-        configure(h, 0);
-        configure(v, 1);
-
-        // Separable 2-pass: horizontal (inner) then vertical (outer) = a clean
-        // 2-D gaussian.
-        final filter = ui.ImageFilter.compose(
-          outer: ui.ImageFilter.shader(v),
-          inner: ui.ImageFilter.shader(h),
-        );
-
-        return ClipRect(
-          child: BackdropFilter(
-            filter: filter,
-            child: const SizedBox.expand(),
-          ),
-        );
-      },
+    return ClipRect(
+      child: _ProgressiveBlurLayer(
+        hShader: h,
+        vShader: v,
+        maxSigma: widget.maxSigma,
+        falloff: widget.falloff,
+        direction: widget.direction,
+        devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
+        child: const SizedBox.expand(),
+      ),
     );
     // coverage:ignore-end
   }
 }
+
+/// The eight uniforms describing the blur region, in the order the program
+/// declares them (float indices 2-9).
+///
+/// Pure, and public to tests, because the defect this replaced was a hard-coded
+/// zero in the middle of a widget build — which no test could see: the shader
+/// path needs a compiled [ui.FragmentProgram], and a headless VM never provides
+/// one. The arithmetic can at least be pinned.
+@visibleForTesting
+List<double> progressiveBlurUniforms({
+  required Offset origin,
+  required Size size,
+  required double devicePixelRatio,
+  required double maxSigma,
+  required double falloff,
+  required ProgressiveBlurDirection direction,
+  required double axis,
+}) =>
+    <double>[
+      maxSigma * devicePixelRatio,
+      falloff,
+      direction._uniform,
+      axis, // 0 = horizontal, 1 = vertical
+      origin.dx * devicePixelRatio,
+      origin.dy * devicePixelRatio,
+      size.width * devicePixelRatio,
+      size.height * devicePixelRatio,
+    ];
+
+// Everything below is reachable only with a compiled FragmentProgram, which a
+// headless VM never provides — so it cannot be exercised by `flutter test`, and
+// the region maths is factored into [progressiveBlurUniforms] above so that the
+// part which CAN be tested, is.
+// coverage:ignore-start
+
+/// Applies the two-pass shader as a backdrop filter.
+///
+/// A render object rather than a [BackdropFilter] under a [LayoutBuilder]
+/// because the region rectangle is only knowable — and only stays current — at
+/// paint time. Two consequences fall out of that:
+///
+///  * The widget's offset within the backdrop layer changes whenever an
+///    ancestor MOVES it: a sheet being dragged, a scroll, an animated inset.
+///    Those move it by repainting, not by rebuilding, so an offset read during
+///    build (or in a post-frame callback) is stale for as long as the motion
+///    lasts, and the gradient is normalised over the wrong rectangle the whole
+///    time.
+///  * Dropping the [LayoutBuilder] also lets a [ProgressiveBlur] sit under a
+///    parent that asks for intrinsic dimensions, which LayoutBuilder refuses to
+///    answer.
+class _ProgressiveBlurLayer extends SingleChildRenderObjectWidget {
+  const _ProgressiveBlurLayer({
+    required this.hShader,
+    required this.vShader,
+    required this.maxSigma,
+    required this.falloff,
+    required this.direction,
+    required this.devicePixelRatio,
+    required Widget super.child,
+  });
+
+  final ui.FragmentShader hShader;
+  final ui.FragmentShader vShader;
+  final double maxSigma;
+  final double falloff;
+  final ProgressiveBlurDirection direction;
+  final double devicePixelRatio;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _RenderProgressiveBlur(
+        hShader: hShader,
+        vShader: vShader,
+        maxSigma: maxSigma,
+        falloff: falloff,
+        direction: direction,
+        devicePixelRatio: devicePixelRatio,
+      );
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    _RenderProgressiveBlur renderObject,
+  ) =>
+      renderObject.update(
+        hShader: hShader,
+        vShader: vShader,
+        maxSigma: maxSigma,
+        falloff: falloff,
+        direction: direction,
+        devicePixelRatio: devicePixelRatio,
+      );
+}
+
+class _RenderProgressiveBlur extends RenderProxyBox {
+  _RenderProgressiveBlur({
+    required ui.FragmentShader hShader,
+    required ui.FragmentShader vShader,
+    required double maxSigma,
+    required double falloff,
+    required ProgressiveBlurDirection direction,
+    required double devicePixelRatio,
+  })  : _hShader = hShader,
+        _vShader = vShader,
+        _maxSigma = maxSigma,
+        _falloff = falloff,
+        _direction = direction,
+        _devicePixelRatio = devicePixelRatio;
+
+  ui.FragmentShader _hShader;
+  ui.FragmentShader _vShader;
+  double _maxSigma;
+  double _falloff;
+  ProgressiveBlurDirection _direction;
+  double _devicePixelRatio;
+
+  /// One setter for the lot: every field arrives from the same widget on the
+  /// same rebuild, so a single comparison is all the change detection this
+  /// needs. The shaders are compared by identity — they are long-lived
+  /// [ui.FragmentShader] instances owned by the [State], not values.
+  void update({
+    required ui.FragmentShader hShader,
+    required ui.FragmentShader vShader,
+    required double maxSigma,
+    required double falloff,
+    required ProgressiveBlurDirection direction,
+    required double devicePixelRatio,
+  }) {
+    if (identical(_hShader, hShader) &&
+        identical(_vShader, vShader) &&
+        _maxSigma == maxSigma &&
+        _falloff == falloff &&
+        _direction == direction &&
+        _devicePixelRatio == devicePixelRatio) {
+      return;
+    }
+    _hShader = hShader;
+    _vShader = vShader;
+    _maxSigma = maxSigma;
+    _falloff = falloff;
+    _direction = direction;
+    _devicePixelRatio = devicePixelRatio;
+    markNeedsPaint();
+  }
+
+  @override
+  bool get alwaysNeedsCompositing => true;
+
+  @override
+  BackdropFilterLayer? get layer => super.layer as BackdropFilterLayer?;
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    if (child == null) {
+      layer = null;
+      return;
+    }
+    // The offset in the backdrop layer's own coordinate space — which is what
+    // the shader's FlutterFragCoord() is expressed in.
+    final origin = localToGlobal(Offset.zero);
+    _configure(_hShader, 0, origin);
+    _configure(_vShader, 1, origin);
+
+    // Separable 2-pass: horizontal (inner) then vertical (outer) = a clean
+    // 2-D gaussian.
+    (layer ??= BackdropFilterLayer()).filter = ui.ImageFilter.compose(
+      outer: ui.ImageFilter.shader(_vShader),
+      inner: ui.ImageFilter.shader(_hShader),
+    );
+    context.pushLayer(layer!, super.paint, offset);
+  }
+
+  void _configure(ui.FragmentShader shader, double axis, Offset origin) {
+    final uniforms = progressiveBlurUniforms(
+      origin: origin,
+      size: size,
+      devicePixelRatio: _devicePixelRatio,
+      maxSigma: _maxSigma,
+      falloff: _falloff,
+      direction: _direction,
+      axis: axis,
+    );
+    for (var i = 0; i < uniforms.length; i++) {
+      shader.setFloat(2 + i, uniforms[i]);
+    }
+  }
+}
+// coverage:ignore-end

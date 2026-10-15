@@ -7,8 +7,13 @@ import '../../theme/glass_theme.dart';
 import '../../theme/glass_theme_helpers.dart';
 import '../../types/glass_quality.dart';
 import '../shared/adaptive_liquid_glass_layer.dart';
-import '../surfaces/glass_bottom_bar.dart' show MaskingQuality;
-import '../surfaces/glass_tab_bar.dart' show DividerSettings, GlassSegment;
+import '../surfaces/shared/tab_bar_types.dart' show MaskingQuality;
+import '../surfaces/glass_tab_bar.dart'
+    show
+        DividerSettings,
+        GlassSegment,
+        SegmentDragBehavior,
+        SegmentSelectionAlignment;
 import '../../src/widgets/interactive/scrollable_segment_content.dart';
 import '../../src/widgets/interactive/segmented_control_internal.dart';
 
@@ -195,6 +200,10 @@ class GlassSegmentedControl extends StatefulWidget {
     this.useOwnLayer = false,
     this.quality,
     this.backgroundKey,
+    this.scrollController,
+    this.selectionAlignment = SegmentSelectionAlignment.minimal,
+    this.regridDuration = Duration.zero,
+    this.dragBehavior = SegmentDragBehavior.selectIndicator,
     this.direction = Axis.horizontal,
     this.segmentExtent,
     // ── iOS 26 interaction ──────────────────────────────────────────────────
@@ -265,6 +274,10 @@ class GlassSegmentedControl extends StatefulWidget {
     this.quality,
     this.backgroundKey,
     // Scrollable-specific params
+    this.scrollController,
+    this.selectionAlignment = SegmentSelectionAlignment.minimal,
+    this.regridDuration = Duration.zero,
+    this.dragBehavior = SegmentDragBehavior.selectIndicator,
     this.iconSize = 24.0,
     this.labelPadding = const EdgeInsets.symmetric(horizontal: 16),
     this.selectedIconColor,
@@ -412,7 +425,7 @@ class GlassSegmentedControl extends StatefulWidget {
   /// Maximum concave lens pinch strength. Forwarded to [AnimatedGlassIndicator].
   ///
   /// Defaults to `0.4` — the iOS 26-calibrated gentle concave lens warp, matching
-  /// [GlassBottomBar] and [GlassTabBar] for a consistent feel across all
+  /// [GlassTabBar] for a consistent feel across all
   /// interactive indicator widgets. Set to `0.0` to disable, `1.0` to restore
   /// the original full-strength warp.
   final double indicatorPinchStrength;
@@ -421,8 +434,8 @@ class GlassSegmentedControl extends StatefulWidget {
   ///
   /// The pill grows by this amount beyond its segment boundary as the user drags,
   /// creating the iOS 26 "jelly" overshoot. Defaults to
-  /// `EdgeInsets.symmetric(horizontal: 12, vertical: 8)` matching [GlassBottomBar]
-  /// and [GlassTabBar].
+  /// `EdgeInsets.symmetric(horizontal: 12, vertical: 8)` matching
+  /// [GlassTabBar].
   final EdgeInsetsGeometry indicatorExpansion;
 
   // ===========================================================================
@@ -484,6 +497,46 @@ class GlassSegmentedControl extends StatefulWidget {
   // Scrollable-mode params (used only when isScrollable: true)
   // ===========================================================================
 
+  /// External scroll controller for the scrollable variant. Scrollable
+  /// mode only.
+  ///
+  /// Lets the host read and position the viewport — for example, keeping
+  /// the selected segment at an exact screen position while the segment
+  /// list is reconfigured around it (a picker changing its granularity).
+  /// When null the control manages its own. Provide it from the first
+  /// build; swapping between external and internal after mount is not
+  /// supported.
+  final ScrollController? scrollController;
+
+  /// Where the scrollable variant keeps its selected segment. Scrollable
+  /// mode only.
+  ///
+  /// [SegmentSelectionAlignment.minimal] (default) scrolls just enough for
+  /// the selection to be visible; [SegmentSelectionAlignment.center] keeps
+  /// it centered whenever the list allows — the picker behavior.
+  final SegmentSelectionAlignment selectionAlignment;
+
+  /// Duration of the re-grid morph when the segment LIST changes around a
+  /// surviving selection (scrollable mode only): entering segments grow in
+  /// (width, with a slight scale and fade riding it), leaving segments
+  /// shrink out, and the survivors glide — anchored so the selected
+  /// segment does not move on screen.
+  ///
+  /// Defaults to [Duration.zero] — the list snaps, and the morph is
+  /// opt-in. There is no platform behavior to mirror here (native
+  /// segmented controls do not scroll), so a host's control should not
+  /// start animating just because the package was upgraded.
+  /// Reduce Motion always snaps.
+  final Duration regridDuration;
+
+  /// What a horizontal drag means. Scrollable mode only — the fixed
+  /// control always drags its indicator (`UISegmentedControl` parity).
+  ///
+  /// Defaults to [SegmentDragBehavior.selectIndicator] (unchanged
+  /// behavior). Use [SegmentDragBehavior.scroll] for picker-style strips
+  /// where a drag should navigate the list and selection is tap-only.
+  final SegmentDragBehavior dragBehavior;
+
   /// Icon size in logical pixels. Used in scrollable mode only.
   /// Defaults to 24.0 — matching [GlassTabBar].
   final double iconSize;
@@ -514,16 +567,18 @@ class GlassSegmentedControl extends StatefulWidget {
 
 class _GlassSegmentedControlState extends State<GlassSegmentedControl> {
   late final ScrollController _scrollController;
+  late final bool _ownsController;
 
   @override
   void initState() {
     super.initState();
-    _scrollController = ScrollController();
+    _scrollController = widget.scrollController ?? ScrollController();
+    _ownsController = widget.scrollController == null;
   }
 
   @override
   void dispose() {
-    _scrollController.dispose();
+    if (_ownsController) _scrollController.dispose();
     super.dispose();
   }
 
@@ -553,7 +608,7 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> {
       final isLight = GlassTheme.brightnessOf(context) == Brightness.light;
       final bg = widget.backgroundColor ??
           (isLight ? _defaultLightBg : _defaultDarkBg);
-      final borderRadius = BorderRadius.circular(widget.borderRadius);
+      final borderRadius = GlassDefaults.safeBorderRadius(widget.borderRadius);
 
       final content = Container(
         height: widget.height,
@@ -567,6 +622,9 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> {
           onTabSelected: widget.onSegmentSelected,
           isScrollable: true,
           scrollController: _scrollController,
+          selectionAlignment: widget.selectionAlignment,
+          regridDuration: widget.regridDuration,
+          dragBehavior: widget.dragBehavior,
           indicatorColor: widget.indicatorColor,
           selectedLabelStyle: widget.selectedTextStyle,
           unselectedLabelStyle: widget.unselectedTextStyle,
@@ -614,7 +672,7 @@ class _GlassSegmentedControlState extends State<GlassSegmentedControl> {
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: backgroundColor,
-          borderRadius: BorderRadius.circular(widget.borderRadius),
+          borderRadius: GlassDefaults.safeBorderRadius(widget.borderRadius),
         ),
         child: Padding(
           padding: widget.padding,

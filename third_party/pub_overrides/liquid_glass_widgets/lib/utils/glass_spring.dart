@@ -1,8 +1,11 @@
-// Internal spring animation utilities — drop-in replacement for the motor
-// package, implemented entirely on top of Flutter's built-in physics.
+// Copyright 2024 Tim Lehmann for whynotmake.it
 //
-// Only the subset of motor that is actually used in this package is
-// implemented here.
+// SPDX-License-Identifier: MIT
+//
+// Adapted from motor (https://github.com/whynotmake-it/rivership/tree/main/packages/motor)
+// by Tim Lehmann for whynotmake.it.
+// Re-implemented using pure Flutter physics primitives without third-party dependencies.
+// See THIRD_PARTY_NOTICES for complete license terms.
 
 import 'package:flutter/physics.dart';
 import 'package:flutter/scheduler.dart';
@@ -414,6 +417,7 @@ class VelocitySpringBuilder extends StatefulWidget {
     required this.springWhenReleased,
     required this.builder,
     this.active = true,
+    this.teleportEpoch = 0,
     this.child,
     super.key,
   });
@@ -429,6 +433,16 @@ class VelocitySpringBuilder extends StatefulWidget {
 
   /// Whether the user is currently dragging (selects [springWhenActive]).
   final bool active;
+
+  /// Monotonic marker for DISCONTINUOUS [value] changes.
+  ///
+  /// When this differs from the previous build's value, the follower snaps
+  /// straight to [value] instead of animating toward it — for corrections
+  /// that must not read as motion (an indicator snapped to freshly measured
+  /// geometry at mount, or after its list was re-measured). Continuous
+  /// changes (taps, drags, spring targets) leave the epoch alone and
+  /// animate exactly as before.
+  final int teleportEpoch;
 
   /// The builder called on every frame with the current value and velocity.
   final VelocitySpringWidgetBuilder builder;
@@ -470,10 +484,13 @@ class _VelocitySpringBuilderState extends State<VelocitySpringBuilder>
     if (springChanged) {
       _ctrl.spring = _currentSpring;
     }
-    if (widget.value != oldWidget.value) {
+    if (widget.value != oldWidget.value ||
+        widget.teleportEpoch != oldWidget.teleportEpoch) {
       // IP1: When Reduce Motion is active, snap instantly instead of animating.
+      // A teleport-epoch change snaps too: the value jumped discontinuously
+      // and travel would render as motion the source never made.
       final reduceMotion = GlassAccessibilityData.of(context).reduceMotion;
-      if (reduceMotion) {
+      if (reduceMotion || widget.teleportEpoch != oldWidget.teleportEpoch) {
         _ctrl.setValue(widget.value);
       } else {
         _ctrl.animateTo(widget.value);
