@@ -1,5 +1,54 @@
 part of 'source_plugins_page.dart';
 
+class _PluginOperationLabel extends StatelessWidget {
+  const _PluginOperationLabel({
+    required this.loading,
+    required this.label,
+    required this.loadingLabel,
+  });
+
+  final bool loading;
+  final String label;
+  final String loadingLabel;
+
+  @override
+  Widget build(BuildContext context) => Stack(
+    alignment: Alignment.center,
+    children: [
+      ExcludeSemantics(
+        excluding: loading,
+        child: AnimatedOpacity(
+          opacity: loading ? 0 : 1,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeInOutCubic,
+          child: Text(label),
+        ),
+      ),
+      Positioned.fill(
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 200),
+          switchInCurve: Curves.easeOutCubic,
+          switchOutCurve: Curves.easeInCubic,
+          transitionBuilder: (child, animation) => FadeTransition(
+            opacity: animation,
+            child: ScaleTransition(
+              scale: Tween<double>(begin: 0.8, end: 1).animate(animation),
+              child: child,
+            ),
+          ),
+          child: loading
+              ? SizedBox.square(
+                  key: const ValueKey('loading'),
+                  dimension: 24,
+                  child: HazukiM3ELoadingIndicator(semanticLabel: loadingLabel),
+                )
+              : const SizedBox.shrink(key: ValueKey('idle')),
+        ),
+      ),
+    ],
+  );
+}
+
 class _PluginSurface extends StatelessWidget {
   const _PluginSurface({required this.child, this.color});
 

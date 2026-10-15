@@ -1202,6 +1202,7 @@
   },
   "homeSourceSwitchTooltip": "Switch source",
   "homeSourceSwitchTitle": "Switch source",
+  "homeSourceSwitchEmpty": "No enabled plugins. Install or enable a plugin in Settings first.",
   "homeSourceSwitchCurrent": "Current source",
   "homeSourceSwitchLoadingTitle": "Switching source",
   "homeSourceSwitchLoadingTo": "Switching to {sourceName}",
@@ -1474,6 +1475,8 @@
   "announcementImageLoadFailed": "Failed to load image",
   "announcementHideCurrent": "Hide this notification",
   "announcementHideAll": "Hide all notifications",
+  "settingsPluginsTitle": "Plugins",
+  "settingsPluginsSubtitle": "Manage plugins",
   "pluginsTitle": "Source plugins",
   "pluginsSubtitle": "Import, manage and update source plugins",
   "pluginsImportLocal": "Import local JS",
@@ -1497,10 +1500,22 @@
   "pluginsLocallyEdited": "Locally edited",
   "pluginsRepositoriesEmpty": "Add a repository to browse and install source plugins.",
   "pluginsRepositoryEmpty": "No plugins to display. Refresh the list to load the built-in catalog.",
-  "pluginsAvailable": "Available plugins",
+  "pluginsAvailable": "Plugin market",
   "pluginsIndexSourceSubtitle": "Select the route for the plugin index. Plugin download URLs are used as listed. This selection is shared with advanced settings.",
   "pluginsUpdate": "Update",
   "pluginsAlreadyInstalled": "Installed",
   "pluginsUpdatesTitle": "Plugin updates",
-  "pluginsUpdatesMessage": "New versions are available for the following installed plugins. Choose which ones to update."
+  "pluginsUpdatesMessage": "New versions are available for {count} plugins",
+  "@pluginsUpdatesMessage": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "pluginsUpdateAvailable": "A new version is available for {name}",
+  "@pluginsUpdateAvailable": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "pluginsViewDetails": "View details"
 }

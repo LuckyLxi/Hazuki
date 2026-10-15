@@ -12,9 +12,16 @@ part 'source_plugins_widgets.dart';
 
 enum _PluginOperationPage { installed, available }
 
+enum SourcePluginsTab { installed, market }
+
 class SourcePluginsPage extends StatefulWidget {
-  const SourcePluginsPage({super.key, required this.manager});
+  const SourcePluginsPage({
+    super.key,
+    required this.manager,
+    this.initialTab = SourcePluginsTab.installed,
+  });
   final SourcePluginGateway manager;
+  final SourcePluginsTab initialTab;
   @override
   State<SourcePluginsPage> createState() => _SourcePluginsPageState();
 }
@@ -24,6 +31,7 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
   _PluginOperationPage? _busyPage;
   bool get _busy => _busyPage != null;
   final Set<String> _installing = {};
+  final Map<String, bool> _pendingEnabled = {};
   bool get _hasOperations => _busy || _installing.isNotEmpty;
 
   @override
@@ -79,6 +87,20 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
     if (file != null) await _manager.importPackage(await file.readAsBytes());
   }
 
+  Future<void> _setEnabled(String id, bool enabled) async {
+    if (_hasOperations || _pendingEnabled.containsKey(id)) return;
+    setState(() => _pendingEnabled[id] = enabled);
+    try {
+      await _manager.setEnabled(id, enabled);
+    } catch (error) {
+      if (mounted) {
+        unawaited(showHazukiPrompt(context, error.toString(), isError: true));
+      }
+    } finally {
+      if (mounted) setState(() => _pendingEnabled.remove(id));
+    }
+  }
+
   Future<void> _update(String id) async {
     final update = await _manager.checkUpdate(id);
     if (update == null) {
@@ -126,6 +148,7 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
     final s = l10n(context);
     return DefaultTabController(
       length: 2,
+      initialIndex: widget.initialTab.index,
       child: Scaffold(
         appBar: hazukiFrostedAppBar(
           context: context,
@@ -196,7 +219,6 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
                       padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
                       children: [
                         if (_busyPage == _PluginOperationPage.available ||
-                            _installing.isNotEmpty ||
                             _manager.checkingIndex) ...[
                           const LinearProgressIndicator(),
                           const SizedBox(height: 12),
@@ -316,13 +338,13 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
                 Semantics(
                   label: plugin.manifest.name,
                   child: Switch(
-                    value: plugin.enabled,
-                    onChanged: _hasOperations
+                    value:
+                        _pendingEnabled[plugin.manifest.id] ?? plugin.enabled,
+                    onChanged:
+                        _hasOperations ||
+                            _pendingEnabled.containsKey(plugin.manifest.id)
                         ? null
-                        : (value) => _run(
-                            () =>
-                                _manager.setEnabled(plugin.manifest.id, value),
-                          ),
+                        : (value) => _setEnabled(plugin.manifest.id, value),
                   ),
                 ),
               ],
@@ -479,6 +501,7 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
                   ),
                   const SizedBox(width: 12),
                   FilledButton.tonal(
+                    key: ValueKey('plugin-market-action-${entry.id}'),
                     onPressed:
                         _busy ||
                             _installing.contains(entry.id) ||
@@ -492,8 +515,10 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
                             () => _installFromRepository(repository, entry),
                             pluginId: entry.id,
                           ),
-                    child: Text(
-                      _manager.pluginFor(entry.id) == null
+                    child: _PluginOperationLabel(
+                      loading: _installing.contains(entry.id),
+                      loadingLabel: s.commonLoading,
+                      label: _manager.pluginFor(entry.id) == null
                           ? s.pluginsInstall
                           : _manager.availableUpdates.any(
                               (update) => update.entry.id == entry.id,

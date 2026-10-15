@@ -8,6 +8,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import 'package:hazuki/l10n/l10n.dart';
+import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/features/home/support/home_feature_contracts.dart';
 import 'package:hazuki/shared/favorites/favorite_app_bar_actions_state.dart';
 import 'package:hazuki/shared/search_box_outline.dart';
@@ -143,6 +144,8 @@ class HomeScaffoldShell extends StatefulWidget {
     required this.onProfileTap,
     required this.onCheckInPressed,
     required this.onSwitchSourcePressed,
+    this.sourceSwitchService,
+    this.onSourceSwitched,
     required this.onOpenHistory,
     required this.onOpenCategories,
     required this.onOpenRanking,
@@ -185,6 +188,8 @@ class HomeScaffoldShell extends StatefulWidget {
   final VoidCallback? onProfileTap;
   final VoidCallback? onCheckInPressed;
   final VoidCallback? onSwitchSourcePressed;
+  final SourceSwitchGateway? sourceSwitchService;
+  final Future<void> Function()? onSourceSwitched;
   final VoidCallback onOpenHistory;
   final VoidCallback onOpenCategories;
   final VoidCallback onOpenRanking;
@@ -332,6 +337,8 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
                 child: HomeWindowsSidebar(
                   key: ValueKey('home-windows-sidebar-$drawerVisualKey'),
                   profile: sidebarProfile,
+                  sourceSwitchService: widget.sourceSwitchService,
+                  onSourceSwitched: widget.onSourceSwitched,
                   actions: sidebarActions,
                   currentIndex: currentIndex,
                   selectedDestination: selectedDrawerDestination,

@@ -321,6 +321,77 @@ void main() {
     },
   );
 
+  for (final enabled in [false, true]) {
+    testWidgets('toggling enabled to $enabled preserves the installed layout', (
+      tester,
+    ) async {
+      var installed = [
+        _installed.first.copyWith(enabled: !enabled),
+        _installed.last,
+      ];
+      when(() => gateway.installed).thenAnswer((_) => installed);
+      final pending = Completer<void>();
+      when(() => gateway.setEnabled('local_source', enabled)).thenAnswer((
+        _,
+      ) async {
+        await pending.future;
+        installed = [
+          installed.first.copyWith(enabled: enabled),
+          installed.last,
+        ];
+      });
+      await tester.pumpWidget(_app(gateway));
+      await tester.pumpAndSettle();
+      final toggle = find.byType(Switch).first;
+      await _scrollTo(tester, toggle);
+      final element = tester.element(toggle);
+      final position = tester.getTopLeft(toggle);
+      await tester.tap(toggle);
+      await tester.pump();
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+      expect(tester.element(toggle), same(element));
+      expect(tester.getTopLeft(toggle), position);
+      expect(tester.widget<Switch>(toggle).value, enabled);
+      expect(tester.widget<Switch>(toggle).onChanged, isNull);
+      expect(
+        tester.widget<Switch>(find.byType(Switch).last).onChanged,
+        isNotNull,
+      );
+      pending.complete();
+      await tester.pumpAndSettle();
+      expect(tester.element(toggle), same(element));
+      expect(tester.getTopLeft(toggle), position);
+      expect(tester.widget<Switch>(toggle).value, enabled);
+      expect(tester.widget<Switch>(toggle).onChanged, isNotNull);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('failed toggles restore the switch and show the error', (
+    tester,
+  ) async {
+    final pending = Completer<void>();
+    when(
+      () => gateway.setEnabled('local_source', false),
+    ).thenAnswer((_) => pending.future);
+    await tester.pumpWidget(_app(gateway));
+    await tester.pumpAndSettle();
+    final toggle = find.byType(Switch).first;
+    await _scrollTo(tester, toggle);
+    await tester.tap(toggle);
+    await tester.pump();
+    expect(tester.widget<Switch>(toggle).value, isFalse);
+    pending.completeError(StateError('Unable to disable plugin'));
+    await tester.pumpAndSettle();
+    expect(tester.widget<Switch>(toggle).value, isTrue);
+    expect(tester.widget<Switch>(toggle).onChanged, isNotNull);
+    expect(find.textContaining('Unable to disable plugin'), findsOneWidget);
+    expect(find.byType(LinearProgressIndicator), findsNothing);
+    await tester.pump(const Duration(seconds: 3));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('initialization disables actions and reports failure', (
     tester,
   ) async {

@@ -8,6 +8,7 @@ import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
 import 'source_account_dialogs.dart';
+import 'source_switch_list.dart';
 
 export 'source_account_dialogs.dart';
 
@@ -229,9 +230,10 @@ class _HomeSourceSwitchPickerPane extends StatelessWidget {
               child: ConstrainedBox(
                 // Three two-line tiles (72 each), including their spacing.
                 constraints: const BoxConstraints(maxHeight: 3 * (72 + 6)),
-                child: ListView(
-                  shrinkWrap: true,
-                  padding: EdgeInsets.zero,
+                child: SourceSwitchList(
+                  currentIndex: sources.indexWhere(
+                    (source) => source.normalizedKey == activeSourceKey,
+                  ),
                   children: [
                     for (final source in sources)
                       Padding(

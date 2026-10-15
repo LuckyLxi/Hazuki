@@ -283,6 +283,8 @@ class _HazukiHomePageState extends State<HazukiHomePage> {
               setState(() {});
             }());
           },
+          sourceSwitchService: _coordinator.sourceSwitchService,
+          onSourceSwitched: () => _coordinator.syncUserProfile(context),
           onOpenHistory: () {
             setState(() {
               _selectedDrawerDestination = HomeDrawerDestination.history;

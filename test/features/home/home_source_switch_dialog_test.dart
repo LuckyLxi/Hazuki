@@ -11,9 +11,11 @@ class _MockSourceSwitchGateway extends Mock implements SourceSwitchGateway {}
 Future<_MockSourceSwitchGateway> _openPicker(
   WidgetTester tester, {
   required int sourceCount,
+  String activeSourceKey = 'source_1',
+  double textScale = 1,
 }) async {
   final gateway = _MockSourceSwitchGateway();
-  when(() => gateway.activeSourceKey).thenReturn('source_1');
+  when(() => gateway.activeSourceKey).thenReturn(activeSourceKey);
   when(() => gateway.allowedSources).thenReturn([
     for (var index = 1; index <= sourceCount; index++)
       SourceCatalogEntry(
@@ -28,6 +30,12 @@ Future<_MockSourceSwitchGateway> _openPicker(
     MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(
+          context,
+        ).copyWith(textScaler: TextScaler.linear(textScale)),
+        child: child!,
+      ),
       home: Builder(
         builder: (context) => Scaffold(
           body: TextButton(
@@ -45,6 +53,46 @@ Future<_MockSourceSwitchGateway> _openPicker(
 }
 
 void main() {
+  for (final textScale in [1.0, 2.0]) {
+    testWidgets(
+      'picker reveals and focuses a late current source at ${textScale}x text',
+      (tester) async {
+        await _openPicker(
+          tester,
+          sourceCount: 30,
+          activeSourceKey: 'source_28',
+          textScale: textScale,
+        );
+        final current = find.widgetWithText(ListTile, 'Source 28');
+        final list = find.byType(ListView);
+        expect(current.hitTestable(), findsOneWidget);
+        final listBounds = tester.getRect(list);
+        final itemBounds = tester.getRect(current);
+        expect(itemBounds.top, greaterThanOrEqualTo(listBounds.top - 0.01));
+        expect(itemBounds.bottom, lessThanOrEqualTo(listBounds.bottom + 0.01));
+        expect(Focus.of(tester.element(current)).hasPrimaryFocus, isTrue);
+        await tester.drag(list, const Offset(0, 300));
+        await tester.pumpAndSettle();
+        expect(find.text('Source 28').hitTestable(), findsNothing);
+        await tester.tap(find.text('Cancel'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Open'));
+        await tester.pumpAndSettle();
+        expect(current.hitTestable(), findsOneWidget);
+        expect(Focus.of(tester.element(current)).hasPrimaryFocus, isTrue);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets('picker handles a current source absent from the list', (
+    tester,
+  ) async {
+    await _openPicker(tester, sourceCount: 5, activeSourceKey: 'missing');
+    expect(find.text('Source 1').hitTestable(), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   for (final sourceCount in [1, 3]) {
     testWidgets('picker fits $sourceCount sources without scrolling', (
       tester,

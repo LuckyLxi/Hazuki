@@ -1202,6 +1202,7 @@
   },
   "homeSourceSwitchTooltip": "切换漫画源",
   "homeSourceSwitchTitle": "切换漫画源",
+  "homeSourceSwitchEmpty": "暂无已启用的插件，请先在设置中安装或启用插件。",
   "homeSourceSwitchCurrent": "当前来源",
   "homeSourceSwitchLoadingTitle": "正在切换来源",
   "homeSourceSwitchLoadingTo": "正在切换到 {sourceName}",
@@ -1474,6 +1475,8 @@
   "announcementImageLoadFailed": "图片加载失败",
   "announcementHideCurrent": "隐藏此通知",
   "announcementHideAll": "隐藏所有通知",
+  "settingsPluginsTitle": "插件",
+  "settingsPluginsSubtitle": "管理插件",
   "pluginsTitle": "漫画源插件",
   "pluginsSubtitle": "导入、管理和更新漫画源插件",
   "pluginsImportLocal": "本地导入 JS",
@@ -1497,10 +1500,22 @@
   "pluginsLocallyEdited": "本地已编辑",
   "pluginsRepositoriesEmpty": "添加插件仓库，即可浏览并安装漫画源插件。",
   "pluginsRepositoryEmpty": "暂无可显示的插件，请刷新内置插件列表。",
-  "pluginsAvailable": "可安装插件",
+  "pluginsAvailable": "插件市场",
   "pluginsIndexSourceSubtitle": "选择插件索引的访问线路，插件下载地址按索引原样使用。线路选择与高级设置同步。",
   "pluginsUpdate": "更新",
   "pluginsAlreadyInstalled": "已安装",
   "pluginsUpdatesTitle": "插件更新",
-  "pluginsUpdatesMessage": "以下已安装插件有新版本，可选择更新。"
+  "pluginsUpdatesMessage": "有 {count} 个插件有新版本",
+  "@pluginsUpdatesMessage": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "pluginsUpdateAvailable": "{name} 有新版本",
+  "@pluginsUpdateAvailable": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "pluginsViewDetails": "查看详情"
 }

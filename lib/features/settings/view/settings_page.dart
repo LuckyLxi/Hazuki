@@ -11,6 +11,7 @@ import 'appearance/appearance_settings_page.dart';
 import 'cache_settings_page.dart';
 import 'other/other_settings_page.dart';
 import 'reading_settings_page.dart';
+import 'plugins/source_plugins_page.dart';
 import 'security/privacy_settings_page.dart';
 import 'settings_group.dart';
 import '../support/settings_core_dependencies.dart';
@@ -158,6 +159,19 @@ class _SettingsPageState extends State<SettingsPage> {
                           passwordLockService:
                               widget.coreDependencies.passwordLock,
                         ),
+                      ),
+                    );
+                  },
+                ),
+              if (widget.coreDependencies.sourcePlugins case final plugins?)
+                ListTile(
+                  leading: const Icon(Icons.extension_outlined),
+                  title: Text(strings.settingsPluginsTitle),
+                  subtitle: Text(strings.settingsPluginsSubtitle),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => SourcePluginsPage(manager: plugins),
                       ),
                     );
                   },

@@ -10,9 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class _MockSourcePluginGateway extends Mock implements SourcePluginGateway {}
 
 void main() {
-  testWidgets('lab opens plugin management and removes the old source entry', (
-    tester,
-  ) async {
+  testWidgets('lab no longer contains plugin management', (tester) async {
     SharedPreferences.setMockInitialValues({});
     final plugins = _MockSourcePluginGateway();
     when(plugins.initialize).thenAnswer((_) async {});
@@ -34,15 +32,13 @@ void main() {
     final strings = AppLocalizations.of(
       tester.element(find.byType(LabSettingsPage)),
     )!;
-    expect(find.text(strings.pluginsTitle), findsOneWidget);
+    expect(find.text(strings.pluginsTitle), findsNothing);
+    expect(find.text(strings.settingsPluginsTitle), findsNothing);
     expect(find.text(strings.labSourceAccountTitle), findsNothing);
     expect(find.text(strings.advancedComicIdSearchTitle), findsNothing);
 
-    await tester.tap(find.text(strings.pluginsTitle));
-    await tester.pumpAndSettle();
-    expect(find.byType(SourcePluginsPage), findsOneWidget);
-    expect(find.text(strings.pluginsImportLocal), findsOneWidget);
-    verify(plugins.initialize).called(1);
+    expect(find.byType(SourcePluginsPage), findsNothing);
+    verifyNever(plugins.initialize);
     expect(tester.takeException(), isNull);
   });
 }

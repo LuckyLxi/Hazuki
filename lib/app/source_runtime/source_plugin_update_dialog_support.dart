@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../../features/settings/view/plugins/source_plugins_page.dart';
 import '../../l10n/l10n.dart';
 import '../../services/source/plugins/source_plugin_repository.dart';
 import '../../services/source/source_capabilities.dart';
@@ -25,17 +28,29 @@ class SourcePluginUpdateDialogSupport {
     final context = navigatorKey.currentState?.overlay?.context;
     if (context == null) return;
     if (!context.mounted) return;
-    await Navigator.of(context, rootNavigator: true).push<void>(
-      _SourcePluginUpdateDialogRoute(
-        context: context,
-        builder: (_) =>
-            SourcePluginUpdateDialog(gateway: plugins, onUpdated: onUpdated),
+    final navigator = Navigator.of(context, rootNavigator: true);
+    final route = _SourcePluginUpdateDialogRoute(
+      context: context,
+      builder: (_) =>
+          SourcePluginUpdateDialog(gateway: plugins, onUpdated: onUpdated),
+    );
+    final viewDetails = await navigator.push<bool>(route);
+    await route.completed;
+    if (viewDetails != true || !isMounted() || !navigator.mounted) return;
+    unawaited(
+      navigator.push<void>(
+        MaterialPageRoute<void>(
+          builder: (_) => SourcePluginsPage(
+            manager: plugins,
+            initialTab: SourcePluginsTab.market,
+          ),
+        ),
       ),
     );
   }
 }
 
-class _SourcePluginUpdateDialogRoute extends DialogRoute<void> {
+class _SourcePluginUpdateDialogRoute extends DialogRoute<bool> {
   _SourcePluginUpdateDialogRoute({
     required super.context,
     required super.builder,
@@ -90,17 +105,21 @@ class SourcePluginUpdateDialog extends StatefulWidget {
 }
 
 class _SourcePluginUpdateDialogState extends State<SourcePluginUpdateDialog> {
-  String? _updating;
+  bool _updating = false;
   String? _error;
 
-  Future<void> _update(SourcePluginUpdate update) async {
-    if (_updating != null) return;
+  Future<void> _updateAll() async {
+    if (_updating) return;
+    final updates = List<SourcePluginUpdate>.of(
+      widget.gateway.availableUpdates,
+    );
+    if (updates.isEmpty) return;
     setState(() {
-      _updating = update.entry.id;
+      _updating = true;
       _error = null;
     });
     try {
-      if (update.plugin.customEdited) {
+      if (updates.any((update) => update.plugin.customEdited)) {
         final proceed = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
@@ -117,19 +136,33 @@ class _SourcePluginUpdateDialogState extends State<SourcePluginUpdateDialog> {
             ],
           ),
         );
-        if (proceed != true) return;
+        if (proceed != true || !mounted) return;
       }
-      await widget.gateway.installFromRepository(
-        update.plugin.repository ?? sourcePluginsRepositoryUrl,
-        update.entry,
-      );
+      final errors = <String>[];
+      for (final update in updates) {
+        if (!mounted) return;
+        try {
+          await widget.gateway.installFromRepository(
+            update.plugin.repository ?? sourcePluginsRepositoryUrl,
+            update.entry,
+          );
+        } catch (error) {
+          errors.add('${update.plugin.manifest.name}: $error');
+          continue;
+        }
+        if (!mounted) return;
+        widget.onUpdated();
+      }
       if (!mounted) return;
-      widget.onUpdated();
-      if (widget.gateway.availableUpdates.isEmpty) Navigator.pop(context);
-    } catch (error) {
-      if (mounted) setState(() => _error = error.toString());
+      setState(() => _error = errors.isEmpty ? null : errors.join('\n'));
+      if (widget.gateway.availableUpdates.isEmpty) {
+        setState(() => _updating = false);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) Navigator.pop(context);
+        });
+      }
     } finally {
-      if (mounted) setState(() => _updating = null);
+      if (mounted) setState(() => _updating = false);
     }
   }
 
@@ -137,64 +170,61 @@ class _SourcePluginUpdateDialogState extends State<SourcePluginUpdateDialog> {
   Widget build(BuildContext context) {
     final s = l10n(context);
     return PopScope(
-      canPop: _updating == null,
+      canPop: !_updating,
       child: AlertDialog(
         title: Text(s.pluginsUpdatesTitle),
-        content: SizedBox(
-          width: 420,
-          child: SingleChildScrollView(
-            child: AnimatedBuilder(
-              animation: widget.gateway,
-              builder: (context, _) => Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Text(s.pluginsUpdatesMessage),
-                  const SizedBox(height: 16),
-                  for (final update in widget.gateway.availableUpdates)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          Text(
-                            update.plugin.manifest.name,
-                            style: Theme.of(context).textTheme.titleSmall,
-                          ),
-                          Text(
-                            '${update.localVersion} → ${update.entry.version}',
-                          ),
-                          Align(
-                            alignment: AlignmentDirectional.centerEnd,
-                            child: TextButton(
-                              onPressed: _updating == null
-                                  ? () => _update(update)
-                                  : null,
-                              child: Text(s.pluginsUpdate),
-                            ),
-                          ),
-                        ],
+        content: AnimatedSize(
+          duration: const Duration(milliseconds: 280),
+          curve: Curves.easeInOutCubic,
+          alignment: Alignment.topCenter,
+          child: SizedBox(
+            width: 420,
+            child: SingleChildScrollView(
+              child: AnimatedBuilder(
+                animation: widget.gateway,
+                builder: (context, _) {
+                  final updates = widget.gateway.availableUpdates;
+                  return Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        updates.length == 1
+                            ? s.pluginsUpdateAvailable(
+                                updates.single.plugin.manifest.name,
+                              )
+                            : updates.isEmpty
+                            ? s.pluginsNoUpdate
+                            : s.pluginsUpdatesMessage(updates.length),
                       ),
-                    ),
-                  if (_updating != null) const LinearProgressIndicator(),
-                  if (_error != null) ...[
-                    const SizedBox(height: 12),
-                    SelectableText(
-                      _error!,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
-                      ),
-                    ),
-                  ],
-                ],
+                      if (_updating) ...[
+                        const SizedBox(height: 16),
+                        const LinearProgressIndicator(),
+                      ],
+                      if (_error != null) ...[
+                        const SizedBox(height: 12),
+                        SelectableText(
+                          _error!,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                        ),
+                      ],
+                    ],
+                  );
+                },
               ),
             ),
           ),
         ),
         actions: [
           TextButton(
-            onPressed: _updating == null ? () => Navigator.pop(context) : null,
-            child: Text(s.commonCancel),
+            onPressed: _updating ? null : () => Navigator.pop(context, true),
+            child: Text(s.pluginsViewDetails),
+          ),
+          FilledButton(
+            onPressed: _updating ? null : _updateAll,
+            child: Text(s.pluginsUpdate),
           ),
         ],
       ),
