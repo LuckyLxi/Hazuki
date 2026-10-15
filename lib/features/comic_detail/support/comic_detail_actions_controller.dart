@@ -137,11 +137,16 @@ class ComicDetailActionsController extends ChangeNotifier {
       isScrollControlled: true,
       isDismissible: true,
       enableDrag: true,
-      useSafeArea: false,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
       sheetAnimationStyle: AnimationStyle(
-        duration: const Duration(milliseconds: 360),
-        curve: Curves.easeOutCubic,
-        reverseDuration: const Duration(milliseconds: 220),
+        duration: MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : const Duration(milliseconds: 320),
+        curve: Curves.easeOutQuart,
+        reverseDuration: MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : const Duration(milliseconds: 220),
         reverseCurve: Curves.easeInCubic,
       ),
       builder: (routeContext) {

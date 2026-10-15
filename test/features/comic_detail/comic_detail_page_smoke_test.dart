@@ -33,7 +33,7 @@ import 'package:hazuki/shared/comments/comments_widget_builder.dart';
 import 'package:hazuki/shared/comments/comments_interaction_state.dart';
 import 'package:hazuki/shared/window/window_title_bar_control.dart';
 import 'package:hazuki/widgets/cached_image_widgets.dart';
-import 'package:hazuki/widgets/chapters_panel_sheet.dart';
+import 'package:hazuki/features/comic_detail/view/comic_detail_chapters_panel.dart';
 import 'package:hazuki/shared/favorites/favorite_folders_morph_dialog.dart';
 import '../../support/test_service_locator.dart';
 
@@ -416,7 +416,7 @@ void main() {
     expect(tester.widget<Opacity>(buttonOpacity).opacity, 1);
     await tester.tap(find.byIcon(Icons.format_list_bulleted_rounded));
     await tester.pumpAndSettle();
-    expect(find.byType(ChaptersPanelSheet), findsOneWidget);
+    expect(find.byType(ComicDetailChaptersPanel), findsOneWidget);
     expect(find.text('Chapter 1'), findsOneWidget);
     expect(tester.takeException(), isNull);
     tester.state<NavigatorState>(find.byType(Navigator)).pop();

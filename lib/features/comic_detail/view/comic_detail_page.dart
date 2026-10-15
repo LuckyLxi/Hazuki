@@ -21,9 +21,9 @@ import 'comic_detail_app_bar.dart';
 import 'package:hazuki/shared/favorites/favorite_folders_morph_dialog.dart';
 
 import 'comic_detail_background.dart';
+import 'comic_detail_chapters_panel.dart';
 import 'comic_detail_cover.dart';
 import 'comic_detail_scaffold.dart';
-import 'package:hazuki/widgets/chapters_panel_sheet.dart';
 
 const MethodChannel _comicDetailMediaChannel = MethodChannel(
   'hazuki.comics/media',
@@ -172,7 +172,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
             required details,
             required onDownloadConfirm,
             required onChapterTap,
-          }) => ChaptersPanelSheet(
+          }) => ComicDetailChaptersPanel(
             details: details,
             onDownloadConfirm: onDownloadConfirm,
             onChapterTap: onChapterTap,
