@@ -7,8 +7,6 @@ import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class _MockSourceRuntimeGateway extends Mock implements SourceRuntimeGateway {}
-
 class _MockSourcePluginGateway extends Mock implements SourcePluginGateway {}
 
 void main() {
@@ -16,9 +14,7 @@ void main() {
     tester,
   ) async {
     SharedPreferences.setMockInitialValues({});
-    final runtime = _MockSourceRuntimeGateway();
     final plugins = _MockSourcePluginGateway();
-    when(() => runtime.supportsDirectComicId).thenReturn(true);
     when(plugins.initialize).thenAnswer((_) async {});
     when(() => plugins.installed).thenReturn([]);
     when(() => plugins.repositories).thenReturn([]);
@@ -31,7 +27,7 @@ void main() {
         locale: const Locale('en'),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        home: LabSettingsPage(sourceService: runtime, sourcePlugins: plugins),
+        home: LabSettingsPage(sourcePlugins: plugins),
       ),
     );
     await tester.pumpAndSettle();
@@ -40,7 +36,7 @@ void main() {
     )!;
     expect(find.text(strings.pluginsTitle), findsOneWidget);
     expect(find.text(strings.labSourceAccountTitle), findsNothing);
-    expect(find.text(strings.advancedComicIdSearchTitle), findsOneWidget);
+    expect(find.text(strings.advancedComicIdSearchTitle), findsNothing);
 
     await tester.tap(find.text(strings.pluginsTitle));
     await tester.pumpAndSettle();

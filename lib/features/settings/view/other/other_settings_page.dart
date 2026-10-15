@@ -80,6 +80,13 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
     await OtherSettingsActions.toggleAggregateSearch(value);
   }
 
+  Future<void> _toggleComicIdSearchEnhance(bool value) async {
+    setState(() {
+      _snapshot = _snapshot.copyWith(comicIdSearchEnhanceEnabled: value);
+    });
+    await OtherSettingsActions.toggleComicIdSearchEnhance(value);
+  }
+
   Future<void> _toggleDiscoverDailyRecommendation(bool value) async {
     setState(() {
       _snapshot = _snapshot.copyWith(discoverDailyRecommendationEnabled: value);
@@ -146,6 +153,8 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
                   OtherSettingsGeneralSection(
                     autoCheckInEnabled: _snapshot.autoCheckInEnabled,
                     aggregateSearchEnabled: _snapshot.aggregateSearchEnabled,
+                    comicIdSearchEnhanceEnabled:
+                        _snapshot.comicIdSearchEnhanceEnabled,
                     discoverDailyRecommendationEnabled:
                         _snapshot.discoverDailyRecommendationEnabled,
                     showAutoCheckInSetting:
@@ -157,12 +166,15 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
                         null,
                     showDailyRecommendationSetting:
                         _sourceService.supportsDailyRecommendation,
+                    showComicIdSearchSetting:
+                        _sourceService.supportsDirectComicId,
                     useSystemTitleBar: _snapshot.useSystemTitleBar,
                     mangaDownloadsRootPath: _snapshot.mangaDownloadsRootPath,
                     showWindowsTitleBarToggle:
                         Theme.of(context).platform == TargetPlatform.windows,
                     onAutoCheckInChanged: _toggleAutoCheckIn,
                     onAggregateSearchChanged: _toggleAggregateSearch,
+                    onComicIdSearchEnhanceChanged: _toggleComicIdSearchEnhance,
                     onDiscoverDailyRecommendationChanged:
                         _toggleDiscoverDailyRecommendation,
                     onUseSystemTitleBarChanged: _toggleUseSystemTitleBar,

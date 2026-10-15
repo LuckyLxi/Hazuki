@@ -8,14 +8,17 @@ class OtherSettingsGeneralSection extends StatelessWidget {
     super.key,
     required this.autoCheckInEnabled,
     required this.aggregateSearchEnabled,
+    required this.comicIdSearchEnhanceEnabled,
     required this.discoverDailyRecommendationEnabled,
     required this.showAutoCheckInSetting,
     required this.showDailyRecommendationSetting,
+    required this.showComicIdSearchSetting,
     required this.useSystemTitleBar,
     required this.mangaDownloadsRootPath,
     required this.showWindowsTitleBarToggle,
     required this.onAutoCheckInChanged,
     required this.onAggregateSearchChanged,
+    required this.onComicIdSearchEnhanceChanged,
     required this.onDiscoverDailyRecommendationChanged,
     required this.onUseSystemTitleBarChanged,
     required this.onEditMangaDownloadPath,
@@ -24,14 +27,17 @@ class OtherSettingsGeneralSection extends StatelessWidget {
 
   final bool autoCheckInEnabled;
   final bool aggregateSearchEnabled;
+  final bool comicIdSearchEnhanceEnabled;
   final bool discoverDailyRecommendationEnabled;
   final bool showAutoCheckInSetting;
   final bool showDailyRecommendationSetting;
+  final bool showComicIdSearchSetting;
   final bool useSystemTitleBar;
   final String mangaDownloadsRootPath;
   final bool showWindowsTitleBarToggle;
   final ValueChanged<bool> onAutoCheckInChanged;
   final ValueChanged<bool> onAggregateSearchChanged;
+  final ValueChanged<bool> onComicIdSearchEnhanceChanged;
   final ValueChanged<bool> onDiscoverDailyRecommendationChanged;
   final ValueChanged<bool> onUseSystemTitleBarChanged;
   final VoidCallback onEditMangaDownloadPath;
@@ -58,6 +64,14 @@ class OtherSettingsGeneralSection extends StatelessWidget {
           value: aggregateSearchEnabled,
           onChanged: onAggregateSearchChanged,
         ),
+        if (showComicIdSearchSetting)
+          SwitchListTile(
+            secondary: const Icon(Icons.tag_outlined),
+            title: Text(strings.advancedComicIdSearchTitle),
+            subtitle: Text(strings.advancedComicIdSearchSubtitle),
+            value: comicIdSearchEnhanceEnabled,
+            onChanged: onComicIdSearchEnhanceChanged,
+          ),
         if (showDailyRecommendationSetting)
           SwitchListTile(
             secondary: const Icon(Icons.auto_awesome_outlined),

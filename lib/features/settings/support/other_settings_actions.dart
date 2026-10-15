@@ -15,6 +15,7 @@ class OtherSettingsSnapshot {
     required this.autoSourceUpdateCheckEnabled,
     required this.autoSoftwareUpdateCheckEnabled,
     required this.aggregateSearchEnabled,
+    required this.comicIdSearchEnhanceEnabled,
     required this.discoverDailyRecommendationEnabled,
     required this.useSystemTitleBar,
     required this.mangaDownloadsRootPath,
@@ -25,6 +26,7 @@ class OtherSettingsSnapshot {
   final bool autoSourceUpdateCheckEnabled;
   final bool autoSoftwareUpdateCheckEnabled;
   final bool aggregateSearchEnabled;
+  final bool comicIdSearchEnhanceEnabled;
   final bool discoverDailyRecommendationEnabled;
   final bool useSystemTitleBar;
   final String mangaDownloadsRootPath;
@@ -35,6 +37,7 @@ class OtherSettingsSnapshot {
     bool? autoSourceUpdateCheckEnabled,
     bool? autoSoftwareUpdateCheckEnabled,
     bool? aggregateSearchEnabled,
+    bool? comicIdSearchEnhanceEnabled,
     bool? discoverDailyRecommendationEnabled,
     bool? useSystemTitleBar,
     String? mangaDownloadsRootPath,
@@ -48,6 +51,8 @@ class OtherSettingsSnapshot {
           autoSoftwareUpdateCheckEnabled ?? this.autoSoftwareUpdateCheckEnabled,
       aggregateSearchEnabled:
           aggregateSearchEnabled ?? this.aggregateSearchEnabled,
+      comicIdSearchEnhanceEnabled:
+          comicIdSearchEnhanceEnabled ?? this.comicIdSearchEnhanceEnabled,
       discoverDailyRecommendationEnabled:
           discoverDailyRecommendationEnabled ??
           this.discoverDailyRecommendationEnabled,
@@ -64,6 +69,7 @@ class OtherSettingsSnapshot {
       autoSourceUpdateCheckEnabled: true,
       autoSoftwareUpdateCheckEnabled: true,
       aggregateSearchEnabled: false,
+      comicIdSearchEnhanceEnabled: false,
       discoverDailyRecommendationEnabled: false,
       useSystemTitleBar: useSystemTitleBar,
       mangaDownloadsRootPath: MangaDownloadAccess.defaultDownloadsRootPath,
@@ -102,6 +108,8 @@ class OtherSettingsActions {
       autoSoftwareUpdateCheckEnabled: updateChecks.software,
       aggregateSearchEnabled:
           prefs.getBool(hazukiAggregateSearchEnabledPreferenceKey) ?? false,
+      comicIdSearchEnhanceEnabled:
+          prefs.getBool(hazukiComicIdSearchEnhancePreferenceKey) ?? false,
       discoverDailyRecommendationEnabled:
           prefs.getBool(
             hazukiDiscoverDailyRecommendationEnabledPreferenceKey,
@@ -131,6 +139,11 @@ class OtherSettingsActions {
   static Future<void> toggleAggregateSearch(bool value) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(hazukiAggregateSearchEnabledPreferenceKey, value);
+  }
+
+  static Future<void> toggleComicIdSearchEnhance(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(hazukiComicIdSearchEnhancePreferenceKey, value);
   }
 
   static Future<void> toggleAutoSourceUpdateCheck(

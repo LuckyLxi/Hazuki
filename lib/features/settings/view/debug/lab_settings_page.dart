@@ -1,68 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:hazuki/shared/preferences/hazuki_preference_keys.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/widgets/widgets.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../settings_group.dart';
 import '../plugins/source_plugins_page.dart';
 import '../plugins/source_plugin_action_widgets.dart';
 
-class LabSettingsPage extends StatefulWidget {
-  const LabSettingsPage({
-    super.key,
-    required this.sourceService,
-    required this.sourcePlugins,
-  });
+class LabSettingsPage extends StatelessWidget {
+  const LabSettingsPage({super.key, required this.sourcePlugins});
 
-  final SourceRuntimeGateway sourceService;
   final SourcePluginGateway sourcePlugins;
-
-  @override
-  State<LabSettingsPage> createState() => _LabSettingsPageState();
-}
-
-class _LabSettingsPageState extends State<LabSettingsPage> {
-  SourceRuntimeGateway get _sourceService => widget.sourceService;
-  bool _comicIdSearchEnhance = false;
-  bool _loading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadSettings();
-    _sourceService.addListener(_handleSourceChanged);
-  }
-
-  @override
-  void dispose() {
-    _sourceService.removeListener(_handleSourceChanged);
-    super.dispose();
-  }
-
-  void _handleSourceChanged() {
-    if (mounted) {
-      setState(() {});
-    }
-  }
-
-  Future<void> _loadSettings() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _comicIdSearchEnhance =
-          prefs.getBool(hazukiComicIdSearchEnhancePreferenceKey) ?? false;
-      _loading = false;
-    });
-  }
-
-  Future<void> _toggleComicIdSearchEnhance(bool value) async {
-    setState(() => _comicIdSearchEnhance = value);
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(hazukiComicIdSearchEnhancePreferenceKey, value);
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -73,43 +20,32 @@ class _LabSettingsPageState extends State<LabSettingsPage> {
         title: Text(strings.labTitle),
       ),
       body: HazukiSettingsPageBody(
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : ListView(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                children: [
-                  SettingsGroup(
-                    children: [
-                      if (_sourceService.supportsDirectComicId)
-                        SwitchListTile(
-                          secondary: const Icon(Icons.tag_outlined),
-                          title: Text(strings.advancedComicIdSearchTitle),
-                          subtitle: Text(strings.advancedComicIdSearchSubtitle),
-                          value: _comicIdSearchEnhance,
-                          onChanged: _toggleComicIdSearchEnhance,
-                        ),
-                      ListTile(
-                        leading: const Icon(Icons.extension_outlined),
-                        title: Text(strings.pluginsTitle),
-                        subtitle: Text(strings.pluginsSubtitle),
-                        onTap: () {
-                          Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => SourcePluginsPage(
-                                manager: widget.sourcePlugins,
-                              ),
-                            ),
-                          );
-                        },
+        child: ListView(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          children: [
+            SettingsGroup(
+              children: [
+                ListTile(
+                  leading: const Icon(Icons.extension_outlined),
+                  title: Text(strings.pluginsTitle),
+                  subtitle: Text(strings.pluginsSubtitle),
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) =>
+                            SourcePluginsPage(manager: sourcePlugins),
                       ),
-                    ],
-                  ),
-                  SourcePluginActionList(
-                    gateway: widget.sourcePlugins,
-                    location: SourcePluginActionLocation.lab,
-                  ),
-                ],
-              ),
+                    );
+                  },
+                ),
+              ],
+            ),
+            SourcePluginActionList(
+              gateway: sourcePlugins,
+              location: SourcePluginActionLocation.lab,
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -370,10 +370,8 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
             onLocaleChanged: onLocaleChanged,
             cloudSyncPageBuilder: (_) =>
                 CloudSyncPage(service: settingsCoreDependencies.cloudSync),
-            labSettingsPageBuilder: (_) => LabSettingsPage(
-              sourceService: settingsCoreDependencies.sourceRuntime,
-              sourcePlugins: sl<SourcePluginGateway>(),
-            ),
+            labSettingsPageBuilder: (_) =>
+                LabSettingsPage(sourcePlugins: sl<SourcePluginGateway>()),
             advancedSettingsPageBuilder: (_) => AdvancedSettingsPage(
               sourceService: settingsCoreDependencies.sourceAdvanced,
               sourcePlugins: sl<SourcePluginGateway>(),

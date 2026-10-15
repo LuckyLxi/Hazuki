@@ -228,10 +228,8 @@ void main() {
       onLocaleChanged: (_) async {},
       cloudSyncPageBuilder: (_) =>
           CloudSyncPage(service: sl<CloudSyncService>()),
-      labSettingsPageBuilder: (_) => LabSettingsPage(
-        sourceService: sl<SourceRuntimeGateway>(),
-        sourcePlugins: sl<SourcePluginGateway>(),
-      ),
+      labSettingsPageBuilder: (_) =>
+          LabSettingsPage(sourcePlugins: sl<SourcePluginGateway>()),
       advancedSettingsPageBuilder: (_) => AdvancedSettingsPage(
         sourceService: sl<SourceAdvancedGateway>(),
         softwareUpdateService: sl<SoftwareUpdateService>(),

@@ -18,8 +18,6 @@ import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-class _MockRuntime extends Mock implements SourceRuntimeGateway {}
-
 class _MockSelection extends Mock implements SourceSelectionGateway {}
 
 class _MockSettings extends Mock implements SourceSettingsGateway {}
@@ -362,8 +360,6 @@ void main() {
     testWidgets('actions are placed and run in the ${location.name} page', (
       tester,
     ) async {
-      final runtime = _MockRuntime();
-      when(() => runtime.supportsDirectComicId).thenReturn(false);
       final settings = _MockSettings();
       when(() => settings.activeSourceKey).thenReturn('fixture');
       when(() => settings.presentationForSource('fixture')).thenReturn({});
@@ -396,7 +392,6 @@ void main() {
           dependencies: dependencies,
         ),
         SourcePluginActionLocation.lab => LabSettingsPage(
-          sourceService: runtime,
           sourcePlugins: plugins,
         ),
         SourcePluginActionLocation.advanced => AdvancedSettingsPage(
