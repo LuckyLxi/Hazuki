@@ -100,13 +100,24 @@ class _SearchResultsPageState extends State<SearchResultsPage>
   late bool _aggregateSearchEnabled;
   late SearchComicLayout _comicLayout;
   bool _keyboardDismissPopInProgress = false;
+  bool _initialSearchPending = true;
 
-  String get _searchKeyword => _aggregateSearchEnabled
+  // Keep the first frame loading until a controller takes over the search.
+  bool get _waitingForInitialSearch =>
+      _initialSearchPending &&
+      widget.initialKeyword.trim().isNotEmpty &&
+      _resultsController.searchKeyword.isEmpty &&
+      _aggregateResultsController.keyword.isEmpty;
+
+  String get _searchKeyword => _waitingForInitialSearch
+      ? widget.initialKeyword.trim()
+      : _aggregateSearchEnabled
       ? _aggregateResultsController.keyword
       : _resultsController.searchKeyword;
   String? get _searchErrorMessage => _resultsController.searchErrorMessage;
   List<ExploreComic> get _searchComics => _resultsController.searchComics;
-  bool get _searchLoading => _resultsController.searchLoading;
+  bool get _searchLoading =>
+      _waitingForInitialSearch || _resultsController.searchLoading;
   bool get _searchLoadingMore => _resultsController.searchLoadingMore;
   String get _searchOrder => _resultsController.searchOrder;
   bool get _showKeyboardOnEnter => widget.entryIntent.showKeyboardOnEnter;
@@ -217,7 +228,16 @@ class _SearchResultsPageState extends State<SearchResultsPage>
           forceShowKeyboard: true,
         );
         await _idExtractController.load();
-        if (mounted) await _submitSearch();
+        if (!mounted) return;
+        try {
+          await _submitSearch();
+        } finally {
+          if (mounted) {
+            setState(() {
+              _initialSearchPending = false;
+            });
+          }
+        }
       }());
     });
   }
@@ -574,7 +594,7 @@ class _SearchResultsPageState extends State<SearchResultsPage>
 
   Widget _buildSearchResultsBody() {
     if (_aggregateSearchEnabled) {
-      if (_resultsController.searchLoading) {
+      if (_searchLoading) {
         return ListView(
           physics: const AlwaysScrollableScrollPhysics(
             parent: ClampingScrollPhysics(),
@@ -582,7 +602,9 @@ class _SearchResultsPageState extends State<SearchResultsPage>
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 80),
           children: [
             SearchResultsStateView(
-              searchKeyword: _resultsController.searchKeyword,
+              searchKeyword: _waitingForInitialSearch
+                  ? widget.initialKeyword.trim()
+                  : _resultsController.searchKeyword,
               searchLoading: true,
               searchComics: const [],
               searchErrorMessage: null,
