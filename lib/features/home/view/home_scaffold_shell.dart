@@ -4,12 +4,14 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/features/home/support/home_feature_contracts.dart';
 import 'package:hazuki/shared/favorites/favorite_app_bar_actions_state.dart';
 import 'package:hazuki/shared/search_box_outline.dart';
 import 'package:hazuki/shared/discover_back_to_top_notification.dart';
+import 'package:hazuki/shared/liquid_glass_support.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'package:hazuki/widgets/windows_comic_detail_host.dart';
 
@@ -429,6 +431,48 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
                   viewportSize: constraints.biggest,
                   progress: drawerProgress,
                 );
+                final navigation = Padding(
+                  // Match the drawer's foreground movement in layout space so
+                  // the glass shader keeps sampling untransformed coordinates.
+                  padding: EdgeInsets.only(left: navigationOffset.dx * 2),
+                  child: RepaintBoundary(
+                    key: const ValueKey(
+                      'home-bottom-navigation-repaint-boundary',
+                    ),
+                    child: HomeBottomNavigation(
+                      currentIndex: currentIndex,
+                      onDestinationSelected: onDestinationSelected,
+                      discoverLabel: l10n(context).homeTabDiscover,
+                      favoriteLabel: l10n(context).homeTabFavorite,
+                      backToTopLabel: l10n(context).favoriteBackToTop,
+                      layoutScale: navigationScale,
+                      showBackToTop: currentIndex == 0
+                          ? _showDiscoverBackToTop
+                          : currentIndex == 1 && widget.showFavoriteBackToTop,
+                      onBackToTopPressed: currentIndex == 0
+                          ? _onDiscoverBackToTopPressed
+                          : widget.onFavoriteBackToTopPressed,
+                    ),
+                  ),
+                );
+                if (HazukiLiquidGlass.isAvailable) {
+                  return GlassScaffold(
+                    backgroundColor: Theme.of(context).colorScheme.surface,
+                    enableBackgroundSampling: false,
+                    resizeToAvoidBottomInset: false,
+                    topEdgeFade: false,
+                    bottomEdgeFade: false,
+                    contentAwareBrightness: false,
+                    bottomBarHeight:
+                        HomeBottomNavigation.floatingBarHeight +
+                        HomeBottomNavigation.floatingVerticalPadding * 2,
+                    body: transformedContent,
+                    bottomBar: Padding(
+                      padding: EdgeInsets.only(bottom: -navigationOffset.dy),
+                      child: navigation,
+                    ),
+                  );
+                }
                 return Stack(
                   fit: StackFit.expand,
                   clipBehavior: Clip.none,
@@ -438,32 +482,7 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
                       left: 0,
                       right: 0,
                       bottom: -navigationOffset.dy,
-                      child: Padding(
-                        // A left inset twice the desired center displacement
-                        // reproduces the right-anchored scale and translation
-                        // using layout coordinates, keeping shaders untransformed.
-                        padding: EdgeInsets.only(left: navigationOffset.dx * 2),
-                        child: RepaintBoundary(
-                          key: const ValueKey(
-                            'home-bottom-navigation-repaint-boundary',
-                          ),
-                          child: HomeBottomNavigation(
-                            currentIndex: currentIndex,
-                            onDestinationSelected: onDestinationSelected,
-                            discoverLabel: l10n(context).homeTabDiscover,
-                            favoriteLabel: l10n(context).homeTabFavorite,
-                            backToTopLabel: l10n(context).favoriteBackToTop,
-                            layoutScale: navigationScale,
-                            showBackToTop: currentIndex == 0
-                                ? _showDiscoverBackToTop
-                                : currentIndex == 1 &&
-                                      widget.showFavoriteBackToTop,
-                            onBackToTopPressed: currentIndex == 0
-                                ? _onDiscoverBackToTopPressed
-                                : widget.onFavoriteBackToTopPressed,
-                          ),
-                        ),
-                      ),
+                      child: navigation,
                     ),
                   ],
                 );

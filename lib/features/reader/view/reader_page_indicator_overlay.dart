@@ -60,7 +60,7 @@ class ReaderPageIndicatorOverlay extends StatelessWidget {
                       total.toString(),
                     ),
                     style: readerTheme.textTheme.labelMedium?.copyWith(
-                      color: Colors.white,
+                      color: ReaderControlSurface.foregroundColor(context),
                       fontWeight: FontWeight.w600,
                     ),
                   ),

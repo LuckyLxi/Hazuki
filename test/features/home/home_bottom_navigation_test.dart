@@ -109,12 +109,16 @@ void main() {
       tabBar.indicatorExpansion,
       const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
     );
-    expect(tabBar.interactionBehavior, GlassInteractionBehavior.scaleOnly);
-    expect(tabBar.indicatorBorderRadius, 40);
-    expect(tabBar.settings?.thickness, 30);
-    expect(tabBar.settings?.blur, 3);
-    expect(tabBar.settings?.glassColor.a, closeTo(0.08, 0.01));
-    expect(tabBar.indicatorSettings, isNull);
+    expect(tabBar.interactionBehavior, GlassInteractionBehavior.full);
+    expect(tabBar.indicatorBorderRadius, GlassDefaults.capsuleRadius);
+    expect(tabBar.barBorderRadius, GlassDefaults.capsuleRadius);
+    expect(tabBar.settings?.thickness, 1.2);
+    expect(tabBar.settings?.blur, 4);
+    expect(
+      tabBar.settings?.glassColor,
+      ThemeData.dark().colorScheme.surfaceContainer.withValues(alpha: 0.4),
+    );
+    expect(tabBar.indicatorSettings?.refractiveIndex, 1.15);
 
     final scaffoldRect = tester.getRect(find.byType(Scaffold));
     final anchorRect = tester.getRect(
@@ -403,6 +407,50 @@ void main() {
 
     await gesture.cancel();
   });
+
+  for (final width in [320.0, 360.0]) {
+    testWidgets('all floating controls remain tappable at width $width', (
+      tester,
+    ) async {
+      await tester.runAsync(HazukiLiquidGlass.initialize);
+      await tester.binding.setSurfaceSize(Size(width, 760));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      var selectedIndex = 0;
+      var backToTopPressed = false;
+
+      await tester.pumpWidget(
+        HazukiLiquidGlass.wrap(
+          child: MaterialApp(
+            home: Scaffold(
+              bottomNavigationBar: StatefulBuilder(
+                builder: (context, setState) => HomeBottomNavigation(
+                  currentIndex: selectedIndex,
+                  onDestinationSelected: (index) =>
+                      setState(() => selectedIndex = index),
+                  discoverLabel: 'Discover',
+                  favoriteLabel: 'Favorites',
+                  showBackToTop: true,
+                  backToTopLabel: 'Back to top',
+                  onBackToTopPressed: () => backToTopPressed = true,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final barRect = tester.getRect(find.byType(GlassTabBar));
+      expect(barRect.left, greaterThanOrEqualTo(12));
+      expect(barRect.right, lessThanOrEqualTo(width - 12));
+      await tester.tap(find.byIcon(Icons.favorite_border));
+      await tester.pumpAndSettle();
+      expect(selectedIndex, 1);
+      await tester.tap(find.byIcon(Icons.vertical_align_top_rounded));
+      expect(backToTopPressed, isTrue);
+      expect(tester.takeException(), isNull);
+    });
+  }
 }
 
 void _ignoreDestination(int index) {}

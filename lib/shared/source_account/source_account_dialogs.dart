@@ -15,11 +15,14 @@ Future<T?> showHomeAnimatedDialog<T>(
   bool barrierDismissible = true,
   bool useGlassTransition = false,
 }) {
+  final clearGlass = useGlassTransition && HazukiLiquidGlass.isAvailable;
   return showGeneralDialog<T>(
     context: context,
     barrierDismissible: barrierDismissible,
     barrierLabel: l10n(context).dialogBarrierLabel,
-    barrierColor: Colors.black45,
+    barrierColor: clearGlass
+        ? Colors.black.withValues(alpha: 0.18)
+        : Colors.black45,
     transitionDuration: const Duration(milliseconds: 260),
     pageBuilder: (buildContext, animation, secondaryAnimation) {
       return SafeArea(
@@ -45,8 +48,8 @@ Future<T?> showHomeAnimatedDialog<T>(
                 child: ClipRect(
                   child: BackdropFilter(
                     filter: ImageFilter.blur(
-                      sigmaX: 8 * progress,
-                      sigmaY: 8 * progress,
+                      sigmaX: (clearGlass ? 1.2 : 8) * progress,
+                      sigmaY: (clearGlass ? 1.2 : 8) * progress,
                     ),
                     child: const SizedBox.expand(),
                   ),
@@ -495,7 +498,6 @@ class _HomeProfileGlassCard extends StatelessWidget {
     );
 
     if (HazukiLiquidGlass.isAvailable) {
-      final isDark = Theme.of(context).brightness == Brightness.dark;
       return ClipRSuperellipse(
         borderRadius: BorderRadius.circular(_borderRadius),
         clipBehavior: Clip.antiAlias,
@@ -504,23 +506,11 @@ class _HomeProfileGlassCard extends StatelessWidget {
           width: _width,
           padding: _padding,
           useOwnLayer: true,
-          quality: HazukiLiquidGlass.navigationQuality,
+          quality: GlassQuality.standard,
           shape: const LiquidRoundedSuperellipse(borderRadius: _borderRadius),
-          settings: LiquidGlassSettings(
+          settings: HazukiLiquidGlass.popoverSettings(
+            context,
             visibility: progress,
-            thickness: 34,
-            blur: 4,
-            chromaticAberration: 0.16,
-            lightIntensity: 0.72,
-            refractiveIndex: 1.56,
-            saturation: 1.06,
-            ambientStrength: 0.3,
-            glowIntensity: 0.5,
-            shadowElevation: 0,
-            glassColor: Colors.white.withValues(alpha: isDark ? 0.1 : 0.18),
-            backerColor: isDark
-                ? Colors.black.withValues(alpha: 0.18)
-                : Colors.white.withValues(alpha: 0.06),
           ),
           clipBehavior: Clip.antiAlias,
           child: content,

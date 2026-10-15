@@ -668,6 +668,7 @@ class _ReaderProgressSlider extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final foreground = ReaderControlSurface.foregroundColor(context);
     return Row(
       children: [
         SizedBox(
@@ -676,7 +677,7 @@ class _ReaderProgressSlider extends StatelessWidget {
             '${displayIndex + 1}',
             textAlign: TextAlign.center,
             style: readerTheme.textTheme.labelLarge?.copyWith(
-              color: Colors.white.withValues(alpha: 0.88),
+              color: foreground.withValues(alpha: 0.88),
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -702,7 +703,7 @@ class _ReaderProgressSlider extends StatelessWidget {
                 child: SliderTheme(
                   data: SliderTheme.of(context).copyWith(
                     activeTrackColor: readerTheme.colorScheme.primary,
-                    inactiveTrackColor: Colors.white.withValues(alpha: 0.18),
+                    inactiveTrackColor: foreground.withValues(alpha: 0.18),
                     thumbColor: readerTheme.colorScheme.primary,
                     overlayColor: readerTheme.colorScheme.primary.withValues(
                       alpha: 0.18,
@@ -729,7 +730,7 @@ class _ReaderProgressSlider extends StatelessWidget {
             '$imageCount',
             textAlign: TextAlign.center,
             style: readerTheme.textTheme.labelLarge?.copyWith(
-              color: Colors.white.withValues(alpha: 0.88),
+              color: foreground.withValues(alpha: 0.88),
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -752,10 +753,9 @@ class _ReaderResetZoomButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final foreground = ReaderControlSurface.foregroundColor(context);
     final button = Material(
-      color: embedded
-          ? Colors.white.withValues(alpha: 0.10)
-          : Colors.transparent,
+      color: embedded ? foreground.withValues(alpha: 0.10) : Colors.transparent,
       borderRadius: BorderRadius.circular(24),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -768,16 +768,12 @@ class _ReaderResetZoomButton extends StatelessWidget {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(
-                  Icons.zoom_out_map_rounded,
-                  color: Colors.white,
-                  size: 20,
-                ),
+                Icon(Icons.zoom_out_map_rounded, color: foreground, size: 20),
                 const SizedBox(width: 7),
                 Text(
                   label,
-                  style: const TextStyle(
-                    color: Colors.white,
+                  style: TextStyle(
+                    color: foreground,
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                   ),
@@ -814,8 +810,9 @@ class _ReaderBarIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final foreground = ReaderControlSurface.foregroundColor(context);
     return Material(
-      color: Colors.white.withValues(alpha: 0.08),
+      color: foreground.withValues(alpha: 0.08),
       borderRadius: BorderRadius.circular(22),
       child: SizedBox(
         width: ReaderOverlayLayout.bottomControlsButtonSize,
@@ -826,15 +823,15 @@ class _ReaderBarIconButton extends StatelessWidget {
           visualDensity: VisualDensity.standard,
           onPressed: onPressed,
           icon: loading
-              ? const SizedBox(
+              ? SizedBox(
                   width: 18,
                   height: 18,
                   child: CircularProgressIndicator(
                     strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    valueColor: AlwaysStoppedAnimation<Color>(foreground),
                   ),
                 )
-              : Icon(icon, color: Colors.white, size: 23),
+              : Icon(icon, color: foreground, size: 23),
         ),
       ),
     );

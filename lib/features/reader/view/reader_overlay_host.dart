@@ -1,9 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import 'package:hazuki/features/reader/state/reader_runtime_state.dart';
 import 'package:hazuki/features/reader/view/reader_overlay_builders.dart';
+import 'package:hazuki/shared/liquid_glass_support.dart';
 
 class ReaderOverlayHost extends StatelessWidget {
   const ReaderOverlayHost({
@@ -45,77 +47,87 @@ class ReaderOverlayHost extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        child,
-        Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
-          child: IgnorePointer(
-            ignoring: !runtimeState.controlsVisible,
-            child: AnimatedSlide(
-              offset: runtimeState.controlsVisible
-                  ? Offset.zero
-                  : const Offset(0, -1),
-              duration: const Duration(milliseconds: 360),
-              curve: Curves.easeOutBack,
-              child: buildReaderTopControls(
-                context: context,
-                runtimeState: runtimeState,
-                readerTheme: readerTheme,
-                title: title,
-                onBackPressed: onBackPressed,
-                onOpenSettingsDrawer: onOpenSettingsDrawer,
-              ),
+    final overlays = <Widget>[
+      Positioned(
+        top: 0,
+        left: 0,
+        right: 0,
+        child: IgnorePointer(
+          ignoring: !runtimeState.controlsVisible,
+          child: AnimatedSlide(
+            offset: runtimeState.controlsVisible
+                ? Offset.zero
+                : const Offset(0, -1),
+            duration: const Duration(milliseconds: 360),
+            curve: Curves.easeOutBack,
+            child: buildReaderTopControls(
+              context: context,
+              runtimeState: runtimeState,
+              readerTheme: readerTheme,
+              title: title,
+              onBackPressed: onBackPressed,
+              onOpenSettingsDrawer: onOpenSettingsDrawer,
             ),
           ),
         ),
-        if (runtimeState.pageIndicator)
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: AnimatedSlide(
-              offset: runtimeState.controlsVisible
-                  ? const Offset(0, 1)
-                  : Offset.zero,
-              duration: const Duration(milliseconds: 360),
-              curve: Curves.easeOutBack,
-              child: buildReaderPageIndicator(
-                runtimeState: runtimeState,
-                readerTheme: readerTheme,
-                chapterIndex: chapterIndex,
-              ),
-            ),
-          ),
+      ),
+      if (runtimeState.pageIndicator)
         Positioned(
           left: 0,
           right: 0,
           bottom: 0,
-          child: buildReaderBottomControls(
-            context: context,
-            runtimeState: runtimeState,
-            readerTheme: readerTheme,
-            chapterPanelLoading: chapterPanelLoading,
-            maybeTriggerSliderHaptic: (value, {force = false}) {
-              maybeTriggerReaderSliderHaptic(
-                runtimeState: runtimeState,
-                value: value,
-                force: force,
-              );
-            },
-            updateState: updateState,
-            goToPage: goToPage,
-            onOpenChaptersPanel: onOpenChaptersPanel,
-            onPreviousChapter: onPreviousChapter,
-            onFavorite: onFavorite,
-            onComments: onComments,
-            onNextChapter: onNextChapter,
-            onResetZoom: onResetZoom,
+          child: AnimatedSlide(
+            offset: runtimeState.controlsVisible
+                ? const Offset(0, 1)
+                : Offset.zero,
+            duration: const Duration(milliseconds: 360),
+            curve: Curves.easeOutBack,
+            child: buildReaderPageIndicator(
+              runtimeState: runtimeState,
+              readerTheme: readerTheme,
+              chapterIndex: chapterIndex,
+            ),
           ),
         ),
-      ],
+      Positioned(
+        left: 0,
+        right: 0,
+        bottom: 0,
+        child: buildReaderBottomControls(
+          context: context,
+          runtimeState: runtimeState,
+          readerTheme: readerTheme,
+          chapterPanelLoading: chapterPanelLoading,
+          maybeTriggerSliderHaptic: (value, {force = false}) {
+            maybeTriggerReaderSliderHaptic(
+              runtimeState: runtimeState,
+              value: value,
+              force: force,
+            );
+          },
+          updateState: updateState,
+          goToPage: goToPage,
+          onOpenChaptersPanel: onOpenChaptersPanel,
+          onPreviousChapter: onPreviousChapter,
+          onFavorite: onFavorite,
+          onComments: onComments,
+          onNextChapter: onNextChapter,
+          onResetZoom: onResetZoom,
+        ),
+      ),
+    ];
+    if (!HazukiLiquidGlass.isAvailable) {
+      return Stack(children: [child, ...overlays]);
+    }
+    // Keep reading content below all control surfaces. The outer Material
+    // scaffold continues to own the settings drawer and keyboard focus.
+    return GlassScaffold(
+      backgroundColor: readerTheme.colorScheme.surface,
+      enableBackgroundSampling: false,
+      resizeToAvoidBottomInset: false,
+      edgeFade: false,
+      body: child,
+      bodyOverlays: overlays,
     );
   }
 }

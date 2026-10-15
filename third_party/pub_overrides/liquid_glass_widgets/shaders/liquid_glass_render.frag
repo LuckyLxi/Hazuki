@@ -127,7 +127,7 @@ uniform vec3 uRimConfig;
 // Slot 40: uLensModel — 0 = spherical (default, exact Snell refraction
 // through the hemispherical bevel), 1 = paraxial (small-angle deviation,
 // (n - 1) times the slope taken as sin^2 of the incidence). See
-// GlassLensModel.
+// GlassLensModel. 2 = circular arc, 3 = circular arc with radial depth.
 uniform float uLensModel;
 
 // Slots 41-44: uFrost — x: frostOpacity (0 = no frost), y: frostClamp,
@@ -146,6 +146,9 @@ uniform vec4 uFrost;
 // default, leaves this shader bit for bit unchanged. See
 // LiquidGlassSettings.bodyShade.
 uniform float uBodyShade;
+
+// Slot 46: circular-arc displacement amplitude in physical pixels.
+uniform float uRefractionAmount;
 
 uniform sampler2D uBackgroundTexture;
 uniform sampler2D uGeometryTexture;
@@ -379,7 +382,24 @@ void main() {
     float height = decodeHeight(geometryData, uThickness);
     float baseHeight = uThickness * 8.0;
     vec2  displacement;
-    if (uLensModel > 0.5) {
+    bool circularArc = uLensModel > 1.5;
+    if (circularArc) {
+        // The circular-arc profile used by compose-miuix's Lens.kt:
+        // 1 - sqrt(1 - x*x), where x falls from 1 at the edge to 0 inside.
+        // The geometry pass already encodes that same circular cross-section.
+        // Use its normal/height to keep blended shapes continuous, and an
+        // explicit pixel amplitude instead of Snell's large grazing-angle fold.
+        float slope = clamp(length(normalXY), 0.0, 1.0);
+        float arc = 1.0 - sqrt(max(0.0, 1.0 - slope * slope));
+        vec2 direction = normalXY / max(slope, 1e-4);
+        if (uLensModel > 2.5) {
+            vec2 radial = fragCoord - (uGeometryOffset + 0.5 * uGeometrySize);
+            radial /= max(length(radial), 1e-4);
+            direction += radial;
+            direction /= max(length(direction), 1e-4);
+        }
+        displacement = -direction * arc * uRefractionAmount;
+    } else if (uLensModel > 0.5) {
         // Paraxial lens: the thin-prism law, deviation = (n - 1) * slope,
         // with the slope taken as sin(incidence)^2. normalXY is
         // sin(incidence) and falls off linearly across the bevel, so the
@@ -547,7 +567,7 @@ void main() {
         }
         refractColor = vec4(0.0, 0.0, 0.0, a);
     } else if (dot(normalXY, normalXY) < 1e-4) {
-        // Flat interior — zero displacement, sample directly.
+        // Flat interior — keep the original backdrop scale.
         refractColor = textureBilinear(screenUV, physTexSize, invTexSize);
     } else if (uChromaticAberration < 0.01) {
         vec2 refractedUV = screenUV + displacement * invTexSize;
@@ -564,6 +584,12 @@ void main() {
         }
     } else {
         float dispersionStrength = uChromaticAberration * 0.5;
+        if (circularArc) {
+            // Dispersion changes direction between corners and vanishes on
+            // the horizontal/vertical axes, matching the reference's quiet rim.
+            vec2 centred = (geometryUV - vec2(0.5)) * 2.0;
+            dispersionStrength = uChromaticAberration * centred.x * centred.y;
+        }
         vec2 redOffset  = displacement * (1.0 + dispersionStrength);
         vec2 blueOffset = displacement * (1.0 - dispersionStrength);
 
@@ -604,6 +630,12 @@ void main() {
 
     vec4 bodyGlassColor = uGlassColor;
     bodyGlassColor.a *= 1.0 - hairline;
+    if (circularArc) {
+        // Reference order: vibrancy, blur/lens, then a stable theme surface.
+        // The existing backdrop blur is linear, so saturation can be applied
+        // here before the tint without another capture or render pass.
+        refractColor.rgb = applySaturation(refractColor.rgb, uSaturation);
+    }
     vec4 finalColor = applyGlassColor(refractColor, bodyGlassColor, uBodyMode);
 
     // VQ4: Content-adaptive glass strength.
@@ -634,7 +666,7 @@ void main() {
     // uSaturation is the artist-set base; we only modulate it, never replace it.
     // The hairline shows the backdrop as it is, so it takes no saturation.
     finalColor.rgb = applySaturation(
-        finalColor.rgb, mix(uSaturation * adaptiveStrength, 1.0, hairline));
+        finalColor.rgb, circularArc ? 1.0 : mix(uSaturation * adaptiveStrength, 1.0, hairline));
 
     // Modulate glass tint blend weight by adaptiveStrength.
     // On dark backgrounds the tint reads heavier (+20%); on bright backgrounds
@@ -743,7 +775,7 @@ void main() {
     // With no light and no ambient term the block below mixes by 0 (the touch
     // glint also scales by uLightIntensity), so skip it: the iOS 27 presets
     // set lightIntensity to 0.
-    if (edgeFactor > 0.01 && (uLightIntensity > 0.0 || uAmbientStrength > 0.0)) {
+    if (!circularArc && edgeFactor > 0.01 && (uLightIntensity > 0.0 || uAmbientStrength > 0.0)) {
         // Re-normalize the bilinearly interpolated normal.
         // Interpolating normals across pixels shrinks their magnitude (the 'chord' effect).
         // If we don't re-normalize, this magnitude oscillation causes severe flickering
@@ -866,7 +898,22 @@ void main() {
     float ring    = (1.0 - smoothstep(uEdgeConfig.x - ringWindow, uEdgeConfig.x + ringWindow, rimDist))
                   * step(0.001, uEdgeConfig.x);
     float fresnel = rimBase * 0.12 * uEdgeConfig.y + ring * 0.45;
-    finalColor.rgb = clamp(finalColor.rgb + vec3(fresnel), 0.0, 1.0);
+    if (circularArc) {
+        // A fine directional stroke with a soft inner bloom, rather than a
+        // broad reflective bevel. Match the reference's two unequal lights.
+        float dpr = max(0.3, dprScale * 3.0);
+        float along = dot(rimN, uLightDirection);
+        float primary = pow(max(along, 0.0), 4.0);
+        float secondary = pow(max(-along, 0.0), 4.0) * 0.4;
+        float core = 1.0 - smoothstep(0.0, dpr, rimDist);
+        float bloom = exp(-rimDist / (2.0 * dpr));
+        float highlight = (primary + secondary) * uLightIntensity;
+        fresnel = clamp((0.08 * uEdgeConfig.y + highlight) *
+                        (0.65 * core + 0.35 * bloom), 0.0, 0.85);
+        finalColor.rgb = mix(finalColor.rgb, vec3(1.0), fresnel);
+    } else {
+        finalColor.rgb = clamp(finalColor.rgb + vec3(fresnel), 0.0, 1.0);
+    }
 
     // iOS 27 rim light (uRimConfig.y): two lobes at the ends of the light
     // axis, each a sharp core one pixel inside the hairline with a soft tail

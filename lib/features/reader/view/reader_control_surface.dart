@@ -21,6 +21,19 @@ class ReaderControlSurface extends StatelessWidget {
   final double? height;
   final EdgeInsetsGeometry? padding;
 
+  /// Opaque fallback surfaces retain their white controls. Glass controls use
+  /// the reader theme so light surfaces have a matching dark foreground.
+  static Color foregroundColor(BuildContext context) =>
+      HazukiLiquidGlass.isAvailable
+      ? Theme.of(context).colorScheme.onSurface
+      : Colors.white;
+
+  static const _foregroundShadows = [
+    Shadow(color: Color(0xCC000000), blurRadius: 1, offset: Offset(0, 1)),
+    Shadow(color: Color(0xCC000000), blurRadius: 1, offset: Offset(0, -1)),
+    Shadow(color: Color(0x99000000), blurRadius: 3),
+  ];
+
   @override
   Widget build(BuildContext context) {
     if (!HazukiLiquidGlass.isAvailable) {
@@ -45,20 +58,25 @@ class ReaderControlSurface extends StatelessWidget {
       useOwnLayer: true,
       quality: HazukiLiquidGlass.navigationQuality,
       shape: LiquidRoundedSuperellipse(borderRadius: borderRadius),
-      settings: LiquidGlassSettings(
-        thickness: 28,
-        blur: 4,
-        chromaticAberration: 0.08,
-        lightIntensity: 0.64,
-        ambientStrength: 0.18,
-        saturation: 1.1,
-        glowIntensity: 0.6,
-        shadowElevation: 0,
-        glassColor: Colors.white.withValues(alpha: 0.12),
-        backerColor: Colors.black.withValues(alpha: 0.34),
-      ),
+      settings: HazukiLiquidGlass.readerSettings(context),
       clipBehavior: Clip.antiAlias,
-      child: child,
+      child: IconTheme.merge(
+        data: IconThemeData(
+          color: foregroundColor(context),
+          shadows: Theme.of(context).brightness == Brightness.dark
+              ? _foregroundShadows
+              : const [],
+        ),
+        child: DefaultTextStyle.merge(
+          style: TextStyle(
+            color: foregroundColor(context),
+            shadows: Theme.of(context).brightness == Brightness.dark
+                ? _foregroundShadows
+                : const [],
+          ),
+          child: child,
+        ),
+      ),
     );
   }
 }

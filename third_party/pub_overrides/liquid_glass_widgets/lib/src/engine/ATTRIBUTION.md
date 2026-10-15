@@ -1,5 +1,17 @@
 # Engine Attribution: `liquid_glass_renderer`
 
+## Hazuki circular-arc material
+
+The optional `circularArc` / `circularArcWithDepth` profiles were implemented
+after studying the Apache-2.0-headered `Lens.kt`, `Vibrancy.kt` and
+`FloatingBottomBarLayers.kt` in compose-miuix (compose-miuix-ui contributors,
+2026; the PixEz compose-miuix source supplied for this integration).
+The existing geometry normals are used to evaluate the circular-arc falloff;
+the Flutter implementation retains its blended-shape geometry and compositing.
+Navigation follows the reference's 24dp lens transition and displacement,
+4dp blur, 1.5 saturation and 40% theme-container tint. The moving indicator
+uses the reference's 10dp transition and 14dp displacement with radial depth.
+
 This directory (`lib/src/engine/`) contains the foundational rendering engine derived from [`liquid_glass_renderer`](https://github.com/whynotmake-it/flutter_liquid_glass/tree/main/packages/liquid_glass_renderer) developed by **Tim Lehmann** ([whynotmake.it](https://github.com/whynotmake-it)), licensed under the **MIT License** (see [LICENSE](LICENSE)).
 
 These files have been significantly evolved and maintained in-tree for `liquid_glass_widgets`. They are **not a hermetic third-party snapshot** — they are deeply integrated with the surrounding package and will continue to be modified as the package evolves.

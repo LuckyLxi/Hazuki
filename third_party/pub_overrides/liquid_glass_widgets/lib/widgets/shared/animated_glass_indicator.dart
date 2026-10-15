@@ -287,6 +287,16 @@ class AnimatedGlassIndicator extends StatelessWidget {
           override.fresnelStrength != _settingsDefaults.fresnelStrength
               ? override.fresnelStrength
               : null,
+      lensModel: override.lensModel != _settingsDefaults.lensModel
+          ? override.lensModel
+          : null,
+      refractionAmount:
+          override.refractionAmount != _settingsDefaults.refractionAmount
+              ? override.refractionAmount
+              : null,
+      bodyMode: override.bodyMode != _settingsDefaults.bodyMode
+          ? override.bodyMode
+          : null,
       // backerColor and platformViewFallbackColor forwarded so indicatorSettings
       // preserve custom stand-in colors.
       backerColor: override.backerColor != _settingsDefaults.backerColor

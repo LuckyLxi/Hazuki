@@ -21,6 +21,7 @@ class ReaderTopControls extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final foreground = ReaderControlSurface.foregroundColor(context);
     return SafeArea(
       bottom: false,
       child: Padding(
@@ -38,7 +39,7 @@ class ReaderTopControls extends StatelessWidget {
             children: [
               IconButton(
                 onPressed: onBackPressed,
-                icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+                icon: Icon(Icons.arrow_back_rounded, color: foreground),
               ),
               Expanded(
                 child: Text(
@@ -46,7 +47,7 @@ class ReaderTopControls extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: readerTheme.textTheme.titleMedium?.copyWith(
-                    color: Colors.white,
+                    color: foreground,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -54,7 +55,7 @@ class ReaderTopControls extends StatelessWidget {
               IconButton(
                 tooltip: settingsTooltip,
                 onPressed: onOpenSettingsDrawer,
-                icon: const Icon(Icons.tune_rounded, color: Colors.white),
+                icon: Icon(Icons.tune_rounded, color: foreground),
               ),
             ],
           ),

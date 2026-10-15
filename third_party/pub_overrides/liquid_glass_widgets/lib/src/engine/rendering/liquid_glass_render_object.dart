@@ -616,7 +616,7 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
               settings.effectiveRimShade,
               settings.effectiveRimLight,
               settings.rimShadeEnds,
-              settings.lensModel == GlassLensModel.paraxial ? 1.0 : 0.0,
+              settings.lensModel.index.toDouble(),
               // Slots 41-44: uFrost.
               if (frostRowsPath == null) 0.0 else frostOpacity,
               settings.frostClamp.clamp(-1.0, 1.0),
@@ -624,6 +624,8 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
               max(settings.blurWeight, 0.0),
               // Slot 45: uBodyShade.
               settings.effectiveBodyShade.clamp(0.0, 1.0),
+              // Slot 46: circular-arc refraction amount, physical pixels.
+              settings.effectiveRefractionAmount * dpr,
             ]);
           })
           ..setImageSampler(
@@ -793,12 +795,14 @@ abstract class LiquidGlassRenderObject extends RenderProxyBox {
           settings.effectiveRimShade,
           settings.effectiveRimLight,
           settings.rimShadeEnds,
-          settings.lensModel == GlassLensModel.paraxial ? 1.0 : 0.0,
+          settings.lensModel.index.toDouble(),
           // Slots 41-44: uFrost. No frost on the capture path (no cloud
           // rows); every component is set so none is left stale.
           0.0, 0.0, 0.0, 1.0,
           // Slot 45: uBodyShade.
           settings.effectiveBodyShade.clamp(0.0, 1.0),
+          // Slot 46: circular-arc refraction amount, physical pixels.
+          settings.effectiveRefractionAmount * dpr,
         ]);
       })
       // Slot 0: captured background image (replaces the BackdropFilter read).

@@ -85,6 +85,15 @@ enum GlassLensModel {
   ///
   /// Only affects the Premium (Impeller) path.
   paraxial,
+
+  /// A circular-arc falloff across the bevel, with a bounded pixel displacement
+  /// set by [LiquidGlassSettings.refractionAmount]. The centre stays flat.
+  /// This is the profile used by the compose-miuix floating navigation bar.
+  circularArc,
+
+  /// [circularArc] with a radial contribution to the displacement direction,
+  /// suitable for the navigation bar's moving indicator lens.
+  circularArcWithDepth,
 }
 
 /// Represents the settings for a liquid glass effect.
@@ -126,6 +135,7 @@ class LiquidGlassSettings {
     this.rimShadeEnds = 0.2,
     this.rimLight = 0.0,
     this.bodyShade = 0.0,
+    this.refractionAmount = 0.0,
     this.lensModel = GlassLensModel.spherical,
     this.backerColor,
     this.platformViewFallbackColor,
@@ -168,6 +178,7 @@ class LiquidGlassSettings {
     this.rimShadeEnds = 0.2,
     this.rimLight = 0.0,
     this.bodyShade = 0.0,
+    this.refractionAmount = 0.0,
     this.lensModel = GlassLensModel.spherical,
     this.backerColor,
     this.platformViewFallbackColor,
@@ -716,6 +727,15 @@ class LiquidGlassSettings {
   /// The effective body shade taking visibility into account.
   double get effectiveBodyShade => bodyShade * visibility;
 
+  /// Maximum circular-arc refraction displacement, in logical pixels.
+  /// Only used by [GlassLensModel.circularArc] and
+  /// [GlassLensModel.circularArcWithDepth]. Defaults to zero (no displacement).
+  final double refractionAmount;
+
+  /// Displacement fades with the material instead of jumping on presentation.
+  double get effectiveRefractionAmount =>
+      refractionAmount.clamp(0.0, double.infinity) * visibility.clamp(0.0, 1.0);
+
   /// How the bevel bends the backdrop. See [GlassLensModel].
   ///
   /// Defaults to [GlassLensModel.spherical], the existing rendering.
@@ -766,6 +786,7 @@ class LiquidGlassSettings {
         rimShadeEnds: rimShadeEnds,
         rimLight: rimLight,
         bodyShade: bodyShade,
+        refractionAmount: refractionAmount,
         lensModel: lensModel,
         backerColor: backerColor,
         platformViewFallbackColor: platformViewFallbackColor,
@@ -885,6 +906,8 @@ class LiquidGlassSettings {
         rimShadeEnds: lerpDouble(a.rimShadeEnds, b.rimShadeEnds, t)!,
         rimLight: lerpDouble(a.rimLight, b.rimLight, t)!,
         bodyShade: lerpDouble(a.bodyShade, b.bodyShade, t)!,
+        refractionAmount:
+            lerpDouble(a.refractionAmount, b.refractionAmount, t)!,
         lensModel: t < 0.5 ? a.lensModel : b.lensModel,
         // Lerp the color so the backer fades smoothly (from/to transparent when
         // one side is null), rather than popping at the midpoint.
@@ -940,6 +963,7 @@ class LiquidGlassSettings {
     double? rimShadeEnds,
     double? rimLight,
     double? bodyShade,
+    double? refractionAmount,
     GlassLensModel? lensModel,
     Color? backerColor,
     Color? platformViewFallbackColor,
@@ -977,6 +1001,7 @@ class LiquidGlassSettings {
         rimShadeEnds: rimShadeEnds ?? this.rimShadeEnds,
         rimLight: rimLight ?? this.rimLight,
         bodyShade: bodyShade ?? this.bodyShade,
+        refractionAmount: refractionAmount ?? this.refractionAmount,
         lensModel: lensModel ?? this.lensModel,
         backerColor: backerColor ?? this.backerColor,
         platformViewFallbackColor:
@@ -1020,6 +1045,7 @@ class LiquidGlassSettings {
         other.rimShadeEnds == rimShadeEnds &&
         other.rimLight == rimLight &&
         other.bodyShade == bodyShade &&
+        other.refractionAmount == refractionAmount &&
         other.lensModel == lensModel &&
         other.backerColor == backerColor &&
         other.platformViewFallbackColor == platformViewFallbackColor &&
@@ -1059,6 +1085,7 @@ class LiquidGlassSettings {
         rimShadeEnds,
         rimLight,
         bodyShade,
+        refractionAmount,
         lensModel,
         backerColor,
         platformViewFallbackColor,
