@@ -225,33 +225,47 @@ class _HomeSourceSwitchPickerPane extends StatelessWidget {
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 16),
-            for (final source in sources)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 6),
-                child: Material(
-                  color: source.normalizedKey == activeSourceKey
-                      ? colorScheme.primaryContainer.withValues(alpha: 0.58)
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(18),
-                  clipBehavior: Clip.antiAlias,
-                  child: ListTile(
-                    onTap: source.normalizedKey == activeSourceKey
-                        ? null
-                        : () => onSelected(source),
-                    leading: Icon(
-                      source.normalizedKey == activeSourceKey
-                          ? Icons.radio_button_checked
-                          : Icons.radio_button_off,
-                    ),
-                    title: Text(source.name),
-                    subtitle: Text(
-                      source.normalizedKey == activeSourceKey
-                          ? strings.homeSourceSwitchCurrent
-                          : source.key,
-                    ),
-                  ),
+            Flexible(
+              child: ConstrainedBox(
+                // Three two-line tiles (72 each), including their spacing.
+                constraints: const BoxConstraints(maxHeight: 3 * (72 + 6)),
+                child: ListView(
+                  shrinkWrap: true,
+                  padding: EdgeInsets.zero,
+                  children: [
+                    for (final source in sources)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Material(
+                          color: source.normalizedKey == activeSourceKey
+                              ? colorScheme.primaryContainer.withValues(
+                                  alpha: 0.58,
+                                )
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(18),
+                          clipBehavior: Clip.antiAlias,
+                          child: ListTile(
+                            onTap: source.normalizedKey == activeSourceKey
+                                ? null
+                                : () => onSelected(source),
+                            leading: Icon(
+                              source.normalizedKey == activeSourceKey
+                                  ? Icons.radio_button_checked
+                                  : Icons.radio_button_off,
+                            ),
+                            title: Text(source.name),
+                            subtitle: Text(
+                              source.normalizedKey == activeSourceKey
+                                  ? strings.homeSourceSwitchCurrent
+                                  : source.key,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
+            ),
             if (errorText != null) ...[
               const SizedBox(height: 8),
               Text(errorText!, style: TextStyle(color: colorScheme.error)),

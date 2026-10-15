@@ -13,6 +13,7 @@ Future<T?> showHomeAnimatedDialog<T>(
   BuildContext context, {
   required Widget child,
   bool barrierDismissible = true,
+  bool useGlassTransition = false,
 }) {
   return showGeneralDialog<T>(
     context: context,
@@ -22,11 +23,8 @@ Future<T?> showHomeAnimatedDialog<T>(
     transitionDuration: const Duration(milliseconds: 260),
     pageBuilder: (buildContext, animation, secondaryAnimation) {
       return SafeArea(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-          child: Center(
-            child: Material(type: MaterialType.transparency, child: child),
-          ),
+        child: Center(
+          child: Material(type: MaterialType.transparency, child: child),
         ),
       );
     },
@@ -37,15 +35,55 @@ Future<T?> showHomeAnimatedDialog<T>(
             curve: Curves.easeOutCubic,
             reverseCurve: Curves.easeInCubic,
           );
-          return FadeTransition(
-            opacity: curved,
-            child: ScaleTransition(
-              scale: Tween<double>(begin: 0.94, end: 1).animate(curved),
-              child: dialogChild,
-            ),
+          final progress = curved.value;
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              // Backdrop filters must read the page directly, without an
+              // ancestor opacity layer isolating them during the transition.
+              IgnorePointer(
+                child: ClipRect(
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(
+                      sigmaX: 8 * progress,
+                      sigmaY: 8 * progress,
+                    ),
+                    child: const SizedBox.expand(),
+                  ),
+                ),
+              ),
+              ScaleTransition(
+                scale: Tween<double>(begin: 0.94, end: 1).animate(curved),
+                child: useGlassTransition
+                    ? _HomeDialogGlassProgress(
+                        progress: progress,
+                        child: dialogChild,
+                      )
+                    : FadeTransition(opacity: curved, child: dialogChild),
+              ),
+            ],
           );
         },
   );
+}
+
+class _HomeDialogGlassProgress extends InheritedWidget {
+  const _HomeDialogGlassProgress({
+    required this.progress,
+    required super.child,
+  });
+
+  final double progress;
+
+  static double of(BuildContext context) =>
+      context
+          .dependOnInheritedWidgetOfExactType<_HomeDialogGlassProgress>()
+          ?.progress ??
+      1;
+
+  @override
+  bool updateShouldNotify(_HomeDialogGlassProgress oldWidget) =>
+      progress != oldWidget.progress;
 }
 
 Color homeDialogBackgroundColor(BuildContext context) {
@@ -415,6 +453,7 @@ Future<void> showHomeAvatarCard(
 }) {
   return showHomeAnimatedDialog<void>(
     context,
+    useGlassTransition: true,
     child: _HomeProfileGlassCard(
       avatarUrl: avatarUrl,
       username: username,
@@ -446,6 +485,7 @@ class _HomeProfileGlassCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final progress = _HomeDialogGlassProgress.of(context);
     final content = HomeProfileCardContent(
       avatarUrl: avatarUrl,
       username: username,
@@ -467,6 +507,7 @@ class _HomeProfileGlassCard extends StatelessWidget {
           quality: HazukiLiquidGlass.navigationQuality,
           shape: const LiquidRoundedSuperellipse(borderRadius: _borderRadius),
           settings: LiquidGlassSettings(
+            visibility: progress,
             thickness: 34,
             blur: 4,
             chromaticAberration: 0.16,
@@ -492,18 +533,20 @@ class _HomeProfileGlassCard extends StatelessWidget {
       key: const ValueKey('home-profile-frosted-glass-card'),
       borderRadius: BorderRadius.circular(_borderRadius),
       child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+        filter: ImageFilter.blur(sigmaX: 24 * progress, sigmaY: 24 * progress),
         child: Container(
           width: _width,
           padding: _padding,
           decoration: BoxDecoration(
-            color: colorScheme.surface.withValues(alpha: 0.72),
+            color: colorScheme.surface.withValues(alpha: 0.72 * progress),
             borderRadius: BorderRadius.circular(_borderRadius),
             border: Border.all(
-              color: colorScheme.outlineVariant.withValues(alpha: 0.4),
+              color: colorScheme.outlineVariant.withValues(
+                alpha: 0.4 * progress,
+              ),
             ),
           ),
-          child: content,
+          child: Opacity(opacity: progress, child: content),
         ),
       ),
     );
