@@ -8,6 +8,7 @@ import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
 import 'favorite_folders_view_model.dart';
+import 'favorite_folders_button_morph.dart';
 
 class FavoriteFoldersMorphDialog extends StatefulWidget {
   const FavoriteFoldersMorphDialog({super.key, required this.viewModel});
@@ -539,10 +540,79 @@ class _FavoriteFoldersMorphDialogState
         final theme = Theme.of(context);
         final cs = theme.colorScheme;
         final size = MediaQuery.sizeOf(context);
+        final morph = FavoriteFoldersMorphScope.maybeOf(context);
         final dialogWidth = expanded
             ? math.min(size.width * 0.9, 460.0)
             : math.min(size.width * 0.78, 320.0);
 
+        final surface = AnimatedContainer(
+          key: const ValueKey('favorite-dialog-surface'),
+          duration: const Duration(milliseconds: 460),
+          curve: Curves.easeInOutCubicEmphasized,
+          width: dialogWidth,
+          constraints: BoxConstraints(
+            minHeight: expanded ? 0 : 196,
+            maxHeight: expanded ? math.min(size.height * 0.78, 520) : 220,
+          ),
+          clipBehavior: Clip.antiAlias,
+          decoration: BoxDecoration(
+            color: morph == null ? cs.surface : Colors.transparent,
+            borderRadius: BorderRadius.circular(expanded ? 32 : 28),
+            border: morph == null
+                ? Border.all(
+                    color: cs.outlineVariant.withValues(
+                      alpha: expanded ? 0.24 : 0.16,
+                    ),
+                  )
+                : null,
+            boxShadow: morph == null
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.18),
+                      blurRadius: expanded ? 30 : 22,
+                      spreadRadius: -6,
+                      offset: const Offset(0, 18),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Stack(
+            children: [
+              Padding(
+                padding: EdgeInsets.fromLTRB(
+                  24,
+                  expanded ? 20 : 24,
+                  24,
+                  expanded ? 20 : 24,
+                ),
+                child: AnimatedSize(
+                  duration: const Duration(milliseconds: 460),
+                  curve: Curves.easeInOutCubicEmphasized,
+                  alignment: Alignment.center,
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 280),
+                    switchInCurve: Curves.easeOutCubic,
+                    switchOutCurve: Curves.easeInCubic,
+                    transitionBuilder: (child, animation) {
+                      final slide = Tween<Offset>(
+                        begin: const Offset(0, 0.08),
+                        end: Offset.zero,
+                      ).animate(animation);
+                      return FadeTransition(
+                        opacity: animation,
+                        child: SlideTransition(position: slide, child: child),
+                      );
+                    },
+                    child: expanded
+                        ? _buildExpandedContent(context)
+                        : _buildLoadingContent(context),
+                  ),
+                ),
+              ),
+              if (_vm.isBusy && expanded) _buildBusyOverlay(context),
+            ],
+          ),
+        );
         return SafeArea(
           child: Material(
             type: MaterialType.transparency,
@@ -552,74 +622,26 @@ class _FavoriteFoldersMorphDialogState
                   horizontal: 18,
                   vertical: 24,
                 ),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 460),
-                  curve: Curves.easeInOutCubicEmphasized,
-                  width: dialogWidth,
-                  constraints: BoxConstraints(
-                    minHeight: expanded ? 0 : 196,
-                    maxHeight: expanded
-                        ? math.min(size.height * 0.78, 520)
-                        : 220,
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  decoration: BoxDecoration(
-                    color: cs.surface,
-                    borderRadius: BorderRadius.circular(expanded ? 32 : 28),
-                    border: Border.all(
-                      color: cs.outlineVariant.withValues(
-                        alpha: expanded ? 0.24 : 0.16,
-                      ),
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.18),
-                        blurRadius: expanded ? 30 : 22,
-                        spreadRadius: -6,
-                        offset: const Offset(0, 18),
-                      ),
-                    ],
-                  ),
-                  child: Stack(
-                    children: [
-                      Padding(
-                        padding: EdgeInsets.fromLTRB(
-                          24,
-                          expanded ? 20 : 24,
-                          24,
-                          expanded ? 20 : 24,
-                        ),
-                        child: AnimatedSize(
-                          duration: const Duration(milliseconds: 460),
-                          curve: Curves.easeInOutCubicEmphasized,
-                          alignment: Alignment.center,
-                          child: AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 280),
-                            switchInCurve: Curves.easeOutCubic,
-                            switchOutCurve: Curves.easeInCubic,
-                            transitionBuilder: (child, animation) {
-                              final slide = Tween<Offset>(
-                                begin: const Offset(0, 0.08),
-                                end: Offset.zero,
-                              ).animate(animation);
-                              return FadeTransition(
-                                opacity: animation,
-                                child: SlideTransition(
-                                  position: slide,
-                                  child: child,
-                                ),
-                              );
-                            },
-                            child: expanded
-                                ? _buildExpandedContent(context)
-                                : _buildLoadingContent(context),
+                child: morph == null
+                    ? surface
+                    : AnimatedBuilder(
+                        animation: morph.animation,
+                        child: surface,
+                        builder: (context, child) => IgnorePointer(
+                          ignoring: morph.animation.value < 1,
+                          child: FavoriteFoldersButtonMorph(
+                            origin: morph.origin,
+                            animation: morph.animation,
+                            surfaceColor: cs.surface,
+                            outlineColor: cs.outlineVariant.withValues(
+                              alpha: expanded ? 0.24 : 0.16,
+                            ),
+                            borderRadius: expanded ? 32 : 28,
+                            shadowBlurRadius: expanded ? 30 : 22,
+                            child: child!,
                           ),
                         ),
                       ),
-                      if (_vm.isBusy && expanded) _buildBusyOverlay(context),
-                    ],
-                  ),
-                ),
               ),
             ),
           ),

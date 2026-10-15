@@ -2,6 +2,7 @@ import '../../support/source_presentation_fixtures.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -10,6 +11,7 @@ import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_page.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_header_cover.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_header_action_row.dart';
+import 'package:hazuki/features/comic_detail/view/comic_detail_favorite_button.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_related_tab.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_related_tile.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_meta.dart';
@@ -307,13 +309,42 @@ void main() {
     facade.complete();
     await tester.pumpAndSettle();
     expect(tester.widget<IconButton>(favorite).onPressed, isNotNull);
+    final sourceRect = tester.getRect(favorite);
+    final buttonOpacity = find.descendant(
+      of: find.byType(ComicDetailFavoriteButton),
+      matching: find.byType(Opacity),
+    );
     await tester.tap(favorite);
+    await tester.pump();
+    final surface = find.byKey(const ValueKey('favorite-dialog-surface'));
+    expect(tester.getRect(surface).left, closeTo(sourceRect.left, 0.5));
+    expect(tester.getRect(surface).top, closeTo(sourceRect.top, 0.5));
+    expect(tester.getRect(surface).width, closeTo(sourceRect.width, 0.5));
+    expect(tester.getRect(surface).height, closeTo(sourceRect.height, 0.5));
+    expect(tester.widget<Opacity>(buttonOpacity).opacity, 0);
+    await tester.pump(const Duration(milliseconds: 120));
+    final openingRect = tester.getRect(surface);
+    expect(openingRect.width, greaterThan(sourceRect.width));
+    expect(openingRect.center.dx, lessThan(sourceRect.center.dx));
     await tester.pumpAndSettle();
     expect(find.byType(FavoriteFoldersMorphDialog), findsOneWidget);
     expect(tester.takeException(), isNull);
-    tester.state<NavigatorState>(find.byType(Navigator)).pop();
+    final expandedRect = tester.getRect(surface);
+    expect(expandedRect.width, greaterThan(openingRect.width));
+    await tester.tap(find.byIcon(Icons.close_rounded));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 160));
+    expect(tester.getRect(surface).width, lessThan(expandedRect.width));
+    expect(tester.widget<Opacity>(buttonOpacity).opacity, 0);
+    await tester.pump(const Duration(milliseconds: 390));
+    expect(tester.getRect(surface).left, closeTo(sourceRect.left, 1));
+    expect(tester.getRect(surface).top, closeTo(sourceRect.top, 1));
+    expect(tester.getRect(surface).width, closeTo(sourceRect.width, 1));
+    expect(tester.getRect(surface).height, closeTo(sourceRect.height, 1));
+    expect(tester.widget<Opacity>(buttonOpacity).opacity, 0);
     await tester.pumpAndSettle();
     expect(find.byType(FavoriteFoldersMorphDialog), findsNothing);
+    expect(tester.widget<Opacity>(buttonOpacity).opacity, 1);
     await tester.tap(find.byIcon(Icons.format_list_bulleted_rounded));
     await tester.pumpAndSettle();
     expect(find.byType(ChaptersPanelSheet), findsOneWidget);
@@ -321,6 +352,187 @@ void main() {
     expect(tester.takeException(), isNull);
     tester.state<NavigatorState>(find.byType(Navigator)).pop();
     await tester.pumpAndSettle();
+  });
+
+  testWidgets('favorite morph hands its button back in the closing frame', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final facade = _MorphDismissalDetailFacade();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData(platform: TargetPlatform.android),
+        builder: (context, child) => withTestSourcePresentation(child!),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: _buildDesktopTestDetail(
+          comic: const ExploreComic(
+            id: 'morph-handoff',
+            sourceKey: 'copy_manga',
+            title: 'Comic',
+            subTitle: '',
+            cover: '',
+          ),
+          facade: facade,
+          shouldAnimateInitialRevealOverride: false,
+        ),
+      ),
+    );
+    facade.complete();
+    await tester.pumpAndSettle();
+    final button = find.byType(ComicDetailFavoriteButton);
+    final buttonOpacity = find.descendant(
+      of: button,
+      matching: find.byType(Opacity),
+    );
+    await tester.tap(button);
+    await tester.pumpAndSettle();
+    final iconButton = find.descendant(
+      of: button,
+      matching: find.byType(IconButton),
+    );
+    expect(tester.widget<IconButton>(iconButton).onPressed, isNotNull);
+    await tester.tap(find.byIcon(Icons.close_rounded));
+    await tester.pump();
+    for (var frame = 0; frame < 40; frame++) {
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(tester.widget<IconButton>(iconButton).onPressed, isNotNull);
+      if (find.byType(FavoriteFoldersMorphDialog).evaluate().isEmpty) {
+        expect(
+          tester.renderObject<RenderOpacity>(buttonOpacity).opacity,
+          1,
+          reason: 'The button must be painted in the frame the overlay leaves.',
+        );
+      }
+    }
+    expect(find.byType(FavoriteFoldersMorphDialog), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final closeMethod in ['barrier', 'back', 'save']) {
+    testWidgets('favorite morph restores its button after $closeMethod', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final facade = _MorphDismissalDetailFacade();
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(platform: TargetPlatform.android),
+          builder: (context, child) => withTestSourcePresentation(child!),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: _buildDesktopTestDetail(
+            comic: const ExploreComic(
+              id: 'morph-dismissal',
+              sourceKey: 'copy_manga',
+              title: 'Comic',
+              subTitle: '',
+              cover: '',
+            ),
+            facade: facade,
+            shouldAnimateInitialRevealOverride: false,
+          ),
+        ),
+      );
+      facade.complete();
+      await tester.pumpAndSettle();
+      final button = find.byType(ComicDetailFavoriteButton);
+      final buttonOpacity = find.descendant(
+        of: button,
+        matching: find.byType(Opacity),
+      );
+      final sourceRect = tester.getRect(button);
+      await tester.tap(button);
+      await tester.pump();
+      if (closeMethod == 'barrier') {
+        // Dismissing during expansion must reverse from the current position.
+        await tester.pump(const Duration(milliseconds: 120));
+        final surface = find.byKey(const ValueKey('favorite-dialog-surface'));
+        final beforeClose = tester.getRect(surface);
+        await tester.tapAt(const Offset(10, 10));
+        await tester.pump();
+        expect(
+          tester.getRect(surface),
+          rectMoreOrLessEquals(beforeClose, epsilon: 0.000001),
+        );
+      } else {
+        await tester.pumpAndSettle();
+        if (closeMethod == 'save') {
+          await tester.tap(find.text('Save'));
+        } else {
+          tester.state<NavigatorState>(find.byType(Navigator)).pop();
+        }
+        await tester.pump();
+      }
+      expect(tester.widget<Opacity>(buttonOpacity).opacity, 0);
+      await tester.pumpAndSettle();
+      expect(find.byType(FavoriteFoldersMorphDialog), findsNothing);
+      expect(tester.widget<Opacity>(buttonOpacity).opacity, 1);
+      expect(tester.getRect(button), sourceRect);
+      await tester.tap(button);
+      await tester.pumpAndSettle();
+      expect(find.byType(FavoriteFoldersMorphDialog), findsOneWidget);
+      tester.state<NavigatorState>(find.byType(Navigator)).pop();
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('favorite morph can close while folders are still loading', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(320, 720);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    final facade = _SlowMorphDetailFacade();
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: ThemeData(platform: TargetPlatform.android),
+        builder: (context, child) => withTestSourcePresentation(child!),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: _buildDesktopTestDetail(
+          comic: const ExploreComic(
+            id: 'slow-morph',
+            sourceKey: 'copy_manga',
+            title: 'Comic',
+            subTitle: '',
+            cover: '',
+          ),
+          facade: facade,
+          shouldAnimateInitialRevealOverride: false,
+        ),
+      ),
+    );
+    facade.complete();
+    await tester.pumpAndSettle();
+    final button = find.byType(ComicDetailFavoriteButton);
+    await tester.tap(button);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 480));
+    expect(find.byType(FavoriteFoldersMorphDialog), findsOneWidget);
+    tester.state<NavigatorState>(find.byType(Navigator)).pop();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 480));
+    facade.completeFolders();
+    await tester.pumpAndSettle();
+    expect(find.byType(FavoriteFoldersMorphDialog), findsNothing);
+    expect(
+      tester
+          .widget<Opacity>(
+            find.descendant(of: button, matching: find.byType(Opacity)),
+          )
+          .opacity,
+      1,
+    );
+    expect(tester.takeException(), isNull);
   });
 
   for (final brightness in Brightness.values) {
@@ -1074,6 +1286,37 @@ class _CompletingMobileDetailFacade extends _CompletingDesktopDetailFacade {
     String sourceKey = '',
   }) async =>
       const FavoriteFoldersResult.success(folders: [], favoritedFolderIds: {});
+}
+
+class _MorphDismissalDetailFacade extends _CompletingMobileDetailFacade {
+  @override
+  Future<FavoriteFoldersResult> loadLocalFavoriteFolders({
+    required String comicId,
+    String sourceKey = '',
+  }) async => const FavoriteFoldersResult.success(
+    folders: [
+      FavoriteFolder(
+        id: 'existing',
+        name: 'Local',
+        source: FavoriteFolderSource.local,
+      ),
+    ],
+    favoritedFolderIds: {'existing'},
+  );
+}
+
+class _SlowMorphDetailFacade extends _CompletingMobileDetailFacade {
+  final _folders = Completer<FavoriteFoldersResult>();
+
+  void completeFolders() => _folders.complete(
+    const FavoriteFoldersResult.success(folders: [], favoritedFolderIds: {}),
+  );
+
+  @override
+  Future<FavoriteFoldersResult> loadLocalFavoriteFolders({
+    required String comicId,
+    String sourceKey = '',
+  }) => _folders.future;
 }
 
 Widget _buildDesktopTestDetail({
