@@ -36,7 +36,10 @@ class _CommentsBodyList extends StatelessWidget {
     final loadMoreFooter = loadingMore
         ? const HazukiLoadMoreFooter()
         : const SizedBox(height: 4);
-    final listBottomPadding = EdgeInsets.only(bottom: 10 + extraBottomPadding);
+    final listBottomPadding = EdgeInsets.only(
+      top: 6,
+      bottom: 10 + extraBottomPadding,
+    );
     final contentKey = _contentKey();
 
     if (isTabView) {
@@ -63,14 +66,7 @@ class _CommentsBodyList extends StatelessWidget {
                     if (index == visibleComments.length) {
                       return loadMoreFooter;
                     }
-                    final isLastComment = index == visibleComments.length - 1;
-                    return Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        commentBuilder(visibleComments[index], index),
-                        if (!isLastComment) const Divider(height: 1),
-                      ],
-                    );
+                    return commentBuilder(visibleComments[index], index);
                   }, childCount: visibleComments.length + 1),
                 ),
               )
@@ -126,14 +122,7 @@ class _CommentsBodyList extends StatelessWidget {
                       if (index == visibleComments.length) {
                         return loadMoreFooter;
                       }
-                      final isLastComment = index == visibleComments.length - 1;
-                      return Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          commentBuilder(visibleComments[index], index),
-                          if (!isLastComment) const Divider(height: 1),
-                        ],
-                      );
+                      return commentBuilder(visibleComments[index], index);
                     }, childCount: visibleComments.length + 1),
                   ),
                 ),
@@ -264,7 +253,7 @@ class _CommentsContent extends StatelessWidget {
       shrinkWrap: true,
       padding: EdgeInsets.zero,
       itemCount: comments.length,
-      separatorBuilder: (_, _) => const Divider(height: 1),
+      separatorBuilder: (_, _) => const SizedBox.shrink(),
       itemBuilder: (context, index) => commentBuilder(comments[index], index),
     );
   }

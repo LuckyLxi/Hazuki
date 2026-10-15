@@ -174,8 +174,18 @@ class _CommentsBottomComposer extends StatelessWidget {
                         maxLines: 3,
                         textInputAction: TextInputAction.send,
                         onSubmitted: (_) => onSubmit(),
+                        style: Theme.of(context).textTheme.bodyMedium,
                         decoration: InputDecoration(
                           hintText: hint,
+                          prefixIcon: Icon(
+                            Icons.edit_outlined,
+                            size: 18,
+                            color: Theme.of(context).colorScheme.primary,
+                          ),
+                          prefixIconConstraints: const BoxConstraints(
+                            minWidth: 40,
+                            minHeight: 40,
+                          ),
                           border: InputBorder.none,
                           enabledBorder: InputBorder.none,
                           focusedBorder: InputBorder.none,
@@ -222,7 +232,7 @@ class _CommentsBottomComposer extends StatelessWidget {
                                         )
                                       : const Icon(
                                           key: ValueKey<String>('send-icon'),
-                                          Icons.send_rounded,
+                                          Icons.arrow_upward_rounded,
                                           size: 20,
                                         ),
                                 ),
@@ -250,13 +260,21 @@ class _CommentsComposerGlassSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     final radius = BorderRadius.circular(24);
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: hazukiSearchBoxBackgroundColor(context),
+        color: colorScheme.surface,
         borderRadius: radius,
-        border: Border.fromBorderSide(hazukiSearchBoxOutlineSide(context)),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.18)),
+        boxShadow: [
+          BoxShadow(
+            color: colorScheme.shadow.withValues(alpha: 0.06),
+            blurRadius: 18,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: child,
     );

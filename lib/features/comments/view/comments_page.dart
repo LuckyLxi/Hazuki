@@ -10,7 +10,6 @@ import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/shared/comments/comments_loading_view.dart';
 import 'package:hazuki/shared/comments/comments_interaction_state.dart';
-import 'package:hazuki/shared/search_box_outline.dart';
 import 'package:hazuki/services/comment_filter_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/widgets/widgets.dart';
@@ -493,20 +492,23 @@ class _CommentsPageState extends State<CommentsPage>
         ? _comments.length - visibleComments.length
         : 0;
 
-    return _CommentsBodyList(
-      comments: _comments,
-      visibleComments: visibleComments,
-      hiddenCount: hiddenCount,
-      initialLoading: _initialLoading,
-      loadingMore: _loadingMore,
-      errorMessage: _errorMessage,
-      isTabView: widget.isTabView,
-      scrollController: _scrollController,
-      extraBottomPadding: extraBottomPadding,
-      reserveKeyboardInset: reserveKeyboardInset,
-      onRetry: () => unawaited(_loadInitial()),
-      onScrollNotification: _onScrollNotification,
-      commentBuilder: _buildCommentTile,
+    return ColoredBox(
+      color: Theme.of(context).colorScheme.surfaceContainerLow,
+      child: _CommentsBodyList(
+        comments: _comments,
+        visibleComments: visibleComments,
+        hiddenCount: hiddenCount,
+        initialLoading: _initialLoading,
+        loadingMore: _loadingMore,
+        errorMessage: _errorMessage,
+        isTabView: widget.isTabView,
+        scrollController: _scrollController,
+        extraBottomPadding: extraBottomPadding,
+        reserveKeyboardInset: reserveKeyboardInset,
+        onRetry: () => unawaited(_loadInitial()),
+        onScrollNotification: _onScrollNotification,
+        commentBuilder: _buildCommentTile,
+      ),
     );
   }
 }

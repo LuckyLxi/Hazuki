@@ -131,8 +131,13 @@ class _CommentsCommentTileContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final hasReply = (comment.replyCount ?? 0) > 0;
-    final bodyStyle = theme.textTheme.bodyMedium;
-    final metaStyle = theme.textTheme.bodySmall;
+    final showReplyCountInHeader =
+        hasReply && (!supportReplies || comment.id == null);
+    final colorScheme = theme.colorScheme;
+    final bodyStyle = theme.textTheme.bodyMedium?.copyWith(height: 1.8);
+    final metaStyle = theme.textTheme.bodySmall?.copyWith(
+      color: colorScheme.onSurfaceVariant,
+    );
     final attribution = parseCommentUserAttribution(comment.userName);
     final displayName = comment.userName.isEmpty
         ? l10n(context).commentsAnonymousUser
@@ -145,93 +150,103 @@ class _CommentsCommentTileContent extends StatelessWidget {
         comment.id ?? '${comment.userName}|${comment.time}|${comment.content}';
     final shouldAnimate = animatedCommentKeys.add(animationKey);
 
-    final item = Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
-      child: Row(
+    final item = Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+      decoration: BoxDecoration(
+        color: theme.brightness == Brightness.dark
+            ? colorScheme.surfaceContainer
+            : colorScheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.35),
+        ),
+      ),
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: HazukiCachedCircleAvatar(
-              url: comment.avatar,
-              fallbackIcon: const Icon(Icons.person_outline),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              HazukiCachedCircleAvatar(
+                url: comment.avatar,
+                radius: 16,
+                fallbackIcon: const Icon(Icons.person_outline, size: 18),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Text(
-                        displayName,
-                        style: theme.textTheme.titleSmall,
+                    Text(
+                      displayName,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
-                    ?filteredCollapseButton,
+                    if (comment.time.isNotEmpty || showReplyCountInHeader) ...[
+                      const SizedBox(height: 3),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 2,
+                        children: [
+                          if (comment.time.isNotEmpty)
+                            Text(
+                              formatCommentTime(comment.time),
+                              style: metaStyle,
+                            ),
+                          if (showReplyCountInHeader)
+                            Text(
+                              l10n(
+                                context,
+                              ).commentsReplyCount('${comment.replyCount}'),
+                              style: metaStyle,
+                            ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
-                if (comment.time.isNotEmpty || hasReply) ...[
-                  const SizedBox(height: 2),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 2,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    children: [
-                      if (comment.time.isNotEmpty)
-                        Text(formatCommentTime(comment.time), style: metaStyle),
-                      if (hasReply)
-                        Text(
-                          l10n(
-                            context,
-                          ).commentsReplyCount('${comment.replyCount}'),
-                          style: metaStyle,
-                        ),
-                    ],
-                  ),
-                ],
-                const SizedBox(height: 6),
-                CommentsSelectableContent(
-                  content: comment.content,
-                  style: bodyStyle,
-                  expansionKey: animationKey,
-                ),
-                if (comment.id != null &&
-                    (supportLike || supportReply || supportReplies)) ...[
-                  const SizedBox(height: 8),
-                  _CommentActionRow(
-                    comment: comment,
+              ),
+              ?filteredCollapseButton,
+            ],
+          ),
+          const SizedBox(height: 12),
+          CommentsSelectableContent(
+            content: comment.content,
+            style: bodyStyle,
+            expansionKey: animationKey,
+          ),
+          if (comment.id != null &&
+              (supportLike || supportReply || supportReplies)) ...[
+            const SizedBox(height: 8),
+            _CommentActionRow(
+              comment: comment,
+              supportLike: supportLike,
+              supportReply: supportReply,
+              supportReplies: supportReplies,
+              isLiking: isLiking,
+              repliesExpanded: repliesExpanded,
+              onLike: onLike,
+              onReply: onReply,
+              onToggleReplies: onToggleReplies,
+            ),
+          ],
+          _AnimatedCommentReplies(
+            expanded: repliesExpanded && comment.id != null,
+            child: comment.id == null
+                ? const SizedBox.shrink()
+                : _CommentRepliesList(
+                    parentId: comment.id!,
+                    replies: replies,
+                    loading: repliesLoading,
+                    hasMore: repliesHasMore,
                     supportLike: supportLike,
                     supportReply: supportReply,
-                    supportReplies: supportReplies,
-                    isLiking: isLiking,
-                    repliesExpanded: repliesExpanded,
-                    onLike: onLike,
                     onReply: onReply,
-                    onToggleReplies: onToggleReplies,
+                    onLike: onLike,
+                    onLoadMore: onLoadMoreReplies,
                   ),
-                ],
-                _AnimatedCommentReplies(
-                  expanded: repliesExpanded && comment.id != null,
-                  child: comment.id == null
-                      ? const SizedBox.shrink()
-                      : _CommentRepliesList(
-                          parentId: comment.id!,
-                          replies: replies,
-                          loading: repliesLoading,
-                          hasMore: repliesHasMore,
-                          supportLike: supportLike,
-                          supportReply: supportReply,
-                          onReply: onReply,
-                          onLike: onLike,
-                          onLoadMore: onLoadMoreReplies,
-                        ),
-                ),
-              ],
-            ),
           ),
         ],
       ),
@@ -337,20 +352,80 @@ class _CommentActionRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final strings = l10n(context);
     final liked = comment.isLiked ?? false;
-    return Align(
-      alignment: AlignmentDirectional.centerEnd,
-      child: Wrap(
-        spacing: 4,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          if (supportReplies && (comment.replyCount ?? 0) > 0)
-            TextButton.icon(
-              onPressed: () => onToggleReplies(comment),
-              style: TextButton.styleFrom(
-                visualDensity: VisualDensity.compact,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    final buttonStyle = TextButton.styleFrom(
+      foregroundColor: theme.colorScheme.onSurfaceVariant,
+      textStyle: theme.textTheme.labelMedium,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      minimumSize: const Size(40, 40),
+      visualDensity: VisualDensity.compact,
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (supportReply || supportLike)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Align(
+                  alignment: AlignmentDirectional.centerStart,
+                  child: supportReply
+                      ? TextButton.icon(
+                          onPressed: () => onReply(comment),
+                          style: buttonStyle,
+                          icon: const Icon(
+                            Icons.mode_comment_outlined,
+                            size: 16,
+                          ),
+                          label: Text(strings.commentsReplyTooltip),
+                        )
+                      : const SizedBox.shrink(),
+                ),
               ),
+              if (supportLike)
+                Flexible(
+                  child: Tooltip(
+                    message: liked
+                        ? strings.commentsUnlikeTooltip
+                        : strings.commentsLikeTooltip,
+                    child: TextButton.icon(
+                      onPressed: isLiking ? null : () => onLike(comment),
+                      style: buttonStyle.copyWith(
+                        foregroundColor: liked
+                            ? WidgetStateProperty.resolveWith((states) {
+                                if (states.contains(WidgetState.disabled)) {
+                                  return theme.colorScheme.onSurface.withValues(
+                                    alpha: 0.38,
+                                  );
+                                }
+                                return theme.colorScheme.primary;
+                              })
+                            : null,
+                      ),
+                      icon: Icon(
+                        liked ? Icons.favorite : Icons.favorite_border,
+                        size: 17,
+                      ),
+                      label: Text('${comment.score ?? 0}'),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        if (supportReplies && (comment.replyCount ?? 0) > 0)
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: TextButton.icon(
+              onPressed: () => onToggleReplies(comment),
+              style: buttonStyle.copyWith(
+                foregroundColor: WidgetStatePropertyAll(
+                  theme.colorScheme.primary,
+                ),
+              ),
+              iconAlignment: IconAlignment.end,
               icon: Icon(
                 repliesExpanded
                     ? Icons.keyboard_arrow_up
@@ -359,35 +434,12 @@ class _CommentActionRow extends StatelessWidget {
               ),
               label: Text(
                 repliesExpanded
-                    ? l10n(context).commentsHideReplies
-                    : l10n(context).commentsReplyCount('${comment.replyCount}'),
+                    ? strings.commentsHideReplies
+                    : strings.commentsReplyCount('${comment.replyCount}'),
               ),
             ),
-          if (supportLike)
-            TextButton.icon(
-              onPressed: isLiking ? null : () => onLike(comment),
-              style: TextButton.styleFrom(
-                visualDensity: VisualDensity.compact,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                foregroundColor: liked ? theme.colorScheme.primary : null,
-              ),
-              icon: Icon(
-                liked ? Icons.thumb_up : Icons.thumb_up_outlined,
-                size: 18,
-              ),
-              label: Text('${comment.score ?? 0}'),
-            ),
-          if (supportReply)
-            IconButton(
-              tooltip: l10n(context).commentsReplyTooltip,
-              onPressed: () => onReply(comment),
-              padding: EdgeInsets.zero,
-              visualDensity: VisualDensity.compact,
-              constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
-              icon: const Icon(Icons.mode_comment_outlined, size: 20),
-            ),
-        ],
-      ),
+          ),
+      ],
     );
   }
 }
@@ -420,7 +472,10 @@ class _CommentRepliesList extends StatelessWidget {
     final theme = Theme.of(context);
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest.withAlpha(96),
+        color: Color.alphaBlend(
+          theme.colorScheme.primary.withValues(alpha: 0.06),
+          theme.colorScheme.surface,
+        ),
         borderRadius: BorderRadius.circular(12),
       ),
       child: Padding(
@@ -429,7 +484,13 @@ class _CommentRepliesList extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             for (var i = 0; i < replies.length; i++) ...[
-              if (i > 0) const Divider(height: 16),
+              if (i > 0)
+                Divider(
+                  height: 20,
+                  color: theme.colorScheme.outlineVariant.withValues(
+                    alpha: 0.4,
+                  ),
+                ),
               _CommentReplyTile(
                 comment: replies[i],
                 supportLike: supportLike,
@@ -505,16 +566,23 @@ class _CommentReplyTile extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(name, style: theme.textTheme.labelLarge),
+                  Text(
+                    name,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: theme.colorScheme.primary,
+                    ),
+                  ),
                   if (comment.time.isNotEmpty)
                     Text(
                       formatCommentTime(comment.time),
-                      style: theme.textTheme.bodySmall,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   const SizedBox(height: 4),
                   CommentsSelectableContent(
                     content: comment.content,
-                    style: theme.textTheme.bodyMedium,
+                    style: theme.textTheme.bodyMedium?.copyWith(height: 1.7),
                     expansionKey:
                         comment.id ??
                         '${comment.userName}|${comment.time}|${comment.content}',
