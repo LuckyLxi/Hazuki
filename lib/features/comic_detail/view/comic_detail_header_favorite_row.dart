@@ -164,6 +164,68 @@ class ComicDetailHeaderFavoriteRow extends StatelessWidget {
     final statsStyle = theme.textTheme.bodySmall?.copyWith(
       color: theme.colorScheme.onSurfaceVariant,
     );
+    final reserveStatsHeight = theme.platform == TargetPlatform.android;
+    final likeButton = TextButton.icon(
+      onPressed: detailsReady && !favorite.isLikeBusy
+          ? () => unawaited(favorite.toggleLike(context, details!))
+          : null,
+      style: TextButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        foregroundColor: likedActive
+            ? theme.colorScheme.primary
+            : theme.colorScheme.onSurfaceVariant,
+        textStyle: statsStyle,
+      ),
+      icon: Icon(
+        likedActive ? Icons.thumb_up_alt_rounded : Icons.thumb_up_alt_outlined,
+        size: 16,
+      ),
+      label: Text(
+        (details?.likesCount.isNotEmpty ?? false)
+            ? l10n(context).comicDetailLikesCount(details!.likesCount)
+            : likedActive
+            ? l10n(context).comicDetailUnlike
+            : l10n(context).comicDetailLike,
+        maxLines: reserveStatsHeight ? 1 : null,
+        overflow: reserveStatsHeight ? TextOverflow.ellipsis : null,
+      ),
+    );
+    final statsLabel = Text(
+      mobileStatsText,
+      style: statsStyle,
+      maxLines: reserveStatsHeight ? 1 : null,
+      overflow: reserveStatsHeight ? TextOverflow.ellipsis : null,
+    );
+    final resolvedStats = reserveStatsHeight
+        ? Row(
+            children: [
+              if (showLikeButton) Flexible(child: likeButton),
+              if (showLikeButton && mobileStatsText.isNotEmpty)
+                const SizedBox(width: 14),
+              if (mobileStatsText.isNotEmpty) Flexible(child: statsLabel),
+            ],
+          )
+        : Wrap(
+            spacing: 14,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              if (showLikeButton) likeButton,
+              if (mobileStatsText.isNotEmpty) statsLabel,
+            ],
+          );
+    final statsContent = detailsReady
+        ? ComicDetailEntranceReveal(
+            key: const ValueKey('comic-detail-stats'),
+            beginOffset: Offset.zero,
+            enabled: shouldAnimateInitialDetailReveal,
+            child: resolvedStats,
+          )
+        : ComicDetailSkeletonBlock(
+            color: skeletonColor,
+            width: 160,
+            height: 16,
+          );
     return Padding(
       key: favoriteRowKey,
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -171,56 +233,37 @@ class ComicDetailHeaderFavoriteRow extends StatelessWidget {
         offset: Offset.zero,
         duration: Duration.zero,
         curve: Curves.easeOutCubic,
-        child: detailsReady
-            ? ComicDetailEntranceReveal(
-                key: const ValueKey('comic-detail-stats'),
-                beginOffset: Offset.zero,
-                enabled: shouldAnimateInitialDetailReveal,
-                child: Wrap(
-                  spacing: 14,
-                  runSpacing: 4,
-                  crossAxisAlignment: WrapCrossAlignment.center,
+        child: reserveStatsHeight
+            ? SizedBox(
+                width: double.infinity,
+                child: Stack(
+                  alignment: Alignment.centerLeft,
                   children: [
-                    if (showLikeButton)
-                      TextButton.icon(
-                        onPressed: !favorite.isLikeBusy
-                            ? () => unawaited(
-                                favorite.toggleLike(context, details!),
-                              )
-                            : null,
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                          foregroundColor: likedActive
-                              ? theme.colorScheme.primary
-                              : theme.colorScheme.onSurfaceVariant,
-                          textStyle: statsStyle,
-                        ),
-                        icon: Icon(
-                          likedActive
-                              ? Icons.thumb_up_alt_rounded
-                              : Icons.thumb_up_alt_outlined,
-                          size: 16,
-                        ),
-                        label: Text(
-                          details!.likesCount.isNotEmpty
-                              ? l10n(
-                                  context,
-                                ).comicDetailLikesCount(details!.likesCount)
-                              : likedActive
-                              ? l10n(context).comicDetailUnlike
-                              : l10n(context).comicDetailLike,
-                        ),
+                    // Reserve a button-sized row even before the plugin's like
+                    // capability resolves. Measuring it also honors text scale,
+                    // theme padding and the minimum touch target size.
+                    Visibility(
+                      visible: false,
+                      maintainSize: true,
+                      maintainState: true,
+                      maintainAnimation: true,
+                      child: TextButton.icon(
+                        onPressed: null,
+                        style: likeButton.style,
+                        icon: const SizedBox.square(dimension: 16),
+                        label: const Text(' ', maxLines: 1),
                       ),
-                    if (mobileStatsText.isNotEmpty)
-                      Text(mobileStatsText, style: statsStyle),
+                    ),
+                    Positioned.fill(
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: statsContent,
+                      ),
+                    ),
                   ],
                 ),
               )
-            : ComicDetailSkeletonBlock(
-                color: skeletonColor,
-                width: 160,
-                height: 16,
-              ),
+            : statsContent,
       ),
     );
   }

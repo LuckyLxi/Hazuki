@@ -273,6 +273,75 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final (canLike, likesCount, textScale, width) in [
+    (false, '42', 1.0, 390.0),
+    (true, '42', 1.0, 390.0),
+    (false, '', 1.0, 390.0),
+    (false, '12345678901234567890', 2.0, 320.0),
+    (true, '12345678901234567890', 2.0, 320.0),
+  ]) {
+    testWidgets('Android keeps controls stable from loading to resolved stats '
+        '(like: $canLike, count: $likesCount, scale: $textScale)', (
+      tester,
+    ) async {
+      tester.view.physicalSize = Size(width, 1600);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      final facade = _CompletingLikeDetailFacade();
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: ThemeData(platform: TargetPlatform.android),
+          builder: (context, child) => withTestSourcePresentation(
+            MediaQuery(
+              data: MediaQuery.of(
+                context,
+              ).copyWith(textScaler: TextScaler.linear(textScale)),
+              child: child!,
+            ),
+          ),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: _buildDesktopTestDetail(
+            comic: const ExploreComic(
+              id: 'android-stable-stats',
+              sourceKey: 'copy_manga',
+              title: 'Stable title',
+              subTitle: 'Stable subtitle',
+              cover: '',
+            ),
+            facade: facade,
+            shouldAnimateInitialRevealOverride: true,
+          ),
+        ),
+      );
+      await tester.pump();
+      final actions = find.byType(ComicDetailHeaderActionRow);
+      final tabs = find.byType(TabBar);
+      final loadingActionTop = tester.getTopLeft(actions).dy;
+      final loadingTabTop = tester.getTopLeft(tabs).dy;
+      // Plugin capabilities can become available with the detail response.
+      facade.canLike = canLike;
+      facade.complete(likesCount: likesCount);
+      await tester.pump();
+      await tester.pump();
+      for (final duration in [
+        Duration.zero,
+        const Duration(milliseconds: 160),
+        const Duration(milliseconds: 200),
+      ]) {
+        await tester.pump(duration);
+        expect(tester.getTopLeft(actions).dy, closeTo(loadingActionTop, 0.5));
+        expect(tester.getTopLeft(tabs).dy, closeTo(loadingTabTop, 0.5));
+        expect(tester.takeException(), isNull);
+      }
+      expect(
+        find.byIcon(Icons.thumb_up_alt_outlined),
+        canLike ? findsOneWidget : findsNothing,
+      );
+    });
+  }
+
   testWidgets('mobile action bar preserves favorite and chapter dialogs', (
     tester,
   ) async {
@@ -1212,7 +1281,7 @@ class _DesktopDetailFacade extends ComicDetailFeatureFacade {
 class _CompletingDesktopDetailFacade extends _DesktopDetailFacade {
   final Completer<ComicDetailsData> _completer = Completer<ComicDetailsData>();
 
-  void complete({String title = 'Stable title'}) {
+  void complete({String title = 'Stable title', String likesCount = '42'}) {
     _completer.complete(
       ComicDetailsData(
         id: 'desktop-loading-reveal',
@@ -1222,7 +1291,7 @@ class _CompletingDesktopDetailFacade extends _DesktopDetailFacade {
         cover: '',
         description: 'Resolved summary',
         updateTime: '2026-09-11',
-        likesCount: '42',
+        likesCount: likesCount,
         chapters: {'1': 'Chapter 1'},
         tags: {
           'author': ['Hazuki Studio'],
