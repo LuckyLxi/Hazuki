@@ -569,6 +569,10 @@ class HazukiCachedCircleAvatar extends StatefulWidget {
 
 class _HazukiCachedCircleAvatarState extends State<HazukiCachedCircleAvatar> {
   Uint8List? _bytes;
+  ImageStream? _retainedImageStream;
+  final ImageStreamListener _retainedImageListener = ImageStreamListener(
+    (image, synchronousCall) => image.dispose(),
+  );
   bool _loading = false;
   late SourceImageGateway _imageGateway;
   late String _sourceKeySnapshot;
@@ -583,15 +587,33 @@ class _HazukiCachedCircleAvatarState extends State<HazukiCachedCircleAvatar> {
     return (gateway.activeSourceKey ?? '');
   }
 
+  void _setImageBytes(Uint8List? bytes) {
+    if (identical(_bytes, bytes)) return;
+    _releaseDecodedImage();
+    _bytes = bytes;
+    if (bytes == null) return;
+
+    // Route transitions can detach CircleAvatar's decoration painter. Keep a
+    // listener for the widget's lifetime so an evicted image stays live and can
+    // be painted synchronously when that painter attaches again.
+    _retainedImageStream = MemoryImage(bytes).resolve(ImageConfiguration.empty)
+      ..addListener(_retainedImageListener);
+  }
+
+  void _releaseDecodedImage() {
+    _retainedImageStream?.removeListener(_retainedImageListener);
+    _retainedImageStream = null;
+  }
+
   void _resetWithoutImage() {
     _loadSession.invalidate();
     if (!mounted) {
-      _bytes = null;
+      _setImageBytes(null);
       _loading = false;
       return;
     }
     setState(() {
-      _bytes = null;
+      _setImageBytes(null);
       _loading = false;
     });
   }
@@ -648,6 +670,7 @@ class _HazukiCachedCircleAvatarState extends State<HazukiCachedCircleAvatar> {
   @override
   void dispose() {
     hazukiNoImageModeNotifier.removeListener(_handleNoImageModeChanged);
+    _releaseDecodedImage();
     super.dispose();
   }
 
@@ -679,12 +702,12 @@ class _HazukiCachedCircleAvatarState extends State<HazukiCachedCircleAvatar> {
     );
     if (normalized.isEmpty) {
       if (!mounted) {
-        _bytes = null;
+        _setImageBytes(null);
         _loading = false;
         return;
       }
       setState(() {
-        _bytes = null;
+        _setImageBytes(null);
         _loading = false;
       });
       return;
@@ -693,23 +716,23 @@ class _HazukiCachedCircleAvatarState extends State<HazukiCachedCircleAvatar> {
     final cached = request.peek();
     if (cached != null) {
       if (!mounted) {
-        _bytes = cached;
+        _setImageBytes(cached);
         _loading = false;
         return;
       }
       setState(() {
-        _bytes = cached;
+        _setImageBytes(cached);
         _loading = false;
       });
       return;
     }
 
     if (!mounted) {
-      _bytes = null;
+      _setImageBytes(null);
       _loading = true;
     } else {
       setState(() {
-        _bytes = null;
+        _setImageBytes(null);
         _loading = true;
       });
     }
@@ -726,7 +749,7 @@ class _HazukiCachedCircleAvatarState extends State<HazukiCachedCircleAvatar> {
       }
       request.retain(bytes);
       setState(() {
-        _bytes = bytes;
+        _setImageBytes(bytes);
         _loading = false;
       });
     } catch (_) {
@@ -739,7 +762,7 @@ class _HazukiCachedCircleAvatarState extends State<HazukiCachedCircleAvatar> {
         return;
       }
       setState(() {
-        _bytes = null;
+        _setImageBytes(null);
         _loading = false;
       });
     }
