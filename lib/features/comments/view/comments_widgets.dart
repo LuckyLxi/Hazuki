@@ -1,3 +1,4 @@
+import 'package:hazuki/shared/text/chinese_conversion_scope.dart';
 import 'package:flutter/material.dart';
 import 'package:hazuki/features/comments/support/comments_content_support.dart';
 import 'package:hazuki/l10n/l10n.dart';
@@ -19,7 +20,7 @@ class CommentsSelectableContent extends StatelessWidget {
     return _ExpandableCommentContent(
       key: ValueKey<String>(expansionKey),
       spans: buildCommentContentSpans(context, content, style),
-      plainText: commentPreviewText(content),
+      plainText: convertChineseText(context, commentPreviewText(content)),
       style: style,
     );
   }

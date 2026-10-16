@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
+import 'package:hazuki/services/chinese_conversion_service.dart';
 
 import '../settings_group.dart';
+import 'chinese_conversion_setting.dart';
 
 class OtherSettingsGeneralSection extends StatelessWidget {
   const OtherSettingsGeneralSection({
@@ -23,6 +25,8 @@ class OtherSettingsGeneralSection extends StatelessWidget {
     required this.onUseSystemTitleBarChanged,
     required this.onEditMangaDownloadPath,
     required this.onCommentFilter,
+    required this.onChineseConversionChanged,
+    this.chineseConversionEnabled = true,
   });
 
   final bool autoCheckInEnabled;
@@ -42,12 +46,18 @@ class OtherSettingsGeneralSection extends StatelessWidget {
   final ValueChanged<bool> onUseSystemTitleBarChanged;
   final VoidCallback onEditMangaDownloadPath;
   final VoidCallback onCommentFilter;
+  final ValueChanged<ChineseConversionMode> onChineseConversionChanged;
+  final bool chineseConversionEnabled;
 
   @override
   Widget build(BuildContext context) {
     final strings = AppLocalizations.of(context)!;
     return SettingsGroup(
       children: [
+        ChineseConversionSetting(
+          onChanged: onChineseConversionChanged,
+          enabled: chineseConversionEnabled,
+        ),
         if (showAutoCheckInSetting)
           SwitchListTile(
             secondary: const Icon(Icons.event_available_outlined),

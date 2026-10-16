@@ -1,6 +1,7 @@
 import 'package:flutter/widgets.dart';
 
 import '../services/cloud_sync_service.dart';
+import '../services/chinese_conversion_service.dart';
 import '../shared/cloud_sync/cloud_sync_restore_handler.dart';
 export '../shared/cloud_sync/cloud_sync_restore_handler.dart';
 
@@ -41,6 +42,7 @@ class HazukiAppController implements CloudSyncRestoreHandler {
       await _applyAppearanceRuntime(appearance);
       await _reloadLocale();
       await _windowsTitleBarController.reloadFromStore();
+      await hazukiChineseConversion.load();
     }
 
     _refreshHome();

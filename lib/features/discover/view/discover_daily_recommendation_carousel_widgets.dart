@@ -1,3 +1,4 @@
+import 'package:hazuki/shared/text/chinese_conversion_scope.dart';
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
@@ -243,7 +244,7 @@ class _DiscoverDailyRecommendationCardOverlayState
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    widget.entry.comic.title,
+                    convertChineseText(context, widget.entry.comic.title),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.titleSmall?.copyWith(

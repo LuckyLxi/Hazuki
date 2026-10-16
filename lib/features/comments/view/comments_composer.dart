@@ -402,7 +402,10 @@ class _CommentsReplyBanner extends StatelessWidget {
         : l10n(
             context,
           ).commentsReplyAttribution(attribution.author, attribution.replyTo!);
-    final preview = commentPreviewText(replyTo.content);
+    final preview = convertChineseText(
+      context,
+      commentPreviewText(replyTo.content),
+    );
 
     return Container(
       width: double.infinity,

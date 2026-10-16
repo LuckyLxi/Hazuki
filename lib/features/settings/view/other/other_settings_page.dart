@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:hazuki/shared/source_presentation.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
+import 'package:hazuki/services/chinese_conversion_service.dart';
 import 'package:hazuki/widgets/widgets.dart';
 import 'comment_filter_dialog.dart';
 import 'other_settings_sections.dart';
@@ -29,6 +30,7 @@ class OtherSettingsPage extends StatefulWidget {
 }
 
 class _OtherSettingsPageState extends State<OtherSettingsPage> {
+  bool _updatingChineseConversion = false;
   SourceSelectionGateway get _sourceService =>
       widget.dependencies.sourceSelection;
   late OtherSettingsSnapshot _snapshot = OtherSettingsSnapshot.initial(
@@ -58,6 +60,7 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
     final snapshot = await OtherSettingsActions.loadSettings(
       initialUseSystemTitleBar: widget.initialUseSystemTitleBar,
     );
+    await hazukiChineseConversion.load();
     if (!mounted) {
       return;
     }
@@ -71,6 +74,23 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
       _snapshot = _snapshot.copyWith(autoCheckInEnabled: value);
     });
     await OtherSettingsActions.toggleAutoCheckIn(value);
+  }
+
+  Future<void> _setChineseConversion(ChineseConversionMode mode) async {
+    if (_updatingChineseConversion) return;
+    setState(() => _updatingChineseConversion = true);
+    try {
+      await hazukiChineseConversion.setMode(mode);
+    } catch (_) {
+      if (mounted) {
+        await showHazukiPrompt(
+          context,
+          AppLocalizations.of(context)!.otherChineseConversionFailed,
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _updatingChineseConversion = false);
+    }
   }
 
   Future<void> _toggleAggregateSearch(bool value) async {
@@ -151,6 +171,9 @@ class _OtherSettingsPageState extends State<OtherSettingsPage> {
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 children: [
                   OtherSettingsGeneralSection(
+                    onChineseConversionChanged: (mode) =>
+                        unawaited(_setChineseConversion(mode)),
+                    chineseConversionEnabled: !_updatingChineseConversion,
                     autoCheckInEnabled: _snapshot.autoCheckInEnabled,
                     aggregateSearchEnabled: _snapshot.aggregateSearchEnabled,
                     comicIdSearchEnhanceEnabled:

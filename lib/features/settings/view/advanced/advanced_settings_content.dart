@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/services/software_update/software_update_service.dart';
+import 'package:hazuki/widgets/widgets.dart';
 import '../settings_group.dart';
 
 class AdvancedSettingsContent extends StatelessWidget {
@@ -101,25 +102,22 @@ class AdvancedSettingsContent extends StatelessWidget {
               leading: const Icon(Icons.system_update_alt_outlined),
               title: Text(strings.advancedSoftwareUpdateSourceTitle),
               subtitle: Text(strings.advancedSoftwareUpdateSourceSubtitle),
-              trailing: DropdownButton<SoftwareUpdateSource>(
-                value: softwareUpdateSource,
-                onChanged: (value) {
-                  if (value != null) {
-                    onSoftwareUpdateSourceChanged(value);
-                  }
-                },
-                items: const [
-                  DropdownMenuItem(
+              trailing: HazukiFrostedDropdown<SoftwareUpdateSource>(
+                selected: softwareUpdateSource,
+                tooltip: strings.advancedSoftwareUpdateSourceTitle,
+                onSelected: onSoftwareUpdateSourceChanged,
+                options: const [
+                  HazukiFrostedMenuOption(
                     value: SoftwareUpdateSource.jsDelivr,
-                    child: Text('jsdelivr'),
+                    label: 'jsdelivr',
                   ),
-                  DropdownMenuItem(
+                  HazukiFrostedMenuOption(
                     value: SoftwareUpdateSource.github,
-                    child: Text('GitHub'),
+                    label: 'GitHub',
                   ),
-                  DropdownMenuItem(
+                  HazukiFrostedMenuOption(
                     value: SoftwareUpdateSource.ghproxy,
-                    child: Text('ghproxy'),
+                    label: 'ghproxy',
                   ),
                 ],
               ),

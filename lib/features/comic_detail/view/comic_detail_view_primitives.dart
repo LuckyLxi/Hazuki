@@ -1,3 +1,4 @@
+import 'package:hazuki/shared/text/chinese_conversion_scope.dart';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -111,7 +112,7 @@ class ComicDetailAppBarTitle extends StatelessWidget {
       },
       child: showCollapsedComicTitle
           ? Text(
-              appBarComicTitle,
+              convertChineseText(context, appBarComicTitle),
               key: const ValueKey('collapsed-appbar-title'),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,

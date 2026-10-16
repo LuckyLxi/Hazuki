@@ -1,3 +1,4 @@
+import 'package:hazuki/shared/text/chinese_conversion_scope.dart';
 import 'package:flutter/material.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/shared/ui_flags.dart';
@@ -35,6 +36,7 @@ List<InlineSpan> buildCommentContentSpans(
   for (final match in _commentInlineImagePattern.allMatches(content)) {
     if (match.start > start) {
       _appendCommentTextSpan(
+        context,
         spans,
         content.substring(start, match.start),
         style,
@@ -54,12 +56,14 @@ List<InlineSpan> buildCommentContentSpans(
           _buildCommentImageSpan(
             context: context,
             source: source,
-            alt: alt,
+            alt: convertChineseText(context, alt),
             style: style,
           ),
         );
       } else if (alt.isNotEmpty) {
-        spans.add(TextSpan(text: alt, style: style));
+        spans.add(
+          TextSpan(text: convertChineseText(context, alt), style: style),
+        );
       }
     }
 
@@ -67,13 +71,15 @@ List<InlineSpan> buildCommentContentSpans(
   }
 
   if (start < content.length) {
-    _appendCommentTextSpan(spans, content.substring(start), style);
+    _appendCommentTextSpan(context, spans, content.substring(start), style);
   }
 
   if (spans.isEmpty) {
     final plainText = normalizeCommentText(content);
     if (plainText.isNotEmpty) {
-      spans.add(TextSpan(text: plainText, style: style));
+      spans.add(
+        TextSpan(text: convertChineseText(context, plainText), style: style),
+      );
     }
   }
 
@@ -178,11 +184,12 @@ String normalizeCommentText(String rawText) {
 }
 
 void _appendCommentTextSpan(
+  BuildContext context,
   List<InlineSpan> spans,
   String rawText,
   TextStyle? style,
 ) {
-  final text = normalizeCommentText(rawText);
+  final text = convertChineseText(context, normalizeCommentText(rawText));
   if (text.isEmpty) {
     return;
   }

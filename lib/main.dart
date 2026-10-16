@@ -36,6 +36,7 @@ import 'services/cloud_sync_service.dart';
 import 'services/manga_download/manga_download_service.dart';
 import 'services/password_lock_service.dart';
 import 'shared/liquid_glass_support.dart';
+import 'shared/text/chinese_conversion_scope.dart';
 import 'services/source/source_capabilities.dart';
 import 'widgets/hazuki_prompt.dart';
 import 'widgets/source_image_gateway_scope.dart';
@@ -332,7 +333,11 @@ class _HazukiAppState extends State<HazukiApp>
                         child: Stack(
                           fit: StackFit.expand,
                           children: [
-                            HazukiWindowFrame(child: child),
+                            HazukiWindowFrame(
+                              child: ChineseConversionScope(
+                                child: child ?? const SizedBox.shrink(),
+                              ),
+                            ),
                             if (_themeRevealSupport.revealImage != null &&
                                 _themeRevealSupport.revealCenter != null)
                               Positioned.fill(

@@ -1,3 +1,4 @@
+import 'package:hazuki/shared/text/chinese_conversion_scope.dart';
 import 'package:flutter/material.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/manga_download/manga_download_models.dart';
@@ -36,7 +37,7 @@ class DownloadedComicOverviewCard extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          comic.title,
+          convertChineseText(context, comic.title),
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
           style: theme.textTheme.titleMedium?.copyWith(
@@ -327,6 +328,7 @@ class _DownloadedComicExpandableDescriptionState
 
   @override
   Widget build(BuildContext context) {
+    final text = convertChineseText(context, widget.text);
     final theme = Theme.of(context);
     final textStyle =
         theme.textTheme.bodyMedium ??
@@ -337,7 +339,7 @@ class _DownloadedComicExpandableDescriptionState
     return LayoutBuilder(
       builder: (context, constraints) {
         final textPainter = TextPainter(
-          text: TextSpan(text: widget.text, style: textStyle),
+          text: TextSpan(text: text, style: textStyle),
           maxLines: _collapsedMaxLines,
           textDirection: textDirection,
           textScaler: textScaler,
@@ -357,7 +359,7 @@ class _DownloadedComicExpandableDescriptionState
               clipBehavior: Clip.hardEdge,
               child: Text(
                 key: const ValueKey<String>('downloaded_description_text'),
-                widget.text,
+                text,
                 style: textStyle,
                 maxLines: _expanded ? null : _collapsedMaxLines,
                 overflow: _expanded

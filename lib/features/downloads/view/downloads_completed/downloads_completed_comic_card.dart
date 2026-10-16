@@ -509,7 +509,7 @@ class _DownloadedComicCardContent extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                comic.title,
+                                convertChineseText(context, comic.title),
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                                 style: theme.textTheme.titleMedium,

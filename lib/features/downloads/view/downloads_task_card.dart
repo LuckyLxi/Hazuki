@@ -1,3 +1,4 @@
+import 'package:hazuki/shared/text/chinese_conversion_scope.dart';
 import 'package:flutter/material.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/manga_download/manga_download_models.dart';
@@ -70,7 +71,7 @@ class DownloadsOngoingTaskCard extends StatelessWidget {
                         children: [
                           Expanded(
                             child: Text(
-                              task.title,
+                              convertChineseText(context, task.title),
                               maxLines: 2,
                               overflow: TextOverflow.ellipsis,
                               style: theme.textTheme.titleMedium?.copyWith(

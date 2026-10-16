@@ -1,3 +1,4 @@
+import 'package:hazuki/shared/text/chinese_conversion_scope.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -76,7 +77,7 @@ class ComicDetailHeaderSection extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SelectableText(
-                displayTitle,
+                convertChineseText(context, displayTitle),
                 key: headerTitleKey,
                 style:
                     (wide
@@ -225,9 +226,9 @@ class ComicDetailHeaderSection extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Tooltip(
-                          message: displayTitle,
+                          message: convertChineseText(context, displayTitle),
                           child: Text(
-                            displayTitle,
+                            convertChineseText(context, displayTitle),
                             key: headerTitleKey,
                             maxLines: 4,
                             overflow: TextOverflow.ellipsis,

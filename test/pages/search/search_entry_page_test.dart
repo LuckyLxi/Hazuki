@@ -1,3 +1,4 @@
+import 'package:hazuki/widgets/hazuki_frosted_menu_button.dart';
 import '../../support/source_presentation_fixtures.dart';
 import 'dart:async';
 
@@ -917,7 +918,7 @@ void main() {
     expect(editableText.focusNode.hasFocus, isTrue);
     expect(tester.testTextInput.isVisible, isTrue);
 
-    await tester.tap(find.byType(PopupMenuButton<String>));
+    await tester.tap(find.byType(HazukiFrostedMenuButton<String>));
     await tester.pumpAndSettle();
 
     editableText = tester.widget<EditableText>(

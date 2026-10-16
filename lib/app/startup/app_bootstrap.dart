@@ -7,6 +7,7 @@ import 'package:hazuki/app/app_settings_store.dart';
 import 'package:hazuki/app/appearance_settings.dart';
 import 'package:hazuki/app/service_locator.dart';
 import 'package:hazuki/services/comment_filter_service.dart';
+import 'package:hazuki/services/chinese_conversion_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_registry.dart';
 import 'package:hazuki/services/manga_download/manga_download_service.dart';
@@ -44,6 +45,7 @@ Future<AppBootstrapResult> bootstrapApp() async {
   // native launch screen visible for the slowest task instead of their sum.
   await Future.wait<void>([
     loadHazukiUiFlags(),
+    hazukiChineseConversion.load(),
     sourcePreferenceFuture,
     sourcePreferenceFuture
         .then((_) => sl<SourceDebugGateway>().loadSoftwareLogCaptureEnabled())

@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:hazuki/shared/text/chinese_conversion_scope.dart';
 
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
@@ -166,7 +167,10 @@ class _ComicDetailChaptersPanelState extends State<ComicDetailChaptersPanel> {
                                 if (!compact) ...[
                                   const SizedBox(height: 3),
                                   Text(
-                                    widget.details.title,
+                                    convertChineseText(
+                                      context,
+                                      widget.details.title,
+                                    ),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: theme.textTheme.bodySmall?.copyWith(

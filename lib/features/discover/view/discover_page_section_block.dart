@@ -1,3 +1,4 @@
+import 'package:hazuki/shared/text/chinese_conversion_scope.dart';
 import 'package:hazuki/shared/source_presentation.dart';
 import 'package:flutter/material.dart';
 
@@ -261,7 +262,7 @@ class _DiscoverSectionBlockState extends State<DiscoverSectionBlock> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        comic.title,
+                        convertChineseText(context, comic.title),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: Theme.of(context).textTheme.titleMedium,

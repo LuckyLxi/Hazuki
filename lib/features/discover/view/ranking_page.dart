@@ -1,3 +1,4 @@
+import 'package:hazuki/shared/text/chinese_conversion_scope.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -473,7 +474,7 @@ class _RankingPageState extends State<RankingPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      comic.title,
+                      convertChineseText(context, comic.title),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: Theme.of(context).textTheme.titleMedium,

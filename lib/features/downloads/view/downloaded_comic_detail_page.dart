@@ -1,3 +1,4 @@
+import 'package:hazuki/shared/text/chinese_conversion_scope.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -32,7 +33,11 @@ class DownloadedComicDetailPage extends StatelessWidget {
     return Scaffold(
       appBar: hazukiFrostedAppBar(
         context: context,
-        title: Text(comic.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+        title: Text(
+          convertChineseText(context, comic.title),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),

@@ -1,3 +1,4 @@
+import 'package:hazuki/shared/text/chinese_conversion_scope.dart';
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/l10n/l10n.dart';
@@ -17,6 +18,7 @@ class _ComicDetailExpandableDescriptionState
 
   @override
   Widget build(BuildContext context) {
+    final text = convertChineseText(context, widget.text);
     final theme = Theme.of(context);
     final textStyle = DefaultTextStyle.of(context).style;
     final textScaler = MediaQuery.textScalerOf(context);
@@ -24,7 +26,7 @@ class _ComicDetailExpandableDescriptionState
     return LayoutBuilder(
       builder: (context, constraints) {
         final textPainter = TextPainter(
-          text: TextSpan(text: widget.text, style: textStyle),
+          text: TextSpan(text: text, style: textStyle),
           maxLines: 6,
           textDirection: Directionality.of(context),
           textScaler: textScaler,
@@ -42,7 +44,7 @@ class _ComicDetailExpandableDescriptionState
               clipBehavior: Clip.hardEdge,
               child: SelectionArea(
                 child: Text(
-                  widget.text,
+                  text,
                   style: textStyle,
                   maxLines: _expanded ? null : (isOverflowing ? 6 : null),
                   overflow: _expanded

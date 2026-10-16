@@ -1,3 +1,4 @@
+import 'package:hazuki/widgets/hazuki_frosted_menu_button.dart';
 import 'dart:async';
 import '../../support/source_presentation_fixtures.dart';
 
@@ -212,6 +213,73 @@ void main() {
       expect(tester.takeException(), isNull);
       await tester.pump(const Duration(seconds: 4));
       await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
+    'advanced update route menu retains choices and saves selection',
+    (tester) async {
+      final advanced = _MockAdvanced();
+      when(advanced.hasCustomEditedActiveSource).thenAnswer((_) async => false);
+      when(
+        advanced.loadSoftwareLogCaptureEnabled,
+      ).thenAnswer((_) async => false);
+      final softwareUpdate = _MockSoftwareUpdate();
+      when(
+        softwareUpdate.loadUpdateSource,
+      ).thenAnswer((_) async => SoftwareUpdateSource.jsDelivr);
+      for (final source in SoftwareUpdateSource.values) {
+        when(
+          () => softwareUpdate.setUpdateSource(source),
+        ).thenAnswer((_) async {});
+      }
+      await tester.pumpWidget(
+        _app(
+          AdvancedSettingsPage(
+            sourceService: advanced,
+            softwareUpdateService: softwareUpdate,
+            logsPageBuilder: (_) => const SizedBox.shrink(),
+            comicSourceEditorPageBuilder: (_) => const SizedBox.shrink(),
+            restoreComicSource: (_) async => false,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final dropdown = find.byType(HazukiFrostedDropdown<SoftwareUpdateSource>);
+      await tester.scrollUntilVisible(dropdown, 250);
+      expect(
+        tester
+            .widget<HazukiFrostedDropdown<SoftwareUpdateSource>>(dropdown)
+            .selected,
+        SoftwareUpdateSource.jsDelivr,
+      );
+      for (final (value, label) in [
+        (SoftwareUpdateSource.github, 'GitHub'),
+        (SoftwareUpdateSource.ghproxy, 'ghproxy'),
+        (SoftwareUpdateSource.jsDelivr, 'jsdelivr'),
+      ]) {
+        await tester.tap(dropdown);
+        await tester.pumpAndSettle();
+        final surface = find.byKey(
+          const ValueKey('hazuki-frosted-menu-surface'),
+        );
+        expect(
+          find.descendant(of: surface, matching: find.byType(BackdropFilter)),
+          findsOneWidget,
+        );
+        await tester.tap(
+          find.descendant(of: surface, matching: find.text(label)),
+        );
+        await tester.pumpAndSettle();
+        verify(() => softwareUpdate.setUpdateSource(value)).called(1);
+        expect(
+          tester
+              .widget<HazukiFrostedDropdown<SoftwareUpdateSource>>(dropdown)
+              .selected,
+          value,
+        );
+      }
+      expect(tester.takeException(), isNull);
     },
   );
 
@@ -470,7 +538,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(plugins.values['fixture/lines'], isTrue);
-      await tester.tap(find.byType(DropdownButton<String>));
+      await tester.tap(find.byType(HazukiFrostedDropdown<String>));
       await tester.pumpAndSettle();
       await tester.tap(find.text('2').last);
       await tester.pumpAndSettle();

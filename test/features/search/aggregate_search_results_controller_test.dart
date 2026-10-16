@@ -1,3 +1,4 @@
+import 'package:hazuki/widgets/hazuki_frosted_menu_button.dart';
 import '../../support/source_presentation_fixtures.dart';
 import '../../support/source_catalog_fixtures.dart';
 import 'dart:async';
@@ -334,15 +335,22 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.tap(find.byType(PopupMenuButton<String>));
+    await tester.tap(find.byType(HazukiFrostedMenuButton<String>));
     await tester.pumpAndSettle();
 
-    expect(find.byType(PopupMenuItem<String>), findsNWidgets(7));
-    await tester.tap(find.byType(PopupMenuItem<String>).at(1));
+    expect(
+      tester
+          .widget<HazukiFrostedMenuButton<String>>(
+            find.byType(HazukiFrostedMenuButton<String>),
+          )
+          .options,
+      hasLength(7),
+    );
+    await tester.tap(find.byKey(const ValueKey(('hazuki-frosted-menu', 'mv'))));
     await tester.pumpAndSettle();
 
-    final orderButton = tester.widget<PopupMenuButton<String>>(
-      find.byType(PopupMenuButton<String>),
+    final orderButton = tester.widget<HazukiFrostedMenuButton<String>>(
+      find.byType(HazukiFrostedMenuButton<String>),
     );
     expect(section.order, 'mv');
     expect(orderButton.tooltip, strings.searchOrderTotalRanking);

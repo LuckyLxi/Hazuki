@@ -6,7 +6,10 @@ import 'package:hazuki/app/hazuki_app_controller.dart';
 import 'package:hazuki/app/theme/hazuki_theme_controller.dart';
 import 'package:hazuki/app/windows/windows_title_bar_controller.dart';
 import 'package:hazuki/services/cloud_sync_service.dart';
+import 'package:hazuki/services/chinese_conversion_service.dart';
+import 'package:hazuki/shared/preferences/hazuki_preference_keys.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class _MockAppSettingsStore extends Mock implements HazukiAppSettingsStore {}
 
@@ -16,6 +19,14 @@ class _MockWindowsTitleBarController extends Mock
     implements HazukiWindowsTitleBarController {}
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUp(() {
+    SharedPreferences.setMockInitialValues({
+      hazukiChineseConversionPreferenceKey: 'simplified',
+    });
+  });
+
   test('cloud restore applies restored appearance runtime state', () async {
     final settingsStore = _MockAppSettingsStore();
     final themeController = _MockThemeController();
@@ -68,6 +79,7 @@ void main() {
     expect(appliedRuntimeAppearances, [appearance]);
     expect(localeReloadCount, 1);
     expect(refreshCount, 1);
+    expect(hazukiChineseConversion.mode, ChineseConversionMode.simplified);
     verify(() => themeController.applyRestoredSettings(appearance)).called(1);
     verify(() => windowsTitleBarController.reloadFromStore()).called(1);
   });

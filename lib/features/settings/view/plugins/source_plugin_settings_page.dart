@@ -146,28 +146,41 @@ class _SourcePluginSettingsContentState
       );
     }
     if (spec['options'] is List) {
-      final items = (spec['options'] as List).map((option) {
+      final options = (spec['options'] as List).map((option) {
         final id = option is Map
             ? option['value'].toString()
             : option.toString();
-        return DropdownMenuItem<String>(
+        return HazukiFrostedMenuOption<String>(
           value: id,
-          child: Text(
-            option is Map
-                ? _text(option['label'] ?? option['text'] ?? id, fallback: id)
-                : _text(id),
-          ),
+          label: option is Map
+              ? _text(option['label'] ?? option['text'] ?? id, fallback: id)
+              : _text(id),
         );
       }).toList();
+      final selected =
+          options.any((option) => option.value == value?.toString())
+          ? value.toString()
+          : null;
       return ListTile(
         title: Text(title),
-        trailing: DropdownButton<String>(
-          value: items.any((item) => item.value == value?.toString())
-              ? value.toString()
-              : null,
-          items: items,
-          onChanged: (v) => _set(key, v),
-        ),
+        trailing: widget.location == SourcePluginActionLocation.lines
+            ? HazukiFrostedDropdown<String>(
+                selected: selected,
+                options: options,
+                tooltip: title,
+                onSelected: (v) => unawaited(_set(key, v)),
+              )
+            : DropdownButton<String>(
+                value: selected,
+                items: [
+                  for (final option in options)
+                    DropdownMenuItem(
+                      value: option.value,
+                      child: Text(option.label),
+                    ),
+                ],
+                onChanged: (v) => _set(key, v),
+              ),
       );
     }
     return ListTile(

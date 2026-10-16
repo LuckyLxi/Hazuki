@@ -1,3 +1,4 @@
+import 'package:hazuki/shared/text/chinese_conversion_scope.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -73,7 +74,7 @@ class ComicCoverTile extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            comic.title,
+            convertChineseText(context, comic.title),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: textTheme.bodyMedium,

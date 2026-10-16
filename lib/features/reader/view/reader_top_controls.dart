@@ -1,3 +1,4 @@
+import 'package:hazuki/shared/text/chinese_conversion_scope.dart';
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/features/reader/view/reader_control_surface.dart';
@@ -43,7 +44,7 @@ class ReaderTopControls extends StatelessWidget {
               ),
               Expanded(
                 child: Text(
-                  title,
+                  convertChineseText(context, title),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: readerTheme.textTheme.titleMedium?.copyWith(

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/shared/favorites/favorite_app_bar_actions_state.dart';
+import 'package:hazuki/widgets/widgets.dart';
 
 class FavoriteAppBarActions extends StatelessWidget {
   const FavoriteAppBarActions({
@@ -77,16 +78,15 @@ class FavoriteAppBarActions extends StatelessWidget {
             ),
           ),
         if (state.showSort)
-          PopupMenuButton<String>(
+          HazukiFrostedMenuButton<String>(
             tooltip: l10n(context).homeSortTooltip,
-            initialValue: state.currentSortOrder,
+            selected: state.currentSortOrder,
             onSelected: onSortSelected,
-            itemBuilder: (context) => state.sortOrders
+            options: state.sortOrders
                 .map(
-                  (order) => CheckedPopupMenuItem<String>(
+                  (order) => HazukiFrostedMenuOption<String>(
                     value: order,
-                    checked: state.currentSortOrder == order,
-                    child: Text(_sortLabel(context, order)),
+                    label: _sortLabel(context, order),
                   ),
                 )
                 .toList(),

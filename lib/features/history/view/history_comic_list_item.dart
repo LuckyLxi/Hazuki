@@ -1,3 +1,4 @@
+import 'package:hazuki/shared/text/chinese_conversion_scope.dart';
 import 'package:hazuki/shared/source_presentation.dart';
 import 'dart:async';
 
@@ -199,7 +200,7 @@ class _HistoryComicListItemState extends State<HistoryComicListItem> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          widget.comic.title,
+          convertChineseText(context, widget.comic.title),
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
           style: Theme.of(context).textTheme.titleMedium,

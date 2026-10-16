@@ -41,25 +41,16 @@ class SearchResultsAppBar extends StatelessWidget
       title: title,
       actions: [
         if (showOrderControl)
-          PopupMenuButton<String>(
+          HazukiFrostedMenuButton<String>(
             tooltip: currentOrderLabel,
             onOpened: onOrderMenuOpened,
             onSelected: onOrderSelected,
-            itemBuilder: (context) => [
+            selected: searchOrder,
+            options: [
               for (final entry in orderLabels.entries)
-                PopupMenuItem<String>(
+                HazukiFrostedMenuOption<String>(
                   value: entry.key,
-                  child: Row(
-                    children: [
-                      Expanded(child: Text(entry.value)),
-                      if (entry.key == searchOrder)
-                        Icon(
-                          Icons.check,
-                          size: 18,
-                          color: Theme.of(context).colorScheme.primary,
-                        ),
-                    ],
-                  ),
+                  label: entry.value,
                 ),
             ],
             child: Padding(
