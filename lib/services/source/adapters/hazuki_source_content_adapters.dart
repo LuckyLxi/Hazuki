@@ -37,6 +37,13 @@ class HazukiSourceSearchAdapter extends HazukiSourceListenableAdapter
   @override
   List<SourceCatalogEntry> get allowedSources =>
       runtime.runtimeRegistry.allowedSources;
+  // Aggregate search also needs metadata changes from inactive sources.
+  @override
+  void addListener(VoidCallback listener) =>
+      runtime.runtimeRegistry.addListener(listener);
+  @override
+  void removeListener(VoidCallback listener) =>
+      runtime.runtimeRegistry.removeListener(listener);
   @override
   void logRuntimeRetryRequested(String value) =>
       runtime.logRuntimeRetryRequested(value);
@@ -44,7 +51,7 @@ class HazukiSourceSearchAdapter extends HazukiSourceListenableAdapter
   Future<SearchComicsResult> searchComics({
     required String keyword,
     required int page,
-    String order = 'mr',
+    String order = '',
     String sourceKey = '',
   }) => _content.searchComics(
     keyword: keyword,
@@ -102,7 +109,7 @@ class HazukiSourceDiscoverAdapter extends HazukiSourceListenableAdapter
   Future<CategoryComicsResult> loadCategoryComicsByViewMore({
     required String viewMoreUrl,
     required int page,
-    String order = 'mr',
+    String order = '',
     List<String>? orders,
   }) => _content.loadCategoryComicsByViewMore(
     viewMoreUrl: viewMoreUrl,

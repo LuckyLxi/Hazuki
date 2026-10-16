@@ -314,6 +314,7 @@ class _SearchAggregateSectionPageState
               orderLabels: orderLabels,
               currentOrderLabel: orderLabels[section.order] ?? section.order,
               searchOrder: section.order,
+              showOrderControl: orderLabels.isNotEmpty,
               onOrderMenuOpened: () {},
               onOrderSelected: (order) {
                 unawaited(

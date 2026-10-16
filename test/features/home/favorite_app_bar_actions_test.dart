@@ -12,7 +12,7 @@ void main() {
       tester,
     ) async {
       final orders = mode == FavoritePageMode.local
-          ? ['mr', 'mp', '-datetime_browse']
+          ? ['savedNewest', 'savedOldest', 'updatedNewest']
           : ['dd', 'da'];
       var selected = orders.first;
       var sortCalls = 0;
@@ -77,6 +77,47 @@ void main() {
       await tester.tap(find.byIcon(Icons.create_new_folder_outlined));
       expect(folderCalls, 1);
       expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final locale in ['zh', 'en']) {
+    testWidgets('cloud sort labels follow plugin declarations in $locale', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          locale: Locale(locale),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Scaffold(
+            body: FavoriteAppBarActions(
+              state: const FavoriteAppBarActionsState(
+                showSort: true,
+                showCreateFolder: false,
+                currentSortOrder: 'score',
+                sortOrders: ['score', 'mr', 'custom'],
+                sortLabels: {
+                  'score': {'zh': '评分', 'en': 'Score'},
+                  'mr': 'Plugin label',
+                },
+                showModeToggle: false,
+                currentMode: FavoritePageMode.cloud,
+              ),
+              onSortSelected: (_) {},
+              onCreateFolderPressed: () {},
+              onModeTogglePressed: () {},
+            ),
+          ),
+        ),
+      );
+      final menu = tester.widget<HazukiFrostedMenuButton<String>>(
+        find.byType(HazukiFrostedMenuButton<String>),
+      );
+      expect(menu.options.map((option) => option.label), [
+        locale == 'zh' ? '评分' : 'Score',
+        'Plugin label',
+        'custom',
+      ]);
     });
   }
 }

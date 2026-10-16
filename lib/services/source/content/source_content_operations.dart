@@ -7,6 +7,7 @@ import '../common/source_json_coerce.dart';
 import '../explore_capability.dart';
 import '../runtime/source_runtime_host.dart';
 import '../runtime/source_runtime_operations.dart';
+import '../plugins/source_sort_options.dart';
 
 abstract interface class SourceContentOperations {
   Future<List<ExploreSection>> loadExploreSections({bool forceRefresh = false});
@@ -41,13 +42,13 @@ abstract interface class SourceContentOperations {
   Future<CategoryComicsResult> loadCategoryComicsByViewMore({
     required String viewMoreUrl,
     required int page,
-    String order = 'mr',
+    String order = '',
     List<String>? orders,
   });
   Future<SearchComicsResult> searchComics({
     required String keyword,
     required int page,
-    String order = 'mr',
+    String order = '',
     String sourceKey = '',
   });
 }
@@ -130,7 +131,7 @@ class SourceContentOperationService implements SourceContentOperations {
   Future<CategoryComicsResult> loadCategoryComicsByViewMore({
     required String viewMoreUrl,
     required int page,
-    String order = 'mr',
+    String order = '',
     List<String>? orders,
   }) => _category.loadComicsByViewMore(
     viewMoreUrl: viewMoreUrl,
@@ -143,7 +144,7 @@ class SourceContentOperationService implements SourceContentOperations {
   Future<SearchComicsResult> searchComics({
     required String keyword,
     required int page,
-    String order = 'mr',
+    String order = '',
     String sourceKey = '',
   }) async {
     final resolvedSourceKey = sourceKey.trim().isEmpty
@@ -205,16 +206,9 @@ class SourceContentOperationService implements SourceContentOperations {
       .toList(growable: false);
 
   String _normalizeSearchOption(String order, String sourceKey) {
-    final normalized = order.trim();
-    final options = _runtimeHost
-        .handleFor(sourceKey)
-        .runtime
-        .sourceMeta
-        ?.presentation;
-    final orders = options?['searchOrders'];
-    final fallback = options?['searchDefaultOrder']?.toString() ?? '';
-    return orders is Map && !orders.containsKey(normalized)
-        ? fallback
-        : normalized;
+    return normalizeSourceSearchOrder(
+      order,
+      _runtimeHost.runtimeRegistry.presentationFor(sourceKey),
+    );
   }
 }

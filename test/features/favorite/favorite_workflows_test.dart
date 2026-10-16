@@ -186,10 +186,9 @@ void main() {
         },
       ),
       readSourceKey: () => sourceKey,
-      readFavoriteSortOrders: () => ['mr', 'mp'],
       isDisposed: () => disposed,
       reloadLocalComicsAfterSort: () async {
-        expect(state.favoriteSortOrder, 'mp');
+        expect(state.favoriteSortOrder, 'updatedNewest');
         events.add('reload.local');
         return localReloadError;
       },
@@ -508,17 +507,20 @@ void main() {
         void onError(String error) {}
         expect(
           await sort.changeSortOrder(
-            ' old ',
+            mode == FavoritePageMode.local ? ' updatedNewest ' : ' old ',
             timeoutMessage: 'timeout',
             onFolderLoadError: onError,
           ),
           isNull,
         );
-        expect(state.favoriteSortOrder, 'mp');
+        expect(
+          state.favoriteSortOrder,
+          mode == FavoritePageMode.local ? 'updatedNewest' : 'mp',
+        );
         expect(
           events,
           mode == FavoritePageMode.local
-              ? ['local.sort:mp', 'reload.local']
+              ? ['local.sort:updatedNewest', 'reload.local']
               : ['cloud.sort:mp', 'reset.cloud', 'reload.cloud:timeout'],
         );
         if (mode == FavoritePageMode.cloud) {
@@ -528,7 +530,16 @@ void main() {
 
       test('$mode repeated sort does not persist or reload', () async {
         state.mode = mode;
-        expect(await sort.changeSortOrder(' mr ', timeoutMessage: ''), isNull);
+        state.favoriteSortOrder = mode == FavoritePageMode.local
+            ? 'savedNewest'
+            : 'mr';
+        expect(
+          await sort.changeSortOrder(
+            ' ${state.favoriteSortOrder} ',
+            timeoutMessage: '',
+          ),
+          isNull,
+        );
         expect(events, isEmpty);
       });
 
@@ -539,14 +550,17 @@ void main() {
           final pending = Completer<void>();
           if (mode == FavoritePageMode.local) {
             when(
-              () => preferences.saveSortOrder('mp'),
+              () => preferences.saveSortOrder('updatedNewest'),
             ).thenAnswer((_) => pending.future);
           } else {
             when(
               () => source.setFavoriteSortOrder('mp'),
             ).thenAnswer((_) => pending.future);
           }
-          final change = sort.changeSortOrder('mp', timeoutMessage: 'timeout');
+          final change = sort.changeSortOrder(
+            mode == FavoritePageMode.local ? 'updatedNewest' : 'mp',
+            timeoutMessage: 'timeout',
+          );
           disposed = true;
           pending.complete();
           expect(await change, isNull);
@@ -560,10 +574,10 @@ void main() {
       state.mode = FavoritePageMode.local;
       localReloadError = 'list failed';
       expect(
-        await sort.changeSortOrder('mp', timeoutMessage: ''),
+        await sort.changeSortOrder('updatedNewest', timeoutMessage: ''),
         'list failed',
       );
-      expect(events, ['local.sort:mp', 'reload.local']);
+      expect(events, ['local.sort:updatedNewest', 'reload.local']);
     });
 
     test(
@@ -584,10 +598,10 @@ void main() {
       () async {
         state.mode = FavoritePageMode.local;
         when(
-          () => preferences.saveSortOrder('mp'),
+          () => preferences.saveSortOrder('updatedNewest'),
         ).thenThrow(StateError('save failed'));
         expect(
-          await sort.changeSortOrder('mp', timeoutMessage: ''),
+          await sort.changeSortOrder('updatedNewest', timeoutMessage: ''),
           contains('save failed'),
         );
         expect(state.favoriteSortOrder, 'mr');

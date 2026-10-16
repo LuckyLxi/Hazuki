@@ -58,12 +58,7 @@ class SourceRuntimeViewService implements SourceRuntimeView {
   bool get supportsDailyRecommendation =>
       dailyRecommendationForSource(activeSourceKey ?? '') != null;
   Map<String, dynamic> _presentationFor(String sourceKey) {
-    final entry = runtimeRegistry.allowedSources
-        .where((entry) => entry.key == sourceKey)
-        .firstOrNull;
-    if (entry == null) return const {};
-    return _runtimeHost.handleFor(sourceKey).runtime.sourceMeta?.presentation ??
-        entry.presentation;
+    return runtimeRegistry.presentationFor(sourceKey);
   }
 
   @override

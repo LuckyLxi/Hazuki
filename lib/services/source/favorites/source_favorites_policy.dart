@@ -1,5 +1,6 @@
 import '../runtime/source_runtime_facade.dart';
 import '../runtime/source_runtime_host.dart';
+import '../plugins/source_sort_options.dart';
 
 /// Resolves source favorite capabilities and source-specific sort settings.
 class SourceFavoritesPolicy {
@@ -81,12 +82,8 @@ class SourceFavoritesPolicy {
     return engine != null && facade.js.asBool(facade.js.evaluate(expression));
   }
 
-  Map<String, dynamic> get _options => {
-    ...(_runtimeHost.hasActiveSource
-        ? _runtimeHost.definitionFor(_runtimeHost.activeSourceKey).presentation
-        : <String, dynamic>{}),
-    ...?_runtimeHost.optionalActiveHandle?.runtime.sourceMeta?.presentation,
-  };
+  Map<String, dynamic> get _options => _runtimeHost.runtimeRegistry
+      .presentationFor(_runtimeHost.activeSourceKey);
   String get favoriteSortOrder {
     if (!_runtimeHost.hasActiveSource) return '';
     final key = _options['favoriteOrderSetting']?.toString() ?? 'favoriteOrder';
@@ -95,19 +92,19 @@ class SourceFavoritesPolicy {
             .loadSourceSetting(_activeFacade.sourceKey, key)
             ?.toString() ??
         '';
-    return favoriteSortOrders.contains(value)
-        ? value
-        : (_options['favoriteDefaultOrder']?.toString() ??
-              favoriteSortOrders.firstOrNull ??
-              '');
+    return normalizeSourceOrder(
+      value,
+      orders: favoriteSortOrders,
+      defaultOrder: _options['favoriteDefaultOrder'],
+    );
   }
 
   Future<void> setFavoriteSortOrder(String order) async {
-    final resolvedOrder = favoriteSortOrders.contains(order)
-        ? order
-        : _options['favoriteDefaultOrder']?.toString() ??
-              favoriteSortOrders.firstOrNull ??
-              '';
+    final resolvedOrder = normalizeSourceOrder(
+      order,
+      orders: favoriteSortOrders,
+      defaultOrder: _options['favoriteDefaultOrder'],
+    );
     if (resolvedOrder.isEmpty) throw StateError('favorite_sort_not_supported');
     await _activeFacade.saveSourceSetting(
       _activeFacade.sourceKey,

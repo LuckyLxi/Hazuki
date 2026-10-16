@@ -1,4 +1,5 @@
 import 'package:hazuki/models/hazuki_models.dart';
+import 'package:hazuki/services/local_favorites/local_favorite_sort.dart';
 
 import 'favorite_app_bar_actions_state.dart';
 import 'favorite_folder_state.dart';
@@ -28,7 +29,7 @@ class FavoritePageData implements FavoriteFolderState, FavoriteSortState {
   bool loadingFolders = false;
   int currentPage = 1;
   @override
-  String favoriteSortOrder = 'mr';
+  String favoriteSortOrder = '';
 
   @override
   String get selectedFolderId => mode == FavoritePageMode.local
@@ -60,16 +61,14 @@ class FavoritePageData implements FavoriteFolderState, FavoriteSortState {
     required bool supportFavoriteSortOrder,
     required bool supportFavoriteFolderAdd,
     required List<String> favoriteSortOrders,
+    Map<String, dynamic> favoriteSortLabels = const {},
   }) {
     if (mode == FavoritePageMode.local) {
-      final localSortOrders = favoriteSortOrders.isEmpty
-          ? const <String>['mr', 'mp']
-          : favoriteSortOrders;
       return FavoriteAppBarActionsState(
         showSort: true,
         showCreateFolder: true,
         currentSortOrder: favoriteSortOrder,
-        sortOrders: localSortOrders,
+        sortOrders: localFavoriteSortOrders,
         showModeToggle: true,
         currentMode: mode,
       );
@@ -80,6 +79,7 @@ class FavoritePageData implements FavoriteFolderState, FavoriteSortState {
       showCreateFolder: isLogged && supportFavoriteFolderAdd,
       currentSortOrder: favoriteSortOrder,
       sortOrders: favoriteSortOrders,
+      sortLabels: favoriteSortLabels,
       showModeToggle: true,
       currentMode: mode,
     );
@@ -106,7 +106,7 @@ class FavoritePageData implements FavoriteFolderState, FavoriteSortState {
     hasMore = true;
     currentPage = 1;
     loadingFolders = false;
-    favoriteSortOrder = 'mr';
+    favoriteSortOrder = '';
   }
 
   void resetForModeChange() {

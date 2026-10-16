@@ -4,6 +4,7 @@ import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/shared/favorites/favorite_app_bar_actions_state.dart';
 import 'package:hazuki/widgets/widgets.dart';
+import 'package:hazuki/services/source/plugins/source_sort_options.dart';
 
 class FavoriteAppBarActions extends StatelessWidget {
   const FavoriteAppBarActions({
@@ -20,12 +21,26 @@ class FavoriteAppBarActions extends StatelessWidget {
   final VoidCallback onModeTogglePressed;
 
   String _sortLabel(BuildContext context, String order) {
+    if (state.currentMode == FavoritePageMode.cloud &&
+        state.sortLabels.containsKey(order)) {
+      return sourceOrderLabel(
+        state.sortLabels[order],
+        Localizations.localeOf(context).languageCode,
+        order,
+      );
+    }
     return switch (order) {
+      'savedNewest' => l10n(context).favoriteSortNewToOld,
+      'savedOldest' => l10n(context).favoriteSortOldToNew,
+      'updatedNewest' => l10n(context).homeFavoriteSortByUpdateTime,
+      // Compatibility for plugins published before favoriteOrderLabels.
       'dd' => l10n(context).favoriteSortNewToOld,
       'da' => l10n(context).favoriteSortOldToNew,
       'mp' || '-datetime_updated' => l10n(context).homeFavoriteSortByUpdateTime,
       '-datetime_browse' => l10n(context).homeFavoriteSortByReadTime,
-      _ => l10n(context).homeFavoriteSortByFavoriteTime,
+      'mr' ||
+      '-datetime_modifier' => l10n(context).homeFavoriteSortByFavoriteTime,
+      _ => order,
     };
   }
 

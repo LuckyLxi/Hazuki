@@ -71,7 +71,9 @@ void main() {
     );
 
     expect(controller.sortOptionGroups, isEmpty);
-    expect(controller.selectedSortValue, 'mr');
+    expect(controller.selectedSortValue, isNull);
+    expect(source.lastOrders, isEmpty);
+    expect(source.lastOrder, '');
     expect(controller.comics.map((comic) => comic.id), ['remote']);
     expect(source.comicsRequestCount, 1);
   });
@@ -106,6 +108,24 @@ void main() {
 
     expect(controller.sortOptions.map((option) => option.label), ['Latest']);
   });
+
+  test('keeps an empty first group selection before the sort group', () async {
+    final source = _FakeDiscoverGateway()
+      ..optionGroups = const [
+        [CategoryRankingOption(value: '', label: 'All')],
+        [CategoryRankingOption(value: 'score', label: 'Score')],
+      ];
+    final controller = DiscoverSectionPageController(
+      sourceService: source,
+      viewMoreUrl: 'category:genre',
+    );
+    addTearDown(controller.dispose);
+    await controller.loadSortOptionsAndInitial(
+      loadFailedMessage: (error) => error,
+    );
+    expect(controller.selectedSortValues, ['', 'score']);
+    expect(source.lastOrders, ['', 'score']);
+  });
 }
 
 ExploreComic _comic(String id) =>
@@ -126,9 +146,14 @@ class _FakeDiscoverGateway extends ChangeNotifier
   int comicsRequestCount = 0;
   String remoteComicId = 'remote';
   bool throwOnOptionsLoad = false;
+  List<List<CategoryRankingOption>> optionGroups = const [
+    [CategoryRankingOption(value: 'latest', label: 'Latest')],
+  ];
+  List<String>? lastOrders;
+  String? lastOrder;
 
   @override
-  String get activeSourceKey => 'jm';
+  String get activeSourceKey => 'custom';
 
   @override
   bool get isLogged => false;
@@ -149,19 +174,19 @@ class _FakeDiscoverGateway extends ChangeNotifier
     required String viewMoreUrl,
   }) async {
     if (throwOnOptionsLoad) throw Exception('options unavailable');
-    return const [
-      [CategoryRankingOption(value: 'mr', label: 'Latest')],
-    ];
+    return optionGroups;
   }
 
   @override
   Future<CategoryComicsResult> loadCategoryComicsByViewMore({
     required String viewMoreUrl,
     required int page,
-    String order = 'mr',
+    String order = '',
     List<String>? orders,
   }) async {
     comicsRequestCount++;
+    lastOrder = order;
+    lastOrders = orders;
     return CategoryComicsResult(comics: [_comic(remoteComicId)], maxPage: 1);
   }
 }

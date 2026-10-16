@@ -108,7 +108,22 @@ class SourcePluginManifest {
     final groups = presentation['listTagGroups'];
     final enrich = presentation['enrichMissingTags'];
     final aliases = presentation['favoriteOrderAliases'];
+    final orderLabels = presentation['favoriteOrderLabels'];
     final localOrders = presentation['localFavoriteOrders'];
+    if (orderLabels != null &&
+        (orderLabels is! Map ||
+            orderLabels.entries.any(
+              (entry) =>
+                  entry.key is! String ||
+                  (entry.value is! String &&
+                      (entry.value is! Map ||
+                          (entry.value as Map).entries.any(
+                            (label) =>
+                                label.key is! String || label.value is! String,
+                          ))),
+            ))) {
+      throw const SourcePluginException('plugin_invalid_manifest');
+    }
     if ((groups != null &&
             (groups is! List ||
                 groups.any(

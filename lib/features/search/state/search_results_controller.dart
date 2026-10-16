@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
+import 'package:hazuki/services/source/plugins/source_sort_options.dart';
 
 import '../support/search_contracts.dart';
 
@@ -15,10 +18,8 @@ class SearchResultsController extends ChangeNotifier {
   }) : _searchPageLoader = searchPageLoader,
        _comicDetailsLoader = comicDetailsLoader,
        _sourceService = sourceService,
-       _searchOrder = _normalizeSearchOrder(
-         initialOrder,
-         sourceService.activeSourceKey,
-       ) {
+       _searchOrder = initialOrder.trim() {
+    _searchOrder = _normalizeSearchOrder(_searchOrder);
     _lastSourceEpoch = _sourceEpoch;
     _sourceService.addListener(_onSourceChanged);
   }
@@ -28,6 +29,7 @@ class SearchResultsController extends ChangeNotifier {
   final SourceSearchGateway _sourceService;
 
   String _searchKeyword = '';
+  SearchMessages? _lastSearchMessages;
   String? _searchErrorMessage;
   List<ExploreComic> _searchComics = const [];
   bool _searchLoading = false;
@@ -64,26 +66,34 @@ class SearchResultsController extends ChangeNotifier {
   void logRuntimeRetryRequested(String source) =>
       _sourceService.logRuntimeRetryRequested(source);
 
-  static String _normalizeSearchOrder(String order, String? sourceKey) {
-    final normalized = order.trim();
-    return normalized;
-  }
+  String _normalizeSearchOrder(String order) => normalizeSourceSearchOrder(
+    order,
+    _sourceService.allowedSources
+            .where((source) => source.key == _sourceService.activeSourceKey)
+            .firstOrNull
+            ?.presentation ??
+        const {},
+  );
 
   void _onSourceChanged() {
-    if (_sourceEpoch != _lastSourceEpoch) {
+    final sourceChanged = _sourceEpoch != _lastSourceEpoch;
+    if (sourceChanged) {
       _lastSourceEpoch = _sourceEpoch;
+      _lastSearchMessages = null;
       _searchRequestToken++;
       _searchComics = const [];
       _searchLoading = false;
       _searchLoadingMore = false;
       _searchErrorMessage = null;
     }
-    final nextOrder = _normalizeSearchOrder(
-      _searchOrder,
-      _sourceService.activeSourceKey,
-    );
+    final nextOrder = _normalizeSearchOrder(_searchOrder);
     if (nextOrder != _searchOrder) {
       _searchOrder = nextOrder;
+      final messages = _lastSearchMessages;
+      if (!sourceChanged && messages != null && _searchKeyword.isNotEmpty) {
+        unawaited(search(messages, keyword: _searchKeyword, page: 1));
+        return;
+      }
     }
     _notify();
   }
@@ -91,6 +101,7 @@ class SearchResultsController extends ChangeNotifier {
   void clearSearchData() {
     _searchRequestToken++;
     _searchKeyword = '';
+    _lastSearchMessages = null;
     _searchErrorMessage = null;
     _searchComics = const [];
     _searchLoading = false;
@@ -102,10 +113,7 @@ class SearchResultsController extends ChangeNotifier {
   }
 
   void setSearchOrder(String order) {
-    final normalized = _normalizeSearchOrder(
-      order,
-      _sourceService.activeSourceKey,
-    );
+    final normalized = _normalizeSearchOrder(order);
     if (_searchOrder == normalized) {
       return;
     }
@@ -115,6 +123,7 @@ class SearchResultsController extends ChangeNotifier {
 
   int prepareDirectIdLookup(String keyword) {
     final requestToken = ++_searchRequestToken;
+    _lastSearchMessages = null;
     _searchKeyword = keyword;
     _searchErrorMessage = null;
     _searchComics = const [];
@@ -198,6 +207,7 @@ class SearchResultsController extends ChangeNotifier {
     final isLoadMore = append;
 
     _searchKeyword = normalized;
+    _lastSearchMessages = messages;
     _searchErrorMessage = null;
     if (!isLoadMore) {
       _searchLoadingMore = false;
@@ -327,6 +337,7 @@ class SearchResultsController extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _searchRequestToken++;
     _sourceService.removeListener(_onSourceChanged);
     super.dispose();
   }

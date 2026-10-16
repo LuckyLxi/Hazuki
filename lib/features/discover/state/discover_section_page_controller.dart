@@ -77,7 +77,7 @@ class DiscoverSectionPageController extends ChangeNotifier {
   }
 
   /// Loads sort options then triggers the first page load.
-  /// On sort option failure, sets default sort value and still attempts to load.
+  /// On sort option failure, lets the plugin choose its default ordering.
   Future<void> loadSortOptionsAndInitial({
     required String Function(String) loadFailedMessage,
   }) async {
@@ -104,7 +104,6 @@ class DiscoverSectionPageController extends ChangeNotifier {
           .asMap()
           .entries
           .map((entry) => _initialSelectionForGroup(entry.value))
-          .where((value) => value.isNotEmpty)
           .toList();
       _state.selectedSortValue = _state.selectedSortValues.isEmpty
           ? null
@@ -119,8 +118,8 @@ class DiscoverSectionPageController extends ChangeNotifier {
       if (_disposed) return;
       _state.sortOptions = const <CategoryRankingOption>[];
       _state.sortOptionGroups = const <List<CategoryRankingOption>>[];
-      _state.selectedSortValue = 'mr';
-      _state.selectedSortValues = const <String>['mr'];
+      _state.selectedSortValue = null;
+      _state.selectedSortValues = const <String>[];
       _notify();
       await _loadPage();
     } finally {
@@ -212,7 +211,7 @@ class DiscoverSectionPageController extends ChangeNotifier {
       final result = await _sourceService.loadCategoryComicsByViewMore(
         viewMoreUrl: url,
         page: nextPage,
-        order: _state.selectedSortValue ?? 'mr',
+        order: _state.selectedSortValue ?? '',
         orders: _state.selectedSortValues,
       );
 

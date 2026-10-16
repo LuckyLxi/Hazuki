@@ -13,6 +13,7 @@ class SourceRuntimeRegistry extends ChangeNotifier {
     required Future<void> Function({String? sourceKey}) ensureInitialized,
     required String? Function(String sourceKey) currentAccountForSource,
     required bool Function(String sourceKey) isLoggedForSource,
+    SourcePresentationReader runtimePresentationFor = emptySourcePresentation,
   }) : _allowedSources = List.unmodifiable(allowedSources),
        _activeSourceKey = activeSourceKey,
        _definitionFor = definitionFor,
@@ -20,7 +21,8 @@ class SourceRuntimeRegistry extends ChangeNotifier {
        _activateSource = activateSource,
        _ensureInitialized = ensureInitialized,
        _currentAccountForSource = currentAccountForSource,
-       _isLoggedForSource = isLoggedForSource;
+       _isLoggedForSource = isLoggedForSource,
+       _runtimePresentationFor = runtimePresentationFor;
 
   List<SourceCatalogEntry> _allowedSources;
   final String Function() _activeSourceKey;
@@ -30,12 +32,16 @@ class SourceRuntimeRegistry extends ChangeNotifier {
   final Future<void> Function({String? sourceKey}) _ensureInitialized;
   final String? Function(String sourceKey) _currentAccountForSource;
   final bool Function(String sourceKey) _isLoggedForSource;
+  final SourcePresentationReader _runtimePresentationFor;
   Future<void> Function()? prepareCatalog;
   SourcePresentationReader historicalPresentationFor = emptySourcePresentation;
 
   Map<String, dynamic> presentationFor(String sourceKey) =>
       isAllowedSourceKey(sourceKey)
-      ? definitionFor(sourceKey.trim()).presentation
+      ? {
+          ...definitionFor(sourceKey.trim()).presentation,
+          ..._runtimePresentationFor(sourceKey.trim()),
+        }
       : const {};
 
   Map<String, dynamic> displayPresentationFor(String sourceKey) =>
@@ -45,7 +51,14 @@ class SourceRuntimeRegistry extends ChangeNotifier {
           historicalPresentationFor(sourceKey.trim()),
         );
 
-  List<SourceCatalogEntry> get allowedSources => _allowedSources;
+  List<SourceCatalogEntry> get allowedSources => List.unmodifiable(
+    _allowedSources.map((source) {
+      final runtime = _runtimePresentationFor(source.normalizedKey);
+      return runtime.isEmpty
+          ? source
+          : source.withPresentation({...source.presentation, ...runtime});
+    }),
+  );
   String? get activeSourceKey =>
       _activeSourceKey().isEmpty ? null : _activeSourceKey();
   bool get hasActiveSource => activeSourceKey != null;
@@ -60,7 +73,7 @@ class SourceRuntimeRegistry extends ChangeNotifier {
       _definitionFor(sourceKey);
   bool isAllowedSourceKey(String sourceKey) {
     final normalized = sourceKey.trim();
-    return allowedSources.any((entry) => entry.normalizedKey == normalized);
+    return _allowedSources.any((entry) => entry.normalizedKey == normalized);
   }
 
   Future<void> loadActiveSourcePreference() async {

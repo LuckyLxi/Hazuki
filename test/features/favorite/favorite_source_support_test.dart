@@ -228,7 +228,7 @@ void main() {
   );
 
   test(
-    'local loader maps arbitrary plugin orders to generic sorting',
+    'local loader uses app sorting across all sources without plugin mappings',
     () async {
       final local = _Local();
       when(
@@ -245,11 +245,6 @@ void main() {
           repository: local,
           preferences: _Preferences(),
         ),
-        presentationFor: (key) => key == 'custom_sort'
-            ? {
-                'localFavoriteOrders': {'custom_updated': 'updatedNewest'},
-              }
-            : const {},
       );
       await loader.load(
         request: loader.capture(
@@ -258,7 +253,7 @@ void main() {
         ),
         page: 1,
         folderId: 'folder',
-        sortOrder: 'custom_updated',
+        sortOrder: 'updatedNewest',
         timeoutMessage: '',
       );
       verify(

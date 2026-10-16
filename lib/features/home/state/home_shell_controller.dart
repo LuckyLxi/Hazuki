@@ -17,7 +17,7 @@ class HomeShellController extends ChangeNotifier {
       const FavoriteAppBarActionsState(
         showSort: false,
         showCreateFolder: false,
-        currentSortOrder: 'mr',
+        currentSortOrder: '',
         showModeToggle: true,
         currentMode: FavoritePageMode.cloud,
       );

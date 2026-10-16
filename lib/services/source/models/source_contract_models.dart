@@ -19,6 +19,17 @@ class SourceCatalogEntry {
   final String? pluginDirectory;
   final Map<String, dynamic> presentation;
 
+  SourceCatalogEntry withPresentation(Map<String, dynamic> value) =>
+      SourceCatalogEntry(
+        key: key,
+        name: name,
+        fileName: fileName,
+        directUrls: directUrls,
+        pluginVersion: pluginVersion,
+        pluginDirectory: pluginDirectory,
+        presentation: value,
+      );
+
   String get normalizedKey => key.trim();
   String get normalizedFileName => fileName.trim();
 

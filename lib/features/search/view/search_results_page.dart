@@ -28,7 +28,7 @@ class SearchResultsPage extends StatefulWidget {
     required this.sourceService,
     required this.historyService,
     required this.initialKeyword,
-    this.initialOrder = 'mr',
+    this.initialOrder = '',
     this.entryIntent = SearchEntryIntent.externalKeyword,
     required this.comicDetailPageBuilder,
     this.comicCoverHeroTagBuilder = comicCoverHeroTag,
@@ -377,12 +377,11 @@ class _SearchResultsPageState extends State<SearchResultsPage>
   }
 
   String get _currentSearchOrderLabel {
-    final strings = AppLocalizations.of(context)!;
     return searchOrderLabels(
           context,
           sourceKey: (_sourceService.activeSourceKey ?? ''),
         )[_searchOrder] ??
-        strings.searchOrderLatest;
+        _searchOrder;
   }
 
   void _handlePopInvoked(bool didPop, Object? result) {
@@ -588,7 +587,12 @@ class _SearchResultsPageState extends State<SearchResultsPage>
         unawaited(_dismissSearchInputIfFocused());
         unawaited(_onSearchOrderSelected(order));
       },
-      showOrderControl: !_aggregateSearchEnabled,
+      showOrderControl:
+          !_aggregateSearchEnabled &&
+          searchOrderLabels(
+            context,
+            sourceKey: (_sourceService.activeSourceKey ?? ''),
+          ).isNotEmpty,
     );
   }
 

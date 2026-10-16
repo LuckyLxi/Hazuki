@@ -47,6 +47,9 @@ class SourceRuntimeHost extends ChangeNotifier {
           _ensureSourceInitialized(sourceKey ?? activeSourceKey),
       currentAccountForSource: _currentAccountForSource,
       isLoggedForSource: _isLoggedForSource,
+      runtimePresentationFor: (key) =>
+          _coordinator.existingHandle(key)?.runtime.sourceMeta?.presentation ??
+          const {},
     );
   }
 

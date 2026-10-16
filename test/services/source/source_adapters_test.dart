@@ -80,18 +80,20 @@ void main() {
   );
 
   test(
-    'search adapter forwards scope and listener through minimal fakes',
+    'search adapter forwards scope and registry notifications until removed',
     () async {
       final runtime = _FakeRuntimeView(activeSourceKey: 'picacg');
+      addTearDown(runtime.dispose);
       final content = _FakeContentOperations();
       final adapter = HazukiSourceSearchAdapter(
         runtime: runtime,
         content: content,
       );
       var notifications = 0;
-      adapter.addListener(() => notifications++);
+      void onChanged() => notifications++;
+      adapter.addListener(onChanged);
 
-      runtime.emit();
+      runtime.runtimeRegistry.notifyChanged();
       await adapter.searchComics(
         keyword: 'hazuki',
         page: 2,
@@ -101,6 +103,10 @@ void main() {
 
       expect(notifications, 1);
       expect(content.searchCalls, [('hazuki', 2, 'vd', 'picacg')]);
+
+      adapter.removeListener(onChanged);
+      runtime.runtimeRegistry.notifyChanged();
+      expect(notifications, 1);
     },
   );
 
@@ -160,7 +166,25 @@ class _FakeRuntimeView extends ChangeNotifier implements SourceRuntimeView {
   @override
   String activeSourceKey;
 
+  @override
+  final SourceRuntimeRegistry runtimeRegistry = _FakeRuntimeRegistry();
+
   void emit() => notifyListeners();
+
+  @override
+  void dispose() {
+    runtimeRegistry.dispose();
+    super.dispose();
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+class _FakeRuntimeRegistry extends ChangeNotifier
+    implements SourceRuntimeRegistry {
+  @override
+  void notifyChanged() => notifyListeners();
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);

@@ -143,7 +143,7 @@ class FavoritePageState extends State<FavoritePage>
       const FavoriteAppBarActionsState(
         showSort: false,
         showCreateFolder: false,
-        currentSortOrder: 'mr',
+        currentSortOrder: '',
         showModeToggle: true,
         currentMode: FavoritePageMode.cloud,
       ),

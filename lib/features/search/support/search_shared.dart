@@ -1,5 +1,6 @@
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/shared/source_presentation.dart';
+import 'package:hazuki/services/source/plugins/source_sort_options.dart';
 import 'search_contracts.dart';
 import 'package:flutter/material.dart';
 import 'package:hazuki/shared/preferences/hazuki_preference_keys.dart';
@@ -34,13 +35,7 @@ Map<String, String> searchOrderLabels(
       ? options.map(
           (key, value) => MapEntry(
             key.toString(),
-            value is Map
-                ? (value[language] ??
-                          value['en'] ??
-                          value.values.firstOrNull ??
-                          key)
-                      .toString()
-                : value.toString(),
+            sourceOrderLabel(value, language, key.toString()),
           ),
         )
       : const {};

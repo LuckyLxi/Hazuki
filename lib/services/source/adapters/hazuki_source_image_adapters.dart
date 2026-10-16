@@ -170,7 +170,7 @@ class HazukiSourceDailyRecommendationAdapter
   Future<SearchComicsResult> searchComics({
     required String keyword,
     required int page,
-    String order = 'mr',
+    String order = '',
     String sourceKey = '',
   }) => _content.searchComics(
     keyword: keyword,

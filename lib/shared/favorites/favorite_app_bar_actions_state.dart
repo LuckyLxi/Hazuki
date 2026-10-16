@@ -7,7 +7,8 @@ class FavoriteAppBarActionsState {
     required this.showSort,
     required this.showCreateFolder,
     required this.currentSortOrder,
-    this.sortOrders = const <String>['mr', 'mp'],
+    this.sortOrders = const [],
+    this.sortLabels = const {},
     required this.showModeToggle,
     required this.currentMode,
   });
@@ -16,6 +17,7 @@ class FavoriteAppBarActionsState {
   final bool showCreateFolder;
   final String currentSortOrder;
   final List<String> sortOrders;
+  final Map<String, dynamic> sortLabels;
   final bool showModeToggle;
   final FavoritePageMode currentMode;
 
@@ -29,6 +31,7 @@ class FavoriteAppBarActionsState {
         other.showCreateFolder == showCreateFolder &&
         other.currentSortOrder == currentSortOrder &&
         listEquals(other.sortOrders, sortOrders) &&
+        mapEquals(other.sortLabels, sortLabels) &&
         other.showModeToggle == showModeToggle &&
         other.currentMode == currentMode;
   }
@@ -39,6 +42,9 @@ class FavoriteAppBarActionsState {
     showCreateFolder,
     currentSortOrder,
     Object.hashAll(sortOrders),
+    Object.hashAllUnordered(
+      sortLabels.entries.map((entry) => Object.hash(entry.key, entry.value)),
+    ),
     showModeToggle,
     currentMode,
   );

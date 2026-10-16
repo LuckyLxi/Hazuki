@@ -314,7 +314,7 @@ class SourceCategoryCapability {
   Future<CategoryComicsResult> loadComicsByViewMore({
     required String viewMoreUrl,
     required int page,
-    String order = 'mr',
+    String order = '',
     List<String>? orders,
   }) async {
     final facade = _runtimeHost.activeHandle.facade;
@@ -323,16 +323,13 @@ class SourceCategoryCapability {
     if (engine == null) throw Exception('source_not_initialized');
 
     final normalizedPage = _normalizePage(page);
-    final normalizedOrder = order.trim().isEmpty ? 'mr' : order.trim();
-    final normalizedOrders = orders == null || orders.isEmpty
-        ? <String>[normalizedOrder]
-        : orders
-              .map((value) => value.trim())
-              .where((value) => value.isNotEmpty)
-              .toList();
-    final optionsJson = jsonEncode(
-      normalizedOrders.isEmpty ? <String>[normalizedOrder] : normalizedOrders,
-    );
+    // Option groups are positional; empty values must not shift later groups.
+    final normalizedOrders = orders != null && orders.isNotEmpty
+        ? orders.map((value) => value.trim()).toList()
+        : order.trim().isNotEmpty
+        ? <String>[order.trim()]
+        : const <String>[];
+    final optionsJson = jsonEncode(normalizedOrders);
 
     final exploreIndex = parseExploreViewMoreIndex(viewMoreUrl);
     final dynamic result;
@@ -417,7 +414,7 @@ class SourceCategoryCapability {
       if (text.isEmpty) continue;
       final index = text.indexOf('-');
       options.add(
-        index <= 0 || index >= text.length - 1
+        index < 0 || index >= text.length - 1
             ? CategoryRankingOption(
                 value: text,
                 label: _translateSourceText(text),

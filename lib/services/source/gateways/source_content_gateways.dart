@@ -15,7 +15,7 @@ abstract interface class SourceSearchGateway implements Listenable {
   Future<SearchComicsResult> searchComics({
     required String keyword,
     required int page,
-    String order = 'mr',
+    String order = '',
     String sourceKey = '',
   });
   Future<ComicDetailsData> loadComicDetails(
@@ -39,7 +39,7 @@ abstract interface class SourceDiscoverGateway implements Listenable {
   Future<CategoryComicsResult> loadCategoryComicsByViewMore({
     required String viewMoreUrl,
     required int page,
-    String order = 'mr',
+    String order = '',
     List<String>? orders,
   });
 }

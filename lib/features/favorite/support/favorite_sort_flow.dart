@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:hazuki/models/hazuki_models.dart';
+import 'package:hazuki/services/local_favorites/local_favorite_sort.dart';
 
 import '../state/favorite_sort_state.dart';
 import 'favorite_cloud_flow.dart';
@@ -14,7 +15,6 @@ class FavoriteSortFlow {
     required FavoriteLocalFlow localFlow,
     required FavoriteSourcePolicy sourcePolicy,
     required String Function() readSourceKey,
-    required List<String> Function() readFavoriteSortOrders,
     required bool Function() isDisposed,
     required Future<String?> Function() reloadLocalComicsAfterSort,
     required VoidCallback resetForReload,
@@ -28,7 +28,6 @@ class FavoriteSortFlow {
        _localFlow = localFlow,
        _sourcePolicy = sourcePolicy,
        _readSourceKey = readSourceKey,
-       _readFavoriteSortOrders = readFavoriteSortOrders,
        _isDisposed = isDisposed,
        _reloadLocalComicsAfterSort = reloadLocalComicsAfterSort,
        _resetForReload = resetForReload,
@@ -39,7 +38,6 @@ class FavoriteSortFlow {
   final FavoriteLocalFlow _localFlow;
   final FavoriteSourcePolicy _sourcePolicy;
   final String Function() _readSourceKey;
-  final List<String> Function() _readFavoriteSortOrders;
   final bool Function() _isDisposed;
   final Future<String?> Function() _reloadLocalComicsAfterSort;
   final VoidCallback _resetForReload;
@@ -54,14 +52,13 @@ class FavoriteSortFlow {
     required String timeoutMessage,
     ValueChanged<String>? onFolderLoadError,
   }) async {
-    final allowedOrders = _state.mode == FavoritePageMode.local
-        ? _readFavoriteSortOrders()
-        : _cloudFlow.sortOrders;
-    final normalized = _sourcePolicy.normalizeSortOrder(
-      order,
-      allowedOrders: allowedOrders,
-      sourceKey: _readSourceKey(),
-    );
+    final normalized = _state.mode == FavoritePageMode.local
+        ? normalizeLocalFavoriteSort(order)
+        : _sourcePolicy.normalizeSortOrder(
+            order,
+            allowedOrders: _cloudFlow.sortOrders,
+            sourceKey: _readSourceKey(),
+          );
     if (normalized == _state.favoriteSortOrder) {
       return null;
     }

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
+import 'package:hazuki/services/source/plugins/source_sort_options.dart';
 
 import '../support/search_contracts.dart';
 
@@ -16,9 +17,9 @@ typedef AggregateSearchPageLoader =
 
 class AggregateSearchSectionState {
   AggregateSearchSectionState({required this.source})
-    : order = (source.presentation['searchDefaultOrder']?.toString() ?? '');
+    : order = normalizeSourceSearchOrder('', source.presentation);
 
-  final SourceCatalogEntry source;
+  SourceCatalogEntry source;
   String order;
   List<ExploreComic> comics = const [];
   String? errorMessage;
@@ -56,6 +57,7 @@ class AggregateSearchResultsController extends ChangeNotifier {
   final List<AggregateSearchSectionState> sections;
 
   String _keyword = '';
+  SearchMessages? _lastMessages;
   bool _disposed = false;
 
   String get keyword => _keyword;
@@ -83,6 +85,7 @@ class AggregateSearchResultsController extends ChangeNotifier {
     if (normalized.isEmpty) return;
 
     _keyword = normalized;
+    _lastMessages = messages;
     for (final section in sections) {
       section
         ..requestToken = section.requestToken + 1
@@ -239,11 +242,30 @@ class AggregateSearchResultsController extends ChangeNotifier {
       for (final section in sections) section.source.key: section,
     };
     final updated = <AggregateSearchSectionState>[];
+    final reload = <AggregateSearchSectionState>[];
     for (final source in _sourceService.allowedSources) {
       final previous = current.remove(source.key);
       if (previous != null &&
           previous.source.pluginDirectory == source.pluginDirectory &&
           previous.source.pluginVersion == source.pluginVersion) {
+        previous.source = source;
+        final order = normalizeSourceSearchOrder(
+          previous.order,
+          source.presentation,
+        );
+        if (order != previous.order) {
+          previous
+            ..requestToken = previous.requestToken + 1
+            ..order = order
+            ..comics = const []
+            ..errorMessage = null
+            ..page = 0
+            ..maxPage = null
+            ..hasMore = true
+            ..loadingMore = false
+            ..loading = _keyword.isNotEmpty && _lastMessages != null;
+          if (previous.loading) reload.add(previous);
+        }
         updated.add(previous);
       } else {
         if (previous != null) previous.requestToken++;
@@ -257,6 +279,11 @@ class AggregateSearchResultsController extends ChangeNotifier {
       ..clear()
       ..addAll(updated);
     _notify();
+    for (final section in reload) {
+      unawaited(
+        _loadSectionPage(_lastMessages!, section, page: 1, append: false),
+      );
+    }
   }
 
   static String defaultOrderForSource(String sourceKey) => '';
@@ -265,10 +292,7 @@ class AggregateSearchResultsController extends ChangeNotifier {
         .where((s) => s.source.key == sourceKey)
         .firstOrNull
         ?.source;
-    final options = source?.presentation['searchOrders'];
-    return options is Map && !options.containsKey(order)
-        ? source?.presentation['searchDefaultOrder']?.toString() ?? ''
-        : order;
+    return normalizeSourceSearchOrder(order, source?.presentation ?? const {});
   }
 
   void _notify() {

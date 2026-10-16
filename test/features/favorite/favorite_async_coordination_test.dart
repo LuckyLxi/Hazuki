@@ -93,6 +93,7 @@ void main() {
       ),
     ).thenAnswer((_) async {});
     when(() => preferences.loadSortOrder()).thenAnswer((_) async => 'mr');
+    when(() => preferences.saveSortOrder(any())).thenAnswer((_) async {});
     when(() => local.loadFavoriteFolders()).thenAnswer(
       (_) async => FavoriteFoldersResult.success(
         favoritedFolderIds: const {},
@@ -135,7 +136,9 @@ void main() {
     await controller.toggleMode(timeoutMessage: 'timeout');
     final pending = Completer<FavoriteFoldersResult>();
     when(() => local.loadFavoriteFolders()).thenAnswer((_) => pending.future);
-    when(() => preferences.saveSortOrder('mp')).thenAnswer((_) async {});
+    when(
+      () => preferences.saveSortOrder('updatedNewest'),
+    ).thenAnswer((_) async {});
     when(
       () => local.loadFavoriteComics(
         page: 1,
@@ -146,7 +149,10 @@ void main() {
     ).thenAnswer((_) async => FavoriteComicsResult.success([_comic('sorted')]));
 
     final reload = controller.reloadFolders();
-    await controller.changeSortOrder('mp', timeoutMessage: 'timeout');
+    await controller.changeSortOrder(
+      'updatedNewest',
+      timeoutMessage: 'timeout',
+    );
     pending.complete(
       FavoriteFoldersResult.success(
         favoritedFolderIds: const {},
@@ -165,6 +171,50 @@ void main() {
     expect(controller.folders.single.name, 'renamed');
     expect(controller.comics.single.id, 'sorted');
   });
+
+  test(
+    'migrates a local sort once and preserves it after changing source',
+    () async {
+      var savedOrder = 'mp';
+      when(
+        () => preferences.loadSortOrder(),
+      ).thenAnswer((_) async => savedOrder);
+      when(() => preferences.saveSortOrder(any())).thenAnswer((call) async {
+        savedOrder = call.positionalArguments.single as String;
+      });
+      when(() => source.supportFavoriteFolderAdd).thenReturn(false);
+      when(() => source.favoriteSortOrders).thenReturn([]);
+      when(
+        () => preferences.loadFavoritePageMode(sourceKey: 'picacg'),
+      ).thenAnswer((_) async => FavoritePageMode.local);
+      when(
+        () => local.loadFavoriteComics(
+          page: 1,
+          folderId: 'local',
+          sortOrder: 'updatedNewest',
+          sourceKey: '',
+        ),
+      ).thenAnswer(
+        (_) async => FavoriteComicsResult.success([_comic('updated')]),
+      );
+      await controller.loadInitial(timeoutMessage: 'timeout');
+      await controller.toggleMode(timeoutMessage: 'timeout');
+      expect(savedOrder, 'updatedNewest');
+      expect(controller.appBarActionsState.currentSortOrder, 'updatedNewest');
+      activeSource = 'picacg';
+      sourceChanged();
+      await _settle();
+      expect(controller.mode, FavoritePageMode.local);
+      expect(controller.appBarActionsState.currentSortOrder, 'updatedNewest');
+      expect(controller.appBarActionsState.sortOrders, [
+        'savedNewest',
+        'savedOldest',
+        'updatedNewest',
+      ]);
+      expect(controller.comics.single.id, 'updated');
+      verify(() => preferences.saveSortOrder('updatedNewest')).called(1);
+    },
+  );
 
   test('empty local directory refresh clears the live comic list', () async {
     await controller.loadInitial(timeoutMessage: 'timeout');
@@ -191,6 +241,35 @@ void main() {
     expect(controller.hasMore, isFalse);
     expect(controller.loadingFolders, isFalse);
   });
+
+  test(
+    'switching from local mode to another source restores its cloud order',
+    () async {
+      when(() => source.supportFavoriteFolderAdd).thenReturn(false);
+      await controller.loadInitial(timeoutMessage: 'timeout');
+      await controller.toggleMode(timeoutMessage: 'timeout');
+      expect(controller.mode, FavoritePageMode.local);
+      when(() => source.favoriteSortOrders).thenReturn(['score', 'recent']);
+      when(() => source.favoriteSortOrder).thenReturn('score');
+      activeSource = 'picacg';
+      sourceChanged();
+      await _settle();
+      expect(controller.mode, FavoritePageMode.cloud);
+      expect(controller.appBarActionsState.currentSortOrder, 'score');
+    },
+  );
+
+  test(
+    'cloud sort follows changed declarations without changing source',
+    () async {
+      when(() => source.supportFavoriteFolderAdd).thenReturn(false);
+      await controller.loadInitial(timeoutMessage: 'timeout');
+      when(() => source.favoriteSortOrders).thenReturn(['score']);
+      when(() => source.favoriteSortOrder).thenReturn('score');
+      sourceChanged();
+      expect(controller.appBarActionsState.currentSortOrder, 'score');
+    },
+  );
 
   test('older folder refresh cannot overwrite the latest folders', () async {
     await controller.loadInitial(timeoutMessage: 'timeout');
