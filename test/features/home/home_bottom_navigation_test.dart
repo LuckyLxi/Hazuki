@@ -189,7 +189,7 @@ void main() {
     expect(tabBar.interactionBehavior, GlassInteractionBehavior.full);
     expect(tabBar.indicatorBorderRadius, GlassDefaults.capsuleRadius);
     expect(tabBar.barBorderRadius, GlassDefaults.capsuleRadius);
-    expect(tabBar.settings?.thickness, 1.2);
+    expect(tabBar.settings?.thickness, 10);
     expect(tabBar.settings?.blur, 4);
     expect(
       tabBar.settings?.glassColor,

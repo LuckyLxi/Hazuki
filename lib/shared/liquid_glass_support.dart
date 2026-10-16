@@ -54,7 +54,7 @@ abstract final class HazukiLiquidGlass {
     final premium = _usesPremiumRenderer(context, quality);
     return LiquidGlassSettings(
       visibility: visibility,
-      thickness: premium ? 72 : 1.2,
+      thickness: premium ? 72 : 10,
       blur: 4,
       refractiveIndex: 1.18,
       lensModel: premium
@@ -63,8 +63,14 @@ abstract final class HazukiLiquidGlass {
       refractionAmount: premium ? 24 : 0,
       chromaticAberration: 0,
       lightAngle: 2.356194490192345,
-      lightIntensity: premium ? 0.55 : 0.18,
-      fresnelStrength: 0.75,
+      lightIntensity: premium ? 0.65 : 0.75,
+      fresnelStrength: 1.05,
+      // Pair the bright lip with a subtle shaded bevel so the edge has depth.
+      // Standard uses thickness/absorption; premium also supports inset rims.
+      edgeAbsorption: isDark ? 0.10 : 0.08,
+      rimShade: premium ? (isDark ? 0.45 : 0.65) : 0,
+      rimShadeEnds: isDark ? 0 : 0.2,
+      rimLight: premium ? (isDark ? 1.05 : 0.85) : 0,
       ambientStrength: 0,
       saturation: 1.5,
       glassColor: isDark ? const Color(0x48141820) : const Color(0x24FFFFFF),
@@ -84,6 +90,9 @@ abstract final class HazukiLiquidGlass {
     chromaticAberration: 0.3,
     lightIntensity: 0.75,
     fresnelStrength: 1,
+    edgeAbsorption: 0.05,
+    rimShade: 0.35,
+    rimLight: 0.75,
     ambientStrength: 0,
     saturation: 1,
     bodyMode: GlassBodyMode.clear,
