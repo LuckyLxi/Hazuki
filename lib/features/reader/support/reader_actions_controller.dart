@@ -18,9 +18,7 @@ import 'package:hazuki/shared/source_presentation.dart';
 import 'package:hazuki/shared/comments/comments_interaction_state.dart';
 import 'package:hazuki/shared/downloads/download_conflict_dialog.dart';
 import 'package:hazuki/widgets/widgets.dart';
-
-typedef ReaderReplacementPageBuilder =
-    Widget Function(ReaderPageContext pageContext);
+import 'package:hazuki/widgets/expanding_chapter_sheet.dart';
 
 class ReaderActionsController {
   ReaderActionsController({
@@ -31,7 +29,7 @@ class ReaderActionsController {
     required ReaderLogPayloadBuilder logPayload,
     required SourceReaderGateway sourceReader,
     required ReaderPageContext pageContext,
-    required ReaderReplacementPageBuilder buildReplacementPage,
+    required ReaderChapterChanged onChapterChanged,
     required MangaDownloadCommands downloader,
   }) : _context = context,
        _isMounted = isMounted,
@@ -40,7 +38,7 @@ class ReaderActionsController {
        _logPayload = logPayload,
        _sourceReader = sourceReader,
        _pageContext = pageContext,
-       _buildReplacementPage = buildReplacementPage,
+       _onChapterChanged = onChapterChanged,
        _downloader = downloader;
 
   final ReaderContextGetter _context;
@@ -50,7 +48,7 @@ class ReaderActionsController {
   final ReaderLogPayloadBuilder _logPayload;
   final SourceReaderGateway _sourceReader;
   final ReaderPageContext _pageContext;
-  final ReaderReplacementPageBuilder _buildReplacementPage;
+  final ReaderChapterChanged _onChapterChanged;
   final MangaDownloadCommands _downloader;
 
   ComicDetailsData? _chapterDetailsCache;
@@ -210,6 +208,8 @@ class ReaderActionsController {
           isDismissible: true,
           enableDrag: true,
           useSafeArea: false,
+          backgroundColor: Colors.transparent,
+          constraints: const BoxConstraints(maxWidth: double.infinity),
           sheetAnimationStyle: const AnimationStyle(
             duration: Duration(milliseconds: 380),
             reverseDuration: Duration(milliseconds: 280),
@@ -219,28 +219,31 @@ class ReaderActionsController {
                 _pageContext.comicTheme ?? Theme.of(routeContext);
             return Theme(
               data: themedData,
-              child: ChaptersPanelSheet(
-                details: details,
-                onDownloadConfirm: (selectedEpIds) {
-                  Navigator.of(routeContext).pop();
-                  unawaited(
-                    _enqueueChapterDownloads(
-                      context,
-                      details,
-                      selectedEpIds: selectedEpIds,
-                    ),
-                  );
-                },
-                onChapterTap: (epId, chapterTitle, index) {
-                  unawaited(
-                    handleChapterSelectedFromPanel(
-                      routeContext,
-                      epId,
-                      chapterTitle,
-                      index,
-                    ),
-                  );
-                },
+              child: ExpandingChapterSheet(
+                cornerRadius: 20,
+                builder: (sheetContext) => ChaptersPanelSheet(
+                  details: details,
+                  onDownloadConfirm: (selectedEpIds) {
+                    Navigator.of(sheetContext).pop();
+                    unawaited(
+                      _enqueueChapterDownloads(
+                        context,
+                        details,
+                        selectedEpIds: selectedEpIds,
+                      ),
+                    );
+                  },
+                  onChapterTap: (epId, chapterTitle, index) {
+                    unawaited(
+                      handleChapterSelectedFromPanel(
+                        sheetContext,
+                        epId,
+                        chapterTitle,
+                        index,
+                      ),
+                    );
+                  },
+                ),
               ),
             );
           },
@@ -447,8 +450,8 @@ class ReaderActionsController {
     String chapterTitle,
     int index,
   ) async {
-    Navigator.of(routeContext).pop();
     if (epId == _pageContext.epId) {
+      Navigator.of(routeContext).pop();
       _logEvent(
         'Reader chapter selection ignored',
         source: 'reader_navigation',
@@ -470,26 +473,24 @@ class ReaderActionsController {
         'targetChapterIndex': index,
       }),
     );
-    await Future<void>.delayed(const Duration(milliseconds: 280));
-    if (!_isMounted()) {
+    final navigator = Navigator.of(routeContext);
+    final sheetRoute = ModalRoute.of(routeContext)!;
+    if (!await ExpandingChapterSheet.expand(routeContext) || !_isMounted()) {
       return;
     }
-    await Navigator.of(_context()).pushReplacement(
-      MaterialPageRoute<void>(
-        builder: (_) => _buildReplacementPage(
-          _pageContext.copyForChapter(
-            epId: epId,
-            chapterTitle: chapterTitle,
-            chapterIndex: index,
-          ),
-        ),
+    navigator.removeRoute(sheetRoute);
+    _onChapterChanged(
+      _pageContext.copyForChapter(
+        epId: epId,
+        chapterTitle: chapterTitle,
+        chapterIndex: index,
       ),
+      animate: false,
     );
   }
 
   Future<void> jumpToAdjacentChapter(int offset) async {
     final context = _context();
-    final navigator = Navigator.of(context);
     final strings = l10n(context);
     try {
       final details = await loadReaderComicDetails();
@@ -540,15 +541,11 @@ class ReaderActionsController {
       if (!_isMounted()) {
         return;
       }
-      await navigator.pushReplacement(
-        MaterialPageRoute<void>(
-          builder: (_) => _buildReplacementPage(
-            _pageContext.copyForChapter(
-              epId: targetChapter.key,
-              chapterTitle: targetChapter.value,
-              chapterIndex: targetIndex,
-            ),
-          ),
+      _onChapterChanged(
+        _pageContext.copyForChapter(
+          epId: targetChapter.key,
+          chapterTitle: targetChapter.value,
+          chapterIndex: targetIndex,
         ),
       );
     } catch (error) {

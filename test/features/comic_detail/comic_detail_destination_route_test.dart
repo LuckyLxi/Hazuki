@@ -125,6 +125,61 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
   });
+
+  for (final platform in [TargetPlatform.android, TargetPlatform.windows]) {
+    testWidgets(
+      'expanded sheet handoff keeps the return animation ($platform)',
+      (tester) async {
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: ThemeData(platform: platform),
+            home: Builder(
+              builder: (context) => Scaffold(
+                body: TextButton(
+                  onPressed: () => Navigator.of(context).push<void>(
+                    buildComicDetailDestinationRoute(
+                      context,
+                      (_) => const Scaffold(body: Text('Reader')),
+                      skipEntrance: true,
+                    ),
+                  ),
+                  child: const Text('Detail'),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.tap(find.text('Detail'));
+        await tester.pump();
+        final reader = find.text('Reader');
+        final route = ModalRoute.of(tester.element(reader))!;
+        expect(route.animation!.status, AnimationStatus.completed);
+        expect(route.animation!.value, 1);
+        expect(
+          _slides(
+            tester,
+            reader,
+          ).every((slide) => slide.position.value == Offset.zero),
+          isTrue,
+        );
+        Navigator.of(tester.element(reader)).pop();
+        await tester.pump();
+        await tester.pump(route.reverseTransitionDuration ~/ 2);
+        expect(route.animation!.value, inExclusiveRange(0, 1));
+        expect(
+          _slides(
+            tester,
+            reader,
+          ).any((slide) => slide.position.value != Offset.zero),
+          isTrue,
+        );
+        await tester.pumpAndSettle();
+        expect(reader, findsNothing);
+        expect(find.text('Detail'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 }
 
 Iterable<SlideTransition> _slides(WidgetTester tester, Finder child) =>

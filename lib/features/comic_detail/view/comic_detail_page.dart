@@ -155,6 +155,11 @@ class _ComicDetailPageState extends State<ComicDetailPage>
     _actionsController = ComicDetailActionsController(
       destinationRouteBuilder: (builder) =>
           buildComicDetailDestinationRoute(context, builder),
+      expandedReaderRouteBuilder: (builder) => buildComicDetailDestinationRoute(
+        context,
+        builder,
+        skipEntrance: true,
+      ),
       repository: _repository,
       comic: widget.comic,
       heroTag: widget.heroTag,

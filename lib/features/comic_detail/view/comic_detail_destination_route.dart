@@ -4,11 +4,13 @@ import 'package:hazuki/shared/windows/windows_comic_detail.dart';
 
 Route<void> buildComicDetailDestinationRoute(
   BuildContext context,
-  WidgetBuilder builder,
-) {
+  WidgetBuilder builder, {
+  bool skipEntrance = false,
+}) {
   return useWindowsComicDetailPanel &&
           Theme.of(context).platform == TargetPlatform.windows
-      ? PageRouteBuilder<void>(
+      ? _WindowsDestinationRoute(
+          skipEntrance: skipEntrance,
           transitionDuration: windowsComicDetailPanelAnimationDuration,
           reverseTransitionDuration: const Duration(milliseconds: 280),
           pageBuilder: (context, animation, secondaryAnimation) =>
@@ -28,5 +30,27 @@ Route<void> buildComicDetailDestinationRoute(
             return SlideTransition(position: position, child: child);
           },
         )
-      : buildSnapshottingPageRoute<void>(builder: builder);
+      : buildSnapshottingPageRoute<void>(
+          builder: builder,
+          skipEntrance: skipEntrance,
+        );
+}
+
+class _WindowsDestinationRoute extends PageRouteBuilder<void> {
+  _WindowsDestinationRoute({
+    required this.skipEntrance,
+    required super.pageBuilder,
+    required super.transitionsBuilder,
+    required super.transitionDuration,
+    required super.reverseTransitionDuration,
+  });
+
+  final bool skipEntrance;
+
+  @override
+  AnimationController createAnimationController() {
+    final controller = super.createAnimationController();
+    if (skipEntrance) controller.value = 1;
+    return controller;
+  }
 }

@@ -14,6 +14,7 @@ import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/manga_download/manga_download_models.dart';
 import 'package:hazuki/widgets/hazuki_prompt.dart';
+import 'package:hazuki/widgets/expanding_chapter_sheet.dart';
 
 import '../repository/comic_detail_repository.dart';
 import 'comic_detail_controller_support.dart';
@@ -35,7 +36,9 @@ class ComicDetailActionsController extends ChangeNotifier {
     ComicDetailCategoryPageBuilder? categoryPageBuilder,
     required MethodChannel mediaChannel,
     required Route<void> Function(WidgetBuilder) destinationRouteBuilder,
+    required Route<void> Function(WidgetBuilder) expandedReaderRouteBuilder,
   }) : _destinationRouteBuilder = destinationRouteBuilder,
+       _expandedReaderRouteBuilder = expandedReaderRouteBuilder,
        _repository = repository,
        _comic = comic,
        _heroTag = heroTag,
@@ -51,6 +54,7 @@ class ComicDetailActionsController extends ChangeNotifier {
        _mediaChannel = mediaChannel;
 
   final Route<void> Function(WidgetBuilder) _destinationRouteBuilder;
+  final Route<void> Function(WidgetBuilder) _expandedReaderRouteBuilder;
   final ComicDetailFeatureFacade _repository;
   final ExploreComic _comic;
   final String _heroTag;
@@ -137,8 +141,9 @@ class ComicDetailActionsController extends ChangeNotifier {
       isScrollControlled: true,
       isDismissible: true,
       enableDrag: true,
-      useSafeArea: true,
+      useSafeArea: false,
       backgroundColor: Colors.transparent,
+      constraints: const BoxConstraints(maxWidth: double.infinity),
       sheetAnimationStyle: AnimationStyle(
         duration: MediaQuery.disableAnimationsOf(context)
             ? Duration.zero
@@ -152,34 +157,65 @@ class ComicDetailActionsController extends ChangeNotifier {
       builder: (routeContext) {
         return _wrapWithDetailTheme(
           routeContext,
-          _chaptersPanelBuilder(
-            details: details,
-            onDownloadConfirm: (selectedEpIds) {
-              Navigator.of(routeContext).pop();
-              unawaited(
-                _enqueueChapterDownloads(
-                  context,
-                  details,
-                  selectedEpIds: selectedEpIds,
-                ),
-              );
-            },
-            onChapterTap: (epId, chapterTitle, index) {
-              Navigator.of(routeContext).pop();
-              unawaited(
-                openReader(
-                  context,
-                  details,
-                  epId: epId,
-                  chapterTitle: chapterTitle,
-                  chapterIndex: index,
-                ),
-              );
-            },
+          ExpandingChapterSheet(
+            cornerRadius: 28,
+            safePadding: MediaQuery.paddingOf(context),
+            builder: (sheetContext) => _chaptersPanelBuilder(
+              details: details,
+              onDownloadConfirm: (selectedEpIds) {
+                Navigator.of(sheetContext).pop();
+                unawaited(
+                  _enqueueChapterDownloads(
+                    context,
+                    details,
+                    selectedEpIds: selectedEpIds,
+                  ),
+                );
+              },
+              onChapterTap: (epId, chapterTitle, index) {
+                unawaited(
+                  _openReaderFromChapterSheet(
+                    context,
+                    sheetContext,
+                    details,
+                    epId: epId,
+                    chapterTitle: chapterTitle,
+                    chapterIndex: index,
+                  ),
+                );
+              },
+            ),
           ),
         );
       },
     );
+  }
+
+  Future<void> _openReaderFromChapterSheet(
+    BuildContext context,
+    BuildContext sheetContext,
+    ComicDetailsData details, {
+    required String epId,
+    required String chapterTitle,
+    required int chapterIndex,
+  }) async {
+    final navigator = Navigator.of(sheetContext);
+    final sheetRoute = ModalRoute.of(sheetContext)!;
+    if (!await ExpandingChapterSheet.expand(sheetContext) ||
+        _disposed ||
+        !context.mounted) {
+      return;
+    }
+    final readerClosed = openReader(
+      context,
+      details,
+      epId: epId,
+      chapterTitle: chapterTitle,
+      chapterIndex: chapterIndex,
+      fromExpandedChapterSheet: true,
+    );
+    navigator.removeRoute(sheetRoute);
+    await readerClosed;
   }
 
   Future<void> openReader(
@@ -188,6 +224,7 @@ class ComicDetailActionsController extends ChangeNotifier {
     String? epId,
     String? chapterTitle,
     int? chapterIndex,
+    bool fromExpandedChapterSheet = false,
   }) async {
     FocusManager.instance.primaryFocus?.unfocus();
     final chapters = details.chapters;
@@ -238,7 +275,9 @@ class ComicDetailActionsController extends ChangeNotifier {
     titleBarController?.suppressCustomTitleBar(titleBarSuppressionOwner);
     try {
       await Navigator.of(context).push(
-        _destinationRouteBuilder(
+        (fromExpandedChapterSheet
+            ? _expandedReaderRouteBuilder
+            : _destinationRouteBuilder)(
           (_) => _readerPageBuilder(
             details: details,
             chapterTitle: initialChapterTitle,

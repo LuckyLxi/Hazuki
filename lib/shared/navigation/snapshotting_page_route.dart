@@ -3,10 +3,12 @@ import 'package:flutter/cupertino.dart';
 Route<T> buildSnapshottingPageRoute<T>({
   required WidgetBuilder builder,
   bool allowSnapshotting = true,
+  bool skipEntrance = false,
 }) {
   return _SnapshottingCupertinoPageRoute<T>(
     builder: builder,
     allowSnapshotting: allowSnapshotting,
+    skipEntrance: skipEntrance,
   );
 }
 
@@ -14,7 +16,17 @@ class _SnapshottingCupertinoPageRoute<T> extends CupertinoPageRoute<T> {
   _SnapshottingCupertinoPageRoute({
     required super.builder,
     required super.allowSnapshotting,
+    required this.skipEntrance,
   }) : super(requestFocus: false);
+
+  final bool skipEntrance;
+
+  @override
+  AnimationController createAnimationController() {
+    final controller = super.createAnimationController();
+    if (skipEntrance) controller.value = 1;
+    return controller;
+  }
 
   @override
   Widget buildTransitions(

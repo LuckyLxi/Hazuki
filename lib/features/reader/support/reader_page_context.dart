@@ -5,6 +5,9 @@ import 'package:hazuki/shared/reading/reader_offline_chapter_data.dart';
 
 export 'package:hazuki/shared/reading/reader_offline_chapter_data.dart';
 
+typedef ReaderChapterChanged =
+    void Function(ReaderPageContext chapter, {bool animate});
+
 class ReaderPageContext {
   const ReaderPageContext({
     required this.title,

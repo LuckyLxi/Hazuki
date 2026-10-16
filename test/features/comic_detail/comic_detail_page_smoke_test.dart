@@ -35,6 +35,7 @@ import 'package:hazuki/shared/comments/comments_widget_builder.dart';
 import 'package:hazuki/shared/comments/comments_interaction_state.dart';
 import 'package:hazuki/shared/window/window_title_bar_control.dart';
 import 'package:hazuki/widgets/cached_image_widgets.dart';
+import 'package:hazuki/widgets/expanding_chapter_sheet.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_chapters_panel.dart';
 import 'package:hazuki/shared/favorites/favorite_folders_morph_dialog.dart';
 import '../../support/test_service_locator.dart';
@@ -477,6 +478,132 @@ void main() {
       expect(find.byType(ComicDetailPage), findsOneWidget);
       expect(tester.takeException(), isNull);
     });
+  }
+
+  for (final platform in [TargetPlatform.android, TargetPlatform.windows]) {
+    for (final disableAnimations in [false, true]) {
+      testWidgets(
+        'chapter sheet expands into reader ($platform, reduced=$disableAnimations)',
+        (tester) async {
+          tester.view.physicalSize = platform == TargetPlatform.android
+              ? const Size(390, 844)
+              : const Size(1200, 900);
+          tester.view.devicePixelRatio = 1;
+          tester.view.padding = const FakeViewPadding(top: 24);
+          addTearDown(tester.view.resetPhysicalSize);
+          addTearDown(tester.view.resetDevicePixelRatio);
+          addTearDown(tester.view.resetPadding);
+          final titleBar = _NavigationTitleBarControl();
+          addTearDown(titleBar.dispose);
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: ThemeData(platform: platform),
+              locale: const Locale('en'),
+              builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(
+                  context,
+                ).copyWith(disableAnimations: disableAnimations),
+                child: withTestSourcePresentation(
+                  HazukiWindowsTitleBarScope(
+                    controller: titleBar,
+                    child: child!,
+                  ),
+                ),
+              ),
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: ComicDetailPage(
+                comic: const ExploreComic(
+                  id: 'chapter-expansion',
+                  sourceKey: 'copy_manga',
+                  title: 'Comic',
+                  subTitle: '',
+                  cover: '',
+                ),
+                dependencies: _comicDetailDependencies(),
+                repository: _NavigationDetailFacade(),
+                heroTag: 'chapter-expansion',
+                shouldAnimateInitialRevealOverride: false,
+                readerWidgetBuilder:
+                    ({
+                      required title,
+                      required chapterTitle,
+                      required comicId,
+                      required epId,
+                      required chapterIndex,
+                      required images,
+                      required sourceKey,
+                      coverUrl = '',
+                      comicTheme,
+                      onFavoriteRequested,
+                    }) => Scaffold(
+                      body: Text('Reader: $epId $chapterTitle $chapterIndex'),
+                    ),
+                searchPageBuilder: (_) => const SizedBox.shrink(),
+                commentsWidgetBuilder: _buildComments,
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(find.byIcon(Icons.format_list_bulleted_rounded));
+          await tester.pumpAndSettle();
+          final sheet = find.byType(ExpandingChapterSheet);
+          final initialRect = tester.getRect(sheet);
+          expect(initialRect.top, greaterThan(24));
+          await tester.tap(find.text('Chapter 1'));
+          await tester.pump();
+          if (!disableAnimations) {
+            // A repeated selection during expansion must not open two readers.
+            tester
+                .widget<ComicDetailChaptersPanel>(
+                  find.byType(ComicDetailChaptersPanel),
+                )
+                .onChapterTap('1', 'Chapter 1', 0);
+            await tester.pump(const Duration(milliseconds: 180));
+            final expandingRect = tester.getRect(sheet);
+            expect(expandingRect.top, lessThan(initialRect.top));
+            expect(expandingRect.bottom, closeTo(initialRect.bottom, 0.1));
+            expect(expandingRect.height, greaterThan(initialRect.height));
+            if (platform == TargetPlatform.windows) {
+              expect(expandingRect.width, greaterThan(initialRect.width));
+            }
+            expect(find.text('Reader: 1 Chapter 1 0'), findsNothing);
+          }
+          await tester.pumpAndSettle();
+          final reader = find.text('Reader: 1 Chapter 1 0');
+          expect(reader, findsOneWidget);
+          expect(sheet, findsNothing);
+          final route = ModalRoute.of(tester.element(reader))!;
+          expect(route.animation!.status, AnimationStatus.completed);
+          Navigator.of(tester.element(reader)).pop();
+          await tester.pumpAndSettle();
+          expect(find.byType(ComicDetailPage), findsOneWidget);
+          expect(sheet, findsNothing);
+          expect(tester.takeException(), isNull);
+          if (!disableAnimations) {
+            // Removing the sheet during expansion cancels the pending handoff.
+            await tester.tap(find.byIcon(Icons.format_list_bulleted_rounded));
+            await tester.pumpAndSettle();
+            final sheetContext = tester.element(
+              find.byType(ComicDetailChaptersPanel),
+            );
+            final sheetRoute = ModalRoute.of(sheetContext)!;
+            final navigator = Navigator.of(sheetContext);
+            await tester.tap(find.text('Chapter 1'));
+            await tester.pump();
+            await tester.pump(const Duration(milliseconds: 120));
+            navigator.removeRoute(sheetRoute);
+            await tester.pumpAndSettle();
+            expect(reader, findsNothing);
+            expect(sheet, findsNothing);
+            expect(find.byType(ComicDetailPage), findsOneWidget);
+            expect(tester.takeException(), isNull);
+          }
+          await tester.pumpWidget(const SizedBox());
+          await tester.pumpAndSettle();
+        },
+      );
+    }
   }
 
   testWidgets('mobile first reveal fades without moving content', (

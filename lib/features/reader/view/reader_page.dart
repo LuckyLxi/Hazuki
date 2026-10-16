@@ -72,13 +72,122 @@ class ReaderPage extends StatefulWidget {
   final List<ReaderOfflineChapterData> offlineChapters;
 
   @override
-  State<ReaderPage> createState() => _ReaderPageState();
+  State<ReaderPage> createState() => _ReaderPageHostState();
 }
 
-class _ReaderPageState extends State<ReaderPage>
+// Chapter changes stay inside the original route so its return transition and
+// navigation result remain intact.
+class _ReaderPageHostState extends State<ReaderPage> {
+  final _chapterNavigatorKey = GlobalKey<NavigatorState>();
+  late ReaderPage _chapter = widget;
+  bool _chapterCanHandlePop = false;
+  bool _settingsDrawerOpen = false;
+
+  void _switchChapter(ReaderPageContext chapter, {bool animate = true}) {
+    _chapter = ReaderPage(
+      title: chapter.title,
+      chapterTitle: chapter.chapterTitle,
+      comicId: chapter.comicId,
+      epId: chapter.epId,
+      chapterIndex: chapter.chapterIndex,
+      images: chapter.images,
+      dependencies: widget.dependencies,
+      sourceKey: chapter.sourceKey,
+      coverUrl: chapter.coverUrl,
+      comicTheme: chapter.comicTheme,
+      onFavoriteRequested: chapter.onFavoriteRequested,
+      commentsWidgetBuilder: chapter.commentsWidgetBuilder,
+      offlineMode: chapter.offlineMode,
+      offlineChapters: chapter.offlineChapters,
+    );
+    unawaited(
+      _chapterNavigatorKey.currentState!.pushReplacement<void, void>(
+        _buildChapterRoute(_chapter, skipEntrance: !animate),
+      ),
+    );
+  }
+
+  Route<void> _buildChapterRoute(
+    ReaderPage chapter, {
+    bool skipEntrance = false,
+  }) {
+    return _ReaderChapterRoute(
+      skipEntrance: skipEntrance,
+      builder: (_) => _ReaderChapterPage(
+        page: chapter,
+        onChapterChanged: _switchChapter,
+        onExitReader: () => Navigator.of(context).maybePop(),
+        onSettingsDrawerChanged: (open) {
+          if (_settingsDrawerOpen != open) {
+            setState(() => _settingsDrawerOpen = open);
+          }
+        },
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope<Object?>(
+      canPop: !_chapterCanHandlePop && !_settingsDrawerOpen,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) {
+          unawaited(_chapterNavigatorKey.currentState!.maybePop(result));
+        }
+      },
+      child: NotificationListener<NavigationNotification>(
+        onNotification: (notification) {
+          if (_chapterCanHandlePop != notification.canHandlePop) {
+            setState(() => _chapterCanHandlePop = notification.canHandlePop);
+          }
+          return false;
+        },
+        child: Navigator(
+          key: _chapterNavigatorKey,
+          onGenerateRoute: (_) =>
+              _buildChapterRoute(_chapter, skipEntrance: true),
+        ),
+      ),
+    );
+  }
+}
+
+// Use Flutter's platform transitions for chapters without replacing the outer
+// reader route, which owns the original return animation.
+class _ReaderChapterRoute extends MaterialPageRoute<void> {
+  _ReaderChapterRoute({required super.builder, required this.skipEntrance});
+
+  final bool skipEntrance;
+
+  @override
+  AnimationController createAnimationController() {
+    final controller = super.createAnimationController();
+    if (skipEntrance) controller.value = 1;
+    return controller;
+  }
+}
+
+class _ReaderChapterPage extends StatefulWidget {
+  const _ReaderChapterPage({
+    required this.page,
+    required this.onChapterChanged,
+    required this.onExitReader,
+    required this.onSettingsDrawerChanged,
+  });
+
+  final ReaderPage page;
+  final ReaderChapterChanged onChapterChanged;
+  final VoidCallback onExitReader;
+  final ValueChanged<bool> onSettingsDrawerChanged;
+
+  @override
+  State<_ReaderChapterPage> createState() => _ReaderPageState();
+}
+
+class _ReaderPageState extends State<_ReaderChapterPage>
     with SingleTickerProviderStateMixin {
   static const _readerSettingsStore = ReaderSettingsStore();
-  late final _sourceSettings = widget.dependencies.sourceSettings;
+  late final _sourceSettings = widget.page.dependencies.sourceSettings;
 
   ReaderSourceImageQualitySnapshot _sourceImageQuality =
       ReaderSourceImageQualitySnapshot.defaults;
@@ -94,19 +203,19 @@ class _ReaderPageState extends State<ReaderPage>
   final ReaderImagePipelineState _imagePipelineState =
       ReaderImagePipelineState();
   late final ReaderPageContext _pageContext = ReaderPageContext(
-    title: widget.title,
-    chapterTitle: widget.chapterTitle,
-    comicId: widget.comicId,
-    epId: widget.epId,
-    chapterIndex: widget.chapterIndex,
-    images: widget.images,
-    sourceKey: widget.sourceKey,
-    coverUrl: widget.coverUrl,
-    comicTheme: widget.comicTheme,
-    onFavoriteRequested: widget.onFavoriteRequested,
-    commentsWidgetBuilder: widget.commentsWidgetBuilder,
-    offlineMode: widget.offlineMode,
-    offlineChapters: widget.offlineChapters,
+    title: widget.page.title,
+    chapterTitle: widget.page.chapterTitle,
+    comicId: widget.page.comicId,
+    epId: widget.page.epId,
+    chapterIndex: widget.page.chapterIndex,
+    images: widget.page.images,
+    sourceKey: widget.page.sourceKey,
+    coverUrl: widget.page.coverUrl,
+    comicTheme: widget.page.comicTheme,
+    onFavoriteRequested: widget.page.onFavoriteRequested,
+    commentsWidgetBuilder: widget.page.commentsWidgetBuilder,
+    offlineMode: widget.page.offlineMode,
+    offlineChapters: widget.page.offlineChapters,
   );
 
   late final AnimationController _resetAnimController = AnimationController(
@@ -134,13 +243,13 @@ class _ReaderPageState extends State<ReaderPage>
         logPayload: _readerLogPayload,
         logVisiblePageChange: _logVisiblePageChange,
         noImageModeEnabled: () => _noImageModeEnabled,
-        comicId: widget.comicId,
-        epId: widget.epId,
-        sourceKey: widget.sourceKey,
+        comicId: widget.page.comicId,
+        epId: widget.page.epId,
+        sourceKey: widget.page.sourceKey,
         loadImagesErrorBuilder: (error) =>
             l10n(context).readerChapterLoadFailed('$error'),
         onImageAspectRatioResolved: _handleImageAspectRatioResolved,
-        sourceService: widget.dependencies.sourceReader,
+        sourceService: widget.page.dependencies.sourceReader,
       );
   late final ReaderZoomController _readerZoomController = ReaderZoomController(
     transformationController: _zoomController,
@@ -163,16 +272,16 @@ class _ReaderPageState extends State<ReaderPage>
         sessionId: () => _displayBridge.sessionId,
         noImageModeEnabled: () => _noImageModeEnabled,
         log: (title, {level = 'info', source = 'reader_ui', content}) =>
-            widget.dependencies.sourceReader.addReaderLog(
+            widget.page.dependencies.sourceReader.addReaderLog(
               title: title,
               level: level,
               source: source,
               content: content,
             ),
-        comicId: widget.comicId,
-        epId: widget.epId,
-        chapterTitle: widget.chapterTitle,
-        chapterIndex: widget.chapterIndex,
+        comicId: widget.page.comicId,
+        epId: widget.page.epId,
+        chapterTitle: widget.page.chapterTitle,
+        chapterIndex: widget.page.chapterIndex,
       );
   late final ReaderNavigationPrefetch _navigationPrefetch =
       ReaderNavigationPrefetch(
@@ -220,14 +329,14 @@ class _ReaderPageState extends State<ReaderPage>
         updateState: _updateReaderState,
         logEvent: _logReaderEvent,
         logPayload: _readerLogPayload,
-        comicId: widget.comicId,
-        epId: widget.epId,
-        sourceKey: widget.sourceKey,
-        chapterTitle: widget.chapterTitle,
-        chapterIndex: widget.chapterIndex,
-        widgetImages: widget.images,
-        readingProgressService: widget.dependencies.readingProgressService,
-        offlineMode: widget.offlineMode,
+        comicId: widget.page.comicId,
+        epId: widget.page.epId,
+        sourceKey: widget.page.sourceKey,
+        chapterTitle: widget.page.chapterTitle,
+        chapterIndex: widget.page.chapterIndex,
+        widgetImages: widget.page.images,
+        readingProgressService: widget.page.dependencies.readingProgressService,
+        offlineMode: widget.page.offlineMode,
       );
   late final ReaderSettingsController _settingsController =
       ReaderSettingsController(
@@ -250,21 +359,21 @@ class _ReaderPageState extends State<ReaderPage>
         updateState: _updateReaderState,
         logEvent: _logReaderEvent,
         logPayload: _readerLogPayload,
-        sourceReader: widget.dependencies.sourceReader,
+        sourceReader: widget.page.dependencies.sourceReader,
         pageContext: _pageContext,
-        buildReplacementPage: _buildReaderPageFromContext,
-        downloader: widget.dependencies.downloader,
+        onChapterChanged: widget.onChapterChanged,
+        downloader: widget.page.dependencies.downloader,
       );
   late final ReaderSaveImageController _saveImageController =
       ReaderSaveImageController(
         context: () => context,
         resolveReaderTheme: _resolveReaderTheme,
-        sourceReader: widget.dependencies.sourceReader,
+        sourceReader: widget.page.dependencies.sourceReader,
         isMounted: () => mounted,
         logEvent: _logReaderEvent,
         logPayload: _readerLogPayload,
-        comicId: widget.comicId,
-        epId: widget.epId,
+        comicId: widget.page.comicId,
+        epId: widget.page.epId,
       );
 
   WindowTitleBarControl? _windowsTitleBarController;
@@ -273,9 +382,9 @@ class _ReaderPageState extends State<ReaderPage>
 
   ReaderImageViews get _imageViews => ReaderImageViews(
     context: context,
-    comicId: widget.comicId,
-    epId: widget.epId,
-    comicTheme: widget.comicTheme,
+    comicId: widget.page.comicId,
+    epId: widget.page.epId,
+    comicTheme: widget.page.comicTheme,
     runtimeState: _runtimeState,
     imagePipelineState: _imagePipelineState,
     zoomController: _zoomController,
@@ -357,7 +466,7 @@ class _ReaderPageState extends State<ReaderPage>
     _sessionController.initialize();
     _sourceImageQuality = ReaderSourceImageQualitySettings.load(
       _sourceSettings,
-      widget.sourceKey,
+      widget.page.sourceKey,
     );
     if (Platform.isWindows) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -430,6 +539,7 @@ class _ReaderPageState extends State<ReaderPage>
         key: _scaffoldKey,
         backgroundColor: readerTheme.colorScheme.surface,
         endDrawerEnableOpenDragGesture: false,
+        onEndDrawerChanged: widget.onSettingsDrawerChanged,
         endDrawer: _buildReaderSettingsDrawer(readerTheme),
         body: Focus(
           autofocus: true,
@@ -441,8 +551,8 @@ class _ReaderPageState extends State<ReaderPage>
             child: ReaderOverlayHost(
               runtimeState: _runtimeState,
               readerTheme: readerTheme,
-              title: widget.title,
-              chapterIndex: widget.chapterIndex,
+              title: widget.page.title,
+              chapterIndex: widget.page.chapterIndex,
               chapterPanelLoading: _actionsController.chapterPanelLoading,
               updateState: _updateReaderState,
               goToPage: (target) => _navigationController.goToPage(
@@ -456,7 +566,8 @@ class _ReaderPageState extends State<ReaderPage>
                 unawaited(_actionsController.jumpToAdjacentChapter(-1));
               },
               onFavorite:
-                  !widget.offlineMode && widget.onFavoriteRequested != null
+                  !widget.page.offlineMode &&
+                      widget.page.onFavoriteRequested != null
                   ? () {
                       unawaited(_openFavoriteDialogAndRestoreFocus());
                     }
@@ -534,25 +645,6 @@ class _ReaderPageState extends State<ReaderPage>
     return result;
   }
 
-  Widget _buildReaderPageFromContext(ReaderPageContext pageContext) {
-    return ReaderPage(
-      title: pageContext.title,
-      chapterTitle: pageContext.chapterTitle,
-      comicId: pageContext.comicId,
-      epId: pageContext.epId,
-      chapterIndex: pageContext.chapterIndex,
-      images: pageContext.images,
-      dependencies: widget.dependencies,
-      sourceKey: pageContext.sourceKey,
-      coverUrl: pageContext.coverUrl,
-      comicTheme: pageContext.comicTheme,
-      onFavoriteRequested: pageContext.onFavoriteRequested,
-      commentsWidgetBuilder: pageContext.commentsWidgetBuilder,
-      offlineMode: pageContext.offlineMode,
-      offlineChapters: pageContext.offlineChapters,
-    );
-  }
-
   Widget _buildReaderSettingsDrawer(ThemeData readerTheme) {
     return buildReaderSettingsDrawer(
       context: context,
@@ -595,7 +687,7 @@ class _ReaderPageState extends State<ReaderPage>
         });
         await ReaderSourceImageQualitySettings.updateImageQuality(
           _sourceSettings,
-          widget.sourceKey,
+          widget.page.sourceKey,
           normalized,
         );
       },
@@ -640,7 +732,7 @@ class _ReaderPageState extends State<ReaderPage>
 
   void _handleBackPressed() {
     _logReaderEvent('Reader back pressed', source: 'reader_navigation');
-    Navigator.of(context).maybePop();
+    widget.onExitReader();
   }
 
   Future<void> _showSaveImageDialog(String imageUrl) {

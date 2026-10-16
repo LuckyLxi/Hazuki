@@ -64,7 +64,7 @@ void main() {
             interactionState,
           }) => const SizedBox.shrink(),
     ),
-    buildReplacementPage: (_) => const SizedBox.shrink(),
+    onChapterChanged: (_, {bool animate = true}) {},
     downloader: _Downloader(),
   );
 
