@@ -107,11 +107,35 @@ class _DiscoverSectionCapsuleGroup extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final selectedIndex = math.max(
       0,
       options.indexWhere((option) => option.value == selectedValue),
     );
+    final labelPainter = TextPainter(
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+      locale: Localizations.maybeLocaleOf(context),
+      maxLines: 1,
+    );
+    var minimumItemWidth = _minimumItemWidth;
+    for (final option in options) {
+      for (final weight in const [FontWeight.w500, FontWeight.w700]) {
+        labelPainter.text = TextSpan(
+          text: option.label,
+          style: (theme.textTheme.labelLarge ?? const TextStyle()).copyWith(
+            fontWeight: weight,
+          ),
+        );
+        labelPainter.layout();
+        minimumItemWidth = math.max(
+          minimumItemWidth,
+          labelPainter.width.ceilToDouble() + 24,
+        );
+      }
+    }
+    labelPainter.dispose();
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(999),
@@ -128,7 +152,7 @@ class _DiscoverSectionCapsuleGroup extends StatelessWidget {
               builder: (context, constraints) {
                 final viewportWidth = constraints.maxWidth - _inset * 2;
                 final itemWidth = math.max(
-                  _minimumItemWidth,
+                  minimumItemWidth,
                   viewportWidth / options.length,
                 );
                 final contentWidth = math.max(
@@ -243,6 +267,7 @@ class DiscoverSectionContent extends StatelessWidget {
     required this.comicDetailPageBuilder,
     required this.comicCoverHeroTagBuilder,
     this.topPadding = 16,
+    this.scrollHeader,
   });
 
   static const int _gridCrossAxisCount = 3;
@@ -255,80 +280,106 @@ class DiscoverSectionContent extends StatelessWidget {
   final ComicDetailPageBuilder comicDetailPageBuilder;
   final ComicHeroTagBuilder comicCoverHeroTagBuilder;
   final double topPadding;
+  final Widget? scrollHeader;
 
   @override
   Widget build(BuildContext context) {
     final strings = AppLocalizations.of(context)!;
     final colorScheme = Theme.of(context).colorScheme;
 
-    return controller.comics.isEmpty
-        ? (controller.loadingMore || controller.sortLoading)
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const HazukiSandyLoadingIndicator(size: 168),
-                      const SizedBox(height: 10),
-                      Text(strings.commonLoading),
-                    ],
-                  ),
-                )
-              : Center(child: Text(strings.discoverSectionEmpty))
-        : LayoutBuilder(
-            builder: (context, constraints) {
-              final useWindowsLayout =
-                  Theme.of(context).platform == TargetPlatform.windows;
-              final contentWidth = constraints.maxWidth - 32;
-              final coverWidth = useWindowsLayout
-                  ? _windowsMaxCoverExtent
-                  : (contentWidth - (_gridCrossAxisCount - 1) * _gridSpacing) /
-                        _gridCrossAxisCount;
-              final coverCacheWidth =
-                  (coverWidth * MediaQuery.devicePixelRatioOf(context)).round();
-              final SliverGridDelegate gridDelegate = useWindowsLayout
-                  ? const SliverGridDelegateWithMaxCrossAxisExtent(
-                      maxCrossAxisExtent: _windowsMaxCoverExtent,
-                      mainAxisSpacing: _gridSpacing,
-                      crossAxisSpacing: _gridSpacing,
-                      childAspectRatio: 0.57,
-                    )
-                  : const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: _gridCrossAxisCount,
-                      mainAxisSpacing: _gridSpacing,
-                      crossAxisSpacing: _gridSpacing,
-                      childAspectRatio: 0.57,
-                    );
+    final emptyContent = (controller.loadingMore || controller.sortLoading)
+        ? Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const HazukiSandyLoadingIndicator(size: 168),
+                const SizedBox(height: 10),
+                Text(strings.commonLoading),
+              ],
+            ),
+          )
+        : Center(child: Text(strings.discoverSectionEmpty));
+    if (controller.comics.isEmpty && scrollHeader == null) {
+      return emptyContent;
+    }
 
-              return GridView.builder(
-                controller: scrollController,
-                addAutomaticKeepAlives: false,
-                padding: EdgeInsets.fromLTRB(16, topPadding, 16, 12),
-                itemCount: controller.comics.length,
-                gridDelegate: gridDelegate,
-                itemBuilder: (context, index) {
-                  final comic = controller.comics[index];
-                  final heroTag = comicCoverHeroTagBuilder(
-                    comic,
-                    salt: 'discover-more-${section.title}-$index',
-                  );
-                  final entryKey = _comicEntryKey(comic, index);
-                  return ComicCoverTile(
-                    key: ValueKey<String>('tile-$entryKey'),
-                    comic: comic,
-                    heroTag: heroTag,
-                    coverCacheWidth: coverCacheWidth,
-                    placeholderColor: colorScheme.surfaceContainerHighest,
-                    onTap: () => openComicDetail(
-                      context,
-                      comic: comic,
-                      heroTag: heroTag,
-                      pageBuilder: comicDetailPageBuilder,
-                    ),
-                  );
-                },
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final useWindowsLayout =
+            Theme.of(context).platform == TargetPlatform.windows;
+        final contentWidth = constraints.maxWidth - 32;
+        final coverWidth = useWindowsLayout
+            ? _windowsMaxCoverExtent
+            : (contentWidth - (_gridCrossAxisCount - 1) * _gridSpacing) /
+                  _gridCrossAxisCount;
+        final coverCacheWidth =
+            (coverWidth * MediaQuery.devicePixelRatioOf(context)).round();
+        final SliverGridDelegate gridDelegate = useWindowsLayout
+            ? const SliverGridDelegateWithMaxCrossAxisExtent(
+                maxCrossAxisExtent: _windowsMaxCoverExtent,
+                mainAxisSpacing: _gridSpacing,
+                crossAxisSpacing: _gridSpacing,
+                childAspectRatio: 0.57,
+              )
+            : const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: _gridCrossAxisCount,
+                mainAxisSpacing: _gridSpacing,
+                crossAxisSpacing: _gridSpacing,
+                childAspectRatio: 0.57,
               );
-            },
+
+        final childrenDelegate = SliverChildBuilderDelegate(
+          (context, index) {
+            final comic = controller.comics[index];
+            final heroTag = comicCoverHeroTagBuilder(
+              comic,
+              salt: 'discover-more-${section.title}-$index',
+            );
+            final entryKey = _comicEntryKey(comic, index);
+            return ComicCoverTile(
+              key: ValueKey<String>('tile-$entryKey'),
+              comic: comic,
+              heroTag: heroTag,
+              coverCacheWidth: coverCacheWidth,
+              placeholderColor: colorScheme.surfaceContainerHighest,
+              onTap: () => openComicDetail(
+                context,
+                comic: comic,
+                heroTag: heroTag,
+                pageBuilder: comicDetailPageBuilder,
+              ),
+            );
+          },
+          childCount: controller.comics.length,
+          addAutomaticKeepAlives: false,
+        );
+        if (scrollHeader != null) {
+          return CustomScrollView(
+            controller: scrollController,
+            slivers: [
+              SliverToBoxAdapter(child: scrollHeader),
+              if (controller.comics.isEmpty)
+                SliverFillRemaining(hasScrollBody: false, child: emptyContent)
+              else
+                SliverPadding(
+                  padding: EdgeInsets.fromLTRB(16, topPadding, 16, 12),
+                  sliver: SliverGrid(
+                    gridDelegate: gridDelegate,
+                    delegate: childrenDelegate,
+                  ),
+                ),
+            ],
           );
+        }
+
+        return GridView.custom(
+          controller: scrollController,
+          padding: EdgeInsets.fromLTRB(16, topPadding, 16, 12),
+          gridDelegate: gridDelegate,
+          childrenDelegate: childrenDelegate,
+        );
+      },
+    );
   }
 }
 

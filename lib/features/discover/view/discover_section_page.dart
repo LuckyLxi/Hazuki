@@ -21,12 +21,14 @@ class DiscoverSectionPage extends StatefulWidget {
     required this.comicDetailPageBuilder,
     required this.sourceService,
     this.comicCoverHeroTagBuilder = comicCoverHeroTag,
+    this.scrollSortBarWithContent = false,
   });
 
   final ExploreSection section;
   final ComicDetailPageBuilder comicDetailPageBuilder;
   final SourceDiscoverGateway sourceService;
   final ComicHeroTagBuilder comicCoverHeroTagBuilder;
+  final bool scrollSortBarWithContent;
 
   @override
   State<DiscoverSectionPage> createState() => _DiscoverSectionPageState();
@@ -172,14 +174,21 @@ class _DiscoverSectionPageState extends State<DiscoverSectionPage> {
               section: widget.section,
               comicDetailPageBuilder: widget.comicDetailPageBuilder,
               comicCoverHeroTagBuilder: widget.comicCoverHeroTagBuilder,
-              topPadding: usesWeeklyDateSelector || !hasSortBar
+              scrollHeader: widget.scrollSortBarWithContent && hasSortBar
+                  ? sortBar
+                  : null,
+              topPadding: widget.scrollSortBarWithContent
+                  ? (hasSortBar ? 8 : 16)
+                  : usesWeeklyDateSelector || !hasSortBar
                   ? 16
                   : 26 + normalGroupCount * 48,
             );
 
             return Stack(
               children: [
-                if (usesWeeklyDateSelector)
+                if (widget.scrollSortBarWithContent)
+                  content
+                else if (usesWeeklyDateSelector)
                   Column(
                     children: [
                       if (hasSortBar) sortBar,

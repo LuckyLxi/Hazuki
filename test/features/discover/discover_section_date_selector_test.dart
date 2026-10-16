@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/discover/view/discover_section_page_widgets.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
@@ -187,6 +188,47 @@ void main() {
     expect(selectedValue, dates.last.value);
     expect(movingX, greaterThan(initialX));
     expect(movingX, lessThan(settledX));
+  });
+
+  testWidgets('long sort labels stay complete at different text scales', (
+    tester,
+  ) async {
+    const options = [
+      CategoryRankingOption(value: 'all', label: '全部'),
+      CategoryRankingOption(value: 'long', label: '这是一个比较长的筛选选项'),
+      CategoryRankingOption(value: 'latest', label: 'Latest updated comics'),
+    ];
+    for (final scale in [1.0, 1.6]) {
+      String? selected;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MediaQuery(
+            data: MediaQueryData(textScaler: TextScaler.linear(scale)),
+            child: Scaffold(
+              body: SizedBox(
+                width: 320,
+                child: DiscoverSectionSortBar(
+                  sortOptions: options,
+                  selectedSortValue: options.first.value,
+                  onSelectSortOption: (value) => selected = value,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
+      for (final option in options) {
+        final paragraph = tester.renderObject<RenderParagraph>(
+          find.text(option.label),
+        );
+        expect(paragraph.didExceedMaxLines, isFalse);
+      }
+      await tester.ensureVisible(find.text(options.last.label));
+      await tester.tap(find.text(options.last.label));
+      expect(selected, options.last.value);
+      expect(tester.takeException(), isNull);
+    }
   });
 
   testWidgets('weekly page morphs the time group and keeps type chips', (
