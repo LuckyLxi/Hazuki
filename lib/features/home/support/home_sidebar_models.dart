@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/l10n/l10n.dart';
+import 'package:hazuki/shared/favorites/favorite_folders_button_morph.dart';
 
 enum HomeDrawerDestination {
   history,
@@ -39,6 +40,8 @@ class HomeSidebarActions {
     this.onProfileTap,
     this.onCheckInPressed,
     this.onSwitchSourcePressed,
+    this.onSwitchSourceWithMorph,
+    this.sourceSwitchDialogOpen = false,
     this.onSelectDiscover,
     this.onSelectFavorite,
     this.onOpenHistory,
@@ -53,6 +56,9 @@ class HomeSidebarActions {
   final VoidCallback? onProfileTap;
   final VoidCallback? onCheckInPressed;
   final VoidCallback? onSwitchSourcePressed;
+  final Future<void> Function(FavoriteFoldersMorphOrigin)?
+  onSwitchSourceWithMorph;
+  final bool sourceSwitchDialogOpen;
   final VoidCallback? onSelectDiscover;
   final VoidCallback? onSelectFavorite;
   final VoidCallback? onOpenHistory;

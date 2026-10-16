@@ -84,9 +84,14 @@ class HomeDrawerProfileHeader extends StatelessWidget {
                       const SizedBox(width: 3),
                       Transform.translate(
                         offset: const Offset(0, 2),
-                        child: HomeSourceSwitchPillButton(
-                          onPressed: actions.onSwitchSourcePressed,
-                        ),
+                        child: actions.onSwitchSourceWithMorph != null
+                            ? HomeSourceSwitchMorphButton(
+                                onPressed: actions.onSwitchSourceWithMorph!,
+                                dialogOpen: actions.sourceSwitchDialogOpen,
+                              )
+                            : HomeSourceSwitchPillButton(
+                                onPressed: actions.onSwitchSourcePressed,
+                              ),
                       ),
                     ],
                   ),

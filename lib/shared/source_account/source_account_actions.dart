@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
+import 'package:hazuki/shared/favorites/favorite_folders_button_morph.dart';
 import 'package:hazuki/widgets/widgets.dart';
 
 import 'source_account_dialogs.dart';
@@ -16,6 +17,8 @@ Future<void> showHomeSourceSwitchDialog(
   BuildContext context, {
   required SourceSwitchGateway sourceService,
   Future<void> Function()? onSourceSwitched,
+  FavoriteFoldersMorphOrigin? morphOrigin,
+  VoidCallback? onDialogClosed,
 }) async {
   final registry = sourceService;
   final strings = l10n(context);
@@ -29,88 +32,89 @@ Future<void> showHomeSourceSwitchDialog(
   _HomeSourceSwitchBusyPhase busyPhase = _HomeSourceSwitchBusyPhase.switching;
   String? errorText;
 
-  await showHomeAnimatedDialog<void>(
-    context,
-    barrierDismissible: true,
-    child: StatefulBuilder(
-      builder: (dialogContext, setDialogState) {
-        Future<void> switchTo(SourceCatalogEntry source) async {
-          if (switching || source.normalizedKey == registry.activeSourceKey) {
+  final dialog = StatefulBuilder(
+    builder: (dialogContext, setDialogState) {
+      final morph = FavoriteFoldersMorphScope.maybeOf(dialogContext);
+      Future<void> switchTo(SourceCatalogEntry source) async {
+        if (switching || source.normalizedKey == registry.activeSourceKey) {
+          return;
+        }
+        final previousSourceKey = registry.activeSourceKey;
+        setDialogState(() {
+          switching = true;
+          switchingSource = source;
+          busyPhase = _HomeSourceSwitchBusyPhase.switching;
+          errorText = null;
+        });
+
+        try {
+          final wasDownloaded = await sourceService.hasLocalSourceFile(
+            source.normalizedKey,
+          );
+          if (!dialogContext.mounted) {
             return;
           }
-          final previousSourceKey = registry.activeSourceKey;
           setDialogState(() {
-            switching = true;
-            switchingSource = source;
-            busyPhase = _HomeSourceSwitchBusyPhase.switching;
-            errorText = null;
+            busyPhase = wasDownloaded
+                ? _HomeSourceSwitchBusyPhase.switching
+                : _HomeSourceSwitchBusyPhase.downloading;
           });
 
-          try {
-            final wasDownloaded = await sourceService.hasLocalSourceFile(
-              source.normalizedKey,
-            );
+          if (!wasDownloaded) {
+            await sourceService.downloadSourceFile(source.normalizedKey);
             if (!dialogContext.mounted) {
               return;
             }
             setDialogState(() {
-              busyPhase = wasDownloaded
-                  ? _HomeSourceSwitchBusyPhase.switching
-                  : _HomeSourceSwitchBusyPhase.downloading;
-            });
-
-            if (!wasDownloaded) {
-              await sourceService.downloadSourceFile(source.normalizedKey);
-              if (!dialogContext.mounted) {
-                return;
-              }
-              setDialogState(() {
-                busyPhase = _HomeSourceSwitchBusyPhase.switching;
-              });
-            } else {
-              await registry.activateSource(source.normalizedKey);
-            }
-            await sourceService.ensureInitialized(
-              sourceKey: source.normalizedKey,
-            );
-            await onSourceSwitched?.call();
-            if (!dialogContext.mounted) {
-              return;
-            }
-            Navigator.of(dialogContext).pop();
-            if (!context.mounted) {
-              return;
-            }
-            await showHazukiPrompt(
-              context,
-              strings.labSourceAccountSwitchSuccess,
-            );
-          } catch (error) {
-            try {
-              await sourceService.ensureInitialized(
-                sourceKey: previousSourceKey,
-              );
-            } catch (_) {}
-            if (!dialogContext.mounted) {
-              return;
-            }
-            setDialogState(() {
-              switching = false;
-              switchingSource = null;
               busyPhase = _HomeSourceSwitchBusyPhase.switching;
-              errorText = strings.labSourceAccountSwitchFailed('$error');
             });
+          } else {
+            await registry.activateSource(source.normalizedKey);
           }
+          await sourceService.ensureInitialized(
+            sourceKey: source.normalizedKey,
+          );
+          await onSourceSwitched?.call();
+          if (!dialogContext.mounted) {
+            return;
+          }
+          Navigator.of(dialogContext).pop();
+          if (!context.mounted) {
+            return;
+          }
+          await showHazukiPrompt(
+            context,
+            strings.labSourceAccountSwitchSuccess,
+          );
+        } catch (error) {
+          try {
+            await sourceService.ensureInitialized(sourceKey: previousSourceKey);
+          } catch (_) {}
+          if (!dialogContext.mounted) {
+            return;
+          }
+          setDialogState(() {
+            switching = false;
+            switchingSource = null;
+            busyPhase = _HomeSourceSwitchBusyPhase.switching;
+            errorText = strings.labSourceAccountSwitchFailed('$error');
+          });
         }
+      }
 
-        return PopScope(
-          canPop: !switching,
-          child: Dialog(
-            backgroundColor: homeDialogBackgroundColor(dialogContext),
-            clipBehavior: Clip.antiAlias,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(switching ? 18 : 28),
-            ),
+      return PopScope(
+        canPop: !switching,
+        child: Dialog(
+          backgroundColor: morph == null
+              ? homeDialogBackgroundColor(dialogContext)
+              : Colors.transparent,
+          elevation: morph == null ? null : 0,
+          clipBehavior: morph == null ? Clip.antiAlias : Clip.none,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(switching ? 18 : 28),
+          ),
+          child: _HomeSourceSwitchMorphSurface(
+            borderRadius: switching ? 18 : 28,
             child: AnimatedSize(
               duration: const Duration(milliseconds: 320),
               curve: Curves.easeOutCubic,
@@ -145,10 +149,89 @@ Future<void> showHomeSourceSwitchDialog(
               ),
             ),
           ),
-        );
-      },
-    ),
+        ),
+      );
+    },
   );
+  if (morphOrigin == null) {
+    await showHomeAnimatedDialog<void>(context, child: dialog);
+    return;
+  }
+
+  final route = RawDialogRoute<void>(
+    barrierDismissible: true,
+    barrierLabel: strings.dialogBarrierLabel,
+    barrierColor: Colors.black.withValues(alpha: 0.46),
+    transitionDuration: MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 560),
+    pageBuilder: (context, animation, secondaryAnimation) =>
+        FavoriteFoldersMorphScope(
+          origin: morphOrigin,
+          animation: animation,
+          child: SafeArea(
+            child: Center(
+              child: Material(type: MaterialType.transparency, child: dialog),
+            ),
+          ),
+        ),
+    transitionBuilder: (context, animation, secondaryAnimation, child) => child,
+  );
+  var buttonRestored = false;
+  void restoreButton() {
+    if (buttonRestored) return;
+    buttonRestored = true;
+    onDialogClosed?.call();
+  }
+
+  final popped = Navigator.of(context, rootNavigator: true).push(route);
+  final animation = route.animation!;
+  void handleStatus(AnimationStatus status) {
+    if (status == AnimationStatus.dismissed) restoreButton();
+  }
+
+  animation.addStatusListener(handleStatus);
+  try {
+    await popped;
+  } finally {
+    // Restore on the final animation frame; waiting for overlay disposal would
+    // leave the button invisible for one frame after the morph disappears.
+    await route.completed;
+    animation.removeStatusListener(handleStatus);
+    restoreButton();
+  }
+}
+
+class _HomeSourceSwitchMorphSurface extends StatelessWidget {
+  const _HomeSourceSwitchMorphSurface({
+    required this.borderRadius,
+    required this.child,
+  });
+
+  final double borderRadius;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final morph = FavoriteFoldersMorphScope.maybeOf(context);
+    if (morph == null) return child;
+    return AnimatedBuilder(
+      animation: morph.animation,
+      child: child,
+      builder: (context, child) => IgnorePointer(
+        ignoring: morph.animation.value < 1,
+        child: FavoriteFoldersButtonMorph(
+          origin: morph.origin,
+          animation: morph.animation,
+          surfaceColor: homeDialogBackgroundColor(context),
+          outlineColor: Colors.transparent,
+          borderRadius: borderRadius,
+          shadowBlurRadius: 22,
+          child: child!,
+        ),
+      ),
+    );
+  }
 }
 
 Future<void> saveHomeAvatarToDownloads(

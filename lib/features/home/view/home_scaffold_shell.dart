@@ -11,6 +11,8 @@ import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
 import 'package:hazuki/features/home/support/home_feature_contracts.dart';
 import 'package:hazuki/shared/favorites/favorite_app_bar_actions_state.dart';
+import 'package:hazuki/shared/favorites/favorite_folders_button_morph.dart';
+import 'package:hazuki/shared/source_account/source_account_actions.dart';
 import 'package:hazuki/shared/search_box_outline.dart';
 import 'package:hazuki/shared/discover_back_to_top_notification.dart';
 import 'package:hazuki/shared/liquid_glass_support.dart';
@@ -208,6 +210,33 @@ class HomeScaffoldShell extends StatefulWidget {
 
 class _HomeScaffoldShellState extends State<HomeScaffoldShell>
     with SingleTickerProviderStateMixin {
+  bool _sourceSwitchDialogOpen = false;
+
+  Future<void> _showSourceSwitchWithMorph(
+    FavoriteFoldersMorphOrigin origin,
+  ) async {
+    if (_sourceSwitchDialogOpen) return;
+    setState(() => _sourceSwitchDialogOpen = true);
+    var buttonRestored = false;
+    void restoreButton() {
+      if (buttonRestored) return;
+      buttonRestored = true;
+      if (mounted) setState(() => _sourceSwitchDialogOpen = false);
+    }
+
+    try {
+      await showHomeSourceSwitchDialog(
+        context,
+        sourceService: widget.sourceSwitchService!,
+        onSourceSwitched: widget.onSourceSwitched,
+        morphOrigin: origin,
+        onDialogClosed: restoreButton,
+      );
+    } finally {
+      restoreButton();
+    }
+  }
+
   bool _showDiscoverBackToTop = false;
   VoidCallback? _onDiscoverBackToTopPressed;
   static const _profileDrawerDuration = Duration(milliseconds: 210);
@@ -310,6 +339,13 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
       onProfileTap: supportsSourceAccount ? onProfileTap : null,
       onCheckInPressed: onCheckInPressed,
       onSwitchSourcePressed: onSwitchSourcePressed,
+      onSwitchSourceWithMorph:
+          (Platform.isAndroid || Platform.isIOS) &&
+              widget.sourceSwitchService != null &&
+              onSwitchSourcePressed != null
+          ? _showSourceSwitchWithMorph
+          : null,
+      sourceSwitchDialogOpen: _sourceSwitchDialogOpen,
       onSelectDiscover: () => onDestinationSelected(0),
       onSelectFavorite: () => onDestinationSelected(1),
       onOpenHistory: onOpenHistory,

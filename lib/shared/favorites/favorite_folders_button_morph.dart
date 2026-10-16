@@ -9,6 +9,8 @@ class FavoriteFoldersMorphOrigin {
     required this.foregroundColor,
     required this.icon,
     this.borderRadius = 15,
+    this.iconSize = 22,
+    this.borderColor,
   });
 
   final Rect rect;
@@ -16,6 +18,8 @@ class FavoriteFoldersMorphOrigin {
   final Color foregroundColor;
   final IconData icon;
   final double borderRadius;
+  final double iconSize;
+  final Color? borderColor;
 }
 
 class FavoriteFoldersMorphScope extends InheritedWidget {
@@ -274,9 +278,12 @@ class _RenderFavoriteFoldersButtonMorph extends RenderProxyBox {
     foregroundCanvas.drawRRect(
       paintedShape.deflate(0.5),
       Paint()
-        ..color = _configuration.outlineColor.withValues(
-          alpha: _configuration.outlineColor.a * progress,
-        )
+        ..color = Color.lerp(
+          origin.borderColor ??
+              _configuration.outlineColor.withValues(alpha: 0),
+          _configuration.outlineColor,
+          progress,
+        )!
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1,
     );
@@ -288,7 +295,7 @@ class _RenderFavoriteFoldersButtonMorph extends RenderProxyBox {
           text: String.fromCharCode(origin.icon.codePoint),
           style: TextStyle(
             fontFamily: origin.icon.fontFamily,
-            fontSize: 22 * _shapeScale,
+            fontSize: origin.iconSize * _shapeScale,
             color: origin.foregroundColor.withValues(alpha: iconOpacity),
           ),
         ),
