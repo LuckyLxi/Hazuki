@@ -1,6 +1,7 @@
 import '../account/source_relogin_coordinator.dart';
 import 'source_catalog_resolver.dart';
 import 'source_js_bridge_cookie_capability.dart';
+import 'source_local_runtime_operations.dart';
 import 'source_runtime_diagnostics_operations.dart';
 import 'source_runtime_host.dart';
 import 'source_runtime_initialization_operations.dart';
@@ -75,6 +76,13 @@ class SourceRuntimeCapability {
         runtimeLoader: _runtimeLoader,
         jsBridgeCookieCapability: _jsBridgeCookieCapability,
         runtimeStateController: _runtimeStateController,
+      );
+  late final SourceLocalRuntimeOperations localRuntime =
+      SourceLocalRuntimeOperations(
+        runtimeHost: _runtimeHost,
+        scriptStore: _scriptStorage,
+        runtimeLoader: _runtimeLoader,
+        jsBridge: _jsBridgeCookieCapability,
       );
   late final SourceRuntimeDiagnosticsOperations diagnostics =
       SourceRuntimeDiagnosticsOperations(runtimeHost: _runtimeHost);

@@ -111,7 +111,19 @@ class SourceRuntimeLoader implements SourceRuntimeLoadClient {
   Future<SourceMeta> loadMetadata(
     SourceRuntimeHandle handle,
     File sourceFile,
-  ) async {
+  ) => _loadMetadata(handle, sourceFile, runSourceInit: true);
+
+  /// Loads local declarations and callbacks without invoking network startup.
+  Future<SourceMeta> loadLocalMetadata(
+    SourceRuntimeHandle handle,
+    File sourceFile,
+  ) => _loadMetadata(handle, sourceFile, runSourceInit: false);
+
+  Future<SourceMeta> _loadMetadata(
+    SourceRuntimeHandle handle,
+    File sourceFile, {
+    required bool runSourceInit,
+  }) async {
     final facade = handle.facade;
     if (handle.isDisposed) throw Exception('source_runtime_disposed');
 
@@ -180,22 +192,26 @@ class SourceRuntimeLoader implements SourceRuntimeLoadClient {
               as Map,
         ),
       );
-      _runtimeStateController.setBusy(
-        facade,
-        facade.runtimeState.phase,
-        SourceRuntimeStep.runningSourceInit,
-        debugDetail: 'running_source_init',
-      );
+      if (runSourceInit) {
+        _runtimeStateController.setBusy(
+          facade,
+          facade.runtimeState.phase,
+          SourceRuntimeStep.runningSourceInit,
+          debugDetail: 'running_source_init',
+        );
+      }
       facade.runtime.sourceMeta = meta;
       facade.runtime.engine = engine;
       handle.htmlBridge = htmlBridge;
       try {
-        final initResult = engine.evaluate(
-          'this.__hazuki_source.init?.()',
-          name: 'source_init.js',
-        );
-        if (initResult is Future) {
-          await initResult.timeout(const Duration(seconds: 90));
+        if (runSourceInit) {
+          final initResult = engine.evaluate(
+            'this.__hazuki_source.init?.()',
+            name: 'source_init.js',
+          );
+          if (initResult is Future) {
+            await initResult.timeout(const Duration(seconds: 90));
+          }
         }
         if (handle.isDisposed) throw Exception('source_runtime_disposed');
       } catch (_) {

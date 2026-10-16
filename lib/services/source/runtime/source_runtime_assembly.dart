@@ -186,12 +186,12 @@ class SourceRuntimeAssembly {
   late final SourcePluginManager plugins;
   late final SourcePluginGateway pluginGateway = HazukiSourcePluginAdapter(
     plugins,
-    metadataLoader: (id) async {
-      await ensureSourceInitialized(id);
-      return sourceMetadata(id);
-    },
+    metadataLoader: (id) => _runtimeCapability.localRuntime.run(
+      id,
+      (handle) async => handle.runtime.sourceMeta,
+    ),
     settingLoader: _settingsOperations.loadSourceSetting,
-    settingWriter: _settingsOperations.updateSourceSetting,
+    settingWriter: _settingsOperations.updatePluginSetting,
     actionRunner: runPluginAction,
   );
   late final AppLogStore _logStore;
@@ -216,7 +216,10 @@ class SourceRuntimeAssembly {
   late final SourceImageOperations _imageOperations =
       SourceImageOperationService(_imageCacheForSourceRequest);
   late final SourceSettingsOperations _settingsOperations =
-      SourceSettingsOperations(_runtimeHost);
+      SourceSettingsOperations(
+        _runtimeHost,
+        localRuntime: _runtimeCapability.localRuntime,
+      );
   late final SourceAccountOperations _accountOperations =
       SourceAccountOperationService(
         accountSession: _accountCapability,
