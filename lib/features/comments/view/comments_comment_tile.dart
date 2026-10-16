@@ -154,9 +154,7 @@ class _CommentsCommentTileContent extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
       decoration: BoxDecoration(
-        color: theme.brightness == Brightness.dark
-            ? colorScheme.surfaceContainer
-            : colorScheme.surfaceContainerLowest,
+        color: colorScheme.surfaceContainer,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
           color: colorScheme.outlineVariant.withValues(alpha: 0.35),
