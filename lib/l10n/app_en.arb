@@ -1497,6 +1497,13 @@
   "pluginsLocalPackage": "Local package",
   "pluginsCheckUpdate": "Check for updates",
   "pluginsUninstall": "Uninstall (keep data)",
+  "pluginsUninstallTitle": "Uninstall plugin",
+  "pluginsUninstallConfirm": "Uninstall “{name}”? Accounts, favorites, reading progress, and downloads will be kept.",
+  "@pluginsUninstallConfirm": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
   "pluginsRepositories": "Repositories",
   "pluginsRefresh": "Refresh list",
   "pluginsRemoveRepository": "Remove repository",

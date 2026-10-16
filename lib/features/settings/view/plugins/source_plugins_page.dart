@@ -116,6 +116,54 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
     );
   }
 
+  Future<void> _confirmUninstall(InstalledSourcePlugin plugin) async {
+    final s = l10n(context);
+    final confirmed = await showGeneralDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: MaterialLocalizations.of(context).modalBarrierDismissLabel,
+      barrierColor: Colors.black54,
+      transitionDuration: const Duration(milliseconds: 240),
+      pageBuilder: (dialogContext, animation, secondaryAnimation) {
+        final colors = Theme.of(dialogContext).colorScheme;
+        return AlertDialog(
+          title: Text(s.pluginsUninstallTitle),
+          content: Text(s.pluginsUninstallConfirm(plugin.manifest.name)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: Text(s.commonCancel),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: colors.error,
+                foregroundColor: colors.onError,
+              ),
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: Text(s.commonConfirm),
+            ),
+          ],
+        );
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        return FadeTransition(
+          opacity: animation,
+          child: ScaleTransition(
+            scale: animation.drive(
+              Tween<double>(
+                begin: 0.9,
+                end: 1.0,
+              ).chain(CurveTween(curve: Curves.easeOutCubic)),
+            ),
+            child: child,
+          ),
+        );
+      },
+    );
+    if (confirmed != true || !mounted) return;
+    await _run(() => _manager.uninstall(plugin.manifest.id));
+  }
+
   Future<void> _installFromRepository(
     String repository,
     SourcePluginIndexEntry entry,
@@ -434,8 +482,7 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
                   ),
                   onPressed: _hasOperations
                       ? null
-                      : () =>
-                            _run(() => _manager.uninstall(plugin.manifest.id)),
+                      : () => _confirmUninstall(plugin),
                   icon: const Icon(Icons.delete_outline, size: 18),
                   label: Text(s.pluginsUninstall),
                 ),

@@ -1497,6 +1497,13 @@
   "pluginsLocalPackage": "本地插件",
   "pluginsCheckUpdate": "检查更新",
   "pluginsUninstall": "卸载（保留数据）",
+  "pluginsUninstallTitle": "卸载插件",
+  "pluginsUninstallConfirm": "确定要卸载“{name}”吗？卸载后将保留账号、收藏、阅读进度和下载数据。",
+  "@pluginsUninstallConfirm": {
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
   "pluginsRepositories": "插件仓库",
   "pluginsRefresh": "刷新列表",
   "pluginsRemoveRepository": "移除仓库",

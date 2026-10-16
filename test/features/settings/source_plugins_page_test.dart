@@ -281,6 +281,60 @@ void main() {
     expect(manager.catalog, isEmpty);
     expect(tester.widget<Switch>(find.byType(Switch)).value, isFalse);
 
+    Future<void> openUninstallDialog() async {
+      await tester.ensureVisible(find.text(s.pluginsUninstall));
+      await tester.pumpAndSettle();
+      // Keep the confirmation continuation in the real async zone for the
+      // manager's file IO after accepting the dialog.
+      await tester.runAsync(() => tester.tap(find.text(s.pluginsUninstall)));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 80));
+      final dialog = find.byType(AlertDialog);
+      final scale = tester.widget<ScaleTransition>(
+        find.ancestor(of: dialog, matching: find.byType(ScaleTransition)).first,
+      );
+      final fade = tester.widget<FadeTransition>(
+        find.ancestor(of: dialog, matching: find.byType(FadeTransition)).first,
+      );
+      expect(scale.scale.value, inExclusiveRange(0.9, 1.0));
+      expect(fade.opacity.value, inExclusiveRange(0.0, 1.0));
+      expect(manager.pluginFor('widget_example'), isNotNull);
+      await tester.pumpAndSettle();
+      expect(find.text(s.pluginsUninstallTitle), findsOneWidget);
+      expect(
+        find.text(s.pluginsUninstallConfirm('Widget example')),
+        findsOneWidget,
+      );
+    }
+
+    for (final dismissal in ['cancel', 'barrier', 'back']) {
+      await openUninstallDialog();
+      switch (dismissal) {
+        case 'cancel':
+          await tester.tap(find.text(s.commonCancel));
+        case 'barrier':
+          await tester.tapAt(const Offset(10, 10));
+        case 'back':
+          await tester.binding.handlePopRoute();
+      }
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 80));
+      final dialog = find.byType(AlertDialog);
+      expect(dialog, findsOneWidget);
+      final scale = tester.widget<ScaleTransition>(
+        find.ancestor(of: dialog, matching: find.byType(ScaleTransition)).first,
+      );
+      final fade = tester.widget<FadeTransition>(
+        find.ancestor(of: dialog, matching: find.byType(FadeTransition)).first,
+      );
+      expect(scale.scale.value, inExclusiveRange(0.9, 1.0));
+      expect(fade.opacity.value, inExclusiveRange(0.0, 1.0));
+      await tester.pumpAndSettle();
+      expect(dialog, findsNothing);
+      expect(manager.pluginFor('widget_example'), isNotNull);
+    }
+
+    await openUninstallDialog();
     await tester.runAsync(() async {
       final uninstalled = Completer<void>();
       void onUninstalled() {
@@ -291,7 +345,7 @@ void main() {
       }
 
       manager.addListener(onUninstalled);
-      await tester.tap(find.text(s.pluginsUninstall));
+      await tester.tap(find.text(s.commonConfirm));
       await uninstalled.future.timeout(const Duration(seconds: 5));
       manager.removeListener(onUninstalled);
     });
