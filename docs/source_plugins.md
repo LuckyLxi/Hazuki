@@ -75,6 +75,23 @@ Hazuki 的 `test/fixtures/source_plugins/` 仅保留宿主回归测试使用的�
 
 `account.checkIn` 返回 `{status: "success" | "alreadyCheckedIn" | "skipped", message?}`。账号能力和这些操作都作用于该插件，不能读取其他插件的凭据。
 
+## 云端收藏夹接口
+
+`favorites.loadFolders(comicId)` 返回 `{folders, favorited?}`。`folders` 是收藏夹 ID 到显示名称的映射，ID 由插件定义，无需包含 `'0'`。例如：
+
+```javascript
+{
+  folders: {shelf: '书架'},
+  favorited: ['shelf']
+}
+```
+
+宿主保留插件返回的收藏夹及其顺序，不因缺少 `'0'` 额外添加“全部”。上例只显示“书架”；返回多个收藏夹时只显示这些收藏夹。收藏页保存的选择已不存在时，改选第一个返回的收藏夹。
+
+`loadComics(page, folderId)`、`addOrDelFavorite(comicId, folderId, adding)` 和 `favorited` 使用同一套插件收藏夹 ID。查询漫画收藏状态时，`favorited` 返回该漫画所属的 ID，未收藏返回空数组；只查询收藏夹列表时，`comicId` 为 `null`，可省略 `favorited`。`singleFolderForSingleComic` 仅表示一部漫画能否同时放入多个收藏夹，不表示网站只有一个收藏夹。
+
+网站没有分组时，可以只实现 `loadComics` 和收藏操作，省略 `loadFolders`。未提供收藏夹接口或返回的列表为空时，宿主显示一个默认“全部”入口。为兼容既有插件，`'0'` 仍是可选的旧版“全部”ID；其显示、不可删除规则，以及 `loadComics` 的 `null` / `'0'` 聚合加载兼容行为保持不变。需要保留这个入口的分组插件应显式返回它；普通收藏夹无需使用这个 ID。
+
 ## 宿主 SDK
 
 - `Hazuki.http`：通用 GET、POST 等请求，返回状态、响应头、正文和可选错误；网站状态含义由插件判断。

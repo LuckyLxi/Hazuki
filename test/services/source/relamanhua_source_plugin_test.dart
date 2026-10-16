@@ -246,6 +246,9 @@ void main() {
         comicId: _comicId,
         sourceKey: _sourceId,
       );
+      expect(folders.errorMessage, isNull);
+      expect(folders.folders.single.id, 'shelf');
+      expect(folders.folders.single.name, '書架');
       expect(folders.favoritedFolderIds, contains('shelf'));
       final shelf = await favorites.loadFavoriteComics(
         page: 1,

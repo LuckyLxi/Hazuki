@@ -71,11 +71,10 @@ class SourceFavoritesResponseParser {
         }
       }
     }
-    if (!folders.any((folder) => folder.id == '0')) {
-      folders.insert(
-        0,
-        const FavoriteFolder(id: '0', name: '__favorite_all__'),
-      );
+    // Folder IDs belong to the plugin. Only supply a default when it returned
+    // no folders; an absent legacy all-folder ID does not imply a missing entry.
+    if (folders.isEmpty) {
+      folders.add(const FavoriteFolder(id: '0', name: '__favorite_all__'));
     }
 
     final favorited = <String>{};

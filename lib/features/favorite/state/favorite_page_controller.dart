@@ -373,17 +373,21 @@ class FavoritePageController extends ChangeNotifier {
   Future<void> selectFolder(
     String folderId, {
     required String timeoutMessage,
+    bool forceReload = false,
   }) async {
     if (_state.mode == FavoritePageMode.local && folderId.trim().isEmpty) {
       return;
     }
-    if (selectedFolderId == folderId ||
-        _state.initialLoading ||
-        _state.refreshing) {
+    if (!forceReload &&
+        (selectedFolderId == folderId ||
+            _state.initialLoading ||
+            _state.refreshing)) {
       return;
     }
 
     final requestVersion = _captureRequest(replace: true);
+    // A forced selection replaces any refresh still loading the deleted folder.
+    _state.refreshing = false;
     _state.setSelectedFolderId(folderId);
     await _saveSelectedFolderId(_state.mode, folderId);
     if (!_isCurrent(requestVersion)) return;

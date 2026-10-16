@@ -131,6 +131,235 @@ void main() {
     await cloudChanges.close();
   });
 
+  test(
+    'initial load replaces the saved all ID with the plugin shelf ID',
+    () async {
+      when(source.loadFavoriteFolders).thenAnswer(
+        (_) async => const FavoriteFoldersResult.success(
+          folders: [FavoriteFolder(id: 'shelf', name: '書架')],
+          favoritedFolderIds: {},
+        ),
+      );
+      when(
+        () => preferences.saveSelectedFavoriteFolderId(
+          FavoritePageMode.cloud,
+          'shelf',
+          sourceKey: 'jm',
+        ),
+      ).thenAnswer((_) async {});
+
+      await controller.loadInitial(timeoutMessage: 'timeout');
+
+      expect(controller.folders.single.id, 'shelf');
+      expect(controller.selectedFolderId, 'shelf');
+      expect(controller.comics.single.id, 'current');
+      verify(
+        () => preferences.saveSelectedFavoriteFolderId(
+          FavoritePageMode.cloud,
+          'shelf',
+          sourceKey: 'jm',
+        ),
+      ).called(1);
+      verify(
+        () => source.loadFavoriteComics(page: 1, folderId: 'shelf'),
+      ).called(1);
+      verifyNever(() => source.loadFavoriteComics(page: 1, folderId: '0'));
+    },
+  );
+
+  for (final remainingId in ['shelf', '0', null]) {
+    test(
+      'cloud deletion reloads the remaining folder ($remainingId)',
+      () async {
+        const deletedFolder = FavoriteFolder(id: 'deleted', name: 'Deleted');
+        final remainingFolders = [
+          if (remainingId != null)
+            FavoriteFolder(id: remainingId, name: 'Remaining'),
+        ];
+        when(
+          () => preferences.loadSelectedFavoriteFolderId(
+            FavoritePageMode.cloud,
+            sourceKey: 'jm',
+          ),
+        ).thenAnswer((_) async => 'deleted');
+        when(source.loadFavoriteFolders).thenAnswer(
+          (_) async => FavoriteFoldersResult.success(
+            folders: [deletedFolder, ...remainingFolders],
+            favoritedFolderIds: const {},
+          ),
+        );
+        when(
+          () => preferences.saveSelectedFavoriteFolderId(
+            FavoritePageMode.cloud,
+            any(),
+            sourceKey: 'jm',
+          ),
+        ).thenAnswer((_) async {});
+        when(
+          () => source.loadFavoriteComics(
+            page: any(named: 'page'),
+            folderId: any(named: 'folderId'),
+          ),
+        ).thenAnswer((call) async {
+          final id = call.namedArguments[#folderId] as String;
+          return FavoriteComicsResult.success([_comic(id)]);
+        });
+        when(
+          () => source.deleteFavoriteFolder('deleted'),
+        ).thenAnswer((_) async {});
+        await controller.loadInitial(timeoutMessage: 'timeout');
+        expect(controller.selectedFolderId, 'deleted');
+        expect(controller.comics.single.id, 'deleted');
+
+        final pendingFolders = Completer<FavoriteFoldersResult>();
+        when(
+          source.loadFavoriteFolders,
+        ).thenAnswer((_) => pendingFolders.future);
+
+        expect(
+          await controller.deleteCurrentFolder(timeoutMessage: 'timeout'),
+          isNull,
+        );
+        final targetId = remainingId ?? '0';
+        expect(controller.selectedFolderId, targetId);
+        expect(controller.comics.single.id, targetId);
+        verify(
+          () => source.loadFavoriteComics(page: 1, folderId: targetId),
+        ).called(1);
+        verify(
+          () => preferences.saveSelectedFavoriteFolderId(
+            FavoritePageMode.cloud,
+            targetId,
+            sourceKey: 'jm',
+          ),
+        ).called(1);
+
+        pendingFolders.complete(
+          FavoriteFoldersResult.success(
+            folders: remainingFolders,
+            favoritedFolderIds: const {},
+          ),
+        );
+        await _settle();
+        expect(controller.selectedFolderId, targetId);
+        expect(controller.folders.single.id, targetId);
+        expect(controller.comics.single.id, targetId);
+      },
+    );
+  }
+
+  for (final remainingId in ['0', 'shelf']) {
+    for (final refreshStage in ['completed', 'folders', 'comics']) {
+      test(
+        'cloud deletion survives a concurrent refresh ($remainingId, $refreshStage)',
+        () async {
+          const deletedFolder = FavoriteFolder(id: 'deleted', name: 'Deleted');
+          final remainingFolder = FavoriteFolder(
+            id: remainingId,
+            name: 'Remaining',
+          );
+          final originalFolders = FavoriteFoldersResult.success(
+            folders: [deletedFolder, remainingFolder],
+            favoritedFolderIds: const {},
+          );
+          when(
+            () => preferences.loadSelectedFavoriteFolderId(
+              FavoritePageMode.cloud,
+              sourceKey: 'jm',
+            ),
+          ).thenAnswer((_) async => 'deleted');
+          when(
+            () => preferences.saveSelectedFavoriteFolderId(
+              FavoritePageMode.cloud,
+              any(),
+              sourceKey: 'jm',
+            ),
+          ).thenAnswer((_) async {});
+          when(
+            source.loadFavoriteFolders,
+          ).thenAnswer((_) async => originalFolders);
+          when(
+            () => source.loadFavoriteComics(
+              page: any(named: 'page'),
+              folderId: any(named: 'folderId'),
+            ),
+          ).thenAnswer((call) async {
+            final id = call.namedArguments[#folderId] as String;
+            return FavoriteComicsResult.success([_comic(id)]);
+          });
+          await controller.loadInitial(timeoutMessage: 'timeout');
+
+          final pendingDelete = Completer<void>();
+          when(
+            () => source.deleteFavoriteFolder('deleted'),
+          ).thenAnswer((_) => pendingDelete.future);
+          final deletion = controller.deleteCurrentFolder(
+            timeoutMessage: 'timeout',
+          );
+
+          final pendingFolders = Completer<FavoriteFoldersResult>();
+          final pendingComics = Completer<FavoriteComicsResult>();
+          if (refreshStage == 'folders') {
+            when(
+              source.loadFavoriteFolders,
+            ).thenAnswer((_) => pendingFolders.future);
+          } else if (refreshStage == 'comics') {
+            when(
+              () => source.loadFavoriteComics(page: 1, folderId: 'deleted'),
+            ).thenAnswer((_) => pendingComics.future);
+          }
+          final refresh = controller.refresh(timeoutMessage: 'timeout');
+          if (refreshStage == 'completed') {
+            await refresh;
+          } else {
+            await _settle();
+            expect(controller.refreshing, isTrue);
+          }
+
+          when(source.loadFavoriteFolders).thenAnswer(
+            (_) async => FavoriteFoldersResult.success(
+              folders: [remainingFolder],
+              favoritedFolderIds: const {},
+            ),
+          );
+          pendingDelete.complete();
+          expect(await deletion, isNull);
+          await _settle();
+
+          void expectRemainingFolder() {
+            expect(controller.selectedFolderId, remainingId);
+            expect(controller.folders.single.id, remainingId);
+            expect(controller.comics.single.id, remainingId);
+            expect(controller.initialLoading, isFalse);
+            expect(controller.refreshing, isFalse);
+            expect(controller.loadingFolders, isFalse);
+          }
+
+          expectRemainingFolder();
+          if (refreshStage == 'folders') {
+            pendingFolders.complete(originalFolders);
+          } else if (refreshStage == 'comics') {
+            pendingComics.complete(
+              FavoriteComicsResult.success([_comic('stale deleted')]),
+            );
+          }
+          await refresh;
+          expectRemainingFolder();
+          verify(
+            () => source.loadFavoriteComics(page: 1, folderId: remainingId),
+          ).called(1);
+          verify(
+            () => preferences.saveSelectedFavoriteFolderId(
+              FavoritePageMode.cloud,
+              remainingId,
+              sourceKey: 'jm',
+            ),
+          ).called(1);
+        },
+      );
+    }
+  }
+
   test('local folder refresh survives a concurrent sort change', () async {
     await controller.loadInitial(timeoutMessage: 'timeout');
     await controller.toggleMode(timeoutMessage: 'timeout');

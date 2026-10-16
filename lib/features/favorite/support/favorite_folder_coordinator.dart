@@ -8,11 +8,13 @@ import 'favorite_cloud_flow.dart';
 import 'favorite_local_flow.dart';
 import 'favorite_selection_store.dart';
 
-typedef _FolderRequest = ({
+typedef _FolderContext = ({
   int generation,
   String sourceKey,
   FavoritePageMode mode,
 });
+
+typedef _FolderRequest = ({int generation, _FolderContext context});
 
 /// Owns directory requests separately from comic-list requests.
 class FavoriteFolderCoordinator {
@@ -27,6 +29,7 @@ class FavoriteFolderCoordinator {
     required Future<void> Function(
       String folderId, {
       required String timeoutMessage,
+      bool forceReload,
     })
     selectFolder,
   }) : _state = state,
@@ -45,23 +48,36 @@ class FavoriteFolderCoordinator {
   final String Function() _readSourceKey;
   final bool Function() _isDisposed;
   final VoidCallback _notify;
-  final Future<void> Function(String folderId, {required String timeoutMessage})
+  final Future<void> Function(
+    String folderId, {
+    required String timeoutMessage,
+    bool forceReload,
+  })
   _selectFolder;
   int _folderRequestVersion = 0;
+  int _contextVersion = 0;
 
-  _FolderRequest _captureFolderRequest() => (
-    generation: ++_folderRequestVersion,
+  _FolderContext _captureContext() => (
+    generation: _contextVersion,
     sourceKey: _readSourceKey(),
     mode: _state.mode,
   );
 
-  bool _isCurrentFolderRequest(_FolderRequest request) =>
+  bool _isCurrentContext(_FolderContext context) =>
       !_isDisposed() &&
+      context.generation == _contextVersion &&
+      context.sourceKey == _readSourceKey() &&
+      context.mode == _state.mode;
+
+  _FolderRequest _captureFolderRequest() =>
+      (generation: ++_folderRequestVersion, context: _captureContext());
+
+  bool _isCurrentFolderRequest(_FolderRequest request) =>
       request.generation == _folderRequestVersion &&
-      request.sourceKey == _readSourceKey() &&
-      request.mode == _state.mode;
+      _isCurrentContext(request.context);
 
   void invalidate() {
+    _contextVersion++;
     _folderRequestVersion++;
     _state.loadingFolders = false;
   }
@@ -182,23 +198,36 @@ class FavoriteFolderCoordinator {
         await saveSelectedFolderId(FavoritePageMode.local, '');
         await reloadLocalFolders();
       } else {
+        // Ordinary directory reads must not invalidate a successful mutation.
+        final context = _captureContext();
         await _cloudFlow.deleteFolder(currentId);
+        if (!_isCurrentContext(context)) return null;
+        // Reads started before deletion completed may still contain this folder.
+        _folderRequestVersion++;
+        _state.loadingFolders = false;
         final updatedFolders = _state.folders
             .where((folder) => folder.id != currentId)
             .toList();
         _state.folders = updatedFolders.isEmpty
             ? const [defaultCloudFavoriteFolder]
             : updatedFolders;
-        _state.selectedCloudFolderId = '0';
-        await saveSelectedFolderId(FavoritePageMode.cloud, '0');
-        _notify();
+        final targetId = _state.folders.any((folder) => folder.id == '0')
+            ? '0'
+            : _state.folders.first.id;
+        // Let selection persist the ID and load its comics before refreshing
+        // folders, which may otherwise preselect it and skip the comic load.
+        await _selectFolder(
+          targetId,
+          timeoutMessage: timeoutMessage,
+          forceReload: true,
+        );
+        if (!_isCurrentContext(context)) return null;
         unawaited(reloadFolders());
+        return null;
       }
 
       await _selectFolder(
-        _state.mode == FavoritePageMode.local
-            ? _state.selectedLocalFolderId
-            : '0',
+        _state.selectedLocalFolderId,
         timeoutMessage: timeoutMessage,
       );
       return null;

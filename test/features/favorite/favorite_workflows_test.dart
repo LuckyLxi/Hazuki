@@ -169,7 +169,7 @@ void main() {
           );
         }
       },
-      selectFolder: (id, {required timeoutMessage}) async {
+      selectFolder: (id, {required timeoutMessage, forceReload = false}) async {
         events.add('select:$id:$timeoutMessage');
         if (selectionError != null) throw selectionError!;
         if (selectionWait != null) await selectionWait;
@@ -450,15 +450,15 @@ void main() {
           await folders.deleteCurrentFolder(timeoutMessage: 'timeout'),
           isNull,
         );
-        expect(state.selectedCloudFolderId, '0');
+        // The injected selection callback records requests; the real controller
+        // owns persisting and updating the selected ID.
+        expect(state.selectedCloudFolderId, 'cloud-1');
         expect(state.loadingFolders, isTrue);
         expect(events, [
           'cloud.delete:cloud-1',
-          'save:cloud:0:jm',
-          'notify:false:0',
-          'notify:true:0',
-          'cloud.load',
           'select:0:timeout',
+          'notify:true:cloud-1',
+          'cloud.load',
         ]);
         pending.complete(_result([defaultCloudFavoriteFolder]));
         await Future<void>.delayed(Duration.zero);
@@ -479,6 +479,63 @@ void main() {
       expect(state.selectedCloudFolderId, 'cloud-1');
       expect(events, isEmpty);
     });
+
+    test(
+      'failed cloud deletion leaves a pending folder refresh valid',
+      () async {
+        state.selectedCloudFolderId = 'cloud-1';
+        state.folders = cloudFolders;
+        final pending = Completer<FavoriteFoldersResult>();
+        when(source.loadFavoriteFolders).thenAnswer((_) => pending.future);
+        final reload = folders.reloadFolders();
+        when(
+          () => source.deleteFavoriteFolder('cloud-1'),
+        ).thenThrow(StateError('delete failed'));
+
+        expect(
+          await folders.deleteCurrentFolder(timeoutMessage: 'timeout'),
+          contains('delete failed'),
+        );
+        final refreshedFolders = [
+          defaultCloudFavoriteFolder,
+          _folder('cloud-1', 'renamed', FavoriteFolderSource.cloud),
+        ];
+        pending.complete(_result(refreshedFolders));
+        await reload;
+
+        expect(state.folders, same(refreshedFolders));
+        expect(state.selectedCloudFolderId, 'cloud-1');
+        expect(state.loadingFolders, isFalse);
+      },
+    );
+
+    for (final transition in ['source', 'mode', 'invalidate', 'dispose']) {
+      test(
+        'cloud deletion ignores a stale completion after $transition',
+        () async {
+          state.selectedCloudFolderId = 'cloud-1';
+          state.folders = cloudFolders;
+          final pending = Completer<void>();
+          when(
+            () => source.deleteFavoriteFolder('cloud-1'),
+          ).thenAnswer((_) => pending.future);
+
+          final deletion = folders.deleteCurrentFolder(
+            timeoutMessage: 'timeout',
+          );
+          if (transition == 'source') sourceKey = 'other';
+          if (transition == 'mode') state.mode = FavoritePageMode.local;
+          if (transition == 'invalidate') folders.invalidate();
+          if (transition == 'dispose') disposed = true;
+          pending.complete();
+
+          expect(await deletion, isNull);
+          expect(state.folders, same(cloudFolders));
+          expect(events, isEmpty);
+          verifyNever(source.loadFavoriteFolders);
+        },
+      );
+    }
 
     for (final transition in ['source', 'mode', 'invalidate', 'dispose']) {
       test('late directory results are discarded after $transition', () async {
