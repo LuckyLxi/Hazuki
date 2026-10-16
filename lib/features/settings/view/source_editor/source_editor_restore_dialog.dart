@@ -8,6 +8,7 @@ import 'package:hazuki/widgets/widgets.dart';
 Future<bool> showSourceEditorRestoreDialog(
   BuildContext context, {
   required SourceUpdateGateway sourceService,
+  SourceScriptGateway? backupService,
 }) async {
   final strings = l10n(context);
   var phase = _ComicSourceRestoreDialogPhase.confirm;
@@ -54,14 +55,18 @@ Future<bool> showSourceEditorRestoreDialog(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            strings.advancedRestoreSourceLabel,
+                            backupService != null
+                                ? strings.sourceBackupRestoreTitle
+                                : strings.sourceRedownloadTitle,
                             style: textTheme.titleLarge?.copyWith(
                               fontWeight: FontWeight.w800,
                             ),
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            strings.sourceEditorRestoreConfirmContent,
+                            backupService != null
+                                ? strings.sourceBackupRestoreConfirm
+                                : strings.sourceEditorRestoreConfirmContent,
                             style: textTheme.bodyMedium?.copyWith(
                               color: colorScheme.onSurfaceVariant,
                               height: 1.45,
@@ -89,25 +94,32 @@ Future<bool> showSourceEditorRestoreDialog(
                           indeterminate = true;
                         });
 
-                        final ok = await sourceService
-                            .downloadActiveSourceAndReload(
-                              onProgress: (received, total) {
-                                if (!dialogContext.mounted) {
-                                  return;
-                                }
-                                setDialogState(() {
-                                  if (total > 0) {
-                                    indeterminate = false;
-                                    progress = (received / total).clamp(
-                                      0.0,
-                                      1.0,
+                        var ok = false;
+                        try {
+                          ok = backupService != null
+                              ? await backupService.restoreActiveSourceBackup()
+                              : await sourceService
+                                    .downloadActiveSourceAndReload(
+                                      onProgress: (received, total) {
+                                        if (!dialogContext.mounted) {
+                                          return;
+                                        }
+                                        setDialogState(() {
+                                          if (total > 0) {
+                                            indeterminate = false;
+                                            progress = (received / total).clamp(
+                                              0.0,
+                                              1.0,
+                                            );
+                                          } else {
+                                            indeterminate = true;
+                                          }
+                                        });
+                                      },
                                     );
-                                  } else {
-                                    indeterminate = true;
-                                  }
-                                });
-                              },
-                            );
+                        } catch (_) {
+                          // Keep the dialog dismissible after a failed restore.
+                        }
 
                         if (!dialogContext.mounted) {
                           return;
@@ -133,7 +145,9 @@ Future<bool> showSourceEditorRestoreDialog(
           }
 
           Widget buildDownloadingContent() {
-            final progressText = indeterminate
+            final progressText = backupService != null
+                ? strings.sourceEditorRestoringTitle
+                : indeterminate
                 ? strings.sourceUpdateDownloading
                 : strings.sourceEditorRestoreDownloadingProgress(
                     (progress * 100).toStringAsFixed(0),

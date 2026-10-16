@@ -99,23 +99,27 @@ class SourceRuntimeCoordinator<T extends SourceRuntimeResource> {
     return removed;
   }
 
-  Future<void> replaceCatalog(List<SourceCatalogEntry> catalog) =>
-      _serialize(() async {
-        final previous = {for (final entry in _catalog) entry.key: entry};
-        final next = {for (final entry in catalog) entry.key: entry};
-        for (final key in _handles.keys.toList()) {
-          if (!next.containsKey(key) ||
-              next[key]?.pluginDirectory != previous[key]?.pluginDirectory ||
-              next[key]?.pluginVersion != previous[key]?.pluginVersion) {
-            _handles.remove(key)?.requestDispose();
-          }
-        }
-        _catalog = List.unmodifiable(catalog);
-        if (!isAllowed(_activeSourceKey)) {
-          _activeSourceKey = _catalog.firstOrNull?.normalizedKey ?? '';
-        }
-        _onActiveSourceChanged();
-      });
+  Future<void> replaceCatalog(
+    List<SourceCatalogEntry> catalog, {
+    Future<void> Function(String activeSourceKey)? beforeReplace,
+  }) => _serialize(() async {
+    final previous = {for (final entry in _catalog) entry.key: entry};
+    final next = {for (final entry in catalog) entry.key: entry};
+    final nextActiveSourceKey = next.containsKey(_activeSourceKey)
+        ? _activeSourceKey
+        : (catalog.firstOrNull?.normalizedKey ?? '');
+    await beforeReplace?.call(nextActiveSourceKey);
+    for (final key in _handles.keys.toList()) {
+      if (!next.containsKey(key) ||
+          next[key]?.pluginDirectory != previous[key]?.pluginDirectory ||
+          next[key]?.pluginVersion != previous[key]?.pluginVersion) {
+        _handles.remove(key)?.requestDispose();
+      }
+    }
+    _catalog = List.unmodifiable(catalog);
+    _activeSourceKey = nextActiveSourceKey;
+    _onActiveSourceChanged();
+  });
 
   /// Disposes a source's current resources and creates a replacement handle.
   ///

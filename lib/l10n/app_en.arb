@@ -1286,7 +1286,7 @@
       "count": {}
     }
   },
-  "sourceEditorRestoreConfirmContent": "Restore the official source? Your edits will be overwritten.",
+  "sourceEditorRestoreConfirmContent": "Download this plugin from the market again? This replaces the current source and keeps your local edit backup.",
   "sourceEditorRestoreFailed": "Restore failed. Please try again later.",
   "sourceEditorRestoreDownloadingProgress": "Downloading {progress}%",
   "@sourceEditorRestoreDownloadingProgress": {
@@ -1523,5 +1523,8 @@
       "name": { "type": "String" }
     }
   },
-  "pluginsViewDetails": "View details"
+  "pluginsViewDetails": "View details",
+  "sourceBackupRestoreTitle": "Restore local backup",
+  "sourceBackupRestoreConfirm": "Restore the source from before the last save? This replaces the current source and clears the backup after success. Restart the app to apply it.",
+  "sourceRedownloadTitle": "Download plugin again"
 }

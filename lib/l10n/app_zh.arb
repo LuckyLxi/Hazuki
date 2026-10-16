@@ -1286,7 +1286,7 @@
       "count": {}
     }
   },
-  "sourceEditorRestoreConfirmContent": "确定要还原为官方漫画源吗？你自己保存的修改会被覆盖。",
+  "sourceEditorRestoreConfirmContent": "确定从插件市场重新下载该插件吗？当前源码会被覆盖，本地编辑备份保持不变。",
   "sourceEditorRestoreFailed": "还原失败，请稍后再试",
   "sourceEditorRestoreDownloadingProgress": "正在下载 {progress}%",
   "@sourceEditorRestoreDownloadingProgress": {
@@ -1523,5 +1523,8 @@
       "name": { "type": "String" }
     }
   },
-  "pluginsViewDetails": "查看详情"
+  "pluginsViewDetails": "查看详情",
+  "sourceBackupRestoreTitle": "恢复本地备份",
+  "sourceBackupRestoreConfirm": "确定恢复到上次保存前的源码吗？当前源码会被覆盖，恢复成功后将清除备份。重启应用后生效。",
+  "sourceRedownloadTitle": "重新下载插件"
 }

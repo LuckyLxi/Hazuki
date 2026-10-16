@@ -34,6 +34,8 @@ abstract interface class SourceRuntimeOperations {
   Future<String> loadEditableActiveSource();
   Future<void> saveEditedActiveSource(String content);
   Future<bool> hasCustomEditedActiveSource();
+  Future<bool> hasActiveSourceBackup();
+  Future<bool> restoreActiveSourceBackup();
   Future<bool> hasCustomEditedSource(String sourceKey);
   Future<void> reloadFromLocalSourceFiles();
   Future<SourceVersionCheckResult?> checkActiveSourceVersionFromCloud();
@@ -96,6 +98,9 @@ class SourceRuntimeOperationService implements SourceRuntimeOperations {
       _scripts.saveEditedActiveSource(content);
   Future<bool> hasCustomEditedActiveSource() =>
       _scripts.hasCustomEditedActiveSource();
+  Future<bool> hasActiveSourceBackup() => _scripts.hasActiveSourceBackup();
+  Future<bool> restoreActiveSourceBackup() =>
+      _scripts.restoreActiveSourceBackup();
   Future<bool> hasCustomEditedSource(String sourceKey) =>
       _scripts.hasCustomEditedSource(sourceKey);
   Future<void> reloadFromLocalSourceFiles() =>

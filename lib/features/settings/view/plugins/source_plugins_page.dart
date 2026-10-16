@@ -412,9 +412,9 @@ class _SourcePluginsPageState extends State<SourcePluginsPage> {
                   icon: const Icon(Icons.tune, size: 18),
                   label: Text(s.settingsTitle),
                 ),
-                if (plugin.repository == null ||
-                    plugin.repository == sourcePluginsRepositoryUrl ||
-                    _manager.repositories.contains(plugin.repository))
+                if (plugin.repository != null &&
+                    (plugin.repository == sourcePluginsRepositoryUrl ||
+                        _manager.repositories.contains(plugin.repository)))
                   TextButton.icon(
                     onPressed: _hasOperations
                         ? null

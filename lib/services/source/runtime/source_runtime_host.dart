@@ -136,13 +136,33 @@ class SourceRuntimeHost extends ChangeNotifier {
   }
 
   Future<void> replaceCatalog(List<SourceCatalogEntry> catalog) async {
-    _catalog = List.unmodifiable(catalog);
-    runtimeRegistry.replaceCatalog(catalog, notify: false);
-    await _coordinator.replaceCatalog(catalog);
-    if (_preferenceLoaded) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(SourcePrefsKeys.activeSourceKey, activeSourceKey);
-    }
+    await _coordinator.replaceCatalog(
+      catalog,
+      beforeReplace: (nextSourceKey) async {
+        if (_preferenceLoaded) {
+          final prefs = await SharedPreferences.getInstance();
+          final previous = prefs.getString(SourcePrefsKeys.activeSourceKey);
+          try {
+            if (!await prefs.setString(
+              SourcePrefsKeys.activeSourceKey,
+              nextSourceKey,
+            )) {
+              throw StateError('source_selection_not_saved');
+            }
+          } catch (_) {
+            // SharedPreferences updates its memory cache before persisting.
+            if (previous == null) {
+              await prefs.remove(SourcePrefsKeys.activeSourceKey);
+            } else {
+              await prefs.setString(SourcePrefsKeys.activeSourceKey, previous);
+            }
+            rethrow;
+          }
+        }
+        _catalog = List.unmodifiable(catalog);
+        runtimeRegistry.replaceCatalog(catalog, notify: false);
+      },
+    );
   }
 
   SourceRuntimeHandle? remove(String sourceKey) =>

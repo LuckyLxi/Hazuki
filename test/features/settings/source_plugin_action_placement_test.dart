@@ -157,11 +157,99 @@ void main() {
   });
   tearDown(() => plugins.dispose());
 
+  for (final market in [false, true]) {
+    testWidgets(
+      'advanced restore consumes backup and online download is ${market ? 'shown for market' : 'hidden for local'} plugins',
+      (tester) async {
+        var hasBackup = true;
+        var restores = 0;
+        var downloads = 0;
+        final advanced = _MockAdvanced();
+        when(advanced.hasActiveSourceBackup).thenAnswer((_) async => hasBackup);
+        when(
+          advanced.loadSoftwareLogCaptureEnabled,
+        ).thenAnswer((_) async => false);
+        final software = _MockSoftwareUpdate();
+        when(
+          software.loadUpdateSource,
+        ).thenAnswer((_) async => SoftwareUpdateSource.github);
+        final plugin = plugins.installed.first;
+        plugins.installed = [
+          InstalledSourcePlugin(
+            manifest: plugin.manifest,
+            directory: plugin.directory,
+            repository: market ? 'https://example.com/plugins.json' : null,
+            customEdited: true,
+          ),
+        ];
+        await tester.pumpWidget(
+          _app(
+            withTestSourcePresentation(
+              AdvancedSettingsPage(
+                sourceService: advanced,
+                sourcePlugins: plugins,
+                softwareUpdateService: software,
+                logsPageBuilder: (_) => const SizedBox.shrink(),
+                comicSourceEditorPageBuilder: (_) => const SizedBox.shrink(),
+                restoreComicSource: (_) async {
+                  restores++;
+                  hasBackup = false;
+                  return true;
+                },
+                redownloadComicSource: (_) async {
+                  downloads++;
+                  return false;
+                },
+              ),
+              activeSourceKey: 'fixture',
+              catalog: const [
+                SourceCatalogEntry(
+                  key: 'fixture',
+                  name: 'Fixture',
+                  fileName: 'fixture.js',
+                ),
+              ],
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final backupButton = find.byKey(const ValueKey('restore-comic-source'));
+        await tester.scrollUntilVisible(backupButton, 250);
+        await tester.pumpAndSettle();
+        if (market) {
+          final onlineButton = find.byKey(
+            const ValueKey('redownload-comic-source'),
+          );
+          await tester.ensureVisible(onlineButton);
+          await tester.pumpAndSettle();
+          await tester.tap(onlineButton);
+          await tester.pumpAndSettle();
+          expect(downloads, 1);
+        } else {
+          expect(
+            find.byKey(const ValueKey('redownload-comic-source')),
+            findsNothing,
+          );
+        }
+        await tester.ensureVisible(backupButton);
+        await tester.pumpAndSettle();
+        await tester.tap(backupButton);
+        await tester.pumpAndSettle();
+        expect(restores, 1);
+        expect(backupButton, findsNothing);
+        expect(plugins.installed.single.customEdited, true);
+        expect(tester.takeException(), null);
+        await tester.pump(const Duration(seconds: 4));
+        await tester.pumpAndSettle();
+      },
+    );
+  }
+
   testWidgets(
     'advanced device button uses its declared owner and action in the original slot',
     (tester) async {
       final advanced = _MockAdvanced();
-      when(advanced.hasCustomEditedActiveSource).thenAnswer((_) async => false);
+      when(advanced.hasActiveSourceBackup).thenAnswer((_) async => false);
       when(
         advanced.loadSoftwareLogCaptureEnabled,
       ).thenAnswer((_) async => false);
@@ -220,7 +308,7 @@ void main() {
     'advanced update route menu retains choices and saves selection',
     (tester) async {
       final advanced = _MockAdvanced();
-      when(advanced.hasCustomEditedActiveSource).thenAnswer((_) async => false);
+      when(advanced.hasActiveSourceBackup).thenAnswer((_) async => false);
       when(
         advanced.loadSoftwareLogCaptureEnabled,
       ).thenAnswer((_) async => false);
@@ -439,7 +527,7 @@ void main() {
       when(() => dependencies.sourceSelection).thenReturn(selection);
       when(() => dependencies.sourcePlugins).thenReturn(plugins);
       final advanced = _MockAdvanced();
-      when(advanced.hasCustomEditedActiveSource).thenAnswer((_) async => false);
+      when(advanced.hasActiveSourceBackup).thenAnswer((_) async => false);
       when(
         advanced.loadSoftwareLogCaptureEnabled,
       ).thenAnswer((_) async => false);

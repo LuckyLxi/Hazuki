@@ -384,6 +384,11 @@ HomeFeatureEntrypoints buildHazukiHomeFeatureEntrypoints() {
               restoreComicSource: (context) => showComicSourceRestoreDialog(
                 context,
                 sourceService: settingsCoreDependencies.sourceUpdate,
+                backupService: settingsCoreDependencies.sourceScript,
+              ),
+              redownloadComicSource: (context) => showComicSourceRestoreDialog(
+                context,
+                sourceService: settingsCoreDependencies.sourceUpdate,
               ),
             ),
           );

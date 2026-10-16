@@ -238,6 +238,11 @@ class _ComicSourceEditorPageState extends State<ComicSourceEditorPage> {
 Future<bool> showComicSourceRestoreDialog(
   BuildContext context, {
   required SourceUpdateGateway sourceService,
+  SourceScriptGateway? backupService,
 }) {
-  return showSourceEditorRestoreDialog(context, sourceService: sourceService);
+  return showSourceEditorRestoreDialog(
+    context,
+    sourceService: sourceService,
+    backupService: backupService,
+  );
 }

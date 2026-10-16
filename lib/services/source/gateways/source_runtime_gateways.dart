@@ -40,6 +40,7 @@ abstract interface class SourceScriptGateway {
   Future<String> loadEditableActiveSource();
   Future<void> saveEditedActiveSource(String content);
   Future<bool> hasCustomEditedActiveSource();
+  Future<bool> restoreActiveSourceBackup();
   Future<String?> readLocalActiveSourceIfExists();
   Future<void> writeLocalActiveSource(String content);
   Future<void> reloadFromLocalSourceFiles();
@@ -92,6 +93,7 @@ abstract interface class SourceSwitchGateway {
 
 abstract interface class SourceAdvancedGateway implements Listenable {
   Future<bool> hasCustomEditedActiveSource();
+  Future<bool> hasActiveSourceBackup();
   Future<bool> loadSoftwareLogCaptureEnabled();
   Future<void> setSoftwareLogCaptureEnabled(bool enabled);
 }

@@ -13,7 +13,7 @@ class AdvancedSettingsContent extends StatelessWidget {
     required this.autoSourceUpdateCheckEnabled,
     required this.autoSoftwareUpdateCheckEnabled,
     required this.softwareUpdateSource,
-    required this.hasCustomEditedSource,
+    required this.hasSourceBackup,
     required this.logsPageBuilder,
     required this.onToggleNoImageMode,
     required this.onToggleSoftwareLogCaptureEnabled,
@@ -22,6 +22,7 @@ class AdvancedSettingsContent extends StatelessWidget {
     required this.onSoftwareUpdateSourceChanged,
     required this.onOpenComicSourceEditor,
     required this.onRestoreComicSource,
+    this.onRedownloadComicSource,
     this.sourceDeviceAction,
     this.footer,
   });
@@ -32,7 +33,7 @@ class AdvancedSettingsContent extends StatelessWidget {
   final bool autoSourceUpdateCheckEnabled;
   final bool autoSoftwareUpdateCheckEnabled;
   final SoftwareUpdateSource softwareUpdateSource;
-  final bool hasCustomEditedSource;
+  final bool hasSourceBackup;
   final WidgetBuilder logsPageBuilder;
   final ValueChanged<bool> onToggleNoImageMode;
   final ValueChanged<bool> onToggleSoftwareLogCaptureEnabled;
@@ -41,6 +42,7 @@ class AdvancedSettingsContent extends StatelessWidget {
   final ValueChanged<SoftwareUpdateSource> onSoftwareUpdateSourceChanged;
   final Future<void> Function() onOpenComicSourceEditor;
   final Future<void> Function() onRestoreComicSource;
+  final Future<void> Function()? onRedownloadComicSource;
   final Widget? sourceDeviceAction;
   final Widget? footer;
 
@@ -143,14 +145,14 @@ class AdvancedSettingsContent extends StatelessWidget {
                   ),
                 );
               },
-              child: hasCustomEditedSource
+              child: hasSourceBackup
                   ? Padding(
                       key: const ValueKey<String>('restore-comic-source'),
                       padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       child: FilledButton.tonalIcon(
                         onPressed: onRestoreComicSource,
                         icon: const Icon(Icons.restore_rounded),
-                        label: Text(strings.advancedRestoreSourceLabel),
+                        label: Text(strings.sourceBackupRestoreTitle),
                         style: FilledButton.styleFrom(
                           minimumSize: const Size.fromHeight(48),
                           alignment: Alignment.centerLeft,
@@ -164,6 +166,13 @@ class AdvancedSettingsContent extends StatelessWidget {
                       key: ValueKey<String>('restore-comic-source-empty'),
                     ),
             ),
+            if (onRedownloadComicSource != null)
+              ListTile(
+                key: const ValueKey('redownload-comic-source'),
+                leading: const Icon(Icons.download_rounded),
+                title: Text(strings.sourceRedownloadTitle),
+                onTap: onRedownloadComicSource,
+              ),
           ],
         ),
         ?footer,

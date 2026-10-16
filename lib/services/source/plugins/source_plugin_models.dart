@@ -318,6 +318,7 @@ class InstalledSourcePlugin {
     this.repository,
     this.enabled = true,
     this.customEdited = false,
+    this.editBackup,
   });
   final SourcePluginManifest manifest;
 
@@ -326,15 +327,21 @@ class InstalledSourcePlugin {
   final String? repository;
   final bool enabled;
   final bool customEdited;
+  final SourcePluginScriptBackup? editBackup;
 
-  InstalledSourcePlugin copyWith({bool? enabled, bool? customEdited}) =>
-      InstalledSourcePlugin(
-        manifest: manifest,
-        directory: directory,
-        repository: repository,
-        enabled: enabled ?? this.enabled,
-        customEdited: customEdited ?? this.customEdited,
-      );
+  InstalledSourcePlugin copyWith({
+    bool? enabled,
+    bool? customEdited,
+    String? directory,
+    SourcePluginScriptBackup? editBackup,
+  }) => InstalledSourcePlugin(
+    manifest: manifest,
+    directory: directory ?? this.directory,
+    repository: repository,
+    enabled: enabled ?? this.enabled,
+    customEdited: customEdited ?? this.customEdited,
+    editBackup: editBackup ?? this.editBackup,
+  );
 
   Map<String, dynamic> toJson() => {
     'manifest': manifest.toJson(),
@@ -342,6 +349,7 @@ class InstalledSourcePlugin {
     'repository': repository,
     'enabled': enabled,
     'customEdited': customEdited,
+    if (editBackup != null) 'editBackup': editBackup!.toJson(),
   };
 
   factory InstalledSourcePlugin.fromJson(Map<String, dynamic> map) {
@@ -357,6 +365,39 @@ class InstalledSourcePlugin {
       repository: map['repository'] as String?,
       enabled: map['enabled'] == true,
       customEdited: map['customEdited'] == true,
+      editBackup: map['editBackup'] is Map
+          ? SourcePluginScriptBackup.fromJson(
+              Map<String, dynamic>.from(map['editBackup'] as Map),
+            )
+          : null,
+    );
+  }
+}
+
+/// A single previous saved script, without recursively retaining older backups.
+class SourcePluginScriptBackup {
+  const SourcePluginScriptBackup({
+    required this.manifest,
+    required this.directory,
+    required this.customEdited,
+  });
+
+  final SourcePluginManifest manifest;
+  final String directory;
+  final bool customEdited;
+
+  Map<String, dynamic> toJson() => {
+    'manifest': manifest.toJson(),
+    'directory': directory,
+    'customEdited': customEdited,
+  };
+
+  factory SourcePluginScriptBackup.fromJson(Map<String, dynamic> json) {
+    final plugin = InstalledSourcePlugin.fromJson(json);
+    return SourcePluginScriptBackup(
+      manifest: plugin.manifest,
+      directory: plugin.directory,
+      customEdited: plugin.customEdited,
     );
   }
 }

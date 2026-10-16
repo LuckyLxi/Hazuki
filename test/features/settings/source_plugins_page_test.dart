@@ -259,6 +259,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Widget example'), findsOneWidget);
     expect(find.text(s.pluginsEmpty), findsNothing);
+    expect(find.text(s.pluginsCheckUpdate), findsNothing);
+    expect(find.text(s.pluginsUpdate), findsNothing);
 
     await tester.runAsync(() async {
       final disabled = Completer<void>();

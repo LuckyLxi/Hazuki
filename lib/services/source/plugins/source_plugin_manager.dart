@@ -45,6 +45,9 @@ class SourcePluginManager extends ChangeNotifier implements SourceScriptStore {
   Future<void> Function(List<SourceCatalogEntry>)? onCatalogChanged;
   final Map<String, InstalledSourcePlugin> _installed = {};
   final Map<String, String> _installedVersions = {};
+  // Pending edits change stored files without publishing a new runtime revision.
+  // Keep these entries stable when another plugin republishes the catalog.
+  final Map<String, SourceCatalogEntry> _deferredCatalogEntries = {};
   static const installedPluginsFileName = 'installed_plugins.json';
   final Map<String, Map<String, dynamic>> _historicalPresentations = {};
 
@@ -87,8 +90,7 @@ class SourcePluginManager extends ChangeNotifier implements SourceScriptStore {
   List<SourcePluginUpdate> get availableUpdates => List.unmodifiable([
     for (final entry in entriesFor(sourcePluginsRepositoryUrl))
       if (_installed[entry.id] case final plugin?)
-        if (plugin.repository == null ||
-            plugin.repository == sourcePluginsRepositoryUrl)
+        if (plugin.repository == sourcePluginsRepositoryUrl)
           if (_installedVersions[entry.id] case final version?)
             if (_isNewer(entry.version, version))
               SourcePluginUpdate(
@@ -136,17 +138,19 @@ class SourcePluginManager extends ChangeNotifier implements SourceScriptStore {
         (plugin) =>
             plugin.enabled && !_fileErrors.containsKey(plugin.manifest.id),
       )
-      .map(
-        (plugin) => SourceCatalogEntry(
-          key: plugin.manifest.id,
-          name: plugin.manifest.name,
-          fileName: plugin.manifest.entry,
-          pluginVersion: plugin.manifest.version,
-          pluginDirectory: p.join(_root!.path, plugin.directory),
-          presentation: plugin.manifest.presentation,
-        ),
-      )
+      .map(_catalogEntryFor)
       .toList(growable: false);
+
+  SourceCatalogEntry _catalogEntryFor(InstalledSourcePlugin plugin) =>
+      _deferredCatalogEntries[plugin.manifest.id] ??
+      SourceCatalogEntry(
+        key: plugin.manifest.id,
+        name: plugin.manifest.name,
+        fileName: plugin.manifest.entry,
+        pluginVersion: plugin.manifest.version,
+        pluginDirectory: p.join(_root!.path, plugin.directory),
+        presentation: plugin.manifest.presentation,
+      );
 
   static Future<Directory> _defaultDirectory() async => Directory(
     p.join((await getApplicationSupportDirectory()).path, 'source_plugins'),
@@ -480,6 +484,11 @@ class SourcePluginManager extends ChangeNotifier implements SourceScriptStore {
     if (!_repositories.contains(repository)) {
       throw const SourcePluginException('plugin_repository_not_added');
     }
+    if (_installed[entry.id] case final installed?) {
+      if (installed.repository != repository) {
+        throw const SourcePluginException('plugin_source_conflict');
+      }
+    }
     // Downloads are independent; catalog changes and registry writes must
     // still commit one at a time.
     final bytes = await _download(entry.downloadUrl);
@@ -487,16 +496,7 @@ class SourcePluginManager extends ChangeNotifier implements SourceScriptStore {
       if (!_repositories.contains(repository)) {
         throw const SourcePluginException('plugin_repository_not_added');
       }
-      await _install(
-        bytes,
-        repository:
-            repository == sourcePluginsRepositoryUrl &&
-                _installed[entry.id]?.repository == null &&
-                _installed.containsKey(entry.id)
-            ? null
-            : repository,
-        expected: entry,
-      );
+      await _install(bytes, repository: repository, expected: entry);
     });
   }
 
@@ -545,12 +545,14 @@ class SourcePluginManager extends ChangeNotifier implements SourceScriptStore {
             .replaceAll('\\', '/'),
         repository: repository,
         enabled: old?.enabled ?? true,
+        editBackup: old?.editBackup,
       );
       final oldPresentation = _historicalPresentations[manifest.id];
       _historicalPresentations[manifest.id] = historicalSourcePresentation(
         manifest.presentation,
       );
       _installed[manifest.id] = plugin;
+      final deferredCatalogEntry = _deferredCatalogEntries.remove(manifest.id);
       final oldError = _fileErrors.remove(manifest.id);
       _runtimeErrors.remove(manifest.id);
       try {
@@ -568,10 +570,14 @@ class SourcePluginManager extends ChangeNotifier implements SourceScriptStore {
         } else {
           _installed[manifest.id] = old;
         }
+        if (deferredCatalogEntry != null) {
+          _deferredCatalogEntries[manifest.id] = deferredCatalogEntry;
+        }
         if (oldError != null) _fileErrors[manifest.id] = oldError;
         await onCatalogChanged?.call(catalog);
         rethrow;
       }
+      await _discardUnusedEditDirectory(old?.directory);
       _notify();
     } finally {
       // Staging uses a generated directory and a fixed main.js filename.
@@ -585,13 +591,24 @@ class SourcePluginManager extends ChangeNotifier implements SourceScriptStore {
 
   Future<void> setEnabled(String id, bool enabled) => _serialize(() async {
     final old = _requirePlugin(id);
+    final deferredCatalogEntry = enabled != old.enabled
+        ? _deferredCatalogEntries.remove(id)
+        : null;
     _installed[id] = old.copyWith(enabled: enabled);
+    var committed = false;
     try {
-      await onCatalogChanged?.call(catalog);
       await _commit();
+      committed = true;
+      await onCatalogChanged?.call(catalog);
     } catch (_) {
       _installed[id] = old;
-      await onCatalogChanged?.call(catalog);
+      if (deferredCatalogEntry != null) {
+        _deferredCatalogEntries[id] = deferredCatalogEntry;
+      }
+      if (committed) {
+        await _commit();
+        await onCatalogChanged?.call(catalog);
+      }
       rethrow;
     }
     _notify();
@@ -600,27 +617,32 @@ class SourcePluginManager extends ChangeNotifier implements SourceScriptStore {
   Future<void> uninstall(String id) => _serialize(() async {
     final old = _requirePlugin(id);
     _installed.remove(id);
-    _runtimeErrors.remove(id);
     final oldError = _fileErrors.remove(id);
+    var committed = false;
     try {
-      await onCatalogChanged?.call(catalog);
       await _commit();
+      committed = true;
+      await onCatalogChanged?.call(catalog);
     } catch (_) {
       _installed[id] = old;
       if (oldError != null) _fileErrors[id] = oldError;
-      await onCatalogChanged?.call(catalog);
+      if (committed) {
+        await _commit();
+        await onCatalogChanged?.call(catalog);
+      }
       rethrow;
     }
     // Retain packages as rollback/edited-script backups and retain all source data.
+    _deferredCatalogEntries.remove(id);
+    _runtimeErrors.remove(id);
     _notify();
   });
 
   Future<SourcePluginIndexEntry?> checkUpdate(String id) async {
     await initialize();
     final plugin = _requirePlugin(id);
-    final builtin =
-        plugin.repository == null ||
-        plugin.repository == sourcePluginsRepositoryUrl;
+    if (plugin.repository == null) return null;
+    final builtin = plugin.repository == sourcePluginsRepositoryUrl;
     if (builtin && _startupUpdateCheck != null) await _startupUpdateCheck;
     final entries = builtin
         ? entriesFor(sourcePluginsRepositoryUrl)
@@ -638,6 +660,139 @@ class SourcePluginManager extends ChangeNotifier implements SourceScriptStore {
   InstalledSourcePlugin _requirePlugin(String id) =>
       _installed[id] ??
       (throw SourcePluginException('plugin_not_installed', id));
+
+  /// Re-fetch the index even when the installed version is already current.
+  Future<bool> redownload(String id) async {
+    await initialize();
+    final repository = _requirePlugin(id).repository;
+    if (repository == null) return false;
+    await refreshRepository(repository);
+    final entry = entriesFor(
+      repository,
+    ).where((entry) => entry.id == id).firstOrNull;
+    if (entry == null) {
+      throw SourcePluginException('plugin_not_found_in_index', id);
+    }
+    await installFromRepository(repository, entry);
+    return true;
+  }
+
+  Future<bool> hasEditBackup(String id) async {
+    await initialize();
+    final backup = _installed[id]?.editBackup;
+    return backup != null &&
+        await File(
+          p.join(_root!.path, backup.directory, backup.manifest.entry),
+        ).exists();
+  }
+
+  Future<void> saveEditedScript(String id, String content) =>
+      _serialize(() async {
+        if (utf8.encode(content).length > 8 * 1024 * 1024) {
+          throw const SourcePluginException('plugin_package_too_large');
+        }
+        final old = _requirePlugin(id);
+        final previousCatalogEntry = _catalogEntryFor(old);
+        // Verify the previous script before making it the new backup.
+        await File(
+          p.join(_root!.path, old.directory, old.manifest.entry),
+        ).readAsString();
+        final staging = Directory(p.join(_root!.path, 'edits', _generation()));
+        await staging.create(recursive: true);
+        var committed = false;
+        try {
+          await File(
+            p.join(staging.path, old.manifest.entry),
+          ).writeAsString(content, flush: true);
+          _installed[id] = old.copyWith(
+            directory: p
+                .relative(staging.path, from: _root!.path)
+                .replaceAll('\\', '/'),
+            customEdited: true,
+            editBackup: SourcePluginScriptBackup(
+              manifest: old.manifest,
+              directory: old.directory,
+              customEdited: old.customEdited,
+            ),
+          );
+          try {
+            await _commit();
+            committed = true;
+          } catch (_) {
+            _installed[id] = old;
+            rethrow;
+          }
+          // Keep the running engine until the requested restart/reload.
+          _deferredCatalogEntries[id] = previousCatalogEntry;
+          await _discardUnusedEditDirectory(old.editBackup?.directory);
+          _notify();
+        } finally {
+          if (!committed &&
+              await staging.exists() &&
+              p.isWithin(_root!.path, staging.path)) {
+            await staging.delete(recursive: true);
+          }
+        }
+      });
+
+  Future<bool> restoreEditBackup(String id) => _serialize(() async {
+    final old = _requirePlugin(id);
+    final previousCatalogEntry = _catalogEntryFor(old);
+    final backup = old.editBackup;
+    if (backup == null) return false;
+    if (!await File(
+      p.join(_root!.path, backup.directory, backup.manifest.entry),
+    ).exists()) {
+      throw const SourcePluginException('plugin_entry_missing');
+    }
+    _installed[id] = InstalledSourcePlugin(
+      manifest: backup.manifest,
+      directory: backup.directory,
+      repository: old.repository,
+      enabled: old.enabled,
+      customEdited: backup.customEdited,
+    );
+    final oldPresentation = _historicalPresentations[id];
+    _historicalPresentations[id] = historicalSourcePresentation(
+      backup.manifest.presentation,
+    );
+    try {
+      await _commit();
+    } catch (_) {
+      _installed[id] = old;
+      if (oldPresentation == null) {
+        _historicalPresentations.remove(id);
+      } else {
+        _historicalPresentations[id] = oldPresentation;
+      }
+      rethrow;
+    }
+    _deferredCatalogEntries[id] = previousCatalogEntry;
+    _fileErrors.remove(id);
+    await _discardUnusedEditDirectory(old.directory);
+    _notify();
+    return true;
+  });
+
+  Future<void> _discardUnusedEditDirectory(String? relative) async {
+    if (relative == null ||
+        _installed.values.any(
+          (plugin) =>
+              plugin.directory == relative ||
+              plugin.editBackup?.directory == relative,
+        )) {
+      return;
+    }
+    final target = p.normalize(p.join(_root!.path, relative));
+    if (!p.isWithin(p.join(_root!.path, 'edits'), target)) return;
+    try {
+      if (await Directory(target).exists()) {
+        await Directory(target).delete(recursive: true);
+      }
+    } on FileSystemException {
+      // Cleanup must not turn an already committed save into a failure.
+    }
+  }
 
   @override
   Future<File> sourceFileFor(

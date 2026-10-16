@@ -188,11 +188,7 @@ class SourceUpdateOperations {
   Future<bool> _updatePlugin() async {
     final manager = _scriptStore as SourcePluginManager;
     final id = _runtimeHost.activeSourceKey;
-    final update = await manager.checkUpdate(id);
-    final plugin = manager.pluginFor(id);
-    if (update == null || plugin?.repository == null) return false;
-    await manager.installFromRepository(plugin!.repository!, update);
-    return true;
+    return manager.redownload(id);
   }
 
   Future<bool> _downloadSourceAndMarkForRestart(

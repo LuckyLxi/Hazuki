@@ -78,6 +78,27 @@ void main() {
       expect(persisted, 'jm');
     });
 
+    test(
+      'failed selection persistence leaves catalog and handles untouched',
+      () async {
+        final coordinator = _createCoordinator(created: {});
+        final original = coordinator.activeHandle;
+        final catalog = coordinator.catalog;
+        await expectLater(
+          coordinator.replaceCatalog(
+            catalog.where((entry) => entry.key != 'jm').toList(),
+            beforeReplace: (_) async =>
+                throw StateError('preferences unavailable'),
+          ),
+          throwsStateError,
+        );
+        expect(coordinator.activeSourceKey, 'jm');
+        expect(coordinator.catalog, catalog);
+        expect(coordinator.activeHandle, same(original));
+        expect(original.disposeCount, 0);
+      },
+    );
+
     test('recreates a runtime once for concurrent recovery requests', () {
       final created = <String, _FakeRuntimeResource>{};
       final coordinator = _createCoordinator(created: created);

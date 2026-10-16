@@ -281,7 +281,7 @@ void main() {
     (tester) async {
       final pending = Completer<SourcePluginIndexEntry?>();
       when(
-        () => gateway.checkUpdate('local_source'),
+        () => gateway.checkUpdate(_installed.last.manifest.id),
       ).thenAnswer((_) => pending.future);
       await tester.pumpWidget(_app(gateway));
       await tester.pumpAndSettle();

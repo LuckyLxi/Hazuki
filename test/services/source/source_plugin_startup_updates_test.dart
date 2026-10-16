@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/services/source/plugins/source_plugin_manager.dart';
+import 'package:hazuki/services/source/plugins/source_plugin_models.dart';
 import 'package:hazuki/services/source/plugins/source_plugin_repository.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -54,6 +55,20 @@ void main() {
               )
               as Map)['plugins']
           as List;
+
+  Future<void> installMarket(String id, String version) async {
+    versions[id] = version;
+    await manager.initialize();
+    await manager.installFromRepository(
+      sourcePluginsRepositoryUrl,
+      SourcePluginIndexEntry(
+        id: id,
+        name: 'Plugin $id',
+        version: version,
+        downloadUrl: Uri.parse('https://downloads.example/$id.js?token=a%2Fb'),
+      ),
+    );
+  }
 
   setUp(() async {
     SharedPreferences.setMockInitialValues({
@@ -110,15 +125,18 @@ void main() {
   test(
     'startup downloads once and compares every installed ID using numeric versions',
     () async {
-      await manager.importPackage(_script('a', '1.9.0'));
-      await manager.importPackage(_script('b', '2.0.0'));
+      await installMarket('a', '1.9.0');
+      await installMarket('b', '2.0.0');
       await manager.setEnabled('b', false);
-      await manager.importPackage(_script('c', '3.0.0'));
+      await installMarket('c', '3.0.0');
+      await manager.importPackage(_script('local', '1.0.0'));
+      requested.clear();
       versions.addAll({
         'a': '1.10.0',
         'b': '2.1.0',
         'c': '2.0.0',
         'uninstalled': '99.0.0',
+        'local': '99.0.0',
       });
       final restarted = createManager();
       addTearDown(restarted.dispose);
@@ -145,7 +163,7 @@ void main() {
         update.entry,
       );
       expect(requested.last, 'https://downloads.example/a.js?token=a%2Fb');
-      expect(restarted.pluginFor('a')!.repository, isNull);
+      expect(restarted.pluginFor('a')!.repository, sourcePluginsRepositoryUrl);
       expect((await records()).first, {'id': 'a', 'version': '1.10.0'});
       expect(restarted.availableUpdates.map((update) => update.entry.id), [
         'b',
@@ -214,10 +232,7 @@ void main() {
       thirdPartyVersion = '1.2.0';
       await manager.checkStartupUpdates();
       expect(requested, [sourcePluginsRepositoryUrl]);
-      expect(manager.availableUpdates.map((update) => update.entry.id), [
-        'a',
-        'b',
-      ]);
+      expect(manager.availableUpdates.map((update) => update.entry.id), ['b']);
       expect(manager.pluginFor('c')!.repository, repository);
       expect(manager.pluginFor('c')!.manifest.version, '1.0.0');
 
@@ -229,10 +244,7 @@ void main() {
       expect(requested.last, packageUrl);
       expect(manager.pluginFor('c')!.repository, repository);
       expect(manager.pluginFor('c')!.manifest.version, '1.2.0');
-      expect(manager.availableUpdates.map((update) => update.entry.id), [
-        'a',
-        'b',
-      ]);
+      expect(manager.availableUpdates.map((update) => update.entry.id), ['b']);
     },
   );
 

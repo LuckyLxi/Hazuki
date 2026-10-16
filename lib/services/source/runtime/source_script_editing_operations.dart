@@ -63,12 +63,16 @@ class SourceScriptEditingOperations {
     await handle.runOperation(() async {
       final facade = handle.facade;
       await _ensureEditableFile(handle);
-      await _storage.write(handle.sourceKey, content);
-      await setCustomEditedSourceFlag(
-        handle.sourceKey,
-        true,
-        targetFacade: facade,
-      );
+      if (_storage case final SourcePluginManager plugins) {
+        await plugins.saveEditedScript(handle.sourceKey, content);
+      } else {
+        await _storage.write(handle.sourceKey, content);
+        await setCustomEditedSourceFlag(
+          handle.sourceKey,
+          true,
+          targetFacade: facade,
+        );
+      }
       facade.lastSourceVersionDebugInfo = {
         'checkedAt': DateTime.now().toIso8601String(),
         'resolvedFrom': 'local_source_editor',
@@ -109,6 +113,30 @@ class SourceScriptEditingOperations {
   Future<bool> hasCustomEditedActiveSource() => _activeSourceKey.isEmpty
       ? Future.value(false)
       : hasCustomEditedSource(_activeSourceKey);
+
+  Future<bool> hasActiveSourceBackup() async {
+    if (_activeSourceKey.isEmpty) return false;
+    return _storage is SourcePluginManager &&
+        await _storage.hasEditBackup(_activeSourceKey);
+  }
+
+  Future<bool> restoreActiveSourceBackup() async {
+    if (_activeSourceKey.isEmpty || _storage is! SourcePluginManager) {
+      return false;
+    }
+    final handle = _runtimeHost.activeHandle;
+    return handle.runOperation(() async {
+      final restored = await _storage.restoreEditBackup(handle.sourceKey);
+      if (restored) {
+        _runtimeStateController.setWaitingForRestart(
+          handle.facade,
+          statusText: 'source_edited_waiting_for_restart',
+          debugDetail: 'local_source_backup_restore',
+        );
+      }
+      return restored;
+    });
+  }
 
   Future<bool> hasCustomEditedSource(String sourceKey) =>
       _storage.isCustomEdited(sourceKey);

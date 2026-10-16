@@ -70,6 +70,9 @@ class HazukiSourceScriptAdapter implements SourceScriptGateway {
   Future<bool> hasCustomEditedActiveSource() =>
       _runtimeOperations.hasCustomEditedActiveSource();
   @override
+  Future<bool> restoreActiveSourceBackup() =>
+      _runtimeOperations.restoreActiveSourceBackup();
+  @override
   Future<String?> readLocalActiveSourceIfExists() =>
       _runtimeOperations.readLocalActiveSourceIfExists();
   @override
@@ -164,6 +167,9 @@ class HazukiSourceAdvancedAdapter extends HazukiSourceListenableAdapter
   @override
   Future<bool> hasCustomEditedActiveSource() =>
       _runtimeOperations.hasCustomEditedActiveSource();
+  @override
+  Future<bool> hasActiveSourceBackup() =>
+      _runtimeOperations.hasActiveSourceBackup();
   @override
   Future<bool> loadSoftwareLogCaptureEnabled() =>
       _runtimeOperations.loadSoftwareLogCaptureEnabled();

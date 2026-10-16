@@ -18,6 +18,7 @@ class AdvancedSettingsPage extends StatefulWidget {
     required this.logsPageBuilder,
     required this.comicSourceEditorPageBuilder,
     required this.restoreComicSource,
+    this.redownloadComicSource,
     required this.sourceService,
     required this.softwareUpdateService,
     this.sourcePlugins,
@@ -26,6 +27,7 @@ class AdvancedSettingsPage extends StatefulWidget {
   final WidgetBuilder logsPageBuilder;
   final WidgetBuilder comicSourceEditorPageBuilder;
   final Future<bool> Function(BuildContext context) restoreComicSource;
+  final Future<bool> Function(BuildContext context)? redownloadComicSource;
   final SourceAdvancedGateway sourceService;
   final SoftwareUpdateService softwareUpdateService;
   final SourcePluginGateway? sourcePlugins;
@@ -40,7 +42,7 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
       widget.softwareUpdateService;
   bool _noImageMode = false;
   bool _softwareLogCaptureEnabled = false;
-  bool _hasCustomEditedSource = false;
+  bool _hasSourceBackup = false;
   bool _autoSourceUpdateCheckEnabled = true;
   bool _autoSoftwareUpdateCheckEnabled = true;
   SoftwareUpdateSource _softwareUpdateSource = SoftwareUpdateSource.jsDelivr;
@@ -62,13 +64,13 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
   void _handleSourceChanged() {
     if (mounted) {
       setState(() {});
+      _refreshSourceBackupState();
     }
   }
 
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
-    final hasCustomEditedSource = await _sourceService
-        .hasCustomEditedActiveSource();
+    final hasSourceBackup = await _sourceService.hasActiveSourceBackup();
     final softwareLogCaptureEnabled = await _sourceService
         .loadSoftwareLogCaptureEnabled();
     final softwareUpdateSource = await _softwareUpdateService
@@ -80,7 +82,7 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
     setState(() {
       _noImageMode = prefs.getBool(hazukiNoImageModePreferenceKey) ?? false;
       _softwareLogCaptureEnabled = softwareLogCaptureEnabled;
-      _hasCustomEditedSource = hasCustomEditedSource;
+      _hasSourceBackup = hasSourceBackup;
       _autoSourceUpdateCheckEnabled = updateChecks.source;
       _autoSoftwareUpdateCheckEnabled = updateChecks.software;
       _softwareUpdateSource = softwareUpdateSource;
@@ -113,14 +115,13 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
     await OtherSettingsActions.toggleAutoSoftwareUpdateCheck(context, value);
   }
 
-  Future<void> _refreshCustomEditedSourceState() async {
-    final hasCustomEditedSource = await _sourceService
-        .hasCustomEditedActiveSource();
+  Future<void> _refreshSourceBackupState() async {
+    final hasSourceBackup = await _sourceService.hasActiveSourceBackup();
     if (!mounted) {
       return;
     }
     setState(() {
-      _hasCustomEditedSource = hasCustomEditedSource;
+      _hasSourceBackup = hasSourceBackup;
     });
   }
 
@@ -131,7 +132,7 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
     if (!mounted) {
       return;
     }
-    await _refreshCustomEditedSourceState();
+    await _refreshSourceBackupState();
   }
 
   Future<void> _restoreComicSource() async {
@@ -139,12 +140,23 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
     if (!mounted || !restored) {
       return;
     }
-    await _refreshCustomEditedSourceState();
+    await _refreshSourceBackupState();
     if (!mounted) {
       return;
     }
     final strings = AppLocalizations.of(context)!;
     await showHazukiPrompt(context, strings.advancedRestoreSourceSuccess);
+  }
+
+  Future<void> _redownloadComicSource() async {
+    final restored = await widget.redownloadComicSource!(context);
+    if (!mounted || !restored) return;
+    await _refreshSourceBackupState();
+    if (!mounted) return;
+    await showHazukiPrompt(
+      context,
+      AppLocalizations.of(context)!.advancedRestoreSourceSuccess,
+    );
   }
 
   Future<void> _runSourceDeviceAction(
@@ -221,7 +233,12 @@ class _AdvancedSettingsPageState extends State<AdvancedSettingsPage> {
           autoSourceUpdateCheckEnabled: _autoSourceUpdateCheckEnabled,
           autoSoftwareUpdateCheckEnabled: _autoSoftwareUpdateCheckEnabled,
           softwareUpdateSource: _softwareUpdateSource,
-          hasCustomEditedSource: _hasCustomEditedSource,
+          hasSourceBackup: _hasSourceBackup,
+          onRedownloadComicSource:
+              widget.redownloadComicSource != null &&
+                  widget.sourcePlugins?.pluginFor(sourceKey)?.repository != null
+              ? _redownloadComicSource
+              : null,
           sourceDeviceAction:
               deviceAction == null || widget.sourcePlugins == null
               ? null
