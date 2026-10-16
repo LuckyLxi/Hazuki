@@ -161,7 +161,7 @@ void main() {
   );
 
   test(
-    'new detail fields survive uninstall and restart without enabling operations',
+    'retired detail fields are excluded from historical display rules',
     () async {
       const detailMetadata = {
         'showUploader': false,
@@ -177,7 +177,6 @@ void main() {
       manager = createManager();
       await manager.initialize();
       expect(manager.historicalPresentationFor('custom_metadata'), {
-        ...detailMetadata,
         'showTags': true,
         'listTagGroups': ['Genre'],
       });
@@ -192,16 +191,9 @@ void main() {
         'listTagGroups': [123],
       },
       {'enrichMissingTags': 'true'},
-      {'showCategories': 'true'},
-      {'showCategories': null},
-      {'showChineseTeam': 1},
-      {'detailTagGroups': 'Tags'},
-      {
-        'detailTagGroups': [123],
-      },
-      {
-        'detailTagGroups': [' '],
-      },
+      {'showComments': 'true'},
+      {'showComments': null},
+      {'showComments': 1},
       {
         'favoriteOrderAliases': {'old': 1},
       },

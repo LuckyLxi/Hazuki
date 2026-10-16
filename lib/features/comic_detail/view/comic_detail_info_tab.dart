@@ -104,15 +104,9 @@ class ComicDetailInfoTab extends StatelessWidget {
           context: context,
         ) !=
         null;
-    final showUploader = sourceFeature(
-      resolvedDetails.sourceKey,
-      'showUploader',
-      context: context,
-    );
     final hasVisibleMeta =
         (showComicId && resolvedDetails.id.trim().isNotEmpty) ||
-        resolvedDetails.tags.isNotEmpty ||
-        (showUploader && resolvedDetails.uploader.trim().isNotEmpty);
+        resolvedDetails.infoFields.any((field) => field.values.isNotEmpty);
 
     return CustomScrollView(
       key: const PageStorageKey<String>('comic-detail-info-tab'),

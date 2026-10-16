@@ -1044,6 +1044,9 @@ function Comic({id, title, subtitle, subTitle, cover, tags, description, maxPage
  * @param recommend {Comic[]?} - related comics
  * @param commentCount {number?}
  * @param likesCount {number?}
+ * @param headerStats {Array<{text: string | Object, action?: string}> | undefined} - short text only
+ * @param viewsCount {number | string | undefined}
+ * @param infoFields {Array<{label: string | Object, values: string | string[], action?: string}> | undefined}
  * @param isLiked {boolean?}
  * @param uploader {string?}
  * @param updateTime {string?}
@@ -1054,7 +1057,7 @@ function Comic({id, title, subtitle, subTitle, cover, tags, description, maxPage
  * @param comments {Comment[]?}- `since 1.0.7` App will display comments in the details page.
  * @constructor
  */
-function ComicDetails({title, subtitle, subTitle, cover, description, tags, chapters, isFavorite, subId, thumbnails, recommend, commentCount, likesCount, isLiked, uploader, updateTime, uploadTime, url, stars, maxPage, comments}) {
+function ComicDetails({title, subtitle, subTitle, cover, description, tags, infoFields, headerStats, viewsCount, chapters, isFavorite, subId, thumbnails, recommend, commentCount, likesCount, isLiked, uploader, updateTime, uploadTime, url, stars, maxPage, comments}) {
     this.title = title;
     this.subtitle = subtitle ?? subTitle;
     this.cover = cover;
@@ -1063,6 +1066,9 @@ function ComicDetails({title, subtitle, subTitle, cover, description, tags, chap
     this.chapters = chapters;
     this.isFavorite = isFavorite;
     this.subId = subId;
+    this.infoFields = infoFields;
+    this.headerStats = headerStats;
+    this.viewsCount = viewsCount;
     this.thumbnails = thumbnails;
     this.recommend = recommend;
     this.commentCount = commentCount;

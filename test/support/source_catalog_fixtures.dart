@@ -9,6 +9,7 @@ const List<SourceCatalogEntry> hazukiAllowedSourceCatalog = [
       "https://cdn.jsdelivr.net/gh/venera-app/venera-configs@main/jm.js",
     ],
     presentation: {
+      "showComments": true,
       "directComicIdRules": {
         "patterns": [r'^(?:jm)?(\d{2,})$'],
         "extractDigits": true,
@@ -51,6 +52,7 @@ const List<SourceCatalogEntry> hazukiAllowedSourceCatalog = [
       "https://cdn.jsdelivr.net/gh/venera-app/venera-configs@main/copy_manga.js",
     ],
     presentation: {
+      "showComments": true,
       "legacyRanking": true,
       "buttons": [
         {
@@ -99,6 +101,7 @@ const List<SourceCatalogEntry> hazukiAllowedSourceCatalog = [
       "https://cdn.jsdelivr.net/gh/venera-app/venera-configs@main/picacg.js",
     ],
     presentation: {
+      "showComments": true,
       "dailyCheckIn": true,
       "commentReplies": true,
       "showTags": true,
@@ -111,11 +114,6 @@ const List<SourceCatalogEntry> hazukiAllowedSourceCatalog = [
         {"id": "imageQuality", "location": "reading"},
         {"id": "imageQuality", "location": "reader"},
       ],
-      "showUploader": true,
-      "showCategories": true,
-      "showChineseTeam": true,
-      "detailTagGroups": ["tag", "tags", "标签"],
-      "showPageCount": true,
       "searchDefaultOrder": "dd",
       "searchOrders": {"dd": "新到旧", "da": "旧到新", "ld": "最多喜欢", "vd": "最多指名"},
       "favoriteOrders": ["dd", "da"],

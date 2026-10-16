@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 
 import 'source_content_gateways.dart';
 import 'source_runtime_gateways.dart';
+import '../models/source_contract_models.dart';
 
 abstract interface class SourceImageGateway {
   String? get activeSourceKey;
@@ -27,4 +28,7 @@ abstract interface class SourceDailyRecommendationGateway
   bool get isInitialized;
   bool get supportsDailyRecommendation;
   DailyRecommendationConfig? dailyRecommendationForSource(String sourceKey);
+  Future<List<SourceDailyRecommendationItem>> loadDailyRecommendations({
+    String sourceKey = '',
+  });
 }

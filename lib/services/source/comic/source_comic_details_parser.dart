@@ -38,7 +38,111 @@ class SourceComicDetailsParser {
       pageCount: (map['pageCount'] ?? map['maxPage'] ?? '').toString(),
       subId: map['subId']?.toString() ?? '',
       sourceKey: sourceKey,
+      infoFields: _extractInfoFields(map['infoFields'], sourceKey: sourceKey),
+      viewsCount: map['viewsCount']?.toString() ?? '',
+      headerStats: _extractHeaderStats(
+        map['headerStats'],
+        sourceKey: sourceKey,
+      ),
     );
+  }
+
+  List<ComicHeaderStat> _extractHeaderStats(
+    Object? value, {
+    required String sourceKey,
+  }) {
+    if (value == null) return const [];
+    if (value is! List) {
+      throw const FormatException('plugin_invalid_header_stats');
+    }
+    final stats = <ComicHeaderStat>[];
+    for (final item in value) {
+      if (item is! Map) {
+        throw const FormatException('plugin_invalid_header_stat');
+      }
+      final text = item['text'];
+      final Object parsedText;
+      if (text is String) {
+        parsedText = _translateSourceText(text.trim(), sourceKey: sourceKey);
+      } else if (text is Map &&
+          text.entries.every((e) => e.key is String && e.value is String)) {
+        parsedText = Map<String, String>.unmodifiable(
+          Map<String, String>.from(text),
+        );
+      } else {
+        throw const FormatException('plugin_invalid_header_stat_text');
+      }
+      final action = item['action'] ?? 'none';
+      final parsedAction = ComicHeaderStatAction.values
+          .where((candidate) => candidate.name == action)
+          .firstOrNull;
+      if (parsedAction == null) {
+        throw const FormatException('plugin_invalid_header_stat_action');
+      }
+      if (text is String && text.trim().isEmpty ||
+          text is Map &&
+              text.values.every((v) => (v as String).trim().isEmpty)) {
+        continue;
+      }
+      stats.add(ComicHeaderStat(text: parsedText, action: parsedAction));
+    }
+    return List.unmodifiable(stats);
+  }
+
+  List<ComicInfoField> _extractInfoFields(
+    Object? value, {
+    required String sourceKey,
+  }) {
+    if (value == null) return const [];
+    if (value is! List) {
+      throw const FormatException('plugin_invalid_info_fields');
+    }
+    final fields = <ComicInfoField>[];
+    for (final item in value) {
+      if (item is! Map) {
+        throw const FormatException('plugin_invalid_info_field');
+      }
+      final label = item['label'];
+      final Object parsedLabel;
+      if (label is String && label.trim().isNotEmpty) {
+        parsedLabel = _translateSourceText(label.trim(), sourceKey: sourceKey);
+      } else if (label is Map &&
+          label.isNotEmpty &&
+          label.entries.every((e) => e.key is String && e.value is String) &&
+          label.values.any((v) => (v as String).trim().isNotEmpty)) {
+        parsedLabel = Map<String, String>.unmodifiable(
+          Map<String, String>.from(label),
+        );
+      } else {
+        throw const FormatException('plugin_invalid_info_field_label');
+      }
+      final rawValues = item['values'];
+      final List<String> values;
+      if (rawValues is String) {
+        values = [rawValues];
+      } else if (rawValues is List && rawValues.every((v) => v is String)) {
+        values = rawValues.cast<String>();
+      } else {
+        throw const FormatException('plugin_invalid_info_field_values');
+      }
+      final action = item['action'] ?? 'none';
+      final parsedAction = ComicInfoAction.values
+          .where((candidate) => candidate.name == action)
+          .firstOrNull;
+      if (parsedAction == null) {
+        throw const FormatException('plugin_invalid_info_field_action');
+      }
+      final nonempty = values.map((v) => v.trim()).where((v) => v.isNotEmpty);
+      if (nonempty.isEmpty) continue;
+      fields.add(
+        ComicInfoField(
+          label: parsedLabel,
+          values: List.unmodifiable(nonempty),
+          action: parsedAction,
+        ),
+      );
+    }
+    return List.unmodifiable(fields);
   }
 
   Map<String, String> _extractChapters(

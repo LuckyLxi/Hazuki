@@ -42,6 +42,218 @@ void main() {
     when(() => source.isInitialized).thenReturn(true);
   });
 
+  for (final count in [0, 1, 3, 12]) {
+    test(
+      'plugin generator preserves $count site entries without author lookup',
+      () async {
+        when(() => source.dailyRecommendationForSource('jm')).thenReturn(
+          const DailyRecommendationConfig(mode: DailyRecommendationMode.plugin),
+        );
+        when(() => source.loadDailyRecommendations(sourceKey: 'jm')).thenAnswer(
+          (_) async => List.generate(
+            count,
+            (index) => SourceDailyRecommendationItem(
+              comic: ExploreComic(
+                id: '$index',
+                sourceKey: 'jm',
+                title: 'Comic $index',
+                subTitle: '',
+                cover: 'cover$index',
+              ),
+              imageUrl: 'banner$index',
+            ),
+          ),
+        );
+        final generator = SourceDiscoverDailyRecommendationCandidateGenerator(
+          source: source,
+          random: Random(1),
+          loadAuthors: () => throw StateError('must not read author assets'),
+        );
+        final snapshot = await generator.generate(previous: _entries());
+        expect(snapshot!.recommendations, hasLength(count));
+        expect(snapshot.configurationKey, 'plugin');
+        expect(
+          snapshot.recommendations.map((entry) => entry.comic.id),
+          List.generate(count, (index) => '$index'),
+        );
+        verifyNever(
+          () => source.loadComicDetails(
+            any(),
+            sourceKey: any(named: 'sourceKey'),
+          ),
+        );
+      },
+    );
+  }
+
+  test(
+    'author recommendations also display a partial successful result',
+    () async {
+      when(
+        () => source.searchComics(
+          keyword: 'author',
+          page: 1,
+          order: 'mr',
+          sourceKey: 'jm',
+        ),
+      ).thenAnswer(
+        (_) async => SearchComicsResult(
+          comics: _entries().take(2).map((e) => e.comic).toList(),
+          maxPage: 1,
+        ),
+      );
+      when(
+        () => source.loadComicDetails(any(), sourceKey: 'jm'),
+      ).thenThrow(StateError('fallback'));
+      final generator = SourceDiscoverDailyRecommendationCandidateGenerator(
+        source: source,
+        random: Random(1),
+        loadAuthors: () async => ['author'],
+      );
+      expect(
+        (await generator.generate(previous: []))!.recommendations,
+        hasLength(2),
+      );
+    },
+  );
+
+  test(
+    'switching recommendation mode discards an in-flight website result',
+    () async {
+      when(() => source.dailyRecommendationForSource('jm')).thenReturn(
+        const DailyRecommendationConfig(mode: DailyRecommendationMode.plugin),
+      );
+      final pending = Completer<List<SourceDailyRecommendationItem>>();
+      when(
+        () => source.loadDailyRecommendations(sourceKey: 'jm'),
+      ).thenAnswer((_) => pending.future);
+      final generator = SourceDiscoverDailyRecommendationCandidateGenerator(
+        source: source,
+        random: Random(1),
+      );
+      final generated = generator.generate(previous: []);
+      when(
+        () => source.dailyRecommendationForSource('jm'),
+      ).thenReturn(const DailyRecommendationConfig(searchOrder: 'mr'));
+      pending.complete([]);
+      expect(await generated, isNull);
+    },
+  );
+
+  test(
+    'website refresh publishes entries before images load and without preloading',
+    () async {
+      when(() => source.dailyRecommendationForSource('jm')).thenReturn(
+        const DailyRecommendationConfig(mode: DailyRecommendationMode.plugin),
+      );
+      final cache = _Cache();
+      final old = DiscoverDailyRecommendationSnapshot(
+        recommendations: _entries().take(1).toList(),
+        selectedAuthor: '',
+        generatedAt: DateTime.now().subtract(const Duration(hours: 1)),
+        sourceKey: 'jm',
+        schemaVersion: 2,
+        configurationKey: 'plugin',
+      );
+      when(
+        () => cache.readSnapshot(activeSourceKey: 'jm'),
+      ).thenAnswer((_) async => old);
+      final refreshed = Completer<List<SourceDailyRecommendationItem>>();
+      when(
+        () => source.loadDailyRecommendations(sourceKey: 'jm'),
+      ).thenAnswer((_) => refreshed.future);
+      registerFallbackValue(old);
+      when(() => cache.persistSnapshot(any())).thenAnswer((_) async {});
+      final service = DiscoverDailyRecommendationService(
+        source: source,
+        cacheStore: cache,
+      );
+      addTearDown(service.dispose);
+      await service.ensurePrepared(enabled: true);
+      expect(service.state.isRefreshing, isTrue);
+      refreshed.complete(
+        _entries()
+            .take(3)
+            .map(
+              (e) => SourceDailyRecommendationItem(
+                comic: e.comic,
+                imageUrl: 'banner-${e.comic.id}',
+              ),
+            )
+            .toList(),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(service.state.displayedRecommendations, hasLength(3));
+      expect(service.state.isRefreshing, isFalse);
+      expect(service.state.isPendingReady, isFalse);
+      verifyNever(
+        () => source.downloadImageBytes(
+          any(),
+          keepInMemory: true,
+          sourceKey: 'jm',
+        ),
+      );
+    },
+  );
+
+  test('a failed website refresh retains the displayed cache', () async {
+    when(() => source.dailyRecommendationForSource('jm')).thenReturn(
+      const DailyRecommendationConfig(mode: DailyRecommendationMode.plugin),
+    );
+    when(
+      () => source.loadDailyRecommendations(sourceKey: 'jm'),
+    ).thenThrow(StateError('site unavailable'));
+    final cache = _Cache();
+    when(() => cache.readSnapshot(activeSourceKey: 'jm')).thenAnswer(
+      (_) async => DiscoverDailyRecommendationSnapshot(
+        recommendations: _entries().take(2).toList(),
+        selectedAuthor: '',
+        generatedAt: DateTime.now().subtract(const Duration(hours: 1)),
+        sourceKey: 'jm',
+        schemaVersion: 2,
+        configurationKey: 'plugin',
+      ),
+    );
+    final service = DiscoverDailyRecommendationService(
+      source: source,
+      cacheStore: cache,
+    );
+    addTearDown(service.dispose);
+    await service.ensurePrepared(enabled: true);
+    await Future<void>.delayed(Duration.zero);
+    expect(service.state.recommendations, hasLength(2));
+    expect(service.state.isRefreshing, isFalse);
+  });
+
+  test(
+    'plugin mode never restores an old author-mode cache for the same source',
+    () async {
+      when(() => source.isInitialized).thenReturn(false);
+      when(() => source.dailyRecommendationForSource('jm')).thenReturn(
+        const DailyRecommendationConfig(mode: DailyRecommendationMode.plugin),
+      );
+      final cache = _Cache();
+      when(() => cache.readSnapshot(activeSourceKey: 'jm')).thenAnswer(
+        (_) async => DiscoverDailyRecommendationSnapshot(
+          recommendations: _entries(),
+          selectedAuthor: 'author',
+          generatedAt: DateTime.now(),
+          sourceKey: 'jm',
+          schemaVersion: 2,
+        ),
+      );
+      final service = DiscoverDailyRecommendationService(
+        source: source,
+        cacheStore: cache,
+      );
+      addTearDown(service.dispose);
+      expect(
+        (await service.ensurePrepared(enabled: true)).recommendations,
+        isEmpty,
+      );
+    },
+  );
+
   test(
     'generator uses injected authors and timestamp without an asset bundle',
     () async {

@@ -6,7 +6,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:hazuki/features/comic_detail/view/comic_detail_meta.dart';
 import 'package:hazuki/l10n/app_localizations.dart';
 import 'package:hazuki/models/hazuki_models.dart';
-import 'package:hazuki/services/source/source_capabilities.dart';
 
 void main() {
   testWidgets('mobile ID precedes authors and copies only on long press', (
@@ -41,6 +40,18 @@ void main() {
         'tags': ['Action'],
         'views': ['10'],
       },
+      infoFields: [
+        ComicInfoField(
+          label: 'Author',
+          values: ['Artist'],
+          action: ComicInfoAction.search,
+        ),
+        ComicInfoField(
+          label: 'Tags',
+          values: ['Action'],
+          action: ComicInfoAction.search,
+        ),
+      ],
       recommend: [],
       isFavorite: false,
       subId: '',
@@ -166,6 +177,18 @@ void main() {
         'tags': <String>['Action'],
         'views': <String>['10'],
       },
+      infoFields: [
+        ComicInfoField(
+          label: 'Author',
+          values: ['Artist'],
+          action: ComicInfoAction.search,
+        ),
+        ComicInfoField(
+          label: 'Tags',
+          values: ['Action'],
+          action: ComicInfoAction.search,
+        ),
+      ],
       recommend: <ExploreComic>[],
       isFavorite: false,
       subId: '',
@@ -211,6 +234,33 @@ void main() {
         'Tags': <String>['Action'],
         'Chinese Team': <String>['Team A'],
       },
+      infoFields: [
+        ComicInfoField(
+          label: 'Author',
+          values: ['Artist'],
+          action: ComicInfoAction.search,
+        ),
+        ComicInfoField(
+          label: 'Categories',
+          values: ['Webtoon'],
+          action: ComicInfoAction.search,
+        ),
+        ComicInfoField(
+          label: 'Tags',
+          values: ['Action'],
+          action: ComicInfoAction.search,
+        ),
+        ComicInfoField(
+          label: 'Uploader',
+          values: ['Uploader'],
+          action: ComicInfoAction.search,
+        ),
+        ComicInfoField(
+          label: 'Chinese team',
+          values: ['Team A'],
+          action: ComicInfoAction.search,
+        ),
+      ],
       recommend: <ExploreComic>[],
       isFavorite: false,
       subId: '',
@@ -265,6 +315,28 @@ void main() {
         'Actor': <String>['Heroine'],
         'View': <String>['10'],
       },
+      infoFields: [
+        ComicInfoField(
+          label: 'Author',
+          values: ['Artist'],
+          action: ComicInfoAction.search,
+        ),
+        ComicInfoField(
+          label: 'Tags',
+          values: ['Action'],
+          action: ComicInfoAction.search,
+        ),
+        ComicInfoField(
+          label: '作品',
+          values: ['Original'],
+          action: ComicInfoAction.search,
+        ),
+        ComicInfoField(
+          label: '角色',
+          values: ['Heroine'],
+          action: ComicInfoAction.search,
+        ),
+      ],
       recommend: <ExploreComic>[],
       isFavorite: false,
       subId: '',
@@ -301,137 +373,113 @@ void main() {
     expect(pressedValues, <String>['Action', 'Original', 'Heroine']);
   });
 
-  for (final spec in [
-    (
-      name: 'uploader does not enable other explicitly disabled fields',
-      presentation: <String, dynamic>{
-        'showUploader': true,
-        'showCategories': false,
-        'showChineseTeam': false,
-        'detailTagGroups': ['Genre'],
-      },
-      categories: false,
-      team: false,
-      uploader: true,
-      tags: <String>['Fantasy'],
-    ),
-    (
-      name: 'categories and team work without uploader',
-      presentation: <String, dynamic>{
-        'showUploader': false,
-        'showCategories': true,
-        'showChineseTeam': true,
-        'detailTagGroups': ['tags'],
-      },
-      categories: true,
-      team: true,
-      uploader: false,
-      tags: <String>['Action'],
-    ),
-    (
-      name: 'empty tag groups hide tags with uploader enabled',
-      presentation: <String, dynamic>{
-        'showUploader': true,
-        'showCategories': false,
-        'showChineseTeam': false,
-        'detailTagGroups': <String>[],
-      },
-      categories: false,
-      team: false,
-      uploader: true,
-      tags: <String>[],
-    ),
-    (
-      name: 'legacy declarations preserve existing metadata rows',
-      presentation: <String, dynamic>{'showUploader': true},
-      categories: true,
-      team: true,
-      uploader: true,
-      tags: <String>['Action'],
-    ),
-    (
-      name: 'detail tag groups ignore whitespace and case',
-      presentation: <String, dynamic>{
-        'showCategories': false,
-        'showChineseTeam': false,
-        'detailTagGroups': [' GENRE '],
-      },
-      categories: false,
-      team: false,
-      uploader: false,
-      tags: <String>['Fantasy'],
-    ),
-  ]) {
-    testWidgets(spec.name, (tester) async {
-      const details = ComicDetailsData(
-        id: 'custom-id',
-        title: 'Comic',
-        subTitle: '',
-        cover: '',
-        description: '',
-        updateTime: '',
-        likesCount: '',
-        chapters: {},
-        tags: {
-          'Author': ['Artist'],
-          'Categories': ['Webtoon'],
-          'Tags': ['Action'],
-          'Chinese Team': ['Team A'],
-          'Genre': ['Fantasy'],
-          'Views': ['10'],
-        },
-        recommend: [],
-        isFavorite: false,
-        subId: '',
-        uploader: 'Uploader',
-        sourceKey: 'arbitrary',
-      );
-      await tester.pumpWidget(
-        MaterialApp(
-          locale: const Locale('en'),
-          builder: (context, child) => withTestSourcePresentation(
-            child!,
-            activeSourceKey: 'arbitrary',
-            catalog: [
-              SourceCatalogEntry(
-                key: 'arbitrary',
-                name: 'Custom',
-                fileName: 'main.js',
-                presentation: spec.presentation,
+  for (final mobile in [true, false]) {
+    testWidgets(
+      'plugin rows preserve labels, order and actions (mobile=$mobile)',
+      (tester) async {
+        final searched = <String>[];
+        final copied = <String>[];
+        final details = _customDetails();
+        await tester.pumpWidget(
+          MaterialApp(
+            locale: const Locale('en'),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: AppLocalizations.supportedLocales,
+            home: Scaffold(
+              body: ComicDetailMetaSection(
+                details: details,
+                showComicId: false,
+                useMobileStyle: mobile,
+                onCopyId: (_) {},
+                onTagValuePressed: searched.add,
+                onMetaValueLongPress: copied.add,
               ),
-            ],
-          ),
-          localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: AppLocalizations.supportedLocales,
-          home: Scaffold(
-            body: ComicDetailMetaSection(
-              details: details,
-              showComicId: false,
-              onCopyId: (_) {},
-              onTagValuePressed: (_) {},
-              onMetaValueLongPress: (_) {},
             ),
           ),
-        ),
-      );
-      expect(
-        find.text('Categories: '),
-        spec.categories ? findsOneWidget : findsNothing,
-      );
-      expect(
-        find.text('Chinese team: '),
-        spec.team ? findsOneWidget : findsNothing,
-      );
-      expect(
-        find.text('Uploader: '),
-        spec.uploader ? findsOneWidget : findsNothing,
-      );
-      final tags = tester
-          .widgetList<ComicDetailMetaRow>(find.byType(ComicDetailMetaRow))
-          .singleWhere((row) => row.label == 'Tags');
-      expect(tags.values, spec.tags);
-      expect(find.textContaining('ID:'), findsNothing);
-      expect(tester.takeException(), isNull);
-    });
+        );
+        final rows = tester
+            .widgetList<ComicDetailMetaRow>(find.byType(ComicDetailMetaRow))
+            .toList();
+        expect(rows.map((r) => r.label), [
+          'Status',
+          'Original story',
+          'Publisher',
+        ]);
+        expect(find.text('Should not leak'), findsNothing);
+        expect(find.text('Legacy uploader'), findsNothing);
+        expect(find.text('Hidden'), findsNothing);
+        expect(rows.first.onValuePressed, isNull);
+        await tester.tap(find.text('Ongoing'));
+        expect(searched, isEmpty);
+        expect(copied, isEmpty);
+        await tester.tap(find.text('Name, with/slashes'));
+        expect(searched, ['Name, with/slashes']);
+        await tester.tap(find.text('Publisher A'));
+        expect(copied, ['Publisher A']);
+        await tester.longPress(find.text('Ongoing'));
+        expect(copied, ['Publisher A', 'Ongoing']);
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
+
+  testWidgets('language maps follow the page locale without changing data', (
+    tester,
+  ) async {
+    Future<void> render(Locale locale) => tester.pumpWidget(
+      MaterialApp(
+        locale: locale,
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+        home: Scaffold(
+          body: ComicDetailMetaSection(
+            details: _customDetails(),
+            showComicId: false,
+            onCopyId: (_) {},
+            onTagValuePressed: (_) {},
+            onMetaValueLongPress: (_) {},
+          ),
+        ),
+      ),
+    );
+    await render(const Locale('en'));
+    expect(find.text('Status: '), findsOneWidget);
+    await render(const Locale('zh', 'CN'));
+    await tester.pumpAndSettle();
+    expect(find.text('状态: '), findsOneWidget);
+    expect(find.text('Ongoing'), findsOneWidget);
+  });
 }
+
+ComicDetailsData _customDetails() => const ComicDetailsData(
+  id: 'custom',
+  title: 'Comic',
+  subTitle: '',
+  cover: '',
+  description: '',
+  updateTime: '',
+  likesCount: '',
+  chapters: {},
+  tags: {
+    'Author': ['Should not leak'],
+    'Status': ['Should not leak'],
+  },
+  uploader: 'Legacy uploader',
+  recommend: [],
+  isFavorite: false,
+  subId: '',
+  infoFields: [
+    ComicInfoField(label: {'zh': '状态', 'en': 'Status'}, values: ['Ongoing']),
+    ComicInfoField(
+      label: 'Original story',
+      values: ['Name, with/slashes'],
+      action: ComicInfoAction.search,
+    ),
+    ComicInfoField(label: 'Hidden', values: []),
+    ComicInfoField(
+      label: 'Publisher',
+      values: ['Publisher A'],
+      action: ComicInfoAction.copy,
+    ),
+  ],
+);

@@ -432,7 +432,7 @@ void main() {
       expect((sections.single as Map)['viewMore'], 'category:最新更新@doujin');
       final search = await run("source.search.load('a b&c',['mv'],2)") as Map;
       expect(search['maxPage'], 2);
-      expect(((search['comics'] as List).single as Map)['subTitle'], 'Author');
+      expect(((search['comics'] as List).single as Map)['subTitle'], isNull);
       expect(fixtures.requests.last.uri.queryParameters, {
         'search_query': 'a b&c',
         'o': 'mv',
@@ -484,10 +484,7 @@ void main() {
     final details = await run("source.comic.loadInfo('jm7')") as Map;
     expect(details['id'], '7');
     expect(details['chapters'], {'11': 'First', '12': '第2話'});
-    expect(
-      ((details['recommend'] as List).single as Map)['subTitle'],
-      'Related author',
-    );
+    expect(((details['recommend'] as List).single as Map)['subTitle'], isNull);
     expect((details['tags'] as Map)['View'], ['123']);
     fixtures.responses['/album'] = {'name': 'Single chapter'};
     expect((await run("source.comic.loadInfo('7')") as Map)['chapters'], {

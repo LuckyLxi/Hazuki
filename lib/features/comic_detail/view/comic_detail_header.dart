@@ -19,9 +19,7 @@ class ComicDetailHeaderSection extends StatelessWidget {
     required this.details,
     required this.skeletonColor,
     required this.displayTitle,
-    required this.displaySubTitle,
     required this.displayCoverUrl,
-    required this.viewsText,
     required this.headerTitleKey,
     required this.favoriteRowKey,
     required this.actionButtonsKey,
@@ -33,9 +31,7 @@ class ComicDetailHeaderSection extends StatelessWidget {
   final ComicDetailsData? details;
   final Color skeletonColor;
   final String displayTitle;
-  final String displaySubTitle;
   final String displayCoverUrl;
-  final String viewsText;
   final GlobalKey headerTitleKey;
   final GlobalKey favoriteRowKey;
   final GlobalKey actionButtonsKey;
@@ -85,16 +81,6 @@ class ComicDetailHeaderSection extends StatelessWidget {
                             : theme.textTheme.titleLarge)
                         ?.copyWith(fontWeight: FontWeight.w700, height: 1.25),
               ),
-              if (displaySubTitle.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Text(
-                  displaySubTitle,
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    height: 1.5,
-                  ),
-                ),
-              ],
             ],
           );
           final animatedTitle = shouldAnimateInitialDetailReveal
@@ -113,7 +99,6 @@ class ComicDetailHeaderSection extends StatelessWidget {
                 details: details,
                 favoriteRowKey: favoriteRowKey,
                 skeletonColor: skeletonColor,
-                viewsText: viewsText,
                 shouldAnimateInitialDetailReveal:
                     shouldAnimateInitialDetailReveal,
                 isDesktop: true,
@@ -240,18 +225,6 @@ class ComicDetailHeaderSection extends StatelessWidget {
                             ),
                           ),
                         ),
-                        if (displaySubTitle.isNotEmpty) ...[
-                          const SizedBox(height: 10),
-                          Text(
-                            displaySubTitle,
-                            maxLines: 3,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: colors.onSurfaceVariant,
-                              height: 1.5,
-                            ),
-                          ),
-                        ],
                         if (status.isNotEmpty) ...[
                           const SizedBox(height: 10),
                           Container(
@@ -281,7 +254,6 @@ class ComicDetailHeaderSection extends StatelessWidget {
                 details: details,
                 favoriteRowKey: favoriteRowKey,
                 skeletonColor: skeletonColor,
-                viewsText: viewsText,
                 shouldAnimateInitialDetailReveal:
                     shouldAnimateInitialDetailReveal,
               ),

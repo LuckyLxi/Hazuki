@@ -18,11 +18,34 @@ abstract interface class DiscoverDailyRecommendationCacheStore {
 
 class SharedPreferencesDiscoverDailyRecommendationCacheStore
     implements DiscoverDailyRecommendationCacheStore {
-  const SharedPreferencesDiscoverDailyRecommendationCacheStore();
+  SharedPreferencesDiscoverDailyRecommendationCacheStore();
+
+  final _sessionSnapshots = <String, DiscoverDailyRecommendationSnapshot>{};
+  late final Future<SharedPreferences> _preferences = _loadPreferences();
+
+  Future<SharedPreferences> _loadPreferences() async {
+    final prefs = await SharedPreferences.getInstance();
+    // Earlier versions persisted plugin recommendations. Never restore them
+    // into a new app session, including caches belonging to inactive sources.
+    for (final key in prefs.getKeys()) {
+      if (key != _discoverDailyRecommendationCachePayloadKey &&
+          !key.startsWith('${_discoverDailyRecommendationCachePayloadKey}_')) {
+        continue;
+      }
+      final snapshot = _parseCachePayload(
+        prefs.getString(key),
+        fallbackSourceKey: 'jm',
+      );
+      if (snapshot?.configurationKey == 'plugin') {
+        await prefs.remove(key);
+      }
+    }
+    return prefs;
+  }
 
   @override
   Future<void> setEnabled(bool enabled) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await _preferences;
     await prefs.setBool(
       hazukiDiscoverDailyRecommendationEnabledPreferenceKey,
       enabled,
@@ -31,7 +54,7 @@ class SharedPreferencesDiscoverDailyRecommendationCacheStore
 
   @override
   Future<bool> loadEnabled() async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await _preferences;
     return prefs.getBool(
           hazukiDiscoverDailyRecommendationEnabledPreferenceKey,
         ) ??
@@ -42,7 +65,14 @@ class SharedPreferencesDiscoverDailyRecommendationCacheStore
   Future<void> persistSnapshot(
     DiscoverDailyRecommendationSnapshot snapshot,
   ) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await _preferences;
+    final sourceKey = snapshot.sourceKey.trim();
+    if (snapshot.configurationKey == 'plugin') {
+      _sessionSnapshots[sourceKey] = snapshot;
+      await prefs.remove(_sourceCachePayloadKey(sourceKey));
+      return;
+    }
+    _sessionSnapshots.remove(sourceKey);
     await prefs.setString(
       _sourceCachePayloadKey(snapshot.sourceKey),
       jsonEncode(<String, dynamic>{
@@ -50,6 +80,7 @@ class SharedPreferencesDiscoverDailyRecommendationCacheStore
         'sourceKey': snapshot.sourceKey,
         'generatedAt': snapshot.generatedAt.toIso8601String(),
         'selectedAuthor': snapshot.selectedAuthor,
+        'configurationKey': snapshot.configurationKey,
         'entries': snapshot.recommendations
             .map((entry) => entry.toJson())
             .toList(),
@@ -61,8 +92,10 @@ class SharedPreferencesDiscoverDailyRecommendationCacheStore
   Future<DiscoverDailyRecommendationSnapshot?> readSnapshot({
     required String activeSourceKey,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs = await _preferences;
     final normalizedActiveSourceKey = activeSourceKey.trim();
+    final sessionSnapshot = _sessionSnapshots[normalizedActiveSourceKey];
+    if (sessionSnapshot != null) return sessionSnapshot;
     final hasActiveSourceKey = normalizedActiveSourceKey.isNotEmpty;
     final candidates = <String>[
       if (hasActiveSourceKey) _sourceCachePayloadKey(activeSourceKey),
@@ -155,9 +188,8 @@ class SharedPreferencesDiscoverDailyRecommendationCacheStore
           : const <DiscoverDailyRecommendationEntry>[];
       if (sourceKey.isEmpty ||
           generatedAt == null ||
-          selectedAuthor.isEmpty ||
-          entries.length !=
-              DiscoverDailyRecommendationConfig.recommendationCount ||
+          entriesRaw is! List ||
+          entries.length != entriesRaw.length ||
           entries.any((entry) => entry.comic.sourceKey != sourceKey)) {
         return null;
       }
@@ -167,6 +199,7 @@ class SharedPreferencesDiscoverDailyRecommendationCacheStore
         generatedAt: generatedAt,
         sourceKey: sourceKey,
         schemaVersion: version,
+        configurationKey: (map['configurationKey'] ?? '').toString(),
       );
     } catch (_) {
       return null;

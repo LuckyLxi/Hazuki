@@ -48,8 +48,35 @@ class SourceDiscoverDailyRecommendationCandidateGenerator
     bool hasSameActiveSource() {
       return _supportsActiveSource &&
           (_source.activeSourceKey ?? '').trim() == sourceKey &&
-          _source.dailyRecommendationForSource(sourceKey)?.searchOrder ==
-              config.searchOrder;
+          _source.dailyRecommendationForSource(sourceKey)?.cacheKey ==
+              config.cacheKey;
+    }
+
+    if (config.mode == DailyRecommendationMode.plugin) {
+      try {
+        final items = await _source.loadDailyRecommendations(
+          sourceKey: sourceKey,
+        );
+        if (!hasSameActiveSource()) return null;
+        return DiscoverDailyRecommendationSnapshot(
+          recommendations: List.unmodifiable(
+            items.map(
+              (item) => DiscoverDailyRecommendationEntry(
+                author: item.caption,
+                comic: item.comic,
+                imageUrl: item.imageUrl,
+              ),
+            ),
+          ),
+          selectedAuthor: '',
+          generatedAt: _now(),
+          sourceKey: sourceKey,
+          schemaVersion: DiscoverDailyRecommendationConfig.cacheSchemaVersion,
+          configurationKey: config.cacheKey,
+        );
+      } catch (_) {
+        return null;
+      }
     }
 
     final authors = await _loadAuthors();
@@ -159,8 +186,7 @@ class SourceDiscoverDailyRecommendationCandidateGenerator
     }
 
     if (!hasSameActiveSource() ||
-        recommendations.length !=
-            DiscoverDailyRecommendationConfig.recommendationCount ||
+        recommendations.isEmpty ||
         contributingAuthors.isEmpty) {
       return null;
     }
@@ -171,6 +197,7 @@ class SourceDiscoverDailyRecommendationCandidateGenerator
       generatedAt: _now(),
       sourceKey: sourceKey,
       schemaVersion: DiscoverDailyRecommendationConfig.cacheSchemaVersion,
+      configurationKey: config.cacheKey,
     );
   }
 

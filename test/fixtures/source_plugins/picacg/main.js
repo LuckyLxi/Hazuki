@@ -240,7 +240,6 @@ function picacgComic(comic) {
   return {
     id: String(comic._id),
     title: String(comic.title || ""),
-    subTitle: String(comic.author || ""),
     cover: picacgAvatarUrl(comic.thumb) || "",
     tags: [...(comic.tags || []), ...(comic.categories || [])],
   };
@@ -274,7 +273,7 @@ function picacgComment(comment) {
 const source = {
   id: "picacg",
   name: "Picacg",
-  version: "1.0.2",
+  version: "1.0.3",
   apiVersion: 1,
   account: {
     login: picacgLogin,
@@ -462,12 +461,69 @@ const source = {
           Categories: info.categories || [],
           Tags: info.tags || [],
         },
+        infoFields: [
+          {
+            label: { zh: "作者", en: "Author" },
+            values: info.author ? [String(info.author)] : [],
+            action: "search",
+          },
+          {
+            label: { zh: "分类", en: "Categories" },
+            values: info.categories || [],
+            action: "search",
+          },
+          {
+            label: { zh: "标签", en: "Tags" },
+            values: info.tags || [],
+            action: "search",
+          },
+          {
+            label: { zh: "上传者", en: "Uploader" },
+            values: String(info._creator?.name || ""),
+            action: "search",
+          },
+          {
+            label: { zh: "汉化组", en: "Chinese team" },
+            values: info.chineseTeam ? [String(info.chineseTeam)] : [],
+            action: "search",
+          },
+          {
+            label: { zh: "状态", en: "Status" },
+            values:
+              typeof info.finished === "boolean"
+                ? info.finished
+                  ? "已完结"
+                  : "连载中"
+                : "",
+          },
+        ],
         chapters: new Map(
           episodes.map((ep, index) => [String(index + 1), String(ep.title)]),
         ),
         isFavorite: Boolean(info.isFavourite),
         isLiked: Boolean(info.isLiked),
         recommend: (relatedResponse.data.comics || []).map(picacgComic),
+        headerStats: [
+          {
+            text:
+              info.likesCount == null
+                ? ""
+                : {
+                    zh: `${info.likesCount}点赞`,
+                    en: `${info.likesCount} likes`,
+                  },
+            action: "like",
+          },
+          {
+            text:
+              info.pagesCount == null
+                ? ""
+                : {
+                    zh: `${info.pagesCount}页`,
+                    en: `${info.pagesCount} pages`,
+                  },
+          },
+        ],
         likesCount: info.likesCount,
         uploader: String(info._creator?.name || ""),
         pageCount: info.pagesCount,
@@ -635,6 +691,7 @@ const source = {
     },
   },
   presentation: {
+    showComments: true,
     buttons: [
       { id: "checkIn", location: "homeProfile" },
       { id: "autoCheckIn", location: "other" },
@@ -647,11 +704,6 @@ const source = {
     listTagGroups: ["tag", "tags", "category", "categories", "标签", "分类"],
     enrichMissingTags: true,
     localFavoriteOrders: { dd: "savedNewest", da: "savedOldest" },
-    showUploader: true,
-    showCategories: true,
-    showChineseTeam: true,
-    detailTagGroups: ["tag", "tags", "标签"],
-    showPageCount: true,
     searchDefaultOrder: "dd",
     searchOrders: {
       dd: "新到旧",

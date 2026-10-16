@@ -10,12 +10,14 @@ class ComicDetailUiStateController extends ChangeNotifier {
     required TickerProvider vsync,
     required ScrollController scrollController,
     required bool includeRelatedTab,
+    required bool includeCommentsTab,
   }) : _comicId = comicId,
        _shouldAnimateInitialRevealOverride = shouldAnimateInitialRevealOverride,
        _initialTabIndex = initialTabIndex,
        _vsync = vsync,
        _scrollController = scrollController,
-       _includeRelatedTab = includeRelatedTab;
+       _includeRelatedTab = includeRelatedTab,
+       _includeCommentsTab = includeCommentsTab;
 
   final String _comicId;
   final bool? _shouldAnimateInitialRevealOverride;
@@ -23,6 +25,7 @@ class ComicDetailUiStateController extends ChangeNotifier {
   final TickerProvider _vsync;
   final ScrollController _scrollController;
   final bool _includeRelatedTab;
+  final bool _includeCommentsTab;
 
   bool _disposed = false;
 
@@ -40,6 +43,9 @@ class ComicDetailUiStateController extends ChangeNotifier {
       _appBarSolidProgressNotifier;
   ValueNotifier<bool> get collapsedTitleNotifier => _collapsedTitleNotifier;
   TabController get tabController => _tabController;
+  int? get commentsTabIndex => _includeCommentsTab ? 1 : null;
+  int? get relatedTabIndex =>
+      _includeRelatedTab ? (_includeCommentsTab ? 2 : 1) : null;
   bool get shouldAnimateInitialDetailReveal =>
       _shouldAnimateInitialDetailReveal;
   String get appBarComicTitle => _appBarComicTitle;
@@ -52,9 +58,11 @@ class ComicDetailUiStateController extends ChangeNotifier {
         !wasComicDetailIdAnimated(_comicId.trim());
     _appBarSolidProgressNotifier = ValueNotifier<double>(0);
     _collapsedTitleNotifier = ValueNotifier<bool>(false);
+    final tabCount =
+        1 + (_includeCommentsTab ? 1 : 0) + (_includeRelatedTab ? 1 : 0);
     _tabController = TabController(
-      length: _includeRelatedTab ? 3 : 2,
-      initialIndex: _initialTabIndex.clamp(0, _includeRelatedTab ? 2 : 1),
+      length: tabCount,
+      initialIndex: _initialTabIndex.clamp(0, tabCount - 1),
       vsync: _vsync,
     )..addListener(_handleTabChanged);
     _appBarComicTitle = initialAppBarTitle;
@@ -105,7 +113,8 @@ class ComicDetailUiStateController extends ChangeNotifier {
 
   Future<void> ensureCommentsTabFullscreen() async {
     if (_disposed ||
-        _tabController.index != 1 ||
+        commentsTabIndex == null ||
+        _tabController.index != commentsTabIndex ||
         !_scrollController.hasClients ||
         _isAnimatingCommentsFullscreen) {
       return;

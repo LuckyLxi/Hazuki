@@ -3,16 +3,21 @@ import '../../models/hazuki_models.dart';
 
 class DiscoverDailyRecommendationEntry {
   const DiscoverDailyRecommendationEntry({
-    required this.author,
+    this.author = '',
     required this.comic,
+    this.imageUrl = '',
   });
 
   final String author;
   final ExploreComic comic;
+  final String imageUrl;
+  String get displayImageUrl =>
+      imageUrl.trim().isEmpty ? comic.cover : imageUrl;
 
   Map<String, dynamic> toJson() {
     return <String, dynamic>{
       'author': author,
+      'imageUrl': imageUrl,
       'comic': <String, dynamic>{
         'id': comic.id,
         'sourceKey': comic.sourceKey,
@@ -47,12 +52,14 @@ class DiscoverDailyRecommendationEntry {
       subTitle: (comicMap['subTitle'] ?? '').toString(),
       cover: (comicMap['cover'] ?? '').toString(),
     );
-    if (author.isEmpty ||
-        comic.id.trim().isEmpty ||
-        comic.title.trim().isEmpty) {
+    if (comic.id.trim().isEmpty || comic.title.trim().isEmpty) {
       return null;
     }
-    return DiscoverDailyRecommendationEntry(author: author, comic: comic);
+    return DiscoverDailyRecommendationEntry(
+      author: author,
+      comic: comic,
+      imageUrl: (map['imageUrl'] ?? '').toString(),
+    );
   }
 }
 
@@ -134,6 +141,7 @@ class DiscoverDailyRecommendationSnapshot {
     required this.generatedAt,
     required this.sourceKey,
     required this.schemaVersion,
+    this.configurationKey = '',
   });
 
   final List<DiscoverDailyRecommendationEntry> recommendations;
@@ -141,4 +149,5 @@ class DiscoverDailyRecommendationSnapshot {
   final DateTime generatedAt;
   final String sourceKey;
   final int schemaVersion;
+  final String configurationKey;
 }

@@ -163,24 +163,12 @@ class _SourcePluginSettingsContentState
           : null;
       return ListTile(
         title: Text(title),
-        trailing: widget.location == SourcePluginActionLocation.lines
-            ? HazukiFrostedDropdown<String>(
-                selected: selected,
-                options: options,
-                tooltip: title,
-                onSelected: (v) => unawaited(_set(key, v)),
-              )
-            : DropdownButton<String>(
-                value: selected,
-                items: [
-                  for (final option in options)
-                    DropdownMenuItem(
-                      value: option.value,
-                      child: Text(option.label),
-                    ),
-                ],
-                onChanged: (v) => _set(key, v),
-              ),
+        trailing: HazukiFrostedDropdown<String>(
+          selected: selected,
+          options: options,
+          tooltip: title,
+          onSelected: (v) => unawaited(_set(key, v)),
+        ),
       );
     }
     return ListTile(

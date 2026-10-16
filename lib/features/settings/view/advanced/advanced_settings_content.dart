@@ -166,13 +166,31 @@ class AdvancedSettingsContent extends StatelessWidget {
                       key: ValueKey<String>('restore-comic-source-empty'),
                     ),
             ),
-            if (onRedownloadComicSource != null)
-              ListTile(
-                key: const ValueKey('redownload-comic-source'),
-                leading: const Icon(Icons.download_rounded),
-                title: Text(strings.sourceRedownloadTitle),
-                onTap: onRedownloadComicSource,
-              ),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 240),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              transitionBuilder: (child, animation) {
+                return FadeTransition(
+                  opacity: animation,
+                  child: SizeTransition(
+                    sizeFactor: animation,
+                    alignment: const AlignmentDirectional(-1.0, -1.0),
+                    child: child,
+                  ),
+                );
+              },
+              child: hasSourceBackup && onRedownloadComicSource != null
+                  ? ListTile(
+                      key: const ValueKey('redownload-comic-source'),
+                      leading: const Icon(Icons.download_rounded),
+                      title: Text(strings.sourceRedownloadTitle),
+                      onTap: onRedownloadComicSource,
+                    )
+                  : const SizedBox.shrink(
+                      key: ValueKey('redownload-comic-source-empty'),
+                    ),
+            ),
           ],
         ),
         ?footer,

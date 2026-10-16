@@ -6,6 +6,7 @@ class ExploreSection {
     required this.comics,
     this.viewMoreUrl,
     this.maxPage,
+    this.initialPage = 1,
     this.offersInitialComicsFilter = false,
   });
 
@@ -16,6 +17,9 @@ class ExploreSection {
   final String? viewMoreUrl;
 
   final int? maxPage;
+
+  /// Last complete page included in [comics]; zero for a homepage preview.
+  final int initialPage;
 
   /// Adds a local filter for the comics already returned by the explore page.
   ///
@@ -28,6 +32,7 @@ class ExploreSection {
     List<ExploreComic>? comics,
     String? viewMoreUrl,
     int? maxPage,
+    int? initialPage,
     bool? offersInitialComicsFilter,
   }) {
     return ExploreSection(
@@ -35,6 +40,7 @@ class ExploreSection {
       comics: comics ?? this.comics,
       viewMoreUrl: viewMoreUrl ?? this.viewMoreUrl,
       maxPage: maxPage ?? this.maxPage,
+      initialPage: initialPage ?? this.initialPage,
       offersInitialComicsFilter:
           offersInitialComicsFilter ?? this.offersInitialComicsFilter,
     );

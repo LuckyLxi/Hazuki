@@ -1,6 +1,34 @@
 import 'explore_models.dart';
 import 'source_scoped_comic_id.dart';
 
+enum ComicInfoAction { none, search, copy }
+
+enum ComicHeaderStatAction { none, like }
+
+/// A short plugin-defined item above the reader button, never long-form text.
+class ComicHeaderStat {
+  const ComicHeaderStat({
+    required this.text,
+    this.action = ComicHeaderStatAction.none,
+  });
+
+  final Object text;
+  final ComicHeaderStatAction action;
+}
+
+/// One plugin-defined detail row. Labels may be localized language maps.
+class ComicInfoField {
+  const ComicInfoField({
+    required this.label,
+    required this.values,
+    this.action = ComicInfoAction.none,
+  });
+
+  final Object label;
+  final List<String> values;
+  final ComicInfoAction action;
+}
+
 class ComicDetailsData {
   const ComicDetailsData({
     required this.id,
@@ -19,6 +47,9 @@ class ComicDetailsData {
     this.pageCount = '',
     this.isLiked = false,
     this.sourceKey = '',
+    this.infoFields = const [],
+    this.viewsCount = '',
+    this.headerStats = const [],
   });
 
   final String id;
@@ -37,6 +68,9 @@ class ComicDetailsData {
   final String pageCount;
   final bool isLiked;
   final String sourceKey;
+  final List<ComicInfoField> infoFields;
+  final String viewsCount;
+  final List<ComicHeaderStat> headerStats;
 
   SourceScopedComicId get scopedId =>
       SourceScopedComicId(sourceKey: sourceKey, comicId: id);
@@ -58,6 +92,9 @@ class ComicDetailsData {
     String? pageCount,
     bool? isLiked,
     String? sourceKey,
+    List<ComicInfoField>? infoFields,
+    String? viewsCount,
+    List<ComicHeaderStat>? headerStats,
   }) {
     return ComicDetailsData(
       id: id ?? this.id,
@@ -76,6 +113,9 @@ class ComicDetailsData {
       pageCount: pageCount ?? this.pageCount,
       isLiked: isLiked ?? this.isLiked,
       sourceKey: sourceKey ?? this.sourceKey,
+      infoFields: infoFields ?? this.infoFields,
+      viewsCount: viewsCount ?? this.viewsCount,
+      headerStats: headerStats ?? this.headerStats,
     );
   }
 }

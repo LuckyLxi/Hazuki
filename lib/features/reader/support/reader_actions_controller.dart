@@ -14,6 +14,7 @@ import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/manga_download/manga_download_commands.dart';
 import 'package:hazuki/shared/chapter_title_resolver.dart';
+import 'package:hazuki/shared/source_presentation.dart';
 import 'package:hazuki/shared/comments/comments_interaction_state.dart';
 import 'package:hazuki/shared/downloads/download_conflict_dialog.dart';
 import 'package:hazuki/widgets/widgets.dart';
@@ -58,6 +59,10 @@ class ReaderActionsController {
       CommentsInteractionState();
 
   bool get chapterPanelLoading => _chapterPanelLoading;
+  bool get commentsEnabled =>
+      !_pageContext.offlineMode &&
+      _isMounted() &&
+      sourceCommentsEnabled(_pageContext.sourceKey, context: _context());
 
   Future<ComicDetailsData> loadReaderComicDetails() async {
     final details =
@@ -116,13 +121,13 @@ class ReaderActionsController {
   }
 
   Future<void> openCommentsSheet() async {
-    _logEvent('Reader comments sheet requested', source: 'reader_ui');
-    if (_pageContext.offlineMode) {
+    if (!commentsEnabled) {
       return;
     }
+    _logEvent('Reader comments sheet requested', source: 'reader_ui');
     try {
       final details = await loadReaderComicDetails();
-      if (!_isMounted()) {
+      if (!_isMounted() || !commentsEnabled) {
         return;
       }
       final context = _context();

@@ -461,7 +461,7 @@ class _ReaderPageState extends State<ReaderPage>
                       unawaited(_openFavoriteDialogAndRestoreFocus());
                     }
                   : null,
-              onComments: widget.offlineMode
+              onComments: !_actionsController.commentsEnabled
                   ? null
                   : () {
                       unawaited(_actionsController.openCommentsSheet());

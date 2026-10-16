@@ -1,7 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_registry.dart';
 import 'package:hazuki/services/source/plugins/source_plugin_buttons.dart';
-import 'package:hazuki/services/source/plugins/source_presentation_metadata.dart';
 
 export 'package:hazuki/services/source/plugins/source_plugin_buttons.dart';
 
@@ -27,13 +26,27 @@ Map<String, dynamic> sourcePresentation(
   final registry = context == null
       ? null
       : SourcePresentationScope.maybeOf(context);
-  return comicDetailPresentation(
-    registry?.displayPresentationFor(sourceKey.trim()) ?? const {},
-  );
+  return registry?.displayPresentationFor(sourceKey.trim()) ?? const {};
 }
 
 bool sourceFeature(String sourceKey, String feature, {BuildContext? context}) =>
     sourcePresentation(sourceKey, context: context)[feature] == true;
+
+/// Comments require an explicit declaration from an enabled, installed plugin.
+bool sourceCommentsEnabled(
+  String sourceKey, {
+  required BuildContext context,
+  bool listen = true,
+}) {
+  final registry = listen
+      ? SourcePresentationScope.maybeOf(context)
+      : SourcePresentationScope.read(context);
+  final key = sourceKey.trim().isEmpty
+      ? registry?.activeSourceKey ?? ''
+      : sourceKey.trim();
+  if (registry?.isAllowedSourceKey(key) != true) return false;
+  return registry!.definitionFor(key).presentation['showComments'] == true;
+}
 
 /// Button visibility always comes from an installed plugin's declarations.
 SourcePluginButton? sourceButton(

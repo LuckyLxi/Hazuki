@@ -8,8 +8,12 @@ import '../explore_capability.dart';
 import '../runtime/source_runtime_host.dart';
 import '../runtime/source_runtime_operations.dart';
 import '../plugins/source_sort_options.dart';
+import '../models/source_contract_models.dart';
 
 abstract interface class SourceContentOperations {
+  Future<List<SourceDailyRecommendationItem>> loadDailyRecommendations({
+    String sourceKey = '',
+  });
   Future<List<ExploreSection>> loadExploreSections({bool forceRefresh = false});
   Future<ComicDetailsData> loadComicDetails(
     String comicId, {
@@ -71,6 +75,60 @@ class SourceContentOperationService implements SourceContentOperations {
   final SourceExploreCapability _explore;
   final SourceCategoryCapability _category;
   final SourceComicDetailsCapability _comicDetails;
+
+  @override
+  Future<List<SourceDailyRecommendationItem>> loadDailyRecommendations({
+    String sourceKey = '',
+  }) async {
+    final key = sourceKey.trim().isEmpty
+        ? _runtimeHost.activeSourceKey
+        : _runtimeHost.normalize(sourceKey);
+    await _runtimeOperations.ensureSourceInitialized(key);
+    final facade = _runtimeHost.handleFor(key).facade;
+    final engine = facade.js.engine;
+    if (engine == null) throw StateError('source_not_initialized');
+    final raw = await facade.js.resolve(
+      engine.evaluate('globalThis.__hazuki_source.dailyRecommendation.load()'),
+    );
+    if (raw is! List) {
+      throw const FormatException('plugin_invalid_daily_recommendations');
+    }
+    final items = <SourceDailyRecommendationItem>[];
+    for (final item in raw) {
+      if (item is! Map ||
+          item['id'] is! String ||
+          (item['id'] as String).trim().isEmpty ||
+          item['title'] is! String ||
+          (item['title'] as String).trim().isEmpty) {
+        throw const FormatException('plugin_invalid_daily_recommendation');
+      }
+      for (final field in ['cover', 'imageUrl', 'caption', 'subTitle']) {
+        if (item[field] != null && item[field] is! String) {
+          throw const FormatException('plugin_invalid_daily_recommendation');
+        }
+      }
+      final cover = (item['cover'] as String? ?? '').trim();
+      final imageUrl = (item['imageUrl'] as String? ?? '').trim();
+      if (cover.isEmpty && imageUrl.isEmpty) {
+        throw const FormatException('plugin_recommendation_image_missing');
+      }
+      items.add(
+        SourceDailyRecommendationItem(
+          comic: ExploreComic(
+            id: (item['id'] as String).trim(),
+            title: (item['title'] as String).trim(),
+            sourceKey: key,
+            cover: cover,
+            subTitle: item['subTitle'] as String? ?? '',
+            tags: jsAsStringList(item['tags']),
+          ),
+          caption: item['caption'] as String? ?? '',
+          imageUrl: imageUrl,
+        ),
+      );
+    }
+    return List.unmodifiable(items);
+  }
 
   @override
   Future<List<ExploreSection>> loadExploreSections({

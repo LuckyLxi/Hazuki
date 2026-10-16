@@ -106,6 +106,7 @@ Promise.all(
             title: _translateSourceText(rawTitle),
             comics: comics,
             viewMoreUrl: viewMore?.isNotEmpty == true ? viewMore : null,
+            initialPage: 0,
             offersInitialComicsFilter:
                 (map['offersInitialComicsFilter'] == true),
           ),

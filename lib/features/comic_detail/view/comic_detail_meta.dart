@@ -1,101 +1,9 @@
 import 'dart:async';
 
-import 'package:hazuki/shared/source_presentation.dart';
+import 'package:hazuki/services/source/plugins/source_plugin_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/models/hazuki_models.dart';
-
-List<String> normalizeComicMetaValues(List<String> rawValues, {String? label}) {
-  final values = <String>[];
-  final seen = <String>{};
-
-  for (final raw in rawValues) {
-    var text = raw.trim();
-    if (text.isEmpty) {
-      continue;
-    }
-
-    if (label != null && label.isNotEmpty) {
-      final lower = text.toLowerCase();
-      final lowerLabel = label.toLowerCase();
-      if (lower.startsWith('$lowerLabel:') ||
-          lower.startsWith('$lowerLabel\uFF1A')) {
-        text = text.substring(label.length + 1).trim();
-      }
-    }
-
-    final parts = text
-        .split(RegExp('[\\n,\\uFF0C/]+'))
-        .map((e) => e.trim())
-        .where((e) => e.isNotEmpty);
-
-    for (final part in parts) {
-      if (seen.add(part)) {
-        values.add(part);
-      }
-    }
-  }
-
-  return values;
-}
-
-String extractComicViewsText(ComicDetailsData details) {
-  final keys = details.tags.keys.toList();
-  if (keys.isEmpty) {
-    return '';
-  }
-  final lastKey = keys.last;
-  final values = details.tags[lastKey] ?? const <String>[];
-  if (values.isEmpty) {
-    return '';
-  }
-  return normalizeComicMetaValues(values).join(' ');
-}
-
-bool isComicAuthorKey(String key) {
-  final normalized = key.trim().toLowerCase();
-  return normalized == 'author' ||
-      normalized == 'authors' ||
-      key.trim() == '\u4f5c\u8005';
-}
-
-bool isComicCategoryKey(String key) {
-  final normalized = key.trim().toLowerCase();
-  return normalized == 'category' ||
-      normalized == 'categories' ||
-      key.trim() == '\u5206\u7c7b';
-}
-
-bool isComicTagKey(String key) {
-  final normalized = key.trim().toLowerCase();
-  return normalized == 'tag' ||
-      normalized == 'tags' ||
-      key.trim() == '\u6807\u7b7e';
-}
-
-bool isComicWorkKey(String key) {
-  final normalized = key.trim().toLowerCase();
-  return normalized == 'work' ||
-      normalized == 'works' ||
-      key.trim() == '\u4f5c\u54c1';
-}
-
-bool isComicActorKey(String key) {
-  final normalized = key.trim().toLowerCase();
-  return normalized == 'actor' ||
-      normalized == 'actors' ||
-      key.trim() == '\u89d2\u8272';
-}
-
-bool isComicChineseTeamKey(String key) {
-  final normalized = key.trim().toLowerCase();
-  return normalized == 'chinese team' ||
-      normalized == 'chineseteam' ||
-      normalized == 'scanlation' ||
-      normalized == 'translator' ||
-      key.trim() == '\u6c49\u5316\u7ec4';
-}
 
 class ComicDetailMetaSection extends StatelessWidget {
   const ComicDetailMetaSection({
@@ -117,87 +25,6 @@ class ComicDetailMetaSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final strings = l10n(context);
-    final authorLabel = strings.comicDetailAuthor;
-    final categoryLabel = strings.comicDetailCategories;
-    final tagLabel = strings.comicDetailTags;
-    final uploaderLabel = strings.comicDetailUploader;
-    final chineseTeamLabel = strings.comicDetailChineseTeam;
-    const jmWorkLabel = '\u4f5c\u54c1';
-    const jmActorLabel = '\u89d2\u8272';
-    final isJm = sourceFeature(
-      details.sourceKey,
-      'showComicId',
-      context: context,
-    );
-    final showUploader = sourceFeature(
-      details.sourceKey,
-      'showUploader',
-      context: context,
-    );
-    final showCategories = sourceFeature(
-      details.sourceKey,
-      'showCategories',
-      context: context,
-    );
-    final showChineseTeam = sourceFeature(
-      details.sourceKey,
-      'showChineseTeam',
-      context: context,
-    );
-    final detailTagGroups = sourcePresentation(
-      details.sourceKey,
-      context: context,
-    )['detailTagGroups'];
-    final tagGroups = detailTagGroups is List
-        ? detailTagGroups
-              .whereType<String>()
-              .map((group) => group.trim().toLowerCase())
-              .toSet()
-        : null;
-    final categoryValues = normalizeComicMetaValues(
-      details.tags.entries
-          .where((entry) => isComicCategoryKey(entry.key))
-          .expand((entry) => entry.value)
-          .toList(),
-      label: categoryLabel,
-    );
-    final tagValues = normalizeComicMetaValues(
-      details.tags.entries
-          .where(
-            (entry) => tagGroups != null
-                ? tagGroups.contains(entry.key.trim().toLowerCase())
-                : !isComicAuthorKey(entry.key) &&
-                      !(isJm && isComicWorkKey(entry.key)) &&
-                      !(isJm && isComicActorKey(entry.key)) &&
-                      entry.key != details.tags.keys.lastOrNull,
-          )
-          .expand((entry) => entry.value)
-          .toList(),
-      label: tagLabel,
-    );
-    final workValues = normalizeComicMetaValues(
-      details.tags.entries
-          .where((entry) => isComicWorkKey(entry.key))
-          .expand((entry) => entry.value)
-          .toList(),
-      label: jmWorkLabel,
-    );
-    final actorValues = normalizeComicMetaValues(
-      details.tags.entries
-          .where((entry) => isComicActorKey(entry.key))
-          .expand((entry) => entry.value)
-          .toList(),
-      label: jmActorLabel,
-    );
-    final chineseTeamValues = normalizeComicMetaValues(
-      details.tags.entries
-          .where((entry) => isComicChineseTeamKey(entry.key))
-          .expand((entry) => entry.value)
-          .toList(),
-      label: chineseTeamLabel,
-    );
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -207,66 +34,22 @@ class ComicDetailMetaSection extends StatelessWidget {
             onCopy: () => onCopyId(details.id),
             useMobileStyle: useMobileStyle,
           ),
-        ComicDetailMetaRow(
-          useMobileStyle: useMobileStyle,
-          label: authorLabel,
-          values: normalizeComicMetaValues(
-            details.tags.keys
-                .where(isComicAuthorKey)
-                .expand((key) => details.tags[key] ?? const <String>[])
-                .toList(),
-            label: authorLabel,
-          ),
-          onValuePressed: onTagValuePressed,
-          onValueLongPress: onMetaValueLongPress,
-        ),
-        if (showCategories)
-          ComicDetailMetaRow(
-            useMobileStyle: useMobileStyle,
-            label: categoryLabel,
-            values: categoryValues,
-            onValuePressed: onTagValuePressed,
-            onValueLongPress: onMetaValueLongPress,
-          ),
-        ComicDetailMetaRow(
-          useMobileStyle: useMobileStyle,
-          label: tagLabel,
-          values: tagValues,
-          onValuePressed: onTagValuePressed,
-          onValueLongPress: onMetaValueLongPress,
-        ),
-        if (isJm)
-          ComicDetailMetaRow(
-            useMobileStyle: useMobileStyle,
-            label: jmWorkLabel,
-            values: workValues,
-            onValuePressed: onTagValuePressed,
-            onValueLongPress: onMetaValueLongPress,
-          ),
-        if (isJm)
-          ComicDetailMetaRow(
-            useMobileStyle: useMobileStyle,
-            label: jmActorLabel,
-            values: actorValues,
-            onValuePressed: onTagValuePressed,
-            onValueLongPress: onMetaValueLongPress,
-          ),
-        if (showUploader)
-          ComicDetailMetaRow(
-            useMobileStyle: useMobileStyle,
-            label: uploaderLabel,
-            values: normalizeComicMetaValues([details.uploader]),
-            onValuePressed: onTagValuePressed,
-            onValueLongPress: onMetaValueLongPress,
-          ),
-        if (showChineseTeam)
-          ComicDetailMetaRow(
-            useMobileStyle: useMobileStyle,
-            label: chineseTeamLabel,
-            values: chineseTeamValues,
-            onValuePressed: onTagValuePressed,
-            onValueLongPress: onMetaValueLongPress,
-          ),
+        for (final field in details.infoFields)
+          if (field.values.isNotEmpty)
+            ComicDetailMetaRow(
+              useMobileStyle: useMobileStyle,
+              label: localizeSourcePluginText(
+                field.label,
+                Localizations.localeOf(context).toLanguageTag(),
+              ),
+              values: field.values,
+              onValuePressed: switch (field.action) {
+                ComicInfoAction.search => onTagValuePressed,
+                ComicInfoAction.copy => onMetaValueLongPress,
+                ComicInfoAction.none => null,
+              },
+              onValueLongPress: onMetaValueLongPress,
+            ),
       ],
     );
   }
@@ -361,7 +144,7 @@ class ComicDetailMetaRow extends StatelessWidget {
 
   final String label;
   final List<String> values;
-  final ValueChanged<String> onValuePressed;
+  final ValueChanged<String>? onValuePressed;
   final ValueChanged<String> onValueLongPress;
   final bool useMobileStyle;
 
@@ -389,6 +172,9 @@ class ComicDetailMetaRow extends StatelessWidget {
                 backgroundColor: useMobileStyle
                     ? cs.primary.withValues(alpha: 0.08)
                     : cs.secondaryContainer,
+                disabledColor: useMobileStyle
+                    ? cs.primary.withValues(alpha: 0.08)
+                    : cs.secondaryContainer,
                 side: useMobileStyle
                     ? BorderSide.none
                     : BorderSide(
@@ -407,7 +193,9 @@ class ComicDetailMetaRow extends StatelessWidget {
                   maxLines: useMobileStyle ? 1 : null,
                   overflow: useMobileStyle ? TextOverflow.ellipsis : null,
                 ),
-                onPressed: () => onValuePressed(value.trim()),
+                onPressed: onValuePressed == null
+                    ? null
+                    : () => onValuePressed!(value.trim()),
               ),
             ),
           ),

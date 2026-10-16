@@ -81,6 +81,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
   late final ComicDetailActionsController _actionsController;
   late final ComicDetailFavoriteController _favoriteController;
   late final bool _supportsRelatedTab;
+  late final bool _supportsCommentsTab;
 
   @override
   void initState() {
@@ -91,6 +92,11 @@ class _ComicDetailPageState extends State<ComicDetailPage>
     _repository =
         widget.repository ??
         widget.dependencies.createFacade(sourceKey: comicSourceKey);
+    _supportsCommentsTab = sourceCommentsEnabled(
+      comicSourceKey,
+      context: context,
+      listen: false,
+    );
     _supportsRelatedTab =
         sourceButton(
           comicSourceKey,
@@ -234,6 +240,7 @@ class _ComicDetailPageState extends State<ComicDetailPage>
       vsync: this,
       scrollController: _scrollController,
       includeRelatedTab: _supportsRelatedTab,
+      includeCommentsTab: _supportsCommentsTab,
     );
   }
 

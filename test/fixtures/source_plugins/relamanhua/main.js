@@ -27,6 +27,7 @@ const relamanhuaOrigin = "https://www.manga2026.com";
 const relamanhuaFallbackKey = "0p0zzpvv.nmn.oop";
 const relamanhuaPageSize = 12;
 const relamanhuaCatalogLimit = 50;
+const relamanhuaRecommendLimit = 60;
 const relamanhuaUserAgent =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36";
 /** Base for API-returned image paths (the site's own VUE_APP_ImageSplitUrl). */
@@ -118,6 +119,661 @@ const relamanhuaThemes = [
   ["xianxia", "仙侠"],
   ["loveLive", "LoveLive"],
   ["zazhifuzengxiezhenji", "雜誌附贈寫真集"],
+];
+
+/** Paid comic tags from /filter?point=1; disabled entries are omitted. */
+const relamanhuaFemaleTags = [
+  ["female_big_breasts", "大胸(女)"],
+  ["female_uniformsole_female", "單女主(女)"],
+  ["female_nakadashi", "中出(女)"],
+  ["female_blowjob", "口交(女)"],
+  ["female_uniformstockings", "絲襪/長筒襪(女)"],
+  ["female_schoolgirl_uniform", "女學生制服(女)"],
+  ["female_lolicon", "蘿莉控/蘿莉(女)"],
+  ["female_anal", "肛交(女)"],
+  ["female_ahegao", "高潮臉|啊嘿顏(女)"],
+  ["female_milf", "熟女(女)"],
+  ["female_huge_breasts", "巨乳(女)"],
+  ["female_twintails", "雙馬尾(女)"],
+  ["female_netorare", "寢取/NTR/綠帽/牛頭人(女)"],
+  ["female_rape", "強暴(女)"],
+  ["ponytail", "馬尾(女)"],
+  ["female_paizuri", "乳交(女)"],
+  ["female_bondage", "捆綁(女)"],
+  ["female_glasses", "眼鏡(女)"],
+  ["female_x_ray", "透視(女)"],
+  ["female_impregnation", "受孕(女)"],
+  ["female_kemonomimi", "獸耳(女)"],
+  ["female_sex_toys", "情趣玩具(女)"],
+  ["female_hairy", "陰毛濃郁(女)"],
+  ["female_double_penetration", "雙插入(女)"],
+  ["female_collar", "項圈(女)"],
+  ["female_defloration", "破處(女)"],
+  ["female_swimsuit", "泳裝(女)"],
+  ["female_femdom", "女王(女)"],
+  ["female_dark_skin", "黑皮(女)"],
+  ["female_big_ass", "肥臀(女)"],
+  ["female_futanari", "扶他/扶她(女)"],
+  ["female_pantyhose", "褲襪(女)"],
+  ["female_bikini", "比基尼(女)"],
+  ["female_gloves", "手套(女)"],
+  ["female_mind_control", "催眠(女)"],
+  ["female_cheating", "偷情(女)"],
+  ["female_yuri", "百合(女)"],
+  ["female_pregnant", "懷孕(女)"],
+  ["female_lactation", "乳汁(女)"],
+  ["female_beauty_mark", "美人痣(女)"],
+  ["female_kissing", "親吻(女)"],
+  ["female_lingerie", "內衣(女)"],
+  ["female_sweating", "汗流浹背(女)"],
+  ["female_sister", "姐妹(女)"],
+  ["female_tentacles", "觸手(女)"],
+  ["female_masturbation", "自慰(女)"],
+  ["verylonghair", "很長的頭髮(女)"],
+  ["female_small_breasts", "平胸/貧乳(女)"],
+  ["female_handjob", "擼/拤(女)"],
+  ["female_fingering", "捻弄(女)"],
+  ["female_females_only", "全女性(女)"],
+  ["female_mother", "母(女)"],
+  ["female_horns", "犄角(女)"],
+  ["female_unusual_pupils", "異形瞳(女)"],
+  ["female_mind_break", "意識崩壞(女)"],
+  ["female_exhibitionism", "暴露癖(女)"],
+  ["female_maid", "女僕(女)"],
+  ["female_footjob", "足交(女)"],
+  ["female_gyaru", "辣妹|太妹(女)"],
+  ["female_piercing", "穿刺(女)"],
+  ["female_harem", "後宮(女)"],
+  ["female_bunny_girl", "兔女郎(女)"],
+  ["female_big_areolae", "大乳暈(女)"],
+  ["tail0", "尾巴(女)"],
+  ["female_demon_girl", "惡魔娘(女)"],
+  ["female_filming", "錄像(女)"],
+  ["halo", "光環(女)"],
+  ["female_cunnilingus", "舌功/prpr(女)"],
+  ["female_elf", "精靈(女)"],
+  ["female_prostitution", "賣淫/援交(女)"],
+  ["female_squirting", "潮吹(女)"],
+  ["female garter belt", "吊襪帶(女)"],
+  ["female_stomach_deformation", "一步到胃(女)"],
+  ["female_urination", "放尿(女)"],
+  ["female_blackmail", "脅迫(女)"],
+  ["female_catgirl", "貓娘(女)"],
+  ["female_gag", "塞口球(女)"],
+  ["female_kimono", "和服(女)"],
+  ["female_teacher", "教師(女)"],
+  ["female_bukkake", "精子風呂/精液浴(女)"],
+  ["female_blindfold", "蒙眼(女)"],
+  ["female_drugs", "嗑藥(女)"],
+  ["female_group", "群交(女)"],
+  ["female_sole_dickgirl", "大屌萌妹(女)"],
+  ["female_bbw", "肥婆(女)"],
+  ["female_tanlines", "日曬痕(女)"],
+  ["female_crotch_tattoo", "胯部紋身|淫紋(女)"],
+  ["female_corruption", "黑化(女)"],
+  ["female_leotard", "緊身褲(女)"],
+  ["female_hidden_sex", "公眾場合躲著做愛(女)"],
+  ["female_deepthroat", "深喉(女)"],
+  ["eye-overingbang", "遮眼劉海(女)"],
+  ["female_blowjob_face", "口交顏(女)"],
+  ["female_inflation", "肚子膨大(女)"],
+  ["female_scat", "脫糞/排便(女)"],
+  ["female_breast_feeding", "喂奶(女)"],
+  ["female_wings", "翅膀(女)"],
+  ["female_rimjob", "舔肛/舔菊花(女)"],
+  ["female_big_penis", "大根/大jj(女)"],
+  ["female_sleeping", "入眠中/夢淫(女)"],
+  ["female_tomboy", "假小子(女)"],
+  ["femaleinvertednipples", "乳頭內陷(女)"],
+  ["female_thigh_high_boots", "長靴(女)"],
+  ["female_fox_girl", "狐女(女)"],
+  ["female_latex", "緊身皮衣/膠衣(女)"],
+  ["female_bestiality", "獸交|人獸(女)"],
+  ["female_monster_girl", "怪物娘(女)"],
+  ["female_bodysuit", "連身衣(女)"],
+  ["female_incest", "亂倫(女)"],
+  ["female_torture", "調教(女)"],
+  ["female_school_swimsuit", "死庫水/學校泳裝(女)"],
+  ["female_big_nipples", "大乳頭(女)"],
+  ["female_magical_girl", "魔法少女(女)"],
+  ["female_business_suit", "西裝(女)"],
+  ["female_drunk", "醉酒(女)"],
+  ["female_tall_girl", "女孩身材較高(女)"],
+  ["female_breast_expansion", "乳房擴張(女)"],
+  ["female_hairy_armpits", "腋窩有毛(女)"],
+  ["female_body_writing", "身上寫字(女)"],
+  ["female_cervix_penetration", "子宮play(女)"],
+  ["female_shemale", "人妖(女)"],
+  ["female_daughter", "女兒(女)"],
+  ["female_slave", "奴隸(女)"],
+  ["nun", "修女(女)"],
+  ["nipple stimulation", "刺激乳頭(女)"],
+  ["vtuber", "虛擬主播(女)"],
+  ["female_oralcumshot", "口內射精(女)"],
+  ["hairbuns", "包包頭(女)"],
+  ["female_bdsm", "sm捆綁(女)"],
+  ["female_shibari", "捆綁(日式)(女)"],
+  ["female_apron", "圍裙(女)"],
+  ["female_double_blowjob", "雙人口交/雙人侍奉(女)"],
+  ["female_oyakodon", "親子蓋飯/母女(女)"],
+  ["female_smell", "臭(女)"],
+  ["female_bisexual", "雙性戀(女)"],
+  ["female_nurse", "護士(女)"],
+  ["female_muscle", "肌肉(女)"],
+  ["female_bloomers", "燈籠褲(女)"],
+  ["female_miko", "巫女(女)"],
+  ["female_enema", "灌腸(女)"],
+  ["female_ryona", "ryona/殘虐快感(女)"],
+  ["female_furry", "獸娘(女)"],
+  ["female_gokkun", "吞精(女)"],
+  ["strapon", "女用穿戴假陽具(女)"],
+  ["female_condom", "避孕套(女)"],
+  ["female_cowgirl", "牛娘/奶牛裝(女)"],
+  ["female_leg_lock", "雙腿鎖腰(女)"],
+  ["female_tribadism", "女同性交/磨鏡(女)"],
+  ["female_transformation", "變身(女)"],
+  ["female_oppai loli", "童顏巨乳(女)"],
+  ["female_humiliation", "羞辱(女)"],
+  ["female_emotionless_sex", "無快感做愛(女)"],
+  ["female_dickgirl_on_dickgirl", "大屌萌妹互爆(女)"],
+  ["female_possession", "附身(女)"],
+  ["female_cosplaying", "cosplay/角色扮演/cos(女)"],
+  ["female_body_modification", "肉體改造(女)"],
+  ["female_dick_growth", "女性長出jj(女)"],
+  ["female_spanking", "打屁股(女)"],
+  ["female_gaping", "合不攏腿(女)"],
+  ["female_birth", "分娩(女)"],
+  ["female_facesitting", "騎臉(女)"],
+  ["female_pasties", "乳貼(女)"],
+  ["female_guro", "糞|血腥獵奇(女)"],
+  ["female_milking", "擠奶(女)"],
+  ["female_oni", "鬼(女)"],
+  ["female_chikan", "癡漢(女)"],
+  ["female_tiara", "頭冠(女)"],
+  ["female_urethra_insertion", "尿道插入(女)"],
+  ["female_nipple_fuck", "乳頭交(女)"],
+  ["female_facial", "顏射(女)"],
+  ["female_male_on_dickgirl", "漢子乾大屌萌妹(女)"],
+  ["female_snuff", "虐殺(女)"],
+  ["mouthmask", "口罩(女)"],
+  ["female_aunt", "姨媽(女)"],
+  ["female_chinese_dress", "旗袍(女)"],
+  ["female_sumata", "素股/蹭蹭不進去(女)"],
+  ["female_asphyxiation", "窒息(女)"],
+  ["female_amputee", "截肢(女)"],
+  ["female_farting", "放屁(女)"],
+  ["female_solo_action", "自慰表演(女)"],
+  ["female_tracksuit", "運動服(女)"],
+  ["female_fisting", "拳交(女)"],
+  ["female_dark_nipples", "黑葡萄|暗色乳頭(女)"],
+  ["tailplug", "尾塞(女)"],
+  ["female_moral_degeneration", "墮落/背德(女)"],
+  ["female_cousin", "表妹表姐(女)"],
+  ["female_bike_shorts", "騎行褲(女)"],
+  ["female_triple_penetration", "三通/三插入(女)"],
+  ["female_hotpants", "熱褲(女)"],
+  ["female_nose_hook", "鼻鉤(女)"],
+  ["shimaidon", "姉妹丼(女)"],
+  ["female_witch", "女巫(女)"],
+  ["female_clothed_paizuri", "著衣乳交(女)"],
+  ["female_prolapse", "脫垂/脫肛/宮脫(女)"],
+  ["female_swinging", "換妻(女)"],
+  ["female_niece", "外甥(女)"],
+  ["female_masked_face", "蒙面(女)"],
+  ["female_chloroform", "麻醉(女)"],
+  ["female_yandere", "病嬌(女)"],
+  ["female_machine", "性愛機器(女)"],
+  ["female_piss_drinking", "飲尿/聖水(女)"],
+  ["female_twins", "雙胞胎(女)"],
+  ["female_multiple_paizuri", "多人乳交(女)"],
+  ["female_cheerleader", "啦啦隊(女)"],
+  ["female_public_use", "公眾便所/肉便器/RBQ(女)"],
+  ["female_bride", "新娘(女)"],
+  ["female_big_clit", "大陰蒂(女)"],
+  ["female_eggs", "產卵(女)"],
+  ["female_robot", "機器人(女)"],
+  ["multipleorgasms", "多次高潮(女)"],
+  ["female_large_insertions", "巨物插入(女)"],
+  ["female_big_balls", "大睾丸(女)"],
+  ["female_eyepatch", "單眼罩/獨眼罩(女)"],
+  ["female_parasite", "寄生(女)"],
+  ["female_ball_sucking", "吸吮睾丸(女)"],
+  ["female_skinsuit", "畫皮(女)"],
+  ["female_blood", "血腥(女)"],
+  ["female_vore", "vore/丸吞(女)"],
+  ["female_kunoichi", "女忍者(女)"],
+  ["female_christmas", "聖誕裝(女)"],
+  ["female_giantess", "女巨人(女)"],
+  ["petplay", "寵物扮演(女)"],
+  ["female_all_the_way_through", "一氣貫通(女)"],
+  ["female_insect", "蟲(女)"],
+  ["female_dog_girl", "犬娘(女)"],
+  ["female_tickling", "撓癢癢(女)"],
+  ["female_widow", "寡婦/未亡人(女)"],
+  ["female_thick_eyebrows", "濃眉毛(女)"],
+  ["female_chastity_belt", "貞操帶(女)"],
+  ["female_double_vaginal", "雙龍入洞(女)"],
+  ["female_huge_penis", "巨根(女)"],
+  ["schoolgymuniform", "學校體育制服(女)"],
+  ["female_living_clothes", "活化衣服(女)"],
+  ["female_unusual_teeth", "特殊牙齒/尖牙(女)"],
+  ["female_slime", "史萊姆(女)"],
+  ["female_stuck_in_wall", "壁尻(女)"],
+  ["female_foot_licking", "戀足/舔腳(女)"],
+  ["genderchange", "性別轉換(女)"],
+  ["female_freckles", "雀斑(女)"],
+  ["female_wolf_girl", "狼女(女)"],
+  ["female_lab_coat", "實驗服/白大褂(女)"],
+  ["female_ghost", "幽靈(女)"],
+  ["female_policewoman", "女警(女)"],
+  ["female_eyemask", "眼罩(女)"],
+  ["female_military", "軍裝(女)"],
+  ["female_dickgirls_only", "全大屌萌妹(女)"],
+  ["female_heterochromia", "異瞳/雙色瞳(女)"],
+  ["female_shimapan", "條紋內褲(女)"],
+  ["female_armpit_licking", "舔腋窩(女)"],
+  ["makeup", "化妝(女)"],
+  ["long_tongue", "長舌(女)"],
+  ["female_orgasm_denial", "拒絕高潮(女)"],
+  ["female_angel", "天使(女)"],
+  ["female_electric_shocks", "電擊(女)"],
+  ["female_vampire", "吸血鬼(女)"],
+  ["female_harness", "拘束衣(女)"],
+  ["female_voyeurism", "偷窺(女)"],
+  ["female_bodystocking", "連體襪(女)"],
+  ["female_coprophagia", "食糞/黃金(女)"],
+  ["female_closed_eyes", "閉眼(女)"],
+  ["female_wet_clothes", "濕身(女)"],
+  ["female_gothic_lolita", "哥特蘿莉(女)"],
+  ["female_armpit_sex", "腋交(女)"],
+  ["female_gymshorts", "運動短褲(女)"],
+  ["female_tights", "緊身衣(女)"],
+  ["female_corset", "束腰/腰封(女)"],
+  ["female_vomit", "嘔吐(女)"],
+  ["female_autofellatio", "自體口交(女)"],
+  ["female_assjob", "臀交(女)"],
+  ["female_age_progression", "年齡變化(女)"],
+  ["female_dark_sclera", "黑色眼白(女)"],
+  ["female_diaper", "尿布(女)"],
+  ["female_metal_armor", "盔甲/鎧甲(女)"],
+  ["female_crossdressing", "異裝癖(女)"],
+  ["female_clit_growth", "陰蒂膨大(女)"],
+  ["female_double_anal", "雙龍入菊(女)"],
+  ["female_sundress", "背心裙(女)"],
+  ["female_tutor", "家庭教師(女)"],
+  ["female_pubic_stubble", "私處剃毛(女)"],
+  ["female_slime_girl", "史萊姆娘(女)"],
+  ["female_ftail_plug", "假尾巴(女)"],
+  ["female_oil", "油(女)"],
+  ["female_scar", "疤痕(女)"],
+  ["female_human_cattle", "人間牧場(女)"],
+  ["female_waitress", "女僕/女服務員(女)"],
+  ["female_wormhole", "蟲洞/空間轉移(女)"],
+  ["female_snake_girl", "蛇女(女)"],
+  ["female_fairy", "妖精(女)"],
+  ["female_minigirl", "拇指姑娘(女)"],
+  ["female_sockjob", "絲襪play(女)"],
+  ["female_brain_fuck", "腦交(女)"],
+  ["female_underwater", "水下(女)"],
+  ["female_absorption", "吸收(女)"],
+  ["female_crown", "王冠/皇冠/公主冠(女)"],
+  ["personalityexcretion", "人格排泄(女)"],
+  ["female_inseki", "無血緣亂倫(女)"],
+  ["female_selfcest", "selfcest/自交(女)"],
+  ["female_unbirth", "胎兒(女)"],
+  ["female_cum_swap", "精液分享(女)"],
+  ["female_ffm_threesome", "一龍二鳳(女)"],
+  ["female_petrification", "石化(女)"],
+  ["female_pillory", "枷鎖(女)"],
+  ["female_bandages", "繃帶(女)"],
+  ["female_fundoshi", "兜襠布(女)"],
+  ["female_ttf_threesome", "一女二扶她(女)"],
+  ["female_horse_girl", "馬娘(女)"],
+  ["female_mecha_girl", "機娘(女)"],
+  ["female_human_on_furry", "人x獸娘/人x獸男(女)"],
+  ["female_vaginal_sticker", "穴口貼紙(女)"],
+  ["female_anal_birth", "肛門生產(女)"],
+  ["female_saliva", "唾液(女)"],
+  ["female_doll_joints", "球關節/玩偶關節(女)"],
+  ["female_fft_threesome", "二女一扶她(女)"],
+  ["female_autopaizuri", "自取其乳(女)"],
+  ["female_mosaic_censorship", "馬賽克審查(女)"],
+  ["female_tube", "導管/插管(女)"],
+  ["female_whip", "鞭打(女)"],
+  ["female_onahole", "飛機杯(女)"],
+  ["female_body_swap", "變身術(女)"],
+  ["female_lizard_girl", "蜥蜴娘(女)"],
+  ["female_zombie", "僵屍(女)"],
+  ["female_hairjob", "頭髮play(女)"],
+  ["female_sunglasses", "太陽鏡(女)"],
+  ["female_wooden_horse", "木馬(女)"],
+  ["female_cbt", "jj調教(女)"],
+  ["female_gender_bender", "掰彎(女)"],
+  ["female_tailjob", "尾巴play(女)"],
+  ["forniphilia", "家具play(女)"],
+  ["female_mermaid", "美人魚(女)"],
+  ["female_catfight", "戰♀鬥(女)"],
+  ["female_glory_hole", "牆洞(女)"],
+  ["female_smegma", "包皮垢(女)"],
+  ["female_mouse_girl", "鼠娘(女)"],
+  ["female_pantyjob", "內褲play(女)"],
+  ["female_clamp", "夾子(女)"],
+  ["female_nipple_expansion", "乳頭擴張(女)"],
+  ["oldlady", "老女人(女)"],
+  ["female_phimosis", "包莖(女)"],
+  ["female_shared_senses", "共感(女)"],
+  ["female_dougi", "武道服(女)"],
+  ["female_wrestling", "角鬥(女)"],
+  ["female_ear_fuck", "耳交(女)"],
+  ["female_full_censorship", "全面審查(女)"],
+  ["female_multiple_breasts", "多乳房(女)"],
+  ["female_speculum", "擴陰器/鴨嘴器(女)"],
+  ["female_plant_girl", "植物娘(女)"],
+  ["frottage", "擊劍(女)"],
+  ["female_mmf threesome", "二龍一鳳(女)"],
+  ["female_syringe", "註射器(女)"],
+  ["female_body_painting", "人體彩繪(女)"],
+  ["female_fox", "狐狸(女)"],
+  ["female_harpy", "鷹身女妖(女)"],
+  ["omorashi", "漏尿(女)"],
+  ["female_spider_girl", "蜘蛛娘(女)"],
+  ["female_weight_gain", "發福(女)"],
+  ["female_table_masturbation", "桌角自慰(女)"],
+  ["female_pig_girl", "豬娘(女)"],
+  ["female_insect_girl", "蟲娘(女)"],
+  ["female_infantilism", "大嬰兒(女)"],
+  ["kindergartenuniform", "幼兒園校服(女)"],
+  ["female_multiple_penises", "多陰莖(女)"],
+  ["female_human_pet", "美女犬/犬奴(女)"],
+  ["female_dragon", "龍(女)"],
+  ["female_raccoon_girl", "浣熊娘/狸娘(女)"],
+  ["female_slug", "蛞蝓(女)"],
+  ["female_cannibalism", "同類相食(女)"],
+  ["female_phone_sex", "電話性愛(女)"],
+  ["female_squid_girl", "烏賊娘(女)"],
+  ["female_balls_expansion", "睾丸膨大(女)"],
+  ["female_cashier", "收銀員/售貨員(女)"],
+  ["female_dicknipples", "乳頭似jj(女)"],
+  ["female_stretching", "拉伸(女)"],
+  ["female_stewardess", "空姐(女)"],
+  ["female_centaur", "半人馬(女)"],
+  ["female_necrophilia", "冰戀(女)"],
+  ["grandmother", "奶奶(女)"],
+  ["female_growth", "巨大化(女)"],
+  ["female_ponygirl", "馬具play(女)"],
+  ["female_menstruation", "月經(女)"],
+  ["female_legjob", "腿部play(女)"],
+  ["female_sheep_girl", "綿羊娘(女)"],
+  ["female_kneepit_sex", "膝窩play(女)"],
+  ["female_octopus", "章魚(女)"],
+  ["female_vacbed", "真空床/真空包裝(女)"],
+  ["aliengirl", "女外星人(女)"],
+  ["female_balljob", "睾丸play(女)"],
+  ["female_butler", "執事|管家(女)"],
+  ["granddaughter", "孫女(女)"],
+  ["female_triple_vaginal", "三龍入穴(女)"],
+  ["female_gasmask", "防毒面具(女)"],
+  ["female_penis birth", "陰莖生殖(女)"],
+  ["female_cockslapping", "用jj抽打(女)"],
+  ["female_squirrel_girl", "松鼠娘(女)"],
+  ["hijab", "頭巾(女)"],
+  ["female_full_body_tattoo", "全身紋身(女)"],
+  ["female_prehensile_hair", "操髮術(女)"],
+  ["female_dog", "狗(女)"],
+  ["female_forniphilia", "傢具play(女)"],
+];
+
+/** Paid comic tags from /filter?point=2; disabled entries are omitted. */
+const relamanhuaMaleTags = [
+  ["male_anal", "肛交(男)"],
+  ["male_males_only", "全男性(男)"],
+  ["male_tomgirl", "偽娘(男)"],
+  ["male_crossdressing", "異裝癖/女裝大佬(男)"],
+  ["male_nakadashi", "中出(男)"],
+  ["male_sole_male", "單男主(男)"],
+  ["male_shotacon", "正太控/正太(男)"],
+  ["male_muscle", "肌肉(男)"],
+  ["male_blowjob", "口交(男)"],
+  ["male_stockings", "絲襪(男)"],
+  ["male_schoolboy_uniform", "男學生制服(男)"],
+  ["male_glasses", "眼鏡(男)"],
+  ["male_bondage", "捆綁(男)"],
+  ["male_huge_penis", "巨根(男)"],
+  ["male_group", "群交(男)"],
+  ["male_furry", "獸男/獸人(男)"],
+  ["male_dark_skin", "黑皮(男)"],
+  ["male_sex_toys", "情趣玩具(男)"],
+  ["male_bbm", "肥男(男)"],
+  ["male_ahegao", "高潮臉/啊嘿顏(男)"],
+  ["male_dilf", "熟男(男)"],
+  ["male_schoolgirl_uniform", "女學生制服(男)"],
+  ["male_josou_seme", "女裝攻(男)"],
+  ["male_collar", "項圈(男)"],
+  ["male_kemonomimi", "獸耳(男)"],
+  ["male_rape", "強暴(男)"],
+  ["male_feminization", "女體化(男)"],
+  ["male_handjob", "擼/拤(男)"],
+  ["male_business_suit", "西裝(男)"],
+  ["male_twintails", "雙馬尾(男)"],
+  ["male_lingerie", "內衣(男)"],
+  ["male_tentacles", "觸手(男)"],
+  ["male_teacher", "教師(男)"],
+  ["male_tutor", "調教(男)"],
+  ["male_incest", "亂倫(男)"],
+  ["male_military", "軍裝(男)"],
+  ["male_condom", "避孕套(男)"],
+  ["male_maid", "女僕(男)"],
+  ["male_kimono", "和服(男)"],
+  ["male_big_penis", "大根/大jj(男)"],
+  ["male_catboy", "貓男(男)"],
+  ["male_prostate_massage", "前列腺按摩(男)"],
+  ["male_demon", "惡魔(男)"],
+  ["male_gender_bender", "掰彎(男)"],
+  ["male_mind_control", "催眠(男)"],
+  ["male_exhibitionism", "暴露癖(男)"],
+  ["male_brother", "兄弟(男)"],
+  ["male_horns", "犄角(男)"],
+  ["male_masturbation", "手淫(男)"],
+  ["male_frottage", "擊劍/摩擦淫(男)"],
+  ["male_blindfold", "蒙眼(男)"],
+  ["male_unusual_pupils", "異瞳(男)"],
+  ["male_bikini", "比基尼(男)"],
+  ["male_prostitution", "賣淫/援交(男)"],
+  ["male_drugs", "嗑藥(男)"],
+  ["male_kissing", "親吻(男)"],
+  ["male_swimsuit", "泳衣(男)"],
+  ["male_piercing", "穿刺(男)"],
+  ["male_elf", "精靈(男)"],
+  ["male_cosplaying", "cosplay/角色扮演/cos(男)"],
+  ["male_chastity_belt", "貞操帶(男)"],
+  ["male_monster", "怪獸(男)"],
+  ["male_mind_break", "意識崩壞(男)"],
+  ["male garter belt", "吊襪帶(男)"],
+  ["male_beauty_mark", "美人痣(男)"],
+  ["male_old_man", "老男人(男)"],
+  ["male_pantyhose", "褲襪(男)"],
+  ["male_x_ray", "透視(男)"],
+  ["male_netorare", "寢取/綠帽/NTR/牛頭人(男)"],
+  ["male_rimjob", "舔肛/舔菊花(男)"],
+  ["male_tanlines", "日曬痕(男)"],
+  ["male_dog_boy", "狗男(男)"],
+  ["male_tracksuit", "運動服(男)"],
+  ["male_filming", "錄像(男)"],
+  ["male_gag", "塞口球(男)"],
+  ["male_urethra_insertion", "尿道插入(男)"],
+  ["male_bear_boy", "熊男(男)"],
+  ["male_footjob", "足交(男)"],
+  ["male_fox_boy", "狐男(男)"],
+  ["male_bald", "禿頭(男)"],
+  ["male_human_on_furry", "人獸(男)"],
+  ["male_slave", "奴隸(男)"],
+  ["male_virginity", "童貞(男)"],
+  ["male_apron", "圍裙(男)"],
+  ["double_anal", "雙龍入菊(男)"],
+  ["male_low_shotacon", "輕度正太控(男)"],
+  ["male_blackmail", "脅迫(男)"],
+  ["male_masked_face", "面具男(男)"],
+  ["male_sweating", "汗流浹背(男)"],
+  ["male_tail_plug", "假尾巴(男)"],
+  ["male_bunny_boy", "兔郎(男)"],
+  ["male_cheating", "偷情(男)"],
+  ["male_gyaru_oh", "偽娘太妹(男)"],
+  ["male_onahole", "飛機杯(男)"],
+  ["male_policeman", "警察(男)"],
+  ["male_sleeping", "入眠中/夢淫(男)"],
+  ["male_urination", "放尿(男)"],
+  ["male_dickgirl_on_male", "大屌萌妹乾漢子(男)"],
+  ["male_tights", "緊身衣(男)"],
+  ["male_wolf_boy", "狼男(男)"],
+  ["male_beast", "野獸(男)"],
+  ["male_latex", "緊身皮衣/膠衣(男)"],
+  ["male_bride", "新娘(男)"],
+  ["male_cbt", "jj調教(男)"],
+  ["male_dragon", "龍(男)"],
+  ["male_orc", "獸人(男)"],
+  ["male_school_swimsuit", "死庫水/學校泳裝(男)"],
+  ["male_father", "父(男)"],
+  ["male_inseki", "無血緣亂倫(男)"],
+  ["male_body_writing", "身上寫字(男)"],
+  ["male_big_ass", "肥臀(男)"],
+  ["male_double_penetration", "雙插入(男)"],
+  ["male_fisting", "毆打(男)"],
+  ["male_harem", "後宮(男)"],
+  ["male_humiliation", "羞辱(男)"],
+  ["male_thigh_high_boots", "長靴(男)"],
+  ["male_public_use", "公眾便所/肉便器(男)"],
+  ["male_pregnant", "懷孕(男)"],
+  ["male_selfcest", "selfcest/自交(男)"],
+  ["male_moral_degeneration", "墮落/背德(男)"],
+  ["male_nurse", "護士(男)"],
+  ["male_pegging", "逆肛交/pegging(男)"],
+  ["male_drunk", "醉酒(男)"],
+  ["male_eyepatch", "單眼罩/獨眼罩(男)"],
+  ["male_big_breasts", "大胸(男)"],
+  ["male_chikan", "癡漢(男)"],
+  ["male_chinese_dress", "旗袍(男)"],
+  ["male_inflation", "肚子膨大(男)"],
+  ["male_orgasm_denial", "拒絕高潮(男)"],
+  ["male_scar", "疤痕(男)"],
+  ["male_stomach_deformation", "一步到胃(男)"],
+  ["male_angel", "天使(男)"],
+  ["male_bloomers", "燈籠褲(男)"],
+  ["male_corruption", "黑化(男)"],
+  ["male_foot_licking", "戀足/舔腳(男)"],
+  ["male_hairy", "陰毛濃郁(男)"],
+  ["male_leotard", "緊身褲(男)"],
+  ["male_ninja", "忍者(男)"],
+  ["male_ryona", "ryona/殘虐快感(男)"],
+  ["male_solo_action", "自慰表演(男)"],
+  ["male_twins", "雙胞胎(男)"],
+  ["male_bisexual", "雙性戀(男)"],
+  ["male_blood", "血腥(男)"],
+  ["male_coach", "教練(男)"],
+  ["male_lizard_guy", "蜥蜴人(男)"],
+  ["male_miko", "巫女(男)"],
+  ["male_smell", "臭(男)"],
+  ["male_asphyxiation", "窒息(男)"],
+  ["male_breast_expansion", "乳房擴張(男)"],
+  ["male_cowman", "奶牛裝(男)"],
+  ["male_lactation", "乳汁(男)"],
+  ["maweinan", "馬尾(男)"],
+  ["male_miniguy", "一寸法師(男)"],
+  ["male_pig_man", "豬男(男)"],
+  ["male_phimosis", "包莖(男)"],
+  ["male_shibari", "捆綁(日式)(男)"],
+  ["male_scat", "脫糞/排便(男)"],
+  ["male_vampire", "吸血鬼(男)"],
+  ["male_anal_birth", "肛門生產(男)"],
+  ["male_bukkake", "精子風呂/精液浴(男)"],
+  ["male_eyemask", "眼罩(男)"],
+  ["male_gymshorts", "運動短褲(男)"],
+  ["male_nose_hook", "鼻鉤(男)"],
+  ["male_snuff", "虐殺(男)"],
+  ["male_sumata", "素股/蹭蹭不進去(男)"],
+  ["male_unusual_teeth", "特殊牙齒/尖牙(男)"],
+  ["male_body_modification", "肉體改造(男)"],
+  ["male_dog", "狗(男)"],
+  ["male_enema", "灌腸(男)"],
+  ["male_oni", "鬼(男)"],
+  ["male_smegma", "包皮垢(男)"],
+  ["male_shrinking", "縮小(男)"],
+  ["male_slime", "史萊姆(男)"],
+  ["male_tall_man", "男孩身材較高(男)"],
+  ["male_transformation", "變形(男)"],
+  ["male_bdsm", "sm捆綁(男)"],
+  ["male_christmas", "聖誕裝(男)"],
+  ["male_freckles", "雀斑(男)"],
+  ["male_giant", "巨人(男)"],
+  ["male_gyaru", "辣妹(男)"],
+  ["male_torture", "調教(男)"],
+  ["male_voyeurism", "偷窺(男)"],
+  ["male_wormhole", "蟲洞/空間轉移(男)"],
+  ["male_amputee", "截肢(男)"],
+  ["male_autofellatio", "自口交(男)"],
+  ["male_clothed_female_nude_male", "女性著衣男性赤裸(男)"],
+  ["male_diaper", "尿布(男)"],
+  ["male_guro", "糞/血腥獵奇(男)"],
+  ["male_goblin", "哥布林/地精(男)"],
+  ["male_robot", "機器人(男)"],
+  ["male_bodysuit", "連身衣(男)"],
+  ["male_butler", "執事/管家(男)"],
+  ["male_body_swap", "變身術(男)"],
+  ["male_chloroform", "麻醉(男)"],
+  ["male_double_blowjob", "雙人口交/雙人侍奉(男)"],
+  ["male_fundoshi", "兜襠布(男)"],
+  ["male_first_person_perspective", "第一人稱視角(男)"],
+  ["male_horse_boy", "馬男(男)"],
+  ["lactation", "乳汁(男)"],
+  ["male_living_clothes", "活化衣服(男)"],
+  ["male_paizuri", "乳交(男)"],
+  ["male_pasties", "乳貼(男)"],
+  ["male_priest", "牧師/祭司(男)"],
+  ["male_armpit_licking", "舔腋窩(男)"],
+  ["male_age_regression", "返老還童(男)"],
+  ["male_animal_on_animal", "動物vs動物(男)"],
+  ["male_bandages", "繃帶(男)"],
+  ["male_dark_sclera", "黑色眼白(男)"],
+  ["male_electric_shocks", "電擊(男)"],
+  ["male_facesitting", "坐臉(男)"],
+  ["male_hairy_armpits", "腋窩有毛(男)"],
+  ["male_infantilism", "大嬰兒(男)"],
+  ["male_long_tongue", "長舌(男)"],
+  ["male_minotaur", "米諾陶/牛頭怪/NTR(男)"],
+  ["male_raccoon_boy", "浣熊男/狸男(男)"],
+  ["male_sunglasses", "太陽鏡(男)"],
+  ["male_alien", "異形(男)"],
+  ["breastfeeding", "餵奶(男)"],
+  ["male_ball_sucking", "吸吮睾丸(男)"],
+  ["male_coprophagia", "食糞/黃金(男)"],
+  ["male_fairy", "妖精(男)"],
+  ["male_glory_hole", "牆洞(男)"],
+  ["male_human_pet", "犬奴(男)"],
+  ["male_merman", "魚人/雄性人魚(男)"],
+  ["male_piss_drinking", "飲尿(男)"],
+  ["male_parasite", "寄生(男)"],
+  ["male_ssbbm", "身高八尺腰圍也是八尺的男人(男)"],
+  ["male_tiara", "頭冠(男)"],
+  ["male_unicorn", "獨角獸(男)"],
+  ["male_waitress", "女僕(男)"],
+  ["yisheng", "醫生(男)"],
+  ["male_cousin", "表哥表弟(男)"],
+  ["male_full_body_tattoo", "全身紋身(男)"],
+  ["male_gijinka", "擬人化(男)"],
+  ["male_horse_cock", "馬弔(男)"],
+  ["male_kunoichi", "女忍者(男)"],
+  ["male_kigurumi", "玩偶裝(男)"],
+  ["male_layer_cake", "夾心蛋糕/兩鮑夾一棍(男)"],
+  ["male_metal_armor", "盔甲/鎧甲(男)"],
+  ["male_machine", "性愛機器(男)"],
+  ["male_multiple_penises", "多陰莖(男)"],
+  ["male_prolapse", "脫垂/脫肛/宮脫(男)"],
+  ["male_shaved_head", "剃光頭(男)"],
+  ["male_shark_boy", "鯊魚男(男)"],
+  ["male_skinsuit", "畫皮(男)"],
+  ["male_unbirth", "胎兒(男)"],
+  ["male_vore", "vore/丸吞(男)"],
+  ["male_vomit", "嘔吐(男)"],
+  ["male_wrestling", "角鬥(男)"],
 ];
 
 /**
@@ -645,10 +1301,11 @@ function relamanhuaParseDetail(doc, pathWord) {
     doc.querySelector(".comicParticulars-synopsis p");
   /** @type {Record<string, string[]>} */
   const groups = {};
+  if (authors.length) groups["作者"] = authors;
   if (themes.length) groups["题材"] = themes;
   if (tags.length) groups["标签"] = tags;
   if (aliases.length) groups["别名"] = aliases;
-  if (statuses.length) groups["状态"] = statuses;
+  groups["状态"] = statuses;
   /** @type {SourceComicDetails} */
   const details = {
     id: pathWord,
@@ -658,9 +1315,20 @@ function relamanhuaParseDetail(doc, pathWord) {
         : pathWord,
     cover: coverNode ? relamanhuaAbsolute(coverNode.attributes.src) : "",
     chapters: {},
+    headerStats: [{ text: statuses.join(" · ") }],
     tags: groups,
+    infoFields: [
+      {
+        label: { zh: "作者", en: "Author" },
+        values: authors,
+        action: "search",
+      },
+      { label: { zh: "题材", en: "Themes" }, values: themes, action: "search" },
+      { label: { zh: "标签", en: "Tags" }, values: tags, action: "search" },
+      { label: { zh: "别名", en: "Aliases" }, values: aliases, action: "copy" },
+      { label: { zh: "状态", en: "Status" }, values: statuses },
+    ],
   };
-  if (authors.length) details.subTitle = authors.join(" / ");
   if (introNode) {
     const description = relamanhuaText(introNode.text);
     if (description) details.description = description;
@@ -727,8 +1395,6 @@ function relamanhuaComicFromSearch(item) {
     title: relamanhuaText(item && item.name) || pathWord,
     cover: relamanhuaAbsolute(item && item.cover),
   };
-  const authors = relamanhuaNameList(item && item.author);
-  if (authors.length) comic.subTitle = authors.join(" / ");
   const themes = relamanhuaNameList(item && item.theme);
   if (themes.length) comic.tags = themes;
   return comic;
@@ -938,7 +1604,16 @@ function relamanhuaHomeSections(html) {
       if (!name) continue;
       comics.push({ id: match[1], title: name, cover });
     }
-    if (comics.length > 0) sections.push({ title, comics });
+    if (comics.length > 0) {
+      /** @type {SourceExploreSection} */
+      const section = { title, comics };
+      if (title === "漫畫推薦") {
+        section.viewMore = "category:" + title + "@recommend";
+      } else if (title === "付費漫畫") {
+        section.viewMore = "category:" + title + "@2";
+      }
+      sections.push(section);
+    }
   }
   return sections;
 }
@@ -1018,9 +1693,18 @@ function relamanhuaCatalogPage(html) {
  * @param {string} theme theme slug, or "" for every theme
  * @param {string} ordering sort key used by the site
  * @param {number} page 1-based page number; the site pages by 50
+ * @param {string} [female] paid comic female tag slug
+ * @param {string} [male] paid comic male tag slug
  * @returns {Promise<ComicPage>}
  */
-async function relamanhuaLoadCatalog(type, theme, ordering, page) {
+async function relamanhuaLoadCatalog(
+  type,
+  theme,
+  ordering,
+  page,
+  female,
+  male,
+) {
   const currentPage = Number(page) > 0 ? Math.floor(Number(page)) : 1;
   const offset = (currentPage - 1) * relamanhuaCatalogLimit;
   let query =
@@ -1033,7 +1717,31 @@ async function relamanhuaLoadCatalog(type, theme, ordering, page) {
     "&limit=" +
     relamanhuaCatalogLimit;
   if (theme) query += "&theme=" + encodeURIComponent(theme);
+  if (type === "2") {
+    if (female) query += "&female=" + encodeURIComponent(female);
+    if (male) query += "&male=" + encodeURIComponent(male);
+  }
   return relamanhuaCatalogPage(await relamanhuaGet(query, ""));
+}
+
+/**
+ * The homepage recommendation preview links to /recommend, which has its own
+ * 60-item pagination and must not be replaced by the general comic catalogue.
+ * @param {number} page
+ * @returns {Promise<ComicPage>}
+ */
+async function relamanhuaLoadRecommendations(page) {
+  const currentPage = Number(page) > 0 ? Math.floor(Number(page)) : 1;
+  const offset = (currentPage - 1) * relamanhuaRecommendLimit;
+  return relamanhuaCatalogPage(
+    await relamanhuaGet(
+      "/recommend?type=1200102&offset=" +
+        offset +
+        "&limit=" +
+        relamanhuaRecommendLimit,
+      "",
+    ),
+  );
 }
 
 /**
@@ -1200,6 +1908,33 @@ function relamanhuaOrdering(value) {
 }
 
 /**
+ * The host splits options on the first dash. Escape slugs that contain one,
+ * and encode spaces without changing the site's original tag identifiers.
+ * @param {string} slug
+ * @returns {string}
+ */
+function relamanhuaTagOptionValue(slug) {
+  return encodeURIComponent(slug).replace(/-/g, "%2D");
+}
+
+/**
+ * Resolve host option values back to the original site slugs. Also accept raw
+ * slugs for callers that do not use the encoded option list.
+ * @param {string | undefined} value
+ * @param {string[][]} tags
+ * @returns {string}
+ */
+function relamanhuaSelectedTag(value, tags) {
+  if (!value) return "";
+  for (const tag of tags) {
+    if (value === tag[0] || value === relamanhuaTagOptionValue(tag[0])) {
+      return tag[0];
+    }
+  }
+  return "";
+}
+
+/**
  * Form-encode a flat object the way the site's own client does.
  * @param {Record<string, string | number>} values
  * @returns {string}
@@ -1229,8 +1964,6 @@ function relamanhuaNestedComic(item) {
     title: relamanhuaText(node && node.name) || pathWord,
     cover: relamanhuaAbsolute(node && node.cover),
   };
-  const authors = relamanhuaNameList(node && node.author);
-  if (authors.length) comic.subTitle = authors.join(" / ");
   const themes = relamanhuaNameList(node && node.theme);
   if (themes.length) comic.tags = themes;
   return comic;
@@ -1596,7 +2329,7 @@ async function relamanhuaSendChapterComment(chapterId, text) {
 Hazuki.registerSource({
   id: "relamanhua",
   name: "热辣漫画",
-  version: "1.3.1",
+  version: "1.3.4",
   apiVersion: 1,
   presentation: {
     buttons: [
@@ -1683,15 +2416,35 @@ Hazuki.registerSource({
     optionList: [
       {
         label: "題材",
+        notShowWhen: ["recommend"],
         options: ["-全部題材"].concat(
           relamanhuaThemes.map((theme) => theme[0] + "-" + theme[1]),
         ),
       },
       {
         label: "排序",
+        notShowWhen: ["recommend"],
         // Values must not contain a dash: the host splits each entry on the
         // first dash, so aliases are mapped back to the real ordering strings.
         options: ["updated-最近更新", "popular-最多人氣", "oldest-最早更新"],
+      },
+      {
+        label: "女性標簽",
+        showWhen: ["付費漫畫", "2"],
+        options: ["-全部女性標簽"].concat(
+          relamanhuaFemaleTags.map(
+            (tag) => relamanhuaTagOptionValue(tag[0]) + "-" + tag[1],
+          ),
+        ),
+      },
+      {
+        label: "男性標簽",
+        showWhen: ["付費漫畫", "2"],
+        options: ["-全部男性標簽"].concat(
+          relamanhuaMaleTags.map(
+            (tag) => relamanhuaTagOptionValue(tag[0]) + "-" + tag[1],
+          ),
+        ),
       },
     ],
     ranking: {
@@ -1699,12 +2452,16 @@ Hazuki.registerSource({
       load: (option, page) => relamanhuaLoadRanking(option, page),
     },
     load: async (category, param, options, page) =>
-      relamanhuaLoadCatalog(
-        param || "1",
-        options[0] || "",
-        relamanhuaOrdering(options[1]),
-        page,
-      ),
+      param === "recommend"
+        ? relamanhuaLoadRecommendations(page)
+        : relamanhuaLoadCatalog(
+            param || "1",
+            options[0] || "",
+            relamanhuaOrdering(options[1]),
+            page,
+            relamanhuaSelectedTag(options[2], relamanhuaFemaleTags),
+            relamanhuaSelectedTag(options[3], relamanhuaMaleTags),
+          ),
   },
   favorites: {
     singleFolderForSingleComic: true,
@@ -1787,7 +2544,10 @@ Hazuki.registerSource({
           details.isFavorite = meta.collected;
           if (meta.locked) {
             const groups = details.tags || {};
-            groups["状态"] = (groups["状态"] || []).concat("付費試看");
+            const statuses = groups["状态"] || [];
+            statuses.push("付費試看");
+            groups["状态"] = statuses;
+            details.headerStats = [{ text: statuses.join(" · ") }];
             details.tags = groups;
           }
         } catch (error) {

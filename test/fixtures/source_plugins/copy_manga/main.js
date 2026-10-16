@@ -377,7 +377,6 @@ function copyComic(item) {
     id: String(comic.path_word),
     title: String(comic.name || ""),
     cover: String(comic.cover || ""),
-    subTitle: String(comic.author?.[0]?.name || ""),
     tags: (comic.theme || []).map((/** @type {any} */ tag) => String(tag.name)),
   };
 }
@@ -442,7 +441,7 @@ function copyComment(comment, replyTo, fallbackId = "") {
 const source = {
   id: "copy_manga",
   name: "CopyManga",
-  version: "1.0.1",
+  version: "1.0.2",
   apiVersion: 1,
   init: async () => {
     await copyEnsureDevices();
@@ -648,6 +647,28 @@ const source = {
           ),
           状态: [String(comic.status?.display || "")],
         },
+        infoFields: [
+          {
+            label: { zh: "作者", en: "Author" },
+            values: (comic.author || []).map((/** @type {any} */ author) =>
+              String(author.name),
+            ),
+            action: "search",
+          },
+          {
+            label: { zh: "标签", en: "Tags" },
+            values: (comic.theme || []).map((/** @type {any} */ tag) =>
+              String(tag.name),
+            ),
+            action: "search",
+          },
+          {
+            label: { zh: "状态", en: "Status" },
+            values: String(comic.status?.display || ""),
+          },
+        ],
+        headerStats: [{ text: String(comic.status?.display || "") }],
+        updateTime: String(comic.datetime_updated || ""),
         chapters: await copyChapters(id, info.results.groups),
         isFavorite: favorite.results.collect != null,
         subId: String(comic.uuid),
@@ -856,6 +877,7 @@ const source = {
     },
   },
   presentation: {
+    showComments: true,
     buttons: [
       {
         id: "resetDeviceInfo",

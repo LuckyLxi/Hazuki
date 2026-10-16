@@ -266,7 +266,7 @@ void main() {
 
       final overlayFinder = find.byKey(
         const ValueKey(
-          'discover_daily_recommendation_overlay_comic-cover-1-discover-daily-0',
+          'discover_daily_recommendation_overlay_comic-cover-1-discover-daily-0_0',
         ),
       );
 

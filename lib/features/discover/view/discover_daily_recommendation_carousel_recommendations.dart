@@ -5,6 +5,7 @@ extension _DiscoverDailyRecommendationCarouselRecommendations
   void _replaceDisplayedRecommendations(
     List<DiscoverDailyRecommendationEntry> recommendations,
   ) {
+    final previousCount = _recommendationCount;
     _displayedRecommendations =
         List<DiscoverDailyRecommendationEntry>.unmodifiable(recommendations);
     _displayedSnapshotKey = _snapshotKey(_displayedRecommendations);
@@ -14,6 +15,15 @@ extension _DiscoverDailyRecommendationCarouselRecommendations
     _currentPage = _recommendationCount == 0
         ? 0
         : _normalizeLogicalPage(_currentPage);
+    if (previousCount != _recommendationCount) {
+      // The replacement scroll position cancels any gesture on the old list.
+      _isUserScrolling = false;
+      _loopController.rebuildPageController(
+        currentPage: _physicalPageForLogical(_currentPage),
+        viewportFraction: _pageController.viewportFraction,
+      );
+      _startAutoPlay(trigger: 'recommendation_count_changed');
+    }
   }
 
   void _clearPendingRecommendations() {
@@ -46,6 +56,13 @@ extension _DiscoverDailyRecommendationCarouselRecommendations
     if (_usingMixedSnapshots ||
         !_hasPendingRecommendations ||
         _displayedRecommendations.isEmpty) {
+      return;
+    }
+    // With one or two entries, every logical item may remain visible forever.
+    // Waiting for all protected cards to move offscreen would stall refreshes.
+    if (_pendingRecommendations.length != _recommendationCount ||
+        _recommendationCount <= 2) {
+      _completePendingPromotion(trigger: '${trigger}_count_change');
       return;
     }
     if (_pendingSnapshotKey == _displayedSnapshotKey) {
@@ -181,7 +198,7 @@ extension _DiscoverDailyRecommendationCarouselRecommendations
     final normalizedIndex = _normalizeLogicalPage(logicalIndex);
     final coverUrl = _resolvedRecommendationEntry(
       normalizedIndex,
-    ).comic.cover.trim();
+    ).displayImageUrl.trim();
     final sourceKey = _resolvedRecommendationEntry(
       normalizedIndex,
     ).comic.sourceKey;

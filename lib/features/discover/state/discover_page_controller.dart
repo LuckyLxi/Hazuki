@@ -204,7 +204,7 @@ class DiscoverPageController extends ChangeNotifier {
     final viewMoreUrl = section.viewMoreUrl;
     if (viewMoreUrl == null || viewMoreUrl.isEmpty) return;
 
-    final currentPage = _state.sectionPages[index] ?? 1;
+    var currentPage = _state.sectionPages[index] ?? section.initialPage;
     final maxPage = section.maxPage;
     if (maxPage != null && currentPage >= maxPage) {
       _state.sectionNoMore.add(index);
@@ -215,30 +215,30 @@ class DiscoverPageController extends ChangeNotifier {
     _notify();
 
     final sourceGeneration = _sourceGeneration;
-    final nextPage = currentPage + 1;
     try {
-      final result = await _sourceService.loadCategoryComicsByViewMore(
-        viewMoreUrl: viewMoreUrl,
-        page: nextPage,
-      );
-      if (_disposed ||
-          sourceGeneration != _sourceGeneration ||
-          index >= _state.sections.length) {
-        return;
-      }
+      while (true) {
+        final nextPage = currentPage + 1;
+        final result = await _sourceService.loadCategoryComicsByViewMore(
+          viewMoreUrl: viewMoreUrl,
+          page: nextPage,
+        );
+        if (_disposed ||
+            sourceGeneration != _sourceGeneration ||
+            index >= _state.sections.length) {
+          return;
+        }
 
-      final latest = _state.sections[index];
-      final existingIds = latest.comics
-          .map((comic) => comic.id)
-          .where((id) => id.isNotEmpty)
-          .toSet();
-      final incoming = result.comics
-          .where((comic) => comic.id.isEmpty || !existingIds.contains(comic.id))
-          .toList();
+        final latest = _state.sections[index];
+        final existingIds = latest.comics
+            .map((comic) => comic.id)
+            .where((id) => id.isNotEmpty)
+            .toSet();
+        final incoming = result.comics
+            .where(
+              (comic) => comic.id.isEmpty || !existingIds.contains(comic.id),
+            )
+            .toList();
 
-      if (incoming.isEmpty) {
-        _state.sectionNoMore.add(index);
-      } else {
         final nextSections = List<ExploreSection>.of(_state.sections);
         nextSections[index] = latest.copyWith(
           comics: <ExploreComic>[...latest.comics, ...incoming],
@@ -247,9 +247,17 @@ class DiscoverPageController extends ChangeNotifier {
         _state.sections = nextSections;
         _state.sectionPages[index] = nextPage;
         final nextMaxPage = result.maxPage ?? latest.maxPage;
-        if (nextMaxPage != null && nextPage >= nextMaxPage) {
+        if (result.comics.isEmpty ||
+            (incoming.isEmpty && nextPage > 1) ||
+            (nextMaxPage != null && nextPage >= nextMaxPage)) {
           _state.sectionNoMore.add(index);
+          break;
         }
+        if (incoming.isNotEmpty) break;
+
+        // A preview may already contain the entire first page. Continue in the
+        // same request so scrolling can progress even when no items were added.
+        currentPage = nextPage;
       }
     } catch (_) {
       // Keep horizontal discovery passive; users can use "More" for errors.
@@ -266,9 +274,11 @@ class DiscoverPageController extends ChangeNotifier {
     _state.sectionLoadingMore.clear();
     _state.sectionNoMore.clear();
     for (var i = 0; i < _state.sections.length; i++) {
-      _state.sectionPages[i] = 1;
-      final maxPage = _state.sections[i].maxPage;
-      if (_state.sections[i].viewMoreUrl == null || maxPage == 1) {
+      final section = _state.sections[i];
+      _state.sectionPages[i] = section.initialPage;
+      final maxPage = section.maxPage;
+      if (section.viewMoreUrl == null ||
+          (maxPage != null && section.initialPage >= maxPage)) {
         _state.sectionNoMore.add(i);
       }
     }

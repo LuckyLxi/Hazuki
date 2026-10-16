@@ -333,6 +333,9 @@ class _DiscoverDailyRecommendationCarouselState
                   _startAutoPlay(trigger: 'hover_exit');
                 },
                 child: NotificationListener<ScrollNotification>(
+                  // Loop offsets change with the item count. Reset the scroll
+                  // position so the rebuilt controller's initial page applies.
+                  key: ValueKey(_recommendationCount),
                   onNotification: _handleScrollNotification,
                   child: PageView.builder(
                     key: const ValueKey(
@@ -351,7 +354,8 @@ class _DiscoverDailyRecommendationCarouselState
                       );
                       final heroTag = widget.comicCoverHeroTagBuilder(
                         entry.comic,
-                        salt: '$discoverDailyHeroSaltPrefix$effectiveIndex',
+                        salt:
+                            '$discoverDailyHeroSaltPrefix${effectiveIndex}_$index',
                       );
                       return AnimatedBuilder(
                         animation: _pageController,
@@ -388,14 +392,22 @@ class _DiscoverDailyRecommendationCarouselState
                             pageExtent: pageExtent,
                           );
 
-                          final imageChild = entry.comic.cover.trim().isEmpty
+                          final imageChild =
+                              entry.displayImageUrl.trim().isEmpty
                               ? ColoredBox(color: placeholderColor)
                               : HazukiCachedImage(
-                                  url: entry.comic.cover,
+                                  key: ValueKey(
+                                    'recommendation-image-${entry.comic.sourceKey}-${entry.displayImageUrl}',
+                                  ),
+                                  url: entry.displayImageUrl,
                                   sourceKey: entry.comic.sourceKey,
                                   fit: BoxFit.cover,
                                   cacheWidth: coverCacheWidth.round(),
                                   animateOnLoad: true,
+                                  animateOnCacheHit: _recommendationService
+                                      .usesPluginRecommendations,
+                                  waitForFirstFrame: _recommendationService
+                                      .usesPluginRecommendations,
                                   filterQuality: FilterQuality.low,
                                   deferLoadingWhileScrolling:
                                       shouldDeferLoading,

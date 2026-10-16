@@ -9,6 +9,7 @@ import '../runtime/source_runtime_handle.dart';
 import '../runtime/source_secure_session_storage.dart';
 import 'source_plugin_models.dart';
 import 'source_plugin_buttons.dart';
+import 'source_search_capabilities.dart';
 
 /// Reads a plugin's own registration without running init or accessing user data.
 class SourcePluginScriptInspector {
@@ -93,6 +94,16 @@ SourcePluginManifest registeredSourcePluginManifest(SourceScriptEngine engine) {
     ),
     'entry': 'main.js',
   });
+  final recommendation = DailyRecommendationConfig.parse(
+    manifest.presentation['dailyRecommendation'],
+  );
+  if (recommendation?.mode == DailyRecommendationMode.plugin &&
+      engine.evaluate(
+            'typeof globalThis.__hazuki_source.dailyRecommendation?.load === "function"',
+          ) !=
+          true) {
+    throw const SourcePluginException('plugin_recommendation_callback_missing');
+  }
   for (final button in SourcePluginButton.parseList(
     manifest.presentation['buttons'],
   )) {

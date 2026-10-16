@@ -12,6 +12,17 @@ SourcePluginManifest manifest(Map<String, dynamic> presentation) =>
     });
 
 void main() {
+  test('plugin recommendation mode needs no author search ordering', () {
+    final plugin = manifest({
+      'dailyRecommendation': {'mode': 'plugin'},
+    });
+    final config = DailyRecommendationConfig.parse(
+      plugin.presentation['dailyRecommendation'],
+    )!;
+    expect(config.mode, DailyRecommendationMode.plugin);
+    expect(config.searchOrder, isEmpty);
+    expect(config.cacheKey, 'plugin');
+  });
   test('new declarations work with an arbitrary plugin identity', () {
     final plugin = manifest({
       'directComicIdRules': {
@@ -114,6 +125,9 @@ void main() {
     {'searchOrder': ''},
     {'searchOrder': ' '},
     {'searchOrder': 1},
+    {'mode': 'unknown'},
+    {'mode': 'plugin', 'searchOrder': 'mr'},
+    {'mode': 'authors'},
   ]) {
     test('manifest rejects invalid recommendation config: $invalid', () {
       expect(

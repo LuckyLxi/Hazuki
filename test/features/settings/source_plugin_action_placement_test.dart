@@ -159,9 +159,9 @@ void main() {
 
   for (final market in [false, true]) {
     testWidgets(
-      'advanced restore consumes backup and online download is ${market ? 'shown for market' : 'hidden for local'} plugins',
+      'advanced backup actions appear after editing and animate away for ${market ? 'market' : 'local'} plugins',
       (tester) async {
-        var hasBackup = true;
+        var hasBackup = false;
         var restores = 0;
         var downloads = 0;
         final advanced = _MockAdvanced();
@@ -190,7 +190,15 @@ void main() {
                 sourcePlugins: plugins,
                 softwareUpdateService: software,
                 logsPageBuilder: (_) => const SizedBox.shrink(),
-                comicSourceEditorPageBuilder: (_) => const SizedBox.shrink(),
+                comicSourceEditorPageBuilder: (context) => Scaffold(
+                  body: TextButton(
+                    onPressed: () {
+                      hasBackup = true;
+                      Navigator.of(context).pop();
+                    },
+                    child: const Text('Save source edit'),
+                  ),
+                ),
                 restoreComicSource: (_) async {
                   restores++;
                   hasBackup = false;
@@ -214,12 +222,23 @@ void main() {
         );
         await tester.pumpAndSettle();
         final backupButton = find.byKey(const ValueKey('restore-comic-source'));
+        final onlineButton = find.byKey(
+          const ValueKey('redownload-comic-source'),
+        );
+        expect(backupButton, findsNothing);
+        expect(onlineButton, findsNothing);
+        final editorButton = find.widgetWithIcon(
+          ListTile,
+          Icons.javascript_rounded,
+        );
+        await tester.scrollUntilVisible(editorButton, 250);
+        await tester.tap(editorButton);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Save source edit'));
+        await tester.pumpAndSettle();
         await tester.scrollUntilVisible(backupButton, 250);
         await tester.pumpAndSettle();
         if (market) {
-          final onlineButton = find.byKey(
-            const ValueKey('redownload-comic-source'),
-          );
           await tester.ensureVisible(onlineButton);
           await tester.pumpAndSettle();
           await tester.tap(onlineButton);
@@ -234,9 +253,35 @@ void main() {
         await tester.ensureVisible(backupButton);
         await tester.pumpAndSettle();
         await tester.tap(backupButton);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 120));
+        if (market) {
+          expect(onlineButton, findsOneWidget);
+          final fade = tester.widget<FadeTransition>(
+            find
+                .ancestor(
+                  of: onlineButton,
+                  matching: find.byType(FadeTransition),
+                )
+                .first,
+          );
+          expect(fade.opacity.value, greaterThan(0));
+          expect(fade.opacity.value, lessThan(1));
+          final size = tester.widget<SizeTransition>(
+            find
+                .ancestor(
+                  of: onlineButton,
+                  matching: find.byType(SizeTransition),
+                )
+                .first,
+          );
+          expect(size.sizeFactor.value, greaterThan(0));
+          expect(size.sizeFactor.value, lessThan(1));
+        }
         await tester.pumpAndSettle();
         expect(restores, 1);
         expect(backupButton, findsNothing);
+        expect(onlineButton, findsNothing);
         expect(plugins.installed.single.customEdited, true);
         expect(tester.takeException(), null);
         await tester.pump(const Duration(seconds: 4));
@@ -437,7 +482,7 @@ void main() {
       expect(find.text('画质'), findsOneWidget);
       expect(find.text('高'), findsOneWidget);
       expect(find.text('https://example.com'), findsOneWidget);
-      await tester.tap(find.byType(DropdownButton<String>));
+      await tester.tap(find.byType(HazukiFrostedDropdown<String>));
       await tester.pumpAndSettle();
       await tester.tap(find.text('低').last);
       await tester.pumpAndSettle();
@@ -590,6 +635,38 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets(
+    'plugin select settings show labels and persist values with the frosted menu',
+    (tester) async {
+      plugins.settings['quality'] = {
+        'title': 'Image quality',
+        'type': 'select',
+        'default': 'standard',
+        'options': [
+          {'value': 'standard', 'label': 'Standard quality'},
+          {'value': 'original', 'label': 'Original quality'},
+        ],
+      };
+      await tester.pumpWidget(
+        _app(SourcePluginSettingsPage(id: 'fixture', gateway: plugins)),
+      );
+      await tester.pumpAndSettle();
+      final dropdown = find.byType(HazukiFrostedDropdown<String>);
+      expect(dropdown, findsOneWidget);
+      expect(find.text('Standard quality'), findsOneWidget);
+      await tester.tap(dropdown);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Original quality'));
+      await tester.pumpAndSettle();
+      expect(plugins.values['fixture/quality'], 'original');
+      expect(
+        find.descendant(of: dropdown, matching: find.text('Original quality')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets(
     'plugin defaults stay local and lines controls save scoped values',

@@ -62,14 +62,32 @@ class DirectComicIdRules {
   }
 }
 
+enum DailyRecommendationMode { authors, plugin }
+
 class DailyRecommendationConfig {
-  const DailyRecommendationConfig({required this.searchOrder});
+  const DailyRecommendationConfig({
+    this.searchOrder = '',
+    this.mode = DailyRecommendationMode.authors,
+  });
 
   final String searchOrder;
+  final DailyRecommendationMode mode;
+  String get cacheKey => mode == DailyRecommendationMode.plugin
+      ? 'plugin'
+      : 'authors:$searchOrder';
 
   static DailyRecommendationConfig? parse(Object? value) {
     if (value == null) return null;
-    if (value is! Map ||
+    if (value is! Map) {
+      throw const SourcePluginException('plugin_invalid_manifest');
+    }
+    final mode = value['mode'] ?? 'authors';
+    if (mode == 'plugin' && !value.containsKey('searchOrder')) {
+      return const DailyRecommendationConfig(
+        mode: DailyRecommendationMode.plugin,
+      );
+    }
+    if (mode != 'authors' ||
         value['searchOrder'] is! String ||
         (value['searchOrder'] as String).trim().isEmpty) {
       throw const SourcePluginException('plugin_invalid_manifest');

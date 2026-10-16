@@ -155,7 +155,7 @@ class DiscoverDailyRecommendationIndicators extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Row(
+    final indicators = Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         for (int index = 0; index < count; index++)
@@ -174,6 +174,15 @@ class DiscoverDailyRecommendationIndicators extends StatelessWidget {
             ),
           ),
       ],
+    );
+    return LayoutBuilder(
+      builder: (context, constraints) => SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(minWidth: constraints.maxWidth),
+          child: indicators,
+        ),
+      ),
     );
   }
 }

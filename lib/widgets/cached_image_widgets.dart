@@ -31,6 +31,8 @@ class HazukiCachedImage extends StatefulWidget {
     this.cacheWidth,
     this.cacheHeight,
     this.animateOnLoad = false,
+    this.animateOnCacheHit = false,
+    this.waitForFirstFrame = false,
     this.loadAnimationDuration = const Duration(milliseconds: 260),
     this.loadAnimationBeginScale = 0.985,
     this.filterQuality = FilterQuality.medium,
@@ -53,6 +55,10 @@ class HazukiCachedImage extends StatefulWidget {
   final int? cacheWidth;
   final int? cacheHeight;
   final bool animateOnLoad;
+  final bool animateOnCacheHit;
+
+  /// Retains the placeholder until the first decoded image frame can be drawn.
+  final bool waitForFirstFrame;
   final Duration loadAnimationDuration;
   final double loadAnimationBeginScale;
   final FilterQuality filterQuality;
@@ -292,9 +298,10 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
     _bytes = cached;
     _error = null;
     _loading = false;
-    _showLoadedImage = true;
-    _useLoadedImageReveal = false;
+    _useLoadedImageReveal = widget.animateOnLoad && widget.animateOnCacheHit;
+    _showLoadedImage = !_useLoadedImageReveal;
     _reportState(HazukiCachedImageLoadState.loaded);
+    if (_useLoadedImageReveal) _queueLoadedImageReveal();
     return true;
   }
 
@@ -367,9 +374,11 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
         _bytes = cached;
         _error = null;
         _loading = false;
-        _showLoadedImage = true;
-        _useLoadedImageReveal = false;
+        _useLoadedImageReveal =
+            widget.animateOnLoad && widget.animateOnCacheHit;
+        _showLoadedImage = !_useLoadedImageReveal;
       });
+      if (_useLoadedImageReveal) _queueLoadedImageReveal();
       return;
     }
 
@@ -452,7 +461,23 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
         cacheHeight: widget.cacheHeight,
         gaplessPlayback: true,
         filterQuality: widget.filterQuality,
+        frameBuilder: widget.waitForFirstFrame
+            ? (context, child, frame, wasSynchronouslyLoaded) =>
+                  _HazukiImageFrameReveal(
+                    ready: frame != null,
+                    animate: widget.animateOnLoad,
+                    duration: widget.loadAnimationDuration,
+                    beginScale: widget.loadAnimationBeginScale,
+                    placeholder: _buildLoadingPlaceholder(),
+                    child: child,
+                  )
+            : null,
+        errorBuilder: widget.waitForFirstFrame
+            ? (context, error, stackTrace) =>
+                  widget.error ?? const Icon(Icons.broken_image_outlined)
+            : null,
       );
+      if (widget.waitForFirstFrame) return image;
       if (!widget.animateOnLoad || !_useLoadedImageReveal) {
         return image;
       }
@@ -479,44 +504,9 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
         width: widget.width,
         height: widget.height,
       );
-    } else if (_loading) {
-      if (widget.loading != null) {
-        if (widget.useShimmerLoading) {
-          currentWidget = SizedBox(
-            key: const ValueKey('loading-stack'),
-            width: widget.width,
-            height: widget.height,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                // 用透明 loading 占位来撑开 Stack 的布局尺寸
-                Opacity(opacity: 0.0, child: widget.loading!),
-                // shimmer 铺满整个占位区域
-                const HazukiShimmerLoading(),
-              ],
-            ),
-          );
-        } else {
-          currentWidget = SizedBox(
-            key: const ValueKey('loading-static'),
-            width: widget.width,
-            height: widget.height,
-            child: widget.loading,
-          );
-        }
-      } else {
-        currentWidget = widget.useShimmerLoading
-            ? HazukiShimmerLoading(
-                key: const ValueKey('loading-shimmer'),
-                width: widget.width,
-                height: widget.height,
-              )
-            : SizedBox(
-                key: const ValueKey('loading-empty'),
-                width: widget.width,
-                height: widget.height,
-              );
-      }
+    } else if (_loading ||
+        (widget.waitForFirstFrame && _error == null && widget.url.isNotEmpty)) {
+      currentWidget = _buildLoadingPlaceholder();
     } else if (_error != null) {
       currentWidget =
           widget.error ??
@@ -540,6 +530,127 @@ class _HazukiCachedImageState extends State<HazukiCachedImage> {
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 300),
       child: currentWidget,
+    );
+  }
+
+  Widget _buildLoadingPlaceholder() {
+    if (widget.loading != null) {
+      if (widget.useShimmerLoading) {
+        return SizedBox(
+          key: const ValueKey('loading-stack'),
+          width: widget.width,
+          height: widget.height,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // 用透明 loading 占位来撑开 Stack 的布局尺寸
+              Opacity(opacity: 0.0, child: widget.loading!),
+              // shimmer 铺满整个占位区域
+              const HazukiShimmerLoading(),
+            ],
+          ),
+        );
+      } else {
+        return SizedBox(
+          key: const ValueKey('loading-static'),
+          width: widget.width,
+          height: widget.height,
+          child: widget.loading,
+        );
+      }
+    } else {
+      return widget.useShimmerLoading
+          ? HazukiShimmerLoading(
+              key: const ValueKey('loading-shimmer'),
+              width: widget.width,
+              height: widget.height,
+            )
+          : SizedBox(
+              key: const ValueKey('loading-empty'),
+              width: widget.width,
+              height: widget.height,
+            );
+    }
+  }
+}
+
+class _HazukiImageFrameReveal extends StatefulWidget {
+  const _HazukiImageFrameReveal({
+    required this.ready,
+    required this.animate,
+    required this.duration,
+    required this.beginScale,
+    required this.placeholder,
+    required this.child,
+  });
+
+  final bool ready;
+  final bool animate;
+  final Duration duration;
+  final double beginScale;
+  final Widget placeholder;
+  final Widget child;
+
+  @override
+  State<_HazukiImageFrameReveal> createState() =>
+      _HazukiImageFrameRevealState();
+}
+
+class _HazukiImageFrameRevealState extends State<_HazukiImageFrameReveal> {
+  bool _visible = false;
+  bool _finished = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.ready) _revealAfterFrame();
+  }
+
+  @override
+  void didUpdateWidget(covariant _HazukiImageFrameReveal oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!widget.ready) {
+      _visible = false;
+      _finished = false;
+    } else if (!oldWidget.ready) {
+      _revealAfterFrame();
+    }
+  }
+
+  void _revealAfterFrame() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !widget.ready) return;
+      setState(() {
+        _visible = true;
+        _finished = !widget.animate;
+      });
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_finished) return widget.child;
+    // Keep the placeholder underneath until the first decoded frame has
+    // actually appeared, including throughout its reveal animation.
+    return Stack(
+      fit: StackFit.passthrough,
+      children: [
+        Positioned.fill(child: widget.placeholder),
+        AnimatedOpacity(
+          opacity: _visible ? 1 : 0,
+          duration: widget.duration,
+          curve: Curves.easeOutCubic,
+          onEnd: () {
+            if (mounted && _visible) setState(() => _finished = true);
+          },
+          child: AnimatedScale(
+            scale: _visible ? 1 : widget.beginScale,
+            duration: widget.duration,
+            curve: Curves.easeOutCubic,
+            child: widget.child,
+          ),
+        ),
+      ],
     );
   }
 }

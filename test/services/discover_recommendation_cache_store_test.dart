@@ -34,10 +34,72 @@ Map<String, dynamic> _payload({
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
-  const store = SharedPreferencesDiscoverDailyRecommendationCacheStore();
+  late SharedPreferencesDiscoverDailyRecommendationCacheStore store;
   const globalKey = 'discover_daily_recommendation_cache';
 
-  setUp(() => SharedPreferences.setMockInitialValues({}));
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+    store = SharedPreferencesDiscoverDailyRecommendationCacheStore();
+  });
+
+  test(
+    'new sessions purge persisted plugin caches for active and inactive sources',
+    () async {
+      final authorPayload = jsonEncode(_payload());
+      final pluginPayload = _payload(
+        sourceKey: 'books',
+        entrySourceKey: 'books',
+      )..['configurationKey'] = 'plugin';
+      SharedPreferences.setMockInitialValues({
+        '${globalKey}_jm': authorPayload,
+        '${globalKey}_books': jsonEncode(pluginPayload),
+        '${globalKey}_other': jsonEncode(
+          _payload(sourceKey: 'other', entrySourceKey: 'other')
+            ..['configurationKey'] = 'plugin',
+        ),
+        'other_discover_daily_recommendation_enabled': true,
+        'unrelated': 'preserved',
+      });
+      expect(await store.loadEnabled(), isTrue);
+      expect(await store.readSnapshot(activeSourceKey: 'books'), isNull);
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getString('${globalKey}_books'), isNull);
+      expect(prefs.getString('${globalKey}_other'), isNull);
+      expect(prefs.getString('${globalKey}_jm'), authorPayload);
+      expect(prefs.getString('unrelated'), 'preserved');
+      expect(await store.readSnapshot(activeSourceKey: 'jm'), isNotNull);
+    },
+  );
+
+  test(
+    'plugin snapshots stay in memory while author snapshots survive a new session',
+    () async {
+      final author = DiscoverDailyRecommendationSnapshot(
+        recommendations: const [],
+        selectedAuthor: 'Author',
+        generatedAt: DateTime.now(),
+        sourceKey: 'jm',
+        schemaVersion: 2,
+        configurationKey: 'authors:mr',
+      );
+      final plugin = DiscoverDailyRecommendationSnapshot(
+        recommendations: const [],
+        selectedAuthor: '',
+        generatedAt: DateTime.now(),
+        sourceKey: 'books',
+        schemaVersion: 2,
+        configurationKey: 'plugin',
+      );
+      await store.persistSnapshot(author);
+      await store.persistSnapshot(plugin);
+      expect(await store.readSnapshot(activeSourceKey: 'books'), same(plugin));
+      expect(await store.readSnapshot(activeSourceKey: 'jm'), isNotNull);
+      final nextSession =
+          SharedPreferencesDiscoverDailyRecommendationCacheStore();
+      expect(await nextSession.readSnapshot(activeSourceKey: 'books'), isNull);
+      expect(await nextSession.readSnapshot(activeSourceKey: 'jm'), isNotNull);
+    },
+  );
 
   for (final sourceKey in ['jm', '', null]) {
     test('legacy cache with source $sourceKey belongs only to JM', () async {

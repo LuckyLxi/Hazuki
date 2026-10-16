@@ -1,4 +1,18 @@
 import 'package:flutter/foundation.dart';
+import '../../../models/explore_models.dart';
+
+/// Website recommendations retain their order and original comic cover.
+class SourceDailyRecommendationItem {
+  const SourceDailyRecommendationItem({
+    required this.comic,
+    this.caption = '',
+    this.imageUrl = '',
+  });
+
+  final ExploreComic comic;
+  final String caption;
+  final String imageUrl;
+}
 
 class SourceCatalogEntry {
   const SourceCatalogEntry({

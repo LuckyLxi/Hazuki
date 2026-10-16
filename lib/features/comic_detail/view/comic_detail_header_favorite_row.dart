@@ -1,4 +1,4 @@
-import 'package:hazuki/shared/source_presentation.dart';
+import 'package:hazuki/services/source/plugins/source_plugin_localization.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -16,7 +16,6 @@ class ComicDetailHeaderFavoriteRow extends StatelessWidget {
     required this.details,
     required this.favoriteRowKey,
     required this.skeletonColor,
-    required this.viewsText,
     required this.shouldAnimateInitialDetailReveal,
     this.isDesktop = false,
   });
@@ -24,7 +23,6 @@ class ComicDetailHeaderFavoriteRow extends StatelessWidget {
   final ComicDetailsData? details;
   final GlobalKey favoriteRowKey;
   final Color skeletonColor;
-  final String viewsText;
   final bool shouldAnimateInitialDetailReveal;
   final bool isDesktop;
 
@@ -35,28 +33,14 @@ class ComicDetailHeaderFavoriteRow extends StatelessWidget {
     final theme = Theme.of(context);
     final showLikeButton = favorite.supportComicLike;
     final detailsReady = details != null;
-    final showPageCount = sourceFeature(
-      details?.sourceKey ?? '',
-      'showPageCount',
-      context: context,
-    );
-    final comicStatusText =
-        sourceFeature(
-          details?.sourceKey ?? '',
-          'showComicStatus',
-          context: context,
-        )
-        ? _comicStatusText(details)
-        : '';
-    final statsText = [
-      if (comicStatusText.isNotEmpty) comicStatusText,
-      if (details?.likesCount.isNotEmpty ?? false)
-        l10n(context).comicDetailLikesCount(details!.likesCount),
-      if (showPageCount && (details?.pageCount.isNotEmpty ?? false))
-        l10n(context).comicDetailPagesCount(details!.pageCount)
-      else if (viewsText.isNotEmpty && comicStatusText.isEmpty)
-        l10n(context).comicDetailViewsCount(viewsText),
-    ].join(' / ');
+    String statText(ComicHeaderStat stat) => localizeSourcePluginText(
+      stat.text,
+      Localizations.localeOf(context).toLanguageTag(),
+    ).trim();
+    final stats = (details?.headerStats ?? const <ComicHeaderStat>[])
+        .where((stat) => statText(stat).isNotEmpty)
+        .toList(growable: false);
+    final statsText = stats.map(statText).join(' / ');
     final favoriteActive =
         favorite.favoriteOverride ?? details?.isFavorite ?? false;
     final likedActive = favorite.likedOverride ?? details?.isLiked ?? false;
@@ -153,66 +137,73 @@ class ComicDetailHeaderFavoriteRow extends StatelessWidget {
       );
     }
 
-    final mobileStatsText = [
-      if (!showLikeButton && (details?.likesCount.isNotEmpty ?? false))
-        l10n(context).comicDetailLikesCount(details!.likesCount),
-      if (showPageCount && (details?.pageCount.isNotEmpty ?? false))
-        l10n(context).comicDetailPagesCount(details!.pageCount)
-      else if (viewsText.isNotEmpty && comicStatusText.isEmpty)
-        l10n(context).comicDetailViewsCount(viewsText),
-    ].join(' · ');
     final statsStyle = theme.textTheme.bodySmall?.copyWith(
       color: theme.colorScheme.onSurfaceVariant,
     );
     final reserveStatsHeight = theme.platform == TargetPlatform.android;
-    final likeButton = TextButton.icon(
-      onPressed: detailsReady && !favorite.isLikeBusy
-          ? () => unawaited(favorite.toggleLike(context, details!))
-          : null,
-      style: TextButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        foregroundColor: likedActive
-            ? theme.colorScheme.primary
-            : theme.colorScheme.onSurfaceVariant,
-        textStyle: statsStyle,
-      ),
-      icon: Icon(
-        likedActive ? Icons.thumb_up_alt_rounded : Icons.thumb_up_alt_outlined,
-        size: 16,
-      ),
-      label: Text(
-        (details?.likesCount.isNotEmpty ?? false)
-            ? l10n(context).comicDetailLikesCount(details!.likesCount)
-            : likedActive
-            ? l10n(context).comicDetailUnlike
-            : l10n(context).comicDetailLike,
-        maxLines: reserveStatsHeight ? 1 : null,
-        overflow: reserveStatsHeight ? TextOverflow.ellipsis : null,
-      ),
+    final likeButtonStyle = TextButton.styleFrom(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      foregroundColor: likedActive
+          ? theme.colorScheme.primary
+          : theme.colorScheme.onSurfaceVariant,
+      textStyle: statsStyle,
     );
-    final statsLabel = Text(
-      mobileStatsText,
-      style: statsStyle,
-      maxLines: reserveStatsHeight ? 1 : null,
-      overflow: reserveStatsHeight ? TextOverflow.ellipsis : null,
-    );
+    final statWidgets = <Widget>[];
+    final plainText = <String>[];
+    void flushPlainText() {
+      if (plainText.isEmpty) return;
+      statWidgets.add(
+        Text(
+          plainText.join(' · '),
+          style: statsStyle,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      );
+      plainText.clear();
+    }
+
+    for (final stat in stats) {
+      if (stat.action == ComicHeaderStatAction.like && showLikeButton) {
+        flushPlainText();
+        statWidgets.add(
+          TextButton.icon(
+            onPressed: detailsReady && !favorite.isLikeBusy
+                ? () => unawaited(favorite.toggleLike(context, details!))
+                : null,
+            style: likeButtonStyle,
+            icon: Icon(
+              likedActive
+                  ? Icons.thumb_up_alt_rounded
+                  : Icons.thumb_up_alt_outlined,
+              size: 16,
+            ),
+            label: Text(
+              statText(stat),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        );
+      } else {
+        plainText.add(statText(stat));
+      }
+    }
+    flushPlainText();
     final resolvedStats = reserveStatsHeight
         ? Row(
             children: [
-              if (showLikeButton) Flexible(child: likeButton),
-              if (showLikeButton && mobileStatsText.isNotEmpty)
-                const SizedBox(width: 14),
-              if (mobileStatsText.isNotEmpty) Flexible(child: statsLabel),
+              for (var index = 0; index < statWidgets.length; index++) ...[
+                if (index > 0) const SizedBox(width: 14),
+                Flexible(child: statWidgets[index]),
+              ],
             ],
           )
         : Wrap(
             spacing: 14,
             runSpacing: 4,
             crossAxisAlignment: WrapCrossAlignment.center,
-            children: [
-              if (showLikeButton) likeButton,
-              if (mobileStatsText.isNotEmpty) statsLabel,
-            ],
+            children: statWidgets,
           );
     final statsContent = detailsReady
         ? ComicDetailEntranceReveal(
@@ -249,7 +240,7 @@ class ComicDetailHeaderFavoriteRow extends StatelessWidget {
                       maintainAnimation: true,
                       child: TextButton.icon(
                         onPressed: null,
-                        style: likeButton.style,
+                        style: likeButtonStyle,
                         icon: const SizedBox.square(dimension: 16),
                         label: const Text(' ', maxLines: 1),
                       ),
@@ -267,26 +258,4 @@ class ComicDetailHeaderFavoriteRow extends StatelessWidget {
       ),
     );
   }
-}
-
-String _comicStatusText(ComicDetailsData? details) {
-  if (details == null) {
-    return '';
-  }
-
-  for (final entry in details.tags.entries) {
-    final key = entry.key.trim().toLowerCase();
-    if (key != 'status' && entry.key.trim() != '状态') {
-      continue;
-    }
-
-    for (final value in entry.value) {
-      final text = value.trim();
-      if (text.isNotEmpty) {
-        return text;
-      }
-    }
-  }
-
-  return '';
 }

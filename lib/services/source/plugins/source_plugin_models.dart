@@ -93,17 +93,9 @@ class SourcePluginManifest {
         : const <String, dynamic>{};
     DirectComicIdRules.parse(presentation['directComicIdRules']);
     DailyRecommendationConfig.parse(presentation['dailyRecommendation']);
-    for (final key in const ['showCategories', 'showChineseTeam']) {
-      if (presentation.containsKey(key) && presentation[key] is! bool) {
-        throw const SourcePluginException('plugin_invalid_manifest');
-      }
-    }
-    if (presentation.containsKey('detailTagGroups')) {
-      final groups = presentation['detailTagGroups'];
-      if (groups is! List ||
-          groups.any((value) => value is! String || value.trim().isEmpty)) {
-        throw const SourcePluginException('plugin_invalid_manifest');
-      }
+    if (presentation.containsKey('showComments') &&
+        presentation['showComments'] is! bool) {
+      throw const SourcePluginException('plugin_invalid_manifest');
     }
     final groups = presentation['listTagGroups'];
     final enrich = presentation['enrichMissingTags'];

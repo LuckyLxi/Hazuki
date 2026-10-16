@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:hazuki/features/discover/state/discover_page_controller.dart';
 import 'package:hazuki/services/source/plugins/source_plugin_buttons.dart';
 import 'package:hazuki/services/source/plugins/source_plugin_manager.dart';
 import 'package:hazuki/services/source/runtime/source_runtime_assembly.dart';
@@ -87,7 +88,7 @@ void main() {
     () async {
       final manifest = manager.installed.single.manifest;
       expect(manifest.id, _sourceId);
-      expect(manifest.version, '1.3.1');
+      expect(manifest.version, '1.3.4');
       expect(assembly.testing.handleFor(_sourceId).runtime.engine, isNull);
       expect(
         SourcePluginButton.parseList(
@@ -115,6 +116,7 @@ void main() {
       expect(first.comics, hasLength(11));
       expect(first.comics.first.id, 'yiquanchaorenmaoer');
       expect(first.comics.first.sourceKey, _sourceId);
+      expect(first.comics.every((comic) => comic.subTitle.isEmpty), isTrue);
       expect(first.maxPage, 1);
       final second = await search.searchComics(
         keyword: '一拳超人',
@@ -140,7 +142,17 @@ void main() {
       expect(details.id, _comicId);
       expect(details.sourceKey, _sourceId);
       expect(details.title, '一拳超人');
+      expect(details.subTitle, isEmpty);
+      expect(details.tags['作者'], ['村田雄介', 'ONE']);
       expect(details.tags['题材'], ['格鬥', '歡樂向', '冒險']);
+      expect(details.infoFields.map((field) => (field.label as Map)['en']), [
+        'Author',
+        'Themes',
+        'Aliases',
+        'Status',
+      ]);
+      expect(details.infoFields.last.values, ['連載中']);
+      expect(details.headerStats.single.text, '連載中');
       expect(details.chapters, hasLength(490));
       expect(details.chapters[_chapterId], '第286话');
       expect(
@@ -150,6 +162,43 @@ void main() {
       expect(details.isFavorite, isFalse);
     },
   );
+
+  for (final sectionIndex in [0, 1]) {
+    test(
+      'homepage preview $sectionIndex continues from catalog page one',
+      () async {
+        final controller = DiscoverPageController(
+          sourceService: assembly.gateways.discover,
+        );
+        addTearDown(controller.dispose);
+        await controller.loadInitial(
+          timeoutMessage: 'timeout',
+          loadFailedMessage: (error) => error,
+        );
+        expect(controller.errorMessage, isNull);
+        expect(controller.sections[sectionIndex].comics, hasLength(12));
+
+        final pageSize = sectionIndex == 0 ? 60 : 50;
+        final path = sectionIndex == 0 ? '/recommend' : '/comics';
+        await controller.loadMoreSection(sectionIndex);
+        expect(controller.sections[sectionIndex].comics, hasLength(pageSize));
+        expect(controller.sections[sectionIndex].comics[12].id, 'catalog-12');
+        expect(controller.sectionHasMore(sectionIndex), isTrue);
+        await controller.loadMoreSection(sectionIndex);
+        expect(
+          controller.sections[sectionIndex].comics,
+          hasLength(pageSize * 2),
+        );
+        expect(controller.sectionHasMore(sectionIndex), isFalse);
+        expect(
+          fixtures.requests
+              .where((request) => request.uri.path == path)
+              .map((request) => request.uri.queryParameters['offset']),
+          ['0', '$pageSize'],
+        );
+      },
+    );
+  }
 
   test(
     'reader decrypts images independently and applies persisted quality',
@@ -196,6 +245,7 @@ void main() {
       page: 2,
     );
     expect(first.comics, hasLength(20));
+    expect(first.comics.every((comic) => comic.subTitle.isEmpty), isTrue);
     expect(second.comics, hasLength(20));
     expect(first.comics.first.sourceKey, _sourceId);
     expect(first.comics.first.id, isNot(second.comics.first.id));
@@ -305,7 +355,27 @@ class _SiteFixtures implements HttpClientAdapter {
     requests.add(options);
     final path = options.uri.path;
     String? fixture;
-    if (path == '/api/v3/search/comic') {
+    if (path == '/' || path == '/recommend' || path == '/comics') {
+      String card(int index) =>
+          '<div class="exemptComicItem"><a href="/comic/catalog-$index">'
+          '<img src="/cover-$index.jpg" alt="Comic $index"></a></div>';
+      final offset = int.parse(options.uri.queryParameters['offset'] ?? '0');
+      final pageSize = path == '/recommend' ? 60 : 50;
+      final html = path == '/'
+          ? '<h4 class="index-all-icon-left-txt">漫畫推薦</h4>'
+                '${List.generate(12, card).join()}'
+                '<h4 class="index-all-icon-left-txt">付費漫畫</h4>'
+                '${List.generate(12, card).join()}'
+          : '${List.generate(pageSize, (index) => card(offset + index)).join()}'
+                '<span class="page-total">/2</span>';
+      return ResponseBody.fromString(
+        html,
+        200,
+        headers: {
+          Headers.contentTypeHeader: ['text/html; charset=utf-8'],
+        },
+      );
+    } else if (path == '/api/v3/search/comic') {
       fixture = options.uri.queryParameters['offset'] == '12'
           ? 'search2.json'
           : 'search.json';

@@ -10,6 +10,7 @@ The upstream repository did not contain a root license file at this commit. No a
 
 const jmFallbackDomains = ['www.cdntwice.org', 'www.cdnsha.org', 'www.cdnaspa.cc', 'www.cdnntr.cc'];
 const jmDefaultImageHost = 'https://cdn-msp.jmapinodeudzn.net';
+const jmComicIdPattern = '^(?:jm)?(\\d{2,})$';
 const jmUserAgent =
   'Mozilla/5.0 (Linux; Android 10; K; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/130.0.0.0 Mobile Safari/537.36';
 let jmApiDomains = jmFallbackDomains.slice();
@@ -199,7 +200,6 @@ function jmParseComic(comic) {
   return {
     id: String(comic.id),
     title: String(comic.name ?? ''),
-    subTitle: Array.isArray(comic.author) ? comic.author.join(', ') : String(comic.author ?? ''),
     cover: jmCoverUrl(comic.id),
     tags: [comic.category?.title, comic.category_sub?.title].filter(Boolean),
   };
@@ -211,6 +211,11 @@ function jmComicPage(items, total, pageSize) {
     comics: jmArray(items).map(jmParseComic),
     maxPage: Math.ceil(Number(total || 0) / pageSize),
   };
+}
+
+/** @param {string} value */
+function jmMatchComicId(value) {
+  return new RegExp(jmComicIdPattern, 'i').exec(value.trim())?.[1] ?? null;
 }
 
 function jmToday() {
@@ -263,7 +268,7 @@ function jmProfile(profile, uid, fallbackName = '') {
 const source = {
   id: 'jm',
   name: 'JMComic',
-  version: '1.0.2',
+  version: '1.0.4',
   apiVersion: 1,
 
   async init() {
@@ -492,6 +497,23 @@ const source = {
 
   search: {
     async load(keyword, options, page) {
+      const id = jmMatchComicId(keyword);
+      if (id) {
+        try {
+          // ID lookup uses the album API; it does not depend on keyword results.
+          const album = await jmGet(`/album?${jmForm({ id })}`);
+          if (typeof album?.name !== 'string' || !album.name.trim()) {
+            throw new Error('invalid_jm_album');
+          }
+          return {
+            comics: page === 1 ? [jmParseComic({ ...album, id })] : [],
+            maxPage: 1,
+          };
+        } catch (error) {
+          // Keep the host's ordinary keyword fallback when an ID is unavailable.
+          Hazuki.log(String(error), 'warn');
+        }
+      }
       const query = jmForm({ search_query: keyword.trim(), o: options[0] || 'mr' }).replace(
         /%20/g,
         '+',
@@ -536,7 +558,7 @@ const source = {
 
   comic: {
     async loadInfo(comicId) {
-      const id = comicId.replace(/^jm/i, '');
+      const id = jmMatchComicId(comicId) ?? comicId.trim().replace(/^jm/i, '');
       const data = await jmGet(`/album?${jmForm({ id })}`);
       /** @type {Record<string, string>} */
       const chapters = {};
@@ -559,6 +581,17 @@ const source = {
           Actor: data.actors ?? [],
           View: data.total_views ? [String(data.total_views)] : [],
         },
+        infoFields: [
+          { label: { zh: '作者', en: 'Author' }, values: data.author ?? [], action: 'search' },
+          { label: { zh: '标签', en: 'Tags' }, values: data.tags ?? [], action: 'search' },
+          { label: { zh: '作品', en: 'Work' }, values: data.works ?? [], action: 'search' },
+          { label: { zh: '角色', en: 'Characters' }, values: data.actors ?? [], action: 'search' },
+        ],
+        viewsCount: data.total_views ?? '',
+        headerStats: [
+          { text: { zh: `${Number(data.likes || 0)}点赞`, en: `${Number(data.likes || 0)} likes` }, action: 'like' },
+          { text: data.total_views == null ? '' : { zh: `${data.total_views}浏览量`, en: `${data.total_views} views` } },
+        ],
         recommend: jmArray(data.related_list).map(jmParseComic),
         isFavorite: Boolean(data.is_favorite),
         isLiked: Boolean(data.liked),
@@ -730,13 +763,14 @@ const source = {
     },
   },
   presentation: {
+    showComments: true,
     buttons: [
       { id: 'checkIn', location: 'homeProfile' },
       { id: 'autoCheckIn', location: 'other' },
       { id: 'copyComicId', location: 'comicDetailInfo' },
       { id: 'relatedComics', location: 'comicDetailTabs' },
     ],
-    directComicIdRules: { patterns: ['^(?:jm)?(\\d{2,})$'], extractDigits: true },
+    directComicIdRules: { patterns: [jmComicIdPattern], extractDigits: true },
     dailyRecommendation: { searchOrder: 'mr' },
     showComicId: true,
     listTagGroups: ['Tag'],

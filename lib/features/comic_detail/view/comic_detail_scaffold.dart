@@ -11,7 +11,6 @@ import 'package:hazuki/shared/comments/comments_widget_builder.dart';
 import '../support/comic_detail_scope.dart';
 import 'comic_detail_header.dart';
 import 'comic_detail_info_tab.dart';
-import 'comic_detail_meta.dart';
 import 'comic_detail_panels.dart';
 import 'comic_detail_related_tab.dart';
 import 'comic_detail_view_primitives.dart';
@@ -64,7 +63,6 @@ class ComicDetailBody extends StatelessWidget {
                 : Colors.black.withValues(alpha: 0.06);
 
             final displayTitle = details?.title ?? comic.title;
-            final displaySubTitle = details?.subTitle ?? comic.subTitle;
             final listCoverUrl = comic.cover.trim();
             final displayCoverUrl = listCoverUrl.isNotEmpty
                 ? listCoverUrl
@@ -74,6 +72,7 @@ class ComicDetailBody extends StatelessWidget {
             final shouldAnimateResolvedContent =
                 shouldAnimateInitialDetailReveal && details != null;
             final supportsRelatedTab = scope.supportsRelatedTab;
+            final supportsCommentsTab = uiState.commentsTabIndex != null;
 
             uiState.updateAppBarMetadata(
               title: displayTitle,
@@ -89,11 +88,7 @@ class ComicDetailBody extends StatelessWidget {
                 details: details,
                 skeletonColor: skeletonColor,
                 displayTitle: displayTitle,
-                displaySubTitle: displaySubTitle,
                 displayCoverUrl: displayCoverUrl,
-                viewsText: details != null
-                    ? extractComicViewsText(details)
-                    : '',
                 headerTitleKey: headerTitleKey,
                 favoriteRowKey: favoriteRowKey,
                 actionButtonsKey: actionButtonsKey,
@@ -177,10 +172,11 @@ class ComicDetailBody extends StatelessWidget {
                               height: 44,
                               text: l10n(context).comicDetailTabInfo,
                             ),
-                            Tab(
-                              height: 44,
-                              text: l10n(context).comicDetailTabComments,
-                            ),
+                            if (supportsCommentsTab)
+                              Tab(
+                                height: 44,
+                                text: l10n(context).comicDetailTabComments,
+                              ),
                             if (supportsRelatedTab)
                               Tab(
                                 height: 44,
@@ -223,34 +219,35 @@ class ComicDetailBody extends StatelessWidget {
                         );
                       },
                     ),
-                    ComicDetailTabTickerScope(
-                      tabController: uiState.tabController,
-                      tabIndex: 1,
-                      builder: (context, shouldRender) {
-                        return details != null
-                            ? RepaintBoundary(
-                                child: commentsWidgetBuilder(
-                                  comicId: details.id,
-                                  subId: details.subId.isEmpty
-                                      ? null
-                                      : details.subId,
-                                  sourceKey: details.sourceKey,
-                                  showAppBar: true,
-                                  isTabView: true,
-                                  isActiveInTabView: shouldRender,
-                                  onRequestTabFullscreen:
-                                      uiState.ensureCommentsTabFullscreen,
-                                  debugOuterScrollStateBuilder:
-                                      uiState.buildCommentsTabDebugState,
-                                ),
-                              )
-                            : const CommentsInitialLoadingView();
-                      },
-                    ),
+                    if (supportsCommentsTab)
+                      ComicDetailTabTickerScope(
+                        tabController: uiState.tabController,
+                        tabIndex: uiState.commentsTabIndex!,
+                        builder: (context, shouldRender) {
+                          return details != null
+                              ? RepaintBoundary(
+                                  child: commentsWidgetBuilder(
+                                    comicId: details.id,
+                                    subId: details.subId.isEmpty
+                                        ? null
+                                        : details.subId,
+                                    sourceKey: details.sourceKey,
+                                    showAppBar: true,
+                                    isTabView: true,
+                                    isActiveInTabView: shouldRender,
+                                    onRequestTabFullscreen:
+                                        uiState.ensureCommentsTabFullscreen,
+                                    debugOuterScrollStateBuilder:
+                                        uiState.buildCommentsTabDebugState,
+                                  ),
+                                )
+                              : const CommentsInitialLoadingView();
+                        },
+                      ),
                     if (supportsRelatedTab)
                       ComicDetailTabTickerScope(
                         tabController: uiState.tabController,
-                        tabIndex: 2,
+                        tabIndex: uiState.relatedTabIndex!,
                         builder: (context, shouldRender) {
                           return RepaintBoundary(
                             child: ComicDetailRelatedTab(

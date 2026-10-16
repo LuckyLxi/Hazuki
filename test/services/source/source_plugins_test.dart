@@ -228,7 +228,7 @@ class PlainSource extends HazukiSource {
   key = ['plain', 'source'].join('_');
   search = {load: async () => ({comics: [], maxPage: 1})};
   comic = {
-    loadInfo: async id => ({id, title: 'Comic', chapters: {}, tags: {}}),
+    loadInfo: async id => new ComicDetails({title: 'Comic', chapters: {}, tags: {}, viewsCount: 12, headerStats: [{text: {zh: '每周更新', en: 'Weekly'}}], infoFields: [{label: {zh: '状态', en: 'Status'}, values: 'Ongoing'}]}),
     loadEp: async () => ({images: []})
   };
 }
@@ -243,6 +243,14 @@ class PlainSource extends HazukiSource {
       expect(manager.installed.single.manifest.id, 'plain_source');
       expect(manager.installed.single.manifest.name, 'plain_source');
       expect(manager.installed.single.manifest.version, '0.0.0');
+      final details = await assembly.gateways.reader.loadComicDetails(
+        'comic',
+        sourceKey: 'plain_source',
+      );
+      expect(details.infoFields.single.label, {'zh': '状态', 'en': 'Status'});
+      expect(details.infoFields.single.values, ['Ongoing']);
+      expect(details.viewsCount, '12');
+      expect(details.headerStats.single.text, {'zh': '每周更新', 'en': 'Weekly'});
       await assembly.runtimeRegistry.ensureInitialized(
         sourceKey: 'plain_source',
       );
@@ -447,8 +455,9 @@ Hazuki.registerSource({
         expect(manifest.id, id);
         expect(manifest.version, switch (id) {
           'example' => '1.0.0',
-          'jm' || 'picacg' => '1.0.2',
-          _ => '1.0.1',
+          'jm' => '1.0.4',
+          'picacg' => '1.0.3',
+          _ => '1.0.2',
         });
         expect(manifest.presentation['searchDefaultOrder'], isNotEmpty);
       },

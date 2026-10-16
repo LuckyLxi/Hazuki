@@ -14,6 +14,7 @@ void main() {
       name: 'Custom',
       fileName: 'main.js',
       presentation: {
+        'showComments': true,
         'showTags': true,
         'listTagGroups': ['Genre'],
         'buttons': [
@@ -40,6 +41,8 @@ void main() {
           home: Builder(
             builder: (context) => Column(
               children: [
+                if (sourceCommentsEnabled('custom', context: context))
+                  const Text('Comments entry'),
                 const SourceComicTags(sourceKey: 'custom', tags: ['Saved tag']),
                 if (sourceButton(
                       'custom',
@@ -57,10 +60,13 @@ void main() {
     );
     expect(find.text('Saved tag'), findsOneWidget);
     expect(find.text('Plugin action'), findsOneWidget);
+    expect(find.text('Comments entry'), findsOneWidget);
     registry.replaceCatalog([]);
     await tester.pump();
     expect(find.text('Saved tag'), findsOneWidget);
     expect(find.text('Plugin action'), findsNothing);
+    expect(find.text('Comments entry'), findsNothing);
+    expect(registry.displayPresentationFor('custom')['showComments'], isNull);
     expect(registry.presentationFor('custom'), isEmpty);
     expect(
       registry.displayPresentationFor('custom')['enrichMissingTags'],

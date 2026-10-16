@@ -22,7 +22,7 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
        _now = now ?? DateTime.now,
        _cacheStore =
            cacheStore ??
-           const SharedPreferencesDiscoverDailyRecommendationCacheStore() {
+           SharedPreferencesDiscoverDailyRecommendationCacheStore() {
     _candidateGenerator =
         candidateGenerator ??
         SourceDiscoverDailyRecommendationCandidateGenerator(
@@ -31,9 +31,9 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
           now: _now,
         );
     _stateSourceKey = (_source.activeSourceKey ?? '').trim();
-    _stateSearchOrder = _source
+    _stateConfigurationKey = _source
         .dailyRecommendationForSource(_stateSourceKey)
-        ?.searchOrder;
+        ?.cacheKey;
     _source.addListener(_handleSourceChanged);
   }
 
@@ -58,7 +58,7 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
   int _generation = 0;
   bool _disposed = false;
   late String _stateSourceKey;
-  String? _stateSearchOrder;
+  String? _stateConfigurationKey;
 
   bool _isCurrent(int generation, String sourceKey) =>
       !_disposed &&
@@ -69,6 +69,10 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
   DiscoverDailyRecommendationState get state => _state;
 
   bool get _supportsActiveSource => _source.supportsDailyRecommendation;
+
+  bool get usesPluginRecommendations =>
+      _source.dailyRecommendationForSource(_stateSourceKey)?.mode ==
+      DailyRecommendationMode.plugin;
 
   Future<void> setEnabled(bool enabled) async {
     await _cacheStore.setEnabled(enabled);
@@ -121,6 +125,7 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
     if (!_isCurrent(generation, sourceKey)) return _state;
     if (cached != null &&
         cached.sourceKey.trim() == sourceKey &&
+        _matchesConfiguration(cached, sourceKey) &&
         cached.recommendations.every(
           (entry) => entry.comic.sourceKey.trim() == sourceKey,
         )) {
@@ -222,6 +227,16 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
         return;
       }
 
+      if (usesPluginRecommendations) {
+        // Publish the entries before downloading images so each visible card
+        // can show its placeholder and reveal independently when ready.
+        await _cacheStore.persistSnapshot(generated);
+        if (_state.enabled && _isCurrent(generation, sourceKey)) {
+          _setState(_snapshotToDisplayedState(generated));
+        }
+        return;
+      }
+
       final preloaded = await _preloadRecommendationImages(
         generated.recommendations,
         sourceKey: sourceKey,
@@ -232,6 +247,10 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
 
       await _cacheStore.persistSnapshot(generated);
       if (!_isCurrent(generation, sourceKey)) return;
+      if (generated.recommendations.isEmpty) {
+        _setState(_snapshotToDisplayedState(generated));
+        return;
+      }
       _setState(
         _state.copyWith(
           pendingRecommendations: generated.recommendations,
@@ -259,7 +278,7 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
     required String sourceKey,
   }) async {
     final imageUrls = recommendations
-        .map((entry) => entry.comic.cover.trim())
+        .map((entry) => entry.displayImageUrl.trim())
         .where((url) => url.isNotEmpty)
         .toList(growable: false);
     if (imageUrls.length != recommendations.length) {
@@ -303,22 +322,32 @@ class DiscoverDailyRecommendationService extends ChangeNotifier {
 
   Future<DiscoverDailyRecommendationSnapshot?>
   _generateRecommendations() async {
-    final previous =
-        _state.displayedRecommendations.length == recommendationCount
-        ? _state.displayedRecommendations
-        : const <DiscoverDailyRecommendationEntry>[];
-    return _candidateGenerator.generate(previous: previous);
+    return _candidateGenerator.generate(
+      previous: _state.displayedRecommendations,
+    );
+  }
+
+  bool _matchesConfiguration(
+    DiscoverDailyRecommendationSnapshot snapshot,
+    String sourceKey,
+  ) {
+    final config = _source.dailyRecommendationForSource(sourceKey);
+    if (config == null) return false;
+    return snapshot.configurationKey.isEmpty
+        ? config.mode == DailyRecommendationMode.authors
+        : snapshot.configurationKey == config.cacheKey;
   }
 
   void _handleSourceChanged() {
     final sourceKey = (_source.activeSourceKey ?? '').trim();
-    final searchOrder = _source
+    final configurationKey = _source
         .dailyRecommendationForSource(sourceKey)
-        ?.searchOrder;
-    if (sourceKey != _stateSourceKey || searchOrder != _stateSearchOrder) {
+        ?.cacheKey;
+    if (sourceKey != _stateSourceKey ||
+        configurationKey != _stateConfigurationKey) {
       _generation++;
       _stateSourceKey = sourceKey;
-      _stateSearchOrder = searchOrder;
+      _stateConfigurationKey = configurationKey;
       _refreshInFlight = null;
       _setState(const DiscoverDailyRecommendationState.disabled());
     }
