@@ -64,6 +64,7 @@
   "displayDiscoverLayoutGrid3": "3-column grid",
   "displayDiscoverLayoutAdaptiveWall": "Adaptive cover wall",
   "homeGuestUser": "Not signed in",
+  "sourceInstallRequired": "Please install a comic source first",
   "homeFirstUseLoading": "Loading first-use time...",
   "homeFirstUseUnknown": "First time using this app",
   "homeFirstUseFormatted": "First used on {date}",

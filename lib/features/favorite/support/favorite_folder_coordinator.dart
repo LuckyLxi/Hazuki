@@ -137,15 +137,18 @@ class FavoriteFolderCoordinator {
     required String timeoutMessage,
     ValueChanged<String>? onFolderLoadError,
   }) async {
+    final context = _captureContext();
     try {
       if (_state.mode == FavoritePageMode.local) {
-        await _localFlow.addFolder(name, sourceKey: _readSourceKey());
+        await _localFlow.addFolder(name, sourceKey: context.sourceKey);
+        if (!_isCurrentContext(context)) return null;
         await reloadLocalFolders();
       } else {
         await _cloudFlow.addFolder(name);
+        if (!_isCurrentContext(context)) return null;
         await reloadFolders(onError: onFolderLoadError);
       }
-      if (_isDisposed()) {
+      if (!_isCurrentContext(context)) {
         return null;
       }
       final created = _state.folders
@@ -170,9 +173,14 @@ class FavoriteFolderCoordinator {
       return null;
     }
 
+    final context = _captureContext();
     try {
-      await _localFlow.renameFolder(folderId: normalizedFolderId, name: name);
-      if (_isDisposed()) {
+      await _localFlow.renameFolder(
+        folderId: normalizedFolderId,
+        name: name,
+        sourceKey: context.sourceKey,
+      );
+      if (!_isCurrentContext(context)) {
         return null;
       }
       await reloadLocalFolders();
@@ -191,15 +199,17 @@ class FavoriteFolderCoordinator {
       return null;
     }
 
+    final context = _captureContext();
     try {
       if (_state.mode == FavoritePageMode.local) {
-        await _localFlow.deleteFolder(currentId);
+        await _localFlow.deleteFolder(currentId, sourceKey: context.sourceKey);
+        if (!_isCurrentContext(context)) return null;
         _state.selectedLocalFolderId = '';
         await saveSelectedFolderId(FavoritePageMode.local, '');
+        if (!_isCurrentContext(context)) return null;
         await reloadLocalFolders();
       } else {
         // Ordinary directory reads must not invalidate a successful mutation.
-        final context = _captureContext();
         await _cloudFlow.deleteFolder(currentId);
         if (!_isCurrentContext(context)) return null;
         // Reads started before deletion completed may still contain this folder.
@@ -226,6 +236,7 @@ class FavoriteFolderCoordinator {
         return null;
       }
 
+      if (!_isCurrentContext(context)) return null;
       await _selectFolder(
         _state.selectedLocalFolderId,
         timeoutMessage: timeoutMessage,
@@ -243,7 +254,9 @@ class FavoriteFolderCoordinator {
       _notify();
     }
 
-    final result = await _localFlow.loadFolders();
+    final result = await _localFlow.loadFoldersForSource(
+      request.context.sourceKey,
+    );
     if (!_isCurrentFolderRequest(request)) {
       return;
     }

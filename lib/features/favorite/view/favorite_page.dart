@@ -467,6 +467,19 @@ class FavoritePageState extends State<FavoritePage>
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, _) {
+        if (_controller.showSourceRequired) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Text(
+                _strings(context).sourceInstallRequired,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+            ),
+          );
+        }
+
         if (_controller.showLoginRequired) {
           return FavoriteLoginRequiredView(
             onLoginPressed: _buildLoginHandler(),

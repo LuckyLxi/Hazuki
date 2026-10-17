@@ -64,6 +64,7 @@
   "displayDiscoverLayoutGrid3": "3 格排版",
   "displayDiscoverLayoutAdaptiveWall": "自适应封面墙",
   "homeGuestUser": "未登录",
+  "sourceInstallRequired": "请先安装漫画源",
   "homeFirstUseLoading": "首次使用时间加载中...",
   "homeFirstUseUnknown": "首次使用本应用",
   "homeFirstUseFormatted": "{date} 首次使用",

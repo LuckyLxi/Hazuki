@@ -228,14 +228,14 @@ void main() {
   );
 
   test(
-    'local loader uses app sorting across all sources without plugin mappings',
+    'local loader keeps the request source while using app sorting',
     () async {
       final local = _Local();
       when(
         () => local.loadFavoriteComics(
           page: 1,
           folderId: 'folder',
-          sourceKey: '',
+          sourceKey: 'custom_sort',
           sortOrder: 'updatedNewest',
         ),
       ).thenAnswer((_) async => const FavoriteComicsResult.success([]));
@@ -260,7 +260,7 @@ void main() {
         () => local.loadFavoriteComics(
           page: 1,
           folderId: 'folder',
-          sourceKey: '',
+          sourceKey: 'custom_sort',
           sortOrder: 'updatedNewest',
         ),
       ).called(1);

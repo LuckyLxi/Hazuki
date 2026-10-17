@@ -91,8 +91,15 @@ class FavoritePageContentSection extends StatelessWidget {
             return Stack(
               alignment: Alignment.topCenter,
               children: <Widget>[
-                ...previousChildren,
-                ...<Widget?>[currentChild].whereType<Widget>(),
+                // Keep the same keyed wrapper when a child starts fading out.
+                for (final child in previousChildren)
+                  IgnorePointer(key: child.key, child: child),
+                if (currentChild != null)
+                  IgnorePointer(
+                    key: currentChild.key,
+                    ignoring: false,
+                    child: currentChild,
+                  ),
               ],
             );
           },

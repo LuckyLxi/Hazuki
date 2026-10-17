@@ -69,7 +69,7 @@ void main() {
     ).thenAnswer(
       (_) async => FavoriteComicsResult.success([_comic('current')]),
     );
-    for (final key in ['jm', 'picacg']) {
+    for (final key in ['jm', 'picacg', '']) {
       when(
         () => preferences.loadFavoritePageMode(sourceKey: key),
       ).thenAnswer((_) async => FavoritePageMode.cloud);
@@ -94,7 +94,9 @@ void main() {
     ).thenAnswer((_) async {});
     when(() => preferences.loadSortOrder()).thenAnswer((_) async => 'mr');
     when(() => preferences.saveSortOrder(any())).thenAnswer((_) async {});
-    when(() => local.loadFavoriteFolders()).thenAnswer(
+    when(
+      () => local.loadFavoriteFolders(sourceKey: any(named: 'sourceKey')),
+    ).thenAnswer(
       (_) async => FavoriteFoldersResult.success(
         favoritedFolderIds: const {},
         folders: const [
@@ -111,7 +113,7 @@ void main() {
         page: 1,
         folderId: 'local',
         sortOrder: 'savedNewest',
-        sourceKey: '',
+        sourceKey: any(named: 'sourceKey'),
       ),
     ).thenAnswer((_) async => FavoriteComicsResult.success([_comic('local')]));
     controller = FavoritePageController(
@@ -130,6 +132,45 @@ void main() {
     controller.dispose();
     await cloudChanges.close();
   });
+
+  test(
+    'cloud favorites require a source before login or initialization',
+    () async {
+      activeSource = '';
+      when(() => source.isLogged).thenReturn(false);
+
+      await controller.loadInitial(timeoutMessage: 'timeout');
+
+      expect(controller.showSourceRequired, isTrue);
+      expect(controller.showLoginRequired, isFalse);
+      expect(controller.initialLoading, isFalse);
+      expect(controller.errorMessage, isNull);
+      verifyNever(() => source.ensureInitialized());
+
+      activeSource = 'jm';
+      expect(controller.showSourceRequired, isFalse);
+      expect(controller.showLoginRequired, isTrue);
+    },
+  );
+
+  test(
+    'saved local favorites still load without an installed source',
+    () async {
+      activeSource = '';
+      when(() => source.isLogged).thenReturn(false);
+      when(
+        () => preferences.loadFavoritePageMode(sourceKey: ''),
+      ).thenAnswer((_) async => FavoritePageMode.local);
+
+      await controller.loadInitial(timeoutMessage: 'timeout');
+
+      expect(controller.mode, FavoritePageMode.local);
+      expect(controller.showSourceRequired, isFalse);
+      expect(controller.showLoginRequired, isFalse);
+      expect(controller.comics.single.id, 'local');
+      verifyNever(() => source.ensureInitialized());
+    },
+  );
 
   test(
     'initial load replaces the saved all ID with the plugin shelf ID',
@@ -364,7 +405,9 @@ void main() {
     await controller.loadInitial(timeoutMessage: 'timeout');
     await controller.toggleMode(timeoutMessage: 'timeout');
     final pending = Completer<FavoriteFoldersResult>();
-    when(() => local.loadFavoriteFolders()).thenAnswer((_) => pending.future);
+    when(
+      () => local.loadFavoriteFolders(sourceKey: 'jm'),
+    ).thenAnswer((_) => pending.future);
     when(
       () => preferences.saveSortOrder('updatedNewest'),
     ).thenAnswer((_) async {});
@@ -373,7 +416,7 @@ void main() {
         page: 1,
         folderId: 'local',
         sortOrder: 'updatedNewest',
-        sourceKey: '',
+        sourceKey: 'jm',
       ),
     ).thenAnswer((_) async => FavoriteComicsResult.success([_comic('sorted')]));
 
@@ -421,7 +464,7 @@ void main() {
           page: 1,
           folderId: 'local',
           sortOrder: 'updatedNewest',
-          sourceKey: '',
+          sourceKey: any(named: 'sourceKey'),
         ),
       ).thenAnswer(
         (_) async => FavoriteComicsResult.success([_comic('updated')]),
@@ -449,7 +492,7 @@ void main() {
     await controller.loadInitial(timeoutMessage: 'timeout');
     await controller.toggleMode(timeoutMessage: 'timeout');
     expect(controller.comics, isNotEmpty);
-    when(local.loadFavoriteFolders).thenAnswer(
+    when(() => local.loadFavoriteFolders(sourceKey: 'jm')).thenAnswer(
       (_) async => const FavoriteFoldersResult.success(
         folders: [],
         favoritedFolderIds: {},

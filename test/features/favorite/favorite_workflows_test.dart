@@ -97,7 +97,9 @@ void main() {
       events.add('cloud.load');
       return _result(cloudFolders);
     });
-    when(local.loadFavoriteFolders).thenAnswer((_) async {
+    when(
+      () => local.loadFavoriteFolders(sourceKey: any(named: 'sourceKey')),
+    ).thenAnswer((_) async {
       events.add('local.load');
       return _result(localFolders);
     });
@@ -358,7 +360,7 @@ void main() {
       state.mode = FavoritePageMode.local;
       expect(await folders.renameLocalFolder(' local-1 ', 'renamed'), isNull);
       expect(events, [
-        'local.rename:local-1:renamed:',
+        'local.rename:local-1:renamed:jm',
         'notify:true:local-1',
         'local.load',
         'notify:false:local-1',
@@ -378,7 +380,7 @@ void main() {
         () => local.renameFavoriteFolder(
           folderId: 'local-1',
           name: 'renamed',
-          sourceKey: '',
+          sourceKey: 'jm',
         ),
       ).thenThrow(StateError('rename failed'));
       expect(
@@ -395,7 +397,7 @@ void main() {
         () => local.renameFavoriteFolder(
           folderId: 'local-1',
           name: 'renamed',
-          sourceKey: '',
+          sourceKey: 'jm',
         ),
       ).thenAnswer((_) => pending.future);
       final rename = folders.renameLocalFolder('local-1', 'renamed');
@@ -426,7 +428,7 @@ void main() {
         isNull,
       );
       expect(events, [
-        'local.delete:local-1:',
+        'local.delete:local-1:jm',
         'save:local::jm',
         'notify:true:',
         'local.load',
@@ -435,6 +437,50 @@ void main() {
         'select:local-2:timeout',
       ]);
     });
+
+    for (final action in ['create', 'rename', 'delete']) {
+      test(
+        'local $action completion cannot mutate a newly selected source',
+        () async {
+          state.mode = FavoritePageMode.local;
+          state.folders = localFolders;
+          final pending = Completer<void>();
+          when(
+            () => local.addFavoriteFolder('new', sourceKey: 'jm'),
+          ).thenAnswer((_) => pending.future);
+          when(
+            () => local.renameFavoriteFolder(
+              folderId: 'local-1',
+              name: 'new',
+              sourceKey: 'jm',
+            ),
+          ).thenAnswer((_) => pending.future);
+          when(
+            () => local.deleteFavoriteFolder('local-1', sourceKey: 'jm'),
+          ).thenAnswer((_) => pending.future);
+
+          final mutation = switch (action) {
+            'create' => folders.createFolder('new', timeoutMessage: 'timeout'),
+            'rename' => folders.renameLocalFolder('local-1', 'new'),
+            _ => folders.deleteCurrentFolder(timeoutMessage: 'timeout'),
+          };
+          sourceKey = 'other';
+          folders.invalidate();
+          state.folders = [
+            _folder('other-folder', 'Other', FavoriteFolderSource.local),
+          ];
+          state.selectedLocalFolderId = 'other-folder';
+          pending.complete();
+          expect(await mutation, isNull);
+          expect(state.folders.single.id, 'other-folder');
+          expect(state.selectedLocalFolderId, 'other-folder');
+          expect(events, isEmpty);
+          verifyNever(
+            () => local.loadFavoriteFolders(sourceKey: any(named: 'sourceKey')),
+          );
+        },
+      );
+    }
 
     test(
       'cloud deletion launches directory refresh without waiting for it',

@@ -48,6 +48,16 @@ class HomeProfileController extends ChangeNotifier {
     } catch (_) {}
     // 异步等待后检查 context 是否仍然有效，防止 use_build_context_synchronously 警告
     if (!context.mounted || revision != _profileSyncRevision) return;
+    if (_sourceService.activeSourceKey?.isNotEmpty != true) {
+      _username = l10n(context).homeGuestUser;
+      _avatarUrl = null;
+      _checkedInToday = false;
+      _profileLoading = false;
+      _hasCompletedProfileSync = true;
+      _notify();
+      return;
+    }
+
     if (!_sourceService.isInitialized) {
       final strings = l10n(context);
       _profileLoading =

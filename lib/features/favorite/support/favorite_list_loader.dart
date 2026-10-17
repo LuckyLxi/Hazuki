@@ -62,7 +62,7 @@ class FavoriteListLoader {
           page: page,
           folderId: folderId,
           sortOrder: normalizeLocalFavoriteSort(sortOrder),
-          sourceKey: '',
+          sourceKey: request.sourceKey,
         )
       : cloud.loadPage(
           page: page,

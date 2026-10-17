@@ -305,7 +305,11 @@ class _DiscoverPageState extends State<DiscoverPage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(l10n(context).pluginsEmpty, textAlign: TextAlign.center),
+              Text(
+                l10n(context).sourceInstallRequired,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
               const SizedBox(height: 16),
               FilledButton.icon(
                 icon: const Icon(Icons.extension_outlined),

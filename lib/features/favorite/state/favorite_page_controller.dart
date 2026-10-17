@@ -133,8 +133,13 @@ class FavoritePageController extends ChangeNotifier {
     }
   }
 
+  bool get showSourceRequired =>
+      _state.mode == FavoritePageMode.cloud && _activeSourceKey.isEmpty;
+
   bool get showLoginRequired =>
-      _state.mode == FavoritePageMode.cloud && !_cloudFlow.isLogged;
+      _state.mode == FavoritePageMode.cloud &&
+      !showSourceRequired &&
+      !_cloudFlow.isLogged;
 
   bool get supportsFolderLoad => true;
   String get _activeSourceKey => (_sourceService.activeSourceKey ?? '');
@@ -205,6 +210,11 @@ class FavoritePageController extends ChangeNotifier {
 
     if (_state.mode == FavoritePageMode.local) {
       await _loadInitialLocal();
+      return;
+    }
+
+    if (showSourceRequired) {
+      resetLoggedOut();
       return;
     }
 
@@ -496,6 +506,8 @@ class FavoritePageController extends ChangeNotifier {
     }
     _lastActiveSourceKey = activeSourceKey;
     _invalidateRequests();
+    _state.resetForModeChange();
+    _notify();
     unawaited(_restoreModeForActiveSource());
   }
 
