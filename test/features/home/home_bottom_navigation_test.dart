@@ -9,6 +9,51 @@ import 'package:hazuki/shared/liquid_glass_support.dart';
 import 'package:hazuki/widgets/hazuki_prompt.dart';
 
 void main() {
+  testWidgets('navigation accent follows theme changes while drawer scales', (
+    tester,
+  ) async {
+    await tester.runAsync(HazukiLiquidGlass.initialize);
+    addTearDown(() => HazukiLiquidGlass.setEnabled(false));
+    State? navigationState;
+    for (final (brightness, seed) in [
+      (Brightness.light, Colors.blue),
+      (Brightness.dark, Colors.orange),
+    ]) {
+      final theme = ThemeData(colorSchemeSeed: seed, brightness: brightness);
+      final expectedAccent = ColorScheme.fromSeed(
+        seedColor: theme.colorScheme.primary,
+        brightness: brightness,
+      ).primary;
+      for (final scale in [1.0, 0.98, 0.965]) {
+        await tester.pumpWidget(
+          HazukiLiquidGlass.wrap(
+            child: MaterialApp(
+              theme: theme,
+              home: Scaffold(
+                bottomNavigationBar: HomeBottomNavigation(
+                  layoutScale: scale,
+                  currentIndex: 0,
+                  onDestinationSelected: _ignoreDestination,
+                  discoverLabel: 'Discover',
+                  favoriteLabel: 'Favorites',
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        navigationState ??= tester.state(find.byType(HomeBottomNavigation));
+        expect(
+          tester.state(find.byType(HomeBottomNavigation)),
+          same(navigationState),
+        );
+        final bar = tester.widget<GlassTabBar>(find.byType(GlassTabBar));
+        expect(bar.selectedIconColor, expectedAccent);
+        expect(bar.selectedLabelColor, expectedAccent);
+      }
+    }
+  });
+
   test('indicator drag starts from its selected position without jumping', () {
     expect(
       DraggableIndicatorPhysics.getAlignmentFromDragDelta(
@@ -190,10 +235,10 @@ void main() {
     expect(tabBar.indicatorBorderRadius, GlassDefaults.capsuleRadius);
     expect(tabBar.barBorderRadius, GlassDefaults.capsuleRadius);
     expect(tabBar.settings?.thickness, 10);
-    expect(tabBar.settings?.blur, 4);
+    expect(tabBar.settings?.blur, 2);
     expect(
       tabBar.settings?.glassColor,
-      ThemeData.dark().colorScheme.surfaceContainer.withValues(alpha: 0.4),
+      ThemeData.dark().colorScheme.surfaceContainer.withValues(alpha: 0.16),
     );
     expect(tabBar.indicatorSettings?.refractiveIndex, 1.15);
 

@@ -22,6 +22,7 @@ import 'package:hazuki/widgets/windows_comic_detail_host.dart';
 import 'home_app_bar_actions.dart';
 import 'home_bottom_navigation.dart';
 import 'home_content_stack.dart';
+import 'home_drawer_snapshot.dart';
 import 'package:hazuki/features/home/view/home_drawer.dart';
 
 @visibleForTesting
@@ -211,6 +212,7 @@ class HomeScaffoldShell extends StatefulWidget {
 class _HomeScaffoldShellState extends State<HomeScaffoldShell>
     with SingleTickerProviderStateMixin {
   final _sourceSwitchDialogOpen = ValueNotifier(false);
+  final _homeContentAnimating = ValueNotifier(false);
 
   Future<void> _showSourceSwitchWithMorph(
     FavoriteFoldersMorphOrigin origin,
@@ -286,6 +288,7 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
   @override
   void dispose() {
     _sourceSwitchDialogOpen.dispose();
+    _homeContentAnimating.dispose();
     _profileDrawerController.dispose();
     super.dispose();
   }
@@ -314,6 +317,8 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
         '$activeSourceKey|${avatarUrl ?? ''}|$profileLoading|${widget.isLogged}|$username';
     final homeContent = HomeContentStack(
       currentIndex: currentIndex,
+      onTransitionChanged: (animating) =>
+          _homeContentAnimating.value = animating,
       discoverChild: NotificationListener<DiscoverBackToTopNotification>(
         onNotification: (notification) {
           setState(() {
@@ -420,76 +425,97 @@ class _HomeScaffoldShellState extends State<HomeScaffoldShell>
         color: Theme.of(context).colorScheme.surface,
         child: AnimatedBuilder(
           animation: _profileDrawerController,
-          child: WindowsComicDetailHost(
-            child: ListenableBuilder(
-              listenable: downloadStatus,
-              builder: (context, _) {
-                final hasDownloadTasks = downloadStatus.hasTasks;
-                return TweenAnimationBuilder<double>(
-                  tween: Tween<double>(end: hasDownloadTasks ? 118 : 56),
-                  duration: const Duration(milliseconds: 260),
-                  curve: Curves.easeOutCubic,
-                  builder: (context, leadingWidth, _) {
-                    final appBar = hazukiFrostedAppBar(
-                      context: context,
-                      leading: Platform.isWindows
-                          ? null
-                          : _HomeAppBarProfileButton(
-                              downloadStatus: downloadStatus,
-                              activeSourceKey: activeSourceKey,
-                              avatarUrl: avatarUrl,
-                              profileLoading: profileLoading,
-                              username: username,
-                              drawerContent: mobileDrawerContent,
-                              onOpenDownloads: onOpenDownloadTasks,
-                              onDrawerVisibilityChanged: _setProfileDrawerOpen,
-                              onDrawerCovered: _resetProfileDrawer,
+          child: HomeDrawerSnapshot(
+            animation: _profileDrawerController,
+            enabled: !Platform.isWindows,
+            contentAnimating: _homeContentAnimating,
+            child: WindowsComicDetailHost(
+              child: ListenableBuilder(
+                listenable: downloadStatus,
+                builder: (context, _) {
+                  final hasDownloadTasks = downloadStatus.hasTasks;
+                  return TweenAnimationBuilder<double>(
+                    tween: Tween<double>(end: hasDownloadTasks ? 118 : 56),
+                    duration: const Duration(milliseconds: 260),
+                    curve: Curves.easeOutCubic,
+                    builder: (context, leadingWidth, _) {
+                      final appBar = hazukiFrostedAppBar(
+                        context: context,
+                        leading: Platform.isWindows
+                            ? null
+                            : _HomeAppBarProfileButton(
+                                downloadStatus: downloadStatus,
+                                activeSourceKey: activeSourceKey,
+                                avatarUrl: avatarUrl,
+                                profileLoading: profileLoading,
+                                username: username,
+                                drawerContent: mobileDrawerContent,
+                                onOpenDownloads: onOpenDownloadTasks,
+                                onDrawerVisibilityChanged:
+                                    _setProfileDrawerOpen,
+                                onDrawerCovered: _resetProfileDrawer,
+                              ),
+                        leadingWidth: Platform.isWindows ? null : leadingWidth,
+                        automaticallyImplyLeading: false,
+                        title: currentIndex == 1
+                            ? null
+                            : _HomeAppBarSearchBox(
+                                onOpenSearch: onOpenSearch,
+                                maxWidth: Platform.isWindows ? 320 : null,
+                              ),
+                        titleSpacing: Platform.isWindows ? null : 4,
+                        centerTitle: Platform.isWindows,
+                        enableBlur: currentIndex != 0 && currentIndex != 1,
+                        actions: [
+                          HomeAppBarActions(
+                            currentIndex: currentIndex,
+                            discoverSearchMorphProgress:
+                                discoverSearchMorphProgress,
+                            forceDiscoverSearchInAppBar:
+                                usePinnedDiscoverSearch,
+                            favoriteAppBarActions: favoriteAppBarActions,
+                            onOpenSearch: onOpenSearch,
+                            onFavoriteSortSelected: onFavoriteSortSelected,
+                            onFavoriteCreateFolderPressed:
+                                onFavoriteCreateFolderPressed,
+                            onFavoriteModeTogglePressed:
+                                onFavoriteModeTogglePressed,
+                          ),
+                        ],
+                      );
+                      return Scaffold(
+                        key: scaffoldKey,
+                        extendBody: true,
+                        appBar: PreferredSize(
+                          preferredSize: appBar.preferredSize,
+                          child: RepaintBoundary(
+                            key: const ValueKey(
+                              'home-app-bar-repaint-boundary',
                             ),
-                      leadingWidth: Platform.isWindows ? null : leadingWidth,
-                      automaticallyImplyLeading: false,
-                      title: currentIndex == 1
-                          ? null
-                          : _HomeAppBarSearchBox(
-                              onOpenSearch: onOpenSearch,
-                              maxWidth: Platform.isWindows ? 320 : null,
+                            child: HomeDrawerSnapshot(
+                              animation: _profileDrawerController,
+                              enabled: !Platform.isWindows,
+                              // The app bar normally composites over Scaffold's
+                              // background. Include it in the isolated raster
+                              // so its translucent glass keeps the same tint.
+                              child: ColoredBox(
+                                color: Theme.of(
+                                  context,
+                                ).scaffoldBackgroundColor,
+                                child: appBar,
+                              ),
                             ),
-                      titleSpacing: Platform.isWindows ? null : 4,
-                      centerTitle: Platform.isWindows,
-                      enableBlur: currentIndex != 0 && currentIndex != 1,
-                      actions: [
-                        HomeAppBarActions(
-                          currentIndex: currentIndex,
-                          discoverSearchMorphProgress:
-                              discoverSearchMorphProgress,
-                          forceDiscoverSearchInAppBar: usePinnedDiscoverSearch,
-                          favoriteAppBarActions: favoriteAppBarActions,
-                          onOpenSearch: onOpenSearch,
-                          onFavoriteSortSelected: onFavoriteSortSelected,
-                          onFavoriteCreateFolderPressed:
-                              onFavoriteCreateFolderPressed,
-                          onFavoriteModeTogglePressed:
-                              onFavoriteModeTogglePressed,
+                          ),
                         ),
-                      ],
-                    );
-                    return Scaffold(
-                      key: scaffoldKey,
-                      extendBody: true,
-                      appBar: PreferredSize(
-                        preferredSize: appBar.preferredSize,
-                        child: RepaintBoundary(
-                          key: const ValueKey('home-app-bar-repaint-boundary'),
-                          child: appBar,
-                        ),
-                      ),
-                      drawerEnableOpenDragGesture: false,
-                      drawer: null,
-                      body: body,
-                      bottomNavigationBar: null,
-                    );
-                  },
-                );
-              },
+                        drawerEnableOpenDragGesture: false,
+                        drawer: null,
+                        body: body,
+                        bottomNavigationBar: null,
+                      );
+                    },
+                  );
+                },
+              ),
             ),
           ),
           builder: (context, child) {

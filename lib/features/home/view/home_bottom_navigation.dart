@@ -47,6 +47,9 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
     with TickerProviderStateMixin {
   static const int _itemCount = 2;
   final _barKey = GlobalKey();
+  Color? _accentSeed;
+  Brightness? _accentBrightness;
+  late Color _accent;
 
   late final GlassMorphController _backToTopMorph;
 
@@ -141,6 +144,16 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    final theme = Theme.of(context);
+    final seed = theme.colorScheme.primary;
+    if (_accentSeed != seed || _accentBrightness != theme.brightness) {
+      _accentSeed = seed;
+      _accentBrightness = theme.brightness;
+      _accent = ColorScheme.fromSeed(
+        seedColor: seed,
+        brightness: theme.brightness,
+      ).primary;
+    }
     _backToTopMorph.setDisableAnimations(
       MediaQuery.disableAnimationsOf(context),
     );
@@ -162,10 +175,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation>
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final scale = widget.layoutScale;
     final bottomPadding = MediaQuery.of(context).padding.bottom * scale;
-    final accent = ColorScheme.fromSeed(
-      seedColor: colorScheme.primary,
-      brightness: Theme.of(context).brightness,
-    ).primary;
+    final accent = _accent;
     final foreground = isDark ? Colors.white : Colors.black87;
     final shadows = [
       Shadow(color: isDark ? Colors.black54 : Colors.white54, blurRadius: 1.5),

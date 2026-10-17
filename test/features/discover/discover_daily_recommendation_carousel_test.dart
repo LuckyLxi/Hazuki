@@ -5,10 +5,13 @@ import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:hazuki/features/discover/view/discover_daily_recommendation_carousel.dart';
 import 'package:hazuki/features/discover/view/discover_daily_recommendation_carousel_widgets.dart';
+import 'package:hazuki/features/home/view/home_drawer_snapshot.dart';
+import 'package:hazuki/shared/liquid_glass_support.dart';
 import 'package:hazuki/models/hazuki_models.dart';
 import 'package:hazuki/services/discover_daily_recommendation_service.dart';
 import 'package:hazuki/services/source/source_capabilities.dart';
@@ -121,6 +124,102 @@ Widget _carousel(
 
 void main() {
   setUp(clearHazukiWidgetImageMemoryForTesting);
+  for (final closing in [false, true]) {
+    for (final startDuringDrawer in [false, true]) {
+      testWidgets('carousel paints through drawer closing=$closing, '
+          'startsDuringDrawer=$startDuringDrawer', (tester) async {
+        await tester.runAsync(HazukiLiquidGlass.initialize);
+        addTearDown(() => HazukiLiquidGlass.setEnabled(false));
+        final drawer = AnimationController(
+          vsync: tester,
+          value: closing ? 1 : 0,
+          duration: const Duration(milliseconds: 210),
+          reverseDuration: const Duration(milliseconds: 160),
+        );
+        addTearDown(drawer.dispose);
+        final rootKey = GlobalKey();
+        await tester.pumpWidget(
+          RepaintBoundary(
+            key: rootKey,
+            child: MaterialApp(
+              home: HomeDrawerSnapshot(
+                animation: drawer,
+                child: Scaffold(
+                  body: _carousel(_Images(), _Service(), _items(2)),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final pages = tester
+            .widget<PageView>(find.byType(PageView))
+            .controller!;
+        SnapshotController snapshot() => tester
+            .widget<SnapshotWidget>(find.byType(SnapshotWidget))
+            .controller;
+        void moveCarousel() {
+          unawaited(
+            pages.animateToPage(
+              pages.page!.round() + 1,
+              duration: const Duration(milliseconds: 1000),
+              curve: const DiscoverCarouselAutoPlayCurve(),
+            ),
+          );
+        }
+
+        if (!startDuringDrawer) {
+          moveCarousel();
+          await tester.pump();
+          await tester.pump(const Duration(milliseconds: 16));
+        }
+        if (closing) {
+          drawer.reverse();
+        } else {
+          drawer.forward();
+        }
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 16));
+        if (startDuringDrawer) {
+          expect(snapshot().allowSnapshotting, isTrue);
+          moveCarousel();
+          await tester.pump();
+        }
+        expect(snapshot().allowSnapshotting, isFalse);
+
+        Future<Uint8List> raster() async {
+          final boundary =
+              rootKey.currentContext!.findRenderObject()!
+                  as RenderRepaintBoundary;
+          return (await tester.runAsync(() async {
+            final image = await boundary.toImage(pixelRatio: 1);
+            try {
+              return (await image.toByteData(
+                format: ui.ImageByteFormat.rawRgba,
+              ))!.buffer.asUint8List();
+            } finally {
+              image.dispose();
+            }
+          }))!;
+        }
+
+        final first = await raster();
+        await tester.pump(const Duration(milliseconds: 48));
+        final second = await raster();
+        expect(
+          listEquals(first, second),
+          isFalse,
+          reason:
+              'the visible carousel must keep repainting, not just its controller',
+        );
+        expect(snapshot().allowSnapshotting, isFalse);
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      });
+    }
+  }
+
   testWidgets(
     'website cards show placeholders while loading, then reveal images',
     (tester) async {
