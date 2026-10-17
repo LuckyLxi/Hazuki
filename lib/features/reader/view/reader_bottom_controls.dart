@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'package:hazuki/features/reader/view/reader_control_surface.dart';
+import 'package:hazuki/features/reader/view/reader_control_motion.dart';
 import 'package:hazuki/features/reader/view/reader_overlay_layout.dart';
 
 class ReaderBottomControls extends StatelessWidget {
@@ -104,7 +105,10 @@ class ReaderBottomControls extends StatelessWidget {
                         builder: (context, offsetY, child) =>
                             Transform.translate(
                               offset: Offset(0, offsetY),
-                              child: child,
+                              child: ReaderControlMotion(
+                                position: Offset(0, offsetY),
+                                child: child!,
+                              ),
                             ),
                         child: IgnorePointer(
                           ignoring: !controlsVisible,
@@ -432,13 +436,16 @@ class _ReaderFloatingResetZoomButtonState
                   opacity: 1 - _blendController.value,
                   child: Transform.translate(
                     offset: _targetDelta * movementProgress,
-                    child: KeyedSubtree(
-                      key: _floatingButtonKey,
+                    child: ReaderControlMotion(
+                      position: _targetDelta * movementProgress,
                       child: KeyedSubtree(
-                        key: const ValueKey<String>(
-                          'reader_floating_reset_zoom_button',
+                        key: _floatingButtonKey,
+                        child: KeyedSubtree(
+                          key: const ValueKey<String>(
+                            'reader_floating_reset_zoom_button',
+                          ),
+                          child: child!,
                         ),
-                        child: child!,
                       ),
                     ),
                   ),

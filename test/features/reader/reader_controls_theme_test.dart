@@ -93,7 +93,7 @@ void main() {
           for (final surface in glassSurfaces) {
             expect(
               surface.settings!.glassColor,
-              theme.colorScheme.surfaceContainer.withValues(alpha: 0.4),
+              theme.colorScheme.surfaceContainer.withValues(alpha: 0.16),
             );
           }
         } else {

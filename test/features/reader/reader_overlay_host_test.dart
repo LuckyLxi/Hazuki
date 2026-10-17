@@ -10,7 +10,7 @@ import 'package:hazuki/shared/liquid_glass_support.dart';
 void main() {
   for (final glassEnabled in [false, true]) {
     testWidgets(
-      'reader content and controls accept taps, glass=$glassEnabled',
+      'reader transitions isolate repaints and preserve taps, glass=$glassEnabled',
       (tester) async {
         await tester.runAsync(
           () => HazukiLiquidGlass.initialize(enabled: glassEnabled),
@@ -22,6 +22,18 @@ void main() {
         var pageTaps = 0;
         var backTaps = 0;
         var settingsTaps = 0;
+        var contentPaints = 0;
+        final contentColor = ValueNotifier<Color>(Colors.blue);
+        addTearDown(contentColor.dispose);
+        final content = CustomPaint(
+          painter: _ReaderContentPainter(() => contentPaints++, contentColor),
+          child: GestureDetector(
+            key: const ValueKey('comic-page'),
+            behavior: HitTestBehavior.opaque,
+            onTap: () => pageTaps++,
+            child: const SizedBox.expand(),
+          ),
+        );
         late StateSetter updateHost;
 
         await tester.pumpWidget(
@@ -45,12 +57,7 @@ void main() {
                       onBackPressed: () => backTaps++,
                       onOpenSettingsDrawer: () => settingsTaps++,
                       onResetZoom: () {},
-                      child: GestureDetector(
-                        key: const ValueKey('comic-page'),
-                        behavior: HitTestBehavior.opaque,
-                        onTap: () => pageTaps++,
-                        child: const SizedBox.expand(),
-                      ),
+                      child: content,
                     );
                   },
                 ),
@@ -73,12 +80,47 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('comic-page')));
         expect(pageTaps, 1);
         updateHost(() => runtimeState.setControlsVisible(false));
+        await tester.pump();
+        final paintsAtTransitionStart = contentPaints;
+        for (var frame = 0; frame < 10; frame++) {
+          await tester.pump(const Duration(milliseconds: 40));
+        }
+        expect(contentPaints, paintsAtTransitionStart);
         await tester.pumpAndSettle();
         await tester.tapAt(const Offset(40, 40));
         expect(pageTaps, 2);
         expect(backTaps, 1);
+        // Page updates must still paint while the controls are hidden.
+        final paintsBeforePageUpdate = contentPaints;
+        contentColor.value = Colors.red;
+        await tester.pump();
+        expect(contentPaints, greaterThan(paintsBeforePageUpdate));
+        updateHost(() => runtimeState.setControlsVisible(true));
+        await tester.pump();
+        final paintsAtShowStart = contentPaints;
+        for (var frame = 0; frame < 10; frame++) {
+          await tester.pump(const Duration(milliseconds: 40));
+        }
+        expect(contentPaints, paintsAtShowStart);
+        await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
       },
     );
   }
+}
+
+class _ReaderContentPainter extends CustomPainter {
+  _ReaderContentPainter(this.onPaint, this.color) : super(repaint: color);
+
+  final VoidCallback onPaint;
+  final ValueNotifier<Color> color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    onPaint();
+    canvas.drawRect(Offset.zero & size, Paint()..color = color.value);
+  }
+
+  @override
+  bool shouldRepaint(_ReaderContentPainter oldDelegate) => false;
 }

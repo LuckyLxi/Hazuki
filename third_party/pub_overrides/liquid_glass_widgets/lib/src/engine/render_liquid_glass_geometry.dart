@@ -216,10 +216,9 @@ abstract class RenderLiquidGlassGeometry extends RenderProxyBox {
     if (geometryState == LiquidGlassGeometryState.mightNeedUpdate &&
         !anyShapeChangedInLayer &&
         geometry != null) {
-      renderLink?.notifyGeometryChanged(this);
-
-      // Only render once we are done building
-      geometry = geometry!.render();
+      // Moving the whole surface changes screen-space shader uniforms, not
+      // its local SDF. Keep both caches: notifying the layer here dirties its
+      // combined matte and calls toImageSync on every translation frame.
       geometryState = LiquidGlassGeometryState.updated;
       return geometry;
     }
