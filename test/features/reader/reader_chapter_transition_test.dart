@@ -17,6 +17,7 @@ import 'package:hazuki/shared/reading/reader_settings_store.dart';
 import 'package:hazuki/shared/ui_flags.dart';
 import 'package:hazuki/shared/window/window_title_bar_control.dart';
 import 'package:hazuki/widgets/expanding_chapter_sheet.dart';
+import 'package:hazuki/widgets/hazuki_frosted_menu_button.dart';
 
 import '../../support/source_presentation_fixtures.dart';
 import '../../support/test_service_locator.dart';
@@ -80,7 +81,7 @@ void main() {
           await tester.pumpAndSettle();
           _host(tester).onOpenSettingsDrawer();
           await tester.pumpAndSettle();
-          final dropdown = find.byType(DropdownButtonFormField<String>);
+          final dropdown = find.byType(HazukiFrostedDropdown<String>);
           await tester.scrollUntilVisible(
             dropdown,
             300,
@@ -91,6 +92,10 @@ void main() {
           );
           await tester.tap(dropdown);
           await tester.pumpAndSettle();
+          expect(
+            find.byKey(const ValueKey('hazuki-frosted-menu-surface')),
+            findsOneWidget,
+          );
           expect(find.text('High quality').hitTestable(), findsOneWidget);
           if (selectQuality) {
             await tester.tap(find.text('High quality').hitTestable());
@@ -100,6 +105,28 @@ void main() {
             await tester.tapAt(const Offset(10, 10));
           }
           await tester.pumpAndSettle();
+          expect(
+            find.byKey(const ValueKey('hazuki-frosted-menu-surface')),
+            findsNothing,
+          );
+          if (selectQuality) {
+            verify(
+              () => settings.updateSourceSetting('picacg', 'quality', 'high'),
+            ).called(1);
+          } else {
+            verifyNever(
+              () => settings.updateSourceSetting('picacg', 'quality', 'high'),
+            );
+          }
+          expect(
+            find.descendant(
+              of: dropdown,
+              matching: find.text(
+                selectQuality ? 'High quality' : 'Low quality',
+              ),
+            ),
+            findsOneWidget,
+          );
           final scaffold = tester.state<ScaffoldState>(
             find
                 .ancestor(
@@ -120,6 +147,7 @@ void main() {
                 matching: find.byType(Scrollable),
               ),
             );
+            await tester.pumpAndSettle();
             await tester.tap(find.byTooltip('Close'));
           }
           await tester.pumpAndSettle();

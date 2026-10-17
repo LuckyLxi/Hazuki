@@ -636,6 +636,77 @@ void main() {
     });
   }
 
+  testWidgets('reading quality uses the frosted menu and saves the selection', (
+    tester,
+  ) async {
+    final settings = _MockSettings();
+    when(() => settings.activeSourceKey).thenReturn('fixture');
+    when(() => settings.presentationForSource('fixture')).thenReturn({
+      'imageQualitySetting': 'quality',
+      'imageQualityTitle': 'Image quality',
+      'imageQualityOptions': {
+        'standard': 'Standard quality',
+        'original': 'Original quality',
+      },
+      'imageQualityDefault': 'standard',
+      'buttons': [
+        {'id': 'imageQuality', 'location': 'reading'},
+      ],
+    });
+    when(
+      () => settings.updateSourceSetting('fixture', 'quality', 'original'),
+    ).thenAnswer((_) async {});
+    await tester.pumpWidget(_app(ReadingSettingsPage(sourceService: settings)));
+    await tester.pumpAndSettle();
+    final dropdown = find.byType(HazukiFrostedDropdown<String>);
+    await tester.scrollUntilVisible(dropdown, 300);
+    expect(find.text('Image quality'), findsOneWidget);
+    expect(
+      find.descendant(of: dropdown, matching: find.text('Standard quality')),
+      findsOneWidget,
+    );
+    await tester.tap(dropdown);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('hazuki-frosted-menu-surface')),
+      findsOneWidget,
+    );
+    await tester.tap(find.text('Original quality'));
+    await tester.pumpAndSettle();
+    verify(
+      () => settings.updateSourceSetting('fixture', 'quality', 'original'),
+    ).called(1);
+    expect(
+      find.descendant(of: dropdown, matching: find.text('Original quality')),
+      findsOneWidget,
+    );
+    await tester.tap(dropdown);
+    await tester.pumpAndSettle();
+    expect(
+      tester
+          .widget<Semantics>(
+            find
+                .ancestor(
+                  of: find.byKey(
+                    const ValueKey(('hazuki-frosted-menu', 'original')),
+                  ),
+                  matching: find.byType(Semantics),
+                )
+                .first,
+          )
+          .properties
+          .selected,
+      isTrue,
+    );
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    verifyNever(
+      () => settings.updateSourceSetting('fixture', 'quality', any()),
+    );
+    expect(find.byType(ReadingSettingsPage), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'plugin select settings show labels and persist values with the frosted menu',
     (tester) async {

@@ -5,6 +5,8 @@ import 'package:hazuki/l10n/l10n.dart';
 import 'package:hazuki/shared/reading/reader_filter_color.dart';
 import 'package:hazuki/shared/reading/reader_mode.dart';
 import 'package:hazuki/shared/reading/reader_source_image_quality_settings.dart';
+import 'package:hazuki/widgets/hazuki_frosted_menu.dart';
+import 'package:hazuki/widgets/hazuki_frosted_menu_button.dart';
 
 enum ReaderSettingsSurface { page, drawer }
 
@@ -560,23 +562,25 @@ class ReaderSettingsContent extends StatelessWidget {
       builder: (context) {
         return Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-          child: DropdownButtonFormField<String>(
-            initialValue: sourceImageQuality.value,
+          child: InputDecorator(
             decoration: InputDecoration(
               border: const OutlineInputBorder(),
               labelText: sourceImageQuality.title,
-
               isDense: true,
             ),
-            items: sourceImageQuality.options.entries
-                .map(
-                  (entry) => DropdownMenuItem<String>(
-                    value: entry.key,
-                    child: Text(entry.value),
-                  ),
-                )
-                .toList(),
-            onChanged: onSourceImageQualityChanged,
+            child: HazukiFrostedDropdown<String>(
+              selected: sourceImageQuality.value,
+              tooltip: sourceImageQuality.title,
+              options: sourceImageQuality.options.entries
+                  .map(
+                    (entry) => HazukiFrostedMenuOption<String>(
+                      value: entry.key,
+                      label: entry.value,
+                    ),
+                  )
+                  .toList(),
+              onSelected: onSourceImageQualityChanged,
+            ),
           ),
         );
       },
